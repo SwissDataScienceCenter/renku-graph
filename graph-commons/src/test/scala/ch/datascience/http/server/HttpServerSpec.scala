@@ -31,7 +31,7 @@ import org.http4s.headers.`Content-Type`
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 
-import scala.concurrent.ExecutionContext.global
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class HttpServerSpec extends WordSpec with Http4sDsl[IO] {
 
@@ -58,7 +58,7 @@ class HttpServerSpec extends WordSpec with Http4sDsl[IO] {
   private def execute(request: Request[IO]): Response[IO] =
     BlazeClientBuilder[IO](global).resource
       .use { httpClient =>
-        httpClient.fetch[Response[IO]](request) { response =>
+        httpClient.run(request).use { response =>
           IO.pure(response)
         }
       }

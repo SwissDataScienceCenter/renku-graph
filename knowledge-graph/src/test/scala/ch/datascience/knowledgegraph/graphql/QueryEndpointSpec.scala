@@ -30,6 +30,7 @@ import io.circe.syntax._
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.matchers.MatcherBase
 import org.scalamock.scalatest.MockFactory

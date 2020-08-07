@@ -26,6 +26,7 @@ import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessingEndpoint
 import org.http4s.Method.POST
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

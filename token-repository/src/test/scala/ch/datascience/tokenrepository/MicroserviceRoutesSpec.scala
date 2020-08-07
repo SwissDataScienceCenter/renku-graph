@@ -31,6 +31,7 @@ import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec

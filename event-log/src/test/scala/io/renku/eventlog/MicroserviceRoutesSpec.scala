@@ -41,6 +41,7 @@ import org.http4s.MediaType.application
 import org.http4s.Method.{GET, PATCH, POST}
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory

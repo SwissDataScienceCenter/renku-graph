@@ -29,6 +29,7 @@ import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
+import doobie.implicits.javatime._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog._

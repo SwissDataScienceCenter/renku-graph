@@ -30,6 +30,7 @@ import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Json
 import io.circe.literal._
 import org.http4s._
+import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._

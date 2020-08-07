@@ -40,6 +40,7 @@ import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.{QueryContext, QueryEndpoint, QueryRunner}
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._

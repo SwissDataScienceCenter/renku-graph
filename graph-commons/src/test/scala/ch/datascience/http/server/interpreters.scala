@@ -21,8 +21,10 @@ package ch.datascience.http.server
 import cats.effect.{ContextShift, IO, Timer}
 import org.http4s.HttpRoutes
 
+import scala.concurrent.ExecutionContext
+
 class IOHttpServer(
     serverPort:    Int,
     serviceRoutes: HttpRoutes[IO]
-)(implicit timer:  Timer[IO], contextShift: ContextShift[IO])
+)(implicit timer:  Timer[IO], contextShift: ContextShift[IO], executionContext: ExecutionContext)
     extends HttpServer[IO](serverPort, serviceRoutes)
