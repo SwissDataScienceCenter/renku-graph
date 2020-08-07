@@ -19,7 +19,7 @@
 package io.renku.eventlog
 
 import cats.data.ValidatedNel
-import cats.effect.{Clock, ConcurrentEffect}
+import cats.effect.{Bracket, Clock, ConcurrentEffect, ContextShift}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
@@ -47,7 +47,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     statusChangeEndpoint:     StatusChangeEndpoint[F],
     subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     routesMetrics:            RoutesMetrics[F]
-)(implicit clock:             Clock[F])
+)(implicit clock:             Clock[F], contextShift: ContextShift[F], bracket: Bracket[F, Throwable])
     extends Http4sDsl[F] {
 
   import LatestPerProjectParameter._
@@ -71,6 +71,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case           GET   -> Root / "ping"                                              => Ok("pong")
     case request @ POST  -> Root / "subscriptions"                                     => addSubscription(request)
   }.meter flatMap `add GET Root / metrics`
+
   // format: on
 
   private object LatestPerProjectParameter {

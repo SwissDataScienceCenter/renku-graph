@@ -115,7 +115,8 @@ abstract class IORestClient[ThrottlingTarget](
                                      mapResponse: ResponseMapping[ResultType],
                                      attempt:     Int): IO[ResultType] =
     httpClient
-      .fetch[ResultType](request.request)(processResponse(request.request, mapResponse))
+      .run(request.request)
+      .use(response => processResponse(request.request, mapResponse)(response))
       .recoverWith(connectionError(httpClient, request, mapResponse, attempt))
 
   private def processResponse[ResultType](request:     Request[IO],

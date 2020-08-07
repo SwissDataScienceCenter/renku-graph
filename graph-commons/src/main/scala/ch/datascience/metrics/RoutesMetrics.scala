@@ -18,7 +18,7 @@
 
 package ch.datascience.metrics
 
-import cats.effect.{Clock, ConcurrentEffect}
+import cats.effect.{Bracket, Clock, ConcurrentEffect}
 import cats.implicits._
 import org.http4s.HttpRoutes
 import org.http4s.metrics.prometheus.{Prometheus, PrometheusExportService}
@@ -31,13 +31,16 @@ class RoutesMetrics[Interpretation[_]](metricsRegistry: MetricsRegistry[Interpre
   implicit class RoutesOps(routes: HttpRoutes[Interpretation]) {
 
     def meter(implicit F: ConcurrentEffect[Interpretation],
-              clock:      Clock[Interpretation]): Interpretation[HttpRoutes[Interpretation]] =
+              clock:      Clock[Interpretation],
+              bracket:    Bracket[Interpretation, Throwable]): Interpretation[HttpRoutes[Interpretation]] =
       metricsRegistry.maybeCollectorRegistry match {
         case Some(collectorRegistry) =>
-          for {
-            metrics <- Prometheus[Interpretation](collectorRegistry, "server")
+          val prometheusService = PrometheusExportService(collectorRegistry)
+          val router = for {
+            metrics <- Prometheus.metricsOps[Interpretation](prometheusService.collectorRegistry, "server")
             meteredRoutes = ServerMetrics[Interpretation](metrics)(routes)
           } yield meteredRoutes
+          router.use(r => F.pure(r))
         case _ => F.pure(routes)
       }
   }
