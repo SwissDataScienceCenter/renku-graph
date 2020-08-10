@@ -24,11 +24,11 @@ import io.renku.jsonld._
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
 import io.renku.jsonld.generators.JsonLDGenerators._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
+class syntaxSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "asJsonLD" should {
 

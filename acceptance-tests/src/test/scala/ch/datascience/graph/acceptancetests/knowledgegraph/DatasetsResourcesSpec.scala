@@ -50,16 +50,22 @@ import io.circe.literal._
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
-import org.scalatest.Matchers._
-import org.scalatest.{FeatureSpec, GivenWhenThen}
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers._
 
 import scala.util.Random
 
-class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
+class DatasetsResourcesSpec
+    extends AnyFeatureSpec
+    with GivenWhenThen
+    with GraphServices
+    with AcceptanceTestPatience
+    with should.Matchers {
 
   import DatasetsResources._
 
-  feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
+  Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
     implicit val accessToken: AccessToken = accessTokens.generateOne
 
@@ -88,7 +94,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       projects         = List(DatasetProject(project.path, project.name, dataset2Creation))
     )
 
-    scenario("As a user I would like to find project's data-sets by calling a REST endpoint") {
+    Scenario("As a user I would like to find project's data-sets by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
       val jsonLDTriples = JsonLD.arr(
@@ -184,9 +190,9 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
     }
   }
 
-  feature("GET knowledge-graph/datasets?query=<text> to find datasets with a free-text search") {
+  Feature("GET knowledge-graph/datasets?query=<text> to find datasets with a free-text search") {
 
-    scenario("As a user I would like to be able to search for datasets by some free-text search") {
+    Scenario("As a user I would like to be able to search for datasets by some free-text search") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
 

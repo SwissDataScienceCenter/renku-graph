@@ -23,11 +23,11 @@ import io.circe.DecodingFailure
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.JsonLDGenerators._
 import io.renku.jsonld.syntax._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.matchers._
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CursorSpec extends WordSpec with ScalaCheckPropertyChecks {
+class CursorSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "as" should {
 

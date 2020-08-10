@@ -28,14 +28,14 @@ import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects.Visibility.{Private, Public}
 import ch.datascience.http.client.AccessToken
 import org.http4s.Status._
-import org.scalatest.Matchers._
-import org.scalatest.{FeatureSpec, GivenWhenThen}
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
 
-class WebhookValidationEndpointSpec extends FeatureSpec with GivenWhenThen with GraphServices {
+class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with should.Matchers {
 
-  feature("Existence of a Graph Services hook can be validated") {
+  Feature("Existence of a Graph Services hook can be validated") {
 
-    scenario("There's a Graph Services hook on a Public project in GitLab") {
+    Scenario("There's a Graph Services hook on a Public project in GitLab") {
 
       val projectId = projectIds.generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne

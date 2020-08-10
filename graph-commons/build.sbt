@@ -36,7 +36,7 @@ libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
 
 libraryDependencies += "io.sentry" % "sentry-logback" % "1.7.30"
 
-val doobieVersion = "0.8.8"
+val doobieVersion = "0.9.0"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
@@ -59,9 +59,10 @@ libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % 
 libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % Test
 
-libraryDependencies += "org.scalamock"  %% "scalamock"  % "4.4.0"  % Test
-libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
-libraryDependencies += "org.scalatest"  %% "scalatest"  % "3.0.8"  % Test
+libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.0.0"   % Test
+libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test
+libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.0.0" % Test
+libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.1"   % Test
 
 libraryDependencies += "org.tpolecat" %% "doobie-h2"        % doobieVersion % Test
 libraryDependencies += "org.tpolecat" %% "doobie-scalatest" % doobieVersion % Test

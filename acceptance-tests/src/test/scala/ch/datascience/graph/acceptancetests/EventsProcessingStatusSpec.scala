@@ -18,7 +18,6 @@
 
 package ch.datascience.graph.acceptancetests
 
-import io.renku.eventlog.EventStatus.New
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -40,25 +39,28 @@ import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.renku.eventlog.EventStatus.New
 import org.http4s.Status._
-import org.scalatest.Matchers._
+import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{FeatureSpec, GivenWhenThen}
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers._
 
 import scala.language.postfixOps
 
 class EventsProcessingStatusSpec
-    extends FeatureSpec
+    extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
     with Eventually
-    with AcceptanceTestPatience {
+    with AcceptanceTestPatience
+    with should.Matchers {
 
   private val numberOfEvents: Int Refined Positive = 5
 
-  feature("Status of events processing for a given project") {
+  Feature("Status of events processing for a given project") {
 
-    scenario("As a user I would like to see progress of events processing for my project") {
+    Scenario("As a user I would like to see progress of events processing for my project") {
 
       val project   = projects.generateOne
       val projectId = project.id

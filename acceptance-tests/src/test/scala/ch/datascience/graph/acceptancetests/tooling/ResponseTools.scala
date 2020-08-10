@@ -22,7 +22,7 @@ import cats.effect.IO
 import io.circe.Json
 import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Response}
-import org.scalatest.Matchers._
+import org.scalatest.Assertions.fail
 
 object ResponseTools {
 
