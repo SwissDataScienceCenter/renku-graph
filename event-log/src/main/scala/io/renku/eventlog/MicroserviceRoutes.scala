@@ -19,7 +19,7 @@
 package io.renku.eventlog
 
 import cats.data.ValidatedNel
-import cats.effect.{Bracket, Clock, ConcurrentEffect, ContextShift}
+import cats.effect.{Clock, ConcurrentEffect, ContextShift, Resource}
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
@@ -47,7 +47,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     statusChangeEndpoint:     StatusChangeEndpoint[F],
     subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     routesMetrics:            RoutesMetrics[F]
-)(implicit clock:             Clock[F], contextShift: ContextShift[F], bracket: Bracket[F, Throwable])
+)(implicit clock:             Clock[F], contextShift: ContextShift[F])
     extends Http4sDsl[F] {
 
   import LatestPerProjectParameter._
@@ -62,7 +62,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import subscriptionsEndpoint._
 
   // format: off
-  lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
+  lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case request @ POST  -> Root / "events"                                            => addEvent(request)
     case request @ PATCH -> Root / "events"                                            => triggerEventsPatching(request)
     case           GET   -> Root / "events" :? `latest-per-project`(maybeValue)        => maybeFindLatestEvents(maybeValue)
@@ -70,10 +70,10 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => maybeFindProcessingStatus(maybeProjectId)
     case           GET   -> Root / "ping"                                              => Ok("pong")
     case request @ POST  -> Root / "subscriptions"                                     => addSubscription(request)
-  }.meter flatMap `add GET Root / metrics`
+  }.withMetrics
+  
 
   // format: on
-
   private object LatestPerProjectParameter {
 
     private implicit val queryParameterDecoder: QueryParamDecoder[Boolean] =

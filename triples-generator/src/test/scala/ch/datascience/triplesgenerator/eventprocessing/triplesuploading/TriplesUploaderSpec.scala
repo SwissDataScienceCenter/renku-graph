@@ -91,11 +91,13 @@ class TriplesUploaderSpec extends WordSpec with MockFactory with ExternalService
       override val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
         fusekiBaseUrl = fusekiBaseUrl
       )
+      val exceptionMessage =
+        s"Error connecting to $fusekiBaseUrl using address ${fusekiBaseUrl.toString.replaceFirst("http[s]?://", "")} (unresolved: false)"
 
       triplesUploader
         .upload(triples)
         .unsafeRunSync() shouldBe DeliveryFailure(
-        s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/data error: Connection refused"
+        s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/data error: $exceptionMessage"
       )
     }
   }

@@ -50,29 +50,29 @@ object Microservice extends IOMicroservice {
   protected implicit override def timer: Timer[IO] =
     IO.timer(executionContext)
 
-  override def run(args: List[String]): IO[ExitCode] =
+  override def run(args: List[String]): IO[ExitCode] = {
     for {
-      sentryInitializer     <- SentryInitializer[IO]
-      projectHookUrl        <- ProjectHookUrl.fromConfig[IO]()
-      gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-      gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
-      hookTokenCrypto       <- HookTokenCrypto[IO]()
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-      metricsRegistry       <- MetricsRegistry()
+      sentryInitializer     <- SentryInitializer[IO].asResource
+      projectHookUrl        <- ProjectHookUrl.fromConfig[IO]().asResource
+      gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit").asResource
+      gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit).asResource
+      hookTokenCrypto       <- HookTokenCrypto[IO]().asResource
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger).asResource
+      metricsRegistry       <- MetricsRegistry().asResource
       hookEventEndpoint <- IOHookEventEndpoint(gitLabThrottler,
                                                hookTokenCrypto,
                                                executionTimeRecorder,
-                                               ApplicationLogger)
+                                               ApplicationLogger).asResource
       hookCreatorEndpoint <- IOHookCreationEndpoint(projectHookUrl,
                                                     gitLabThrottler,
                                                     hookTokenCrypto,
                                                     executionTimeRecorder,
-                                                    ApplicationLogger)
+                                                    ApplicationLogger).asResource
       processingStatusEndpoint <- IOProcessingStatusEndpoint(projectHookUrl,
                                                              gitLabThrottler,
                                                              executionTimeRecorder,
-                                                             ApplicationLogger)
-      hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler)
+                                                             ApplicationLogger).asResource
+      hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler).asResource
       routes <- new MicroserviceRoutes[IO](
                  hookEventEndpoint,
                  hookCreatorEndpoint,
@@ -84,13 +84,14 @@ object Microservice extends IOMicroservice {
 
       eventsSynchronizationScheduler <- IOEventsSynchronizationScheduler(gitLabThrottler,
                                                                          executionTimeRecorder,
-                                                                         ApplicationLogger)
-      exitCode <- new MicroserviceRunner(
-                   sentryInitializer,
-                   eventsSynchronizationScheduler,
-                   httpServer
-                 ) run args
+                                                                         ApplicationLogger).asResource
+      exitCode = new MicroserviceRunner(
+        sentryInitializer,
+        eventsSynchronizationScheduler,
+        httpServer
+      ) run args
     } yield exitCode
+  }.use(identity)
 }
 
 class MicroserviceRunner(sentryInitializer:              SentryInitializer[IO],

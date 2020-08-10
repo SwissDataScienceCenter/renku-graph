@@ -18,10 +18,12 @@
 
 package ch.datascience.metrics
 
-import cats.effect.{Bracket, Clock, ConcurrentEffect}
+import cats.Applicative
+import cats.effect.{Bracket, Clock, ConcurrentEffect, Resource, Sync}
 import cats.implicits._
 import org.http4s.HttpRoutes
 import org.http4s.metrics.prometheus.{Prometheus, PrometheusExportService}
+import org.http4s.server.Router
 import org.http4s.server.middleware.{Metrics => ServerMetrics}
 
 import scala.language.higherKinds
@@ -30,29 +32,19 @@ class RoutesMetrics[Interpretation[_]](metricsRegistry: MetricsRegistry[Interpre
 
   implicit class RoutesOps(routes: HttpRoutes[Interpretation]) {
 
-    def meter(implicit F: ConcurrentEffect[Interpretation],
-              clock:      Clock[Interpretation],
-              bracket:    Bracket[Interpretation, Throwable]): Interpretation[HttpRoutes[Interpretation]] =
+    def withMetrics(implicit F: Sync[Interpretation],
+                    clock:      Clock[Interpretation]): Resource[Interpretation, HttpRoutes[Interpretation]] =
       metricsRegistry.maybeCollectorRegistry match {
         case Some(collectorRegistry) =>
-          val prometheusService = PrometheusExportService(collectorRegistry)
-          val router = for {
-            metrics <- Prometheus.metricsOps[Interpretation](prometheusService.collectorRegistry, "server")
-            meteredRoutes = ServerMetrics[Interpretation](metrics)(routes)
-          } yield meteredRoutes
-          router.use(r => F.pure(r))
-        case _ => F.pure(routes)
+          for {
+            metrics <- Prometheus.metricsOps[Interpretation](collectorRegistry, "server")
+          } yield {
+            val meteredRoutes = PrometheusExportService(collectorRegistry).routes <+> ServerMetrics[Interpretation](
+              metrics
+            )(routes)
+            meteredRoutes
+          }
+        case _ => Resource.liftF(F.pure(routes))
       }
   }
-
-  def `add GET Root / metrics`(
-      routes:   HttpRoutes[Interpretation]
-  )(implicit F: ConcurrentEffect[Interpretation]): Interpretation[HttpRoutes[Interpretation]] =
-    metricsRegistry.maybeCollectorRegistry match {
-      case Some(collectorRegistry) =>
-        for {
-          prometheusService <- PrometheusExportService(collectorRegistry).pure[Interpretation]
-        } yield prometheusService.routes <+> routes
-      case _ => F.pure(routes)
-    }
 }

@@ -18,8 +18,10 @@
 
 package ch.datascience.http.server
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ContextShift, ExitCode, IO, Resource, Timer}
 import org.http4s.HttpRoutes
+import org.http4s.implicits._
+import org.http4s.server.blaze.BlazeServerBuilder
 
 import scala.concurrent.ExecutionContext
 
@@ -27,4 +29,6 @@ class IOHttpServer(
     serverPort:    Int,
     serviceRoutes: HttpRoutes[IO]
 )(implicit timer:  Timer[IO], contextShift: ContextShift[IO], executionContext: ExecutionContext)
-    extends HttpServer[IO](serverPort, serviceRoutes)
+    extends HttpServer[IO](serverPort, serviceRoutes) {
+  override def run: IO[ExitCode] = ???
+}

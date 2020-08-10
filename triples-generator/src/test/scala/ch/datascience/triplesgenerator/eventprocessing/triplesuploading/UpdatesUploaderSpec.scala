@@ -92,9 +92,11 @@ class UpdatesUploaderSpec extends WordSpec with ExternalServiceStubbing {
       override val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
         fusekiBaseUrl = fusekiBaseUrl
       )
+      val connectionExceptionMessage =
+        s"Error connecting to $fusekiBaseUrl using address ${fusekiBaseUrl.toString.replaceFirst("http[s]?://", "")} (unresolved: false)"
 
       updater.send(List(curationUpdates.generateOne)).unsafeRunSync() shouldBe DeliveryFailure(
-        s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/update error: Connection refused"
+        s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/update error: $connectionExceptionMessage"
       )
     }
   }

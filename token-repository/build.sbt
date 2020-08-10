@@ -20,7 +20,7 @@ name := "token-repository"
 
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
 
-val doobieVersion = "0.7.0"
+val doobieVersion = "0.8.8"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 

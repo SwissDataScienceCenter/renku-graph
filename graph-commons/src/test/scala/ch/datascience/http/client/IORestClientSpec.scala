@@ -37,6 +37,7 @@ import eu.timepit.refined.collection.NonEmpty
 import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Histogram
 import org.http4s.Method.GET
+import org.http4s.client.ConnectionFailure
 import org.http4s.{Request, Response, Status}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -203,16 +204,19 @@ class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFa
     "fail after retrying if there is a persistent connectivity problem" in {
       val logger = TestLogger[IO]()
 
+      val exceptionMessage =
+        "Error connecting to http://localhost:1024 using address localhost:1024 (unresolved: false)"
+
       val exception = intercept[ConnectivityException] {
         new TestRestClient(ServiceUrl("http://localhost:1024"), Throttler.noThrottling, logger, None).callRemote
           .unsafeRunSync()
       }
-      exception.getMessage shouldBe s"GET http://localhost:1024/resource error: Connection refused"
-      exception.getCause   shouldBe a[ConnectException]
+      exception.getMessage shouldBe s"GET http://localhost:1024/resource error: $exceptionMessage"
+      exception.getCause   shouldBe a[ConnectionFailure]
 
       logger.loggedOnly(
-        Warn("GET http://localhost:1024/resource timed out -> retrying attempt 1 error: Connection refused"),
-        Warn("GET http://localhost:1024/resource timed out -> retrying attempt 2 error: Connection refused")
+        Warn(s"GET http://localhost:1024/resource timed out -> retrying attempt 1 error: $exceptionMessage"),
+        Warn(s"GET http://localhost:1024/resource timed out -> retrying attempt 2 error: $exceptionMessage")
       )
     }
   }

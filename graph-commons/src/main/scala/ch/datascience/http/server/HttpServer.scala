@@ -48,7 +48,7 @@ class HttpServer[F[_]: ConcurrentEffect](
       Kleisli { a =>
         routes
           .run(a)
-          .getOrElse(Response(Status.NotFound) withEntity InfoMessage("Resource not found"))
+          .getOrElse(Response(Status.NotFound).withEntity(InfoMessage("Resource not found")))
       }
   }
 }

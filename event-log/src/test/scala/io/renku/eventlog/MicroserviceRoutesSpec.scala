@@ -18,7 +18,9 @@
 
 package io.renku.eventlog
 
-import cats.effect.{Clock, IO}
+import cats.{Id, MonadError}
+import cats.data.Kleisli
+import cats.effect.{Bracket, Clock, IO}
 import cats.implicits._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
@@ -29,8 +31,9 @@ import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestRoutesMetrics
-import ch.datascience.metrics.LabeledGauge
+import ch.datascience.metrics.{LabeledGauge, MetricsRegistry, RoutesMetrics}
 import io.chrisdavenport.log4cats.Logger
+import io.prometheus.client.hotspot.StandardExports
 import io.renku.eventlog.creation.{EventCreationEndpoint, EventPersister}
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
@@ -46,7 +49,7 @@ import org.http4s.headers.`Content-Type`
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.{Assertion, WordSpec}
 
 import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
@@ -56,9 +59,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
   "routes" should {
 
     "define a GET /events?latest-per-project=true" in new TestCase {
-
       val request = Request[IO](GET, uri"events" withQueryParam ("latest-per-project", "true"))
-
       (latestEventsEndpoint.findLatestEvents _).expects().returning(Response[IO](Ok).pure[IO])
 
       val response = routes.call(request)
@@ -68,7 +69,6 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
     "define a GET /events?latest-per-project=true " +
       s"returning $NotFound if no latest-per-project parameter given" in new TestCase {
-
       val response = routes call Request[IO](GET, uri"events")
 
       response.status            shouldBe NotFound
@@ -78,7 +78,6 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
     "define a GET /events?latest-per-project=true " +
       s"returning $BadRequest if latest-per-project parameter has invalid value" in new TestCase {
-
       val response = routes call Request[IO](GET, uri"events" withQueryParam ("latest-per-project", "xxx"))
 
       response.status             shouldBe BadRequest
@@ -87,7 +86,6 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
     }
 
     "define a PATCH /events endpoint" in new TestCase {
-
       val request = Request[IO](PATCH, uri"events")
 
       (eventsPatchingEndpoint.triggerEventsPatching _).expects(request).returning(Response[IO](Accepted).pure[IO])
@@ -175,7 +173,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
       response.body[ErrorMessage] shouldBe ErrorMessage("'project-id' parameter with invalid value")
     }
 
-    "define a POST /subscriptions endpoint" in new TestCase {
+    "define a POST /subscriptions endpoint" in new TestCase with TestCase2 {
       val request = Request[IO](POST, uri"subscriptions")
 
       (subscriptionsEndpoint.addSubscription _).expects(request).returning(Response[IO](Accepted).pure[IO])
@@ -188,8 +186,11 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory {
 
   private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
 
-  private trait TestCase {
+  private trait TestCase2 {
+    self: TestCase =>
+  }
 
+  private trait TestCase {
     val latestEventsEndpoint     = mock[TestLatestEventsEndpoint]
     val eventCreationEndpoint    = mock[TestEventCreationEndpoint]
     val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]

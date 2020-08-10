@@ -32,7 +32,7 @@ import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import pureconfig.{ConfigSource, loadConfigOrThrow}
+import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -48,18 +48,18 @@ object Microservice extends IOMicroservice {
   protected implicit override def timer: Timer[IO] =
     IO.timer(executionContext)
 
-  override def run(args: List[String]): IO[ExitCode] =
+  override def run(args: List[String]): IO[ExitCode] = {
     for {
-      sentryInitializer       <- SentryInitializer[IO]
-      gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-      gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
-      metricsRegistry         <- MetricsRegistry()
-      sparqlTimeRecorder      <- SparqlQueryTimeRecorder(metricsRegistry)
-      projectEndpoint         <- IOProjectEndpoint(gitLabThrottler, sparqlTimeRecorder)
-      projectDatasetsEndpoint <- IOProjectDatasetsEndpoint(sparqlTimeRecorder)
-      queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder, ApplicationLogger)
-      datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder)
-      datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)
+      sentryInitializer       <- SentryInitializer[IO].asResource
+      gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit").asResource
+      gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit).asResource
+      metricsRegistry         <- MetricsRegistry().asResource
+      sparqlTimeRecorder      <- SparqlQueryTimeRecorder(metricsRegistry).asResource
+      projectEndpoint         <- IOProjectEndpoint(gitLabThrottler, sparqlTimeRecorder).asResource
+      projectDatasetsEndpoint <- IOProjectDatasetsEndpoint(sparqlTimeRecorder).asResource
+      queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder, ApplicationLogger).asResource
+      datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder).asResource
+      datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder).asResource
       routes <- new MicroserviceRoutes[IO](
                  queryEndpoint,
                  projectEndpoint,
@@ -70,8 +70,10 @@ object Microservice extends IOMicroservice {
                ).routes
       httpServer = new HttpServer[IO](serverPort = 9004, routes)
 
-      exitCode <- new MicroserviceRunner(sentryInitializer, httpServer).run(args)
+      exitCode = new MicroserviceRunner(sentryInitializer, httpServer).run(args)
     } yield exitCode
+  }.use(identity)
+
 }
 
 private class MicroserviceRunner(

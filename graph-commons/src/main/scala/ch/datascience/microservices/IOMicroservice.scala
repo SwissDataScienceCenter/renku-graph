@@ -20,7 +20,7 @@ package ch.datascience.microservices
 
 import java.util.concurrent.ConcurrentHashMap
 
-import cats.effect.{CancelToken, IO, IOApp}
+import cats.effect.{CancelToken, IO, IOApp, Resource}
 
 import scala.collection.JavaConverters._
 
@@ -29,4 +29,8 @@ trait IOMicroservice extends IOApp {
   protected val subProcessesCancelTokens = new ConcurrentHashMap[CancelToken[IO], Unit]()
 
   def stopSubProcesses: List[CancelToken[IO]] = subProcessesCancelTokens.keys().asScala.toList
+
+  implicit class IOLiftOps[T](monad: IO[T]) {
+    lazy val asResource: Resource[IO, T] = Resource.liftF(monad)
+  }
 }
