@@ -28,6 +28,7 @@ import ch.datascience.tinytypes.constraints.Url
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.GenerationResult.Triples
 import com.typesafe.config.Config
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
@@ -69,12 +70,12 @@ private[eventprocessing] class RemoteTriplesGenerator(
 
   override def generateTriples(
       commitEvent:             CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
     EitherT.right {
       for {
         uri           <- validateUri(s"$serviceUrl/projects/${commitEvent.project.id}/commits/${commitEvent.commitId}")
         triplesInJson <- send(request(GET, uri))(mapResponse)
-        triples       <- IO.fromEither(JsonLDTriples from triplesInJson)
+        triples       <- IO.fromEither(JsonLDTriples from triplesInJson map Triples.apply)
       } yield triples
     }
 

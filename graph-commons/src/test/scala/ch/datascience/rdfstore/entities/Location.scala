@@ -18,11 +18,22 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.tinytypes.RelativePathTinyType
+import ch.datascience.tinytypes.constraints.{RelativePath, RelativePathOps}
+import ch.datascience.tinytypes.{RelativePathTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 
-final class CwlFile private (val value: String) extends AnyVal with RelativePathTinyType
-object CwlFile {
-  def apply(fileName: String Refined NonEmpty): CwlFile = new CwlFile(s".renku/workflow/$fileName")
+sealed trait Location extends Any with RelativePathTinyType
+object Location       extends TinyTypeFactory[Location](new LocationImpl(_)) with RelativePath with RelativePathOps[Location]
+final class LocationImpl(override val value: String) extends AnyVal with Location
+
+sealed trait WorkflowFile extends Any with Location
+
+object WorkflowFile {
+
+  def cwl(fileName:  String Refined NonEmpty): WorkflowFile = new CwlFile(s".renku/workflow/$fileName")
+  def yaml(fileName: String Refined NonEmpty): WorkflowFile = new YamlFile(s".renku/workflow/$fileName")
+
+  final class CwlFile(override val value:  String) extends AnyVal with WorkflowFile
+  final class YamlFile(override val value: String) extends AnyVal with WorkflowFile
 }

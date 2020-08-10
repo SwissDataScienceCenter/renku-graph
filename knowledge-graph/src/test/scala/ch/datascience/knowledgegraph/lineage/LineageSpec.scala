@@ -23,11 +23,14 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
+import ch.datascience.rdfstore.entities.bundles.{prov, schema, wfprov}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import scala.util.Random
 
 class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
@@ -58,7 +61,7 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "fail if there are orphan nodes" in {
       val edgesSet = edgesSets.generateOne
-      val nodesSet = generateNodes(edgesSet) + nodes.generateOne
+      val nodesSet = generateNodes(edgesSet) + entityNodes.generateOne
 
       val Left(exception) = Lineage.from[EitherLineage](edgesSet, nodesSet)
 
@@ -71,10 +74,10 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     s"return '${Node.SingleWordType.ProcessRun}' " +
       "if node contains the 'http://purl.org/wf4ever/wfprov#ProcessRun' type" in {
-      val node = nodes.generateOne.copy(
+      val node = entityNodes.generateOne.copy(
         types = Set(
-          "http://www.w3.org/ns/prov#Activity",
-          "http://purl.org/wf4ever/wfprov#ProcessRun"
+          (prov / "Activity").toString,
+          (wfprov / "ProcessRun").toString
         ).map(Node.Type.apply)
       )
 
@@ -83,10 +86,10 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     s"return '${Node.SingleWordType.File}' " +
       "if node contains the 'http://www.w3.org/ns/prov#Entity' type but not 'http://www.w3.org/ns/prov#Collection'" in {
-      val node = nodes.generateOne.copy(
+      val node = entityNodes.generateOne.copy(
         types = Set(
-          "http://www.w3.org/ns/prov#Entity",
-          "http://purl.org/wf4ever/wfprov#Artifact"
+          (prov / "Entity").toString,
+          (wfprov / "Artifact").toString
         ).map(Node.Type.apply)
       )
 
@@ -95,11 +98,11 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     s"return '${Node.SingleWordType.Directory}' " +
       "if node contains the 'http://www.w3.org/ns/prov#Entity' and 'http://www.w3.org/ns/prov#Collection' types" in {
-      val node = nodes.generateOne.copy(
+      val node = entityNodes.generateOne.copy(
         types = Set(
-          "http://www.w3.org/ns/prov#Entity",
-          "http://purl.org/wf4ever/wfprov#Artifact",
-          "http://www.w3.org/ns/prov#Collection"
+          (prov / "Entity").toString,
+          (wfprov / "Artifact").toString,
+          (prov / "Collection").toString
         ).map(Node.Type.apply)
       )
 
@@ -108,25 +111,43 @@ class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
 
     "return an Exception there's no match to the given types" in {
       val types = Set(
-        "http://purl.org/wf4ever/wfprov#Artifact",
-        "http://schema.org/Dataset"
+        (wfprov / "Artifact").toString,
+        (schema / "Dataset").toString
       )
 
-      val Left(exception) = nodes.generateOne
+      val Left(exception) = entityNodes.generateOne
         .copy(types = types.map(Node.Type.apply))
         .singleWordType
 
       exception.getMessage shouldBe s"${types.mkString(", ")} cannot be converted to a NodeType"
     }
   }
+  "getNode" should {
 
-  private val edgesSets: Gen[Set[Edge]] = for {
+    "return a Node if there is one with the given location" in {
+      forAll { lineage: Lineage =>
+        val node = Random.shuffle(lineage.nodes.toList).head
+
+        lineage.getNode(node.location) shouldBe node.some
+      }
+    }
+
+    "return None if no node are found with the given location" in {
+      forAll { lineage: Lineage =>
+        val location = nodeLocations.generateOne
+
+        lineage.getNode(location) shouldBe None
+      }
+    }
+  }
+
+  private lazy val edgesSets: Gen[Set[Edge]] = for {
     edgesNumber <- positiveInts(max               = 20)
     edgesSet    <- setOf[Edge](edges, minElements = 1, maxElements = edgesNumber)
   } yield edgesSet
 
   private def generateNodes(edges: Set[Edge]): Set[Node] =
     edges.foldLeft(Set.empty[Node]) { (acc, edge) =>
-      acc + nodes.generateOne.copy(location = edge.source) + nodes.generateOne.copy(location = edge.target)
+      acc + entityNodes.generateOne.copy(location = edge.source) + entityNodes.generateOne.copy(location = edge.target)
     }
 }

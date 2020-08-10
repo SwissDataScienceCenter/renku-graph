@@ -21,74 +21,105 @@ package ch.datascience.rdfstore.entities
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.ProcessRun.{ChildProcessRun, StandAloneProcessRun, WorkflowProcessRun}
+import ch.datascience.rdfstore.entities.WorkflowRun.ActivityWorkflowRun
 
-abstract class Activity(val id:              CommitId,
-                        val committedDate:   CommittedDate,
-                        val committer:       Person,
-                        val project:         Project,
-                        val agent:           Agent,
-                        val comment:         String,
-                        val maybeInformedBy: Option[Activity])
+import scala.language.postfixOps
+
+class Activity(val commitId:                 CommitId,
+               val committedDate:            CommittedDate,
+               val committer:                Person,
+               val project:                  Project,
+               val agent:                    Agent,
+               val comment:                  String,
+               val maybeInformedBy:          Option[Activity],
+               val maybeInfluenced:          Option[Activity],
+               val maybeInvalidation:        Option[Entity with Artifact],
+               val maybeGenerationFactories: List[Activity => Generation]) {
+  lazy val generations: List[Generation] = maybeGenerationFactories.map(_.apply(this))
+
+  def entity(location: Location): Entity with Artifact =
+    generations
+      .flatMap(_.maybeReverseEntity)
+      .find(_.location == location)
+      .getOrElse(throw new IllegalStateException(s"No entity for $location on Activity for $commitId"))
+}
 
 object Activity {
 
-  def apply(id:              CommitId,
-            committedDate:   CommittedDate,
-            committer:       Person,
-            project:         Project,
-            agent:           Agent,
-            comment:         String = "some comment",
-            maybeInformedBy: Option[Activity] = None): Activity =
-    StandardActivity(id, committedDate, committer, project, agent, comment, maybeInformedBy)
+  def apply(id:                       CommitId,
+            committedDate:            CommittedDate,
+            committer:                Person,
+            project:                  Project,
+            agent:                    Agent,
+            comment:                  String = "some comment",
+            maybeInformedBy:          Option[Activity] = None,
+            maybeInfluenced:          Option[Activity] = None,
+            maybeInvalidation:        Option[Entity with Artifact] = None,
+            maybeGenerationFactories: List[Activity => Generation] = Nil): Activity =
+    new Activity(id,
+                 committedDate,
+                 committer,
+                 project,
+                 agent,
+                 comment,
+                 maybeInformedBy,
+                 maybeInfluenced,
+                 maybeInvalidation,
+                 maybeGenerationFactories)
 
-  import cats.data.NonEmptyList
+  import cats.implicits._
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  def toProperties(
-      entity:              Activity
-  )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): NonEmptyList[(Property, JsonLD)] =
-    NonEmptyList.of(
-      prov / "startedAtTime" -> entity.committedDate.asJsonLD,
-      prov / "endedAtTime"   -> entity.committedDate.asJsonLD,
-      prov / "wasInformedBy" -> entity.maybeInformedBy.asJsonLD,
-      prov / "agent"         -> JsonLD.arr(entity.agent.asJsonLD, entity.committer.asJsonLD),
-      rdfs / "comment"       -> entity.comment.asJsonLD,
-      schema / "isPartOf"    -> entity.project.asJsonLD
-    )
+  private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
+                                           fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Activity] =
+    new PartialEntityConverter[Activity] {
+      override def convert[T <: Activity]: T => Either[Exception, PartialEntity] =
+        entity =>
+          for {
+            reverseInvalidation <- entity.maybeInvalidation match {
+                                    case Some(invalidation) =>
+                                      Reverse.of((prov / "wasInvalidatedBy") -> invalidation.asJsonLD)
+                                    case _ => Reverse.empty.asRight[Exception]
+                                  }
+            reverseGeneration <- Reverse.of((prov / "activity") -> entity.generations.map(_.asJsonLD))
+          } yield PartialEntity(
+            EntityTypes of (prov / "Activity"),
+            reverseInvalidation combine reverseGeneration,
+            rdfs / "label"             -> entity.commitId.asJsonLD,
+            rdfs / "comment"           -> entity.comment.asJsonLD,
+            prov / "startedAtTime"     -> entity.committedDate.asJsonLD,
+            prov / "endedAtTime"       -> entity.committedDate.asJsonLD,
+            prov / "wasInformedBy"     -> entity.maybeInformedBy.map(_.asEntityId).asJsonLD,
+            prov / "wasAssociatedWith" -> JsonLD.arr(entity.agent.asJsonLD, entity.committer.asJsonLD),
+            prov / "influenced"        -> entity.maybeInfluenced.asJsonLD,
+            schema / "isPartOf"        -> entity.project.asJsonLD
+          )
+
+      override def toEntityId: Activity => Option[EntityId] =
+        entity => (EntityId of (fusekiBaseUrl / "activities" / "commit" / entity.commitId)).some
+    }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Activity] =
     JsonLDEncoder.instance {
-      case a: StandardActivity           => a.asJsonLD
-      case a: ProcessRunActivity         => a.asJsonLD
-      case a: ProcessRunWorkflowActivity => a.asJsonLD
+      case a: ActivityWorkflowRun                => a.asJsonLD
+      case a: Activity with ChildProcessRun      => a.asJsonLD
+      case a: Activity with WorkflowProcessRun   => a.asJsonLD
+      case a: Activity with StandAloneProcessRun => a.asJsonLD
+      case a: Activity                           => a.asPartialJsonLD[Activity] getOrFail
       case a => throw new Exception(s"Cannot serialize ${a.getClass} Activity")
     }
-}
 
-final case class StandardActivity(override val id:              CommitId,
-                                  override val committedDate:   CommittedDate,
-                                  override val committer:       Person,
-                                  override val project:         Project,
-                                  override val agent:           Agent,
-                                  override val comment:         String,
-                                  override val maybeInformedBy: Option[Activity] = None)
-    extends Activity(id, committedDate, committer, project, agent, comment, maybeInformedBy)
-
-object StandardActivity {
-
-  import ch.datascience.graph.config.RenkuBaseUrl
-  import ch.datascience.rdfstore.FusekiBaseUrl
-  import io.renku.jsonld._
-  import io.renku.jsonld.syntax._
-
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[StandardActivity] =
-    JsonLDEncoder.instance { entity =>
-      JsonLD.entity(
-        EntityId of (fusekiBaseUrl / "activities" / "commit" / entity.id),
-        EntityTypes of (prov / "Activity"),
-        Activity.toProperties(entity) :+ rdfs / "label" -> entity.id.asJsonLD
-      )
+  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
+                               fusekiBaseUrl:         FusekiBaseUrl): EntityIdEncoder[Activity] =
+    EntityIdEncoder.instance {
+      case a: ActivityWorkflowRun => a.asEntityId
+      case a: Activity with ChildProcessRun => a.asEntityId
+      case a: Activity with WorkflowProcessRun => a.asEntityId
+      case a: Activity with StandAloneProcessRun => a.asEntityId
+      case a: Activity =>
+        converter.toEntityId(a).getOrElse(throw new IllegalStateException(s"No EntityId found for $a"))
+      case a => throw new Exception(s"Cannot serialize ${a.getClass} Activity")
     }
 }

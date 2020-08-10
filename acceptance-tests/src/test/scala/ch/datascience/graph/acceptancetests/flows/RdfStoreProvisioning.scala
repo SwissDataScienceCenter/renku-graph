@@ -27,7 +27,7 @@ import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.users.Email
 import ch.datascience.http.client.AccessToken
@@ -47,12 +47,12 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
   def `data in the RDF store`(
       project:            Project,
       commitId:           CommitId,
-      schemaVersion:      SchemaVersion = currentSchemaVersion
+      schemaVersion:      CliVersion = currentCliVersion
   )(implicit accessToken: AccessToken): Assertion =
     `data in the RDF store`(
       project,
       commitId,
-      fileCommit(commitId = commitId, schemaVersion = schemaVersion)(projectPath = project.path)
+      fileCommit(commitId = commitId, cliVersion = schemaVersion)(projectPath = project.path)
     )
 
   def `data in the RDF store`(

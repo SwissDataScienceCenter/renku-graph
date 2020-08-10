@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects.{FilePath, Id, Path, ResourceId, Visibility}
+import ch.datascience.graph.model.projects.{FilePath, Id, Path, ResourceId, SchemaVersion, Visibility}
 import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
@@ -69,7 +69,7 @@ object GraphModelGenerators {
     max <- choose(1001, 100000)
     id  <- choose(min, max)
   } yield Id(id)
-  implicit val projectNames:        Gen[projects.Name]        = nonEmptyStrings() map projects.Name.apply
+  implicit val projectNames:        Gen[projects.Name]        = nonBlankStrings(minLength = 5) map (n => projects.Name(n.value))
   implicit val projectDescriptions: Gen[projects.Description] = paragraphs() map (v => projects.Description(v.value))
   implicit val projectVisibilities: Gen[Visibility]           = Gen.oneOf(Visibility.all.toList)
   implicit val projectCreatedDates: Gen[projects.DateCreated] = timestampsNotInTheFuture map projects.DateCreated.apply
@@ -92,6 +92,12 @@ object GraphModelGenerators {
     for {
       path <- projectPaths
     } yield ResourceId.from(s"$renkuBaseUrl/projects/$path").fold(throw _, identity)
+
+  implicit val projectSchemaVersions: Gen[SchemaVersion] = Gen
+    .listOfN(3, positiveInts(max = 50))
+    .map(_.mkString("."))
+    .map(SchemaVersion.apply)
+
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
   implicit val datasetIdentifiers: Gen[Identifier] = Gen

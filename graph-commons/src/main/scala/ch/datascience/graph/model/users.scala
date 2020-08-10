@@ -22,11 +22,14 @@ import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{Renderer, StringTinyType, TinyTypeFactory}
+import io.renku.jsonld.EntityId
 
 object users {
 
   final class ResourceId private (val value: String) extends AnyVal with StringTinyType
   implicit object ResourceId extends TinyTypeFactory[ResourceId](new ResourceId(_)) with NonBlank {
+
+    def apply(id: EntityId): ResourceId = ResourceId(id.value.toString)
 
     implicit object UsersResourceIdRdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
       private val localPartExtractor = "^mailto:(.*)@.*$".r

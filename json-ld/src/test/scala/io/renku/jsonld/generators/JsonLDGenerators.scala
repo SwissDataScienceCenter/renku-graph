@@ -19,6 +19,7 @@
 package io.renku.jsonld.generators
 
 import Generators._
+import io.renku.jsonld.JsonLD.JsonLDEntity
 import io.renku.jsonld._
 import org.scalacheck.{Arbitrary, Gen}
 
@@ -43,7 +44,7 @@ object JsonLDGenerators {
   private implicit val longJsonLDs:      Gen[JsonLD] = Arbitrary.arbLong.arbitrary map JsonLD.fromLong
   private implicit val instantJsonLDs:   Gen[JsonLD] = timestamps map JsonLD.fromInstant
   private implicit val localDateJsonLDs: Gen[JsonLD] = localDates map JsonLD.fromLocalDate
-  implicit val jsonLDs: Gen[JsonLD] = Gen.oneOf(
+  implicit val jsonLDValues: Gen[JsonLD] = Gen.oneOf(
     stringJsonLDs,
     intJsonLDs,
     longJsonLDs,
@@ -58,6 +59,12 @@ object JsonLDGenerators {
 
   implicit val entityProperties: Gen[(Property, JsonLD)] = for {
     property <- properties
-    value    <- jsonLDs
+    value    <- jsonLDValues
   } yield property -> value
+
+  implicit val jsonLDEntities: Gen[JsonLDEntity] = for {
+    id         <- entityIds
+    types      <- entityTypesObject
+    properties <- nonEmptyList(entityProperties)
+  } yield JsonLD.entity(id, types, properties)
 }

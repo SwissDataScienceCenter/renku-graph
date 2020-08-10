@@ -139,7 +139,7 @@ object Generators {
 
   def nonPositiveInts(min: Int = -1000): Gen[Int Refined NonPositive] = choose(min, 0) map Refined.unsafeApply
 
-  def negativeInts(min: Int = -1000): Gen[Int] = choose(min, 0)
+  def negativeInts(min: Int = -1000): Gen[Int] = choose(min, -1)
 
   def nonNegativeLongs(max: Long = 1000): Gen[Long Refined NonNegative] = choose(0L, max) map Refined.unsafeApply
 
@@ -148,9 +148,10 @@ object Generators {
 
   def relativePaths(minSegments: Int = 1,
                     maxSegments: Int = 10,
-                    partsGenerator: Gen[String] = nonEmptyStrings(
-                      charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_'))
-                    )): Gen[String] = {
+                    partsGenerator: Gen[String] = nonBlankStrings(
+                      charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_')),
+                      minLength      = 3
+                    ).map(_.value)): Gen[String] = {
     require(minSegments <= maxSegments,
             s"Generate relative paths with minSegments=$minSegments and maxSegments=$maxSegments makes no sense")
 

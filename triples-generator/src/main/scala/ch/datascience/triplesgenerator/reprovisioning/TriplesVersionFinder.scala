@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.CliVersion
 import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 
@@ -32,7 +32,7 @@ private trait TriplesVersionFinder[Interpretation[_]] {
 
 private class IOTriplesVersionFinder(
     rdfStoreConfig:          RdfStoreConfig,
-    schemaVersion:           SchemaVersion,
+    currentCliVersion:       CliVersion,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
@@ -43,23 +43,22 @@ private class IOTriplesVersionFinder(
   import io.circe.Decoder
   import io.circe.Decoder._
 
-  override def triplesUpToDate: IO[Boolean] = findCommitAgents map {
+  override def triplesUpToDate: IO[Boolean] = findCliVersion map {
     case Nil      => false
-    case versions => versions forall (_.endsWith(schemaVersion.toString))
+    case versions => versions forall (_.endsWith(currentCliVersion.toString))
   }
 
-  private def findCommitAgents = queryExpecting[List[String]] {
+  private def findCliVersion = queryExpecting[List[String]] {
     SparqlQuery(
-      name = "renku version find",
+      name = "cli version find",
       Set(
         "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-        "PREFIX prov: <http://www.w3.org/ns/prov#>"
+        "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
       ),
-      s"""|SELECT DISTINCT ?agent
+      s"""|SELECT DISTINCT ?version
           |WHERE {
-          |  ?commit rdf:type prov:Activity ;
-          |          prov:agent ?agent .
-          |  ?agent rdf:type prov:SoftwareAgent .
+          |  ?id rdf:type renku:CliVersion;
+          |      renku:version ?version.
           |}
           |""".stripMargin
     )
@@ -68,7 +67,7 @@ private class IOTriplesVersionFinder(
   private implicit lazy val agentsDecoder: Decoder[List[String]] =
     _.downField("results")
       .downField("bindings")
-      .as(decodeList(ofAgents))
+      .as(decodeList(ofVersions))
 
-  private lazy val ofAgents: Decoder[String] = _.downField("agent").downField("value").as[String]
+  private lazy val ofVersions: Decoder[String] = _.downField("version").downField("value").as[String]
 }

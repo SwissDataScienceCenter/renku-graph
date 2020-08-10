@@ -151,12 +151,12 @@ class PersonDetailsUpdaterSpec extends WordSpec {
   private lazy val maybeUpdatePerson: entities.Person => Option[UpdatePerson] = { person =>
     person.maybeEmail map { email =>
       val entityId = person.asJsonLD.entityId getOrElse (throw new Exception(s"Cannot find entity id for $person"))
-      UpdatePerson(ResourceId(entityId.toString), NonEmptyList.of(person.name), Set(email))
+      UpdatePerson(ResourceId(entityId), NonEmptyList.of(person.name), Set(email))
     }
   }
 
   private lazy val atLeastOneWithoutEmail: NonEmptyList[entities.Person] => Boolean = _.exists(_.maybeEmail.isEmpty)
 
-  private lazy val blankIds:       Person => Boolean = _.id.value startsWith "_"
+  private lazy val blankIds:       Person => Boolean = p => !(p.id.value startsWith "mailto:")
   private lazy val noEmailAndName: Person => Person  = _.copy(maybeName = None, maybeEmail = None)
 }

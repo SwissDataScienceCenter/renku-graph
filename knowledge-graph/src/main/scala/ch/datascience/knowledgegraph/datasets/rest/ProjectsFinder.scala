@@ -130,13 +130,13 @@ private class ProjectsFinder(
         |    ?l0 rdf:type <http://schema.org/Dataset> ;
         |        schema:isPartOf ?projectId;
         |        prov:qualifiedGeneration/prov:activity ?activityId .
-        |    ?activityId prov:startedAtTime ?minDateCreated ;
-        |                prov:agent ?agentId .
         |    ?projectId rdf:type <http://schema.org/Project> ;
         |               schema:name ?projectName .
-        |    ?agentId rdf:type <http://schema.org/Person> ;
-        |             schema:name ?agentName.
-        |    OPTIONAL { ?agentId schema:email ?maybeAgentEmail }
+        |    ?activityId prov:startedAtTime ?minDateCreated;
+        |                prov:wasAssociatedWith ?associationId.
+        |    ?associationId rdf:type <http://schema.org/Person>;
+        |                   schema:name ?agentName.
+        |    OPTIONAL { ?associationId schema:email ?maybeAgentEmail }
         |  }
         |}
         |GROUP BY ?projectId ?projectName ?minDateCreated ?maybeAgentEmail ?agentName

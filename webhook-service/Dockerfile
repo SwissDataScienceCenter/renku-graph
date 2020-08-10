@@ -1,7 +1,7 @@
 # This is a multi-stage build, see reference:
 # https://docs.docker.com/develop/develop-images/multistage-build/
 
-FROM openjdk:8-jre-alpine3.9 as builder
+FROM openjdk:16-jdk-alpine as builder
 
 WORKDIR /work
 
@@ -12,7 +12,7 @@ RUN echo "http://dl-4.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositor
     sbt "project webhook-service" stage  && \
     apk del .build-dependencies
 
-FROM openjdk:8-jre-alpine3.9
+FROM openjdk:16-jdk-alpine
 
 WORKDIR /opt/webhook-service
 

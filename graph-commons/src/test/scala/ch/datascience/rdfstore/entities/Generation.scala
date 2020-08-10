@@ -18,9 +18,11 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.model.projects.FilePath
+import ch.datascience.rdfstore.entities.ProcessRun.ChildProcessRun
 
-final case class Generation(filePath: FilePath, activity: Activity)
+final case class Generation(location:           Location,
+                            activity:           Activity,
+                            maybeReverseEntity: Option[Entity with Artifact] = None)
 
 object Generation {
 
@@ -29,13 +31,28 @@ object Generation {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
+  def factory(entityFactory: Activity => Entity with Artifact): Activity => Generation = activity => {
+    val entity = entityFactory(activity)
+    Generation(entity.location, activity, Some(entity))
+  }
+
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Generation] =
     JsonLDEncoder.instance { entity =>
+      val maybeStep = entity.activity match {
+        case a: ChildProcessRun => Some(a.processRunStep)
+        case _ => None
+      }
+      val reverseEntity = entity.maybeReverseEntity
+        .flatMap { entity =>
+          Reverse.of(prov / "qualifiedGeneration" -> entity.asJsonLD).toOption
+        }
+        .getOrElse(Reverse.empty)
+
       JsonLD.entity(
-        EntityId of fusekiBaseUrl / "commit" / entity.activity.id / "tree" / entity.filePath,
-        EntityTypes of (prov / "Generation"),
-        prov / "activity" -> entity.activity.asJsonLD,
-        prov / "hadRole"  -> entity.filePath.asJsonLD
+        EntityId of fusekiBaseUrl / "activities" / "commit" / entity.activity.commitId / maybeStep / "tree" / entity.location,
+        EntityTypes of prov / "Generation",
+        reverseEntity,
+        prov / "activity" -> entity.activity.asEntityId.asJsonLD
       )
     }
 }

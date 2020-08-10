@@ -27,6 +27,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.bundles.renkuBaseUrl
 import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._
 import org.scalatest.Matchers._
@@ -45,7 +46,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
         val updates = updatesCreator.prepareUpdates(
           Set(
-            UpdaterPerson(ResourceId(personId.value), NonEmptyList.of(name), Set(email))
+            UpdaterPerson(ResourceId(personId), NonEmptyList.of(name), Set(email))
           )
         )
 
@@ -66,7 +67,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
       val updates = updatesCreator.prepareUpdates(
         Set(
-          UpdaterPerson(ResourceId(personId.value), NonEmptyList.of(name), emails = Set.empty)
+          UpdaterPerson(ResourceId(personId), NonEmptyList.of(name), emails = Set.empty)
         )
       )
 
@@ -96,7 +97,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
         val updates = updatesCreator.prepareUpdates(
           Set(
-            UpdaterPerson(ResourceId(person1Id.value), NonEmptyList.of(name1Updated), Set(email1))
+            UpdaterPerson(ResourceId(person1Id), NonEmptyList.of(name1Updated), Set(email1))
           )
         )
 
@@ -129,7 +130,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
         val updates = updatesCreator.prepareUpdates(
           Set(
-            UpdaterPerson(ResourceId(person1Id.value), NonEmptyList.of(name1Updated), emails = Set.empty)
+            UpdaterPerson(ResourceId(person1Id), NonEmptyList.of(name1Updated), emails = Set.empty)
           )
         )
 
@@ -164,7 +165,7 @@ class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckP
 
         val updates = updatesCreator.prepareUpdates(
           Set(
-            UpdaterPerson(ResourceId(person1Id.value), name1Updates, email1Updates)
+            UpdaterPerson(ResourceId(person1Id), name1Updates, email1Updates)
           )
         )
 

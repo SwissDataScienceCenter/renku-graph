@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkul
 import java.security.SecureRandom
 
 import cats.data.EitherT
-import cats.data.EitherT.right
+import cats.data.EitherT.{right, rightT}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.graph.config.{GitLabUrl, RenkuLogTimeout}
@@ -31,10 +31,9 @@ import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
-import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.GenerationResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.GitLabRepoUrlFinder
-import io.chrisdavenport.log4cats.Logger
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.{GenerationResult, TriplesGenerator}
 
 import scala.concurrent.ExecutionContext
 import scala.language.{higherKinds, postfixOps}
@@ -58,28 +57,47 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
 
   override def generateTriples(
       commitEvent:             CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
     EitherT {
       createRepositoryDirectory(commitEvent.project.path)
-        .bracket(cloneCheckoutGenerate(commitEvent, maybeAccessToken))(deleteDirectory)
+        .bracket(cloneCheckoutGenerate(commitEvent))(deleteDirectory)
         .recoverWith(meaningfulError(maybeAccessToken))
     }
 
-  private def cloneCheckoutGenerate(
-      commitEvent:      CommitEvent,
-      maybeAccessToken: Option[AccessToken]
-  )(repoDirectory:      Path): IO[Either[ProcessingRecoverableError, JsonLDTriples]] = {
+  private def cloneCheckoutGenerate(commitEvent: CommitEvent)(repoDirectory: Path)(
+      implicit maybeAccessToken:                 Option[AccessToken]
+  ): IO[Either[ProcessingRecoverableError, GenerationResult]] = {
+    for {
+      _      <- prepareRepository(commitEvent, repoDirectory)
+      result <- processEvent(commitEvent, repoDirectory)
+    } yield result
+  }.value
+
+  private def prepareRepository(commitEvent: CommitEvent, repoDirectory: Path)(
+      implicit maybeAccessToken:             Option[AccessToken]
+  ): EitherT[IO, ProcessingRecoverableError, Unit] =
     for {
       repositoryUrl <- findRepositoryUrl(commitEvent.project.path, maybeAccessToken).toRight
       _             <- git clone (repositoryUrl, repoDirectory, workDirectory)
       _             <- (git checkout (commitEvent.commitId, repoDirectory)).toRight
-      _             <- (renku migrate (commitEvent, repoDirectory)).toRight
-      triples       <- findTriples(commitEvent, repoDirectory).toRight
-    } yield triples
-  }.value
+    } yield ()
+
+  private def processEvent(commitEvent:   CommitEvent,
+                           repoDirectory: Path): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
+    (git findCommitMessage (commitEvent.commitId, repoDirectory)).toRight flatMap {
+      case message if message contains "renku migrate" => rightT[IO, ProcessingRecoverableError](MigrationEvent)
+      case _                                           => migrateAndLog(commitEvent, repoDirectory)
+    }
+
+  private def migrateAndLog(commitEvent:   CommitEvent,
+                            repoDirectory: Path): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
+    for {
+      _       <- (renku migrate (commitEvent, repoDirectory)).toRight
+      triples <- findTriples(commitEvent, repoDirectory)
+    } yield Triples(triples)
 
   private implicit class IOOps[Right](io: IO[Right]) {
-    lazy val toRight: EitherT[IO, GenerationRecoverableError, Right] = right[GenerationRecoverableError](io)
+    lazy val toRight: EitherT[IO, ProcessingRecoverableError, Right] = right[ProcessingRecoverableError](io)
   }
 
   private def createRepositoryDirectory(projectPath: projects.Path): IO[Path] =
@@ -92,7 +110,8 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
     case repositoryDirectoryFinder(folderName) => folderName
   }
 
-  private def findTriples(commitEvent: CommitEvent, repositoryDirectory: Path): IO[JsonLDTriples] = {
+  private def findTriples(commitEvent:         CommitEvent,
+                          repositoryDirectory: Path): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = {
     import renku._
 
     commitEvent match {
@@ -103,7 +122,7 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
 
   private def meaningfulError(
       maybeAccessToken: Option[AccessToken]
-  ): PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, JsonLDTriples]]] = {
+  ): PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, GenerationResult]]] = {
     case NonFatal(exception) =>
       IO.raiseError {
         (Option(exception.getMessage) -> maybeAccessToken)

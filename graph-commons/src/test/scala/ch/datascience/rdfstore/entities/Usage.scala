@@ -18,13 +18,20 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.CommandParameter.{EntityCommandParameter, Input}
 
-final case class Usage(commitId: CommitId, filePath: FilePath, artifact: Artifact)
+final class Usage private (val activity:     Activity,
+                           val commandInput: EntityCommandParameter with Input,
+                           val maybeStep:    Option[Step])
 
 object Usage {
+
+  def apply(activity: Activity, commandInput: EntityCommandParameter with Input): Usage =
+    new Usage(activity, commandInput, maybeStep = None)
+
+  def factory(activity: Activity, commandInput: EntityCommandParameter with Input): Step => Usage =
+    step => new Usage(activity, commandInput, maybeStep = Some(step))
 
   import ch.datascience.graph.config.RenkuBaseUrl
   import io.renku.jsonld._
@@ -32,18 +39,17 @@ object Usage {
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Usage] =
     JsonLDEncoder.instance { entity =>
+      val entityId = entity.maybeStep match {
+        case None =>
+          EntityId of fusekiBaseUrl / "activities" / entity.activity.commitId / "inputs" / entity.commandInput.toString
+        case Some(step) =>
+          EntityId of fusekiBaseUrl / "activities" / entity.activity.commitId / "steps" / step / "inputs" / entity.commandInput.toString
+      }
       JsonLD.entity(
-        EntityId of (fusekiBaseUrl / "commit" / entity.commitId / entity.filePath),
+        entityId,
         EntityTypes of (prov / "Usage"),
-        prov / "entity"  -> toJsonLD(entity.artifact),
-        prov / "hadRole" -> entity.filePath.asJsonLD
+        prov / "entity"  -> entity.commandInput.entity.asJsonLD,
+        prov / "hadRole" -> entity.commandInput.toString.asJsonLD
       )
     }
-
-  private def toJsonLD(
-      artifact:            Artifact
-  )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = artifact match {
-    case a: ArtifactEntity           => a.asJsonLD
-    case a: ArtifactEntityCollection => a.asJsonLD
-  }
 }

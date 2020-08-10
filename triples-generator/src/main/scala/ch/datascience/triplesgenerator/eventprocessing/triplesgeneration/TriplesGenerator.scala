@@ -21,22 +21,22 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import com.typesafe.config.{Config, ConfigFactory}
-import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private[eventprocessing] trait TriplesGenerator[Interpretation[_]] {
   def generateTriples(
-      commit:                  CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, ProcessingRecoverableError, JsonLDTriples]
+      commit: CommitEvent
+  )(
+      implicit maybeAccessToken: Option[AccessToken]
+  ): EitherT[Interpretation, ProcessingRecoverableError, GenerationResult]
 }
 
 private[eventprocessing] object TriplesGenerator {

@@ -35,6 +35,7 @@ object DbEventLogGenerators {
     New,
     Processing,
     TriplesStore,
+    Skipped,
     RecoverableFailure,
     NonRecoverableFailure
   )

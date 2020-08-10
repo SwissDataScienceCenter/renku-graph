@@ -19,7 +19,7 @@
 package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{httpUrls, relativePaths}
+import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings, relativePaths}
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
@@ -58,6 +58,29 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
       val url       = (httpUrls() map UrlType.apply).generateOne
       val otherPath = (relativePaths(minSegments = 2) map RelativePathString.apply).generateOne
       (url / otherPath) shouldBe UrlType(s"$url/$otherPath")
+    }
+
+    "add the given TinyType path segment when it's Some" in {
+      val url                         = (httpUrls() map UrlType.apply).generateOne
+      val maybePath @ Some(pathValue) = (relativePaths(minSegments = 2) map RelativePathString.apply).generateSome
+      (url / maybePath) shouldBe UrlType(s"$url/$pathValue")
+    }
+
+    "not add a path segment for None TinyType" in {
+      val url       = (httpUrls() map UrlType.apply).generateOne
+      val otherPath = Option.empty[RelativePathString]
+      (url / otherPath) shouldBe url
+    }
+
+    "add the given value path segment when it's Some" in {
+      val url                          = (httpUrls() map UrlType.apply).generateOne
+      val maybeSegment @ Some(segment) = nonBlankStrings().generateSome.map(_.toString())
+      (url / maybeSegment) shouldBe UrlType(s"$url/$segment")
+    }
+
+    "not add a path segment for None value" in {
+      val url = (httpUrls() map UrlType.apply).generateOne
+      (url / Option.empty[String]) shouldBe url
     }
   }
 

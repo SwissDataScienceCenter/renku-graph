@@ -24,6 +24,7 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
+import io.renku.jsonld.EntityId
 
 object projects {
 
@@ -50,6 +51,9 @@ object projects {
 
     def apply(renkuBaseUrl: RenkuBaseUrl, projectPath: Path): ResourceId =
       ResourceId((renkuBaseUrl / "projects" / projectPath).value)
+
+    def apply(id: EntityId): ResourceId =
+      ResourceId(id.value.toString)
 
     private val pathExtractor = "^.*\\/projects\\/(.*)$".r
     implicit lazy val projectPathConverter: TinyTypeConverter[ResourceId, Path] = {
@@ -98,4 +102,7 @@ object projects {
         }
       }
   }
+
+  final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
+  implicit object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank
 }

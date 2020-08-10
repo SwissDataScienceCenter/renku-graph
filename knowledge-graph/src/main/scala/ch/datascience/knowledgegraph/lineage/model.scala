@@ -19,13 +19,16 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.MonadError
+import ch.datascience.knowledgegraph.lineage.model.Node.Location
+import io.renku.jsonld.EntityId
 
-import scala.collection.Set
 import scala.language.higherKinds
 
 object model {
 
-  final case class Lineage private (edges: Set[Edge], nodes: Set[Node])
+  private[lineage] type EdgeMap = Map[EntityId, (Set[Node.Location], Set[Node.Location])]
+
+  final case class Lineage private (edges: Set[Edge], nodes: Set[Node]) extends LineageOps
 
   object Lineage {
 
@@ -45,6 +48,13 @@ object model {
       edges.foldLeft(Set.empty[Node.Location]) {
         case (acc, Edge(source, target)) => acc + source + target
       }
+  }
+
+  trait LineageOps {
+    self: Lineage =>
+
+    def getNode(location: Location): Option[Node] =
+      nodes.find(_.location == location)
   }
 
   final case class Edge(source: Node.Location, target: Node.Location)
@@ -89,16 +99,25 @@ object model {
 
       import SingleWordType._
 
-      private lazy val FileTypes = Set("http://www.w3.org/ns/prov#Entity", "http://purl.org/wf4ever/wfprov#Artifact")
-      private lazy val DirectoryTypes = Set("http://www.w3.org/ns/prov#Entity",
-                                            "http://purl.org/wf4ever/wfprov#Artifact",
-                                            "http://www.w3.org/ns/prov#Collection")
+      private lazy val FileTypes = Set(
+        "http://www.w3.org/ns/prov#Entity",
+        "http://purl.org/wf4ever/wfprov#Artifact"
+      )
+      private lazy val DirectoryTypes = Set(
+        "http://www.w3.org/ns/prov#Entity",
+        "http://purl.org/wf4ever/wfprov#Artifact",
+        "http://www.w3.org/ns/prov#Collection"
+      )
+      private lazy val ProcessRunTypes = Set(
+        "http://purl.org/wf4ever/wfprov#ProcessRun",
+        "http://www.w3.org/ns/prov#Activity"
+      )
 
       lazy val singleWordType: Either[Exception, SingleWordType] = node.types.map(_.toString) match {
-        case types if types contains "http://purl.org/wf4ever/wfprov#ProcessRun" => Right(ProcessRun)
-        case types if (DirectoryTypes diff types).isEmpty                        => Right(Directory)
-        case types if (FileTypes diff types).isEmpty                             => Right(File)
-        case types                                                               => Left(new Exception(s"${types.mkString(", ")} cannot be converted to a NodeType"))
+        case types if (ProcessRunTypes diff types).isEmpty => Right(ProcessRun)
+        case types if (DirectoryTypes diff types).isEmpty  => Right(Directory)
+        case types if (FileTypes diff types).isEmpty       => Right(File)
+        case types                                         => Left(new Exception(s"${types.mkString(", ")} cannot be converted to a NodeType"))
       }
     }
   }

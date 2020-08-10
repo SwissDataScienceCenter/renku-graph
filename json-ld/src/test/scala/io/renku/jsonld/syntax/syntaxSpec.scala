@@ -182,6 +182,18 @@ class syntaxSpec extends WordSpec with ScalaCheckPropertyChecks {
     }
   }
 
+  "asEntityId" should {
+    "return EntityId for a custom object" in {
+      forAll { (id: EntityId, string: String, int: Int) =>
+        implicit val encoder: EntityIdEncoder[Object] = EntityIdEncoder.instance { _ =>
+          id
+        }
+
+        Object(string, int).asEntityId shouldBe id
+      }
+    }
+  }
+
   private case class Object(string: String, int: Int)
   private case class Parent(string: String, child: Child)
   private case class Child(int:     Int)

@@ -19,10 +19,10 @@
 package ch.datascience.knowledgegraph.lineage.graphql
 
 import cats.effect.IO
-import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.knowledgegraph.graphql.Arguments._
 import ch.datascience.knowledgegraph.graphql.CommonQueryFields._
 import ch.datascience.knowledgegraph.graphql.QueryContext
+import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import eu.timepit.refined.auto._
 import sangria.schema._
 
@@ -38,16 +38,16 @@ object QueryFields {
         name        = "lineage",
         fieldType   = OptionType(lineageType),
         description = Some("Returns a lineage for a project with the given path"),
-        arguments   = List(projectPathArgument, filePathArgument),
+        arguments   = List(projectPathArgument, locationArgument),
         resolve = context =>
           context.ctx.lineageFinder
-            .findLineage(context.args arg projectPathArgument, context.args arg filePathArgument)
+            .find(context.args arg projectPathArgument, context.args arg locationArgument)
             .unsafeToFuture()
       )
     )
 
-  private val filePathArgument = Argument(
+  private val locationArgument = Argument(
     name         = "filePath",
-    argumentType = FilePath.toScalarType(name = "FilePath", description = "File path")
+    argumentType = Location.toScalarType(name = "FilePath", description = "File path")
   )
 }

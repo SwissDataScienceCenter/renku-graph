@@ -18,19 +18,41 @@
 
 package io.renku.jsonld
 
-import io.circe.{Encoder, Json}
+import java.util.UUID
 
-abstract class EntityId(val value: String) extends Product with Serializable {
-  override lazy val toString: String = value
+import io.circe.{Decoder, Encoder, Json}
+
+abstract class EntityId extends Product with Serializable {
+  type Value
+  def value: Value
 }
 
 object EntityId {
 
   def of[T](value: T)(implicit convert: T => EntityId): EntityId = convert(value)
+  def blank: EntityId = BlankNodeEntityId(UUID.randomUUID())
 
-  private[jsonld] final case class StandardEntityId(override val value: String) extends EntityId(value)
+  private[jsonld] final case class StandardEntityId(override val value: String) extends EntityId {
+    type Value = String
+    override lazy val toString: String = value
+  }
+  private[jsonld] final case class BlankNodeEntityId(override val value: UUID) extends EntityId {
+    type Value = UUID
+    override lazy val toString: String = s"_:$value"
+  }
 
-  implicit val entityIdJsonEncoder: Encoder[EntityId]    = Encoder.instance(id => Json.fromString(id.value))
-  implicit val stringToEntityId:    String => EntityId   = StandardEntityId.apply
-  implicit val propertyToEntityId:  Property => EntityId = p => StandardEntityId(p.url)
+  implicit val entityIdJsonEncoder: Encoder[EntityId] = Encoder.instance {
+    case StandardEntityId(url)   => Json.fromString(url)
+    case BlankNodeEntityId(uuid) => Json.fromString(s"_:$uuid")
+  }
+
+  implicit val entityIdJsonDecoder: Decoder[EntityId] = Decoder.instance {
+    _.as[String].map {
+      case s if s.startsWith("_:") => EntityId.blank
+      case s                       => EntityId.of(s)
+    }
+  }
+
+  implicit val stringToEntityId:   String => EntityId   = StandardEntityId.apply
+  implicit val propertyToEntityId: Property => EntityId = p => StandardEntityId(p.url)
 }

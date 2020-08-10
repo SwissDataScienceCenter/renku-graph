@@ -55,4 +55,5 @@ object JsonLDEncoder {
   final implicit val encodeLocalDate: JsonLDEncoder[LocalDate] = (a: LocalDate) => JsonLD.fromLocalDate(a)
   final implicit val encodeEntityId:  JsonLDEncoder[EntityId]  = JsonLD.fromEntityId
   final implicit val encodeJsonLD:    JsonLDEncoder[JsonLD]    = identity
+  final implicit val encodeBoolean:   JsonLDEncoder[Boolean]   = (a: Boolean) => JsonLD.fromBoolean(a)
 }

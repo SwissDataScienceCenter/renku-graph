@@ -633,7 +633,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
       val dataset2 = dataset1.copy(
         id       = datasetIdentifiers.generateOne,
-        sameAs   = dataset1Json.entityId.asSameAs,
+        sameAs   = dataset1.entityId.asSameAs,
         projects = List(dataset2Project)
       )
       val dataset2Json = toDataSetCommit(dataset2)
@@ -641,7 +641,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project
       val dataset3 = dataset2.copy(
         id       = datasetIdentifiers.generateOne,
-        sameAs   = dataset2Json.entityId.asSameAs,
+        sameAs   = dataset2.entityId.asSameAs,
         projects = List(dataset3Project)
       )
 
@@ -668,7 +668,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
       val dataset2 = dataset1.copy(
         id       = datasetIdentifiers.generateOne,
-        sameAs   = dataset1Json.entityId.asSameAs,
+        sameAs   = dataset1.entityId.asSameAs,
         projects = List(dataset2Project)
       )
       val dataset2Json = toDataSetCommit(dataset2)
@@ -676,7 +676,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project
       val dataset3 = dataset2.copy(
         id       = datasetIdentifiers.generateOne,
-        sameAs   = dataset2Json.entityId.asSameAs,
+        sameAs   = dataset2.entityId.asSameAs,
         projects = List(dataset3Project)
       )
 
@@ -684,7 +684,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
 
       datasetFinder.findDataset(dataset1.id).unsafeRunSync() shouldBe Some(
         dataset1.copy(
-          sameAs = dataset1Json.entityId.asSameAs,
+          sameAs = dataset1.entityId.asSameAs,
           parts  = dataset1.parts.sorted,
           projects = List(
             dataset1Project,
@@ -705,7 +705,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
       val dataset2 = dataset1.copy(
         id       = datasetIdentifiers.generateOne,
-        sameAs   = dataset1Json.entityId.asSameAs,
+        sameAs   = dataset1.entityId.asSameAs,
         projects = List(dataset2Project)
       )
       val dataset2Json = toDataSetCommit(dataset2)
@@ -713,7 +713,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project
       val dataset3 = dataset2.copy(
         id       = datasetIdentifiers.generateOne,
-        sameAs   = dataset2Json.entityId.asSameAs,
+        sameAs   = dataset2.entityId.asSameAs,
         projects = List(dataset3Project)
       )
 
@@ -742,7 +742,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
       val dataset2 = dataset1.copy(
         id       = datasetIdentifiers.generateOne,
-        sameAs   = dataset1Json.entityId.asSameAs,
+        sameAs   = dataset1.entityId.asSameAs,
         projects = List(dataset2Project)
       )
       val dataset2Json = toDataSetCommit(dataset2)
@@ -750,7 +750,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project
       val dataset3 = dataset2.copy(
         id       = datasetIdentifiers.generateOne,
-        sameAs   = dataset2Json.entityId.asSameAs,
+        sameAs   = dataset2.entityId.asSameAs,
         projects = List(dataset3Project)
       )
 
@@ -787,7 +787,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project
       val dataset3 = dataset2.copy(
         id       = datasetIdentifiers.generateOne,
-        sameAs   = dataset2Json.entityId.asSameAs,
+        sameAs   = dataset2.entityId.asSameAs,
         projects = List(dataset3Project)
       )
 
@@ -835,12 +835,12 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
   }
 
   private implicit class EntityIdOps(entityId: EntityId) {
-    lazy val asSameAs: SameAs = SameAs.fromId(entityId.value).fold(throw _, identity)
+    lazy val asSameAs: SameAs = SameAs.fromId(entityId.value.toString).fold(throw _, identity)
   }
 
   private implicit class OptionEntityIdOps(maybeEntityId: Option[EntityId]) {
     lazy val asSameAs: SameAs = maybeEntityId
-      .flatMap(id => SameAs.fromId(id.value).toOption)
+      .flatMap(id => SameAs.fromId(id.value.toString).toOption)
       .getOrElse(throw new Exception(s"Cannot convert $maybeEntityId EntityId to SameAs"))
   }
 
