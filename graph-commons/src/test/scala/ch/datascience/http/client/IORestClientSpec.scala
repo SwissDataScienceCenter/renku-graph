@@ -40,15 +40,15 @@ import org.http4s.Method.GET
 import org.http4s.client.ConnectionFailure
 import org.http4s.{Request, Response, Status}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class IORestClientSpec extends WordSpec with ExternalServiceStubbing with MockFactory {
+class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
 
   "send" should {
 

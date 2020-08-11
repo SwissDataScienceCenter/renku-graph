@@ -30,13 +30,13 @@ import ch.datascience.http.rest.paging.model.Page.first
 import eu.timepit.refined.api.Refined
 import org.http4s._
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Try
 
-class PagingHeadersSpec extends WordSpec with ScalaCheckPropertyChecks {
+class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   import PagingHeaders._
 

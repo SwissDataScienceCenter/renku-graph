@@ -34,11 +34,11 @@ import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.entities.{DataSet, Person}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.{EntityId, JsonLD}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
+class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
 
   "findDataset" should {
 

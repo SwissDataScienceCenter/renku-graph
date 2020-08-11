@@ -25,11 +25,11 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.tinytypes.constraints.NonBlank
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CompoundEventIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+class CompoundEventIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "toString" should {
 
@@ -41,7 +41,7 @@ class CompoundEventIdSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class EventBodySpec extends WordSpec with ScalaCheckPropertyChecks {
+class EventBodySpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   import io.circe.literal._
   import io.circe.Decoder
@@ -80,7 +80,7 @@ class EventBodySpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class BatchDateSpec extends WordSpec {
+class BatchDateSpec extends AnyWordSpec with should.Matchers {
 
   "apply()" should {
 

@@ -34,15 +34,19 @@ import io.prometheus.client.Histogram
 import org.scalacheck.Gen
 import org.scalacheck.Gen.finiteDuration
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.util.{Success, Try}
 
-class ExecutionTimeRecorderSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
+class ExecutionTimeRecorderSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "measureExecutionTime" should {
 

@@ -34,10 +34,10 @@ import io.renku.eventlog.EventStatus.{Processing, TriplesStore}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{EventStatus, ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class ToTriplesStoreSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
   "command" should {
 

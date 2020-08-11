@@ -27,13 +27,13 @@ import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators
 import ServiceTypesGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.language.postfixOps
 import scala.util.Try
 
-class FusekiDatasetInitializerSpec extends WordSpec with MockFactory {
+class FusekiDatasetInitializerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
 

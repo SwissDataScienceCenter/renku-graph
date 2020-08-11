@@ -21,11 +21,11 @@ package ch.datascience.tinytypes.constraints
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.scalacheck.Gen.uuid
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class UUIDSpec extends WordSpec with ScalaCheckPropertyChecks {
+class UUIDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "UUID" should {
 

@@ -37,10 +37,14 @@ import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class ToNonRecoverableFailureSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class ToNonRecoverableFailureSpec
+    extends AnyWordSpec
+    with InMemoryEventLogDbSpec
+    with MockFactory
+    with should.Matchers {
 
   "command" should {
 

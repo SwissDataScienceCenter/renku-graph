@@ -37,12 +37,12 @@ import io.circe.Json
 import org.http4s.Status
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOProjectHookVerifierSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
+class IOProjectHookVerifierSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
 
   "checkHookPresence" should {
 

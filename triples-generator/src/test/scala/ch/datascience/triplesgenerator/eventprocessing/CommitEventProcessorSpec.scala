@@ -57,9 +57,10 @@ import eu.timepit.refined.numeric.Positive
 import io.prometheus.client.Histogram
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
+import org.scalatest.matchers._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
-import org.scalatest.{Assertion, WordSpec}
+import org.scalatest.Assertion
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
@@ -67,7 +68,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.higherKinds
 import scala.util.Try
 
-class CommitEventProcessorSpec extends WordSpec with MockFactory with Eventually with IntegrationPatience {
+class CommitEventProcessorSpec
+    extends AnyWordSpec
+    with MockFactory
+    with Eventually
+    with IntegrationPatience
+    with should.Matchers {
   import IOAccessTokenFinder._
 
   "process" should {

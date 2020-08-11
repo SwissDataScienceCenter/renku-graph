@@ -29,12 +29,12 @@ import org.http4s._
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class HttpServerSpec extends WordSpec with Http4sDsl[IO] {
+class HttpServerSpec extends AnyWordSpec with Http4sDsl[IO] with should.Matchers {
 
   "run" should {
 

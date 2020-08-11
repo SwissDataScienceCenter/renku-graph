@@ -34,10 +34,10 @@ import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog.{EventStatus, InMemoryEventLogDbSpec}
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class ProcessingStatusFinderSpec extends WordSpec with InMemoryEventLogDbSpec {
+class ProcessingStatusFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
 
   "fetchStatus" should {
 

@@ -27,15 +27,15 @@ import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.RefType
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
-class DBConfigProviderSpec extends WordSpec {
+class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
 
   "get" should {
 

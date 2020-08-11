@@ -19,11 +19,11 @@
 package ch.datascience.rdfstore
 
 import org.scalacheck.Gen._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class SparqlValueEncoderSpec extends WordSpec with ScalaCheckPropertyChecks {
+class SparqlValueEncoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   import SparqlValueEncoder._
 

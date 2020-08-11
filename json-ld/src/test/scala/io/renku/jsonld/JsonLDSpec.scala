@@ -30,11 +30,11 @@ import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
 import io.renku.jsonld.generators.JsonLDGenerators._
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class JsonLDSpec extends WordSpec with ScalaCheckPropertyChecks {
+class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "JsonLD.fromString" should {
 

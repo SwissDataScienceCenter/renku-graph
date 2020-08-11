@@ -20,10 +20,10 @@ package ch.datascience.graph.http.server
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectIdSpec extends WordSpec {
+class ProjectIdSpec extends AnyWordSpec with should.Matchers {
   import binders._
 
   "unapply" should {

@@ -28,10 +28,10 @@ import doobie.implicits._
 import io.circe.literal._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.Event
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectPathAdderSpec extends WordSpec with DbInitSpec {
+class ProjectPathAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
   "run" should {
 

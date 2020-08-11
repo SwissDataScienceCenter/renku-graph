@@ -29,14 +29,15 @@ import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.tinytypes.constraints.{RelativePath, Url}
 import eu.timepit.refined.auto._
 import io.circe.{DecodingFailure, Json}
-import org.scalacheck.Gen.{alphaChar, const, frequency, numChar, oneOf}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalacheck.Gen
+import org.scalacheck.Gen.{alphaChar, const, frequency, numChar}
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Try
 
-class IdSpec extends WordSpec with ScalaCheckPropertyChecks {
+class IdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "instantiation" should {
 
@@ -54,7 +55,7 @@ class IdSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class PathSpec extends WordSpec with ScalaCheckPropertyChecks {
+class PathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "Path" should {
 
@@ -92,7 +93,7 @@ class PathSpec extends WordSpec with ScalaCheckPropertyChecks {
 
   private val partsGenerator = {
     val firstCharGen    = frequency(6 -> alphaChar, 2 -> numChar, 1 -> const('_'))
-    val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> oneOf('_', '.', '-'))
+    val nonFirstCharGen = frequency(6 -> alphaChar, 2 -> numChar, 1 -> Gen.oneOf('_', '.', '-'))
     for {
       firstChar  <- firstCharGen
       otherChars <- nonEmptyList(nonFirstCharGen, minElements = 5, maxElements = 10)
@@ -100,7 +101,7 @@ class PathSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class VisibilitySpec extends WordSpec {
+class VisibilitySpec extends AnyWordSpec with should.Matchers {
 
   "Visibility" should {
 
@@ -128,7 +129,7 @@ class VisibilitySpec extends WordSpec {
   }
 }
 
-class ResourceIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+class ResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "ResourceId" should {
 

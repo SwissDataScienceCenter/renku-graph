@@ -41,10 +41,14 @@ import ch.datascience.stubbing.ExternalServiceStubbing
 import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class NodesDetailsFinderSpec extends WordSpec with InMemoryRdfStore with ExternalServiceStubbing {
+class NodesDetailsFinderSpec
+    extends AnyWordSpec
+    with InMemoryRdfStore
+    with ExternalServiceStubbing
+    with should.Matchers {
 
   import NodesDetailsFinder._
 

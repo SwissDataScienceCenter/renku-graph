@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.creation
 
-import EventPersister.Result
 import cats.effect.IO
 import cats.implicits._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
@@ -33,17 +32,18 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.creation.EventPersister.Result
 import io.renku.eventlog.{Event, EventProject}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
-import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
+import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class EventCreationEndpointSpec extends WordSpec with MockFactory {
+class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "addEvent" should {
 

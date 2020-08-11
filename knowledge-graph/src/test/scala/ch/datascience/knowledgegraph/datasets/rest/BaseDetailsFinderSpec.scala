@@ -28,11 +28,11 @@ import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.entities.DataSet
 import io.circe.literal._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
+class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   private implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 

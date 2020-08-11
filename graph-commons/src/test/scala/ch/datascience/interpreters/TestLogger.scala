@@ -24,12 +24,12 @@ import cats.Monad
 import ch.datascience.interpreters.TestLogger.LogMessage._
 import io.chrisdavenport.log4cats.Logger
 import org.scalatest.Assertion
-import org.scalatest.Matchers._
+import org.scalatest.matchers._
 import scala.collection.JavaConverters._
 
 import scala.language.higherKinds
 
-class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] {
+class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] with should.Matchers {
 
   import TestLogger.Level._
   import TestLogger._

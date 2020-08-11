@@ -35,12 +35,12 @@ import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 import io.renku.eventlog.{EventLogDB, EventStatus, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.language.higherKinds
 
-class StatusUpdatesRunnerSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
   "run" should {
 

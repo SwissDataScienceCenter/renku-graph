@@ -30,14 +30,14 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class TriplesUploaderSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
+class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
 
   "upload" should {
 

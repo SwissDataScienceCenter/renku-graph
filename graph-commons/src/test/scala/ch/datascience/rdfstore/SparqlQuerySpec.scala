@@ -23,12 +23,12 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import eu.timepit.refined.auto._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Failure, Success, Try}
 
-class SparqlQuerySpec extends WordSpec {
+class SparqlQuerySpec extends AnyWordSpec with should.Matchers {
 
   "toString" should {
 

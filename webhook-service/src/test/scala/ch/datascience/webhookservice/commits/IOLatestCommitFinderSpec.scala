@@ -33,12 +33,12 @@ import io.circe.Json
 import io.circe.literal._
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOLatestCommitFinderSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
+class IOLatestCommitFinderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
 
   "findLatestCommit" should {
 

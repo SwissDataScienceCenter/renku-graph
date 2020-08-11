@@ -27,10 +27,10 @@ import ch.datascience.generators.Generators._
 import org.http4s.ParseFailure
 import org.http4s.Status._
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class QueryParameterToolsSpec extends WordSpec {
+class QueryParameterToolsSpec extends AnyWordSpec with should.Matchers {
 
   import QueryParameterTools._
 

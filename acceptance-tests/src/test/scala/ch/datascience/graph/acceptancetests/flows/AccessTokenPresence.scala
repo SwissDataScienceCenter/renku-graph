@@ -25,7 +25,7 @@ import ch.datascience.knowledgegraph.projects.model.Project
 import io.circe.syntax._
 import org.http4s.Status._
 import org.scalatest.Assertion
-import org.scalatest.Matchers._
+import org.scalatest.matchers._
 
 object AccessTokenPresence {
 

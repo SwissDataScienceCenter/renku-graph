@@ -33,14 +33,14 @@ import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
 import org.http4s.Status
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class UpdatesUploaderSpec extends WordSpec with ExternalServiceStubbing {
+class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
 
   "send" should {
 

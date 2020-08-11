@@ -30,12 +30,12 @@ import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import org.http4s.Status._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
+class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
 
   "markNew" should {
 

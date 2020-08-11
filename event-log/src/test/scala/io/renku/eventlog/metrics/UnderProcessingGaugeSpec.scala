@@ -34,12 +34,12 @@ import io.renku.eventlog.EventStatus
 import io.renku.eventlog.EventStatus.Processing
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 
-class UnderProcessingGaugeSpec extends WordSpec with MockFactory {
+class UnderProcessingGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "apply" should {
 

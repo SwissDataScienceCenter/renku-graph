@@ -21,15 +21,15 @@ package ch.datascience.webhookservice.missedevents
 import cats.MonadError
 import cats.implicits._
 import com.typesafe.config.ConfigFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Try
 
-class SchedulerConfigProviderSpec extends WordSpec {
+class SchedulerConfigProviderSpec extends AnyWordSpec with should.Matchers {
 
   "getInitialDelay" should {
 

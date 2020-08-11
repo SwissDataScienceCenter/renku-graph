@@ -31,13 +31,13 @@ import ch.datascience.knowledgegraph.lineage.model.{EdgeMap, Lineage, Node}
 import ch.datascience.rdfstore.SparqlQuery
 import io.renku.jsonld.EntityId
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
 import scala.util.{Failure, Try}
 
-class LineageFinderSpec extends WordSpec with MockFactory with ScalaCheckDrivenPropertyChecks {
+class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDrivenPropertyChecks with should.Matchers {
 
   import NodesDetailsFinder._
 

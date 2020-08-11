@@ -28,13 +28,13 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends WordSpec with MockFactory {
+class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "routes" should {
 

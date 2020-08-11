@@ -23,10 +23,10 @@ import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class SubscriptionsSpec extends WordSpec {
+class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
 
   "add and getAll" should {
 

@@ -25,10 +25,10 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDb
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class DbInitializerSpec extends WordSpec with InMemoryProjectsTokensDb with MockFactory {
+class DbInitializerSpec extends AnyWordSpec with InMemoryProjectsTokensDb with MockFactory with should.Matchers {
 
   "run" should {
 

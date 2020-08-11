@@ -31,10 +31,10 @@ import doobie.implicits.javatime._
 import io.circe.literal._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.{CreatedDate, Event}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class BatchDateAdderSpec extends WordSpec with DbInitSpec {
+class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
   "run" should {
 

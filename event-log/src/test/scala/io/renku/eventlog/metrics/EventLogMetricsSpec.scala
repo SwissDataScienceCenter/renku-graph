@@ -31,15 +31,20 @@ import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
 
-class EventLogMetricsSpec extends WordSpec with MockFactory with Eventually with IntegrationPatience {
+class EventLogMetricsSpec
+    extends AnyWordSpec
+    with MockFactory
+    with Eventually
+    with IntegrationPatience
+    with should.Matchers {
 
   "run" should {
 

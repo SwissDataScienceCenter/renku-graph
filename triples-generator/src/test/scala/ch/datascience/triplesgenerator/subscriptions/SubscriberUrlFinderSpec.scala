@@ -22,13 +22,13 @@ import java.net.NetworkInterface
 
 import cats.implicits._
 import ch.datascience.triplesgenerator.Microservice
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.util.Try
 
-class SubscriberUrlFinderSpec extends WordSpec {
+class SubscriberUrlFinderSpec extends AnyWordSpec with should.Matchers {
 
   "findSubscriberUrl" should {
 

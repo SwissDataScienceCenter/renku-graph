@@ -18,22 +18,19 @@
 
 package io.renku.eventlog
 
-import cats.{Id, MonadError}
-import cats.data.Kleisli
-import cats.effect.{Bracket, Clock, IO}
+import cats.effect.{Clock, IO}
 import cats.implicits._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.controllers.InfoMessage.InfoMessage
+import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestRoutesMetrics
-import ch.datascience.metrics.{LabeledGauge, MetricsRegistry, RoutesMetrics}
+import ch.datascience.metrics.LabeledGauge
 import io.chrisdavenport.log4cats.Logger
-import io.prometheus.client.hotspot.StandardExports
 import io.renku.eventlog.creation.{EventCreationEndpoint, EventPersister}
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
@@ -44,17 +41,17 @@ import org.http4s.MediaType.application
 import org.http4s.Method.{GET, PATCH, POST}
 import org.http4s.Status._
 import org.http4s._
-import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
+import org.http4s.implicits._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.{Assertion, WordSpec}
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends WordSpec with MockFactory {
+class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "routes" should {
 

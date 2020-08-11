@@ -23,13 +23,13 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class ProjectHookUrlSpec extends WordSpec with MockFactory {
+class ProjectHookUrlSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "fromConfig" should {
 

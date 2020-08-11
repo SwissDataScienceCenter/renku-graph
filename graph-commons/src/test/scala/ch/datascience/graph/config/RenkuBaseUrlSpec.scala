@@ -25,14 +25,14 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.views.RdfResource
 import com.typesafe.config.ConfigFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class RenkuBaseUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
+class RenkuBaseUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "apply" should {
 

@@ -25,12 +25,12 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.client.UrlEncoder._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class SentryInitializerSpec extends WordSpec with MockFactory {
+class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
 

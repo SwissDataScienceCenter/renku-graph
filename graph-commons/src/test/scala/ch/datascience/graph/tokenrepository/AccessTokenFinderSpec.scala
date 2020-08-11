@@ -28,12 +28,12 @@ import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class AccessTokenFinderSpec extends WordSpec with ExternalServiceStubbing with MockFactory {
+class AccessTokenFinderSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
 
   import IOAccessTokenFinder._
 

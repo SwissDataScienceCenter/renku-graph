@@ -25,12 +25,12 @@ import ch.datascience.generators.Generators._
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import eu.timepit.refined.auto._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}
 
-class PagingSpec extends WordSpec {
+class PagingSpec extends AnyWordSpec with should.Matchers {
 
   "findPage" should {
 

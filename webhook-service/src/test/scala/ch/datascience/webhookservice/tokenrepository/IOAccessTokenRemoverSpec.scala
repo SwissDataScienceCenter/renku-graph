@@ -32,12 +32,12 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.syntax._
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOAccessTokenRemoverSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
+class IOAccessTokenRemoverSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
 
   "removeAccessToken" should {
 

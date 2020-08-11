@@ -32,12 +32,12 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import org.http4s.Status
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOLatestEventsFetcherSpec extends WordSpec with ExternalServiceStubbing {
+class IOLatestEventsFetcherSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
 
   "fetchLatestEvents" should {
 

@@ -39,12 +39,12 @@ import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.language.postfixOps
 
-class EventFetcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
   "popEvent" should {
 

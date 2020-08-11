@@ -23,11 +23,11 @@ import ch.datascience.generators.Generators._
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class JsonOpsSpec extends WordSpec with ScalaCheckPropertyChecks {
+class JsonOpsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   import JsonOps._
 

@@ -39,12 +39,12 @@ import ch.datascience.webhookservice.eventprocessing.{CommitEvent, Project, Star
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util._
 
-class CommitToEventLogSpec extends WordSpec with MockFactory {
+class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   import IOAccessTokenFinder._
 

@@ -21,11 +21,11 @@ package ch.datascience.tinytypes
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.constraints.PathSegment
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class TinyTypeSpec extends WordSpec with ScalaCheckPropertyChecks {
+class TinyTypeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "toString" should {
 
@@ -62,7 +62,7 @@ class TinyTypeSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class SensitiveSpec extends WordSpec {
+class SensitiveSpec extends AnyWordSpec with should.Matchers {
 
   "toString" should {
 
@@ -79,7 +79,7 @@ class SensitiveSpec extends WordSpec {
   }
 }
 
-class TinyTypeFactorySpec extends WordSpec {
+class TinyTypeFactorySpec extends AnyWordSpec with should.Matchers {
 
   import TinyTypeTest._
 
@@ -132,7 +132,7 @@ class TinyTypeFactorySpec extends WordSpec {
   }
 }
 
-class TypeNameSpec extends WordSpec {
+class TypeNameSpec extends AnyWordSpec with should.Matchers {
 
   "typeName" should {
 

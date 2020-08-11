@@ -34,10 +34,10 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class DbInitializerSpec extends WordSpec with DbInitSpec with MockFactory {
+class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory with should.Matchers {
 
   "run" should {
 

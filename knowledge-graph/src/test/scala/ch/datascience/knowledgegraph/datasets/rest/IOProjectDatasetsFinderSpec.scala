@@ -31,15 +31,16 @@ import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import io.renku.jsonld.EntityId
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class IOProjectDatasetsFinderSpec
-    extends WordSpec
+    extends AnyWordSpec
     with InMemoryRdfStore
     with ExternalServiceStubbing
-    with ScalaCheckPropertyChecks {
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "findProjectDatasets" should {
 

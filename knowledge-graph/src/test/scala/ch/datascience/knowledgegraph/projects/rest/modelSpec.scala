@@ -24,11 +24,11 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.knowledgegraph.projects.model.Permissions.AccessLevel
 import ch.datascience.knowledgegraph.projects.model.Urls._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class modelSpec extends WordSpec with ScalaCheckPropertyChecks {
+class modelSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "HttpUrl" should {
 

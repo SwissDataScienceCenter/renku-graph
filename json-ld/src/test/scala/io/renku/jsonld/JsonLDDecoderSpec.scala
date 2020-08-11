@@ -21,11 +21,11 @@ package io.renku.jsonld
 import io.circe.DecodingFailure
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.JsonLDGenerators._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class JsonLDDecoderSpec extends WordSpec with ScalaCheckPropertyChecks {
+class JsonLDDecoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "implicit decoders" should {
 

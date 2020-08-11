@@ -26,12 +26,12 @@ import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.webhookservice.missedevents._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class MicroserviceRunnerSpec extends WordSpec with MockFactory {
+class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
 

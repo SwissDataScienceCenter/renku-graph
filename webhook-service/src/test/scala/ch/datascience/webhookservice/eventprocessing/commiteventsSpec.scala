@@ -23,11 +23,11 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.graph.model.users.Email
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CommitEventSpec extends WordSpec with ScalaCheckPropertyChecks {
+class CommitEventSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "compoundEventId" should {
 
@@ -39,7 +39,7 @@ class CommitEventSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class AuthorSpec extends WordSpec with ScalaCheckPropertyChecks {
+class AuthorSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "withEmail" should {
 
@@ -51,7 +51,7 @@ class AuthorSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class CommitterSpec extends WordSpec with ScalaCheckPropertyChecks {
+class CommitterSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "withEmail" should {
 

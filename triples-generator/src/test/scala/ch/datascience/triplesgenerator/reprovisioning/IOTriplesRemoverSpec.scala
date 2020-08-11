@@ -23,10 +23,10 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
-class IOTriplesRemoverSpec extends WordSpec with InMemoryRdfStore {
+class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   "removeAllTriples" should {
 

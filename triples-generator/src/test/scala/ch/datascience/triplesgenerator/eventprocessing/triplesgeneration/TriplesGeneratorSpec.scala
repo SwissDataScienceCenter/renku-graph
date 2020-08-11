@@ -25,13 +25,13 @@ import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import com.typesafe.config.ConfigFactory
 import io.chrisdavenport.log4cats.Logger
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
-class TriplesGeneratorSpec extends WordSpec {
+class TriplesGeneratorSpec extends AnyWordSpec with should.Matchers {
 
   "apply" should {
 

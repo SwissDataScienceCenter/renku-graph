@@ -26,11 +26,11 @@ import ch.datascience.tinytypes.Sensitive
 import io.circe.DecodingFailure
 import io.circe.literal._
 import io.circe.syntax._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class AccessTokenSpec extends WordSpec with ScalaCheckPropertyChecks {
+class AccessTokenSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "PersonalAccessToken" should {
 

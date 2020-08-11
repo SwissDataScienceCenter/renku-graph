@@ -38,13 +38,13 @@ import io.circe.optics.JsonPath.root
 import io.circe.{Decoder, Encoder, Json}
 import io.renku.jsonld.syntax._
 import monocle.function.Plated
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers._
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-class PersonDetailsUpdaterSpec extends WordSpec {
+class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers {
 
   "curate" should {
 
