@@ -43,7 +43,8 @@ class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChe
       forAll(kgProjects(parentsGen = emptyOptionOf[Parent])) { project =>
         val maybeProjectCreator = project.created.maybeCreator
         loadToStore(
-          fileCommit(commitId = commitIds.generateOne)(projectPath = projectPaths.generateOne),
+          fileCommit(commitId = commitIds.generateOne)(projectPath = projectPaths.generateOne,
+                                                       projectVersion = projectSchemaVersions.generateOne),
           fileCommit(
             commitId      = commitIds.generateOne,
             committedDate = CommittedDate(project.created.date.value)
@@ -52,7 +53,8 @@ class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChe
             projectName         = project.name,
             projectDateCreated  = project.created.date,
             maybeProjectCreator = maybeProjectCreator.toMaybePerson,
-            maybeParent         = None
+            maybeParent         = None,
+            projectVersion      = project.version
           )
         )
 
@@ -76,9 +78,11 @@ class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChe
                 parent.name,
                 parent.created.date,
                 maybeCreator       = parent.created.maybeCreator.toMaybePerson,
-                maybeParentProject = None
+                maybeParentProject = None,
+                version            = projectSchemaVersions.generateOne
               )
-            }
+            },
+            projectVersion = project.version
           )
         )
 

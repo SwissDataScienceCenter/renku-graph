@@ -234,6 +234,7 @@ class ProjectFinderSpec extends WordSpec with MockFactory {
       tags        = gitLabProject.tags,
       starsCount  = gitLabProject.starsCount,
       permissions = gitLabProject.permissions,
-      statistics  = gitLabProject.statistics
+      statistics  = gitLabProject.statistics,
+      version     = kgProject.version
     )
 }

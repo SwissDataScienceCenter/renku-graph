@@ -101,7 +101,8 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           projectPath         = project.path,
           projectName         = project.name,
           projectDateCreated  = project.created.date,
-          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail))
+          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
+          projectVersion      = project.version
         )(
           datasetIdentifier         = dataset1.id,
           datasetTitle              = dataset1.title,
@@ -121,7 +122,8 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           projectPath         = project.path,
           projectName         = project.name,
           projectDateCreated  = project.created.date,
-          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail))
+          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
+          projectVersion      = project.version
         )(
           datasetIdentifier         = dataset2.id,
           datasetTitle              = dataset2.title,

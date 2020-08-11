@@ -38,13 +38,18 @@ trait KGProjectFinder[Interpretation[_]] {
 
 object KGProjectFinder {
 
-  final case class KGProject(path: Path, name: Name, created: ProjectCreation, maybeParent: Option[Parent])
+  final case class KGProject(path:        Path,
+                             name:        Name,
+                             created:     ProjectCreation,
+                             maybeParent: Option[Parent],
+                             version:     SchemaVersion)
 
   final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
 
   final case class Parent(resourceId: ResourceId, name: Name, created: ProjectCreation)
 
   final case class ProjectCreator(maybeEmail: Option[users.Email], name: users.Name)
+
 }
 
 private class IOKGProjectFinder(
@@ -76,11 +81,12 @@ private class IOKGProjectFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX prov: <http://www.w3.org/ns/prov#>"
     ),
-    s"""|SELECT DISTINCT ?name ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail
+    s"""|SELECT DISTINCT ?name ?dateCreated ?maybeCreatorName ?maybeCreatorEmail ?maybeParentId ?maybeParentName ?maybeParentDateCreated ?maybeParentCreatorName ?maybeParentCreatorEmail ?schemaVersion
         |WHERE {
         |  BIND (${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} AS ?projectId)
         |  ?projectId rdf:type <http://schema.org/Project>;
         |             schema:name ?name;
+        |             schema:schemaVersion ?schemaVersion;
         |             schema:dateCreated ?dateCreated.
         |  OPTIONAL {
         |    ?projectId schema:creator ?maybeCreatorId.
@@ -124,6 +130,7 @@ private class IOKGProjectFinder(
                                     .downField("maybeParentCreatorEmail")
                                     .downField("value")
                                     .as[Option[users.Email]]
+        version <- cursor.downField("schemaVersion").downField("value").as[SchemaVersion]
       } yield KGProject(
         path,
         name,
@@ -134,7 +141,8 @@ private class IOKGProjectFinder(
                    name,
                    ProjectCreation(dateCreated,
                                    maybeParentCreatorName.map(name => ProjectCreator(maybeParentCreatorEmail, name))))
-        }
+        },
+        version
       )
     }
 

@@ -53,7 +53,8 @@ class ProjectPropertiesRemoverSpec extends WordSpec with ScalaCheckPropertyCheck
                 projectName         = project.name,
                 projectDateCreated  = project.dateCreated,
                 maybeProjectCreator = project.maybeCreator,
-                maybeParent         = project.maybeParentProject
+                maybeParent         = project.maybeParentProject,
+                projectVersion      = project.version
               ),
               project.asJsonLD
             )

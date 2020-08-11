@@ -52,7 +52,8 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
     `data in the RDF store`(
       project,
       commitId,
-      fileCommit(commitId = commitId, cliVersion = schemaVersion)(projectPath = project.path)
+      fileCommit(commitId = commitId, cliVersion = schemaVersion)(projectPath = project.path,
+                                                                  projectVersion = project.version)
     )
 
   def `data in the RDF store`(
