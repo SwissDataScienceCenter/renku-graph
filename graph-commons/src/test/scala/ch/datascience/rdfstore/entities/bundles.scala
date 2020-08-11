@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartLocation, PartName, PublishedDate, SameAs, Url}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartLocation, PartName, PublishedDate, SameAs, Title, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path}
 import ch.datascience.graph.model.{CliVersion, datasets, projects}
@@ -91,6 +91,7 @@ object bundles extends Schemas {
       maybeParent:         Option[Project]      = None
   )(
       datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
+      datasetTitle:              Title = datasetTitles.generateOne,
       datasetName:               Name = datasetNames.generateOne,
       maybeDatasetUrl:           Option[Url] = Gen.option(datasetUrls).generateOne,
       maybeDatasetSameAs:        Option[SameAs] = Gen.option(datasetSameAs).generateOne,
@@ -111,6 +112,7 @@ object bundles extends Schemas {
         Generation.factory(
           DataSet.factory(
             datasetIdentifier,
+            datasetTitle,
             datasetName,
             maybeDatasetUrl,
             maybeDatasetSameAs,
@@ -167,6 +169,7 @@ object bundles extends Schemas {
         Generation.factory(
           entityFactory = DataSet.factory(
             id             = dataSetId,
+            title          = datasets.Title("zhbikes"),
             name           = datasets.Name("zhbikes"),
             createdDate    = datasetCreatedDates.generateOne,
             creators       = dataSetCreators,

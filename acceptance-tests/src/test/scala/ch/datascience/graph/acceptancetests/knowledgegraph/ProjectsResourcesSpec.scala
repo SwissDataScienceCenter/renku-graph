@@ -104,9 +104,10 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
             )
             .some
         )(
-          datasetIdentifier  = dataset.id,
-          datasetName        = dataset.name,
-          maybeDatasetSameAs = dataset.sameAs.some
+          datasetIdentifier    = dataset.id,
+          datasetTitle          = dataset.title,
+          datasetName = dataset.name,
+          maybeDatasetSameAs   = dataset.sameAs.some
         )
       )
       `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)

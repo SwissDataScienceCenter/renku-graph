@@ -16,16 +16,16 @@ This is a microservice which provides API for the Graph DB.
 
 #### GET /knowledge-graph/datasets?query=\<phrase\>&sort=\<property\>:asc|desc&page=\<page\>&per_page=\<per_page\>
 
-Finds datasets which `name`, `description` or creator `name` matches the given `phrase` or returns all the datasets if no `query` parameter is given.
+Finds datasets which `title`, `description` or creator `name` matches the given `phrase` or returns all the datasets if no `query` parameter is given.
 
 NOTES: 
 * the `phrase` query parameter has to be url encoded and it cannot be blank.
-* the `sort` query parameter is optional and defaults to `name:asc`. Allowed property names are: `name`, `datePublished` and `projectsCount`.
+* the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`, `datePublished` and `projectsCount`.
 * the `page` query parameter is optional and defaults to `1`.
 * the `per_page` query parameter is optional and defaults to `20`.
 
 **Response**
-
+****
 | Status                     | Description                                                                                    |
 |----------------------------|------------------------------------------------------------------------------------------------|
 | OK (200)                   | If there are datasets for the project or `[]` if nothing is found                              |
@@ -60,7 +60,8 @@ Response body example:
 [  
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
-      "name":"rmDaYfpehl",
+      "title":"rmDaYfpehl",
+      "name": "mniouUnmal",
       "description": "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
       "published": {
         "datePublished": "2012-10-14T03:02:25.639Z", // optional property
@@ -125,7 +126,8 @@ Response body example:
     }
   ],
   "identifier" : "6f622603-2129-4058-ad29-3ff927481461",
-  "name" : "dataset name",
+  "title" : "dataset title",
+  "name" : "dataset alternate name",
   "url" : "http://host/url1",  // optional property
   "sameAs" : "http://host/url1",
   "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
@@ -363,7 +365,8 @@ Response body example:
 [  
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
-      "name": "rmDaYfpehl",
+      "title": "rmDaYfpehl",
+      "name": "mniouUnmal",
       "sameAs": "http://host/url1",
       "_links": [  
          {  

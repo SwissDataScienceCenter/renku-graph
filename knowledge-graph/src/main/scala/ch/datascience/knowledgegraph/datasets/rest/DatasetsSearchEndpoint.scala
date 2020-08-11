@@ -96,10 +96,11 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   }
 
   private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
-    case DatasetSearchResult(id, name, maybeDescription, published, projectsCount) =>
+    case DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount) =>
       json"""
       {
         "identifier": $id,
+        "title": $title,
         "name": $name,
         "published": $published,
         "projectsCount": $projectsCount
@@ -146,11 +147,11 @@ object DatasetsSearchEndpoint {
     type PropertyType = SearchProperty
 
     sealed trait SearchProperty             extends Property
-    final case object NameProperty          extends Property("name") with SearchProperty
+    final case object TitleProperty         extends Property("title") with SearchProperty
     final case object DatePublishedProperty extends Property("datePublished") with SearchProperty
     final case object ProjectsCountProperty extends Property("projectsCount") with SearchProperty
 
-    override lazy val properties: Set[SearchProperty] = Set(NameProperty, DatePublishedProperty, ProjectsCountProperty)
+    override lazy val properties: Set[SearchProperty] = Set(TitleProperty, DatePublishedProperty, ProjectsCountProperty)
   }
 }
 

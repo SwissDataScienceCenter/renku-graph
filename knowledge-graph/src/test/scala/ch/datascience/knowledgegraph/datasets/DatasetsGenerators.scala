@@ -20,7 +20,6 @@ package ch.datascience.knowledgegraph.datasets
 
 import cats.Order
 import cats.data.NonEmptyList
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -37,6 +36,7 @@ object DatasetsGenerators {
                projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)): Gen[Dataset] =
     for {
       id               <- datasetIdentifiers
+      title            <- datasetTitles
       name             <- datasetNames
       maybeUrl         <- Gen.option(datasetUrls)
       sameas           <- sameAs
@@ -44,7 +44,7 @@ object DatasetsGenerators {
       published        <- datasetPublishingInfos
       part             <- listOf(datasetParts)
       projects         <- projects
-    } yield Dataset(id, name, sameas, maybeUrl, maybeDescription, published, part, projects.toList)
+    } yield Dataset(id, title, name, sameas, maybeUrl, maybeDescription, published, part, projects.toList)
 
   implicit lazy val datasetCreators: Gen[DatasetCreator] = for {
     maybeEmail       <- Gen.option(userEmails)
