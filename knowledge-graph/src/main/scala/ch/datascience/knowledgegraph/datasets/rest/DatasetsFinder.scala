@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{Name, Description, Identifier, Title, PublishedDate}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PublishedDate, Title}
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
@@ -45,12 +45,12 @@ private trait DatasetsFinder[Interpretation[_]] {
 
 private object DatasetsFinder {
   final case class DatasetSearchResult(
-                                        id:               Identifier,
-                                        title:             Title,
-                                        name:    Name,
-                                        maybeDescription: Option[Description],
-                                        published:        DatasetPublishing,
-                                        projectsCount:    ProjectsCount
+      id:               Identifier,
+      title:            Title,
+      name:             Name,
+      maybeDescription: Option[Description],
+      published:        DatasetPublishing,
+      projectsCount:    ProjectsCount
   )
 
   final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
@@ -468,8 +468,8 @@ private object IODatasetsFinder {
 
     for {
       id                 <- cursor.downField("identifier").downField("value").as[Identifier]
-      title               <- cursor.downField("name").downField("value").as[Title]
-      name      <- cursor.downField("alternateName").downField("value").as[Name]
+      title              <- cursor.downField("name").downField("value").as[Title]
+      name               <- cursor.downField("alternateName").downField("value").as[Name]
       maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
       projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
       maybeDescription <- cursor

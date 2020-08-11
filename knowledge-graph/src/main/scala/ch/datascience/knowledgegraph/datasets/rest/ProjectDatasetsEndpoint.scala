@@ -24,7 +24,7 @@ import ch.datascience.config.renku
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{Name, Identifier, Title, SameAs}
+import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs, Title}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links._

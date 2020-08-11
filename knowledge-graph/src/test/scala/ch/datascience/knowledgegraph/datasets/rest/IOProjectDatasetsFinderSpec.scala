@@ -48,16 +48,16 @@ class IOProjectDatasetsFinderSpec
         loadToStore(
           randomDataSetCommit,
           dataSetCommit()(projectPath)(
-            datasetIdentifier    = dataset1.id,
-            datasetTitle          = dataset1.title,
-            datasetName = dataset1.name,
-            maybeDatasetSameAs   = dataset1.sameAs.some
+            datasetIdentifier  = dataset1.id,
+            datasetTitle       = dataset1.title,
+            datasetName        = dataset1.name,
+            maybeDatasetSameAs = dataset1.sameAs.some
           ),
           dataSetCommit()(projectPath)(
-            datasetIdentifier    = dataset2.id,
-            datasetTitle          = dataset2.title,
-            datasetName = dataset2.name,
-            maybeDatasetSameAs   = dataset2.sameAs.some
+            datasetIdentifier  = dataset2.id,
+            datasetTitle       = dataset2.title,
+            datasetName        = dataset2.name,
+            maybeDatasetSameAs = dataset2.sameAs.some
           )
         )
 
@@ -73,16 +73,16 @@ class IOProjectDatasetsFinderSpec
       forAll(projectPaths, datasets, projectPaths, datasets) { (project1, dataset1, project2, dataset2) =>
         loadToStore(
           dataSetCommit()(project1)(
-            datasetIdentifier    = dataset1.id,
-            datasetTitle          = dataset1.title,
-            datasetName = dataset1.name,
-            maybeDatasetSameAs   = dataset1.sameAs.some
+            datasetIdentifier  = dataset1.id,
+            datasetTitle       = dataset1.title,
+            datasetName        = dataset1.name,
+            maybeDatasetSameAs = dataset1.sameAs.some
           ),
           dataSetCommit()(project2)(
-            datasetIdentifier    = dataset2.id,
-            datasetTitle          = dataset2.title,
-            datasetName = dataset2.name,
-            maybeDatasetSameAs   = DataSet.entityId(dataset1.id).asSameAs.some
+            datasetIdentifier  = dataset2.id,
+            datasetTitle       = dataset2.title,
+            datasetName        = dataset2.name,
+            maybeDatasetSameAs = DataSet.entityId(dataset1.id).asSameAs.some
           )
         )
 
@@ -102,16 +102,16 @@ class IOProjectDatasetsFinderSpec
 
         loadToStore(
           dataSetCommit()(project1)(
-            datasetIdentifier    = dataset1.id,
-            datasetTitle          = dataset1.title,
-            datasetName = dataset1.name,
-            maybeDatasetSameAs   = None
+            datasetIdentifier  = dataset1.id,
+            datasetTitle       = dataset1.title,
+            datasetName        = dataset1.name,
+            maybeDatasetSameAs = None
           ),
           dataSetCommit()(project2)(
-            datasetIdentifier    = dataset2.id,
-            datasetTitle          = dataset2.title,
-            datasetName = dataset2.name,
-            maybeDatasetSameAs   = dataSet1BasedSameAs.some
+            datasetIdentifier  = dataset2.id,
+            datasetTitle       = dataset2.title,
+            datasetName        = dataset2.name,
+            maybeDatasetSameAs = dataSet1BasedSameAs.some
           )
         )
 

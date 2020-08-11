@@ -126,8 +126,8 @@ private object BaseDetailsFinder {
       for {
         id                 <- extract[String]("datasetId", from = cursor)
         identifier         <- extract[Identifier]("identifier", from = cursor)
-        title               <- extract[Title]("name", from = cursor)
-        name      <- extract[Name]("alternateName", from = cursor)
+        title              <- extract[Title]("name", from = cursor)
+        name               <- extract[Name]("alternateName", from = cursor)
         maybeUrl           <- extract[Option[String]]("url", from = cursor).map(blankToNone).flatMap(toOption[Url])
         maybeSameAs        <- extract[Option[String]]("sameAs", from = cursor).map(blankToNone).flatMap(toOption[SameAs])
         maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate", from = cursor)

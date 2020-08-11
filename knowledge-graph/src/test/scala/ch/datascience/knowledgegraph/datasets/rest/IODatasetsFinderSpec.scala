@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DateCreated, Description, Title, PublishedDate, SameAs}
+import ch.datascience.graph.model.datasets.{DateCreated, Description, PublishedDate, SameAs, Title}
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.rest.SortBy.Direction
@@ -866,8 +866,8 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
             projectPath = firstProject.path
           )(
             datasetIdentifier         = dataset.id,
-            datasetTitle               = dataset.title,
-            datasetName      = dataset.name,
+            datasetTitle              = dataset.title,
+            datasetName               = dataset.name,
             maybeDatasetSameAs        = if (noSameAs) None else dataset.sameAs.some,
             maybeDatasetDescription   = dataset.maybeDescription,
             maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -885,8 +885,8 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
             )(
               projectPath = project.path
             )(
-              datasetTitle               = dataset.title,
-              datasetName      = dataset.name,
+              datasetTitle              = dataset.title,
+              datasetName               = dataset.name,
               maybeDatasetSameAs        = someSameAs,
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,

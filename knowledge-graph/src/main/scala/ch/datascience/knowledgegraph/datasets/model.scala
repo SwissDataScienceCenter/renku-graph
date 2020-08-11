@@ -26,8 +26,8 @@ import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 object model {
 
   final case class Dataset(id:               Identifier,
-                           title:             Title,
-                           name:    Name,
+                           title:            Title,
+                           name:             Name,
                            sameAs:           SameAs,
                            maybeUrl:         Option[Url],
                            maybeDescription: Option[Description],
