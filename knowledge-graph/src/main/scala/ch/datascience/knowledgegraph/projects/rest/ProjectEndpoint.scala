@@ -111,7 +111,7 @@ class ProjectEndpoint[Interpretation[_]: Effect](
       "ssh":    ${urls.ssh.value},
       "http":   ${urls.http.value},
       "web":    ${urls.web.value},
-      "readme": ${urls.readme.value}
+      "readme": ${urls.maybeReadme.map(_.value)}
     }"""
   }
 

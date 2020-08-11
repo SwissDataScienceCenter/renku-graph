@@ -19,10 +19,12 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import com.typesafe.config.ConfigFactory
+import io.chrisdavenport.log4cats.Logger
 import org.scalatest.Matchers._
 import org.scalatest.WordSpec
 

@@ -20,8 +20,8 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId}
-import ch.datascience.graph.model.{SchemaVersion, users}
+import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId, SchemaVersion}
+import ch.datascience.graph.model.users
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.rdfstore.entities.Project
 import ch.datascience.rdfstore.entities.bundles._

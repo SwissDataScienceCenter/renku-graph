@@ -102,4 +102,7 @@ object projects {
         }
       }
   }
+
+  final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
+  implicit object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank
 }

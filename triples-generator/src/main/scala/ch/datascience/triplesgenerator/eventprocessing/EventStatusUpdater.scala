@@ -37,6 +37,7 @@ private trait EventStatusUpdater[Interpretation[_]] {
   def markEventDone(eventId:                 CompoundEventId): Interpretation[Unit]
   def markEventFailedRecoverably(eventId:    CompoundEventId, exception: Throwable): Interpretation[Unit]
   def markEventFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): Interpretation[Unit]
+  def markEventSkipped(eventId:              CompoundEventId, message: String): Interpretation[Unit]
 }
 
 private class IOEventStatusUpdater(
@@ -81,6 +82,13 @@ private class IOEventStatusUpdater(
     sendStatusChange(
       eventId,
       payload         = json"""{"status": "NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+      responseMapping = okConflictAsSuccess
+    )
+
+  def markEventSkipped(eventId: CompoundEventId, message: String): IO[Unit] =
+    sendStatusChange(
+      eventId,
+      payload         = json"""{"status": "SKIPPED", "message": $message}""",
       responseMapping = okConflictAsSuccess
     )
 

@@ -42,7 +42,7 @@ class ProcessingStatusFinderSpec extends WordSpec with InMemoryEventLogDbSpec {
   "fetchStatus" should {
 
     "return ProcessingStatus for the given project " +
-      s"where $TriplesStore and $NonRecoverableFailure events are counted as done " +
+      s"where $TriplesStore, $Skipped and $NonRecoverableFailure events are counted as done " +
       "and all as total" in new TestCase {
 
       storeEvents(projectIds.generateOne, batchDates.generateOne, nonEmptyList(eventStatuses).generateOne)
@@ -53,7 +53,7 @@ class ProcessingStatusFinderSpec extends WordSpec with InMemoryEventLogDbSpec {
         maxElements = 20
       ).generateOne
       val doneEvents = nonEmptyList(
-        Gen.oneOf(TriplesStore, NonRecoverableFailure),
+        Gen.oneOf(TriplesStore, Skipped, NonRecoverableFailure),
         minElements = 10,
         maxElements = 20
       ).generateOne
@@ -62,7 +62,7 @@ class ProcessingStatusFinderSpec extends WordSpec with InMemoryEventLogDbSpec {
 
       val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
 
-      val expectedTotal: Int = doneEvents.size + toBeProcessedEvents.size
+      val expectedTotal = doneEvents.size + toBeProcessedEvents.size
       processingStatus.done.value           shouldBe doneEvents.size
       processingStatus.total.value          shouldBe expectedTotal
       processingStatus.progress.value.floor shouldBe ((doneEvents.size.toDouble / expectedTotal) * 100).floor
@@ -96,7 +96,7 @@ class ProcessingStatusFinderSpec extends WordSpec with InMemoryEventLogDbSpec {
       storeEvents(projectId, olderBatchDate, olderBatchStatuses)
 
       val newerBatchDate     = BatchDate(olderBatchDate.value plus (1, MINUTES))
-      val newerBatchStatuses = nonEmptyList(Gen.oneOf(TriplesStore, NonRecoverableFailure)).generateOne
+      val newerBatchStatuses = nonEmptyList(Gen.oneOf(TriplesStore, Skipped, NonRecoverableFailure)).generateOne
       storeEvents(projectId, newerBatchDate, newerBatchStatuses)
 
       val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()

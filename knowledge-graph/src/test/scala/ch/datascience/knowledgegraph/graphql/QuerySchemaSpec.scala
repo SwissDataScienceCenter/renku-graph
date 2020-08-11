@@ -97,8 +97,8 @@ class QuerySchemaSpec
           .returning(result)
     }
 
-    private val sourceNode = nodes.generateOne
-    private val targetNode = nodes.generateOne
+    private val sourceNode = entityNodes.generateOne
+    private val targetNode = processRunNodes.generateOne
     lazy val lineage = Lineage(
       edges = Set(Edge(sourceNode.location, targetNode.location)),
       nodes = Set(sourceNode, targetNode)

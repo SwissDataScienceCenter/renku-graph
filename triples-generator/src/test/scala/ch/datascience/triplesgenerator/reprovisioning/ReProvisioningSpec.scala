@@ -38,30 +38,37 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
 
   "run" should {
 
-    "clear the RDF Store and reschedule for processing all Commit Events in the Log if store outdated" in new TestCase {
+    "clear the RDF Store and reschedule for processing all Commit Events in the Log if store is outdated" in new TestCase {
       inSequence {
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
-          .returning(context.pure(false))
+          .returning(false.pure[IO])
 
         (triplesRemover.removeAllTriples _)
           .expects()
-          .returning(context.unit)
+          .returning(IO.unit)
 
         (eventsReScheduler.triggerEventsReScheduling _)
           .expects()
-          .returning(context.unit)
+          .returning(IO.unit)
+
+        (triplesVersionCreator.insertCliVersion _)
+          .expects()
+          .returning(IO.unit)
       }
 
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.loggedOnly(Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms"))
+      logger.loggedOnly(
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+      )
     }
 
     "do nothing if there all RDF store is up to date" in new TestCase {
       (triplesVersionFinder.triplesUpToDate _)
         .expects()
-        .returning(context.pure(true))
+        .returning(true.pure[IO])
 
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
@@ -74,11 +81,11 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
       inSequence {
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
-          .returning(context.raiseError(exception))
+          .returning(exception.raiseError[IO, Boolean])
 
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
-          .returning(context.pure(true))
+          .returning(true.pure[IO])
       }
 
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
@@ -95,29 +102,35 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
       inSequence {
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
-          .returning(context.pure(false))
+          .returning(false.pure[IO])
 
         (triplesRemover.removeAllTriples _)
           .expects()
-          .returning(context.raiseError(exception))
+          .returning(exception.raiseError[IO, Unit])
 
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
-          .returning(context.pure(false))
+          .returning(false.pure[IO])
 
         (triplesRemover.removeAllTriples _)
           .expects()
-          .returning(context.unit)
+          .returning(IO.unit)
 
         (eventsReScheduler.triggerEventsReScheduling _)
           .expects()
-          .returning(context.unit)
+          .returning(IO.unit)
+
+        (triplesVersionCreator.insertCliVersion _)
+          .expects()
+          .returning(IO.unit)
       }
 
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
         Error("Re-provisioning failure", exception),
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
         Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
       )
     }
@@ -128,33 +141,86 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
       inSequence {
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
-          .returning(context.pure(false))
+          .returning(false.pure[IO])
 
         (triplesRemover.removeAllTriples _)
           .expects()
-          .returning(context.unit)
+          .returning(IO.unit)
 
         (eventsReScheduler.triggerEventsReScheduling _)
           .expects()
-          .returning(context.raiseError(exception))
+          .returning(exception.raiseError[IO, Unit])
 
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
-          .returning(context.pure(false))
+          .returning(false.pure[IO])
 
         (triplesRemover.removeAllTriples _)
           .expects()
-          .returning(context.unit)
+          .returning(IO.unit)
 
         (eventsReScheduler.triggerEventsReScheduling _)
           .expects()
-          .returning(context.unit)
+          .returning(IO.unit)
+
+        (triplesVersionCreator.insertCliVersion _)
+          .expects()
+          .returning(IO.unit)
       }
 
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
         Error("Re-provisioning failure", exception),
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+      )
+    }
+
+    "do not fail but simply retry if creating the triples version fails" in new TestCase {
+      val exception = exceptions.generateOne
+
+      inSequence {
+        (triplesVersionFinder.triplesUpToDate _)
+          .expects()
+          .returning(false.pure[IO])
+
+        (triplesRemover.removeAllTriples _)
+          .expects()
+          .returning(IO.unit)
+
+        (eventsReScheduler.triggerEventsReScheduling _)
+          .expects()
+          .returning(IO.unit)
+
+        (triplesVersionCreator.insertCliVersion _)
+          .expects()
+          .returning(exception.raiseError[IO, Unit])
+
+        (triplesVersionFinder.triplesUpToDate _)
+          .expects()
+          .returning(false.pure[IO])
+
+        (triplesRemover.removeAllTriples _)
+          .expects()
+          .returning(IO.unit)
+
+        (eventsReScheduler.triggerEventsReScheduling _)
+          .expects()
+          .returning(IO.unit)
+
+        (triplesVersionCreator.insertCliVersion _)
+          .expects()
+          .returning(IO.unit)
+      }
+
+      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
+
+      logger.loggedOnly(
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Error("Re-provisioning failure", exception),
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
         Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
       )
     }
@@ -162,16 +228,17 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
     "start re-provisioning after the initial delay" in new TestCase {
       (triplesVersionFinder.triplesUpToDate _)
         .expects()
-        .returning(context.pure(true))
+        .returning(true.pure[IO])
 
       val someInitialDelay: ReProvisioningDelay = ReProvisioningDelay(500 millis)
 
       val startTime = System.currentTimeMillis()
 
-      new ReProvisioning[IO](
+      new ReProvisioningImpl[IO](
         triplesVersionFinder,
         triplesRemover,
         eventsReScheduler,
+        triplesVersionCreator,
         someInitialDelay,
         executionTimeRecorder,
         logger,
@@ -192,13 +259,15 @@ class ReProvisioningSpec extends WordSpec with MockFactory {
     val triplesVersionFinder  = mock[TriplesVersionFinder[IO]]
     val triplesRemover        = mock[TriplesRemover[IO]]
     val eventsReScheduler     = mock[EventsReScheduler[IO]]
+    val triplesVersionCreator = mock[TriplesVersionCreator[IO]]
     val initialDelay          = ReProvisioningDelay(durations(100 millis).generateOne)
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder(logger)
-    val reProvisioning = new ReProvisioning[IO](
+    val reProvisioning = new ReProvisioningImpl[IO](
       triplesVersionFinder,
       triplesRemover,
       eventsReScheduler,
+      triplesVersionCreator,
       initialDelay,
       executionTimeRecorder,
       logger,

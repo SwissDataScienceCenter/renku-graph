@@ -27,7 +27,7 @@ import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.users.Email
 import ch.datascience.http.client.AccessToken
@@ -35,7 +35,7 @@ import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.eventlog.EventStatus
-import io.renku.eventlog.EventStatus.New
+import io.renku.eventlog.EventStatus.{New, TriplesStore}
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.Assertion
@@ -47,12 +47,12 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
   def `data in the RDF store`(
       project:            Project,
       commitId:           CommitId,
-      schemaVersion:      SchemaVersion = currentSchemaVersion
+      schemaVersion:      CliVersion = currentCliVersion
   )(implicit accessToken: AccessToken): Assertion =
     `data in the RDF store`(
       project,
       commitId,
-      fileCommit(commitId = commitId, schemaVersion = schemaVersion)(projectPath = project.path)
+      fileCommit(commitId = commitId, cliVersion = schemaVersion)(projectPath = project.path)
     )
 
   def `data in the RDF store`(
@@ -75,7 +75,7 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience {
       .status shouldBe Accepted
 
     eventually {
-      EventLog.findEvents(projectId, status = New) shouldBe List(commitId)
+      EventLog.findEvents(projectId, status = New, TriplesStore) shouldBe List(commitId)
     }
 
     eventually {

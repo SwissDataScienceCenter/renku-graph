@@ -42,7 +42,6 @@ object Project {
       EntityTypes of (prov / "Location", schema / "Project"),
       schema / "name"          -> entity.name.asJsonLD,
       schema / "dateCreated"   -> entity.dateCreated.asJsonLD,
-      schema / "dateUpdated"   -> entity.dateCreated.asJsonLD,
       schema / "creator"       -> entity.maybeCreator.asJsonLD,
       schema / "schemaVersion" -> entity.version.asJsonLD,
       prov / "wasDerivedFrom"  -> entity.maybeParentProject.asJsonLD

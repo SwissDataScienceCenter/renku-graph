@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
-import ch.datascience.triplesgenerator.reprovisioning.IOReProvisioning
+import ch.datascience.triplesgenerator.reprovisioning.ReProvisioning
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers._
@@ -172,7 +172,7 @@ class MicroserviceRunnerSpec extends WordSpec with MockFactory {
     val sentryInitializer  = mock[IOSentryInitializer]
     val datasetInitializer = mock[IOFusekiDatasetInitializer]
     val subscriber         = mock[Subscriber]
-    val reProvisioning     = mock[IOReProvisioning]
+    val reProvisioning     = mock[ReProvisioning[IO]]
     val httpServer         = mock[IOHttpServer]
     val microserviceRunner = new MicroserviceRunner(
       sentryInitializer,

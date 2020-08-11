@@ -1,4 +1,4 @@
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "knowledgeGraph.fullname" . }}
@@ -74,7 +74,7 @@ spec:
               path: /ping
               port: http-kg
           resources:
-  {{ toYaml .Values.knowledgeGraph.resources | indent 12 }}
+  {{- toYaml .Values.knowledgeGraph.resources | nindent 12 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}

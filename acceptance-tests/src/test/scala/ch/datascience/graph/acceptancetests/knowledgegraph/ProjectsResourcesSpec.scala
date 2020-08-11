@@ -87,8 +87,8 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       Given("some data in the RDF Store")
       val jsonLDTriples = JsonLD.arr(
         dataSetCommit(
-          commitId      = dataset1CommitId,
-          schemaVersion = currentSchemaVersion
+          commitId   = dataset1CommitId,
+          cliVersion = currentCliVersion
         )(
           projectPath         = project.path,
           projectName         = project.name,
@@ -154,7 +154,7 @@ object ProjectsResources {
       "ssh":       ${project.urls.ssh.value},
       "http":      ${project.urls.http.value},
       "web":       ${project.urls.web.value},
-      "readme":    ${project.urls.readme.value}
+      "readme":    ${project.urls.maybeReadme.map(_.value)}
     },
     "forking":     ${project.forking.toJson},
     "tags":        ${project.tags.map(_.value).toList},

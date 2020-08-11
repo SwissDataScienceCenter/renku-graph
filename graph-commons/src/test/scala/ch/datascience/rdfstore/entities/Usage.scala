@@ -21,15 +21,17 @@ package ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.{EntityCommandParameter, Input}
 
-final class Usage private (val commandInput: EntityCommandParameter with Input, val maybeStep: Option[Step])
+final class Usage private (val activity:     Activity,
+                           val commandInput: EntityCommandParameter with Input,
+                           val maybeStep:    Option[Step])
 
 object Usage {
 
-  def apply(commandInput: EntityCommandParameter with Input): Usage =
-    new Usage(commandInput, maybeStep = None)
+  def apply(activity: Activity, commandInput: EntityCommandParameter with Input): Usage =
+    new Usage(activity, commandInput, maybeStep = None)
 
-  def factory(commandInput: EntityCommandParameter with Input): Step => Usage =
-    step => new Usage(commandInput, maybeStep = Some(step))
+  def factory(activity: Activity, commandInput: EntityCommandParameter with Input): Step => Usage =
+    step => new Usage(activity, commandInput, maybeStep = Some(step))
 
   import ch.datascience.graph.config.RenkuBaseUrl
   import io.renku.jsonld._
@@ -37,11 +39,17 @@ object Usage {
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Usage] =
     JsonLDEncoder.instance { entity =>
+      val entityId = entity.maybeStep match {
+        case None =>
+          EntityId of fusekiBaseUrl / "activities" / entity.activity.commitId / "inputs" / entity.commandInput.toString
+        case Some(step) =>
+          EntityId of fusekiBaseUrl / "activities" / entity.activity.commitId / "steps" / step / "inputs" / entity.commandInput.toString
+      }
       JsonLD.entity(
-        EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commandInput.entity.commitId / entity.maybeStep / "inputs" / entity.commandInput.toString,
+        entityId,
         EntityTypes of (prov / "Usage"),
         prov / "entity"  -> entity.commandInput.entity.asJsonLD,
-        prov / "hadRole" -> s"${entity.commandInput}_${entity.commandInput.position}".asJsonLD
+        prov / "hadRole" -> entity.commandInput.toString.asJsonLD
       )
     }
 }

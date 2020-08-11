@@ -20,7 +20,7 @@ package io.renku.jsonld
 
 import java.util.UUID
 
-import io.circe.{Encoder, Json}
+import io.circe.{Decoder, Encoder, Json}
 
 abstract class EntityId extends Product with Serializable {
   type Value
@@ -45,6 +45,14 @@ object EntityId {
     case StandardEntityId(url)   => Json.fromString(url)
     case BlankNodeEntityId(uuid) => Json.fromString(s"_:$uuid")
   }
+
+  implicit val entityIdJsonDecoder: Decoder[EntityId] = Decoder.instance {
+    _.as[String].map {
+      case s if s.startsWith("_:") => EntityId.blank
+      case s                       => EntityId.of(s)
+    }
+  }
+
   implicit val stringToEntityId:   String => EntityId   = StandardEntityId.apply
   implicit val propertyToEntityId: Property => EntityId = p => StandardEntityId(p.url)
 }

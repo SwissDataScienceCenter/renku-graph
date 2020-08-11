@@ -202,7 +202,7 @@ object GitLab {
               "ssh_url_to_repo":      ${project.urls.ssh.value},
               "http_url_to_repo":     ${project.urls.http.value},
               "web_url":              ${project.urls.web.value},
-              "readme_url":           ${project.urls.readme.value},
+              "readme_url":           ${project.urls.maybeReadme.map(_.value)},
               "forks_count":          ${project.forking.forksCount.value},
               "tag_list":             ${project.tags.map(_.value).toList},
               "star_count":           ${project.starsCount.value},

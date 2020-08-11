@@ -1,4 +1,4 @@
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "webhookService.fullname" . }}
@@ -86,7 +86,7 @@ spec:
               path: /ping
               port: http-webhook-sv
           resources:
-  {{ toYaml .Values.webhookService.resources | indent 12 }}
+  {{- toYaml .Values.webhookService.resources | nindent 12 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}
