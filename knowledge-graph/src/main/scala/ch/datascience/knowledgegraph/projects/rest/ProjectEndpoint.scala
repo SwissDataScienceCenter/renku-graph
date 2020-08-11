@@ -93,7 +93,8 @@ class ProjectEndpoint[Interpretation[_]: Effect](
       "tags":       ${project.tags.map(_.value).toList},
       "starsCount": ${project.starsCount.value},
       "permissions":${project.permissions},
-      "statistics": ${project.statistics}
+      "statistics": ${project.statistics},
+      "version":    ${project.version.value}
     }""" deepMerge _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))

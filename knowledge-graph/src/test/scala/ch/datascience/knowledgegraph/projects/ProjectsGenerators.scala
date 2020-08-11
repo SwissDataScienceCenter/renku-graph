@@ -69,7 +69,8 @@ object ProjectsGenerators {
     tags        = gitLabProject.tags,
     starsCount  = gitLabProject.starsCount,
     permissions = gitLabProject.permissions,
-    statistics  = gitLabProject.statistics
+    statistics  = gitLabProject.statistics,
+    version     = kgProject.version
   )
 
   implicit lazy val kgProjects: Gen[KGProject] = kgProjects(parents.toGeneratorOfOptions)
@@ -80,7 +81,8 @@ object ProjectsGenerators {
       name        <- projectNames
       created     <- projectCreations
       maybeParent <- parentsGen
-    } yield KGProject(id, name, created, maybeParent).copy(
+      version     <- projectSchemaVersions
+    } yield KGProject(id, name, created, maybeParent, version).copy(
       maybeParent = maybeParent.map { parent =>
         parent.copy(
           created = parent.created.copy(

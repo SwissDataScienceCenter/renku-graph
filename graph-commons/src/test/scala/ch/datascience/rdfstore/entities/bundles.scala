@@ -27,7 +27,7 @@ import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartLocation, PartName, PublishedDate, SameAs, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
-import ch.datascience.graph.model.projects.{DateCreated, Path}
+import ch.datascience.graph.model.projects.{DateCreated, Path, SchemaVersion}
 import ch.datascience.graph.model.{CliVersion, datasets, projects}
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream
 import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
@@ -49,7 +49,11 @@ object bundles extends Schemas {
   def generateAgent: Agent = Agent(cliVersions.generateOne)
 
   def generateProject(path: Path): Project =
-    Project(path, projectNames.generateOne, projectCreatedDates.generateOne, projectCreators.generateOption)
+    Project(path,
+            projectNames.generateOne,
+            projectCreatedDates.generateOne,
+            projectCreators.generateOption,
+            version = projectSchemaVersions.generateOne)
 
   def fileCommit(
       location:      Location      = locations.generateOne,
@@ -62,13 +66,14 @@ object bundles extends Schemas {
       projectName:         projects.Name = projectNames.generateOne,
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
-      maybeParent:         Option[Project] = None
+      maybeParent:         Option[Project] = None,
+      projectVersion:      SchemaVersion
   )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
     Activity(
       commitId,
       committedDate,
       committer,
-      Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent),
+      Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion),
       Agent(cliVersion),
       maybeGenerationFactories = List(
         Generation.factory(Entity.factory(location))
@@ -88,7 +93,8 @@ object bundles extends Schemas {
       projectName:         projects.Name        = projectNames.generateOne,
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
       maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
-      maybeParent:         Option[Project]      = None
+      maybeParent:         Option[Project]      = None,
+      projectVersion:      SchemaVersion        = projectSchemaVersions.generateOne
   )(
       datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
       datasetName:               Name = datasetNames.generateOne,
@@ -100,7 +106,8 @@ object bundles extends Schemas {
       datasetCreators:           Set[Person] = setOf(persons).generateOne,
       datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne
   )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = {
-    val project = Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent)
+    val project =
+      Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion)
     Activity(
       commitId,
       committedDate,
@@ -148,8 +155,11 @@ object bundles extends Schemas {
         projectPath:         Path = projectPaths.generateOne,
         cliVersion:          CliVersion = cliVersions.generateOne
     )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): (List[JsonLD], ExamplarData) = {
-      val project =
-        Project(projectPath, projectNames.generateOne, projectCreatedDates.generateOne, projectCreators.generateOption)
+      val project = Project(projectPath,
+                            projectNames.generateOne,
+                            projectCreatedDates.generateOne,
+                            projectCreators.generateOption,
+                            version = projectSchemaVersions.generateOne)
       val agent           = Agent(cliVersion)
       val dataSetId       = datasets.Identifier("d67a1653-0b6e-463b-89a0-afe72a53c8bb")
       val dataSetCreators = nonEmptySet(persons).generateOne

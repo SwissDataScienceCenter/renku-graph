@@ -100,9 +100,11 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
               parentProject.name,
               parentProject.created.date,
               maybeCreator =
-                parentProject.created.maybeCreator.map(creator => entities.Person(creator.name, creator.maybeEmail))
+                parentProject.created.maybeCreator.map(creator => entities.Person(creator.name, creator.maybeEmail)),
+              version = projectSchemaVersions.generateOne
             )
-            .some
+            .some,
+          projectVersion = project.version
         )(
           datasetIdentifier  = dataset.id,
           datasetName        = dataset.name,
@@ -165,7 +167,8 @@ object ProjectsResources {
       "repositorySize":   ${project.statistics.repositorySize.value},
       "lfsObjectsSize":   ${project.statistics.lsfObjectsSize.value},
       "jobArtifactsSize": ${project.statistics.jobArtifactsSize.value}
-    }
+    },
+    "version": ${project.version.value}
   }""" deepMerge {
     _links(
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),

@@ -82,7 +82,8 @@ package object forks {
       path        <- projectPaths
       name        <- projectNames
       createdDate <- projectCreatedDates
-    } yield Project(path, name, createdDate, maybeCreator, maybeParentProject)
+      version     <- projectSchemaVersions
+    } yield Project(path, name, createdDate, maybeCreator, maybeParentProject, version)
 
   def entitiesPersons(maybeEmailGen: Gen[Option[Email]] = userEmails.toGeneratorOfOptions): Gen[Person] =
     for {

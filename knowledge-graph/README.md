@@ -334,6 +334,7 @@ Response body example:
     "lfsObjectsSize":   0,
     "jobArtifactsSize": 0
   },
+  "version": "1", 
   "_links":[  
     {  
       "rel":"self",
