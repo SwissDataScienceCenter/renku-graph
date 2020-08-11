@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DateCreated, Description, Name, PublishedDate, SameAs}
+import ch.datascience.graph.model.datasets.{DateCreated, Description, PublishedDate, SameAs, Title}
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.rest.SortBy.Direction
@@ -68,12 +68,12 @@ class IODatasetsFinderSpec
         loadToStore(datasetsList flatMap (_.toJsonLD(noSameAs = false)): _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase = maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase = maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe datasetsList
           .map(_.toDatasetSearchResult)
-          .sortBy(_.name.value)
+          .sortBy(_.title.value)
 
         result.pagingInfo.total shouldBe Total(datasetsList.size)
       }
@@ -89,12 +89,12 @@ class IODatasetsFinderSpec
       loadToStore(datasetsList flatMap (_.toJsonLD(noSameAs = false)): _*)
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
+        .findDatasets(maybePhrase = None, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
         .unsafeRunSync()
 
       result.results shouldBe datasetsList
         .map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
+        .sortBy(_.title.value)
 
       result.pagingInfo.total shouldBe Total(datasetsList.size)
     }
@@ -109,12 +109,12 @@ class IODatasetsFinderSpec
       loadToStore(datasetsList flatMap (_.toJsonLD(noSameAs = true)): _*)
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
+        .findDatasets(maybePhrase = None, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
         .unsafeRunSync()
 
       result.results shouldBe datasetsList
         .map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
+        .sortBy(_.title.value)
 
       result.pagingInfo.total shouldBe Total(datasetsList.size)
     }
@@ -133,13 +133,13 @@ class IODatasetsFinderSpec
       )
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(3)))
+        .findDatasets(maybePhrase = None, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(3)))
         .unsafeRunSync()
 
       val datasetsList = List(dataset1, dataset2, dataset3)
       result.results shouldBe datasetsList
         .map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
+        .sortBy(_.title.value)
 
       result.pagingInfo.total shouldBe Total(datasetsList.size)
     }
@@ -171,13 +171,13 @@ class IODatasetsFinderSpec
       )
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+        .findDatasets(maybePhrase = None, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
         .unsafeRunSync()
 
       result.results shouldBe List(
         dataset1 addAll dataset1Fork.projects addAll dataset2.projects addAll dataset2Fork.projects
       ).map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
+        .sortBy(_.title.value)
 
       result.pagingInfo.total shouldBe Total(1)
     }
@@ -207,13 +207,13 @@ class IODatasetsFinderSpec
       )
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+        .findDatasets(maybePhrase = None, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
         .unsafeRunSync()
 
       result.results shouldBe List(
         initialDataset addAll initialDatasetFork.projects addAll importedDataset.projects addAll importedDatasetFork.projects
       ).map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
+        .sortBy(_.title.value)
 
       result.pagingInfo.total shouldBe Total(1)
     }
@@ -241,14 +241,14 @@ class IODatasetsFinderSpec
       )
 
       val result = datasetsFinder
-        .findDatasets(maybePhrase = None, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
+        .findDatasets(maybePhrase = None, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(2)))
         .unsafeRunSync()
 
       result.results shouldBe List(
         dataset1 addAll dataset1Fork.projects,
         dataset2 addAll dataset2Fork.projects
       ).map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
+        .sortBy(_.title.value)
 
       result.pagingInfo.total shouldBe Total(2)
     }
@@ -276,7 +276,7 @@ class IODatasetsFinderSpec
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       val matchingDatasets = List(dataset1, dataset2, dataset3)
@@ -306,7 +306,7 @@ class IODatasetsFinderSpec
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       val matchingDatasets = List(dataset1, dataset2, dataset3)
@@ -341,7 +341,7 @@ class IODatasetsFinderSpec
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       val matchingDatasets = List(dataset1, dataset2, dataset3)
@@ -394,7 +394,7 @@ class IODatasetsFinderSpec
 
       val result = datasetsFinder
         .findDatasets(maybePhrase = Some(phrase),
-                      Sort.By(NameProperty, Direction.Asc),
+                      Sort.By(TitleProperty, Direction.Asc),
                       PagingRequest(Page(1), PerPage(3)))
         .unsafeRunSync()
 
@@ -403,7 +403,7 @@ class IODatasetsFinderSpec
         dataset2 addAll dataset2Fork.projects,
         dataset3 addAll dataset3Fork.projects
       ).map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
+        .sortBy(_.title.value)
 
       result.pagingInfo.total shouldBe Total(3)
     }
@@ -449,7 +449,7 @@ class IODatasetsFinderSpec
 
       val result = datasetsFinder
         .findDatasets(maybePhrase = Some(phrase),
-                      Sort.By(NameProperty, Direction.Asc),
+                      Sort.By(TitleProperty, Direction.Asc),
                       PagingRequest(Page(1), PerPage(3)))
         .unsafeRunSync()
 
@@ -458,7 +458,7 @@ class IODatasetsFinderSpec
         dataset2 addAll dataset2Fork.projects,
         dataset3 addAll dataset3Fork.projects
       ).map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
+        .sortBy(_.title.value)
 
       result.pagingInfo.total shouldBe Total(3)
     }
@@ -497,7 +497,7 @@ class IODatasetsFinderSpec
 
       val result = datasetsFinder
         .findDatasets(maybePhrase = Some(phrase),
-                      Sort.By(NameProperty, Direction.Asc),
+                      Sort.By(TitleProperty, Direction.Asc),
                       PagingRequest(Page(1), PerPage(3)))
         .unsafeRunSync()
 
@@ -506,7 +506,7 @@ class IODatasetsFinderSpec
         dataset2 addAll dataset2Fork.projects,
         dataset3 addAll dataset3Fork.projects
       ).map(_.toDatasetSearchResult)
-        .sortBy(_.name.value)
+        .sortBy(_.title.value)
 
       result.pagingInfo.total shouldBe Total(3)
     }
@@ -514,7 +514,7 @@ class IODatasetsFinderSpec
 
   "findDatasets with explicit sorting given" should {
 
-    s"return datasets with name, description or creator matching the given phrase sorted by $NameProperty" in new TestCase {
+    s"return datasets with name, description or creator matching the given phrase sorted by $TitleProperty" in new TestCase {
       forAll(datasets, datasets, datasets, datasets) { (dataset1Orig, dataset2Orig, dataset3Orig, nonPhrased) =>
         val phrase                         = phrases.generateOne
         val (dataset1, dataset2, dataset3) = addPhrase(phrase, dataset1Orig, dataset2Orig, dataset3Orig)
@@ -522,11 +522,11 @@ class IODatasetsFinderSpec
         loadToStore(List(dataset1, dataset2, dataset3, nonPhrased) flatMap (_.toJsonLD(noSameAs = false)): _*)
 
         datasetsFinder
-          .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
           .results shouldBe List(dataset1.toDatasetSearchResult,
                                  dataset2.toDatasetSearchResult,
-                                 dataset3.toDatasetSearchResult).sortBy(_.name.value)
+                                 dataset3.toDatasetSearchResult).sortBy(_.title.value)
       }
     }
 
@@ -587,7 +587,7 @@ class IODatasetsFinderSpec
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       val expectedDataset = List(dataset1, dataset2, dataset3).sorted(byName)(1)
@@ -609,7 +609,7 @@ class IODatasetsFinderSpec
       val pagingRequest = PagingRequest(Page(2), PerPage(3))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       result.results                  shouldBe Nil
@@ -660,13 +660,13 @@ class IODatasetsFinderSpec
         loadToStore(dataset1Jsons ++ dataset2Jsons ++ dataset3Jsons: _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
           .unsafeRunSync()
 
         result.results shouldBe List(
           dataset1 addAll dataset2.projects addAll dataset3.projects
         ).map(_.toDatasetSearchResult)
-          .sortBy(_.name.value)
+          .sortBy(_.title.value)
 
         result.pagingInfo.total shouldBe Total(1)
       }
@@ -696,13 +696,13 @@ class IODatasetsFinderSpec
         loadToStore(dataset1Jsons ++ dataset2Jsons ++ dataset3Jsons: _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
           .unsafeRunSync()
 
         result.results shouldBe List(
           dataset1 addAll dataset2.projects addAll dataset3.projects
         ).map(_.toDatasetSearchResult)
-          .sortBy(_.name.value)
+          .sortBy(_.title.value)
 
         result.pagingInfo.total shouldBe Total(1)
       }
@@ -732,13 +732,13 @@ class IODatasetsFinderSpec
         loadToStore(dataset1Jsons ++ dataset2Jsons ++ dataset3Jsons: _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
           .unsafeRunSync()
 
         result.results shouldBe List(
           dataset1 addAll dataset2.projects addAll dataset3.projects
         ).map(_.toDatasetSearchResult)
-          .sortBy(_.name.value)
+          .sortBy(_.title.value)
 
         result.pagingInfo.total shouldBe Total(1)
       }
@@ -756,13 +756,13 @@ class IODatasetsFinderSpec
         loadToStore(allJsons: _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(1)))
           .unsafeRunSync()
 
         result.results shouldBe List(
           dataset1 addAll allDatasets.tail.flatMap(_.projects)
         ).map(_.toDatasetSearchResult)
-          .sortBy(_.name.value)
+          .sortBy(_.title.value)
 
         result.pagingInfo.total shouldBe Total(1)
       }
@@ -788,7 +788,7 @@ class IODatasetsFinderSpec
   ): (Dataset, Dataset, Dataset) = {
     val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(containtingPhrase.toString)
     val dataset1 = dataset1Orig.copy(
-      name = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
+      title = sentenceContaining(nonEmptyPhrase).map(_.value).map(Title.apply).generateOne
     )
     val dataset2 = dataset2Orig.copy(
       maybeDescription = Some(sentenceContaining(nonEmptyPhrase).map(_.value).map(Description.apply).generateOne)
@@ -821,7 +821,7 @@ class IODatasetsFinderSpec
     def makeNameContaining(phrase: Phrase): Dataset = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
       dataset.copy(
-        name = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
+        title = sentenceContaining(nonEmptyPhrase).map(_.value).map(Title.apply).generateOne
       )
     }
 
@@ -852,6 +852,7 @@ class IODatasetsFinderSpec
 
     lazy val toDatasetSearchResult: DatasetSearchResult = DatasetSearchResult(
       dataset.id,
+      dataset.title,
       dataset.name,
       dataset.maybeDescription,
       dataset.published,
@@ -869,6 +870,7 @@ class IODatasetsFinderSpec
             projectPath = firstProject.path
           )(
             datasetIdentifier         = dataset.id,
+            datasetTitle              = dataset.title,
             datasetName               = dataset.name,
             maybeDatasetSameAs        = if (noSameAs) None else dataset.sameAs.some,
             maybeDatasetDescription   = dataset.maybeDescription,
@@ -887,6 +889,7 @@ class IODatasetsFinderSpec
             )(
               projectPath = project.path
             )(
+              datasetTitle              = dataset.title,
               datasetName               = dataset.name,
               maybeDatasetSameAs        = someSameAs,
               maybeDatasetDescription   = dataset.maybeDescription,
@@ -944,5 +947,5 @@ class IODatasetsFinderSpec
     creator => Person(creator.name, creator.maybeEmail, creator.maybeAffiliation)
 
   private lazy val byName: Ordering[Dataset] =
-    (ds1: Dataset, ds2: Dataset) => ds1.name.value compareTo ds2.name.value
+    (ds1: Dataset, ds2: Dataset) => ds1.title.value compareTo ds2.title.value
 }

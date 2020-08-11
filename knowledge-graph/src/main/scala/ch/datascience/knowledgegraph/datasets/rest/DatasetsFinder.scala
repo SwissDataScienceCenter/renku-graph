@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PublishedDate}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PublishedDate, Title}
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
@@ -46,6 +46,7 @@ private trait DatasetsFinder[Interpretation[_]] {
 private object DatasetsFinder {
   final case class DatasetSearchResult(
       id:               Identifier,
+      title:            Title,
       name:             Name,
       maybeDescription: Option[Description],
       published:        DatasetPublishing,
@@ -95,7 +96,7 @@ private class IODatasetsFinder(
     ),
     maybePhrase match {
       case Some(phrase) if phrase.value.trim != "*" =>
-        s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
+        s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?projectsCount
             |WHERE {
             |  {
             |    # locating earliest commit (date) where dataset with same origin was added
@@ -221,6 +222,7 @@ private class IODatasetsFinder(
             |    ?dsId schema:sameAs/schema:url ?topmostSameAs;
             |          schema:identifier ?identifier ;
             |          schema:name ?name ;
+            |          schema:alternateName ?alternateName ;
             |          prov:qualifiedGeneration/prov:activity ?activityId .
             |    ?activityId prov:startedAtTime ?minDateCreated
             |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
@@ -230,18 +232,19 @@ private class IODatasetsFinder(
             |                   schema:identifier ?identifier .
             |    ?dsId schema:identifier ?identifier;
             |          schema:name ?name ;
+            |          schema:alternateName ?alternateName ;
             |          prov:qualifiedGeneration/prov:activity ?activityId .
             |    ?activityId prov:startedAtTime ?minDateCreated
             |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
             |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
             |  }
             |}
-            |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
+            |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?projectsCount
             |HAVING (COUNT(*) > 0)
             |${`ORDER BY`(sort)}
             |""".stripMargin
       case _ =>
-        s"""|SELECT ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
+        s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?projectsCount
             |WHERE {
             |  {
             |    # locating earliest commit (date) where dataset with same origin was added
@@ -306,6 +309,7 @@ private class IODatasetsFinder(
             |    ?dsId schema:sameAs/schema:url ?topmostSameAs;
             |          schema:identifier ?identifier ;
             |          schema:name ?name ;
+            |          schema:alternateName ?alternateName ;
             |          prov:qualifiedGeneration/prov:activity ?activityId .
             |    ?activityId prov:startedAtTime ?minDateCreated
             |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
@@ -315,13 +319,14 @@ private class IODatasetsFinder(
             |                   schema:identifier ?identifier .
             |    ?dsId schema:identifier ?identifier;
             |          schema:name ?name ;
+            |          schema:alternateName ?alternateName ;
             |          prov:qualifiedGeneration/prov:activity ?activityId .
             |    ?activityId prov:startedAtTime ?minDateCreated
             |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
             |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
             |  }
             |}
-            |GROUP BY ?identifier ?name ?maybeDescription ?maybePublishedDate ?projectsCount
+            |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?projectsCount
             |HAVING (COUNT(*) > 0)
             |${`ORDER BY`(sort)}
             |""".stripMargin
@@ -437,7 +442,7 @@ private class IODatasetsFinder(
   )
 
   private def `ORDER BY`(sort: Sort.By): String = sort.property match {
-    case Sort.NameProperty          => s"ORDER BY ${sort.direction}(?name)"
+    case Sort.TitleProperty         => s"ORDER BY ${sort.direction}(?name)"
     case Sort.DatePublishedProperty => s"ORDER BY ${sort.direction}(?maybePublishedDate)"
     case Sort.ProjectsCountProperty => s"ORDER BY ${sort.direction}(?projectsCount)"
   }
@@ -463,7 +468,8 @@ private object IODatasetsFinder {
 
     for {
       id                 <- cursor.downField("identifier").downField("value").as[Identifier]
-      name               <- cursor.downField("name").downField("value").as[Name]
+      title              <- cursor.downField("name").downField("value").as[Title]
+      name               <- cursor.downField("alternateName").downField("value").as[Name]
       maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
       projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
       maybeDescription <- cursor
@@ -474,6 +480,7 @@ private object IODatasetsFinder {
                            .flatMap(toOption[Description])
     } yield DatasetSearchResult(
       id,
+      title,
       name,
       maybeDescription,
       DatasetPublishing(maybePublishedDate, Set.empty),

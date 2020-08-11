@@ -64,7 +64,8 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
         {
           "datasetId": {"value": ${DataSet.entityId(dataset.id).value.toString}},
           "identifier": {"value": ${dataset.id.value}},
-          "name": {"value": ${dataset.name.value}},
+          "name": {"value": ${dataset.title.value}},
+          "alternateName": {"value": ${dataset.name.value}},
           "publishedDate": {"value": ${publishedDate.value}},
           "description": {"value": $blank},
           "url": {"value": $blank},

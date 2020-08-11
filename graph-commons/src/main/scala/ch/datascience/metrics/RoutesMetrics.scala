@@ -36,13 +36,10 @@ class RoutesMetrics[Interpretation[_]](metricsRegistry: MetricsRegistry[Interpre
                     clock:      Clock[Interpretation]): Resource[Interpretation, HttpRoutes[Interpretation]] =
       metricsRegistry.maybeCollectorRegistry match {
         case Some(collectorRegistry) =>
-          for {
-            metrics <- Prometheus.metricsOps[Interpretation](collectorRegistry, "server")
-          } yield {
-            val meteredRoutes = PrometheusExportService(collectorRegistry).routes <+> ServerMetrics[Interpretation](
+          Prometheus.metricsOps[Interpretation](collectorRegistry, "server").map { metrics =>
+            PrometheusExportService(collectorRegistry).routes <+> ServerMetrics[Interpretation](
               metrics
             )(routes)
-            meteredRoutes
           }
         case _ => Resource.liftF(F.pure(routes))
       }

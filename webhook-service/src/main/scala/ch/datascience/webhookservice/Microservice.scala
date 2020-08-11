@@ -73,6 +73,10 @@ object Microservice extends IOMicroservice {
                                                              executionTimeRecorder,
                                                              ApplicationLogger)
       hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler)
+      eventsSynchronizationScheduler <- IOEventsSynchronizationScheduler(gitLabThrottler,
+                                                                         executionTimeRecorder,
+                                                                         ApplicationLogger)
+
       microserviceRoutes = new MicroserviceRoutes[IO](
         hookEventEndpoint,
         hookCreatorEndpoint,
@@ -80,9 +84,7 @@ object Microservice extends IOMicroservice {
         processingStatusEndpoint,
         new RoutesMetrics[IO](metricsRegistry)
       ).routes
-      eventsSynchronizationScheduler <- IOEventsSynchronizationScheduler(gitLabThrottler,
-                                                                         executionTimeRecorder,
-                                                                         ApplicationLogger)
+
       exitcode <- microserviceRoutes.use { routes =>
                    val httpServer = new HttpServer[IO](serverPort = 9001, routes)
 

@@ -75,7 +75,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
       maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]]
   ): F[Response[F]] =
     (maybePhrase.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Phrase])),
-     maybeSort getOrElse Validated.validNel(Sort.By(NameProperty, Direction.Asc)),
+     maybeSort getOrElse Validated.validNel(Sort.By(TitleProperty, Direction.Asc)),
      PagingRequest(maybePage, maybePerPage))
       .mapN(datasetsSearchEndpoint.searchForDatasets)
       .fold(toBadRequest(), identity)
