@@ -50,48 +50,49 @@ object Microservice extends IOMicroservice {
   protected implicit override def timer: Timer[IO] =
     IO.timer(executionContext)
 
-  override def run(args: List[String]): IO[ExitCode] = {
+  override def run(args: List[String]): IO[ExitCode] =
     for {
-      sentryInitializer     <- SentryInitializer[IO].asResource
-      projectHookUrl        <- ProjectHookUrl.fromConfig[IO]().asResource
-      gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit").asResource
-      gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit).asResource
-      hookTokenCrypto       <- HookTokenCrypto[IO]().asResource
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger).asResource
-      metricsRegistry       <- MetricsRegistry().asResource
+      sentryInitializer     <- SentryInitializer[IO]
+      projectHookUrl        <- ProjectHookUrl.fromConfig[IO]()
+      gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+      gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
+      hookTokenCrypto       <- HookTokenCrypto[IO]()
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+      metricsRegistry       <- MetricsRegistry()
       hookEventEndpoint <- IOHookEventEndpoint(gitLabThrottler,
                                                hookTokenCrypto,
                                                executionTimeRecorder,
-                                               ApplicationLogger).asResource
+                                               ApplicationLogger)
       hookCreatorEndpoint <- IOHookCreationEndpoint(projectHookUrl,
                                                     gitLabThrottler,
                                                     hookTokenCrypto,
                                                     executionTimeRecorder,
-                                                    ApplicationLogger).asResource
+                                                    ApplicationLogger)
       processingStatusEndpoint <- IOProcessingStatusEndpoint(projectHookUrl,
                                                              gitLabThrottler,
                                                              executionTimeRecorder,
-                                                             ApplicationLogger).asResource
-      hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler).asResource
-      routes <- new MicroserviceRoutes[IO](
-                 hookEventEndpoint,
-                 hookCreatorEndpoint,
-                 hookValidationEndpoint,
-                 processingStatusEndpoint,
-                 new RoutesMetrics[IO](metricsRegistry)
-               ).routes
-      httpServer = new HttpServer[IO](serverPort = 9001, routes)
-
+                                                             ApplicationLogger)
+      hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler)
+      microserviceRoutes = new MicroserviceRoutes[IO](
+        hookEventEndpoint,
+        hookCreatorEndpoint,
+        hookValidationEndpoint,
+        processingStatusEndpoint,
+        new RoutesMetrics[IO](metricsRegistry)
+      ).routes
       eventsSynchronizationScheduler <- IOEventsSynchronizationScheduler(gitLabThrottler,
                                                                          executionTimeRecorder,
-                                                                         ApplicationLogger).asResource
-      exitCode = new MicroserviceRunner(
-        sentryInitializer,
-        eventsSynchronizationScheduler,
-        httpServer
-      ) run args
-    } yield exitCode
-  }.use(identity)
+                                                                         ApplicationLogger)
+      exitcode <- microserviceRoutes.use { routes =>
+                   val httpServer = new HttpServer[IO](serverPort = 9001, routes)
+
+                   new MicroserviceRunner(
+                     sentryInitializer,
+                     eventsSynchronizationScheduler,
+                     httpServer
+                   ) run args
+                 }
+    } yield exitcode
 }
 
 class MicroserviceRunner(sentryInitializer:              SentryInitializer[IO],

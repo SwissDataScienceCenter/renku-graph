@@ -44,27 +44,28 @@ object Microservice extends IOMicroservice {
 
   private def runMicroservice(transactorResource: DbTransactorResource[IO, ProjectsTokensDB], args: List[String]) =
     transactorResource.use { transactor =>
-      val program = for {
-        sentryInitializer      <- SentryInitializer[IO].asResource
-        fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, ApplicationLogger).asResource
-        associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, ApplicationLogger).asResource
-        dbInitializer          <- IODbInitializer(transactor, ApplicationLogger).asResource
-        metricsRegistry        <- MetricsRegistry().asResource
-        routes <- new MicroserviceRoutes[IO](
-                   fetchTokenEndpoint,
-                   associateTokenEndpoint,
-                   new IODeleteTokenEndpoint(transactor, ApplicationLogger),
-                   new RoutesMetrics[IO](metricsRegistry)
-                 ).routes
-        httpServer = new HttpServer[IO](serverPort = 9003, routes)
+      for {
+        sentryInitializer      <- SentryInitializer[IO]
+        fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, ApplicationLogger)
+        associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, ApplicationLogger)
+        dbInitializer          <- IODbInitializer(transactor, ApplicationLogger)
+        metricsRegistry        <- MetricsRegistry()
+        microserviceRoutes = new MicroserviceRoutes[IO](
+          fetchTokenEndpoint,
+          associateTokenEndpoint,
+          new IODeleteTokenEndpoint(transactor, ApplicationLogger),
+          new RoutesMetrics[IO](metricsRegistry)
+        ).routes
+        exitcode <- microserviceRoutes.use { routes =>
+                     val httpServer = new HttpServer[IO](serverPort = 9003, routes)
 
-        exitCode = new MicroserviceRunner(
-          sentryInitializer,
-          dbInitializer,
-          httpServer
-        ) run args
-      } yield exitCode
-      program.use(identity)
+                     new MicroserviceRunner(
+                       sentryInitializer,
+                       dbInitializer,
+                       httpServer
+                     ) run args
+                   }
+      } yield exitcode
     }
 }
 

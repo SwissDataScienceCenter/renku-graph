@@ -41,18 +41,6 @@ object EndpointTester {
   implicit val jsonListEntityDecoder: EntityDecoder[IO, List[Json]] = jsonOf[IO, List[Json]]
   implicit val jsonEntityEncoder:     EntityEncoder[IO, Json]       = jsonEncoderOf[IO, Json]
 
-  implicit class IOEndpointOps(endpoint: IO[Kleisli[IO, Request[IO], Response[IO]]]) {
-
-    def call(request: Request[IO]) = new {
-      private val runResponse: Response[IO] = endpoint.flatMap(_.run(request)).unsafeRunSync()
-
-      lazy val status:      Status                 = runResponse.status
-      lazy val contentType: Option[`Content-Type`] = runResponse.contentType
-
-      def body[T](implicit decoder: EntityDecoder[IO, T]): T = runResponse.as[T].unsafeRunSync
-    }
-  }
-
   implicit class ResourceEndpointOps(endpoint: Resource[IO, Kleisli[IO, Request[IO], Response[IO]]]) {
 
     def call(request: Request[IO]) = new {

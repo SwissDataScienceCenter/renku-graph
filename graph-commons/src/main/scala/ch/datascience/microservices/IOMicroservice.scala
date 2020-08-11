@@ -30,7 +30,4 @@ trait IOMicroservice extends IOApp {
 
   def stopSubProcesses: List[CancelToken[IO]] = subProcessesCancelTokens.keys().asScala.toList
 
-  implicit class IOLiftOps[T](monad: IO[T]) {
-    lazy val asResource: Resource[IO, T] = Resource.liftF(monad)
-  }
 }

@@ -21,6 +21,7 @@ package io.renku.eventlog
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors.newFixedThreadPool
 
+import cats.FlatMap.ops.toAllFlatMapOps
 import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
@@ -58,59 +59,61 @@ object Microservice extends IOMicroservice {
 
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
     transactorResource.use { transactor =>
-      val serviceRunner = for {
-        _                    <- new IODbInitializer(transactor, ApplicationLogger).run.asResource
-        sentryInitializer    <- SentryInitializer[IO].asResource
-        metricsRegistry      <- MetricsRegistry().asResource
-        queriesExecTimes     <- QueriesExecutionTimes(metricsRegistry).asResource
-        statsFinder          <- IOStatsFinder(transactor, queriesExecTimes).asResource
-        eventLogMetrics      <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry).asResource
-        waitingEventsGauge   <- WaitingEventsGauge(metricsRegistry, statsFinder, ApplicationLogger).asResource
-        underProcessingGauge <- UnderProcessingGauge(metricsRegistry, statsFinder, ApplicationLogger).asResource
+      for {
+        _                    <- new IODbInitializer(transactor, ApplicationLogger).run
+        sentryInitializer    <- SentryInitializer[IO]
+        metricsRegistry      <- MetricsRegistry()
+        queriesExecTimes     <- QueriesExecutionTimes(metricsRegistry)
+        statsFinder          <- IOStatsFinder(transactor, queriesExecTimes)
+        eventLogMetrics      <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
+        waitingEventsGauge   <- WaitingEventsGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        underProcessingGauge <- UnderProcessingGauge(metricsRegistry, statsFinder, ApplicationLogger)
         eventCreationEndpoint <- IOEventCreationEndpoint(transactor,
                                                          waitingEventsGauge,
                                                          queriesExecTimes,
-                                                         ApplicationLogger).asResource
-        latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger).asResource
-        processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger).asResource
+                                                         ApplicationLogger)
+        latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
+        processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
                                                            waitingEventsGauge,
                                                            underProcessingGauge,
                                                            queriesExecTimes,
-                                                           ApplicationLogger).asResource
+                                                           ApplicationLogger)
         statusChangeEndpoint <- IOStatusChangeEndpoint(transactor,
                                                        waitingEventsGauge,
                                                        underProcessingGauge,
                                                        queriesExecTimes,
-                                                       ApplicationLogger).asResource
-        subscriptions <- Subscriptions(ApplicationLogger).asResource
+                                                       ApplicationLogger)
+        subscriptions <- Subscriptions(ApplicationLogger)
         eventsDispatcher <- EventsDispatcher(transactor,
                                              subscriptions,
                                              waitingEventsGauge,
                                              underProcessingGauge,
                                              queriesExecTimes,
-                                             ApplicationLogger).asResource
-        subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptions, ApplicationLogger).asResource
-        routes <- new MicroserviceRoutes[IO](
-                   eventCreationEndpoint,
-                   latestEventsEndpoint,
-                   processingStatusEndpoint,
-                   eventsPatchingEndpoint,
-                   statusChangeEndpoint,
-                   subscriptionsEndpoint,
-                   new RoutesMetrics[IO](metricsRegistry)
-                 ).routes
-        httpServer = new HttpServer[IO](serverPort = 9005, routes)
+                                             ApplicationLogger)
+        subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptions, ApplicationLogger)
+        microserviceRoutes = new MicroserviceRoutes[IO](
+          eventCreationEndpoint,
+          latestEventsEndpoint,
+          processingStatusEndpoint,
+          eventsPatchingEndpoint,
+          statusChangeEndpoint,
+          subscriptionsEndpoint,
+          new RoutesMetrics[IO](metricsRegistry)
+        ).routes
+        exitcode <- microserviceRoutes.use { routes =>
+                     val httpServer = new HttpServer[IO](serverPort = 9005, routes)
 
-        exitCode = new MicroserviceRunner(
-          sentryInitializer,
-          eventLogMetrics,
-          eventsDispatcher,
-          httpServer,
-          subProcessesCancelTokens
-        ) run args
-      } yield exitCode
-      serviceRunner.use(identity)
+                     new MicroserviceRunner(
+                       sentryInitializer,
+                       eventLogMetrics,
+                       eventsDispatcher,
+                       httpServer,
+                       subProcessesCancelTokens
+                     ) run args
+                   }
+      } yield exitcode
+
     }
 
 }
