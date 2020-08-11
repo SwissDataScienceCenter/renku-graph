@@ -25,7 +25,7 @@ import com.zaxxer.hikari.HikariDataSource
 import eu.timepit.refined.api.RefType.applyRef
 import org.scalacheck.Gen.choose
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._

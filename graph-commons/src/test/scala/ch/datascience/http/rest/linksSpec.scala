@@ -24,7 +24,7 @@ import ch.datascience.http.rest.Links.{Link, _links}
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

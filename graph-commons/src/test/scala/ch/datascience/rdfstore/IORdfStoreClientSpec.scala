@@ -36,7 +36,7 @@ import io.circe.Json
 import org.http4s.Status.{BadRequest, Ok}
 import org.http4s.{Request, Response, Status}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global

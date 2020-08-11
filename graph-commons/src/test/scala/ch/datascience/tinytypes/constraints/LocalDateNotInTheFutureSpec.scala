@@ -22,7 +22,7 @@ import java.time.LocalDate
 
 import ch.datascience.generators.Generators.localDatesNotInTheFuture
 import ch.datascience.tinytypes.{LocalDateTinyType, TinyTypeFactory}
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

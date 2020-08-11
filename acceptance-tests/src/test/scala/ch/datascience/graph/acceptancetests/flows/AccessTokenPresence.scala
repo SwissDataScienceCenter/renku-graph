@@ -25,9 +25,9 @@ import ch.datascience.knowledgegraph.projects.model.Project
 import io.circe.syntax._
 import org.http4s.Status._
 import org.scalatest.Assertion
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 
-object AccessTokenPresence {
+object AccessTokenPresence extends should.Matchers {
 
   def givenAccessTokenPresentFor(project: Project)(implicit accessToken: AccessToken): Assertion = {
 

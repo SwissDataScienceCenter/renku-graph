@@ -49,7 +49,7 @@ import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 
 class ProjectsResourcesSpec
     extends AnyFeatureSpec

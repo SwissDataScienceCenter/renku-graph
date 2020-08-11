@@ -21,7 +21,7 @@ package ch.datascience.tinytypes
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.constraints.PathSegment
 import org.scalacheck.Gen
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

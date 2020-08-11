@@ -35,7 +35,7 @@ import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import sangria.ast.Document
 import sangria.macros._
 

@@ -26,7 +26,7 @@ import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 

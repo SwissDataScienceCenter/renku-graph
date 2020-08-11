@@ -39,7 +39,7 @@ import io.renku.eventlog.EventStatus.{New, TriplesStore}
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.Assertion
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.concurrent.Eventually
 
 object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience with should.Matchers {

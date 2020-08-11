@@ -30,7 +30,7 @@ import ch.datascience.http.rest.paging.model.Page.first
 import eu.timepit.refined.api.Refined
 import org.http4s._
 import org.scalacheck.Gen
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

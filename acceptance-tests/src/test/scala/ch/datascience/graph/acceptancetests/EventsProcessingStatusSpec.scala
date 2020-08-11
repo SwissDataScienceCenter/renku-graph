@@ -44,7 +44,7 @@ import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 
 import scala.language.postfixOps
 

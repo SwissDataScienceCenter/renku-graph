@@ -28,7 +28,7 @@ import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec}
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class LatestEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {

@@ -31,7 +31,7 @@ import ch.datascience.knowledgegraph.lineage.model.{EdgeMap, Lineage, Node}
 import ch.datascience.rdfstore.SparqlQuery
 import io.renku.jsonld.EntityId
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 

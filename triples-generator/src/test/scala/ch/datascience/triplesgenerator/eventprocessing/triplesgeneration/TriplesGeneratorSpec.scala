@@ -25,7 +25,7 @@ import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import com.typesafe.config.ConfigFactory
 import io.chrisdavenport.log4cats.Logger
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._

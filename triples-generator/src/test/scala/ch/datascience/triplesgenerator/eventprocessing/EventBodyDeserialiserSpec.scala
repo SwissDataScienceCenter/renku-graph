@@ -29,7 +29,7 @@ import ch.datascience.triplesgenerator.eventprocessing.CommitEvent.{CommitEventW
 import io.circe._
 import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Failure, Try}

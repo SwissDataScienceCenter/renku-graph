@@ -33,7 +33,7 @@ import ch.datascience.webhookservice.model.HookToken
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.RefType
 import eu.timepit.refined.auto._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._

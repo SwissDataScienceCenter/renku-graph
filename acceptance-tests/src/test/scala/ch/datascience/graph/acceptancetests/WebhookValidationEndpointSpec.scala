@@ -30,6 +30,7 @@ import ch.datascience.http.client.AccessToken
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should
 
 class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with should.Matchers {
 
@@ -53,7 +54,7 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
       response.status shouldBe Ok
     }
 
-    scenario("There's no Graph Services hook on a Public project in GitLab") {
+    Scenario("There's no Graph Services hook on a Public project in GitLab") {
 
       val projectId = projectIds.generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
@@ -71,7 +72,7 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
       response.status shouldBe NotFound
     }
 
-    scenario("There's a Graph Services hook on a non-public project in GitLab") {
+    Scenario("There's a Graph Services hook on a non-public project in GitLab") {
 
       val projectId = projectIds.generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne

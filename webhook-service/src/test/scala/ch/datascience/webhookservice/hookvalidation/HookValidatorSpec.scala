@@ -38,7 +38,7 @@ import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository.{AccessTokenAssociator, AccessTokenRemover}
 import io.chrisdavenport.log4cats.Logger
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Failure, Try}

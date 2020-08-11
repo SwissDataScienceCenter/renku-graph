@@ -40,7 +40,7 @@ import org.http4s.Method.GET
 import org.http4s.client.ConnectionFailure
 import org.http4s.{Request, Response, Status}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._

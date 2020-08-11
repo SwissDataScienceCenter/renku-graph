@@ -31,7 +31,7 @@ import eu.timepit.refined.auto._
 import io.circe.{DecodingFailure, Json}
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, const, frequency, numChar}
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

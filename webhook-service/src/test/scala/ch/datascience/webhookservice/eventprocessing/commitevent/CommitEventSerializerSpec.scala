@@ -25,7 +25,7 @@ import ch.datascience.webhookservice.eventprocessing.{CommitEvent, Person}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import io.circe.Json
 import io.circe.parser._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

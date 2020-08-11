@@ -41,7 +41,7 @@ import ch.datascience.stubbing.ExternalServiceStubbing
 import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class NodesDetailsFinderSpec

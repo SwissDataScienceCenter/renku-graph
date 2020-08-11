@@ -29,7 +29,7 @@ import ch.datascience.knowledgegraph.lineage.model._
 import io.circe.Json
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

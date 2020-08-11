@@ -23,7 +23,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Email, Name}
 import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import io.circe.literal._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

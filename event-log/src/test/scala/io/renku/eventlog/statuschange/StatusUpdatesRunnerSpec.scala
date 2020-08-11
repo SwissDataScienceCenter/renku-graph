@@ -35,7 +35,7 @@ import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 import io.renku.eventlog.{EventLogDB, EventStatus, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.language.higherKinds

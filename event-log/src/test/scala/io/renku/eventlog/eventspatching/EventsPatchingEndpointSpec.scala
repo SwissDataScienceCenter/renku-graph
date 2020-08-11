@@ -40,7 +40,7 @@ import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.matchers.ArgCapture.CaptureAll
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class EventsPatchingEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {

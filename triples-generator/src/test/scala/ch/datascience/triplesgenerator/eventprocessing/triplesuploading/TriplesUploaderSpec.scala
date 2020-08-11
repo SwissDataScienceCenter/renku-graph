@@ -30,7 +30,7 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global

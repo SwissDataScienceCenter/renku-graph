@@ -38,7 +38,7 @@ import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {

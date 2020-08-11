@@ -24,7 +24,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.webhookservice.eventprocessing.{Author, Committer}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators.commitInfos
 import io.circe.literal._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

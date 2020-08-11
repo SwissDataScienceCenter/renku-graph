@@ -32,7 +32,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.concurrent.Eventually
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec

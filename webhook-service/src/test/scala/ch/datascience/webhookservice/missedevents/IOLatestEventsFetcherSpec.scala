@@ -32,7 +32,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import org.http4s.Status
 import org.scalacheck.Gen
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global

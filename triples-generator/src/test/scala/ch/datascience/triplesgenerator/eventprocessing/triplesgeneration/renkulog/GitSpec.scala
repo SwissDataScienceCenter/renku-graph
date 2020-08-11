@@ -26,7 +26,7 @@ import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.Triples
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.Git
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class GitSpec extends AnyWordSpec with MockFactory with should.Matchers {

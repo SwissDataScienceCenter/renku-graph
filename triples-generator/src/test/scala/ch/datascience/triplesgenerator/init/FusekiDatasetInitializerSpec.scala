@@ -27,7 +27,7 @@ import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators
 import ServiceTypesGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.language.postfixOps

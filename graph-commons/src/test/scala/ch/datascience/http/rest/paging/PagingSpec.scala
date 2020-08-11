@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import eu.timepit.refined.auto._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}

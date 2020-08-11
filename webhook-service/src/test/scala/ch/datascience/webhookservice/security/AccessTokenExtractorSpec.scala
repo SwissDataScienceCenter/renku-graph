@@ -27,7 +27,7 @@ import org.http4s.AuthScheme._
 import org.http4s.Credentials.Token
 import org.http4s.headers.Authorization
 import org.http4s.{Header, Headers, Request}
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try

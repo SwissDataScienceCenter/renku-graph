@@ -20,7 +20,7 @@ package ch.datascience.tinytypes.constraints
 
 import ch.datascience.tinytypes.{IntTinyType, LongTinyType, TinyTypeFactory}
 import org.scalacheck.Gen
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

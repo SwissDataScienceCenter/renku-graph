@@ -26,7 +26,7 @@ import ch.datascience.tinytypes.Sensitive
 import io.circe.DecodingFailure
 import io.circe.literal._
 import io.circe.syntax._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

@@ -25,7 +25,7 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.control.RateLimitUnit._
 import eu.timepit.refined.auto._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._

@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators._
 import io.prometheus.client.{Gauge => LibGauge}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}

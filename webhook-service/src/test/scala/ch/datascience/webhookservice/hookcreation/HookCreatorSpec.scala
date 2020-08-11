@@ -55,7 +55,7 @@ import ch.datascience.webhookservice.model.HookToken
 import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository.AccessTokenAssociator
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext

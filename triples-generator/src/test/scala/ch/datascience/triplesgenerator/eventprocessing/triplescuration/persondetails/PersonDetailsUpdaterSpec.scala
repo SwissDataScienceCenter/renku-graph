@@ -38,7 +38,7 @@ import io.circe.optics.JsonPath.root
 import io.circe.{Decoder, Encoder, Json}
 import io.renku.jsonld.syntax._
 import monocle.function.Plated
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.mutable

@@ -26,7 +26,7 @@ import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 import ch.datascience.rdfstore.entities.bundles.{prov, schema, wfprov}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

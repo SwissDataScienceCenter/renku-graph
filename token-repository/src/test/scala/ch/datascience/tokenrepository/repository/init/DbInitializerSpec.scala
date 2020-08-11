@@ -25,7 +25,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDb
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class DbInitializerSpec extends AnyWordSpec with InMemoryProjectsTokensDb with MockFactory with should.Matchers {

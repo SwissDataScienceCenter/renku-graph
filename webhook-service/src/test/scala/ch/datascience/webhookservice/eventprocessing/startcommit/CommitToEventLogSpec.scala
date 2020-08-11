@@ -39,7 +39,7 @@ import ch.datascience.webhookservice.eventprocessing.{CommitEvent, Project, Star
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util._

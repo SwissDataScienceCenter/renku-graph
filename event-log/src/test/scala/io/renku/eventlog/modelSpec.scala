@@ -24,7 +24,7 @@ import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
 import io.circe.Json
 import io.renku.eventlog.DbEventLogGenerators._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

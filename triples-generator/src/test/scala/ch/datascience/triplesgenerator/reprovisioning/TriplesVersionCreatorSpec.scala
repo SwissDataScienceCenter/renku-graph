@@ -25,7 +25,7 @@ import ch.datascience.graph.model.CliVersion
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class TriplesVersionCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {

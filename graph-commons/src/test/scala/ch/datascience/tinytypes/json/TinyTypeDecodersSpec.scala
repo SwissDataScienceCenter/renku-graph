@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators._
 import eu.timepit.refined.api.Refined
 import io.circe.literal._
 import org.scalacheck.Arbitrary
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class TinyTypeDecodersSpec extends AnyWordSpec with should.Matchers {

@@ -28,7 +28,7 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext

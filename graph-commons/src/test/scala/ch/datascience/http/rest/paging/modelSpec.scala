@@ -20,7 +20,7 @@ package ch.datascience.http.rest.paging
 
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import ch.datascience.tinytypes.constraints.{NonNegativeInt, PositiveInt}
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

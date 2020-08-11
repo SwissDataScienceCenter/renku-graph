@@ -35,7 +35,7 @@ import io.renku.eventlog._
 import io.renku.eventlog.creation.EventPersister.Result
 import io.renku.eventlog.creation.EventPersister.Result._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class EventPersisterSpec

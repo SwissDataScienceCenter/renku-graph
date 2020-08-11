@@ -35,7 +35,7 @@ import io.circe.literal._
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 
 class WebhookCreationSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with should.Matchers {
 
@@ -59,7 +59,7 @@ class WebhookCreationSpec extends AnyFeatureSpec with GivenWhenThen with GraphSe
       response.status shouldBe Ok
     }
 
-    scenario("No Graph Services webhook on the project in GitLab") {
+    Scenario("No Graph Services webhook on the project in GitLab") {
 
       val project   = projects.generateOne
       val projectId = project.id

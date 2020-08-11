@@ -34,7 +34,7 @@ import io.renku.eventlog.EventStatus
 import io.renku.eventlog.EventStatus.Processing
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._

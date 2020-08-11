@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.exceptions
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Matchers {

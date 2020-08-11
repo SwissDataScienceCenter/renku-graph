@@ -30,7 +30,7 @@ import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.Event
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult.{Delivered, Misdelivered, ServiceBusy}
 import org.http4s.Status._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global

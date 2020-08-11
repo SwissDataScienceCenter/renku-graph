@@ -57,7 +57,7 @@ import eu.timepit.refined.numeric.Positive
 import io.prometheus.client.Histogram
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AnyWordSpec

@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.http.client.UrlEncoder._
 import ch.datascience.http.rest.SortBy.Direction.Desc
 import org.http4s.ParseFailure
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

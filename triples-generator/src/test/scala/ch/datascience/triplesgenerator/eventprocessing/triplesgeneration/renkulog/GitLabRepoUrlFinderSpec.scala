@@ -29,7 +29,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.GitLabRepoUrlFinder
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try

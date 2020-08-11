@@ -21,7 +21,7 @@ package ch.datascience.tinytypes.constraints
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.scalacheck.Gen.uuid
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

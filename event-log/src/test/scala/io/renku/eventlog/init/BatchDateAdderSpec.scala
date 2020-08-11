@@ -31,7 +31,7 @@ import doobie.implicits.javatime._
 import io.circe.literal._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.{CreatedDate, Event}
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {

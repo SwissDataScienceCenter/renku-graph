@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.config
 import cats.implicits._
 import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import com.typesafe.config.ConfigFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._

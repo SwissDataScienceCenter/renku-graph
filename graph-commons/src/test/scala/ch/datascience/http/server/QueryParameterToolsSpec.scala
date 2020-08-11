@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators._
 import org.http4s.ParseFailure
 import org.http4s.Status._
 import org.scalacheck.Gen
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class QueryParameterToolsSpec extends AnyWordSpec with should.Matchers {

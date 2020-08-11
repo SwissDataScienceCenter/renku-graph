@@ -24,7 +24,7 @@ import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.JsonLDGenerators._
 import io.renku.jsonld.syntax._
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class CursorSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {

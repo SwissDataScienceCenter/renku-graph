@@ -21,7 +21,7 @@ package ch.datascience.tinytypes.constraints
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings, relativePaths}
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

@@ -30,7 +30,7 @@ import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles.renkuBaseUrl
 import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

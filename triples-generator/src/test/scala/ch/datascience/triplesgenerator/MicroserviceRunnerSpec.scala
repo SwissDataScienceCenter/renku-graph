@@ -29,7 +29,7 @@ import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioning
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext

@@ -21,7 +21,7 @@ package ch.datascience.controllers
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import org.scalacheck.Gen
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class ErrorMessageSpec extends AnyWordSpec with should.Matchers {

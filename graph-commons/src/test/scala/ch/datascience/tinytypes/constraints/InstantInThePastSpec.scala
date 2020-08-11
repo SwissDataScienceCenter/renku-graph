@@ -22,7 +22,7 @@ import java.time.{Clock, Instant, ZoneId}
 
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

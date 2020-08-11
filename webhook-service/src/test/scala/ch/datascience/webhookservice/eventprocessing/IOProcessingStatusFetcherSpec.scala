@@ -34,7 +34,7 @@ import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

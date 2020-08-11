@@ -24,7 +24,7 @@ import cats.Monad
 import ch.datascience.interpreters.TestLogger.LogMessage._
 import io.chrisdavenport.log4cats.Logger
 import org.scalatest.Assertion
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import scala.collection.JavaConverters._
 
 import scala.language.higherKinds

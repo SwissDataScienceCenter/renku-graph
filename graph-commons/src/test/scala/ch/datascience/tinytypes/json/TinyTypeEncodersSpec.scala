@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators._
 import io.circe.Json
 import io.circe.syntax._
 import org.scalacheck.Arbitrary
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class TinyTypeEncodersSpec extends AnyWordSpec with should.Matchers {

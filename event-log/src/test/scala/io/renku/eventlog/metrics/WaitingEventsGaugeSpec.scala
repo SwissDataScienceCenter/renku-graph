@@ -33,7 +33,7 @@ import io.prometheus.client.{Gauge => LibGauge}
 import io.renku.eventlog.EventStatus.{New, RecoverableFailure}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._

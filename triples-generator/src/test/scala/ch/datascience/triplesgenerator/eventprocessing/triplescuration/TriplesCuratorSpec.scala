@@ -32,7 +32,7 @@ import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.ForkInfoUpdater
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.{PersonDetailsUpdater, UpdatesCreator}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try

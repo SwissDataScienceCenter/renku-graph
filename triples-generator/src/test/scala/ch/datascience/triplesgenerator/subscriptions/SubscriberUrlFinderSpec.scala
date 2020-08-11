@@ -22,7 +22,7 @@ import java.net.NetworkInterface
 
 import cats.implicits._
 import ch.datascience.triplesgenerator.Microservice
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._

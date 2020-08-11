@@ -19,7 +19,7 @@
 package ch.datascience.config
 
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

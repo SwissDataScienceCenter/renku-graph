@@ -32,7 +32,7 @@ import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import ch.datascience.tokenrepository.repository.TryAccessTokenCrypto
 import ch.datascience.tokenrepository.repository.deletion.TryTokenRemover
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try

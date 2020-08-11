@@ -31,7 +31,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.metrics.{EventLogMetrics, StatsFinder}
 import io.renku.eventlog.subscriptions.EventsDispatcher
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global

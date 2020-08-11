@@ -36,7 +36,7 @@ import io.renku.eventlog.EventStatus.{Processing, Skipped}
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {

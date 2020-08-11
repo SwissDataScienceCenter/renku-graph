@@ -19,7 +19,7 @@
 package ch.datascience.rdfstore
 
 import org.scalacheck.Gen._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

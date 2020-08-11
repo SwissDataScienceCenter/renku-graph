@@ -34,7 +34,7 @@ import io.circe.literal._
 import io.renku.eventlog.EventStatus
 import io.renku.eventlog.EventStatus.New
 import org.http4s.Status._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.concurrent.Eventually
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec

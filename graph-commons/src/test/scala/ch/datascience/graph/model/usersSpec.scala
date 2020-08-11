@@ -27,7 +27,7 @@ import ch.datascience.tinytypes.constraints.NonBlank
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

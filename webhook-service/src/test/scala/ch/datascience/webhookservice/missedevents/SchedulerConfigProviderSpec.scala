@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.missedevents
 import cats.MonadError
 import cats.implicits._
 import com.typesafe.config.ConfigFactory
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._

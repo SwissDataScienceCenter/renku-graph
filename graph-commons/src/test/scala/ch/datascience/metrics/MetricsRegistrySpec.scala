@@ -21,7 +21,7 @@ package ch.datascience.metrics
 import ch.datascience.metrics.MetricsRegistry.{DisabledMetricsRegistry, EnabledMetricsRegistry}
 import com.typesafe.config.ConfigFactory
 import io.prometheus.client.{Gauge => LibGauge}
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._

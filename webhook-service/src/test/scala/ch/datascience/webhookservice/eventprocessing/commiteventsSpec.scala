@@ -23,7 +23,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.graph.model.users.Email
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 

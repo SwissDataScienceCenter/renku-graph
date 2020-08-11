@@ -20,7 +20,7 @@ package ch.datascience.graph.http.server
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import org.scalatest.matchers._
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class ProjectIdSpec extends AnyWordSpec with should.Matchers {
