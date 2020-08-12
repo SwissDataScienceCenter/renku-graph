@@ -36,7 +36,7 @@ before_install:
   - sudo apt-get update
 install:
   - travis_retry sudo pip3 install -U pip
-  - travis_retry sudo pip3 install "chartpress==0.3.2" "ruamel.yaml==0.15.54"
+  - travis_retry sudo pip3 install "docker==4.2.2" "chartpress==0.6.0" "ruamel.yaml==0.15.54"
   # Installing Helm
   - wget -q ${HELM_URL}/${HELM_TGZ}
   - tar xzfv ${HELM_TGZ}
