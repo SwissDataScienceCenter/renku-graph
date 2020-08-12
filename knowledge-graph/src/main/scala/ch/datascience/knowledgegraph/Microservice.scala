@@ -32,7 +32,7 @@ import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import pureconfig.loadConfigOrThrow
+import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -40,7 +40,7 @@ import scala.language.higherKinds
 object Microservice extends IOMicroservice {
 
   private implicit val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
+    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
   protected implicit override def contextShift: ContextShift[IO] =
     IO.contextShift(executionContext)
@@ -60,18 +60,22 @@ object Microservice extends IOMicroservice {
       queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder, ApplicationLogger)
       datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder)
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)
-      routes <- new MicroserviceRoutes[IO](
-                 queryEndpoint,
-                 projectEndpoint,
-                 projectDatasetsEndpoint,
-                 datasetEndpoint,
-                 datasetsSearchEndpoint,
-                 new RoutesMetrics[IO](metricsRegistry)
-               ).routes
-      httpServer = new HttpServer[IO](serverPort = 9004, routes)
+      microServiceResource = new MicroserviceRoutes[IO](
+        queryEndpoint,
+        projectEndpoint,
+        projectDatasetsEndpoint,
+        datasetEndpoint,
+        datasetsSearchEndpoint,
+        new RoutesMetrics[IO](metricsRegistry)
+      ).routes
+      exicode <- microServiceResource.use { routes =>
+                  val httpServer = new HttpServer[IO](serverPort = 9004, routes)
 
-      exitCode <- new MicroserviceRunner(sentryInitializer, httpServer).run(args)
-    } yield exitCode
+                  new MicroserviceRunner(sentryInitializer, httpServer).run(args)
+                }
+
+    } yield exicode
+
 }
 
 private class MicroserviceRunner(

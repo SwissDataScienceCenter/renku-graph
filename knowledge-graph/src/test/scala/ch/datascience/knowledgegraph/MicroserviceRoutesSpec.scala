@@ -40,17 +40,18 @@ import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.{QueryContext, QueryEndpoint, QueryRunner}
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import sangria.schema.Schema
 
 import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
+class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers {
 
   "routes" should {
 

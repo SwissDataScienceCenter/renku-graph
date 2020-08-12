@@ -32,12 +32,13 @@ import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Json
 import io.circe.literal._
 import org.http4s._
+import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class AssociateTokenEndpointSpec extends WordSpec with MockFactory {
+class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "associateToken" should {
 

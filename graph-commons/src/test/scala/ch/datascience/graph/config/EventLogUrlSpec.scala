@@ -23,13 +23,13 @@ import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpUrls
 import com.typesafe.config.ConfigFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class EventLogUrlSpec extends WordSpec {
+class EventLogUrlSpec extends AnyWordSpec with should.Matchers {
 
   "apply" should {
 

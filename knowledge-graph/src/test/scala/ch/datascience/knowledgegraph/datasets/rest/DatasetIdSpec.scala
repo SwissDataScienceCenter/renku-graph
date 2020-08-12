@@ -20,10 +20,10 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class DatasetIdSpec extends WordSpec {
+class DatasetIdSpec extends AnyWordSpec with should.Matchers {
 
   "unapply" should {
 

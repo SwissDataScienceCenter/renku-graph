@@ -22,11 +22,11 @@ import java.time.{Clock, Instant, ZoneId}
 
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class InstantInThePastSpec extends WordSpec with ScalaCheckPropertyChecks {
+class InstantInThePastSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "InstantInThePast" should {
 

@@ -28,13 +28,13 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.circe.Json
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.{Failure, Success, Try}
 
-class PagingResponseSpec extends WordSpec with ScalaCheckPropertyChecks {
+class PagingResponseSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "from" should {
 

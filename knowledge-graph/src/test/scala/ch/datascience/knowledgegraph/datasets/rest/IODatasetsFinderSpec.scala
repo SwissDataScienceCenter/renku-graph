@@ -48,11 +48,15 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.jsonld.{EntityId, JsonLD}
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
+class IODatasetsFinderSpec
+    extends AnyWordSpec
+    with InMemoryRdfStore
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "findDatasets - no phrase" should {
 

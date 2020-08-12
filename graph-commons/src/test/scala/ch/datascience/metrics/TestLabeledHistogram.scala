@@ -22,6 +22,7 @@ import cats.effect.IO
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Histogram => LibHistogram}
+import org.scalatest.Assertions.fail
 
 import scala.language.higherKinds
 
@@ -30,7 +31,7 @@ class TestLabeledHistogram[LabelValue](
 ) extends LabeledHistogram[IO, LabelValue] {
 
   import MetricsTools._
-  import org.scalatest.Matchers._
+  import org.scalatest.matchers._
 
   def verifyExecutionTimeMeasured(forLabelValue: LabelValue, other: LabelValue*): Unit =
     (forLabelValue +: other).map(_.toString) diff histogram.collectAllSamples.map(_._2) match {

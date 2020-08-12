@@ -22,11 +22,11 @@ import LineageGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.knowledgegraph.lineage.model.Node
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class NodeIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+class NodeIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "showAs[RdfResource]" should {
 

@@ -34,20 +34,22 @@ import io.circe.literal._
 import io.renku.eventlog.EventStatus
 import io.renku.eventlog.EventStatus.New
 import org.http4s.Status._
-import org.scalatest.Matchers._
+import org.scalatest.matchers.should
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{FeatureSpec, GivenWhenThen}
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
 
 class PushEventsConsumptionSpec
-    extends FeatureSpec
+    extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
     with Eventually
-    with AcceptanceTestPatience {
+    with AcceptanceTestPatience
+    with should.Matchers {
 
-  feature("A Push Event sent to the services generates Commit Events in the Event Log") {
+  Feature("A Push Event sent to the services generates Commit Events in the Event Log") {
 
-    scenario("Push Event not being processed yet gets translated into Commit Events in the Event Log") {
+    Scenario("Push Event not being processed yet gets translated into Commit Events in the Event Log") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
       val project   = projects.generateOne

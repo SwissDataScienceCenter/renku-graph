@@ -26,12 +26,12 @@ import ch.datascience.generators.Generators._
 import io.prometheus.client.{Gauge => LibGauge}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}
 
-class SingleValueGaugeSpec extends WordSpec with MockFactory {
+class SingleValueGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "set" should {
 
@@ -56,7 +56,7 @@ class SingleValueGaugeSpec extends WordSpec with MockFactory {
   }
 }
 
-class LabeledGaugeSpec extends WordSpec with MockFactory {
+class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
   import ch.datascience.graph.model.GraphModelGenerators._
   import ch.datascience.graph.model.projects.Path
 
@@ -180,7 +180,7 @@ class LabeledGaugeSpec extends WordSpec with MockFactory {
   }.map(_.toMap)
 }
 
-class GaugeSpec extends WordSpec with MockFactory {
+class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "apply without label names" should {
 

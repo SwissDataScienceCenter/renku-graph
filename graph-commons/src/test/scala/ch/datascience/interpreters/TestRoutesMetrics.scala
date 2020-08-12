@@ -21,7 +21,7 @@ package ch.datascience.interpreters
 import cats.effect.IO
 import ch.datascience.metrics.RoutesMetrics
 
-class TestRoutesMetrics(metricsRegistry: TestMetricsRegistry.type) extends RoutesMetrics[IO](metricsRegistry) {
+class TestRoutesMetrics(val metricsRegistry: TestMetricsRegistry.type) extends RoutesMetrics[IO](metricsRegistry) {
 
   def clearRegistry(): Unit = metricsRegistry.clear()
 }

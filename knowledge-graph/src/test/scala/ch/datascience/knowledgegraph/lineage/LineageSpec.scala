@@ -26,13 +26,13 @@ import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 import ch.datascience.rdfstore.entities.bundles.{prov, schema, wfprov}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Random
 
-class LineageSpec extends WordSpec with ScalaCheckPropertyChecks {
+class LineageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   type EitherLineage[Lineage] = Either[Throwable, Lineage]
 

@@ -20,11 +20,11 @@ package ch.datascience.tinytypes.constraints
 
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class PositiveIntSpec extends WordSpec with ScalaCheckPropertyChecks {
+class PositiveIntSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "PositiveInt" should {
 

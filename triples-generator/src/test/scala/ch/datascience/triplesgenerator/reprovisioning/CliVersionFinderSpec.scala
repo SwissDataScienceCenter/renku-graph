@@ -24,13 +24,13 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
 import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.util.{Success, Try}
 
-class CliVersionFinderSpec extends WordSpec with MockFactory {
+class CliVersionFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "apply" should {
 

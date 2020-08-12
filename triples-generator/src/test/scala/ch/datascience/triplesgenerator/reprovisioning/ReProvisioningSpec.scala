@@ -27,14 +27,14 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class ReProvisioningSpec extends WordSpec with MockFactory {
+class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
 

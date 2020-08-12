@@ -34,14 +34,18 @@ import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.math.BigDecimal.RoundingMode
 
-class IOProcessingStatusFetcherSpec extends WordSpec with ExternalServiceStubbing with ScalaCheckPropertyChecks {
+class IOProcessingStatusFetcherSpec
+    extends AnyWordSpec
+    with ExternalServiceStubbing
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "fetchProcessingStatus" should {
 

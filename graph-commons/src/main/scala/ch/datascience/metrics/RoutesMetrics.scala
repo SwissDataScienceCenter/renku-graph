@@ -18,10 +18,12 @@
 
 package ch.datascience.metrics
 
-import cats.effect.{Clock, ConcurrentEffect}
+import cats.Applicative
+import cats.effect.{Bracket, Clock, ConcurrentEffect, Resource, Sync}
 import cats.implicits._
 import org.http4s.HttpRoutes
 import org.http4s.metrics.prometheus.{Prometheus, PrometheusExportService}
+import org.http4s.server.Router
 import org.http4s.server.middleware.{Metrics => ServerMetrics}
 
 import scala.language.higherKinds
@@ -30,26 +32,16 @@ class RoutesMetrics[Interpretation[_]](metricsRegistry: MetricsRegistry[Interpre
 
   implicit class RoutesOps(routes: HttpRoutes[Interpretation]) {
 
-    def meter(implicit F: ConcurrentEffect[Interpretation],
-              clock:      Clock[Interpretation]): Interpretation[HttpRoutes[Interpretation]] =
+    def withMetrics(implicit F: Sync[Interpretation],
+                    clock:      Clock[Interpretation]): Resource[Interpretation, HttpRoutes[Interpretation]] =
       metricsRegistry.maybeCollectorRegistry match {
         case Some(collectorRegistry) =>
-          for {
-            metrics <- Prometheus[Interpretation](collectorRegistry, "server")
-            meteredRoutes = ServerMetrics[Interpretation](metrics)(routes)
-          } yield meteredRoutes
-        case _ => F.pure(routes)
+          Prometheus.metricsOps[Interpretation](collectorRegistry, "server").map { metrics =>
+            PrometheusExportService(collectorRegistry).routes <+> ServerMetrics[Interpretation](
+              metrics
+            )(routes)
+          }
+        case _ => Resource.liftF(F.pure(routes))
       }
   }
-
-  def `add GET Root / metrics`(
-      routes:   HttpRoutes[Interpretation]
-  )(implicit F: ConcurrentEffect[Interpretation]): Interpretation[HttpRoutes[Interpretation]] =
-    metricsRegistry.maybeCollectorRegistry match {
-      case Some(collectorRegistry) =>
-        for {
-          prometheusService <- PrometheusExportService(collectorRegistry).pure[Interpretation]
-        } yield prometheusService.routes <+> routes
-      case _ => F.pure(routes)
-    }
 }

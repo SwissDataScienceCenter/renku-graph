@@ -26,10 +26,10 @@ import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.tokenrepository.repository.init.IODbInitializer
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class MicroserviceRunnerSpec extends WordSpec with MockFactory {
+class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
 

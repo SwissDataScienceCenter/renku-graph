@@ -41,13 +41,13 @@ import ch.datascience.triplesgenerator.eventprocessing.{CommitEvent, Project}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import os.Path
 
 import scala.concurrent.ExecutionContext
 
-class RenkuLogTriplesGeneratorSpec extends WordSpec with MockFactory {
+class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "generateTriples" should {
 

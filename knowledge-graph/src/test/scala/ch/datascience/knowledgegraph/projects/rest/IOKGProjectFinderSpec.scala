@@ -31,11 +31,15 @@ import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.{Parent, Proj
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, entities}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
+class IOKGProjectFinderSpec
+    extends AnyWordSpec
+    with InMemoryRdfStore
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "findProject" should {
 

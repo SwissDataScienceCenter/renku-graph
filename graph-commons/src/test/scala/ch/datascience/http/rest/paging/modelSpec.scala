@@ -20,11 +20,11 @@ package ch.datascience.http.rest.paging
 
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import ch.datascience.tinytypes.constraints.{NonNegativeInt, PositiveInt}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class modelSpec extends WordSpec with ScalaCheckPropertyChecks {
+class modelSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "Page" should {
 

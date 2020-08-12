@@ -21,11 +21,11 @@ package io.renku.jsonld
 import io.renku.jsonld.EntityId.BlankNodeEntityId
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.matchers.should
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EntityIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+class EntityIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "of" should {
 

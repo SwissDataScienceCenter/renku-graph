@@ -30,15 +30,16 @@ import io.circe.syntax._
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.matchers.MatcherBase
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import sangria.execution.{ExceptionHandler, QueryAnalysisError}
 import sangria.schema._
 
-class QueryEndpointSpec extends WordSpec with MockFactory {
+class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "handleQuery" should {
 

@@ -24,6 +24,7 @@ import cats.effect.Bracket
 import cats.implicits._
 import ch.datascience.db.DbTransactor
 import doobie.implicits._
+import doobie.implicits.javatime._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 

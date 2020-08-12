@@ -40,11 +40,15 @@ import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
+class ProjectDatasetsEndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "getProjectDatasets" should {
 

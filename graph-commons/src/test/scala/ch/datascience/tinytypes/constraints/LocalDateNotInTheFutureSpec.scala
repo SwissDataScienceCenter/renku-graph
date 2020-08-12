@@ -22,11 +22,11 @@ import java.time.LocalDate
 
 import ch.datascience.generators.Generators.localDatesNotInTheFuture
 import ch.datascience.tinytypes.{LocalDateTinyType, TinyTypeFactory}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class LocalDateNotInTheFutureSpec extends WordSpec with ScalaCheckPropertyChecks {
+class LocalDateNotInTheFutureSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "LocalDateNotInTheFuture" should {
 

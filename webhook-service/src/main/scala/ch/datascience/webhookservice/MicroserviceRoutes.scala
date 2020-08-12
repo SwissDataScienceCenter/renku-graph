@@ -18,8 +18,7 @@
 
 package ch.datascience.webhookservice
 
-import cats.effect.{Clock, ConcurrentEffect}
-import cats.implicits._
+import cats.effect.{Clock, ConcurrentEffect, Resource}
 import ch.datascience.graph.http.server.binders.ProjectId
 import ch.datascience.metrics.RoutesMetrics
 import ch.datascience.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
@@ -46,12 +45,12 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import routesMetrics._
 
   // format: off
-  lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
+  lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case           GET  -> Root / "ping"                                                        => Ok("pong")
     case request @ POST -> Root / "webhooks" / "events"                                         => processPushEvent(request)
     case request @ POST -> Root / "projects" / ProjectId(projectId) / "webhooks"                => createHook(projectId, request)
     case request @ POST -> Root / "projects" / ProjectId(projectId) / "webhooks" / "validation" => validateHook(projectId, request)
     case           GET  -> Root / "projects" / ProjectId(projectId) / "events" / "status"       => fetchProcessingStatus(projectId)
-  }.meter flatMap `add GET Root / metrics`
+  }.withMetrics
   // format: on
 }

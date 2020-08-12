@@ -29,12 +29,12 @@ import ch.datascience.triplesgenerator.eventprocessing.CommitEvent.{CommitEventW
 import io.circe._
 import org.scalacheck.Gen
 import org.scalacheck.Gen.choose
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Failure, Try}
 
-class EventBodyDeserialiserSpec extends WordSpec {
+class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
 
   "toCommitEvents" should {
 

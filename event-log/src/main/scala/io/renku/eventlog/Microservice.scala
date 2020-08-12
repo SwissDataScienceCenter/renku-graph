@@ -21,6 +21,7 @@ package io.renku.eventlog
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors.newFixedThreadPool
 
+import cats.FlatMap.ops.toAllFlatMapOps
 import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
@@ -29,14 +30,14 @@ import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import io.renku.eventlog.creation.IOEventCreationEndpoint
+import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
 import io.renku.eventlog.init.IODbInitializer
 import io.renku.eventlog.latestevents.IOLatestEventsEndpoint
 import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
-import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
 import io.renku.eventlog.subscriptions.{EventsDispatcher, IOSubscriptionsEndpoint, Subscriptions}
-import pureconfig.loadConfigOrThrow
+import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -44,7 +45,7 @@ import scala.language.higherKinds
 object Microservice extends IOMicroservice {
 
   private implicit val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
+    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
   protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
 
@@ -91,26 +92,30 @@ object Microservice extends IOMicroservice {
                                              queriesExecTimes,
                                              ApplicationLogger)
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptions, ApplicationLogger)
-        routes <- new MicroserviceRoutes[IO](
-                   eventCreationEndpoint,
-                   latestEventsEndpoint,
-                   processingStatusEndpoint,
-                   eventsPatchingEndpoint,
-                   statusChangeEndpoint,
-                   subscriptionsEndpoint,
-                   new RoutesMetrics[IO](metricsRegistry)
-                 ).routes
-        httpServer = new HttpServer[IO](serverPort = 9005, routes)
+        microserviceRoutes = new MicroserviceRoutes[IO](
+          eventCreationEndpoint,
+          latestEventsEndpoint,
+          processingStatusEndpoint,
+          eventsPatchingEndpoint,
+          statusChangeEndpoint,
+          subscriptionsEndpoint,
+          new RoutesMetrics[IO](metricsRegistry)
+        ).routes
+        exitcode <- microserviceRoutes.use { routes =>
+                     val httpServer = new HttpServer[IO](serverPort = 9005, routes)
 
-        exitCode <- new MicroserviceRunner(
-                     sentryInitializer,
-                     eventLogMetrics,
-                     eventsDispatcher,
-                     httpServer,
-                     subProcessesCancelTokens
-                   ) run args
-      } yield exitCode
+                     new MicroserviceRunner(
+                       sentryInitializer,
+                       eventLogMetrics,
+                       eventsDispatcher,
+                       httpServer,
+                       subProcessesCancelTokens
+                     ) run args
+                   }
+      } yield exitcode
+
     }
+
 }
 
 private class MicroserviceRunner(

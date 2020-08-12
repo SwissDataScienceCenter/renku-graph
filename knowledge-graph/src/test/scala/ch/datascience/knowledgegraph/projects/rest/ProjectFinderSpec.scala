@@ -34,12 +34,12 @@ import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.KGProject
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
 
-class ProjectFinderSpec extends WordSpec with MockFactory {
+class ProjectFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "findProject" should {
 

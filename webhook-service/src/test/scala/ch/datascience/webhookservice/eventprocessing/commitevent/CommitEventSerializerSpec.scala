@@ -25,13 +25,13 @@ import ch.datascience.webhookservice.eventprocessing.{CommitEvent, Person}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import io.circe.Json
 import io.circe.parser._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Try
 
-class CommitEventSerializerSpec extends WordSpec with ScalaCheckPropertyChecks {
+class CommitEventSerializerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "serialiseToJsonString" should {
 

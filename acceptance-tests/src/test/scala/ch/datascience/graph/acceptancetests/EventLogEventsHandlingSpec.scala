@@ -32,20 +32,22 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._
-import org.scalatest.Matchers._
+import org.scalatest.matchers.should
 import org.scalatest.concurrent.Eventually
-import org.scalatest.{FeatureSpec, GivenWhenThen}
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
 
 class EventLogEventsHandlingSpec
-    extends FeatureSpec
+    extends AnyFeatureSpec
     with GivenWhenThen
     with GraphServices
     with Eventually
-    with AcceptanceTestPatience {
+    with AcceptanceTestPatience
+    with should.Matchers {
 
-  feature("Commit Events from the Event Log get translated to triples in the RDF Store") {
+  Feature("Commit Events from the Event Log get translated to triples in the RDF Store") {
 
-    scenario("Not processed Commit Events in the Event Log should be picked-up for processing") {
+    Scenario("Not processed Commit Events in the Event Log should be picked-up for processing") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
       val project   = projects.generateOne

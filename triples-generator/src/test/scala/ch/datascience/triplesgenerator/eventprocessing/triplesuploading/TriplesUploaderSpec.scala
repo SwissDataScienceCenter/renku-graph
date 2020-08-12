@@ -30,14 +30,14 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class TriplesUploaderSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
+class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
 
   "upload" should {
 
@@ -91,11 +91,13 @@ class TriplesUploaderSpec extends WordSpec with MockFactory with ExternalService
       override val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
         fusekiBaseUrl = fusekiBaseUrl
       )
+      val exceptionMessage =
+        s"Error connecting to $fusekiBaseUrl using address ${fusekiBaseUrl.toString.replaceFirst("http[s]?://", "")} (unresolved: false)"
 
       triplesUploader
         .upload(triples)
         .unsafeRunSync() shouldBe DeliveryFailure(
-        s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/data error: Connection refused"
+        s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/data error: $exceptionMessage"
       )
     }
   }

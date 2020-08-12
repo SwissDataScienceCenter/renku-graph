@@ -47,10 +47,16 @@ import io.circe.Json
 import io.circe.literal._
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
-import org.scalatest.Matchers._
-import org.scalatest.{FeatureSpec, GivenWhenThen}
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should
 
-class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
+class ProjectsResourcesSpec
+    extends AnyFeatureSpec
+    with GivenWhenThen
+    with GraphServices
+    with AcceptanceTestPatience
+    with should.Matchers {
 
   import ProjectsResources._
 
@@ -80,9 +86,9 @@ class ProjectsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
     projects         = List(DatasetProject(project.path, project.name, addedToProject.generateOne))
   )
 
-  feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
+  Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
 
-    scenario("As a user I would like to find project's details by calling a REST endpoint") {
+    Scenario("As a user I would like to find project's details by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
       val jsonLDTriples = JsonLD.arr(

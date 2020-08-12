@@ -30,11 +30,11 @@ import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles.renkuBaseUrl
 import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
+class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
 
   "prepareUpdates" should {
 

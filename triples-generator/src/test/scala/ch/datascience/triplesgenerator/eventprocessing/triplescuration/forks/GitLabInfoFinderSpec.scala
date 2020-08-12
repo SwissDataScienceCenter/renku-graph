@@ -39,14 +39,18 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.circe.Json
 import io.circe.literal._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.reflectiveCalls
 
-class GitLabInfoFinderSpec extends WordSpec with ExternalServiceStubbing with ScalaCheckPropertyChecks {
+class GitLabInfoFinderSpec
+    extends AnyWordSpec
+    with ExternalServiceStubbing
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "findProject" should {
 

@@ -47,7 +47,7 @@ object Microservice extends IOMicroservice {
   val ServicePort: Int Refined Positive = 9002
 
   private implicit val executionContext: ExecutionContext =
-    ExecutionContext fromExecutorService newFixedThreadPool(loadConfigOrThrow[Int]("threads-number"))
+    ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
   protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
 
@@ -69,16 +69,19 @@ object Microservice extends IOMicroservice {
                                                            gitLabThrottler,
                                                            sparqlTimeRecorder,
                                                            ApplicationLogger)
-      routes <- new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry)).routes
-      exitCode <- new MicroserviceRunner(
-                   sentryInitializer,
-                   fusekiDatasetInitializer,
-                   subscriber,
-                   reProvisioning,
-                   new HttpServer[IO](serverPort = ServicePort.value, routes),
-                   subProcessesCancelTokens
-                 ) run args
-    } yield exitCode
+      microserviceRoutes = new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry)).routes
+      exitcode <- microserviceRoutes.use { routes =>
+                   new MicroserviceRunner(
+                     sentryInitializer,
+                     fusekiDatasetInitializer,
+                     subscriber,
+                     reProvisioning,
+                     new HttpServer[IO](serverPort = ServicePort.value, routes),
+                     subProcessesCancelTokens
+                   ) run args
+                 }
+
+    } yield exitcode
 }
 
 private class MicroserviceRunner(

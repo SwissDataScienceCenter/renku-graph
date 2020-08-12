@@ -27,12 +27,16 @@ import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IODatasetExistenceCreatorSpec extends WordSpec with ExternalServiceStubbing with MockFactory {
+class IODatasetExistenceCreatorSpec
+    extends AnyWordSpec
+    with ExternalServiceStubbing
+    with MockFactory
+    with should.Matchers {
 
   "createDataset" should {
 

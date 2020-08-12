@@ -19,6 +19,7 @@
 package ch.datascience.rdfstore
 
 import java.net.BindException
+import java.nio.file.Files
 
 import cats.effect.{ExitCode, IO, IOApp, Timer}
 import cats.implicits._
@@ -27,6 +28,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import org.apache.jena.fuseki.FusekiException
 import org.apache.jena.fuseki.main.FusekiServer
+import org.apache.lucene.store.MMapDirectory
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -56,7 +58,7 @@ class RdfStoreServer(port: Int Refined Positive, datasetName: DatasetName)(impli
 
     TextDatasetFactory.createLucene(
       DatasetFactory.create(),
-      new RAMDirectory,
+      new MMapDirectory(Files.createTempDirectory("lucene-store-jena")),
       new TextIndexConfig(entityDefinition)
     )
   }

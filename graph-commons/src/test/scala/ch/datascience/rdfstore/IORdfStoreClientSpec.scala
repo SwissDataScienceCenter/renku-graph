@@ -36,14 +36,14 @@ import io.circe.Json
 import org.http4s.Status.{BadRequest, Ok}
 import org.http4s.{Request, Response, Status}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
 import scala.util.Try
 
-class IORdfStoreClientSpec extends WordSpec with ExternalServiceStubbing with MockFactory {
+class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
 
   "IORdfStoreClient" should {
 

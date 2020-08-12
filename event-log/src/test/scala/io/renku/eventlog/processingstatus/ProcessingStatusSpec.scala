@@ -20,14 +20,14 @@ package io.renku.eventlog.processingstatus
 
 import cats.implicits._
 import ch.datascience.generators.Generators._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.math.BigDecimal.RoundingMode
 import scala.util.{Failure, Success, Try}
 
-class ProcessingStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
+class ProcessingStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "from" should {
 

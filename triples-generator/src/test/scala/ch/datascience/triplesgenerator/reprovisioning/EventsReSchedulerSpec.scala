@@ -25,12 +25,12 @@ import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import org.http4s.Status.{Accepted, BadRequest}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class EventsReSchedulerSpec extends WordSpec with ExternalServiceStubbing {
+class EventsReSchedulerSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
 
   "triggerEventsReScheduling" should {
 

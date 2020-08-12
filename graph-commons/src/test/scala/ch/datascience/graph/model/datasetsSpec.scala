@@ -24,11 +24,11 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.tinytypes.UrlTinyType
 import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class datasetsSpec extends WordSpec with ScalaCheckPropertyChecks {
+class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "Identifier" should {
     "be a NonBlank" in {

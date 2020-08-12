@@ -26,10 +26,10 @@ import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.Triples
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.Git
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class GitSpec extends WordSpec with MockFactory {
+class GitSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "clone" should {
 

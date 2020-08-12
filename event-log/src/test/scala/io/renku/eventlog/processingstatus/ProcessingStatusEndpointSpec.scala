@@ -35,15 +35,16 @@ import io.circe.Decoder
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class ProcessingStatusEndpointSpec extends WordSpec with MockFactory {
+class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "findProcessingStatus" should {
 

@@ -19,12 +19,12 @@
 package ch.datascience.control
 
 import ch.datascience.control.RateLimitUnit._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
 
-class RateLimitUnitSpec extends WordSpec {
+class RateLimitUnitSpec extends AnyWordSpec with should.Matchers {
 
   "multiplierFor" should {
 

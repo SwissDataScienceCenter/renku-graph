@@ -36,12 +36,13 @@ import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class HookValidationEndpointSpec extends WordSpec with MockFactory {
+class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "validateHook" should {
 

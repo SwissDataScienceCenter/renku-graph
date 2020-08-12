@@ -50,20 +50,22 @@ object Microservice extends IOMicroservice {
         associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, ApplicationLogger)
         dbInitializer          <- IODbInitializer(transactor, ApplicationLogger)
         metricsRegistry        <- MetricsRegistry()
-        routes <- new MicroserviceRoutes[IO](
-                   fetchTokenEndpoint,
-                   associateTokenEndpoint,
-                   new IODeleteTokenEndpoint(transactor, ApplicationLogger),
-                   new RoutesMetrics[IO](metricsRegistry)
-                 ).routes
-        httpServer = new HttpServer[IO](serverPort = 9003, routes)
+        microserviceRoutes = new MicroserviceRoutes[IO](
+          fetchTokenEndpoint,
+          associateTokenEndpoint,
+          new IODeleteTokenEndpoint(transactor, ApplicationLogger),
+          new RoutesMetrics[IO](metricsRegistry)
+        ).routes
+        exitcode <- microserviceRoutes.use { routes =>
+                     val httpServer = new HttpServer[IO](serverPort = 9003, routes)
 
-        exitCode <- new MicroserviceRunner(
-                     sentryInitializer,
-                     dbInitializer,
-                     httpServer
-                   ) run args
-      } yield exitCode
+                     new MicroserviceRunner(
+                       sentryInitializer,
+                       dbInitializer,
+                       httpServer
+                     ) run args
+                   }
+      } yield exitcode
     }
 }
 

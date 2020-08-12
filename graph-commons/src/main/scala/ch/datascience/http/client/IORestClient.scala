@@ -35,7 +35,7 @@ import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.Status.BadRequest
 import org.http4s._
-import org.http4s.client.Client
+import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.headers.Authorization
 
@@ -115,7 +115,8 @@ abstract class IORestClient[ThrottlingTarget](
                                      mapResponse: ResponseMapping[ResultType],
                                      attempt:     Int): IO[ResultType] =
     httpClient
-      .fetch[ResultType](request.request)(processResponse(request.request, mapResponse))
+      .run(request.request)
+      .use(response => processResponse(request.request, mapResponse)(response))
       .recoverWith(connectionError(httpClient, request, mapResponse, attempt))
 
   private def processResponse[ResultType](request:     Request[IO],
@@ -153,7 +154,7 @@ abstract class IORestClient[ThrottlingTarget](
     case error: RestClientError => throttler.release flatMap (_ => error.raiseError[IO, T])
     case NonFatal(cause) =>
       cause match {
-        case exception: ConnectException if attempt <= maxRetries.value =>
+        case exception: ConnectionFailure if attempt <= maxRetries.value =>
           for {
             _      <- logger.warn(LogMessage(request.request, s"timed out -> retrying attempt $attempt", exception))
             _      <- timer sleep retryInterval

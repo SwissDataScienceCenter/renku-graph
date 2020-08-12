@@ -42,13 +42,18 @@ import io.renku.eventlog.statuschange.commands._
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-class StatusChangeEndpointSpec extends WordSpec with MockFactory with TableDrivenPropertyChecks {
+class StatusChangeEndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with TableDrivenPropertyChecks
+    with should.Matchers {
 
   "changeStatus" should {
 

@@ -20,12 +20,12 @@ package io.renku.jsonld
 
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.JsonLDGenerators._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import syntax._
 
-class JsonLDEncoderSpec extends WordSpec with ScalaCheckPropertyChecks {
+class JsonLDEncoderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "instance" should {
 

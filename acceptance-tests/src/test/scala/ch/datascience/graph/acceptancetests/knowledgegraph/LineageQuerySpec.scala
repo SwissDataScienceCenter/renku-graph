@@ -33,23 +33,29 @@ import io.circe.Json
 import io.circe.literal._
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
-import org.scalatest.Matchers._
-import org.scalatest.{FeatureSpec, GivenWhenThen}
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should
 import sangria.ast.Document
 import sangria.macros._
 
 import scala.collection.Set
 
-class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
+class LineageQuerySpec
+    extends AnyFeatureSpec
+    with GivenWhenThen
+    with GraphServices
+    with AcceptanceTestPatience
+    with should.Matchers {
 
   private implicit val accessToken: AccessToken = accessTokens.generateOne
   private val project               = projects.generateOne.copy(path = model.projects.Path("namespace/lineage-project"))
   private val (jsons, examplarData) = exemplarLineageFlow(project.path)
   import examplarData._
 
-  feature("GraphQL query to find lineage") {
+  Feature("GraphQL query to find lineage") {
 
-    scenario("As a user I would like to find project's lineage with a GraphQL query") {
+    Scenario("As a user I would like to find project's lineage with a GraphQL query") {
 
       Given("some data in the RDF Store")
       `data in the RDF store`(
@@ -69,7 +75,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       lineageJson.downField("nodes").as[List[Json]].map(_.toSet) shouldBe theExpectedNodes
     }
 
-    scenario("As a user I would like to find project's lineage with a named GraphQL query") {
+    Scenario("As a user I would like to find project's lineage with a named GraphQL query") {
 
       Given("some data in the RDF Store")
 

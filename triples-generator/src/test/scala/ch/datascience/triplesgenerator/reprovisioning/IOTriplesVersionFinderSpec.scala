@@ -30,10 +30,10 @@ import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityTypes, JsonLD}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
+class IOTriplesVersionFinderSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   private implicit lazy val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 

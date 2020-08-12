@@ -32,12 +32,12 @@ import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.ForkInfoUpdater
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.{PersonDetailsUpdater, UpdatesCreator}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class TriplesCuratorSpec extends WordSpec with MockFactory {
+class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "curate" should {
 

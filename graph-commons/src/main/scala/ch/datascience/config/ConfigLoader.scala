@@ -43,7 +43,7 @@ object ConfigLoader {
       config:        Config
   )(implicit reader: ConfigReader[T], ME: MonadError[Interpretation, Throwable]): Interpretation[T] =
     fromEither {
-      loadConfig[T](config, key)
+      ConfigSource.fromConfig(config).at(key).load[T]
     }
 
   private def fromEither[Interpretation[_], T](

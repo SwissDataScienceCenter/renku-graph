@@ -32,10 +32,10 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class EventsPatcherSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class EventsPatcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
   "applyToAllEvents" should {
 

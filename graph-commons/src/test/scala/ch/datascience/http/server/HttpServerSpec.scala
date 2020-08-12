@@ -19,6 +19,7 @@
 package ch.datascience.http.server
 
 import cats.effect._
+import cats.implicits.catsSyntaxApplicativeId
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpPorts
 import ch.datascience.http.server.EndpointTester._
@@ -28,12 +29,12 @@ import org.http4s._
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.dsl.Http4sDsl
 import org.http4s.headers.`Content-Type`
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.ExecutionContext.global
+import scala.concurrent.ExecutionContext.Implicits.global
 
-class HttpServerSpec extends WordSpec with Http4sDsl[IO] {
+class HttpServerSpec extends AnyWordSpec with Http4sDsl[IO] with should.Matchers {
 
   "run" should {
 
@@ -58,7 +59,7 @@ class HttpServerSpec extends WordSpec with Http4sDsl[IO] {
   private def execute(request: Request[IO]): Response[IO] =
     BlazeClientBuilder[IO](global).resource
       .use { httpClient =>
-        httpClient.fetch[Response[IO]](request) { response =>
+        httpClient.run(request).use { response =>
           IO.pure(response)
         }
       }

@@ -32,8 +32,8 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult.{Accepted, Busy}
 import com.typesafe.config.ConfigFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.collection.JavaConverters._
@@ -41,7 +41,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class EventsProcessingRunnerSpec extends WordSpec with Eventually with IntegrationPatience {
+class EventsProcessingRunnerSpec extends AnyWordSpec with Eventually with IntegrationPatience with should.Matchers {
 
   "scheduleForProcessing" should {
 

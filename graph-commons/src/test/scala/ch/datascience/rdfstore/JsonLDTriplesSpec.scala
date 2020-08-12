@@ -22,12 +22,12 @@ import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import io.circe.ParsingFailure
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Failure, Success, Try}
 
-class JsonLDTriplesSpec extends WordSpec {
+class JsonLDTriplesSpec extends AnyWordSpec with should.Matchers {
 
   "parse" should {
 

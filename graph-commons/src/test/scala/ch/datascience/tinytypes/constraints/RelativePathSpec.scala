@@ -21,11 +21,11 @@ package ch.datascience.tinytypes.constraints
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{RelativePathTinyType, TinyTypeFactory}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class RelativePathSpec extends WordSpec with ScalaCheckPropertyChecks {
+class RelativePathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "RelativePath" should {
 
