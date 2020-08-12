@@ -24,7 +24,7 @@ ENV TZ UTC
 
 # Installing Renku and other dependencies
 RUN apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev yaml-dev && \
-    python3 -m pip install 'git+https://github.com/SwissDataScienceCenter/renku-python.git@1298-calamus-workflows' sentry-sdk && \
+    python3 -m pip install 'git+https://github.com/SwissDataScienceCenter/renku-python.git@master' sentry-sdk && \
     chown -R daemon:daemon . && \
     export RENKU_DISABLE_VERSION_CHECK=true && \
     git config --global user.name 'renku'  && \
