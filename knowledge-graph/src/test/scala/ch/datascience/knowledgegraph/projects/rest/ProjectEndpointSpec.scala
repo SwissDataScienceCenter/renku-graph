@@ -159,6 +159,7 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       starsCount       <- cursor.downField("starsCount").as[StarsCount]
       permissions      <- cursor.downField("permissions").as[Permissions]
       statistics       <- cursor.downField("statistics").as[Statistics]
+      version          <- cursor.downField("version").as[SchemaVersion]
     } yield Project(id,
                     path,
                     name,
@@ -171,7 +172,8 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                     tags,
                     starsCount,
                     permissions,
-                    statistics)
+                    statistics,
+                    version)
 
   private implicit lazy val createdDecoder: Decoder[Creation] = cursor =>
     for {

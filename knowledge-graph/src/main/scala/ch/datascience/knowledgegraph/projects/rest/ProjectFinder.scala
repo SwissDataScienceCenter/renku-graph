@@ -76,7 +76,8 @@ class IOProjectFinder(
       tags        = gitLabProject.tags,
       starsCount  = gitLabProject.starsCount,
       permissions = gitLabProject.permissions,
-      statistics  = gitLabProject.statistics
+      statistics  = gitLabProject.statistics,
+      version     = kgProject.version
     )
 
   private implicit class ParentOps(maybeParent: Option[Parent]) {
