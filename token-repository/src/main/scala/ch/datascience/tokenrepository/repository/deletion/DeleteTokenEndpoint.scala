@@ -53,8 +53,10 @@ class DeleteTokenEndpoint[Interpretation[_]: Effect](
   }
 }
 
-class IODeleteTokenEndpoint(
-    transactor:          DbTransactor[IO, ProjectsTokensDB],
-    logger:              Logger[IO]
-)(implicit contextShift: ContextShift[IO])
-    extends DeleteTokenEndpoint[IO](new TokenRemover[IO](transactor), logger)
+object IODeleteTokenEndpoint {
+  def apply(
+      transactor:          DbTransactor[IO, ProjectsTokensDB],
+      logger:              Logger[IO]
+  )(implicit contextShift: ContextShift[IO]): IO[DeleteTokenEndpoint[IO]] =
+    new DeleteTokenEndpoint[IO](new TokenRemover[IO](transactor), logger).pure[IO]
+}

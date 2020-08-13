@@ -59,8 +59,6 @@ libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % 
 libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % Test
 
-libraryDependencies += "org.apache.logging.log4j" % "log4j-slf4j-impl" % "2.13.3" % Test
-
 libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.0.0"   % Test
 libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.0.0" % Test

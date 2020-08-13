@@ -31,7 +31,7 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Title}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Name, Title}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.client.AccessToken
@@ -224,16 +224,24 @@ class DatasetsResourcesSpec
           projects = dataset3Projects map toDatasetProject
         )
       }
-      val dataset4Projects = List(projects.generateOne)
+
+      val dataset4Projects = nonEmptyList(projects).generateOne.toList
       val dataset4 = nonModifiedDatasets().generateOne.copy(
+        name     = sentenceContaining(text).map(_.value).map(Name.apply).generateOne,
         projects = dataset4Projects map toDatasetProject
       )
 
-      Given("some datasets with description, name and author containing some arbitrary chosen text")
+      val dataset5Projects = List(projects.generateOne)
+      val dataset5 = nonModifiedDatasets().generateOne.copy(
+        projects = dataset5Projects map toDatasetProject
+      )
+
+      Given("some datasets with title, description, name and author containing some arbitrary chosen text")
       pushToStore(dataset1, dataset1Projects)
       pushToStore(dataset2, dataset2Projects)
       pushToStore(dataset3, dataset3Projects)
       pushToStore(dataset4, dataset4Projects)
+      pushToStore(dataset5, dataset5Projects)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>")
       val datasetsSearchResponse = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}"
@@ -245,7 +253,8 @@ class DatasetsResourcesSpec
       foundDatasets.flatMap(sortCreators) should contain theSameElementsAs List(
         searchResultJson(dataset1),
         searchResultJson(dataset2),
-        searchResultJson(dataset3)
+        searchResultJson(dataset3),
+        searchResultJson(dataset4)
       ).flatMap(sortCreators)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc")
@@ -258,9 +267,10 @@ class DatasetsResourcesSpec
       val datasetsSortedByName = List(
         searchResultJson(dataset1),
         searchResultJson(dataset2),
-        searchResultJson(dataset3)
+        searchResultJson(dataset3),
+        searchResultJson(dataset4)
       ).flatMap(sortCreators)
-        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'name' property found")))
+        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
       foundDatasetsSortedByName.flatMap(sortCreators) shouldBe datasetsSortedByName
 
       When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc&page=2&per_page=1")
@@ -280,9 +290,10 @@ class DatasetsResourcesSpec
         searchResultJson(dataset1),
         searchResultJson(dataset2),
         searchResultJson(dataset3),
-        searchResultJson(dataset4)
+        searchResultJson(dataset4),
+        searchResultJson(dataset5)
       ).flatMap(sortCreators)
-        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'name' property found")))
+        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
 
       When("user uses the response header link with the rel='first'")
       val firstPageLink     = searchForPage.headerLink(rel = "first")
@@ -322,14 +333,15 @@ class DatasetsResourcesSpec
                         commitId:             CommitId,
                         committedDate:        CommittedDate,
                         dataset:              NonModifiedDataset,
-                        overriddenIdentifier: Option[Identifier] = None) =
+                        overriddenIdentifier: Option[Identifier] = None): JsonLD =
       nonModifiedDataSetCommit(
         commitId      = commitId,
         committedDate = committedDate,
         cliVersion    = currentCliVersion
       )(
-        projectPath = project.path,
-        projectName = project.name
+        projectPath    = project.path,
+        projectName    = project.name,
+        projectVersion = project.version
       )(
         datasetIdentifier         = overriddenIdentifier getOrElse dataset.id,
         datasetTitle              = dataset.title,

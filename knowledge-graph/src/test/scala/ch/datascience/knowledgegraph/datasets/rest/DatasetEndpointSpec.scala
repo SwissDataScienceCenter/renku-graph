@@ -160,7 +160,9 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
     } yield maybeSameAs
       .map(NonModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects))
-      .orElse(maybeDerivedFrom map (ModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects)))
+      .orElse(
+        maybeDerivedFrom map (ModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects))
+      )
       .getOrElse(fail("Cannot decode payload as Dataset"))
 
   private implicit lazy val datasetPublishingDecoder: Decoder[DatasetPublishing] = (cursor: HCursor) =>

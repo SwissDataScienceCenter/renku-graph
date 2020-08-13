@@ -92,7 +92,7 @@ class ProjectsResourcesSpec
 
       Given("some data in the RDF Store")
       val jsonLDTriples = JsonLD.arr(
-        dataSetCommit(
+        nonModifiedDataSetCommit(
           commitId   = dataset1CommitId,
           cliVersion = currentCliVersion
         )(
@@ -112,10 +112,10 @@ class ProjectsResourcesSpec
             .some,
           projectVersion = project.version
         )(
-          datasetIdentifier    = dataset.id,
-          datasetTitle          = dataset.title,
-          datasetName = dataset.name,
-          maybeDatasetSameAs   = dataset.sameAs.some
+          datasetIdentifier  = dataset.id,
+          datasetTitle       = dataset.title,
+          datasetName        = dataset.name,
+          maybeDatasetSameAs = dataset.sameAs.some
         )
       )
       `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)

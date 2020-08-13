@@ -31,7 +31,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait ProjectDatasetsFinder[Interpretation[_]] {
-  def findProjectDatasets(projectPath: Path): Interpretation[List[(Identifier,Title, Name, SameAsOrDerived)]]
+  def findProjectDatasets(projectPath: Path): Interpretation[List[(Identifier, Title, Name, SameAsOrDerived)]]
 }
 
 private object ProjectDatasetsFinder {
@@ -78,6 +78,7 @@ private class IOProjectDatasetsFinder(
 }
 
 private object IOProjectDatasetsFinder {
+
   import io.circe.Decoder
   import io.circe.Decoder.decodeList
 
@@ -89,11 +90,11 @@ private object IOProjectDatasetsFinder {
       case (sameAs, _)            => Left(sameAs)
     }
 
-    implicit val recordDecoder: Decoder[(Identifier,Title, Name, SameAsOrDerived)] = { cursor =>
+    implicit val recordDecoder: Decoder[(Identifier, Title, Name, SameAsOrDerived)] = { cursor =>
       for {
         id               <- cursor.downField("identifier").downField("value").as[Identifier]
-        title             <- cursor.downField("name").downField("value").as[Title]
-        name   <- cursor.downField("alternateName").downField("value").as[Name]
+        title            <- cursor.downField("name").downField("value").as[Title]
+        name             <- cursor.downField("alternateName").downField("value").as[Name]
         sameAs           <- cursor.downField("topmostSameAs").downField("value").as[SameAs]
         maybeDerivedFrom <- cursor.downField("maybeDerivedFrom").downField("value").as[Option[DerivedFrom]]
       } yield (id, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom))

@@ -509,7 +509,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
       )
       val dataset3 = NonModifiedDataset(
         id               = datasetIdentifiers.generateOne,
-        title = modifiedDataset2.title,
+        title            = modifiedDataset2.title,
         name             = modifiedDataset2.name,
         url              = datasetUrls.generateOne,
         sameAs           = modifiedDataset2.entityId.asSameAs,

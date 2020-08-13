@@ -18,8 +18,8 @@
 
 package ch.datascience.generators
 
-import java.time.{Instant, LocalDate, LocalDateTime, ZoneId, ZoneOffset, ZonedDateTime}
 import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
+import java.time._
 
 import cats.data.NonEmptyList
 import ch.datascience.config.ServiceUrl

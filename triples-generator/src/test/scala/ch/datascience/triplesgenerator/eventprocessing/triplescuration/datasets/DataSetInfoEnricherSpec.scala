@@ -67,7 +67,7 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
       val updatedCuratedTriples = topmostDatas.foldLeft(curatedTriples) { (triples, topmostData) =>
         val updatedTriples = curatedTriplesObjects.generateOne
         (triplesUpdater.mergeTopmostDataIntoTriples _)
-          .expects(triples, topmostData)
+          .expects(triples, *)
           .returning(updatedTriples)
         updatedTriples
       }
@@ -75,7 +75,7 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
       val curatedTriplesWithUpdates = topmostDatas.foldLeft(updatedCuratedTriples) { (triples, topmostData) =>
         val triplesWithUpdates = curatedTriplesObjects.generateOne
         (descendantsUpdater.prepareUpdates _)
-          .expects(triples, topmostData)
+          .expects(triples, *)
           .returning(triplesWithUpdates)
         triplesWithUpdates
       }
@@ -150,7 +150,7 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
       val updatedCuratedTriples = topmostDatas.foldLeft(curatedTriples) { (triples, topmostData) =>
         val updatedTriples = curatedTriplesObjects.generateOne
         (triplesUpdater.mergeTopmostDataIntoTriples _)
-          .expects(triples, topmostData)
+          .expects(triples, *)
           .returning(updatedTriples)
         updatedTriples
       }
@@ -158,7 +158,7 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
       val exception = exceptions.generateOne
 
       (descendantsUpdater.prepareUpdates _)
-        .expects(updatedCuratedTriples, topmostDatas.head)
+        .expects(updatedCuratedTriples, *)
         .throwing(exception)
 
       enricher.enrichDataSetInfo(curatedTriples).value shouldBe Failure(exception)

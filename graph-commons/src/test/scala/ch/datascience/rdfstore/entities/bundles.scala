@@ -97,7 +97,8 @@ object bundles extends Schemas {
       projectName:         projects.Name        = projectNames.generateOne,
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
       maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
-      maybeParent:         Option[Project]      = None
+      maybeParent:         Option[Project]      = None,
+      projectVersion:      SchemaVersion        = projectSchemaVersions.generateOne
   )(
       datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
       datasetTitle:               Title = datasetTitles.generateOne,
@@ -117,7 +118,7 @@ object bundles extends Schemas {
       committedDate,
       committer,
       cliVersion
-    )(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent)(
+    )(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion)(
       datasetIdentifier,
       datasetTitle,
       datasetName,

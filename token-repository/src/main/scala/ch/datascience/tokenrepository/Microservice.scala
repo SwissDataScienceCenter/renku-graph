@@ -26,7 +26,7 @@ import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEndpoint
-import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
+import ch.datascience.tokenrepository.repository.deletion.{DeleteTokenEndpoint, IODeleteTokenEndpoint, TokenRemover}
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
 import ch.datascience.tokenrepository.repository.init.{DbInitializer, IODbInitializer}
 import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
@@ -50,10 +50,11 @@ object Microservice extends IOMicroservice {
         associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, ApplicationLogger)
         dbInitializer          <- IODbInitializer(transactor, ApplicationLogger)
         metricsRegistry        <- MetricsRegistry()
+        deleteTokenEndpoint    <- IODeleteTokenEndpoint(transactor, ApplicationLogger)
         microserviceRoutes = new MicroserviceRoutes[IO](
           fetchTokenEndpoint,
           associateTokenEndpoint,
-          new IODeleteTokenEndpoint(transactor, ApplicationLogger),
+          deleteTokenEndpoint,
           new RoutesMetrics[IO](metricsRegistry)
         ).routes
         exitcode <- microserviceRoutes.use { routes =>
