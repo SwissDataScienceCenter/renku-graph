@@ -19,7 +19,7 @@
 package ch.datascience.graph.acceptancetests.stubs
 
 import ch.datascience.graph.acceptancetests.data._
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
@@ -30,21 +30,22 @@ import io.renku.jsonld.JsonLD
 object RemoteTriplesGenerator {
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
-      project:       Project,
-      commitId:      CommitId,
-      schemaVersion: SchemaVersion = currentSchemaVersion
+      project:    Project,
+      commitId:   CommitId,
+      cliVersion: CliVersion = currentCliVersion
   ): Unit =
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project,
       commitId,
       fileCommit(
-        commitId      = commitId,
-        schemaVersion = schemaVersion
+        commitId   = commitId,
+        cliVersion = cliVersion
       )(
         projectPath         = project.path,
         projectName         = project.name,
         projectDateCreated  = project.created.date,
-        maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail))
+        maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
+        projectVersion      = project.version
       )
     )
 

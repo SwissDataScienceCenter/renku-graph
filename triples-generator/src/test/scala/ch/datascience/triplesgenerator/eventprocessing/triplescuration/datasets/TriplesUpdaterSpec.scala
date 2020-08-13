@@ -30,10 +30,10 @@ import io.circe.Json
 import io.circe.optics.JsonPath.root
 import io.circe.optics.{JsonPath, JsonTraversalPath}
 import io.renku.jsonld.{EntityId, Property}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class TriplesUpdaterSpec extends WordSpec {
+class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
 
   private implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 

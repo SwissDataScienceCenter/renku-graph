@@ -21,11 +21,11 @@ package ch.datascience.graph.http.server
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.eventIds
 import ch.datascience.graph.model.events
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EventIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+class EventIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
   import binders._
 
   "unapply" should {

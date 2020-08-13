@@ -38,13 +38,13 @@ import io.circe.optics.JsonPath.root
 import io.circe.{Decoder, Encoder, Json}
 import io.renku.jsonld.syntax._
 import monocle.function.Plated
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-class PersonDetailsUpdaterSpec extends WordSpec {
+class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers {
 
   "curate" should {
 
@@ -157,6 +157,6 @@ class PersonDetailsUpdaterSpec extends WordSpec {
 
   private lazy val atLeastOneWithoutEmail: NonEmptyList[entities.Person] => Boolean = _.exists(_.maybeEmail.isEmpty)
 
-  private lazy val blankIds:       Person => Boolean = _.id.value startsWith "_"
+  private lazy val blankIds:       Person => Boolean = p => !(p.id.value startsWith "mailto:")
   private lazy val noEmailAndName: Person => Person  = _.copy(maybeName = None, maybeEmail = None)
 }

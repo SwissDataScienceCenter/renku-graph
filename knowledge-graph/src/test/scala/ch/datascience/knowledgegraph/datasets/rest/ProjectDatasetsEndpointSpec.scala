@@ -26,7 +26,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Identifier, Name}
+import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs, Title}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
@@ -41,11 +41,15 @@ import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
+class ProjectDatasetsEndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "getProjectDatasets" should {
 
@@ -124,10 +128,11 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
       logger
     ).getProjectDatasets _
 
-    lazy val toJson: ((Identifier, Name, SameAsOrDerived)) => Json = {
-      case (id, name, Left(sameAs)) =>
+    lazy val toJson: ((Identifier, Title, Name, SameAsOrDerived)) => Json = {
+      case (id, title, name, Left(sameAs)) =>
         json"""{
           "identifier": ${id.value},
+          "title": ${title.value},
           "name": ${name.value},
           "sameAs": ${sameAs.value},
           "_links": [{
@@ -135,9 +140,10 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
             "href": ${(renkuResourcesUrl / "datasets" / id).value}
           }]
         }"""
-      case (id, name, Right(derivedFrom)) =>
+      case (id, title, name, Right(derivedFrom)) =>
         json"""{
           "identifier": ${id.value},
+          "title": ${title.value},
           "name": ${name.value},
           "derivedFrom": ${derivedFrom.value},
           "_links": [{
@@ -148,9 +154,10 @@ class ProjectDatasetsEndpointSpec extends WordSpec with MockFactory with ScalaCh
     }
   }
 
-  private implicit lazy val datasetBasicDetails: Gen[(Identifier, Name, SameAsOrDerived)] = for {
+  private implicit lazy val datasetBasicDetails: Gen[(Identifier, Title, Name, SameAsOrDerived)] = for {
     id                      <- datasetIdentifiers
+    title                   <- datasetTitles
     name                    <- datasetNames
     sameAsEitherDerivedFrom <- Gen.oneOf(datasetSameAs map (Left(_)), datasetDerivedFroms map (Right(_)))
-  } yield (id, name, sameAsEitherDerivedFrom)
+  } yield (id, title, name, sameAsEitherDerivedFrom)
 }

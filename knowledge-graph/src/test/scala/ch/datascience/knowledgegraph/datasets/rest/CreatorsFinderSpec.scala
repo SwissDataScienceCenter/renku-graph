@@ -23,11 +23,11 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Email, Name}
 import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import io.circe.literal._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CreatorsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
+class CreatorsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   import CreatorsFinder._
 

@@ -40,6 +40,7 @@ object DatasetsGenerators {
   ): Gen[NonModifiedDataset] =
     for {
       id               <- datasetIdentifiers
+      title            <- datasetTitles
       name             <- datasetNames
       url              <- datasetUrls
       sameAs           <- sameAs
@@ -47,7 +48,7 @@ object DatasetsGenerators {
       published        <- datasetPublishingInfos
       part             <- listOf(datasetParts)
       projects         <- projects
-    } yield NonModifiedDataset(id, name, url, sameAs, maybeDescription, published, part, projects.toList)
+    } yield NonModifiedDataset(id, title, name, url, sameAs, maybeDescription, published, part, projects.toList)
 
   def modifiedDatasetsOnFirstProject(dataset: Dataset, derivedFromOverride: Option[DerivedFrom] = None)(
       implicit renkuBaseUrl:                  RenkuBaseUrl
@@ -57,6 +58,7 @@ object DatasetsGenerators {
       published <- datasetPublishingInfos
     } yield ModifiedDataset(
       id,
+      dataset.title,
       dataset.name,
       Url(DataSet.entityId(id).toString),
       derivedFromOverride getOrElse DerivedFrom(DataSet.entityId(dataset.id)),

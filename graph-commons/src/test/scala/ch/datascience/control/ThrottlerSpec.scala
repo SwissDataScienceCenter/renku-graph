@@ -25,15 +25,15 @@ import cats.effect._
 import cats.implicits._
 import ch.datascience.control.RateLimitUnit._
 import eu.timepit.refined.auto._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class ThrottlerSpec extends WordSpec {
+class ThrottlerSpec extends AnyWordSpec with should.Matchers {
 
   "Throttler" should {
 

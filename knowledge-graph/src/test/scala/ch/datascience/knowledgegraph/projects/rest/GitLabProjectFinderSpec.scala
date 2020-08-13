@@ -38,13 +38,17 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import io.circe.literal._
 import org.http4s.Status
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class GitLabProjectFinderSpec extends WordSpec with ExternalServiceStubbing with ScalaCheckPropertyChecks {
+class GitLabProjectFinderSpec
+    extends AnyWordSpec
+    with ExternalServiceStubbing
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "findProject" should {
 
@@ -82,6 +86,23 @@ class GitLabProjectFinderSpec extends WordSpec with ExternalServiceStubbing with
               projectJson(project)
                 .deepMerge(json"""{"description": ${blankStrings().generateOne}}""")
                 .noSpaces
+            )
+          )
+      }
+
+      projectFinder.findProject(path, maybeAccessToken = None).value.unsafeRunSync() shouldBe Some(project)
+    }
+
+    "return fetched project info with no readme if readme_url in remote is blank" in new TestCase {
+      val path          = projectPaths.generateOne
+      val gitLabProject = gitLabProjects.generateOne
+      val project       = gitLabProject.copy(urls = gitLabProject.urls.copy(maybeReadme = None))
+
+      stubFor {
+        get(s"/api/v4/projects/${urlEncode(path.toString)}?statistics=true")
+          .willReturn(
+            okJson(
+              projectJson(project).noSpaces
             )
           )
       }
@@ -142,7 +163,7 @@ class GitLabProjectFinderSpec extends WordSpec with ExternalServiceStubbing with
     "ssh_url_to_repo":  ${project.urls.ssh.value},
     "http_url_to_repo": ${project.urls.http.value},
     "web_url":          ${project.urls.web.value},
-    "readme_url":       ${project.urls.readme.value},
+    "readme_url":       ${project.urls.maybeReadme.map(_.value)},
     "forks_count":      ${project.forksCount.value},
     "tag_list":         ${project.tags.map(_.value).toList},
     "star_count":       ${project.starsCount.value},

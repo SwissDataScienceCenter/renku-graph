@@ -50,13 +50,14 @@ private class BaseDetailsFinder(
       "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
       "PREFIX schema: <http://schema.org/>"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?url ?topmostSameAs ?maybeDerivedFrom ?description ?publishedDate
+    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?description ?publishedDate
         |WHERE {
         |    ?datasetId schema:identifier "$identifier";
         |               schema:identifier ?identifier;
         |               rdf:type <http://schema.org/Dataset>;
         |               schema:url ?url;
         |               schema:name ?name;
+        |               schema:alternateName ?alternateName ;
         |               renku:topmostSameAs/schema:url ?topmostSameAs .
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom ?maybeDerivedFrom }.
         |    OPTIONAL { ?datasetId schema:description ?description }.
@@ -83,7 +84,8 @@ private object BaseDetailsFinder {
     val dataset: Decoder[Dataset] = { implicit cursor =>
       for {
         identifier         <- extract[Identifier]("identifier")
-        name               <- extract[Name]("name")
+        title              <- extract[Title]("name")
+        name               <- extract[Name]("alternateName")
         url                <- extract[Url]("url")
         maybeDerivedFrom   <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
         sameAs             <- extract[SameAs]("topmostSameAs")
@@ -95,6 +97,7 @@ private object BaseDetailsFinder {
         case Some(derivedFrom) =>
           ModifiedDataset(
             identifier,
+            title,
             name,
             url,
             derivedFrom,
@@ -106,6 +109,7 @@ private object BaseDetailsFinder {
         case None =>
           NonModifiedDataset(
             identifier,
+            title,
             name,
             url,
             sameAs,
@@ -115,7 +119,6 @@ private object BaseDetailsFinder {
             projects = List.empty
           )
       }
-
     }
 
     _.downField("results").downField("bindings").as(decodeList(dataset))

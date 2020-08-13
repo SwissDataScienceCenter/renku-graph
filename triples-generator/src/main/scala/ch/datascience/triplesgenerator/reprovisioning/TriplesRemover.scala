@@ -29,10 +29,6 @@ private trait TriplesRemover[Interpretation[_]] {
   def removeAllTriples(): Interpretation[Unit]
 }
 
-private object TriplesRemover {
-  val TriplesRemovalBatchSize: Long = 50000
-}
-
 private class IOTriplesRemover(
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO],
@@ -41,59 +37,13 @@ private class IOTriplesRemover(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with TriplesRemover[IO] {
 
-  import TriplesRemover._
-  import cats.implicits._
   import eu.timepit.refined.auto._
-  import io.circe.Decoder
 
-  import scala.util.Try
-
-  override def removeAllTriples(): IO[Unit] =
-    queryExpecting[Long](findTriplesCount)(countDecoder) flatMap {
-      case 0 => IO.unit
-      case _ =>
-        for {
-          _ <- updateWitNoResult(removeTriplesBatch)
-          _ <- removeAllTriples()
-        } yield ()
-    }
-
-  private val findTriplesCount = SparqlQuery(
-    name     = "triples remove - count",
-    prefixes = Set.empty,
-    """|SELECT (COUNT(*) AS ?count)
-       |WHERE { ?s ?p ?o }
-       |""".stripMargin
-  )
+  override def removeAllTriples(): IO[Unit] = updateWitNoResult(removeTriplesBatch)
 
   private val removeTriplesBatch = SparqlQuery(
-    name     = "triples remove - delete",
+    name     = "all triples remove",
     prefixes = Set.empty,
-    s"""|DELETE { ?s ?p ?o }
-        |WHERE { 
-        |  SELECT  ?s ?p ?o 
-        |  WHERE { ?s ?p ?o }
-        |  LIMIT $TriplesRemovalBatchSize
-        |}
-        |""".stripMargin
+    body     = "CLEAR DEFAULT"
   )
-
-  private implicit val countDecoder: Decoder[Long] = {
-    import io.circe.Decoder.decodeList
-    import io.circe.DecodingFailure
-
-    val rows: Decoder[Long] = _.downField("count")
-      .downField("value")
-      .as[String]
-      .flatMap { count =>
-        Try(count.toLong).toEither.leftMap { ex =>
-          DecodingFailure(s"Triples count in non-number format: $ex", Nil)
-        }
-      }
-
-    _.downField("results")
-      .downField("bindings")
-      .as[List[Long]](decodeList(rows))
-      .map(_.headOption.getOrElse(0))
-  }
 }

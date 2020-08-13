@@ -25,13 +25,13 @@ import com.zaxxer.hikari.HikariDataSource
 import eu.timepit.refined.api.RefType.applyRef
 import org.scalacheck.Gen.choose
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class DataSourceUpdaterSpec extends WordSpec with MockFactory {
+class DataSourceUpdaterSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "DataSourceUpdater" should {
 

@@ -28,12 +28,13 @@ import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.jsonld.{EntityId, JsonLD}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
+class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
 
   "findDataset" should {
     "return details of the dataset with the given id " +
@@ -508,6 +509,7 @@ class IODatasetFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheck
       )
       val dataset3 = NonModifiedDataset(
         id               = datasetIdentifiers.generateOne,
+        title = modifiedDataset2.title,
         name             = modifiedDataset2.name,
         url              = datasetUrls.generateOne,
         sameAs           = modifiedDataset2.entityId.asSameAs,

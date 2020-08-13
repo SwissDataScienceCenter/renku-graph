@@ -30,10 +30,10 @@ import ch.datascience.rdfstore.entities.bundles._
 import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class KGDatasetInfoFinderSpec extends WordSpec with InMemoryRdfStore {
+class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   "findTopmostSameAs" should {
 

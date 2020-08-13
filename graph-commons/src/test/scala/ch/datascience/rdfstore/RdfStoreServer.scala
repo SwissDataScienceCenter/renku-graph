@@ -70,11 +70,12 @@ class RdfStoreServer(
       val definition = new EntityDefinition("uri", "name")
       definition.setPrimaryPredicate(NodeFactory.createURI("http://schema.org/name"))
       definition.set("description", NodeFactory.createURI("http://schema.org/description"))
+      definition.set("alternateName", NodeFactory.createURI("http://schema.org/alternateName"))
       definition
     }
 
     TextDatasetFactory.createLucene(
-      DatasetFactory.createTxnMem(),
+      DatasetFactory.create(),
       new MMapDirectory(Files.createTempDirectory("lucene-store-jena")),
       new TextIndexConfig(entityDefinition)
     )

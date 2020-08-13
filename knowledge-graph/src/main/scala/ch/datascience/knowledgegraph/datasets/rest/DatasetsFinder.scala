@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PublishedDate}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PublishedDate, Title}
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
@@ -29,7 +29,9 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.constraints.NonNegativeInt
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.predicates.all.NonEmpty
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -44,6 +46,7 @@ private trait DatasetsFinder[Interpretation[_]] {
 private object DatasetsFinder {
   final case class DatasetSearchResult(
       id:               Identifier,
+      title:            Title,
       name:             Name,
       maybeDescription: Option[Description],
       published:        DatasetPublishing,
@@ -83,7 +86,7 @@ private class IODatasetsFinder(
   }
 
   private def sparqlQuery(phrase: Phrase, sort: Sort.By): SparqlQuery = SparqlQuery(
-    name = "ds free-text search",
+    name = queryName(phrase, "ds free-text search"),
     Set(
       "PREFIX prov: <http://www.w3.org/ns/prov#>",
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
@@ -92,7 +95,7 @@ private class IODatasetsFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX text: <http://jena.apache.org/text#>"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs ?projectsCount
+    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs ?projectsCount
         |WHERE {
         |  {
         |    SELECT (MIN(?dateCreated) AS ?earliestCreated) ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
@@ -102,7 +105,7 @@ private class IODatasetsFinder(
         |        WHERE {
         |          {
         |            SELECT ?id
-        |            WHERE { ?id text:query (schema:name schema:description '$phrase') }
+        |            WHERE { ?id text:query (schema:name schema:description schema:alternateName '$phrase') }
         |            GROUP BY ?id
         |            HAVING (COUNT(*) > 0)
         |          } {
@@ -123,7 +126,7 @@ private class IODatasetsFinder(
         |                 prov:qualifiedGeneration/prov:activity ?activityId;
         |                 schema:isPartOf ?projectId.
         |        ?activityId prov:startedAtTime ?dateCreated.
-        |        FILTER NOT EXISTS { 
+        |        FILTER NOT EXISTS {
         |          ?someId prov:wasDerivedFrom ?allDsId.
         |          ?someId schema:isPartOf ?projectId.
         |        }
@@ -135,7 +138,8 @@ private class IODatasetsFinder(
         |    ?dsId rdf:type <http://schema.org/Dataset>;
         |          renku:topmostSameAs/schema:url ?sameAs;
         |          schema:identifier ?identifier;
-        |          schema:name ?name;
+        |          schema:name ?name ;
+        |          schema:alternateName ?alternateName ;
         |          prov:qualifiedGeneration/prov:activity ?activityId.
         |    ?activityId prov:startedAtTime ?earliestCreated.
         |    OPTIONAL { ?dsId schema:description ?maybeDescription }
@@ -149,7 +153,7 @@ private class IODatasetsFinder(
   )
 
   private def `ORDER BY`(sort: Sort.By): String = sort.property match {
-    case Sort.NameProperty          => s"ORDER BY ${sort.direction}(?name)"
+    case Sort.TitleProperty         => s"ORDER BY ${sort.direction}(?name)"
     case Sort.DatePublishedProperty => s"ORDER BY ${sort.direction}(?maybePublishedDate)"
     case Sort.ProjectsCountProperty => s"ORDER BY ${sort.direction}(?projectsCount)"
   }
@@ -158,6 +162,12 @@ private class IODatasetsFinder(
     dataset =>
       findCreators(dataset.id)
         .map(creators => dataset.copy(published = dataset.published.copy(creators = creators)))
+
+  private def queryName(phrase: Phrase, name: String Refined NonEmpty): String Refined NonEmpty =
+    phrase.value match {
+      case "*" => Refined.unsafeApply(s"$name *")
+      case _   => name
+    }
 }
 
 private object IODatasetsFinder {
@@ -169,7 +179,8 @@ private object IODatasetsFinder {
 
     for {
       id                 <- cursor.downField("identifier").downField("value").as[Identifier]
-      name               <- cursor.downField("name").downField("value").as[Name]
+      title              <- cursor.downField("name").downField("value").as[Title]
+      name               <- cursor.downField("alternateName").downField("value").as[Name]
       maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
       projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
       maybeDescription <- cursor
@@ -180,6 +191,7 @@ private object IODatasetsFinder {
                            .flatMap(toOption[Description])
     } yield DatasetSearchResult(
       id,
+      title,
       name,
       maybeDescription,
       DatasetPublishing(maybePublishedDate, Set.empty),

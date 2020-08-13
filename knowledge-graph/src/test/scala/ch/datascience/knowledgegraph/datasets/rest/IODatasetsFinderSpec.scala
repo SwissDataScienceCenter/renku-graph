@@ -22,11 +22,13 @@ import java.time.LocalDate
 
 import cats.effect.IO
 import cats.implicits._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets._
+import ch.datascience.graph.model.datasets.{DateCreated, Description, PublishedDate, SameAs, Title}
+import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
@@ -40,15 +42,21 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.entities.{DataSet, Person}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.renku.jsonld.JsonLD
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import io.renku.jsonld.{EntityId, JsonLD}
+import org.scalacheck.Gen
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
+class IODatasetsFinderSpec
+    extends AnyWordSpec
+    with InMemoryRdfStore
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "findDatasets - no phrase" should {
 
@@ -68,13 +76,13 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         )
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page(1), PerPage(3)))
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page(1), PerPage(3)))
           .unsafeRunSync()
 
         val datasetsList = List(dataset1, dataset2, dataset3)
+          .map(_.toDatasetSearchResult)
+          .sortBy(_.title.value)
         result.results shouldBe datasetsList
-          .map(toDatasetSearchResult)
-          .sortBy(_.name.value)
 
         result.pagingInfo.total shouldBe Total(datasetsList.size)
       }
@@ -89,12 +97,12 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         loadToStore(datasetsList flatMap (_.toJsonLDsAndDatasets(noSameAs = false)().jsonLDs): _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe datasetsList
-          .map(toDatasetSearchResult)
-          .sortBy(_.name.value)
+          .map(_.toDatasetSearchResult)
+          .sortBy(_.title.value)
 
         result.pagingInfo.total shouldBe Total(datasetsList.size)
       }
@@ -111,11 +119,11 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()())
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe List(
-          toDatasetSearchResult(datasets1).copy(projectsCount = ProjectsCount(2))
+          datasets1.toDatasetSearchResult.copy(projectsCount = ProjectsCount(2))
         )
 
         result.pagingInfo.total shouldBe Total(1)
@@ -128,18 +136,18 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         val datasets1    = nonModifiedDatasets(projects = single).generateOne.copy(sameAs = sharedSameAs)
         val datasets2    = datasets1.copy(id = datasetIdentifiers.generateOne, projects = single.generateOne.toList)
         val datasets2Modification = modifiedDatasetsOnFirstProject(datasets2).generateOne
-          .copy(name = datasetNames.generateOne)
+          .copy(title = datasetTitles.generateOne)
 
         loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()(), datasets2Modification.toJsonLD())
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe List(
-          toDatasetSearchResult(datasets1).copy(projectsCount = ProjectsCount(1)),
-          toDatasetSearchResult(datasets2Modification)
-        ).sortBy(_.name.value)
+          datasets1.toDatasetSearchResult.copy(projectsCount = ProjectsCount(1)),
+          datasets2Modification.toDatasetSearchResult
+        ).sortBy(_.title.value)
 
         result.pagingInfo.total shouldBe Total(2)
       }
@@ -161,12 +169,12 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()(), datasets2Fork.toJsonLD()())
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe List(
-          toDatasetSearchResult(datasets1).copy(projectsCount = ProjectsCount(3))
-        ).sortBy(_.name.value)
+          datasets1.toDatasetSearchResult.copy(projectsCount = ProjectsCount(3))
+        ).sortBy(_.title.value)
 
         result.pagingInfo.total shouldBe Total(1)
       }
@@ -186,12 +194,12 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         loadToStore(modifiedDatasetsList map (_.toJsonLD()): _*)
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe modifiedDatasetsList
-          .map(toDatasetSearchResult)
-          .sortBy(_.name.value)
+          .map(_.toDatasetSearchResult)
+          .sortBy(_.title.value)
 
         result.pagingInfo.total shouldBe Total(modifiedDatasetsList.size)
       }
@@ -201,9 +209,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
         val original = nonModifiedDatasets(projects = single).generateOne
         val modification1 = modifiedDatasetsOnFirstProject(original).generateOne
-          .copy(name = datasetNames.generateOne)
+          .copy(title = datasetTitles.generateOne)
         val modification2 = modifiedDatasetsOnFirstProject(modification1).generateOne
-          .copy(name = datasetNames.generateOne)
+          .copy(title = datasetTitles.generateOne)
 
         loadToStore(
           original.toJsonLD()(),
@@ -212,10 +220,10 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         )
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
-        result.results          should contain only toDatasetSearchResult(modification2)
+        result.results          should contain only modification2.toDatasetSearchResult
         result.pagingInfo.total shouldBe Total(1)
       }
 
@@ -234,12 +242,12 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         )
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe List(dataset1Modification, nonModifiedDataset)
-          .map(toDatasetSearchResult)
-          .sortBy(_.name.value)
+          .map(_.toDatasetSearchResult)
+          .sortBy(_.title.value)
         result.pagingInfo.total shouldBe Total(2)
       }
 
@@ -250,7 +258,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
           datasetProjects.generateNonEmptyList(minElements = 2, maxElements = 2).toList
         val dataset = nonModifiedDatasets().generateOne.copy(projects = projects)
         val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
-          .copy(name = datasetNames.generateOne)
+          .copy(title = datasetTitles.generateOne)
 
         val jsonsAndDatasets = dataset.toJsonLDsAndDatasets(noSameAs = false)()
         loadToStore(
@@ -259,13 +267,13 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         )
 
         val result = datasetsFinder
-          .findDatasets(None, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe List(
-          toDatasetSearchResult(jsonsAndDatasets.dataset(havingOnly = project2)).copy(projectsCount = ProjectsCount(1)),
-          toDatasetSearchResult(datasetModification)
-        ).sortBy(_.name.value)
+          jsonsAndDatasets.dataset(havingOnly = project2).toDatasetSearchResult.copy(projectsCount = ProjectsCount(1)),
+          datasetModification.toDatasetSearchResult
+        ).sortBy(_.title.value)
         result.pagingInfo.total shouldBe Total(2)
       }
 
@@ -281,11 +289,11 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         )
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results should contain theSameElementsAs List(
-          toDatasetSearchResult(dataset).copy(projectsCount = ProjectsCount(2))
+          dataset.toDatasetSearchResult.copy(projectsCount = ProjectsCount(2))
         )
         result.pagingInfo.total shouldBe Total(1)
       }
@@ -296,7 +304,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         val dataset     = nonModifiedDatasets(projects = single).generateOne
         val datasetFork = dataset.copy(projects = List(datasetProjects.generateOne))
         val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
-          .copy(name = datasetNames.generateOne)
+          .copy(title = datasetTitles.generateOne)
 
         loadToStore(
           dataset.toJsonLD()(),
@@ -305,13 +313,13 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         )
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results shouldBe List(
-          toDatasetSearchResult(datasetFork).copy(projectsCount = ProjectsCount(1)),
-          toDatasetSearchResult(datasetModification)
-        ).sortBy(_.name.value)
+          datasetFork.toDatasetSearchResult.copy(projectsCount = ProjectsCount(1)),
+          datasetModification.toDatasetSearchResult
+        ).sortBy(_.title.value)
         result.pagingInfo.total shouldBe Total(2)
       }
 
@@ -334,13 +342,13 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         )
 
         val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
         result.results should contain theSameElementsAs List(
-          toDatasetSearchResult(datasetModification).copy(projectsCount = ProjectsCount(1)),
-          toDatasetSearchResult(datasetModificationOnFork)
-        ).sortBy(_.name.value)
+          datasetModification.toDatasetSearchResult.copy(projectsCount = ProjectsCount(1)),
+          datasetModificationOnFork.toDatasetSearchResult
+        ).sortBy(_.title.value)
         result.pagingInfo.total shouldBe Total(2)
       }
     }
@@ -361,20 +369,24 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val dataset3 = nonModifiedDatasets(
         projects = nonEmptyList(datasetProjects, maxElements = 1)
       ).generateOne.makeCreatorNameContaining(phrase)
+      val dataset4 = nonModifiedDatasets(
+        projects = nonEmptyList(datasetProjects, maxElements = 1)
+      ).generateOne.makeTitleContaining(phrase)
 
       loadToStore(
-        List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne)
+        List(dataset1, dataset2, dataset3, dataset4, nonModifiedDatasets().generateOne)
           .flatMap(_.toJsonLDsAndDatasets(noSameAs = true)().jsonLDs): _*
       )
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
 
-      val matchingDatasets = List(dataset1, dataset2, dataset3)
-      result.results shouldBe matchingDatasets.map(toDatasetSearchResult).sortBy(_.name.value)
+      val matchingDatasets =
+        List(dataset1, dataset2, dataset3, dataset4).map(_.toDatasetSearchResult).sortBy(_.title.value)
+      result.results shouldBe matchingDatasets
 
-      result.pagingInfo.total shouldBe Total(3)
+      result.pagingInfo.total shouldBe Total(4)
     }
 
     "return no results if there is no matching dataset" in new TestCase {
@@ -384,7 +396,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       loadToStore(dataset.toJsonLDsAndDatasets(noSameAs = true)().jsonLDs: _*)
 
       val result = datasetsFinder
-        .findDatasets(Some(phrases.generateOne), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .findDatasets(Some(phrases.generateOne), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
 
       result.results          shouldBe empty
@@ -395,15 +407,15 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
       val phrase       = phrases.generateOne
       val project      = datasetProjects.generateOne
-      val original     = nonModifiedDatasets().generateOne.copy(projects = List(project)).makeNameContaining(phrase)
-      val modification = modifiedDatasetsOnFirstProject(original).generateOne.copy(name = datasetNames.generateOne)
+      val original     = nonModifiedDatasets().generateOne.copy(projects = List(project)).makeTitleContaining(phrase)
+      val modification = modifiedDatasetsOnFirstProject(original).generateOne.copy(title = datasetTitles.generateOne)
 
       loadToStore(
         original.toJsonLDsAndDatasets(noSameAs = true)().jsonLDs :+ modification.toJsonLD(): _*
       )
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
         .results shouldBe empty
     }
@@ -414,12 +426,12 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val sharedSameAs = datasetSameAs.generateOne
       val dataset1 = nonModifiedDatasets(projects = single).generateOne
         .copy(sameAs = sharedSameAs)
-        .makeNameContaining(phrase)
+        .makeTitleContaining(phrase)
       val dataset2 = nonModifiedDatasets(projects = single).generateOne
         .copy(sameAs = sharedSameAs)
-        .makeNameContaining(phrase)
+        .makeTitleContaining(phrase)
       val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
-        .copy(name = datasetNames.generateOne)
+        .copy(title = datasetTitles.generateOne)
 
       loadToStore(
         List(dataset1, dataset2).flatMap(_.toJsonLDsAndDatasets(noSameAs = true)()).jsonLDs :+
@@ -427,9 +439,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe List(toDatasetSearchResult(dataset1))
+        .results shouldBe List(dataset1.toDatasetSearchResult)
     }
 
     "return datasets matching the criteria after modification" in new TestCase {
@@ -441,7 +453,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val dataset2 = nonModifiedDatasets(projects = single).generateOne
         .copy(sameAs = sharedSameAs)
       val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
-        .makeNameContaining(phrase)
+        .makeTitleContaining(phrase)
 
       loadToStore(
         List(dataset1, dataset2).flatMap(_.toJsonLDsAndDatasets(noSameAs = true)()).jsonLDs :+
@@ -449,9 +461,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe List(toDatasetSearchResult(dataset2Modification))
+        .results shouldBe List(dataset2Modification.toDatasetSearchResult)
     }
 
     "return no datasets if the criteria is matched somewhere in the middle of the modification hierarchy" in new TestCase {
@@ -461,9 +473,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val dataset = nonModifiedDatasets(projects = single).generateOne
         .copy(sameAs = sharedSameAs)
       val datasetModification1 = modifiedDatasetsOnFirstProject(dataset).generateOne
-        .makeNameContaining(phrase)
+        .makeTitleContaining(phrase)
       val datasetModification2 = modifiedDatasetsOnFirstProject(datasetModification1).generateOne
-        .copy(name = datasetNames.generateOne)
+        .copy(title = datasetTitles.generateOne)
 
       loadToStore(
         dataset.toJsonLD()(),
@@ -472,7 +484,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
         .results shouldBe empty
     }
@@ -483,10 +495,10 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val sharedSameAs = datasetSameAs.generateOne
       val dataset1 = nonModifiedDatasets(projects = single).generateOne
         .copy(sameAs = sharedSameAs)
-        .makeNameContaining(phrase)
+        .makeTitleContaining(phrase)
       val dataset2 = dataset1.copy(projects = single.generateOne.toList)
       val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
-        .copy(name = datasetNames.generateOne)
+        .copy(title = datasetTitles.generateOne)
 
       loadToStore(
         List(dataset1, dataset2).flatMap(_.toJsonLDsAndDatasets(noSameAs = true)()).jsonLDs :+
@@ -494,9 +506,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe List(toDatasetSearchResult(dataset1))
+        .results shouldBe List(dataset1.toDatasetSearchResult)
     }
 
     "return datasets matching the criteria after modification of the fork" in new TestCase {
@@ -505,7 +517,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val dataset1 = nonModifiedDatasets(projects = single).generateOne
       val dataset2 = dataset1.copy(projects = single.generateOne.toList)
       val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
-        .makeNameContaining(phrase)
+        .makeTitleContaining(phrase)
 
       loadToStore(
         List(dataset1, dataset2).flatMap(_.toJsonLDsAndDatasets(noSameAs = true)()).jsonLDs :+
@@ -513,15 +525,15 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       )
 
       datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe List(toDatasetSearchResult(dataset2Modification))
+        .results shouldBe List(dataset2Modification.toDatasetSearchResult)
     }
   }
 
   "findDatasets with explicit sorting given" should {
 
-    s"return datasets with name, description or creator matching the given phrase sorted by $NameProperty" in new TestCase {
+    s"return datasets with name, description or creator matching the given phrase sorted by $TitleProperty" in new TestCase {
       forAll(nonModifiedDatasets(), nonModifiedDatasets(), nonModifiedDatasets(), nonModifiedDatasets()) {
         (dataset1Orig, dataset2Orig, dataset3Orig, nonPhrased) =>
           val phrase                         = phrases.generateOne
@@ -532,11 +544,11 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
           )
 
           datasetsFinder
-            .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), PagingRequest.default)
+            .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
             .unsafeRunSync()
-            .results shouldBe List(toDatasetSearchResult(dataset1),
-                                   toDatasetSearchResult(dataset2),
-                                   toDatasetSearchResult(dataset3)).sortBy(_.name.value)
+            .results shouldBe List(dataset1.toDatasetSearchResult,
+                                   dataset2.toDatasetSearchResult,
+                                   dataset3.toDatasetSearchResult).sortBy(_.title.value)
       }
     }
 
@@ -557,9 +569,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(DatePublishedProperty, Direction.Desc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe List(toDatasetSearchResult(dataset3),
-                               toDatasetSearchResult(dataset1),
-                               toDatasetSearchResult(dataset2))
+        .results shouldBe List(dataset3.toDatasetSearchResult,
+                               dataset1.toDatasetSearchResult,
+                               dataset2.toDatasetSearchResult)
     }
 
     s"return datasets with name, description or creator matching the given phrase sorted by $ProjectsCountProperty" in new TestCase {
@@ -579,9 +591,9 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(ProjectsCountProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe List(toDatasetSearchResult(dataset2),
-                               toDatasetSearchResult(dataset3),
-                               toDatasetSearchResult(dataset1))
+        .results shouldBe List(dataset2.toDatasetSearchResult,
+                               dataset3.toDatasetSearchResult,
+                               dataset1.toDatasetSearchResult)
     }
   }
 
@@ -603,11 +615,11 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val pagingRequest = PagingRequest(Page(2), PerPage(1))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       val expectedDataset = List(dataset1, dataset2, dataset3).sorted(byName)(1)
-      result.results shouldBe List(toDatasetSearchResult(expectedDataset))
+      result.results shouldBe List(expectedDataset.toDatasetSearchResult)
 
       result.pagingInfo.pagingRequest shouldBe pagingRequest
       result.pagingInfo.total         shouldBe Total(3)
@@ -629,7 +641,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
       val pagingRequest = PagingRequest(Page(2), PerPage(3))
 
       val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(NameProperty, Direction.Asc), pagingRequest)
+        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), pagingRequest)
         .unsafeRunSync()
 
       result.results                  shouldBe Nil
@@ -657,7 +669,7 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
   ): (NonModifiedDataset, NonModifiedDataset, NonModifiedDataset) = {
     val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(containingPhrase.toString)
     val dataset1 = dataset1Orig.copy(
-      name = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
+      title = sentenceContaining(nonEmptyPhrase).map(_.value).map(Title.apply).generateOne
     )
     val dataset2 = dataset2Orig.copy(
       maybeDescription = Some(sentenceContaining(nonEmptyPhrase).map(_.value).map(Description.apply).generateOne)
@@ -676,15 +688,17 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
 
     (dataset1, dataset2, dataset3)
   }
+  private implicit class DatasetOps(dataset: Dataset) {
 
-  private def toDatasetSearchResult(dataset: Dataset): DatasetSearchResult = DatasetSearchResult(
-    dataset.id,
-    dataset.name,
-    dataset.maybeDescription,
-    dataset.published,
-    ProjectsCount(dataset.projects.size)
-  )
-
+    lazy val toDatasetSearchResult: DatasetSearchResult = DatasetSearchResult(
+      dataset.id,
+      dataset.title,
+      dataset.name,
+      dataset.maybeDescription,
+      dataset.published,
+      ProjectsCount(dataset.projects.size)
+    )
+  }
   private implicit class JsonAndProjectTuplesOps(tuples: List[(JsonLD, Dataset)]) {
 
     lazy val jsonLDs: List[JsonLD] = tuples.map(_._1)
@@ -700,4 +714,14 @@ class IODatasetsFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChec
         } getOrElse fail(s"Cannot find dataset for project ${havingOnly.path}")
     }._2
   }
+
+  private implicit class DateCreatedOps(dateCreated: DateCreated) {
+    lazy val shiftToFuture = DateCreated(dateCreated.value plusSeconds positiveInts().generateOne.value)
+  }
+
+  private lazy val toPerson: DatasetCreator => Person =
+    creator => Person(creator.name, creator.maybeEmail, creator.maybeAffiliation)
+
+  private lazy val byName: Ordering[Dataset] =
+    (ds1: Dataset, ds2: Dataset) => ds1.title.value compareTo ds2.title.value
 }

@@ -24,14 +24,14 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.rdfstore.entities.DataSet
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import cats.implicits._
 import ch.datascience.graph.model.datasets.{IdSameAs, UrlSameAs}
 
 import scala.util.{Success, Try}
 
-class DataSetInfoFinderSpec extends WordSpec {
+class DataSetInfoFinderSpec extends AnyWordSpec with should.Matchers {
 
   private implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 

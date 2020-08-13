@@ -23,14 +23,14 @@ import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._
 import com.typesafe.config.ConfigFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class FusekiAdminConfigSpec extends WordSpec with ScalaCheckPropertyChecks {
+class FusekiAdminConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "apply" should {
 

@@ -26,15 +26,16 @@ import ch.datascience.controllers.InfoMessage._
 import org.http4s.server.blaze._
 import org.http4s.{HttpRoutes, Request, Response, Status}
 
+import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 class HttpServer[F[_]: ConcurrentEffect](
     serverPort:    Int,
     serviceRoutes: HttpRoutes[F]
-)(implicit timer:  Timer[F]) {
+)(implicit timer:  Timer[F], executionContext: ExecutionContext) {
 
   def run: F[ExitCode] =
-    BlazeServerBuilder[F]
+    BlazeServerBuilder[F](executionContext)
       .bindHttp(serverPort, "0.0.0.0")
       .withHttpApp(serviceRoutes.orNotFound)
       .serve
@@ -47,7 +48,7 @@ class HttpServer[F[_]: ConcurrentEffect](
       Kleisli { a =>
         routes
           .run(a)
-          .getOrElse(Response(Status.NotFound) withEntity InfoMessage("Resource not found"))
+          .getOrElse(Response(Status.NotFound).withEntity(InfoMessage("Resource not found")))
       }
   }
 }

@@ -34,12 +34,12 @@ import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class CommitEventSenderSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
+class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
 
   "send" should {
 

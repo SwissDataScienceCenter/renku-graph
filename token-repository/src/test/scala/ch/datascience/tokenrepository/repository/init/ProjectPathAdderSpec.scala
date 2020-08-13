@@ -35,16 +35,17 @@ import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{IOAccessTokenCrypto, InMemoryProjectsTokensDbSpec}
 import doobie.implicits._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 class ProjectPathAdderSpec
-    extends WordSpec
+    extends AnyWordSpec
     with InMemoryProjectsTokensDbSpec
     with MockFactory
     with Eventually
-    with IntegrationPatience {
+    with IntegrationPatience
+    with should.Matchers {
 
   "run" should {
 

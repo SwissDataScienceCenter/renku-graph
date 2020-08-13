@@ -31,7 +31,7 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Title}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.client.AccessToken
@@ -50,16 +50,22 @@ import io.circe.literal._
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
-import org.scalatest.Matchers._
-import org.scalatest.{FeatureSpec, GivenWhenThen}
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should
 
 import scala.util.Random
 
-class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
+class DatasetsResourcesSpec
+    extends AnyFeatureSpec
+    with GivenWhenThen
+    with GraphServices
+    with AcceptanceTestPatience
+    with should.Matchers {
 
   import DatasetsResources._
 
-  feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
+  Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
     implicit val accessToken: AccessToken = accessTokens.generateOne
 
@@ -88,7 +94,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       projects         = List(DatasetProject(project.path, project.name, dataset2Creation))
     )
 
-    scenario("As a user I would like to find project's data-sets by calling a REST endpoint") {
+    Scenario("As a user I would like to find project's data-sets by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
       val jsonLDTriples = JsonLD.arr(
@@ -96,14 +102,16 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           commitId      = dataset1CommitId,
           committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer     = Person(dataset1Creation.agent.name, dataset1Creation.agent.maybeEmail),
-          schemaVersion = currentSchemaVersion
+          cliVersion    = currentCliVersion
         )(
           projectPath         = project.path,
           projectName         = project.name,
           projectDateCreated  = project.created.date,
-          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail))
+          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
+          projectVersion      = project.version
         )(
           datasetIdentifier         = dataset1.id,
+          datasetTitle              = dataset1.title,
           datasetName               = dataset1.name,
           maybeDatasetSameAs        = dataset1.sameAs.some,
           maybeDatasetDescription   = dataset1.maybeDescription,
@@ -115,14 +123,16 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
           commitId      = dataset2CommitId,
           committedDate = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer     = Person(dataset2Creation.agent.name, dataset2Creation.agent.maybeEmail),
-          schemaVersion = currentSchemaVersion
+          cliVersion    = currentCliVersion
         )(
           projectPath         = project.path,
           projectName         = project.name,
           projectDateCreated  = project.created.date,
-          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail))
+          maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
+          projectVersion      = project.version
         )(
           datasetIdentifier         = dataset2.id,
+          datasetTitle              = dataset2.title,
           datasetName               = dataset2.name,
           maybeDatasetSameAs        = dataset2.sameAs.some,
           maybeDatasetDescription   = dataset2.maybeDescription,
@@ -184,16 +194,16 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
     }
   }
 
-  feature("GET knowledge-graph/datasets?query=<text> to find datasets with a free-text search") {
+  Feature("GET knowledge-graph/datasets?query=<text> to find datasets with a free-text search") {
 
-    scenario("As a user I would like to be able to search for datasets by some free-text search") {
+    Scenario("As a user I would like to be able to search for datasets by some free-text search") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
 
       val text             = nonBlankStrings(minLength = 10).generateOne
       val dataset1Projects = nonEmptyList(projects).generateOne.toList
       val dataset1 = nonModifiedDatasets().generateOne.copy(
-        name     = sentenceContaining(text).map(_.value).map(Name.apply).generateOne,
+        title    = sentenceContaining(text).map(_.value).map(Title.apply).generateOne,
         projects = dataset1Projects map toDatasetProject
       )
       val dataset2Projects = nonEmptyList(projects).generateOne.toList
@@ -238,10 +248,10 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         searchResultJson(dataset3)
       ).flatMap(sortCreators)
 
-      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=name:asc")
-      val searchSortedByName = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=name:asc"
+      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc")
+      val searchSortedByName = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=title:asc"
 
-      Then("he should get OK response with some matching datasets sorted by name ASC")
+      Then("he should get OK response with some matching datasets sorted by title ASC")
       searchSortedByName.status shouldBe Ok
 
       val Right(foundDatasetsSortedByName) = searchSortedByName.bodyAsJson.as[List[Json]]
@@ -249,11 +259,12 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         searchResultJson(dataset1),
         searchResultJson(dataset2),
         searchResultJson(dataset3)
-      ).flatMap(sortCreators).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
+      ).flatMap(sortCreators)
+        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'name' property found")))
       foundDatasetsSortedByName.flatMap(sortCreators) shouldBe datasetsSortedByName
 
-      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=name:asc&page=2&per_page=1")
-      val searchForPage = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=name:asc&page=2&per_page=1"
+      When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc&page=2&per_page=1")
+      val searchForPage = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}&sort=title:asc&page=2&per_page=1"
 
       Then("he should get OK response with the dataset from the requested page")
       val Right(foundDatasetsPage) = searchForPage.bodyAsJson.as[List[Json]]
@@ -261,7 +272,7 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         .flatMap(sortCreators)
 
       When("user calls the GET knowledge-graph/datasets?sort=name:asc")
-      val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=name:asc"
+      val searchWithoutPhrase = knowledgeGraphClient GET s"knowledge-graph/datasets?sort=title:asc"
 
       Then("he should get OK response with all the datasets")
       val Right(foundDatasetsWithoutPhrase) = searchWithoutPhrase.bodyAsJson.as[List[Json]]
@@ -270,7 +281,8 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
         searchResultJson(dataset2),
         searchResultJson(dataset3),
         searchResultJson(dataset4)
-      ).flatMap(sortCreators).sortBy(_.hcursor.downField("name").as[String].getOrElse(fail("No 'name' property found")))
+      ).flatMap(sortCreators)
+        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'name' property found")))
 
       When("user uses the response header link with the rel='first'")
       val firstPageLink     = searchForPage.headerLink(rel = "first")
@@ -314,12 +326,13 @@ class DatasetsResourcesSpec extends FeatureSpec with GivenWhenThen with GraphSer
       nonModifiedDataSetCommit(
         commitId      = commitId,
         committedDate = committedDate,
-        schemaVersion = currentSchemaVersion
+        cliVersion    = currentCliVersion
       )(
         projectPath = project.path,
         projectName = project.name
       )(
         datasetIdentifier         = overriddenIdentifier getOrElse dataset.id,
+        datasetTitle              = dataset.title,
         datasetName               = dataset.name,
         maybeDatasetSameAs        = dataset.sameAs.some,
         maybeDatasetDescription   = dataset.maybeDescription,
@@ -338,7 +351,8 @@ object DatasetsResources {
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
 
   def briefJson(dataset: NonModifiedDataset): Json = json"""{
-    "identifier": ${dataset.id.value}, 
+    "identifier": ${dataset.id.value},
+    "title": ${dataset.title.value},
     "name": ${dataset.name.value},
     "sameAs": ${dataset.sameAs.value}
   }""" deepMerge {
@@ -349,7 +363,8 @@ object DatasetsResources {
 
   def searchResultJson(dataset: Dataset): Json =
     json"""{
-      "identifier": ${dataset.id.value}, 
+      "identifier": ${dataset.id.value},
+      "title": ${dataset.title.value},
       "name": ${dataset.name.value},
       "published": ${dataset.published},
       "projectsCount": ${dataset.projects.size}

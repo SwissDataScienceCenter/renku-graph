@@ -25,11 +25,11 @@ import io.renku.jsonld.JsonLD.JsonLDEntity
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
 import io.renku.jsonld.generators.JsonLDGenerators._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ReverseSpec extends WordSpec with ScalaCheckPropertyChecks {
+class ReverseSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "of(Property -> List[JsonLD])" should {
 

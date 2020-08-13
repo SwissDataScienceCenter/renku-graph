@@ -19,17 +19,19 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import com.typesafe.config.ConfigFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import io.chrisdavenport.log4cats.Logger
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
-class TriplesGeneratorSpec extends WordSpec {
+class TriplesGeneratorSpec extends AnyWordSpec with should.Matchers {
 
   "apply" should {
 

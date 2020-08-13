@@ -27,11 +27,11 @@ import ch.datascience.tinytypes.constraints.NonBlank
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EmailSpec extends WordSpec with ScalaCheckPropertyChecks {
+class EmailSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "Email" should {
 
@@ -93,7 +93,7 @@ class EmailSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class UsersResourceIdSpec extends WordSpec with ScalaCheckPropertyChecks {
+class UsersResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   import ch.datascience.rdfstore.SparqlValueEncoder._
 

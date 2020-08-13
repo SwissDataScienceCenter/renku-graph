@@ -28,11 +28,11 @@ import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.{Dataset, ModifiedDataset, NonModifiedDataset}
 import ch.datascience.rdfstore.entities.DataSet
 import io.circe.literal._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
+class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   private implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
@@ -81,7 +81,8 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
         {
           "datasetId": {"value": ${DataSet.entityId(dataset.id).value.toString}},
           "identifier": {"value": ${dataset.id.value}},
-          "name": {"value": ${dataset.name.value}},
+          "name": {"value": ${dataset.title.value}},
+          "alternateName": {"value": ${dataset.name.value}},
           "publishedDate": {"value": ${publishedDate.value}},
           "description": {"value": $blank},
           "url": {"value": ${dataset.url.value}},
@@ -96,9 +97,10 @@ class BaseDetailsFinderSpec extends WordSpec with ScalaCheckPropertyChecks {
     "results": {
       "bindings": [
         {
-          "datasetId": {"value": ${DataSet.entityId(dataset.id).toString}},
+          "datasetId": {"value": ${DataSet.entityId(dataset.id).value.toString}},
           "identifier": {"value": ${dataset.id.value}},
-          "name": {"value": ${dataset.name.value}},
+          "name": {"value": ${dataset.title.value}},
+          "alternateName": {"value": ${dataset.name.value}},
           "publishedDate": {"value": ${publishedDate.value}},
           "description": {"value": $blank},
           "url": {"value": ${dataset.url.value}},

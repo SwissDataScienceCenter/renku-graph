@@ -52,6 +52,11 @@ trait UrlOps[T <: StringTinyType] {
 
     def /(value: String): T = apply(s"$url/${urlEncode(value)}")
 
+    def /(maybeValue: Option[String]): T = maybeValue match {
+      case Some(value) => apply(s"$url/${urlEncode(value)}")
+      case _           => url
+    }
+
     def ?[Value](keyAndValue: (String, Value))(implicit convert: Value => QueryParamValue): UrlWithQueryParam =
       keyAndValue match {
         case (key, value) =>

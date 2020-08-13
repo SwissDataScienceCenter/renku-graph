@@ -30,12 +30,12 @@ import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import org.http4s.Status._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
+class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
 
   "markNew" should {
 
@@ -153,6 +153,38 @@ class EventStatusUpdaterSpec extends WordSpec with ExternalServiceStubbing {
 
       intercept[Exception] {
         updater.markEventFailedNonRecoverably(eventId, exceptions.generateOne).unsafeRunSync()
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+    }
+  }
+
+  "markEventSkipped" should {
+
+    val message = "MigrationEvent"
+
+    Set(Ok, Conflict) foreach { status =>
+      s"succeed if remote responds with $status" in new TestCase {
+        stubFor {
+          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+            .withRequestBody(
+              equalToJson(json"""{"status": "SKIPPED", "message": $message}""".spaces2)
+            )
+            .willReturn(aResponse().withStatus(status.code))
+        }
+
+        updater.markEventSkipped(eventId, message).unsafeRunSync() shouldBe ((): Unit)
+      }
+    }
+
+    s"fail if remote responds with status different than $Ok" in new TestCase {
+      val status = BadRequest
+
+      stubFor {
+        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          .willReturn(aResponse().withStatus(status.code))
+      }
+
+      intercept[Exception] {
+        updater.markEventSkipped(eventId, message).unsafeRunSync()
       }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
   }

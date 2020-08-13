@@ -1,4 +1,4 @@
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "eventLog.fullname" . }}
@@ -68,6 +68,7 @@ spec:
             periodSeconds: 10
             successThreshold: 1
             failureThreshold: 10
+            timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /ping
@@ -76,7 +77,7 @@ spec:
             successThreshold: 1
             failureThreshold: 3
           resources:
-  {{ toYaml .Values.eventLog.resources | indent 12 }}
+  {{- toYaml .Values.eventLog.resources | nindent 12 }}
   {{- with .Values.nodeSelector }}
 nodeSelector:
   {{ toYaml . | indent 8 }}

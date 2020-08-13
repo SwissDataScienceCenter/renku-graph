@@ -38,12 +38,12 @@ import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository.{AccessTokenAssociator, AccessTokenRemover}
 import io.chrisdavenport.log4cats.Logger
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Failure, Try}
 
-class HookValidatorSpec extends WordSpec with MockFactory {
+class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
   import IOAccessTokenFinder._
 
   "validateHook - finding project visibility and project access token" should {

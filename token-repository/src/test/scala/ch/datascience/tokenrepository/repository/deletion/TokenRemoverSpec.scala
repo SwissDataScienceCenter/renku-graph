@@ -22,10 +22,10 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import ch.datascience.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class TokenRemoverSpec extends WordSpec with InMemoryProjectsTokensDbSpec {
+class TokenRemoverSpec extends AnyWordSpec with InMemoryProjectsTokensDbSpec with should.Matchers {
 
   "delete" should {
 

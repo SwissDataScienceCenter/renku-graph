@@ -27,6 +27,7 @@ object model {
 
   sealed trait Dataset extends Product with Serializable {
     val id:               Identifier
+    val title:            Title
     val name:             Name
     val url:              Url
     val maybeDescription: Option[Description]
@@ -36,6 +37,7 @@ object model {
   }
 
   final case class NonModifiedDataset(id:               Identifier,
+                                      title:            Title,
                                       name:             Name,
                                       url:              Url,
                                       sameAs:           SameAs,
@@ -46,6 +48,7 @@ object model {
       extends Dataset
 
   final case class ModifiedDataset(id:               Identifier,
+                                   title:            Title,
                                    name:             Name,
                                    url:              Url,
                                    derivedFrom:      DerivedFrom,

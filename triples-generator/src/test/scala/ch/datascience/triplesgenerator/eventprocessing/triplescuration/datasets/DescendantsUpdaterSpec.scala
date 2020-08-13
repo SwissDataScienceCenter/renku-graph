@@ -27,10 +27,10 @@ import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators.curatedTriplesObjects
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
 import io.renku.jsonld.generators.JsonLDGenerators.entityIds
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class DescendantsUpdaterSpec extends WordSpec with InMemoryRdfStore {
+class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   "prepareUpdates" should {
 

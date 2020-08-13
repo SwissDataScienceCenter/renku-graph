@@ -18,17 +18,17 @@
 
 package io.renku.eventlog
 
-import DbEventLogGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
 import io.circe.Json
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import io.renku.eventlog.DbEventLogGenerators._
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EventStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
+class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   import EventStatus._
 
@@ -39,6 +39,7 @@ class EventStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
       "NEW"                     -> New,
       "PROCESSING"              -> Processing,
       "TRIPLES_STORE"           -> TriplesStore,
+      "SKIPPED"                 -> Skipped,
       "RECOVERABLE_FAILURE"     -> RecoverableFailure,
       "NON_RECOVERABLE_FAILURE" -> NonRecoverableFailure
     )
@@ -71,7 +72,7 @@ class EventStatusSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class CreatedDateSpec extends WordSpec with ScalaCheckPropertyChecks {
+class CreatedDateSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "CreatedDate" should {
 
@@ -87,7 +88,7 @@ class CreatedDateSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class ExecutionDateSpec extends WordSpec with ScalaCheckPropertyChecks {
+class ExecutionDateSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "ExecutionDate" should {
 
@@ -99,7 +100,7 @@ class ExecutionDateSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class EventMessageSpec extends WordSpec with ScalaCheckPropertyChecks {
+class EventMessageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "Message" should {
 
@@ -127,7 +128,7 @@ class EventMessageSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class EventSpec extends WordSpec with ScalaCheckPropertyChecks {
+class EventSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "compoundEventId" should {
 

@@ -29,6 +29,7 @@ trait DataSet {
   self: Artifact with Entity =>
 
   val datasetId:                         Identifier
+  val datasetTitle:                      Title
   val datasetName:                       Name
   val datasetUrl:                        Url
   val maybeDatasetSameAs:                Option[SameAs]
@@ -66,6 +67,7 @@ object DataSet {
   type DataSetEntity = Entity with DataSet with Artifact
 
   def nonModifiedFactory(id:                         Identifier,
+                         title:                      Title,
                          name:                       Name,
                          url:                        Url,
                          maybeSameAs:                Option[SameAs] = None,
@@ -83,6 +85,7 @@ object DataSet {
                maybeInvalidationActivity = None,
                maybeGeneration           = None) with DataSet with Artifact {
       override val datasetId:                         Identifier                = id
+      override val datasetTitle:                      Title                     = title
       override val datasetName:                       Name                      = name
       override val datasetUrl:                        Url                       = url
       override val maybeDatasetSameAs:                Option[SameAs]            = maybeSameAs
@@ -98,6 +101,7 @@ object DataSet {
     }
 
   def modifiedFactory(id:                         Identifier,
+                      title:                      Title,
                       name:                       Name,
                       url:                        Url,
                       derivedFrom:                DerivedFrom,
@@ -115,6 +119,7 @@ object DataSet {
                maybeInvalidationActivity = None,
                maybeGeneration           = None) with DataSet with Artifact {
       override val datasetId:                         Identifier                = id
+      override val datasetTitle:                      Title                     = title
       override val datasetName:                       Name                      = name
       override val datasetUrl:                        Url                       = url
       override val maybeDatasetSameAs:                Option[SameAs]            = None
@@ -144,7 +149,8 @@ object DataSet {
           EntityTypes of schema / "Dataset",
           rdfs / "label"               -> entity.datasetId.asJsonLD,
           schema / "identifier"        -> entity.datasetId.asJsonLD,
-          schema / "name"              -> entity.datasetName.asJsonLD,
+          schema / "name"              -> entity.datasetTitle.asJsonLD,
+          schema / "alternateName"     -> entity.datasetName.asJsonLD,
           schema / "url"               -> entity.datasetUrl.asJsonLD,
           schema / "sameAs"            -> entity.maybeDatasetSameAs.asJsonLD,
           prov / "wasDerivedFrom"      -> entity.maybeDatasetDerivedFrom.asJsonLD,

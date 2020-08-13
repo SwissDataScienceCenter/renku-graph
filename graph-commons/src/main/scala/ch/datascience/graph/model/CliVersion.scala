@@ -18,13 +18,13 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.NonBlank
 
-final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
-object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank {
+final class CliVersion private (val value: String) extends AnyVal with StringTinyType
+object CliVersion extends TinyTypeFactory[CliVersion](new CliVersion(_)) with NonBlank {
   import ch.datascience.tinytypes.json.TinyTypeDecoders
   import io.circe.Decoder
 
-  implicit val jsonDecoder: Decoder[SchemaVersion] = TinyTypeDecoders.stringDecoder(this)
+  implicit val jsonDecoder: Decoder[CliVersion] = TinyTypeDecoders.stringDecoder(this)
 }

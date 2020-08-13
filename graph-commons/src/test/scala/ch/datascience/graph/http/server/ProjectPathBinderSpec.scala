@@ -21,10 +21,10 @@ package ch.datascience.graph.http.server
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectPathBinderSpec extends WordSpec {
+class ProjectPathBinderSpec extends AnyWordSpec with should.Matchers {
 
   import binders._
 

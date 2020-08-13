@@ -20,8 +20,6 @@ package io.renku.eventlog.creation
 
 import java.time.Instant
 
-import EventPersister.Result
-import Result._
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
@@ -34,11 +32,18 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus.New
 import io.renku.eventlog._
+import io.renku.eventlog.creation.EventPersister.Result
+import io.renku.eventlog.creation.EventPersister.Result._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class EventPersisterSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory with TypesSerializers {
+class EventPersisterSpec
+    extends AnyWordSpec
+    with InMemoryEventLogDbSpec
+    with MockFactory
+    with TypesSerializers
+    with should.Matchers {
 
   "storeNewEvent" should {
 

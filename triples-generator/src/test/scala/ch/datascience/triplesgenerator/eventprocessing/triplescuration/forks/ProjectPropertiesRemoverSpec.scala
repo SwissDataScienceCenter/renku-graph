@@ -20,8 +20,8 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId}
-import ch.datascience.graph.model.{SchemaVersion, users}
+import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId, SchemaVersion}
+import ch.datascience.graph.model.users
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.rdfstore.entities.Project
 import ch.datascience.rdfstore.entities.bundles._
@@ -33,13 +33,13 @@ import io.circe.{Decoder, Encoder, Json}
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, JsonLD, Property}
 import monocle.function.Plated
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.collection.mutable
 
-class ProjectPropertiesRemoverSpec extends WordSpec with ScalaCheckPropertyChecks {
+class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "ProjectPropertiesRemover" should {
 
@@ -53,7 +53,8 @@ class ProjectPropertiesRemoverSpec extends WordSpec with ScalaCheckPropertyCheck
                 projectName         = project.name,
                 projectDateCreated  = project.dateCreated,
                 maybeProjectCreator = project.maybeCreator,
-                maybeParent         = project.maybeParentProject
+                maybeParent         = project.maybeParentProject,
+                projectVersion      = project.version
               ),
               project.asJsonLD
             )

@@ -23,13 +23,41 @@ import java.time.{Instant, LocalDate}
 import cats.kernel.Semigroup
 import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.datasets.{IdSameAs, SameAs, UrlSameAs}
 import ch.datascience.tinytypes._
+import ch.datascience.tinytypes.constraints.PathSegment
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 package object entities extends Schemas with EntitiesGenerators {
 
   implicit val fusekiBaseUrlToEntityId: FusekiBaseUrl => EntityId = url => EntityId of url.value
   implicit val renkuBaseUrlToEntityId:  RenkuBaseUrl => EntityId  = url => EntityId of url.value
+
+  implicit def sameAsEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
+    case v: IdSameAs  => idSameAsEncoder(renkuBaseUrl)(v)
+    case v: UrlSameAs => urlSameAsEncoder(renkuBaseUrl)(v)
+  }
+
+  private def idSameAsEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[IdSameAs] = JsonLDEncoder.instance {
+    sameAs =>
+      JsonLD.entity(
+        EntityId of (renkuBaseUrl / "urls" / sameAs),
+        EntityTypes of (schema / "URL"),
+        schema / "url" -> EntityId.of(sameAs.value).asJsonLD
+      )
+  }
+
+  private def urlSameAsEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[UrlSameAs] = JsonLDEncoder.instance {
+    sameAs =>
+      JsonLD.entity(
+        EntityId of (renkuBaseUrl / "urls" / sameAs),
+        EntityTypes of (schema / "URL"),
+        schema / "url" -> sameAs.value.asJsonLD
+      )
+  }
+
+  private implicit lazy val sameAsToPathSegment: SameAs => List[PathSegment] = sameAs => List(PathSegment(sameAs.value))
 
   implicit def stringTTEncoder[TT <: StringTinyType]: JsonLDEncoder[TT] =
     JsonLDEncoder.instance(v => JsonLD.fromString(v.value))
@@ -50,6 +78,12 @@ package object entities extends Schemas with EntitiesGenerators {
 
     def getEntityId[S >: T](implicit converter: PartialEntityConverter[S]): Option[EntityId] =
       converter.toEntityId(entity)
+  }
+
+  implicit class EntityIdOps(entityId: EntityId) {
+    import ch.datascience.http.client.UrlEncoder._
+
+    def /(value: Any): EntityId = EntityId.of(s"$entityId/${urlEncode(value.toString)}")
   }
 
   implicit class PropertiesOps(x: List[(Property, JsonLD)]) {

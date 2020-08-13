@@ -24,11 +24,11 @@ import ch.datascience.http.rest.Links.{Link, _links}
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class linksSpec extends WordSpec with ScalaCheckPropertyChecks {
+class linksSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "links" should {
 

@@ -24,11 +24,11 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.webhookservice.eventprocessing.{Author, Committer}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators.commitInfos
 import io.circe.literal._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class CommitInfoSpec extends WordSpec with ScalaCheckPropertyChecks {
+class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "CommitInfo Decoder" should {
 

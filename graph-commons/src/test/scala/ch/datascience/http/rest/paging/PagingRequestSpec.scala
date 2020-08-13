@@ -26,11 +26,11 @@ import ch.datascience.generators.Generators._
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import org.http4s.ParseFailure
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class PagingRequestSpec extends WordSpec with ScalaCheckPropertyChecks {
+class PagingRequestSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "page" should {
 

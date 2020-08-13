@@ -25,14 +25,14 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.collection.JavaConverters._
 import scala.util.{Failure, Success, Try}
 
-class ResourcesUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
+class ResourcesUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "apply" should {
 

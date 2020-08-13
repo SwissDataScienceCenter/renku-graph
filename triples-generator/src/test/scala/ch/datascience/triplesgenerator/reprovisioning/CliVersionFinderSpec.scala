@@ -18,47 +18,44 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
-import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
 import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.util.{Success, Try}
 
-class SchemaVersionFinderSpec extends WordSpec with MockFactory {
+class CliVersionFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "apply" should {
 
-    val schemaVersion = schemaVersions.generateOne
+    val cliVersion = cliVersions.generateOne
 
-    s"return 'services.triples-generator.schema-version' config value if TriplesGeneration is $RemoteTriplesGeneration" in {
+    s"return 'services.triples-generator.cli-version' config value if TriplesGeneration is $RemoteTriplesGeneration" in {
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "triples-generator" -> Map(
-              "schema-version" -> schemaVersion.toString
+              "cli-version" -> cliVersion.toString
             ).asJava
           ).asJava
         ).asJava
       )
 
-      SchemaVersionFinder[Try](triplesGeneration  = RemoteTriplesGeneration,
-                               renkuVersionFinder = context.pure(schemaVersions.generateOne),
-                               config             = config) shouldBe Success(schemaVersion)
+      CliVersionFinder[Try](triplesGeneration  = RemoteTriplesGeneration,
+                            renkuVersionFinder = cliVersions.generateOne.pure[Try],
+                            config             = config) shouldBe Success(cliVersion)
     }
 
     s"call 'renku --version' if TriplesGeneration is $RenkuLog" in {
-      SchemaVersionFinder[Try](triplesGeneration  = RenkuLog,
-                               renkuVersionFinder = context.pure(schemaVersion),
-                               config             = ConfigFactory.empty()) shouldBe Success(schemaVersion)
+      CliVersionFinder[Try](triplesGeneration  = RenkuLog,
+                            renkuVersionFinder = cliVersion.pure[Try],
+                            config             = ConfigFactory.empty()) shouldBe Success(cliVersion)
     }
   }
-
-  private val context = MonadError[Try, Throwable]
 }

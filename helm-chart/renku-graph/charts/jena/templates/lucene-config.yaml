@@ -8,47 +8,47 @@ metadata:
     chart: {{ template "jena.chart" . }}
     release: {{ .Release.Name }}
     heritage: {{ .Release.Service }}
-type: Opaque
 data:
   {{ .Values.global.graph.jena.dataset }}.ttl: |-
 
-    @prefix :        <#> .
-    @prefix fuseki:  <http://jena.apache.org/fuseki#> .
-    @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
-    @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
-    @prefix tdb:     <http://jena.hpl.hp.com/2008/tdb#> .
-    @prefix ja:      <http://jena.hpl.hp.com/2005/11/Assembler#> .
-    @prefix text:    <http://jena.apache.org/text#> .
+                                                 @prefix:        <#> .
+                                                 @prefix fuseki:  <http://jena.apache.org/fuseki#> .
+                                                 @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+                                                 @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+                                                 @prefix tdb:     <http://jena.hpl.hp.com/2008/tdb#> .
+                                                 @prefix ja:      <http://jena.hpl.hp.com/2005/11/Assembler#> .
+                                                 @prefix text:    <http://jena.apache.org/text#> .
 
-    :renku_tdb_all rdf:type fuseki:Service ;
-      rdfs:label                        "TDB renku" ;
-      fuseki:name                       "{{ .Values.global.graph.jena.dataset }}" ;
-      fuseki:dataset                    :text_dataset ;
-      fuseki:serviceQuery               "query" , "sparql" ;
-      fuseki:serviceReadGraphStore      "get" ;
-      fuseki:serviceReadWriteGraphStore "data" ;
-      fuseki:serviceUpdate              "update" ;
-      fuseki:serviceUpload              "upload" ;
-    .
+                                                 :renku_tdb_all rdf:type fuseki:Service ;
+                                                 rdfs:label                        "TDB renku" ;
+                                                 fuseki:name                       "{{ .Values.global.graph.jena.dataset }}" ;
+                                                 fuseki:dataset                    :text_dataset ;
+                                                 fuseki:serviceQuery               "query" , "sparql" ;
+                                                 fuseki:serviceReadGraphStore      "get" ;
+                                                 fuseki:serviceReadWriteGraphStore "data" ;
+                                                 fuseki:serviceUpdate              "update" ;
+                                                 fuseki:serviceUpload              "upload" ;
+                                                 .
 
-    :text_dataset rdf:type text:TextDataset ;
-      text:dataset   :{{ .Values.global.graph.jena.dataset }} ;
-      text:index     <#indexLucene> ;
-    .
+                                                 :text_dataset rdf:type text:TextDataset ;
+                                                 text:dataset   :{{ .Values.global.graph.jena.dataset }} ;
+                                                 text:index     <#indexLucene> ;
+                                                 .
 
-    :{{ .Values.global.graph.jena.dataset }} rdf:type tdb:DatasetTDB ;
-      tdb:location "/fuseki/databases/{{ .Values.global.graph.jena.dataset }}" ;
-    .
+                                                 :{{ .Values.global.graph.jena.dataset }} rdf:type tdb:DatasetTDB ;
+                                                 tdb:location "/fuseki/databases/{{ .Values.global.graph.jena.dataset }}" ;
+                                                 .
 
-    <#indexLucene> a text:TextIndexLucene ;
-      text:directory <file:/fuseki/databases/{{ .Values.global.graph.jena.dataset }}/lucene_index> ;
-      text:entityMap <#entMap> ;
-    .
+                                                 <#indexLucene> a text:TextIndexLucene ;
+                                                 text:directory <file:/fuseki/databases/{{ .Values.global.graph.jena.dataset }}/lucene_index> ;
+                                                 text:entityMap <#entMap> ;
+                                                 .
 
-    <#entMap> a text:EntityMap ;
-      text:defaultField     "name" ;
-      text:entityField      "uri" ;
-      text:map (
-          [ text:field "name" ; text:predicate <http://schema.org/name> ]
-          [ text:field "description" ; text:predicate <http://schema.org/description> ]
-      ) .
+                                                 <#entMap> a text:EntityMap ;
+                                                 text:defaultField     "name" ;
+                                                 text:entityField      "uri" ;
+                                                 text:map (
+  [ text:field "name" ; text:predicate <http://schema.org/name> ]
+  [ text:field "description" ; text:predicate <http://schema.org/description> ]
+  [ text:field "alternateName" ; text:predicate <http://schema.org/alternateName> ]
+                                                 ) .

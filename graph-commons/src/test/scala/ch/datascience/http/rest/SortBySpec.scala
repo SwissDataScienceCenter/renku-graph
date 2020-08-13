@@ -25,11 +25,11 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.http.client.UrlEncoder._
 import ch.datascience.http.rest.SortBy.Direction.Desc
 import org.http4s.ParseFailure
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class SortBySpec extends WordSpec with ScalaCheckPropertyChecks {
+class SortBySpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "from" should {
 

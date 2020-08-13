@@ -30,11 +30,15 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class StatsFinderSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaCheckPropertyChecks {
+class StatsFinderSpec
+    extends AnyWordSpec
+    with InMemoryEventLogDbSpec
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "statuses" should {
 
@@ -48,6 +52,7 @@ class StatsFinderSpec extends WordSpec with InMemoryEventLogDbSpec with ScalaChe
           New                   -> statuses.count(_ == New),
           Processing            -> statuses.count(_ == Processing),
           TriplesStore          -> statuses.count(_ == TriplesStore),
+          Skipped               -> statuses.count(_ == Skipped),
           RecoverableFailure    -> statuses.count(_ == RecoverableFailure),
           NonRecoverableFailure -> statuses.count(_ == NonRecoverableFailure)
         )

@@ -20,6 +20,7 @@ package ch.datascience.tokenrepository
 
 import cats.data.OptionT
 import cats.effect.{Clock, IO}
+import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects
@@ -31,15 +32,16 @@ import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
+class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers {
 
   "routes" should {
 

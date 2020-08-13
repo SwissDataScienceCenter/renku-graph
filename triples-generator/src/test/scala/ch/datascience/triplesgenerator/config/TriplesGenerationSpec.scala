@@ -21,13 +21,13 @@ package ch.datascience.triplesgenerator.config
 import cats.implicits._
 import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import com.typesafe.config.ConfigFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.JavaConverters._
 import scala.util.{Success, Try}
 
-class TriplesGenerationSpec extends WordSpec {
+class TriplesGenerationSpec extends AnyWordSpec with should.Matchers {
 
   "apply" should {
 

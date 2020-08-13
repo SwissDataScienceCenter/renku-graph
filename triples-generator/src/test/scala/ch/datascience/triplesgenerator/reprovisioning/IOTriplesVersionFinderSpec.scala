@@ -21,97 +21,57 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.CliVersion
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.EntitiesGenerators._
-import ch.datascience.rdfstore.entities.Person.persons
-import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.{Activity, Agent, Association, Project, RunPlan}
+import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.syntax._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import io.renku.jsonld.{EntityId, EntityTypes, JsonLD}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class IOTriplesVersionFinderSpec extends WordSpec with InMemoryRdfStore {
+class IOTriplesVersionFinderSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
+
+  private implicit lazy val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
   "triplesUpToDate" should {
 
-    "return true if all Activities' are associated with the latest version of Renku" in new TestCase {
+    "return true if CLI Version in the triples store matches the current version of Renku" in new TestCase {
 
-      loadToStore(
-        List(
-          agentRelatedEntities(schemaVersionOnGeneration = latestSchemaVersion,
-                               originalSchemaVersion     = schemaVersions.generateOne),
-          agentRelatedEntities(schemaVersionOnGeneration = latestSchemaVersion,
-                               originalSchemaVersion     = schemaVersions.generateOne)
-        ).flatten: _*
-      )
+      loadToStore(cliVersionOnTG(currentCliVersion))
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe true
 
-      logger.loggedOnly(Warn(s"renku version find finished${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(s"cli version find finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
-    "return false if there's an Activity associated with some old version of Renku" in new TestCase {
+    "return false if CLI Version in the triples store does not match the current version of Renku" in new TestCase {
 
-      loadToStore(
-        List(
-          agentRelatedEntities(schemaVersionOnGeneration = latestSchemaVersion,
-                               originalSchemaVersion     = schemaVersions.generateOne),
-          agentRelatedEntities(schemaVersionOnGeneration = schemaVersions.generateOne,
-                               originalSchemaVersion     = schemaVersions.generateOne)
-        ).flatten: _*
-      )
+      loadToStore(cliVersionOnTG(cliVersions.generateOne))
 
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
-
-      logger.loggedOnly(Warn(s"renku version find finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
-    "return false if there's a SoftwareAgent pointing to the latest version of Renku " +
-      "but it's not linked to an Activity" in new TestCase {
-
-      loadToStore(Agent(latestSchemaVersion).asJsonLD)
-
+    "return false if CLI Version cannot be found in the triples store" in new TestCase {
       triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
-
-      logger.loggedOnly(Warn(s"renku version find finished${executionTimeRecorder.executionTimeInfo}"))
     }
   }
 
   private trait TestCase {
-    val latestSchemaVersion   = schemaVersions.generateOne
+    val currentCliVersion     = cliVersions.generateOne
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder(logger)
     private val timeRecorder  = new SparqlQueryTimeRecorder(executionTimeRecorder)
-    val triplesVersionFinder  = new IOTriplesVersionFinder(rdfStoreConfig, latestSchemaVersion, logger, timeRecorder)
+    val triplesVersionFinder  = new IOTriplesVersionFinder(rdfStoreConfig, currentCliVersion, logger, timeRecorder)
   }
 
-  private def agentRelatedEntities(schemaVersionOnGeneration: SchemaVersion, originalSchemaVersion: SchemaVersion) = {
-    val project =
-      Project(projectPaths.generateOne, projectNames.generateOne, projectCreatedDates.generateOne, maybeCreator = None)
-    val activity = Activity(
-      commitIds.generateOne,
-      committedDates.generateOne,
-      persons.generateOne,
-      project,
-      Agent(schemaVersionOnGeneration)
+  private def cliVersionOnTG(version: CliVersion) =
+    JsonLD.entity(
+      EntityId of renkuBaseUrl / "cli-version",
+      EntityTypes of renku / "CliVersion",
+      renku / "version" -> version.asJsonLD
     )
-    List(
-      activity.asJsonLD,
-      Association
-        .process(
-          Agent(originalSchemaVersion),
-          RunPlan.process(
-            workflowFiles.generateOne,
-            runPlanCommands.generateOne
-          )
-        )(activity)
-        .asJsonLD
-    )
-  }
 }

@@ -32,12 +32,12 @@ import ch.datascience.tokenrepository.repository.RepositoryGenerators._
 import ch.datascience.tokenrepository.repository.TryAccessTokenCrypto
 import ch.datascience.tokenrepository.repository.deletion.TryTokenRemover
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
 
-class TokenAssociatorSpec extends WordSpec with MockFactory {
+class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "associate" should {
 

@@ -27,8 +27,8 @@ import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.collection.JavaConverters._
@@ -36,7 +36,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
-class RateLimitSpec extends WordSpec with ScalaCheckPropertyChecks {
+class RateLimitSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   private type EitherWithThrowable[T] = Either[Throwable, T]
   private trait Target

@@ -85,6 +85,7 @@ class DatasetEndpoint[Interpretation[_]: Effect](
       List(
         Some("identifier" -> dataset.id.asJson),
         Some("name" -> dataset.name.asJson),
+        Some("title" -> dataset.title.asJson),
         Some("url" -> dataset.url.asJson),
         Some {
           dataset match {
@@ -103,7 +104,7 @@ class DatasetEndpoint[Interpretation[_]: Effect](
     ) deepMerge _links(
       Link(Rel.Self -> Href(renkuResourcesUrl / "datasets" / dataset.id))
     )
-  } 
+  }
   // format: on
 
   // format: off

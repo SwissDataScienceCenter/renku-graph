@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
 import cats.MonadError
+import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.graph.config.{GitLabUrl, RenkuLogTimeout}
@@ -29,6 +30,8 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -58,7 +61,7 @@ private object Commands {
       ServiceUrl.from {
         val url              = gitLabUrl.value
         val protocol         = new URL(url).getProtocol
-        val serviceWithToken = url.toString.replace(s"$protocol://", s"$protocol://$urlTokenPart")
+        val serviceWithToken = url.replace(s"$protocol://", s"$protocol://$urlTokenPart")
         s"$serviceWithToken/$projectPath.git"
       }
     }
@@ -92,6 +95,11 @@ private object Commands {
         %%('git, 'checkout, commitId.value)(repositoryDirectory)
       }.map(_ => ())
 
+    def findCommitMessage(commitId: CommitId, repositoryDirectory: Path): IO[String] =
+      IO {
+        %%('git, 'log, "--format=%B", "-n", "1", commitId.value)(repositoryDirectory)
+      }.map(_.out.string.trim)
+
     def clone(
         repositoryUrl:        ServiceUrl,
         destinationDirectory: Path,
@@ -108,11 +116,12 @@ private object Commands {
     private lazy val relevantError: PartialFunction[Throwable, IO[Either[GenerationRecoverableError, Unit]]] = {
       case ShelloutException(result) =>
         def errorMessage(message: String) = s"git clone failed with: $message"
+
         IO(result.out.string) flatMap {
-          case err if recoverableErrors exists err.contains =>
-            GenerationRecoverableError(errorMessage(err)).asLeft[Unit].pure[IO]
-          case err =>
-            new Exception(errorMessage(err)).raiseError[IO, Either[GenerationRecoverableError, Unit]]
+          case out if recoverableErrors exists out.contains =>
+            GenerationRecoverableError(errorMessage(result.toString())).asLeft[Unit].pure[IO]
+          case _ =>
+            new Exception(errorMessage(result.toString())).raiseError[IO, Either[GenerationRecoverableError, Unit]]
         }
     }
   }
@@ -144,32 +153,39 @@ private object Commands {
     def log[T <: CommitEvent](
         commit:                 T,
         destinationDirectory:   Path
-    )(implicit generateTriples: (T, Path) => CommandResult): IO[JsonLDTriples] =
-      IO.race(
-          call(generateTriples(commit, destinationDirectory)),
-          timer sleep timeout.value
+    )(implicit generateTriples: (T, Path) => CommandResult): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
+      EitherT {
+        IO.race(
+            call(generateTriples(commit, destinationDirectory)),
+            timer sleep timeout.value
+          )
+          .flatMap {
+            case Left(result) => IO.pure(result)
+            case Right(_)     => timeoutExceededError(commit)
+          }
+      }
+
+    private def timeoutExceededError(commitEvent: CommitEvent): IO[Either[ProcessingRecoverableError, JsonLDTriples]] =
+      ME.raiseError {
+        new Exception(
+          s"'renku log' execution for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id} took longer than $timeout - terminating"
         )
-        .flatMap {
-          case Left(triples) => IO.pure(triples)
-          case Right(_)      => timeoutExceededError(commit)
-        }
+      }
 
-    private def timeoutExceededError(commitEvent: CommitEvent): IO[JsonLDTriples] = ME.raiseError {
-      new Exception(
-        s"'renku log' execution for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id} took longer than $timeout - terminating"
-      )
-    }
-
-    private def call(generateTriples: => CommandResult) =
-      IO.cancelable[JsonLDTriples] { callback =>
+    private def call(generateTriples: => CommandResult): IO[Either[ProcessingRecoverableError, JsonLDTriples]] =
+      IO.cancelable[Either[ProcessingRecoverableError, JsonLDTriples]] { callback =>
         executionContext.execute { () =>
           {
             for {
               triplesAsString <- Try(generateTriples.out.string.trim)
               wrappedTriples  <- JsonLDTriples.parse[Try](triplesAsString)
-            } yield callback(Right(wrappedTriples))
-          }.recover { case NonFatal(exception) => callback(Left(exception)) }
-            .fold(throw _, identity)
+            } yield callback(Right(Right(wrappedTriples)))
+          } recover {
+            case NonFatal(ShelloutException(result)) if result.exitCode == 137 =>
+              callback(Right(Left(GenerationRecoverableError("Not enough memory"))))
+            case NonFatal(exception) =>
+              callback(Left(exception))
+          } fold (throw _, identity)
         }
         IO.unit
       }

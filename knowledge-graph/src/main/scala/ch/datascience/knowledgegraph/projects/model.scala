@@ -23,7 +23,7 @@ import java.time.Instant
 
 import cats.data.Validated
 import cats.implicits._
-import ch.datascience.graph.model.projects.{DateCreated, Description, Id, Name, Path, Visibility}
+import ch.datascience.graph.model.projects.{DateCreated, Description, Id, Name, Path, SchemaVersion, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.knowledgegraph.projects.model.Statistics._
 import ch.datascience.tinytypes._
@@ -50,7 +50,8 @@ object model {
                            tags:             Set[Tag],
                            starsCount:       StarsCount,
                            permissions:      Permissions,
-                           statistics:       Statistics)
+                           statistics:       Statistics,
+                           version:          SchemaVersion)
 
   object Project {
     final class Tag private (val value: String) extends AnyVal with StringTinyType
@@ -151,7 +152,7 @@ object model {
         with NonNegativeLong
   }
 
-  final case class Urls(ssh: SshUrl, http: HttpUrl, web: WebUrl, readme: ReadmeUrl)
+  final case class Urls(ssh: SshUrl, http: HttpUrl, web: WebUrl, maybeReadme: Option[ReadmeUrl])
 
   object Urls {
 

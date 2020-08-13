@@ -27,15 +27,17 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import io.renku.jsonld.EntityId
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class IOProjectDatasetsFinderSpec
-    extends WordSpec
+    extends AnyWordSpec
     with InMemoryRdfStore
     with ExternalServiceStubbing
-    with ScalaCheckPropertyChecks {
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "findProjectDatasets" should {
 
@@ -62,7 +64,10 @@ class IOProjectDatasetsFinderSpec
         )
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
-          (datasetModification2.id, datasetModification2.name, Right(datasetModification2.derivedFrom))
+          (datasetModification2.id,
+           datasetModification2.title,
+           datasetModification2.name,
+           Right(datasetModification2.derivedFrom))
         )
       }
     }
@@ -84,8 +89,11 @@ class IOProjectDatasetsFinderSpec
         )
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.name, Left(dataset1.sameAs)),
-          (dataset2Modification.id, dataset2Modification.name, Right(dataset2Modification.derivedFrom))
+          (dataset1.id, dataset1.title, dataset1.name, Left(dataset1.sameAs)),
+          (dataset2Modification.id,
+           dataset2Modification.title,
+           dataset2Modification.name,
+           Right(dataset2Modification.derivedFrom))
         )
       }
     }
@@ -109,8 +117,8 @@ class IOProjectDatasetsFinderSpec
         )
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.name, Left(sharedSameAs)),
-          (dataset2.id, dataset2.name, Left(sharedSameAs))
+          (dataset1.id, dataset1.title, dataset1.name, Left(sharedSameAs)),
+          (dataset2.id, dataset2.title, dataset2.name, Left(sharedSameAs))
         )
       }
     }

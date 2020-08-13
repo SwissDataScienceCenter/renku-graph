@@ -24,13 +24,13 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import sangria.ast.StringValue
 import sangria.schema.ScalarType
 import sangria.validation.ValueCoercionViolation
 
-class ArgumentsSpec extends WordSpec {
+class ArgumentsSpec extends AnyWordSpec with should.Matchers {
 
   import Arguments._
 

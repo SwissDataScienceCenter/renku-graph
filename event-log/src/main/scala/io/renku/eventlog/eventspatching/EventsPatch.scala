@@ -27,6 +27,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
+import doobie.implicits.javatime._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.eventlog.EventStatus.New

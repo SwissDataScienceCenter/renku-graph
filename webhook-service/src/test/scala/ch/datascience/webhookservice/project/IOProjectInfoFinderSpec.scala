@@ -33,12 +33,12 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import org.http4s.Status
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOProjectInfoFinderSpec extends WordSpec with MockFactory with ExternalServiceStubbing {
+class IOProjectInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
 
   "findProjectInfo" should {
 

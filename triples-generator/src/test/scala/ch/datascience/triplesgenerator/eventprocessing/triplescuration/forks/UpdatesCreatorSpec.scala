@@ -29,10 +29,10 @@ import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.{Person, Project}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import io.renku.jsonld.syntax._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class UpdatesCreatorSpec extends WordSpec with InMemoryRdfStore {
+class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   "deleteWasDerivedFrom" should {
 

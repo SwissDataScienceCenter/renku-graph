@@ -40,17 +40,18 @@ import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.{QueryContext, QueryEndpoint, QueryRunner}
 import org.http4s.Status._
 import org.http4s._
+import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import sangria.schema.Schema
 
 import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
 
-class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
+class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers {
 
   "routes" should {
 
@@ -79,7 +80,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
       val request = Request[IO](Method.GET, uri"knowledge-graph/datasets" withQueryParam (query.parameterName, phrase))
       (datasetsSearchEndpoint
         .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
-        .expects(Phrase(phrase).some, Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage.default))
+        .expects(Phrase(phrase).some, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page.first, PerPage.default))
         .returning(IO.pure(Response[IO](Ok)))
 
       val response = routes.call(request)
@@ -94,7 +95,9 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
 
       (datasetsSearchEndpoint
         .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
-        .expects(Option.empty[Phrase], Sort.By(NameProperty, Direction.Asc), PagingRequest(Page.first, PerPage.default))
+        .expects(Option.empty[Phrase],
+                 Sort.By(TitleProperty, Direction.Asc),
+                 PagingRequest(Page.first, PerPage.default))
         .returning(IO.pure(Response[IO](Ok)))
 
       val response = routes.call(request)
@@ -134,7 +137,7 @@ class MicroserviceRoutesSpec extends WordSpec with MockFactory with ScalaCheckPr
         )
         (datasetsSearchEndpoint
           .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
-          .expects(phrase.some, Sort.By(NameProperty, Direction.Asc), PagingRequest(page, perPage))
+          .expects(phrase.some, Sort.By(TitleProperty, Direction.Asc), PagingRequest(page, perPage))
           .returning(IO.pure(Response[IO](Ok)))
 
         val response = routes.call(request)

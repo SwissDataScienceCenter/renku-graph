@@ -26,8 +26,8 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonBlankStrings, nonEmptyList, positiveInts, sentenceContaining}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetInProjectCreationDates, userAffiliations, userEmails}
-import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, DerivedFrom, Description, Identifier, Name, PublishedDate, SameAs}
+import ch.datascience.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetInProjectCreationDates, datasetTitles, userAffiliations, userEmails}
+import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, DerivedFrom, Description, Identifier, Name, PublishedDate, SameAs, Title}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
@@ -92,6 +92,7 @@ package object rest {
             projectName = firstProject.name
           )(
             datasetIdentifier         = dataSet.id,
+            datasetTitle              = dataSet.title,
             datasetName               = dataSet.name,
             datasetUrl                = dataSet.url,
             maybeDatasetSameAs        = if (noSameAs) None else dataSet.sameAs.some,
@@ -116,6 +117,7 @@ package object rest {
               projectName = project.name
             )(
               datasetIdentifier         = dataSetId,
+              datasetTitle              = dataSet.title,
               datasetName               = dataSet.name,
               datasetUrl                = dataSet.url,
               maybeDatasetSameAs        = sameAs.some,
@@ -147,6 +149,13 @@ package object rest {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
       dataSet.copy(
         name = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
+      )
+    }
+
+    def makeTitleContaining(phrase: Phrase): NonModifiedDataset = {
+      val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
+      dataSet.copy(
+        title = sentenceContaining(nonEmptyPhrase).map(_.value).map(Title.apply).generateOne
       )
     }
 
@@ -207,6 +216,7 @@ package object rest {
             projectName = firstProject.name
           )(
             datasetIdentifier          = dataSet.id,
+            datasetTitle               = dataSet.title,
             datasetName                = dataSet.name,
             datasetUrl                 = dataSet.url,
             datasetDerivedFrom         = dataSet.derivedFrom,
@@ -229,6 +239,7 @@ package object rest {
               projectPath = project.path,
               projectName = project.name
             )(
+              datasetTitle               = dataSet.title,
               datasetName                = dataSet.name,
               datasetUrl                 = dataSet.url,
               datasetDerivedFrom         = dataSet.derivedFrom,
@@ -243,10 +254,10 @@ package object rest {
           firstJsonLd +: otherJsonLds
       }
 
-    def makeNameContaining(phrase: Phrase): ModifiedDataset = {
+    def makeTitleContaining(phrase: Phrase): ModifiedDataset = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
       dataSet.copy(
-        name = sentenceContaining(nonEmptyPhrase).map(_.value).map(Name.apply).generateOne
+        title = sentenceContaining(nonEmptyPhrase).map(_.value).map(Title.apply).generateOne
       )
     }
   }

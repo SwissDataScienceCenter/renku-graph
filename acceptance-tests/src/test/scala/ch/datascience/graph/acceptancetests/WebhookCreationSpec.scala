@@ -33,14 +33,15 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
 import io.circe.literal._
 import org.http4s.Status._
-import org.scalatest.Matchers._
-import org.scalatest.{FeatureSpec, GivenWhenThen}
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should
 
-class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServices {
+class WebhookCreationSpec extends AnyFeatureSpec with GivenWhenThen with GraphServices with should.Matchers {
 
-  feature("A Graph Services hook can be created for a project") {
+  Feature("A Graph Services hook can be created for a project") {
 
-    scenario("Graph Services hook is present on the project in GitLab") {
+    Scenario("Graph Services hook is present on the project in GitLab") {
 
       val projectId = projectIds.generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
@@ -58,7 +59,7 @@ class WebhookCreationSpec extends FeatureSpec with GivenWhenThen with GraphServi
       response.status shouldBe Ok
     }
 
-    scenario("No Graph Services webhook on the project in GitLab") {
+    Scenario("No Graph Services webhook on the project in GitLab") {
 
       val project   = projects.generateOne
       val projectId = project.id

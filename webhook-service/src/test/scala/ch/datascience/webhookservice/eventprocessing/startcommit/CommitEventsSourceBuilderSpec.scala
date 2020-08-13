@@ -36,12 +36,12 @@ import ch.datascience.webhookservice.generators.WebhookServiceGenerators
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}
 
-class CommitEventsSourceBuilderSpec extends WordSpec with MockFactory {
+class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "newCommitEventSource.transformEventsWith" should {
 

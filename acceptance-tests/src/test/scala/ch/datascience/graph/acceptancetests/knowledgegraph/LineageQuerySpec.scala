@@ -29,28 +29,33 @@ import ch.datascience.graph.model
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
 import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.bundles.exemplarLineageFlow.NodeDef
 import io.circe.Json
 import io.circe.literal._
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
-import org.scalatest.Matchers._
-import org.scalatest.{FeatureSpec, GivenWhenThen}
+import org.scalatest.GivenWhenThen
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should
 import sangria.ast.Document
 import sangria.macros._
 
 import scala.collection.Set
 
-class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices with AcceptanceTestPatience {
+class LineageQuerySpec
+    extends AnyFeatureSpec
+    with GivenWhenThen
+    with GraphServices
+    with AcceptanceTestPatience
+    with should.Matchers {
 
   private implicit val accessToken: AccessToken = accessTokens.generateOne
   private val project               = projects.generateOne.copy(path = model.projects.Path("namespace/lineage-project"))
   private val (jsons, examplarData) = exemplarLineageFlow(project.path)
   import examplarData._
 
-  feature("GraphQL query to find lineage") {
+  Feature("GraphQL query to find lineage") {
 
-    scenario("As a user I would like to find project's lineage with a GraphQL query") {
+    Scenario("As a user I would like to find project's lineage with a GraphQL query") {
 
       Given("some data in the RDF Store")
       `data in the RDF store`(
@@ -70,7 +75,7 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
       lineageJson.downField("nodes").as[List[Json]].map(_.toSet) shouldBe theExpectedNodes
     }
 
-    scenario("As a user I would like to find project's lineage with a named GraphQL query") {
+    Scenario("As a user I would like to find project's lineage with a named GraphQL query") {
 
       Given("some data in the RDF Store")
 
@@ -126,26 +131,26 @@ class LineageQuerySpec extends FeatureSpec with GivenWhenThen with GraphServices
 
   private lazy val theExpectedEdges = Right {
     Set(
-      json"""{"source": ${`sha3 zhbikes`.location},             "target": ${`sha8 renku run`.location}}""",
-      json"""{"source": ${`sha7 plot_data`.location},           "target": ${`sha9 renku run`.location}}""",
-      json"""{"source": ${`sha7 clean_data`.location},          "target": ${`sha8 renku run`.location}}""",
-      json"""{"source": ${`sha8 renku run`.location},           "target": ${`sha8 parquet`.location}}""",
-      json"""{"source": ${`sha8 parquet`.location},             "target": ${`sha9 renku run`.location}}""",
-      json"""{"source": ${`sha9 renku run`.location},           "target": ${`sha9 plot_data`.location}}""",
-      json"""{"source": ${`sha9 renku run`.location},           "target": ${`sha9 cumulative`.location}}"""
+      json"""{"source": ${`sha3 zhbikes`.location},    "target": ${`sha8 renku run`.location}}""",
+      json"""{"source": ${`sha7 plot_data`.location},  "target": ${`sha9 renku run`.location}}""",
+      json"""{"source": ${`sha7 clean_data`.location}, "target": ${`sha8 renku run`.location}}""",
+      json"""{"source": ${`sha8 renku run`.location},  "target": ${`sha8 parquet`.location}}""",
+      json"""{"source": ${`sha8 parquet`.location},    "target": ${`sha9 renku run`.location}}""",
+      json"""{"source": ${`sha9 renku run`.location},  "target": ${`sha9 plot_data`.location}}""",
+      json"""{"source": ${`sha9 renku run`.location},  "target": ${`sha9 cumulative`.location}}"""
     )
   }
 
   private lazy val theExpectedNodes = Right {
     Set(
-      json"""{"id": ${`sha3 zhbikes`.location},             "location": ${`sha3 zhbikes`.location},             "label": ${`sha3 zhbikes`.location},             "type": ${`sha3 zhbikes`.singleWordType}   }""",
-      json"""{"id": ${`sha7 clean_data`.location},          "location": ${`sha7 clean_data`.location},          "label": ${`sha7 clean_data`.location},          "type": ${`sha7 clean_data`.singleWordType}}""",
-      json"""{"id": ${`sha7 plot_data`.location},           "location": ${`sha7 plot_data`.location},           "label": ${`sha7 plot_data`.location},           "type": ${`sha7 plot_data`.singleWordType} }""",
-      json"""{"id": ${`sha8 renku run`.location},           "location": ${`sha8 renku run`.location},           "label": ${`sha8 renku run`.location},           "type": ${`sha8 renku run`.singleWordType} }""",
-      json"""{"id": ${`sha8 parquet`.location},             "location": ${`sha8 parquet`.location},             "label": ${`sha8 parquet`.location},             "type": ${`sha8 parquet`.singleWordType}   }""",
-      json"""{"id": ${`sha9 renku run`.location},           "location": ${`sha9 renku run`.location},           "label": ${`sha9 renku run`.location},           "type": ${`sha9 renku run`.singleWordType} }""",
-      json"""{"id": ${`sha9 plot_data`.location},           "location": ${`sha9 plot_data`.location},           "label": ${`sha9 plot_data`.location},           "type": ${`sha9 plot_data`.singleWordType} }""",
-      json"""{"id": ${`sha9 cumulative`.location},          "location": ${`sha9 cumulative`.location},          "label": ${`sha9 cumulative`.location},          "type": ${`sha9 cumulative`.singleWordType} }"""
+      json"""{"id": ${`sha3 zhbikes`.location},    "location": ${`sha3 zhbikes`.location},    "label": ${`sha3 zhbikes`.label},    "type": ${`sha3 zhbikes`.singleWordType}   }""",
+      json"""{"id": ${`sha7 clean_data`.location}, "location": ${`sha7 clean_data`.location}, "label": ${`sha7 clean_data`.label}, "type": ${`sha7 clean_data`.singleWordType}}""",
+      json"""{"id": ${`sha7 plot_data`.location},  "location": ${`sha7 plot_data`.location},  "label": ${`sha7 plot_data`.label},  "type": ${`sha7 plot_data`.singleWordType} }""",
+      json"""{"id": ${`sha8 renku run`.location},  "location": ${`sha8 renku run`.location},  "label": ${`sha8 renku run`.label},  "type": ${`sha8 renku run`.singleWordType} }""",
+      json"""{"id": ${`sha8 parquet`.location},    "location": ${`sha8 parquet`.location},    "label": ${`sha8 parquet`.label},    "type": ${`sha8 parquet`.singleWordType}   }""",
+      json"""{"id": ${`sha9 renku run`.location},  "location": ${`sha9 renku run`.location},  "label": ${`sha9 renku run`.label},  "type": ${`sha9 renku run`.singleWordType} }""",
+      json"""{"id": ${`sha9 plot_data`.location},  "location": ${`sha9 plot_data`.location},  "label": ${`sha9 plot_data`.label},  "type": ${`sha9 plot_data`.singleWordType} }""",
+      json"""{"id": ${`sha9 cumulative`.location}, "location": ${`sha9 cumulative`.location}, "label": ${`sha9 cumulative`.label}, "type": ${`sha9 cumulative`.singleWordType} }"""
     )
   }
 

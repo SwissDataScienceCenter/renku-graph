@@ -18,51 +18,53 @@
 
 name := "graph-commons"
 
-val pureConfigVersion = "0.11.1"
+val pureConfigVersion = "0.13.0"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
-val refinedVersion = "0.9.9"
+val refinedVersion = "0.9.15"
 libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 
-libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % "0.3.0"
+libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % "1.1.1"
 
-val circeVersion = "0.11.1"
+val circeVersion = "0.13.0"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
-libraryDependencies += "io.circe" %% "circe-optics"  % "0.11.0"
+libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
 
-libraryDependencies += "io.sentry" % "sentry-logback" % "1.7.27"
+libraryDependencies += "io.sentry" % "sentry-logback" % "1.7.30"
 
-val doobieVersion = "0.7.0"
+val doobieVersion = "0.9.0"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 
-libraryDependencies += "org.typelevel" %% "cats-core" % "1.6.1"
+libraryDependencies += "org.typelevel" %% "cats-core" % "2.1.1"
 
-val http4sVersion = "0.20.10"
+val http4sVersion = "0.21.6"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-circe"              % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-dsl"                % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sVersion
 
 // Test dependencies
-libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.24.1" % Test
+libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.27.1" % Test
 
-val jenaVersion = "3.15.0"
+val jenaVersion = "3.16.0"
 libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % Test
 
 libraryDependencies += "org.apache.logging.log4j" % "log4j-slf4j-impl" % "2.13.3" % Test
 
-libraryDependencies += "org.scalamock"  %% "scalamock"  % "4.4.0"  % Test
-libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
-libraryDependencies += "org.scalatest"  %% "scalatest"  % "3.0.8"  % Test
+libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.0.0"   % Test
+libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test
+libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.0.0" % Test
+libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.1"   % Test
 
 libraryDependencies += "org.tpolecat" %% "doobie-h2"        % doobieVersion % Test
 libraryDependencies += "org.tpolecat" %% "doobie-scalatest" % doobieVersion % Test

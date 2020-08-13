@@ -48,11 +48,15 @@ import org.http4s.Status._
 import org.http4s.headers.`Content-Type`
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
+class DatasetsSearchEndpointSpec
+    extends AnyWordSpec
+    with MockFactory
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "searchForDatasets" should {
 
@@ -121,7 +125,7 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     import DatasetsSearchEndpoint.Sort._
 
     "list only name, datePublished and projectsCount" in {
-      DatasetsSearchEndpoint.Sort.properties shouldBe Set(NameProperty, DatePublishedProperty, ProjectsCountProperty)
+      DatasetsSearchEndpoint.Sort.properties shouldBe Set(TitleProperty, DatePublishedProperty, ProjectsCountProperty)
     }
   }
 
@@ -150,9 +154,10 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
     ).searchForDatasets _
 
     lazy val toJson: DatasetSearchResult => Json = {
-      case DatasetSearchResult(id, name, maybeDescription, published, projectsCount) =>
+      case DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount) =>
         json"""{
           "identifier": $id,
+          "title": $title,
           "name": $name,
           "published": $published,
           "projectsCount": ${projectsCount.value},
@@ -187,9 +192,10 @@ class DatasetsSearchEndpointSpec extends WordSpec with MockFactory with ScalaChe
 
   private implicit val datasetSearchResultItems: Gen[DatasetSearchResult] = for {
     id               <- datasetIdentifiers
+    title            <- datasetTitles
     name             <- datasetNames
     maybeDescription <- Gen.option(datasetDescriptions)
     published        <- datasetPublishingInfos
     projectsCount    <- nonNegativeInts() map (_.value) map ProjectsCount.apply
-  } yield DatasetSearchResult(id, name, maybeDescription, published, projectsCount)
+  } yield DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount)
 }

@@ -32,12 +32,12 @@ import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
 import io.renku.jsonld.generators.JsonLDGenerators._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Failure, Success, Try}
 
-class DataSetInfoEnricherSpec extends WordSpec with MockFactory {
+class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "enrichDataSetInfo" should {
 

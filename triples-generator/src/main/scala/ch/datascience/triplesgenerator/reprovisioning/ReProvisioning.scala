@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.MonadError
 import cats.effect.Timer
 import cats.implicits._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
@@ -33,22 +34,29 @@ import scala.concurrent.duration.FiniteDuration
 import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
-class ReProvisioning[Interpretation[_]](
+trait ReProvisioning[Interpretation[_]] {
+  def run: Interpretation[Unit]
+}
+
+class ReProvisioningImpl[Interpretation[_]](
     triplesVersionFinder:  TriplesVersionFinder[Interpretation],
     triplesRemover:        TriplesRemover[Interpretation],
     eventsReScheduler:     EventsReScheduler[Interpretation],
+    triplesVersionCreator: TriplesVersionCreator[Interpretation],
     reProvisioningDelay:   ReProvisioningDelay,
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     logger:                Logger[Interpretation],
     sleepWhenBusy:         FiniteDuration
-)(implicit ME:             MonadError[Interpretation, Throwable], timer: Timer[Interpretation]) {
+)(implicit ME:             MonadError[Interpretation, Throwable], timer: Timer[Interpretation])
+    extends ReProvisioning[Interpretation] {
 
   import eventsReScheduler._
   import executionTimeRecorder._
   import triplesRemover._
+  import triplesVersionCreator._
   import triplesVersionFinder._
 
-  def run: Interpretation[Unit] =
+  override def run: Interpretation[Unit] =
     for {
       _ <- timer sleep reProvisioningDelay.value
       _ <- startReProvisioning
@@ -63,8 +71,10 @@ class ReProvisioning[Interpretation[_]](
   private def triggerReProvisioning =
     measureExecutionTime {
       for {
+        _ <- logger.info("The triples are not up to date - clearing DB and re-scheduling all the events")
         _ <- removeAllTriples()
         _ <- triggerEventsReScheduling
+        _ <- insertCliVersion()
       } yield ()
     } flatMap logSummary
 
@@ -96,7 +106,7 @@ object IOReProvisioning {
   import scala.concurrent.ExecutionContext
   import scala.concurrent.duration._
 
-  private val SleepWhenBusy = 1 minute
+  private val SleepWhenBusy = 10 minutes
 
   def apply(
       triplesGeneration: TriplesGeneration,
@@ -109,15 +119,17 @@ object IOReProvisioning {
     timer:               Timer[IO]): IO[ReProvisioning[IO]] =
     for {
       rdfStoreConfig    <- RdfStoreConfig[IO](configuration)
-      schemaVersion     <- SchemaVersionFinder[IO](triplesGeneration)
+      currentCliVersion <- CliVersionFinder[IO](triplesGeneration)
       eventsReScheduler <- IOEventsReScheduler(logger)
+      renkuBaseUrl      <- RenkuBaseUrl[IO]()
       initialDelay <- find[IO, FiniteDuration]("re-provisioning-initial-delay", configuration)
                        .flatMap(delay => ME.fromEither(ReProvisioningDelay.from(delay)))
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-    } yield new ReProvisioning[IO](
-      new IOTriplesVersionFinder(rdfStoreConfig, schemaVersion, logger, timeRecorder),
+    } yield new ReProvisioningImpl[IO](
+      new IOTriplesVersionFinder(rdfStoreConfig, currentCliVersion, logger, timeRecorder),
       new IOTriplesRemover(rdfStoreConfig, logger, timeRecorder),
       eventsReScheduler,
+      new IOTriplesVersionCreator(rdfStoreConfig, currentCliVersion, renkuBaseUrl, logger, timeRecorder),
       initialDelay,
       executionTimeRecorder,
       logger,

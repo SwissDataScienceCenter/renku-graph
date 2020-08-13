@@ -37,10 +37,10 @@ import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class StatusNewPatchSpec extends WordSpec with InMemoryEventLogDbSpec with MockFactory {
+class StatusNewPatchSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
   "StatusNewPatch" should {
 

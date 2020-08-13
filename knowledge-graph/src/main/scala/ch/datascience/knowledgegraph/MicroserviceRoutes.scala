@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph
 
 import cats.data.{Validated, ValidatedNel}
-import cats.effect.{Clock, ConcurrentEffect}
+import cats.effect.{Clock, ConcurrentEffect, Resource}
 import cats.implicits._
 import ch.datascience.graph.model
 import ch.datascience.http.rest.SortBy.Direction
@@ -58,14 +58,14 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import routesMetrics._
 
   // format: off
-  lazy val routes: F[HttpRoutes[F]] = HttpRoutes.of[F] {
+  lazy val routes = HttpRoutes.of[F] {
     case           GET  -> Root / "ping"                                                                                                      => Ok("pong")
     case           GET  -> Root / "knowledge-graph" / "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) => searchForDatasets(maybePhrase, maybeSortBy,page, perPage)
     case           GET  -> Root / "knowledge-graph" / "datasets" / DatasetId(id)                                                              => getDataset(id)
     case           GET  -> Root / "knowledge-graph" / "graphql"                                                                               => schema
     case request @ POST -> Root / "knowledge-graph" / "graphql"                                                                               => handleQuery(request)
     case           GET  ->        "knowledge-graph" /: "projects" /: path                                                                     => routeToProjectsEndpoints(path)
-  }.meter flatMap `add GET Root / metrics`
+  }.withMetrics
   // format: on
 
   private def searchForDatasets(
@@ -75,7 +75,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
       maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]]
   ): F[Response[F]] =
     (maybePhrase.map(_.map(Option.apply)).getOrElse(Validated.validNel(Option.empty[Phrase])),
-     maybeSort getOrElse Validated.validNel(Sort.By(NameProperty, Direction.Asc)),
+     maybeSort getOrElse Validated.validNel(Sort.By(TitleProperty, Direction.Asc)),
      PagingRequest(maybePage, maybePerPage))
       .mapN(datasetsSearchEndpoint.searchForDatasets)
       .fold(toBadRequest(), identity)

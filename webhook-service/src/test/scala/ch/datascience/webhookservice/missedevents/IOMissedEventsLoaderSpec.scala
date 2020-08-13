@@ -41,12 +41,12 @@ import ch.datascience.webhookservice.project.ProjectInfoFinder
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.global
 
-class IOMissedEventsLoaderSpec extends WordSpec with MockFactory {
+class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
   import IOAccessTokenFinder._
 
   "loadMissedEvents" should {

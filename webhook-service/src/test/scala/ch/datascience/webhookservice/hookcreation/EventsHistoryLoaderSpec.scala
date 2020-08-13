@@ -34,12 +34,12 @@ import ch.datascience.webhookservice.eventprocessing.{Project, StartCommit}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.project.ProjectInfo
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}
 
-class EventsHistoryLoaderSpec extends WordSpec with MockFactory {
+class EventsHistoryLoaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "loadAllEvents" should {
 

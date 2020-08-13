@@ -22,12 +22,12 @@ import DbConfigGenerator._
 import cats.effect.{ContextShift, IO}
 import com.zaxxer.hikari.HikariDataSource
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class DbTransactorResourceSpec extends WordSpec with MockFactory {
+class DbTransactorResourceSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "use" should {
 

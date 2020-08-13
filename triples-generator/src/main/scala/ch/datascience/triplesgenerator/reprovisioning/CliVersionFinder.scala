@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.MonadError
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.CliVersion
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import com.typesafe.config.{Config, ConfigFactory}
@@ -28,36 +28,36 @@ import pureconfig.ConfigReader
 import scala.language.higherKinds
 import scala.util.Try
 
-private object SchemaVersionFinder {
+private object CliVersionFinder {
 
   import ch.datascience.config.ConfigLoader._
 
-  private implicit val schemaVersionLoader: ConfigReader[SchemaVersion] = stringTinyTypeReader(SchemaVersion)
+  private implicit val cliVersionLoader: ConfigReader[CliVersion] = stringTinyTypeReader(CliVersion)
 
   def apply[Interpretation[_]](
       triplesGeneration: TriplesGeneration
-  )(implicit ME:         MonadError[Interpretation, Throwable]): Interpretation[SchemaVersion] =
+  )(implicit ME:         MonadError[Interpretation, Throwable]): Interpretation[CliVersion] =
     apply(triplesGeneration, findRenkuVersion, ConfigFactory.load())
 
   private[reprovisioning] def apply[Interpretation[_]](
       triplesGeneration:  TriplesGeneration,
-      renkuVersionFinder: Interpretation[SchemaVersion],
+      renkuVersionFinder: Interpretation[CliVersion],
       config:             Config
-  )(implicit ME:          MonadError[Interpretation, Throwable]): Interpretation[SchemaVersion] = triplesGeneration match {
+  )(implicit ME:          MonadError[Interpretation, Throwable]): Interpretation[CliVersion] = triplesGeneration match {
     case RenkuLog => renkuVersionFinder
     case RemoteTriplesGeneration =>
-      find[Interpretation, SchemaVersion]("services.triples-generator.schema-version", config)
+      find[Interpretation, CliVersion]("services.triples-generator.cli-version", config)
   }
 
   private def findRenkuVersion[Interpretation[_]](
       implicit ME: MonadError[Interpretation, Throwable]
-  ): Interpretation[SchemaVersion] = {
+  ): Interpretation[CliVersion] = {
     import ammonite.ops._
     import cats.implicits._
 
     for {
       versionAsString <- ME.fromTry { Try(%%('renku, "--version")(pwd).out.string.trim) }
-      version         <- ME.fromEither(SchemaVersion.from(versionAsString))
+      version         <- ME.fromEither(CliVersion.from(versionAsString))
     } yield version
   }
 }

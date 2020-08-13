@@ -31,11 +31,15 @@ import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.{Parent, Proj
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder, entities}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks {
+class IOKGProjectFinderSpec
+    extends AnyWordSpec
+    with InMemoryRdfStore
+    with ScalaCheckPropertyChecks
+    with should.Matchers {
 
   "findProject" should {
 
@@ -43,7 +47,8 @@ class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChe
       forAll(kgProjects(parentsGen = emptyOptionOf[Parent])) { project =>
         val maybeProjectCreator = project.created.maybeCreator
         loadToStore(
-          fileCommit(commitId = commitIds.generateOne)(projectPath = projectPaths.generateOne),
+          fileCommit(commitId = commitIds.generateOne)(projectPath = projectPaths.generateOne,
+                                                       projectVersion = projectSchemaVersions.generateOne),
           fileCommit(
             commitId      = commitIds.generateOne,
             committedDate = CommittedDate(project.created.date.value)
@@ -52,7 +57,8 @@ class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChe
             projectName         = project.name,
             projectDateCreated  = project.created.date,
             maybeProjectCreator = maybeProjectCreator.toMaybePerson,
-            maybeParent         = None
+            maybeParent         = None,
+            projectVersion      = project.version
           )
         )
 
@@ -76,9 +82,11 @@ class IOKGProjectFinderSpec extends WordSpec with InMemoryRdfStore with ScalaChe
                 parent.name,
                 parent.created.date,
                 maybeCreator       = parent.created.maybeCreator.toMaybePerson,
-                maybeParentProject = None
+                maybeParentProject = None,
+                version            = projectSchemaVersions.generateOne
               )
-            }
+            },
+            projectVersion = project.version
           )
         )
 

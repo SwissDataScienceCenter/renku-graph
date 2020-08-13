@@ -104,8 +104,8 @@ private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
         .remove("http://www.w3.org/2000/01/rdf-schema#label")
 
     private lazy val skipBlankNodes: ResourceId => Option[ResourceId] = id =>
-      if (id.value startsWith "_") None
-      else Some(id)
+      if (id.value startsWith "mailto:") Some(id)
+      else None
 
   }
 }

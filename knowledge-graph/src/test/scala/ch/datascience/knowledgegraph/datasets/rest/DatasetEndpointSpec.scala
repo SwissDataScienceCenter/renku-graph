@@ -49,11 +49,11 @@ import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
+class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers {
 
   "getDataset" should {
 
@@ -149,6 +149,7 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
   private implicit lazy val datasetDecoder: Decoder[Dataset] = cursor =>
     for {
       id               <- cursor.downField("identifier").as[Identifier]
+      title            <- cursor.downField("title").as[Title]
       name             <- cursor.downField("name").as[Name]
       url              <- cursor.downField("url").as[Url]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
@@ -158,8 +159,8 @@ class DatasetEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
       maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
     } yield maybeSameAs
-      .map(NonModifiedDataset(id, name, url, _, maybeDescription, published, parts, projects))
-      .orElse(maybeDerivedFrom map (ModifiedDataset(id, name, url, _, maybeDescription, published, parts, projects)))
+      .map(NonModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects))
+      .orElse(maybeDerivedFrom map (ModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects)))
       .getOrElse(fail("Cannot decode payload as Dataset"))
 
   private implicit lazy val datasetPublishingDecoder: Decoder[DatasetPublishing] = (cursor: HCursor) =>

@@ -19,7 +19,6 @@
 package ch.datascience.knowledgegraph.lineage.graphql
 
 import cats.effect.IO
-import ch.datascience.graph.model.projects.FilePath
 import ch.datascience.knowledgegraph.graphql.Arguments._
 import ch.datascience.knowledgegraph.graphql.CommonQueryFields._
 import ch.datascience.knowledgegraph.graphql.QueryContext

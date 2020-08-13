@@ -69,7 +69,7 @@ object WorkflowRun {
                  maybeInvalidation,
                  maybeGenerationFactories) with WorkflowProcessRun with WorkflowRun {
       override val processRunAssociation: WorkflowRunPlanAssociation = associationFactory(project)(this)(workflowFile)
-      override val processRunUsages:      List[Usage]                = processRunAssociation.runPlan.asUsages
+      override val processRunUsages:      List[Usage]                = processRunAssociation.runPlan.asUsages(this)
       val workflowRunFile:                WorkflowFile               = workflowFile
       val processRuns: List[Activity with ChildProcessRun] = processRunsFactories.zipWithIndex.map {
         case (factory, idx) => factory(this)(Step(idx))

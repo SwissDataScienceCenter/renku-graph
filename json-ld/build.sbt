@@ -20,15 +20,16 @@ organization := "io.renku"
 name := "json-ld"
 scalaVersion := "2.12.11"
 
-val circeVersion = "0.11.1"
+val circeVersion = "0.13.0"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
-libraryDependencies += "org.typelevel" %% "cats-core" % "1.6.1"
+libraryDependencies += "org.typelevel" %% "cats-core" % "2.1.1"
 
 // Test dependencies
-libraryDependencies += "eu.timepit"     %% "refined"    % "0.9.9"  % Test
-libraryDependencies += "org.scalamock"  %% "scalamock"  % "4.4.0"  % Test
-libraryDependencies += "org.scalacheck" %% "scalacheck" % "1.14.0" % Test
-libraryDependencies += "org.scalatest"  %% "scalatest"  % "3.0.8"  % Test
+libraryDependencies += "eu.timepit"        %% "refined"         % "0.9.15"  % Test
+libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.0.0"   % Test
+libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test
+libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.0.0" % Test
+libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.1"   % Test

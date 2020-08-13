@@ -20,11 +20,11 @@ package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators._
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class NonBlankSpec extends WordSpec with ScalaCheckPropertyChecks {
+class NonBlankSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "NonBlank" should {
 

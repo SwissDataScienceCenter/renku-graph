@@ -21,10 +21,10 @@ package ch.datascience.controllers
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import org.scalacheck.Gen
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class ErrorMessageSpec extends WordSpec {
+class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
 
   "ErrorMessage" should {
 

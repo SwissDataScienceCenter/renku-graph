@@ -19,11 +19,11 @@
 package ch.datascience.config
 
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ServiceUrlSpec extends WordSpec with ScalaCheckPropertyChecks {
+class ServiceUrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "ServiceUrl" should {
 

@@ -29,8 +29,8 @@ import ch.datascience.knowledgegraph.lineage.model._
 import io.circe.Json
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import sangria.ast.Document
@@ -42,11 +42,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.reflectiveCalls
 
 class QuerySchemaSpec
-    extends WordSpec
+    extends AnyWordSpec
     with ScalaCheckPropertyChecks
     with MockFactory
     with ScalaFutures
-    with IntegrationPatience {
+    with IntegrationPatience
+    with should.Matchers {
 
   "query" should {
 
@@ -97,8 +98,8 @@ class QuerySchemaSpec
           .returning(result)
     }
 
-    private val sourceNode = nodes.generateOne
-    private val targetNode = nodes.generateOne
+    private val sourceNode = entityNodes.generateOne
+    private val targetNode = processRunNodes.generateOne
     lazy val lineage = Lineage(
       edges = Set(Edge(sourceNode.location, targetNode.location)),
       nodes = Set(sourceNode, targetNode)

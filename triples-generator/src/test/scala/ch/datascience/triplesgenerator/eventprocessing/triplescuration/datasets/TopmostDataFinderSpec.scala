@@ -21,8 +21,8 @@ import io.renku.jsonld.generators.JsonLDGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
-import org.scalatest.WordSpec
-import org.scalatest.Matchers._
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatest.matchers.should
 import cats.implicits._
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
@@ -30,7 +30,7 @@ import org.scalamock.scalatest.MockFactory
 
 import scala.util.{Failure, Try}
 
-class TopmostDataFinderSpec extends WordSpec with MockFactory {
+class TopmostDataFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "findTopmostData" should {
 

@@ -45,16 +45,15 @@ class DbTransactorResource[Interpretation[_], TargetDB](
 
   private lazy val transactorResource: Resource[Interpretation, HikariTransactor[Interpretation]] =
     for {
-      connectionsThreadPool  <- fixedThreadPool[Interpretation](dbConfig.connectionPool.value)
-      transactionsThreadPool <- cachedThreadPool[Interpretation]
-      transactor             <- createHikariTransactor(connectionsThreadPool, transactionsThreadPool)
+      connectionsThreadPool <- fixedThreadPool[Interpretation](dbConfig.connectionPool.value)
+      blocker               <- Blocker[Interpretation]
+      transactor            <- createHikariTransactor(connectionsThreadPool, blocker)
     } yield transactor
 
-  private def createHikariTransactor(connectionsThreadPool:  ExecutionContext,
-                                     transactionsThreadPool: ExecutionContext) =
+  private def createHikariTransactor(connectionsThreadPool: ExecutionContext, blocker: Blocker) =
     for {
       _          <- Resource.liftF(Async[Interpretation] delay Class.forName(dbConfig.driver.value))
-      transactor <- initial[Interpretation](connectionsThreadPool, transactionsThreadPool)
+      transactor <- initial[Interpretation](connectionsThreadPool, blocker)
       _ <- Resource.liftF {
             transactor.configure { dataSource =>
               Async[Interpretation] delay dataSourceUpdater(dataSource)

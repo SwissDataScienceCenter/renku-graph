@@ -18,8 +18,6 @@
 
 package io.renku.eventlog.processingstatus
 
-import java.time.Instant
-
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
@@ -43,8 +41,7 @@ trait ProcessingStatusFinder[Interpretation[_]] {
 
 class ProcessingStatusFinderImpl(
     transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-    now:              () => Instant = () => Instant.now
+    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
     with ProcessingStatusFinder[IO] {
@@ -73,7 +70,7 @@ class ProcessingStatusFinderImpl(
 
   private def toProcessingStatus(statuses: List[EventStatus]) =
     statuses.foldLeft(0 -> 0) {
-      case ((done, total), status) if status == TriplesStore || status == NonRecoverableFailure =>
+      case ((done, total), _: FinalStatus) =>
         (done + 1) -> (total + 1)
       case ((done, total), _) => done -> (total + 1)
     } match {

@@ -37,14 +37,13 @@ class Activity(val commitId:                 CommitId,
                val maybeInfluenced:          Option[Activity],
                val maybeInvalidation:        Option[Entity with Artifact],
                val maybeGenerationFactories: List[Activity => Generation]) {
-
   lazy val generations: List[Generation] = maybeGenerationFactories.map(_.apply(this))
 
-  def entity(byLocation: Location): Entity with Artifact =
+  def entity(location: Location): Entity with Artifact =
     generations
       .flatMap(_.maybeReverseEntity)
-      .find(_.location == byLocation)
-      .getOrElse(throw new IllegalStateException(s"No entity for $byLocation on Activity for $commitId"))
+      .find(_.location == location)
+      .getOrElse(throw new IllegalStateException(s"No entity for $location on Activity for $commitId"))
 
   def entity[T](implicit tag: ClassTag[T]): T =
     generations

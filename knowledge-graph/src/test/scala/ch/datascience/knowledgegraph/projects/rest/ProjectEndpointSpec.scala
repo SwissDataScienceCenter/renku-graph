@@ -51,11 +51,11 @@ import org.http4s._
 import org.http4s.circe.jsonOf
 import org.http4s.headers.`Content-Type`
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPropertyChecks {
+class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPropertyChecks with should.Matchers {
 
   "getProject" should {
 
@@ -159,6 +159,7 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
       starsCount       <- cursor.downField("starsCount").as[StarsCount]
       permissions      <- cursor.downField("permissions").as[Permissions]
       statistics       <- cursor.downField("statistics").as[Statistics]
+      version          <- cursor.downField("version").as[SchemaVersion]
     } yield Project(id,
                     path,
                     name,
@@ -171,7 +172,8 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
                     tags,
                     starsCount,
                     permissions,
-                    statistics)
+                    statistics,
+                    version)
 
   private implicit lazy val createdDecoder: Decoder[Creation] = cursor =>
     for {
@@ -200,11 +202,11 @@ class ProjectEndpointSpec extends WordSpec with MockFactory with ScalaCheckPrope
 
   private implicit lazy val urlsDecoder: Decoder[Urls] = cursor =>
     for {
-      ssh    <- cursor.downField("ssh").as[SshUrl]
-      http   <- cursor.downField("http").as[HttpUrl]
-      web    <- cursor.downField("web").as[WebUrl]
-      readme <- cursor.downField("readme").as[ReadmeUrl]
-    } yield Urls(ssh, http, web, readme)
+      ssh         <- cursor.downField("ssh").as[SshUrl]
+      http        <- cursor.downField("http").as[HttpUrl]
+      web         <- cursor.downField("web").as[WebUrl]
+      maybeReadme <- cursor.downField("readme").as[Option[ReadmeUrl]]
+    } yield Urls(ssh, http, web, maybeReadme)
 
   private implicit lazy val permissionsDecoder: Decoder[Permissions] = cursor => {
     def maybeAccessLevel(name: String) = cursor.downField(name).as[Option[AccessLevel]]

@@ -19,13 +19,13 @@
 package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{httpUrls, relativePaths}
+import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings, relativePaths}
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
+class UrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   import UrlTypes._
 
@@ -60,16 +60,27 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
       (url / otherPath) shouldBe UrlType(s"$url/$otherPath")
     }
 
-    "add the given path segment when it's Some" in {
+    "add the given TinyType path segment when it's Some" in {
       val url                         = (httpUrls() map UrlType.apply).generateOne
       val maybePath @ Some(pathValue) = (relativePaths(minSegments = 2) map RelativePathString.apply).generateSome
       (url / maybePath) shouldBe UrlType(s"$url/$pathValue")
     }
 
-    "not add a path segment for None" in {
+    "not add a path segment for None TinyType" in {
       val url       = (httpUrls() map UrlType.apply).generateOne
       val otherPath = Option.empty[RelativePathString]
       (url / otherPath) shouldBe url
+    }
+
+    "add the given value path segment when it's Some" in {
+      val url                          = (httpUrls() map UrlType.apply).generateOne
+      val maybeSegment @ Some(segment) = nonBlankStrings().generateSome.map(_.toString())
+      (url / maybeSegment) shouldBe UrlType(s"$url/$segment")
+    }
+
+    "not add a path segment for None value" in {
+      val url = (httpUrls() map UrlType.apply).generateOne
+      (url / Option.empty[String]) shouldBe url
     }
   }
 
@@ -183,7 +194,7 @@ class UrlSpec extends WordSpec with ScalaCheckPropertyChecks {
   }
 }
 
-class BaseUrlSpec extends WordSpec {
+class BaseUrlSpec extends AnyWordSpec with should.Matchers {
 
   import UrlTypes._
 

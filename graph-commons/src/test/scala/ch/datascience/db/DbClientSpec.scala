@@ -25,12 +25,12 @@ import ch.datascience.metrics.{LabeledHistogram, TestLabeledHistogram}
 import doobie.implicits._
 import doobie.util.transactor.Transactor
 import eu.timepit.refined.auto._
-import org.scalatest.Matchers._
-import org.scalatest.WordSpec
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class DbClientSpec extends WordSpec {
+class DbClientSpec extends AnyWordSpec with should.Matchers {
 
   "measureExecutionTime" should {
 

@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects.{FilePath, Id, Path, ResourceId, Visibility}
+import ch.datascience.graph.model.projects.{FilePath, Id, Path, ResourceId, SchemaVersion, Visibility}
 import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
@@ -92,6 +92,12 @@ object GraphModelGenerators {
     for {
       path <- projectPaths
     } yield ResourceId.from(s"$renkuBaseUrl/projects/$path").fold(throw _, identity)
+
+  implicit val projectSchemaVersions: Gen[SchemaVersion] = Gen
+    .listOfN(3, positiveInts(max = 50))
+    .map(_.mkString("."))
+    .map(SchemaVersion.apply)
+
   implicit val filePaths: Gen[FilePath] = relativePaths() map FilePath.apply
 
   implicit val datasetIdentifiers: Gen[Identifier] = Gen
@@ -104,17 +110,18 @@ object GraphModelGenerators {
       } yield s"$first.$second/zenodo.$third"
     )
     .map(Identifier.apply)
-  implicit val datasetNames:          Gen[datasets.Name] = nonEmptyStrings() map datasets.Name.apply
-  implicit val datasetDescriptions:   Gen[Description]   = paragraphs() map (_.value) map Description.apply
-  implicit val datasetUrls:           Gen[Url]           = validatedUrls map (_.value) map Url.apply
+  implicit val datasetTitles:         Gen[datasets.Title] = nonEmptyStrings() map datasets.Title.apply
+  implicit val datasetNames:          Gen[datasets.Name]  = nonEmptyStrings() map datasets.Name.apply
+  implicit val datasetDescriptions:   Gen[Description]    = paragraphs() map (_.value) map Description.apply
+  implicit val datasetUrls:           Gen[Url]            = validatedUrls map (_.value) map Url.apply
   val datasetUrlSameAs:               Gen[UrlSameAs]     = validatedUrls map (_.value) map SameAs.fromUrl map (_.fold(throw _, identity))
   val datasetIdSameAs:                Gen[IdSameAs]      = validatedUrls map (_.value) map SameAs.fromId map (_.fold(throw _, identity))
-  implicit val datasetSameAs:         Gen[SameAs]        = Gen.oneOf(datasetUrlSameAs, datasetIdSameAs)
+  implicit val datasetSameAs:         Gen[SameAs]         = Gen.oneOf(datasetUrlSameAs, datasetIdSameAs)
   implicit val datasetDerivedFroms:   Gen[DerivedFrom]   = validatedUrls map (_.value) map DerivedFrom.apply
-  implicit val datasetPublishedDates: Gen[PublishedDate] = localDatesNotInTheFuture map PublishedDate.apply
-  implicit val datasetCreatedDates:   Gen[DateCreated]   = timestampsNotInTheFuture map DateCreated.apply
-  implicit val datasetKeywords:       Gen[Keyword]       = nonBlankStrings() map (_.value) map Keyword.apply
-  implicit val datasetPartNames:      Gen[PartName]      = nonBlankStrings(minLength = 5) map (v => PartName(v.value))
+  implicit val datasetPublishedDates: Gen[PublishedDate]  = localDatesNotInTheFuture map PublishedDate.apply
+  implicit val datasetCreatedDates:   Gen[DateCreated]    = timestampsNotInTheFuture map DateCreated.apply
+  implicit val datasetKeywords:       Gen[Keyword]        = nonBlankStrings() map (_.value) map Keyword.apply
+  implicit val datasetPartNames:      Gen[PartName]       = nonBlankStrings(minLength = 5) map (v => PartName(v.value))
   implicit val datasetPartLocations: Gen[PartLocation] =
     relativePaths(minSegments = 2, maxSegments = 2)
       .map(path => s"data/$path")
