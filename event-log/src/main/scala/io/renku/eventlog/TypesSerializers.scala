@@ -18,15 +18,15 @@
 
 package io.renku.eventlog
 
-import doobie.implicits.javatime._
 import java.time.Instant
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId}
 import ch.datascience.graph.model.projects
+import doobie.util.meta.{MetaConstructors, SqlMeta, TimeMetaInstances}
 import doobie.util.{Get, Put, Read}
 
 object TypesSerializers extends TypesSerializers
 
-trait TypesSerializers {
+trait TypesSerializers extends TimeMetaInstances with SqlMeta with MetaConstructors {
 
   implicit val eventIdGet: Get[EventId] = Get[String].tmap(EventId.apply)
   implicit val eventIdPut: Put[EventId] = Put[String].contramap(_.value)

@@ -32,7 +32,6 @@ import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
 import doobie.util.fragments.in
-import doobie.implicits.javatime._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus.{New, Processing, RecoverableFailure}
 import io.renku.eventlog.TypesSerializers._
