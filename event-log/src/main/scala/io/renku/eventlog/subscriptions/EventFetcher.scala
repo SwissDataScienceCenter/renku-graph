@@ -35,6 +35,7 @@ import doobie.util.fragments._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
+import io.renku.eventlog.TypesSerializers._
 
 import scala.language.higherKinds
 import scala.util.Random
