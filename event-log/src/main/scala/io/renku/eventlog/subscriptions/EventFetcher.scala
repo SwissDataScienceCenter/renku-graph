@@ -30,8 +30,7 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import doobie.free.connection.ConnectionOp
-import doobie.implicits._
-import doobie.implicits.javatime._
+import doobie.syntax.all._
 import doobie.util.fragments._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus._
@@ -123,14 +122,18 @@ private class EventFetcherImpl(
       measureExecutionTime(updateStatus(commitEventId)) map toNoneIfEventAlreadyTaken(idAndBody)
   }
 
-  private def updateStatus(commitEventId: CompoundEventId) = SqlQuery(
-    sql"""|update event_log 
-          |set status = ${EventStatus.Processing: EventStatus}, execution_date = ${now()}
-          |where (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status <> ${Processing: EventStatus})
-          |  or (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
-          |""".stripMargin.update.run,
-    name = "pop event - status update"
-  )
+  private def updateStatus(commitEventId: CompoundEventId) = {
+    val timeNow: Instant = now()
+
+    SqlQuery(
+      sql"""|update event_log 
+            |set status = ${EventStatus.Processing: EventStatus}, execution_date = $timeNow
+            |where (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status <> ${Processing: EventStatus})
+            |  or (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus} and execution_date < ${timeNow minus MaxProcessingTime})
+            |""".stripMargin.update.run,
+      name = "pop event - status update"
+    )
+  }
 
   private def toNoneIfEventAlreadyTaken(idAndBody: EventIdAndBody): Int => Option[EventIdAndBody] = {
     case 0 => None
