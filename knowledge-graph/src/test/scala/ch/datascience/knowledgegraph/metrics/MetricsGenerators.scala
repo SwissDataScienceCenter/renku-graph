@@ -1,6 +1,6 @@
 package ch.datascience.knowledgegraph.metrics
 
-import ch.datascience.knowledgegraph.metrics.KGEntityType._
+import ch.datascience.knowledgegraph.metrics.KGEntityType.{Dataset, ProcessRun, Project}
 import org.scalacheck.Gen
 
 object MetricsGenerators {

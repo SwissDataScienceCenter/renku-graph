@@ -23,6 +23,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
+
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
