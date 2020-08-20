@@ -49,10 +49,12 @@ private class IODatasetFinder(
   def findDataset(identifier: Identifier): IO[Option[Dataset]] =
     for {
       maybeDetailsFiber <- findBaseDetails(identifier).start
+      keywordsFiber     <- findKeywords(identifier).start
       creatorsFiber     <- findCreators(identifier).start
       partsFiber        <- findParts(identifier).start
       projectsFiber     <- findProjects(identifier).start
       maybeDetails      <- maybeDetailsFiber.join
+      keywords          <- keywordsFiber.join
       creators          <- creatorsFiber.join
       parts             <- partsFiber.join
       projects          <- projectsFiber.join
@@ -60,7 +62,8 @@ private class IODatasetFinder(
       details.copy(
         published = details.published.copy(creators = creators),
         parts     = parts,
-        projects  = projects
+        projects  = projects,
+        keywords  = keywords
       )
     }
 }
