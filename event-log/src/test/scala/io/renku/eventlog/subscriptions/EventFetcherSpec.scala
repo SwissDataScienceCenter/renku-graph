@@ -250,7 +250,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
       currentTime
     )
 
-    val now           = Instant.now() // TODO: check if this should be a def
+    val now           = Instant.now()
     val executionDate = ExecutionDate(now)
     currentTime.expects().returning(now).anyNumberOfTimes()
 

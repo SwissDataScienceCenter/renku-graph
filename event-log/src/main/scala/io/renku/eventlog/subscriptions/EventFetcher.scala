@@ -122,18 +122,14 @@ private class EventFetcherImpl(
       measureExecutionTime(updateStatus(commitEventId)) map toNoneIfEventAlreadyTaken(idAndBody)
   }
 
-  private def updateStatus(commitEventId: CompoundEventId) = {
-    val timeNow: Instant = now()
-
-    SqlQuery(
-      sql"""|update event_log 
-            |set status = ${EventStatus.Processing: EventStatus}, execution_date = $timeNow
-            |where (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status <> ${Processing: EventStatus})
-            |  or (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus} and execution_date < ${timeNow minus MaxProcessingTime})
-            |""".stripMargin.update.run,
-      name = "pop event - status update"
-    )
-  }
+  private def updateStatus(commitEventId: CompoundEventId) = SqlQuery(
+    sql"""|update event_log 
+          |set status = ${EventStatus.Processing: EventStatus}, execution_date = ${now()}
+          |where (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status <> ${Processing: EventStatus})
+          |  or (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
+          |""".stripMargin.update.run,
+    name = "pop event - status update"
+  )
 
   private def toNoneIfEventAlreadyTaken(idAndBody: EventIdAndBody): Int => Option[EventIdAndBody] = {
     case 0 => None

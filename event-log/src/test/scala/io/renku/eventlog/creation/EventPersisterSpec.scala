@@ -151,14 +151,6 @@ class EventPersisterSpec
         None
       )
     }
-
-    "properly convert SQL Date to Java Instant" in new TestCase { // This is really testing the library
-      (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
-
-      persister.storeNewEvent(event).unsafeRunSync shouldBe Created
-
-      storedEvent(event.compoundEventId)._5 shouldBe event.date
-    }
   }
 
   private trait TestCase {
