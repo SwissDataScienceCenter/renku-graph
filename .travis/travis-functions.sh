@@ -69,6 +69,7 @@ function updateVersionInRenku() {
   # running helm dep udpate
   cd charts || exit
   helm repo add renku https://swissdatasciencecenter.github.io/helm-charts/
+  helm repo add bitnami https://charts.bitnami.com/bitnami
   helm dep update renku
   cd .. || exit
 
