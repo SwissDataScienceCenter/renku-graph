@@ -11,7 +11,7 @@ metadata:
 data:
   {{ .Values.global.graph.jena.dataset }}.ttl: |-
 
-    @prefix :        <#> .
+    @prefix:        <#> .
     @prefix fuseki:  <http://jena.apache.org/fuseki#> .
     @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
     @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
@@ -48,6 +48,7 @@ data:
       text:defaultField     "name" ;
       text:entityField      "uri" ;
       text:map (
-          [ text:field "name" ; text:predicate <http://schema.org/name> ]
-          [ text:field "description" ; text:predicate <http://schema.org/description> ]
+        [ text:field "name" ; text:predicate <http://schema.org/name> ]
+        [ text:field "description" ; text:predicate <http://schema.org/description> ]
+        [ text:field "alternateName" ; text:predicate <http://schema.org/alternateName> ]
       ) .
