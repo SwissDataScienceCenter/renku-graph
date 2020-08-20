@@ -231,23 +231,6 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         orderBy = fr"execution_date asc"
       ).map(_._1.projectId) should contain theSameElementsAs List(project1Id, project2Id)
     }
-
-    "return event and check date was converted to Java Instant" in new TestCase {
-      val localExecutionDate = ExecutionDate(now minus (maxProcessingTime.toMinutes + 1, MIN))
-      val project1Id         = projectIds.generateOne
-      storeEvent(
-        CompoundEventId(eventIds.generateOne, project1Id),
-        EventStatus.Processing,
-        localExecutionDate,
-        eventDates.generateOne,
-        eventBodies.generateOne
-      )
-
-      findEvents(
-        status  = Processing,
-        orderBy = fr"execution_date asc"
-      ).map(_._2) shouldBe List(localExecutionDate) //  contain theSameElementsAs List(project1Id, project2Id)
-    }
   }
 
   private trait TestCase {

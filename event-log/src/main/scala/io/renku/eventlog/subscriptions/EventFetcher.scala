@@ -30,12 +30,11 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import doobie.free.connection.ConnectionOp
-import doobie.syntax.all._
+import doobie.implicits._
 import doobie.util.fragments._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
-import io.renku.eventlog.TypesSerializers._
 
 import scala.language.higherKinds
 import scala.util.Random
