@@ -20,9 +20,11 @@ package ch.datascience.knowledgegraph.metrics
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.knowledgegraph.metrics.KGEntityType.Dataset
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Decoder
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -44,8 +46,8 @@ class StatsFinderImpl(
 
   override def entitiesCount: IO[Map[KGEntityType, Long]] =
     for {
-      results <- queryExpecting[Set[(KGEntityType, Long)]](query)
-      resultsWithDefaultCOunts = addMissingStatues(results.toMap)
+      results <- queryExpecting[Map[KGEntityType, Long]](query)
+      resultsWithDefaultCOunts = addMissingStatues(results)
     } yield resultsWithDefaultCOunts
 
   private lazy val query = SparqlQuery(
@@ -54,13 +56,18 @@ class StatsFinderImpl(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX schema: <http://schema.org/>"
     ),
-    s"""|SELECT DISTINCT ?partName ?partLocation
+    s"""|SELECT (COUNT(DISTINCT ?dataset) as ?datasetCount)
         |WHERE {
-        |  ?id rdf:type <http://schema.org/Dataset> ;
+        |  ?dataset rdf:type <http://schema.org/Dataset> ;
         |}
-        |ORDER BY ASC(?partName)
         |""".stripMargin
   )
+
+  private implicit val totalDecoder: Decoder[Map[KGEntityType, Long]] = cursor => {
+    for {
+      datasetCount <- cursor.downField("datasetCount").downField("value").as[Long]
+    } yield Map(Dataset -> datasetCount)
+  }
 
   private def addMissingStatues(stats: Map[KGEntityType, Long]): Map[KGEntityType, Long] =
     KGEntityType.all.map(counts => counts -> stats.getOrElse(counts, 0L)).toMap

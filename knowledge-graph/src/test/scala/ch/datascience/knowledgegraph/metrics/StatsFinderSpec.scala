@@ -19,7 +19,6 @@
 package ch.datascience.knowledgegraph.metrics
 
 import cats.effect.IO
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyList
 import ch.datascience.graph.model.datasets.DateCreated
@@ -28,10 +27,9 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.{datasetProjects, datasets}
 import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetProject}
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.{Person, Project}
-import ch.datascience.rdfstore.entities.bundles.renkuBaseUrl
-import ch.datascience.rdfstore.entities.bundles.dataSetCommit
-import ch.datascience.rdfstore.{FusekiBaseUrl, InMemoryRdfStore, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.bundles.{dataSetCommit, renkuBaseUrl}
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.JsonLD
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -57,10 +55,8 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
   }
 
   trait TestCase {
-    private val fusekiBaseUrl  = FusekiBaseUrl("http://localhost")
-    private val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(fusekiBaseUrl = fusekiBaseUrl)
-    private val logger         = TestLogger[IO]()
-    val executionTimeRecorder  = TestExecutionTimeRecorder[IO](logger)
+    private val logger        = TestLogger[IO]()
+    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     val stats =
       new StatsFinderImpl(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(executionTimeRecorder))
   }
