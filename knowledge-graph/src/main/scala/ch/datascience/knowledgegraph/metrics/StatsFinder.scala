@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.metrics
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.knowledgegraph.metrics.KGEntityType.Dataset
+import ch.datascience.knowledgegraph.metrics.KGEntityType.{Dataset, ProcessRun, Project}
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
@@ -59,9 +59,11 @@ class StatsFinderImpl(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
     ),
     s"""|SELECT (COUNT(DISTINCT ?dataset) as ?datasetCount) (COUNT(DISTINCT ?project) as ?projectCount)
+        |(COUNT(DISTINCT ?processRun) as ?processRunCount)
         |WHERE {
         |  { ?dataset rdf:type <http://schema.org/Dataset> ; }
-        |  { ?project rdf:type <http://schema.org/Project> ; }
+        |  UNION { ?project rdf:type <http://schema.org/Project> ; }
+        |  UNION { ?processRun rdf:type <http://purl.org/wf4ever/wfprov#ProcessRun> ; }
         |}
         |""".stripMargin
   )
@@ -80,7 +82,16 @@ object EntityCount {
                          .downField("datasetCount")
                          .downField("value")
                          .as[Long]
-      } yield Map(Dataset -> datasetCount)
+        projectCount <- cursor
+                         .downField("projectCount")
+                         .downField("value")
+                         .as[Long]
+
+        processRunCount <- cursor
+                            .downField("processRunCount")
+                            .downField("value")
+                            .as[Long]
+      } yield Map(Dataset -> datasetCount, Project -> projectCount, ProcessRun -> processRunCount)
     }
 
     _.downField("results")

@@ -19,16 +19,20 @@
 package ch.datascience.knowledgegraph.metrics
 
 import cats.effect.IO
+import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonEmptyList
+import ch.datascience.generators.Generators.{listOf, nonBlankStrings, nonEmptyList, nonEmptyStrings}
+import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.datasets.DateCreated
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.{datasetProjects, datasets}
 import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetProject}
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.Person
-import ch.datascience.rdfstore.entities.bundles.{dataSetCommit, renkuBaseUrl}
+import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.RunPlan.Command
+import ch.datascience.rdfstore.entities.bundles.{dataSetCommit, generateProject, renkuBaseUrl}
+import ch.datascience.rdfstore.entities.{Agent, Association, Person, ProcessRun, RunPlan, WorkflowFile}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.JsonLD
 import org.scalacheck.Gen
@@ -44,17 +48,18 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
 
     "return info about number of objects by types" in new TestCase {
       val projects = nonEmptyList(datasetProjects).generateOne
-      val datasets = projects.toList.foldLeft(List.empty[JsonLD]) {
-        case (datasetsAcc, project) =>
-          datasetsAcc ++: nonEmptyList(datasetsJsonLDs(project)).generateOne.toList
+      val (datasets, processRuns) = projects.toList.foldLeft((List.empty[JsonLD], List.empty[JsonLD])) {
+        case ((datasetsAcc, processRunsAcc), project) =>
+          (datasetsAcc ++: listOf(datasetsJsonLDs(project)).generateOne,
+           processRunsAcc ++: listOf(processRunsJsonLDs(project)).generateOne)
       }
 
-      loadToStore(datasets: _*)
+      loadToStore(datasets ++: processRuns: _*)
 
       stats.entitiesCount.unsafeRunSync() shouldBe Map(
         KGEntityType.Dataset    -> datasets.size,
         KGEntityType.Project    -> projects.size,
-        KGEntityType.ProcessRun -> 0
+        KGEntityType.ProcessRun -> processRuns.size
       )
     }
 
@@ -66,6 +71,8 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
     val stats =
       new StatsFinderImpl(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(executionTimeRecorder))
   }
+
+  import io.renku.jsonld.syntax._
 
   private def datasetsJsonLDs(datasetProjects: DatasetProject): Gen[JsonLD] =
     for {
@@ -94,4 +101,35 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         )
       case _ => fail("Not prepared to work datasets having multiple projects")
     }
+
+  private def processRunsJsonLDs(datasetProject: DatasetProject): Gen[JsonLD] =
+    for {
+      commitId   <- commitIds
+      commitDate <- committedDates
+      committer  <- persons
+      cliVersion <- cliVersions
+      project = generateProject(datasetProject.path)
+      agent   = Agent(cliVersion)
+      comment      <- nonEmptyStrings()
+      workflowFile <- nonBlankStrings()
+    } yield ProcessRun
+      .standAlone(
+        commitId,
+        commitDate,
+        committer,
+        project,
+        agent,
+        comment,
+        None,
+        Association.process(
+          agent.copy(cliVersion = cliVersions.generateOne),
+          RunPlan.process(
+            WorkflowFile.yaml(workflowFile),
+            Command("python"),
+            inputs  = List(),
+            outputs = List()
+          )
+        )
+      )
+      .asJsonLD
 }

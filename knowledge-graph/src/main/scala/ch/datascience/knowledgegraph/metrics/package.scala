@@ -41,8 +41,8 @@ package object metrics {
     }
 
     final case object ProcessRun extends KGEntityType {
-      override val value: String = "PROCESSRUN"
-      val rdtType = "http://schema.org/ProcessRun"
+      override val value: String = "PROCESS_RUN"
+      val rdtType = "http://purl.org/wf4ever/wfprov#ProcessRun"
     }
 
     implicit val kgEntityTypeDecoder: Decoder[KGEntityType] = decodeString.emap { value =>
