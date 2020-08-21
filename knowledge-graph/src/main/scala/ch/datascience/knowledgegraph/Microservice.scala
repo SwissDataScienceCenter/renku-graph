@@ -27,6 +27,7 @@ import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.IOQueryEndpoint
+import ch.datascience.knowledgegraph.metrics.{EntitiesCountGauge, IOEntitiesCountGauge, IOStatsFinder}
 import ch.datascience.knowledgegraph.projects.rest.IOProjectEndpoint
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
@@ -60,6 +61,8 @@ object Microservice extends IOMicroservice {
       queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder, ApplicationLogger)
       datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder)
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)
+      statsFinder             <- IOStatsFinder(sparqlTimeRecorder, ApplicationLogger)
+      entitiesCountGauge      <- IOEntitiesCountGauge(statsFinder, metricsRegistry, ApplicationLogger)
       microServiceResource = new MicroserviceRoutes[IO](
         queryEndpoint,
         projectEndpoint,
@@ -71,7 +74,7 @@ object Microservice extends IOMicroservice {
       exicode <- microServiceResource.use { routes =>
                   val httpServer = new HttpServer[IO](serverPort = 9004, routes)
 
-                  new MicroserviceRunner(sentryInitializer, httpServer).run(args)
+                  new MicroserviceRunner(sentryInitializer, httpServer, entitiesCountGauge).run(args)
                 }
 
     } yield exicode
@@ -79,13 +82,15 @@ object Microservice extends IOMicroservice {
 }
 
 private class MicroserviceRunner(
-    sentryInitializer: SentryInitializer[IO],
-    httpServer:        HttpServer[IO]
+    sentryInitializer:  SentryInitializer[IO],
+    httpServer:         HttpServer[IO],
+    entitiesCountGauge: EntitiesCountGauge[IO]
 ) {
 
   def run(args: List[String]): IO[ExitCode] =
     for {
       _        <- sentryInitializer.run
+      _        <- entitiesCountGauge.run
       exitCode <- httpServer.run
     } yield exitCode
 }

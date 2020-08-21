@@ -22,23 +22,23 @@ import java.lang.Thread.sleep
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
-import MetricsGenerators._
-import ch.datascience.generators.Generators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.knowledgegraph.metrics.MetricsGenerators._
 import ch.datascience.metrics.LabeledGauge
+import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
 
-class KGEntitiesMetricsSpec
+class EntitiesCountGaugeSpec
     extends AnyWordSpec
     with MockFactory
     with Eventually
@@ -110,7 +110,7 @@ class KGEntitiesMetricsSpec
   private trait TestCase extends TestGauges {
     lazy val statsFinder: StatsFinder[IO] = mock[StatsFinder[IO]]
     lazy val logger = TestLogger[IO]()
-    lazy val metrics = new KGEntitiesMetrics(
+    lazy val metrics = new IOEntitiesCountGauge(
       statsFinder,
       logger,
       countsGauge,

@@ -24,6 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
+import ch.datascience.knowledgegraph.metrics.IOEntitiesCountGauge
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -35,6 +36,10 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
     "return Success Exit Code if Sentry initializes and http server starts up" in new TestCase {
 
       (sentryInitializer.run _)
+        .expects()
+        .returning(context.unit)
+
+      (entityCountGauge.run _)
         .expects()
         .returning(context.unit)
 
@@ -64,7 +69,27 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(context.unit)
 
+      (entityCountGauge.run _)
+        .expects()
+        .returning(context.unit)
+
       (httpServer.run _)
+        .expects()
+        .returning(context.raiseError(exception))
+
+      intercept[Exception] {
+        runner.run(Nil).unsafeRunSync()
+      } shouldBe exception
+    }
+
+    "fail if starting the entity metrics fails" in new TestCase {
+
+      val exception = exceptions.generateOne
+      (sentryInitializer.run _)
+        .expects()
+        .returning(context.unit)
+
+      (entityCountGauge.run _)
         .expects()
         .returning(context.raiseError(exception))
 
@@ -79,6 +104,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     val sentryInitializer = mock[IOSentryInitializer]
     val httpServer        = mock[IOHttpServer]
-    val runner            = new MicroserviceRunner(sentryInitializer, httpServer)
+    val entityCountGauge  = mock[IOEntitiesCountGauge]
+    val runner            = new MicroserviceRunner(sentryInitializer, httpServer, entityCountGauge)
   }
 }

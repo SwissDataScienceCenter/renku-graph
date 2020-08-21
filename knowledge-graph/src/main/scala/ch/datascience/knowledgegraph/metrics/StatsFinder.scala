@@ -103,13 +103,14 @@ object EntityCount {
 
 object IOStatsFinder {
   def apply(
-      rdfStoreConfig:          RdfStoreConfig,
+      timeRecorder:            SparqlQueryTimeRecorder[IO],
       logger:                  Logger[IO],
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
+      rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO]()
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO],
-    ME:                        MonadError[IO, Throwable]): IO[StatsFinder[IO]] = IO {
-    new StatsFinderImpl(rdfStoreConfig, logger, timeRecorder)
-  }
+    ME:                        MonadError[IO, Throwable]): IO[StatsFinder[IO]] =
+    for {
+      config <- rdfStoreConfig
+    } yield new StatsFinderImpl(config, logger, timeRecorder)
 }

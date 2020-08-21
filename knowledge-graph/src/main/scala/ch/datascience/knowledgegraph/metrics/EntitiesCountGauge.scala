@@ -28,13 +28,18 @@ import scala.concurrent.duration.FiniteDuration
 import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
-class KGEntitiesMetrics(
+trait EntitiesCountGauge[Interpretation[_]] {
+  def run: Interpretation[Unit]
+}
+
+class IOEntitiesCountGauge(
     statsFinder:    StatsFinder[IO],
     logger:         Logger[IO],
     countsGauge:    LabeledGauge[IO, KGEntityType],
-    interval:       FiniteDuration = KGEntitiesMetrics.interval,
-    countsInterval: FiniteDuration = KGEntitiesMetrics.statusesInterval
-)(implicit ME:      MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO]) {
+    interval:       FiniteDuration = IOEntitiesCountGauge.interval,
+    countsInterval: FiniteDuration = IOEntitiesCountGauge.statusesInterval
+)(implicit ME:      MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
+    extends EntitiesCountGauge[IO] {
 
   def run: IO[Unit] =
     for {
@@ -65,28 +70,24 @@ class KGEntitiesMetrics(
   }
 }
 
-object KGEntitiesMetrics {
+object IOEntitiesCountGauge {
+
+  import cats.effect.IO._
+  import eu.timepit.refined.auto._
 
   import scala.concurrent.duration._
 
   private val interval:         FiniteDuration = 10 seconds
   private val statusesInterval: FiniteDuration = 5 seconds
-}
-
-object IOKGEntitiesMetrics {
-
-  import cats.effect.IO._
-  import eu.timepit.refined.auto._
-
   def apply(
       statsFinder:         StatsFinder[IO],
-      logger:              Logger[IO],
-      metricsRegistry:     MetricsRegistry[IO]
-  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[KGEntitiesMetrics] =
+      metricsRegistry:     MetricsRegistry[IO],
+      logger:              Logger[IO]
+  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[EntitiesCountGauge[IO]] =
     for {
       statusesGauge <- Gauge[IO, KGEntityType](name = "entities_count",
                                                help      = "Total object by type.",
                                                labelName = "entities")(metricsRegistry)
 
-    } yield new KGEntitiesMetrics(statsFinder, logger, statusesGauge)
+    } yield new IOEntitiesCountGauge(statsFinder, logger, statusesGauge)
 }
