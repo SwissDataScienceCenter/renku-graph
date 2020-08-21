@@ -25,6 +25,7 @@ import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, S
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder
+import io.circe.Decoder.decodeList
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
@@ -44,34 +45,49 @@ class StatsFinderImpl(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with StatsFinder[IO] {
 
+  import EntityCount._
+
   override def entitiesCount: IO[Map[KGEntityType, Long]] =
     for {
       results <- queryExpecting[Map[KGEntityType, Long]](query)
-      resultsWithDefaultCOunts = addMissingStatues(results)
-    } yield resultsWithDefaultCOunts
+      resultsWithDefaultCounts = addMissingStatues(results)
+    } yield resultsWithDefaultCounts
 
   private lazy val query = SparqlQuery(
     name = "entities - counts",
     Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX schema: <http://schema.org/>"
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
     ),
-    s"""|SELECT (COUNT(DISTINCT ?dataset) as ?datasetCount)
+    s"""|SELECT (COUNT(DISTINCT ?dataset) as ?datasetCount) (COUNT(DISTINCT ?project) as ?projectCount)
         |WHERE {
-        |  ?dataset rdf:type <http://schema.org/Dataset> ;
+        |  { ?dataset rdf:type <http://schema.org/Dataset> ; }
+        |  { ?project rdf:type <http://schema.org/Project> ; }
         |}
         |""".stripMargin
   )
 
-  private implicit val totalDecoder: Decoder[Map[KGEntityType, Long]] = cursor => {
-    for {
-      datasetCount <- cursor.downField("datasetCount").downField("value").as[Long]
-    } yield Map(Dataset -> datasetCount)
-  }
-
   private def addMissingStatues(stats: Map[KGEntityType, Long]): Map[KGEntityType, Long] =
-    KGEntityType.all.map(counts => counts -> stats.getOrElse(counts, 0L)).toMap
+    KGEntityType.all.map(entityType => entityType -> stats.getOrElse(entityType, 0L)).toMap
 
+}
+
+object EntityCount {
+
+  private[metrics] implicit val countsDecoder: Decoder[Map[KGEntityType, Long]] = {
+    val counts: Decoder[Map[KGEntityType, Long]] = { cursor =>
+      for {
+        datasetCount <- cursor
+                         .downField("datasetCount")
+                         .downField("value")
+                         .as[Long]
+      } yield Map(Dataset -> datasetCount)
+    }
+
+    _.downField("results")
+      .downField("bindings")
+      .as(decodeList(counts))
+      .map(_.headOption.getOrElse(Map.empty[KGEntityType, Long]))
+  }
 }
 
 object IOStatsFinder {

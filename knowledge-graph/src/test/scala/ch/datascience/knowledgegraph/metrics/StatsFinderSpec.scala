@@ -38,16 +38,22 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
   "entitiesCount" should {
+    "return zero if there are no entity in the DB" in new TestCase {
+      stats.entitiesCount.unsafeRunSync() shouldBe KGEntityType.all.map(entityType => entityType -> 0).toMap
+    }
 
-    "return info about number of objects grouped by types" in new TestCase {
-      val project  = datasetProjects.generateOne
-      val datasets = nonEmptyList(datasetsJsonLDs(project)).generateOne
+    "return info about number of objects by types" in new TestCase {
+      val projects = nonEmptyList(datasetProjects).generateOne
+      val datasets = projects.toList.foldLeft(List.empty[JsonLD]) {
+        case (datasetsAcc, project) =>
+          datasetsAcc ++: nonEmptyList(datasetsJsonLDs(project)).generateOne.toList
+      }
 
-      loadToStore(datasets.toList: _*)
+      loadToStore(datasets: _*)
 
       stats.entitiesCount.unsafeRunSync() shouldBe Map(
         KGEntityType.Dataset    -> datasets.size,
-        KGEntityType.Project    -> 1,
+        KGEntityType.Project    -> projects.size,
         KGEntityType.ProcessRun -> 0
       )
     }
