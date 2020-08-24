@@ -18,28 +18,51 @@
 
 package ch.datascience.knowledgegraph
 
+import cats.implicits._
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import io.circe.Decoder
+import io.circe.Decoder.decodeString
 
 package object metrics {
 
-  sealed trait KGEntityType extends StringTinyType
+  sealed trait KGEntityType extends StringTinyType {
+    def rdfType: String
+  }
+
   object KGEntityType extends TinyTypeFactory[KGEntityType](EventStatusInstantiator) {
 
     val all: Set[KGEntityType] =
-      Set(Dataset, Project, ProcessRun)
+      Set(Dataset, Project, ProcessRun, Activity, WorkflowRun)
 
     final case object Dataset extends KGEntityType {
       override val value: String = "Dataset"
-      val rdtType = "http://schema.org/Dataset"
+      val rdfType = "http://schema.org/Dataset"
     }
     final case object Project extends KGEntityType {
       override val value: String = "Project"
-      val rdtType = "http://schema.org/Project"
+      val rdfType = "http://schema.org/Project"
     }
 
     final case object ProcessRun extends KGEntityType {
       override val value: String = "Process run"
-      val rdtType = "http://purl.org/wf4ever/wfprov#ProcessRun"
+      val rdfType = "http://purl.org/wf4ever/wfprov#ProcessRun"
+    }
+
+    final case object Activity extends KGEntityType {
+      override val value: String = "Activity"
+      val rdfType = "http://www.w3.org/ns/prov#Activity"
+    }
+
+    final case object WorkflowRun extends KGEntityType {
+      override val value: String = "WorkflowRun"
+      val rdfType = "http://purl.org/wf4ever/wfprov#WorkflowRun"
+    }
+
+    implicit val kgEntityTypeDecoder: Decoder[KGEntityType] = decodeString.emap { value =>
+      Either.fromOption(
+        KGEntityType.all.find(_.rdfType == value),
+        ifNone = s"'$value' unknown KGEntityType"
+      )
     }
   }
 

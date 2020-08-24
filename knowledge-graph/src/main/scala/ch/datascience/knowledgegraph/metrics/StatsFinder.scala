@@ -49,8 +49,8 @@ class StatsFinderImpl(
 
   override def entitiesCount: IO[Map[KGEntityType, Long]] =
     for {
-      results <- queryExpecting[Map[KGEntityType, Long]](query)
-      resultsWithDefaultCounts = addMissingStatues(results)
+      results <- queryExpecting[List[(KGEntityType, Long)]](query)
+      resultsWithDefaultCounts = addMissingStatues(results.toMap)
     } yield resultsWithDefaultCounts
 
   private lazy val query = SparqlQuery(
@@ -58,13 +58,13 @@ class StatsFinderImpl(
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
     ),
-    s"""|SELECT (COUNT(DISTINCT ?dataset) as ?datasetCount) (COUNT(DISTINCT ?project) as ?projectCount)
-        |(COUNT(DISTINCT ?processRun) as ?processRunCount)
+    s"""|SELECT ?type (COUNT(DISTINCT ?id) as ?count)
         |WHERE {
-        |  { ?dataset rdf:type <http://schema.org/Dataset> ; }
-        |  UNION { ?project rdf:type <http://schema.org/Project> ; }
-        |  UNION { ?processRun rdf:type <http://purl.org/wf4ever/wfprov#ProcessRun> ; }
+        |  ?id rdf:type ?type
+        |  FILTER (?type IN (<http://schema.org/Dataset>, <http://schema.org/Project>, 
+        |  <http://www.w3.org/ns/prov#Activity>,  <http://purl.org/wf4ever/wfprov#ProcessRun>, <http://purl.org/wf4ever/wfprov#WorkflowRun>))
         |}
+        |GROUP BY ?type
         |""".stripMargin
   )
 
@@ -75,19 +75,17 @@ class StatsFinderImpl(
 
 object EntityCount {
 
-  private[metrics] implicit val countsDecoder: Decoder[Map[KGEntityType, Long]] = {
-    val counts: Decoder[Map[KGEntityType, Long]] = { cursor =>
+  private[metrics] implicit val countsDecoder: Decoder[List[(KGEntityType, Long)]] = {
+    val counts: Decoder[(KGEntityType, Long)] = { cursor =>
       for {
-        datasetCount    <- cursor.downField("datasetCount").downField("value").as[Long]
-        projectCount    <- cursor.downField("projectCount").downField("value").as[Long]
-        processRunCount <- cursor.downField("processRunCount").downField("value").as[Long]
-      } yield Map(Dataset -> datasetCount, Project -> projectCount, ProcessRun -> processRunCount)
+        entityType <- cursor.downField("type").downField("value").as[KGEntityType]
+        count      <- cursor.downField("count").downField("value").as[Long]
+      } yield entityType -> count
     }
 
     _.downField("results")
       .downField("bindings")
       .as(decodeList(counts))
-      .map(_.headOption.getOrElse(Map.empty[KGEntityType, Long]))
   }
 }
 

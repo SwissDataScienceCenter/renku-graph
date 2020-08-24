@@ -21,20 +21,21 @@ package ch.datascience.knowledgegraph.metrics
 import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{listOf, nonBlankStrings, nonEmptyList, nonEmptyStrings}
+import ch.datascience.generators.Generators.{listOf, nonBlankStrings, nonEmptyList, nonEmptyStrings, setOf}
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
-import ch.datascience.graph.model.datasets.DateCreated
-import ch.datascience.graph.model.events.CommittedDate
+import ch.datascience.graph.model.datasets
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.{datasetProjects, datasets}
+import ch.datascience.knowledgegraph.datasets.DatasetsGenerators
+import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasetProjects
 import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetProject}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
-import ch.datascience.rdfstore.entities.bundles.{dataSetCommit, generateProject, renkuBaseUrl}
-import ch.datascience.rdfstore.entities.{Agent, Association, Person, ProcessRun, RunPlan, WorkflowFile}
+import ch.datascience.rdfstore.entities.bundles.{generateProject, renkuBaseUrl}
+import ch.datascience.rdfstore.entities.{Activity, Agent, Association, DataSet, Generation, ProcessRun, RunPlan, WorkflowFile, WorkflowRun}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.JsonLD
+import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -47,19 +48,44 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
     }
 
     "return info about number of objects by types" in new TestCase {
-      val projects = nonEmptyList(datasetProjects).generateOne
-      val (datasets, processRuns) = projects.toList.foldLeft((List.empty[JsonLD], List.empty[JsonLD])) {
-        case ((datasetsAcc, processRunsAcc), project) =>
-          (datasetsAcc ++: listOf(datasetsJsonLDs(project)).generateOne,
-           processRunsAcc ++: listOf(processRunsJsonLDs(project)).generateOne)
+      implicit class MapOps(entitiesByType: Map[KGEntityType, List[JsonLD]]) {
+        def update(entityType: KGEntityType, entities: List[JsonLD]) =
+          entitiesByType
+            .updated(entityType, entitiesByType.getOrElse(entityType, List.empty[JsonLD]) ++: entities)
       }
 
-      loadToStore(datasets ++: processRuns: _*)
+      val projects = nonEmptyList(datasetProjects).generateOne
+      val entitiesToStore = projects.toList.foldLeft(Map.empty[KGEntityType, List[JsonLD]]) {
+        case (entitiesByType, project) =>
+          val commitActivities = listOf(datasetsWithActivity(project)).generateOne
+          val processRuns      = listOf(processRunsJsonLDs(project)).generateOne
+          val workflowRuns = commitActivities.headOption match {
+            case Some(activity) =>
+              listOf(
+                workflowJsonLDs(project, activity)
+              ).generateOne
+            case None => List.empty[JsonLD]
+          }
 
-      stats.entitiesCount.unsafeRunSync() shouldBe Map(
-        KGEntityType.Dataset    -> datasets.size,
-        KGEntityType.Project    -> projects.size,
-        KGEntityType.ProcessRun -> processRuns.size
+          entitiesByType
+            .update(KGEntityType.Dataset, commitActivities.map(_.asJsonLD))
+            .update(KGEntityType.ProcessRun, processRuns)
+            .update(KGEntityType.WorkflowRun, workflowRuns)
+      }
+
+      loadToStore(entitiesToStore.values.flatten.toList: _*)
+
+      private val numberOfDatasetCommits:  Long = entitiesToStore(KGEntityType.Dataset).size
+      private val numberOfWorkflowRuns:    Long = entitiesToStore(KGEntityType.WorkflowRun).size
+      private val numberOfProcessRuns:     Long = entitiesToStore(KGEntityType.ProcessRun).size + numberOfWorkflowRuns
+      private val totalNumberOfActivities: Long = numberOfDatasetCommits + numberOfProcessRuns
+
+      stats.entitiesCount.unsafeRunSync() shouldBe Map[KGEntityType, Long](
+        KGEntityType.Dataset     -> numberOfDatasetCommits,
+        KGEntityType.Project     -> projects.size.toLong,
+        KGEntityType.ProcessRun  -> numberOfProcessRuns,
+        KGEntityType.WorkflowRun -> numberOfWorkflowRuns,
+        KGEntityType.Activity    -> totalNumberOfActivities
       )
     }
 
@@ -72,32 +98,37 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
       new StatsFinderImpl(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(executionTimeRecorder))
   }
 
-  import io.renku.jsonld.syntax._
+  import eu.timepit.refined.auto._
 
-  private def datasetsJsonLDs(datasetProjects: DatasetProject): Gen[JsonLD] =
+  private def datasetsWithActivity(datasetProjects: DatasetProject): Gen[Activity] =
     for {
-      dataset <- datasets
+      dataset <- DatasetsGenerators.datasets
     } yield toDataSetCommit(dataset.copy(projects = List(datasetProjects)))
 
-  private def toDataSetCommit(dataSet: Dataset): JsonLD =
+  private def toDataSetCommit(dataSet: Dataset): Activity =
     dataSet.projects match {
-      case project +: Nil =>
-        dataSetCommit(
-          committedDate = CommittedDate(project.created.date.value),
-          committer     = Person(project.created.agent.name, project.created.agent.maybeEmail)
-        )(
-          projectPath = project.path,
-          projectName = project.name
-        )(
-          datasetIdentifier         = dataSet.id,
-          datasetTitle              = dataSet.title,
-          datasetName               = dataSet.name,
-          maybeDatasetUrl           = dataSet.maybeUrl,
-          maybeDatasetSameAs        = None,
-          maybeDatasetDescription   = dataSet.maybeDescription,
-          maybeDatasetPublishedDate = dataSet.published.maybeDate,
-          datasetCreatedDate        = DateCreated(project.created.date.value),
-          datasetParts              = dataSet.parts.map(part => (part.name, part.atLocation))
+      case datasetProject +: Nil =>
+        val project       = generateProject(datasetProject.path)
+        val committedDate = committedDates.generateOne
+        Activity(
+          commitIds.generateOne,
+          committedDate,
+          persons.generateOne,
+          project,
+          Agent(cliVersions.generateOne),
+          maybeGenerationFactories = List(
+            Generation.factory(
+              DataSet.factory(
+                dataSet.id,
+                dataSet.title,
+                dataSet.name,
+                dataSet.maybeUrl,
+                createdDate    = datasets.DateCreated(committedDate.value),
+                creators       = setOf(persons).generateOne,
+                partsFactories = List()
+              )
+            )
+          )
         )
       case _ => fail("Not prepared to work datasets having multiple projects")
     }
@@ -132,4 +163,35 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         )
       )
       .asJsonLD
+
+  private def workflowJsonLDs(datasetProject: DatasetProject, activity: Activity) =
+    for {
+      commitId   <- commitIds
+      commitDate <- committedDates
+      committer  <- persons
+      cliVersion <- cliVersions
+      project = generateProject(datasetProject.path)
+      agent   = Agent(cliVersion)
+      comment <- nonEmptyStrings()
+    } yield WorkflowRun(
+      commitId,
+      commitDate,
+      committer,
+      project,
+      agent,
+      comment = comment,
+      WorkflowFile.yaml("renku-update.yaml"),
+      informedBy = activity,
+      associationFactory = Association.workflow(
+        agent.copy(cliVersion = cliVersions.generateOne),
+        RunPlan.workflow(
+          inputs       = List(),
+          outputs      = List(),
+          subprocesses = List()
+        )
+      ),
+      processRunsFactories = List(),
+      maybeInvalidation    = None
+    ).asJsonLD
+
 }
