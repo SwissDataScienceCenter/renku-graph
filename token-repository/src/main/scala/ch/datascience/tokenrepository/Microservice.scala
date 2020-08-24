@@ -50,10 +50,11 @@ object Microservice extends IOMicroservice {
         associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, ApplicationLogger)
         dbInitializer          <- IODbInitializer(transactor, ApplicationLogger)
         metricsRegistry        <- MetricsRegistry()
+        deleteTokenEndpoint    <- IODeleteTokenEndpoint(transactor, ApplicationLogger)
         microserviceRoutes = new MicroserviceRoutes[IO](
           fetchTokenEndpoint,
           associateTokenEndpoint,
-          new IODeleteTokenEndpoint(transactor, ApplicationLogger),
+          deleteTokenEndpoint,
           new RoutesMetrics[IO](metricsRegistry)
         ).routes
         exitcode <- microserviceRoutes.use { routes =>
