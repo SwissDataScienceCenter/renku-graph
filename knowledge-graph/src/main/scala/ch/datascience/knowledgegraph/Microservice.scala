@@ -83,13 +83,13 @@ object Microservice extends IOMicroservice {
 private class MicroserviceRunner(
     sentryInitializer:   SentryInitializer[IO],
     httpServer:          HttpServer[IO],
-    entitiesCountGauge:  KGMetrics[IO]
+    kgMetrics:           KGMetrics[IO]
 )(implicit contextShift: ContextShift[IO]) {
 
   def run(args: List[String]): IO[ExitCode] =
     for {
       _        <- sentryInitializer.run
-      _        <- entitiesCountGauge.run.start
+      _        <- kgMetrics.run.start
       exitCode <- httpServer.run
     } yield exitCode
 }

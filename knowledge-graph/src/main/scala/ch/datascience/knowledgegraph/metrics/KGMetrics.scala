@@ -85,9 +85,9 @@ object IOKGMetrics {
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[KGMetrics[IO]] =
     for {
-      statusesGauge <- Gauge[IO, KGEntityType](name = "entities_count",
-                                               help      = "Total object by type.",
-                                               labelName = "entities")(metricsRegistry)
+      entitiesCountGauge <- Gauge[IO, KGEntityType](name = "entities_count",
+                                                    help      = "Total object by type.",
+                                                    labelName = "entities")(metricsRegistry)
 
-    } yield new IOKGMetrics(statsFinder, logger, statusesGauge)
+    } yield new IOKGMetrics(statsFinder, logger, entitiesCountGauge)
 }

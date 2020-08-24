@@ -20,7 +20,6 @@ package ch.datascience.knowledgegraph.metrics
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.knowledgegraph.metrics.KGEntityType.{Dataset, ProcessRun, Project}
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
@@ -62,7 +61,8 @@ class StatsFinderImpl(
         |WHERE {
         |  ?id rdf:type ?type
         |  FILTER (?type IN (<http://schema.org/Dataset>, <http://schema.org/Project>, 
-        |  <http://www.w3.org/ns/prov#Activity>,  <http://purl.org/wf4ever/wfprov#ProcessRun>, <http://purl.org/wf4ever/wfprov#WorkflowRun>))
+        |  <http://www.w3.org/ns/prov#Activity>,  <http://purl.org/wf4ever/wfprov#ProcessRun>,
+        |  <http://purl.org/wf4ever/wfprov#WorkflowRun>))
         |}
         |GROUP BY ?type
         |""".stripMargin
@@ -73,7 +73,7 @@ class StatsFinderImpl(
 
 }
 
-object EntityCount {
+private object EntityCount {
 
   private[metrics] implicit val countsDecoder: Decoder[List[(KGEntityType, Long)]] = {
     val counts: Decoder[(KGEntityType, Long)] = { cursor =>

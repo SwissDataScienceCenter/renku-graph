@@ -18,14 +18,9 @@
 
 package ch.datascience.knowledgegraph.metrics
 
-import ch.datascience.knowledgegraph.metrics.KGEntityType.{Dataset, ProcessRun, Project}
 import org.scalacheck.Gen
 
-object MetricsGenerators {
+private object MetricsGenerators {
 
-  implicit val entitiesType: Gen[KGEntityType] = Gen.oneOf(
-    Dataset,
-    Project,
-    ProcessRun
-  )
+  implicit val entitiesTypes: Gen[KGEntityType] = Gen.oneOf(KGEntityType.all)
 }

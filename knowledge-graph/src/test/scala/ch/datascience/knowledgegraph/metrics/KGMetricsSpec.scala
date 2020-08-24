@@ -116,7 +116,7 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
 
   private lazy val entitiesCountGen: Gen[Map[KGEntityType, Long]] = nonEmptySet {
     for {
-      entityType <- entitiesType
+      entityType <- entitiesTypes
       count      <- nonNegativeLongs()
     } yield entityType -> count.value
   }.map(_.toMap)
