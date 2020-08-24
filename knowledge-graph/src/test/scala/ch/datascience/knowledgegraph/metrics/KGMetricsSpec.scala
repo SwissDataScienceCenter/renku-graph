@@ -1,5 +1,3 @@
-package ch.datascience.knowledgegraph.metrics
-
 /*
  * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
@@ -17,6 +15,7 @@ package ch.datascience.knowledgegraph.metrics
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package ch.datascience.knowledgegraph.metrics
 
 import java.lang.Thread.sleep
 
@@ -38,12 +37,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
 
-class EntitiesCountGaugeSpec
-    extends AnyWordSpec
-    with MockFactory
-    with Eventually
-    with IntegrationPatience
-    with should.Matchers {
+class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with IntegrationPatience with should.Matchers {
 
   "run" should {
 
@@ -110,7 +104,7 @@ class EntitiesCountGaugeSpec
   private trait TestCase extends TestGauges {
     lazy val statsFinder: StatsFinder[IO] = mock[StatsFinder[IO]]
     lazy val logger = TestLogger[IO]()
-    lazy val metrics = new IOEntitiesCountGauge(
+    lazy val metrics = new IOKGMetrics(
       statsFinder,
       logger,
       countsGauge,

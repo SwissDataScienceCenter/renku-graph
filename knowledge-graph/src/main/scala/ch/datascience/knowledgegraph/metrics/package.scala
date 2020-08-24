@@ -18,44 +18,34 @@
 
 package ch.datascience.knowledgegraph
 
-import cats.implicits._
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import io.circe.Decoder
-import io.circe.Decoder.decodeString
 
 package object metrics {
 
-  sealed trait KGEntityType extends StringTinyType with Product with Serializable
+  sealed trait KGEntityType extends StringTinyType
   object KGEntityType extends TinyTypeFactory[KGEntityType](EventStatusInstantiator) {
 
     val all: Set[KGEntityType] =
       Set(Dataset, Project, ProcessRun)
 
     final case object Dataset extends KGEntityType {
-      override val value: String = "DATASET"
+      override val value: String = "Dataset"
       val rdtType = "http://schema.org/Dataset"
     }
     final case object Project extends KGEntityType {
-      override val value: String = "PROJECT"
+      override val value: String = "Project"
       val rdtType = "http://schema.org/Project"
     }
 
     final case object ProcessRun extends KGEntityType {
-      override val value: String = "PROCESS_RUN"
+      override val value: String = "Process run"
       val rdtType = "http://purl.org/wf4ever/wfprov#ProcessRun"
-    }
-
-    implicit val kgEntityTypeDecoder: Decoder[KGEntityType] = decodeString.emap { value =>
-      Either.fromOption(
-        KGEntityType.all.find(_.value == value),
-        ifNone = s"'$value' unknown EventStatus"
-      )
     }
   }
 
   private object EventStatusInstantiator extends (String => KGEntityType) {
     override def apply(value: String): KGEntityType = KGEntityType.all.find(_.value == value).getOrElse {
-      throw new IllegalArgumentException(s"'$value' unknown EventStatus")
+      throw new IllegalArgumentException(s"'$value' unknown KGEntityType")
     }
   }
 

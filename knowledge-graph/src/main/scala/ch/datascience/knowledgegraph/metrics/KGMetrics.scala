@@ -28,18 +28,18 @@ import scala.concurrent.duration.FiniteDuration
 import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
-trait EntitiesCountGauge[Interpretation[_]] {
+trait KGMetrics[Interpretation[_]] {
   def run: Interpretation[Unit]
 }
 
-class IOEntitiesCountGauge(
+class IOKGMetrics(
     statsFinder:    StatsFinder[IO],
     logger:         Logger[IO],
     countsGauge:    LabeledGauge[IO, KGEntityType],
-    interval:       FiniteDuration = IOEntitiesCountGauge.interval,
-    countsInterval: FiniteDuration = IOEntitiesCountGauge.statusesInterval
+    interval:       FiniteDuration = IOKGMetrics.interval,
+    countsInterval: FiniteDuration = IOKGMetrics.statusesInterval
 )(implicit ME:      MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
-    extends EntitiesCountGauge[IO] {
+    extends KGMetrics[IO] {
 
   def run: IO[Unit] =
     for {
@@ -70,7 +70,7 @@ class IOEntitiesCountGauge(
   }
 }
 
-object IOEntitiesCountGauge {
+object IOKGMetrics {
 
   import cats.effect.IO._
   import eu.timepit.refined.auto._
@@ -83,11 +83,11 @@ object IOEntitiesCountGauge {
       statsFinder:         StatsFinder[IO],
       metricsRegistry:     MetricsRegistry[IO],
       logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[EntitiesCountGauge[IO]] =
+  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[KGMetrics[IO]] =
     for {
       statusesGauge <- Gauge[IO, KGEntityType](name = "entities_count",
                                                help      = "Total object by type.",
                                                labelName = "entities")(metricsRegistry)
 
-    } yield new IOEntitiesCountGauge(statsFinder, logger, statusesGauge)
+    } yield new IOKGMetrics(statsFinder, logger, statusesGauge)
 }

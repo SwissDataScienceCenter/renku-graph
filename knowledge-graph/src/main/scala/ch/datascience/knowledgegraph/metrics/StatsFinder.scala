@@ -78,19 +78,9 @@ object EntityCount {
   private[metrics] implicit val countsDecoder: Decoder[Map[KGEntityType, Long]] = {
     val counts: Decoder[Map[KGEntityType, Long]] = { cursor =>
       for {
-        datasetCount <- cursor
-                         .downField("datasetCount")
-                         .downField("value")
-                         .as[Long]
-        projectCount <- cursor
-                         .downField("projectCount")
-                         .downField("value")
-                         .as[Long]
-
-        processRunCount <- cursor
-                            .downField("processRunCount")
-                            .downField("value")
-                            .as[Long]
+        datasetCount    <- cursor.downField("datasetCount").downField("value").as[Long]
+        projectCount    <- cursor.downField("projectCount").downField("value").as[Long]
+        processRunCount <- cursor.downField("processRunCount").downField("value").as[Long]
       } yield Map(Dataset -> datasetCount, Project -> projectCount, ProcessRun -> processRunCount)
     }
 
