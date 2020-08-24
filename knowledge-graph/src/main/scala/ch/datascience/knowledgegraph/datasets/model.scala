@@ -33,7 +33,8 @@ object model {
                            maybeDescription: Option[Description],
                            published:        DatasetPublishing,
                            parts:            List[DatasetPart],
-                           projects:         List[DatasetProject])
+                           projects:         List[DatasetProject],
+                           keywords:         List[Keyword])
 
   final case class DatasetPublishing(maybeDate: Option[PublishedDate], creators: Set[DatasetCreator])
   final case class DatasetCreator(maybeEmail:   Option[Email], name:             UserName, maybeAffiliation: Option[Affiliation])

@@ -66,9 +66,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
         val response = getDataset(dataset.id).unsafeRunSync()
 
-        response.status      shouldBe Ok
-        response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-
+        response.status                    shouldBe Ok
+        response.contentType               shouldBe Some(`Content-Type`(MediaType.application.json))
         response.as[Dataset].unsafeRunSync shouldBe dataset
         response.as[Json].unsafeRunSync._links shouldBe Right(
           Links.of(Self -> Href(renkuResourcesUrl / "datasets" / dataset.id))
@@ -157,7 +156,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       published        <- cursor.downField("published").as[DatasetPublishing]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
       projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
-    } yield Dataset(id, title, name, sameAs, maybeUrl, maybeDescription, published, parts, projects)
+      keywords         <- cursor.downField("keywords").as[List[Keyword]]
+    } yield Dataset(id, title, name, sameAs, maybeUrl, maybeDescription, published, parts, projects, keywords)
 
   private implicit lazy val datasetPublishingDecoder: Decoder[DatasetPublishing] = (cursor: HCursor) =>
     for {

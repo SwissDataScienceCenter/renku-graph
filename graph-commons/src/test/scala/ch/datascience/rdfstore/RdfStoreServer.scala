@@ -53,6 +53,7 @@ class RdfStoreServer(port: Int Refined Positive, datasetName: DatasetName)(impli
       val definition = new EntityDefinition("uri", "name")
       definition.setPrimaryPredicate(NodeFactory.createURI("http://schema.org/name"))
       definition.set("description", NodeFactory.createURI("http://schema.org/description"))
+      definition.set("alternateName", NodeFactory.createURI("http://schema.org/alternateName"))
       definition
     }
 

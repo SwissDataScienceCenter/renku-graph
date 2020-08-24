@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, SameAs}
+import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, Keyword, SameAs}
 import ch.datascience.graph.model.events.CommittedDate
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
@@ -65,7 +65,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreatedDate        = DateCreated(addedToProject1.date.value),
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             ),
             dataSetCommit( // to simulate adding a file to the data-set in another commit
               committedDate = CommittedDate(project1DatasetCreationDate.value plusSeconds 10)
@@ -82,7 +83,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreatedDate        = DateCreated(addedToProject1.date.value),
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             ),
             dataSetCommit( // to simulate adding the same data-set to another project
               committedDate = addedToProject2.date.toUnsafe(date => CommittedDate.from(date.value)),
@@ -99,7 +101,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             ),
             randomDataSetCommit
           )
@@ -108,7 +111,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset.copy(
               parts = dataset.parts.sorted,
               projects = List(DatasetProject(project1.path, project1.name, addedToProject1),
-                              DatasetProject(project2.path, project2.name, addedToProject2)).sorted
+                              DatasetProject(project2.path, project2.name, addedToProject2)).sorted,
+              keywords = dataset.keywords.sorted
             )
           )
       }
@@ -135,7 +139,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreatedDate        = DateCreated(addedToProject1.date.value),
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             ),
             dataSetCommit( // simulating dataset modification
               committedDate = CommittedDate(addedToProject1.date.value).shiftToFuture
@@ -152,7 +157,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreatedDate        = DateCreated(addedToProject1.date.value),
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             ),
             dataSetCommit( // to simulate adding first project's data-set to another project
               committedDate = addedToProject2.date.toUnsafe(date => CommittedDate.from(date.value)),
@@ -169,7 +175,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             ),
             randomDataSetCommit
           )
@@ -179,7 +186,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               sameAs = dataset.entityId.asSameAs,
               parts  = dataset.parts.sorted,
               projects = List(DatasetProject(project1.path, project1.name, addedToProject1),
-                              DatasetProject(project2.path, project2.name, addedToProject2)).sorted
+                              DatasetProject(project2.path, project2.name, addedToProject2)).sorted,
+              keywords = dataset.keywords.sorted
             )
           )
       }
@@ -205,7 +213,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             maybeDatasetPublishedDate = dataset.published.maybeDate,
             datasetCreatedDate        = DateCreated(addedToProject.date.value),
             datasetCreators           = dataset.published.creators map toPerson,
-            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+            datasetKeywords           = dataset.keywords
           ),
           dataSetCommit( // simulating dataset modification
             committedDate = CommittedDate(addedToProject.date.value).shiftToFuture
@@ -222,7 +231,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             maybeDatasetPublishedDate = dataset.published.maybeDate,
             datasetCreatedDate        = DateCreated(addedToProject.date.value),
             datasetCreators           = dataset.published.creators map toPerson,
-            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+            datasetKeywords           = dataset.keywords
           ),
           randomDataSetCommit
         )
@@ -230,7 +240,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
           dataset.copy(
             parts    = dataset.parts.sorted,
-            projects = List(DatasetProject(project.path, project.name, addedToProject))
+            projects = List(DatasetProject(project.path, project.name, addedToProject)),
+            keywords = dataset.keywords.sorted
           )
         )
       }
@@ -256,7 +267,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             maybeDatasetPublishedDate = dataset.published.maybeDate,
             datasetCreatedDate        = DateCreated(addedToProject.date.value),
             datasetCreators           = dataset.published.creators map toPerson,
-            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+            datasetKeywords           = dataset.keywords
           ),
           dataSetCommit( // simulating dataset modification
             committedDate = CommittedDate(addedToProject.date.value).shiftToFuture
@@ -273,7 +285,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             maybeDatasetPublishedDate = dataset.published.maybeDate,
             datasetCreatedDate        = DateCreated(addedToProject.date.value),
             datasetCreators           = dataset.published.creators map toPerson,
-            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+            datasetKeywords           = dataset.keywords
           ),
           randomDataSetCommit
         )
@@ -282,7 +295,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           dataset.copy(
             sameAs   = dataset.entityId.asSameAs,
             parts    = dataset.parts.sorted,
-            projects = List(DatasetProject(project.path, project.name, addedToProject))
+            projects = List(DatasetProject(project.path, project.name, addedToProject)),
+            keywords = dataset.keywords.sorted
           )
         )
       }
@@ -316,7 +330,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             ),
             dataSetCommit( // to simulate adding the same data-set to another project
               commitId      = project2DatasetCommit,
@@ -334,7 +349,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             ),
             dataSetCommit( // to simulate forking project2
               commitId      = project2DatasetCommit,
@@ -352,7 +368,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             )
           )
 
@@ -363,7 +380,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
                 DatasetProject(project1.path, project1.name, addedToProject1),
                 DatasetProject(project2.path, project2.name, addedToProject2),
                 DatasetProject(project2Fork.path, project2Fork.name, addedToProject2)
-              ).sorted
+              ).sorted,
+              keywords = dataset.keywords.sorted
             )
           )
       }
@@ -399,7 +417,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             ),
             dataSetCommit( // to simulate adding first project's data-set to another project
               commitId      = project2DatasetCommit,
@@ -417,7 +436,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             ),
             dataSetCommit( // to simulate forking project2
               commitId      = project2DatasetCommit,
@@ -435,7 +455,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             )
           )
 
@@ -447,7 +468,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
                 DatasetProject(project1.path, project1.name, addedToProject1),
                 DatasetProject(project2.path, project2.name, addedToProject2),
                 DatasetProject(project2Fork.path, project2Fork.name, addedToProject2)
-              ).sorted
+              ).sorted,
+              keywords = dataset.keywords.sorted
             )
           )
       }
@@ -475,7 +497,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             ),
             dataSetCommit(
               commitId      = commitId,
@@ -493,7 +516,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             )
           )
 
@@ -504,7 +528,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               projects = List(
                 DatasetProject(sourceProject.path, sourceProject.name, addedToProject),
                 DatasetProject(forkProject.path, forkProject.name, addedToProject)
-              ).sorted
+              ).sorted,
+              keywords = dataset.keywords.sorted
             )
           )
       }
@@ -532,7 +557,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             ),
             dataSetCommit(
               commitId      = commitId,
@@ -550,7 +576,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             )
           )
 
@@ -560,7 +587,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               projects = List(
                 DatasetProject(sourceProject.path, sourceProject.name, addedToProject),
                 DatasetProject(forkProject.path, forkProject.name, addedToProject)
-              ).sorted
+              ).sorted,
+              keywords = dataset.keywords.sorted
             )
           )
       }
@@ -587,7 +615,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             maybeDatasetDescription   = dataset.maybeDescription,
             maybeDatasetPublishedDate = dataset.published.maybeDate,
             datasetCreators           = dataset.published.creators map toPerson,
-            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+            datasetKeywords           = dataset.keywords
           )
           val parentProjectDataSet = dataSetCommit(
             commitId      = commitId,
@@ -605,7 +634,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             maybeDatasetDescription   = dataset.maybeDescription,
             maybeDatasetPublishedDate = dataset.published.maybeDate,
             datasetCreators           = dataset.published.creators map toPerson,
-            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+            datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+            datasetKeywords           = dataset.keywords
           )
           loadToStore(
             grandparentProjectDataSet,
@@ -626,7 +656,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               maybeDatasetDescription   = dataset.maybeDescription,
               maybeDatasetPublishedDate = dataset.published.maybeDate,
               datasetCreators           = dataset.published.creators map toPerson,
-              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation))
+              datasetParts              = dataset.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataset.keywords
             )
           )
 
@@ -638,7 +669,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
                 DatasetProject(grandparentProject.path, grandparentProject.name, addedToProject),
                 DatasetProject(parentProject.path, parentProject.name, addedToProject),
                 DatasetProject(childProject.path, childProject.name, addedToProject)
-              ).sorted
+              ).sorted,
+              keywords = dataset.keywords.sorted
             )
           )
       }
@@ -677,7 +709,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset1Project,
             dataset2Project,
             dataset3Project
-          ).sorted
+          ).sorted,
+          keywords = dataset1.keywords.sorted
         )
       )
     }
@@ -713,7 +746,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset1Project,
             dataset2Project,
             dataset3Project
-          ).sorted
+          ).sorted,
+          keywords = dataset1.keywords.sorted
         )
       )
     }
@@ -750,7 +784,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset1Project,
             dataset2Project,
             dataset3Project
-          ).sorted
+          ).sorted,
+          keywords = dataset2.keywords.sorted
         )
       )
     }
@@ -787,7 +822,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset1Project,
             dataset2Project,
             dataset3Project
-          ).sorted
+          ).sorted,
+          keywords = dataset3.keywords.sorted
         )
       )
     }
@@ -823,7 +859,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset1Project,
             dataset2Project,
             dataset3Project
-          ).sorted
+          ).sorted,
+          keywords = dataset1.keywords.sorted
         )
       )
     }
@@ -886,7 +923,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           maybeDatasetPublishedDate = dataSet.published.maybeDate,
           datasetCreatedDate        = DateCreated(project.created.date.value),
           datasetCreators           = dataSet.published.creators map toPerson,
-          datasetParts              = dataSet.parts.map(part => (part.name, part.atLocation))
+          datasetParts              = dataSet.parts.map(part => (part.name, part.atLocation)),
+          datasetKeywords           = dataSet.keywords
         )
       case _ => fail("Not prepared to work datasets having multiple projects")
     }
@@ -899,4 +937,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
 
   private implicit lazy val projectsAlphabeticalOrdering: Ordering[DatasetProject] =
     (project1: DatasetProject, project2: DatasetProject) => project1.name.value compareTo project2.name.value
+
+  private implicit lazy val keywordsAlphabeticalOrdering: Ordering[Keyword] =
+    (keyword1: Keyword, keyword2: Keyword) => keyword1.value compareTo keyword2.value
+
 }
