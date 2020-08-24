@@ -48,12 +48,12 @@ object RDFStore {
       import org.apache.jena.graph.NodeFactory
       import org.apache.jena.query.DatasetFactory
       import org.apache.jena.query.text.{EntityDefinition, TextDatasetFactory, TextIndexConfig}
-      import org.apache.lucene.store.RAMDirectory
 
       val entityDefinition: EntityDefinition = {
         val definition = new EntityDefinition("uri", "name")
         definition.setPrimaryPredicate(NodeFactory.createURI("http://schema.org/name"))
         definition.set("description", NodeFactory.createURI("http://schema.org/description"))
+        definition.set("alternateName", NodeFactory.createURI("http://schema.org/alternateName"))
         definition
       }
 

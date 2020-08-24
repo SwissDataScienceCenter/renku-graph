@@ -25,10 +25,10 @@ import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PartLocation, PartName, PublishedDate, SameAs, Title, Url}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Keyword, Name, PartLocation, PartName, PublishedDate, SameAs, Title, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path, SchemaVersion}
-import ch.datascience.graph.model.{CliVersion, datasets, projects}
+import ch.datascience.graph.model.{CliVersion, GraphModelGenerators, datasets, projects}
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream
 import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
 import ch.datascience.rdfstore.entities.CommandParameter._
@@ -105,7 +105,8 @@ object bundles extends Schemas {
       maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
       datasetCreatedDate:        datasets.DateCreated = datasets.DateCreated(committedDate.value),
       datasetCreators:           Set[Person] = setOf(persons).generateOne,
-      datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne
+      datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      datasetKeywords:           List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne
   )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = {
     val project =
       Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion)
@@ -129,7 +130,8 @@ object bundles extends Schemas {
             datasetCreators,
             datasetParts.map {
               case (name, location) => DataSetPart.factory(name, location, None)(_)
-            }
+            },
+            datasetKeywords
           )
         )
       )

@@ -4,7 +4,7 @@ branches:
     - master
     - "/(^hotfix-\\d+\\.\\d+(\\.\\d+)?$)|(^\\d+\\.\\d+\\.\\d+$)/"
 language: scala
-jdk: openjdk12
+jdk: openjdk11
 scala:
   - 2.12.11
 cache:

@@ -189,6 +189,10 @@ Response body example:
         }
       }
     }
+  ],
+  keywords: [
+    "rldzpwo",
+    "gfioui"
   ]
 }
 ```

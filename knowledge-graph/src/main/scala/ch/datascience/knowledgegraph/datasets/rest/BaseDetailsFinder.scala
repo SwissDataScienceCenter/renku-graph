@@ -21,11 +21,12 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.Identifier
+import ch.datascience.graph.model.datasets.{Identifier, Keyword}
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Decoder.decodeList
 import io.circe.HCursor
 
 import scala.concurrent.ExecutionContext
@@ -54,7 +55,7 @@ private class BaseDetailsFinder(
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
       "PREFIX schema: <http://schema.org/>"
     ),
-    s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?alternateName ?url (?topmostSameAs AS ?sameAs) ?description ?publishedDate
+    s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?alternateName ?url (?topmostSameAs AS ?sameAs) ?description ?publishedDate 
         |WHERE {
         |  {
         |    SELECT ?topmostSameAs
@@ -103,6 +104,22 @@ private class BaseDetailsFinder(
         |""".stripMargin
   )
 
+  def findKeywords(identifier: Identifier): IO[List[Keyword]] =
+    queryExpecting[List[Keyword]](using = queryKeywords(identifier)).flatMap(s => ME.pure(s))
+
+  private def queryKeywords(identifier: Identifier) = SparqlQuery(
+    name = "ds by id - keyword details",
+    Set(
+      "PREFIX schema: <http://schema.org/>"
+    ),
+    s"""|SELECT DISTINCT ?keyword
+        |WHERE {
+        |    ?datasetId schema:identifier "$identifier" ;
+        |               schema:keywords ?keyword .
+        |}ORDER BY ASC(?keyword)
+        |""".stripMargin
+  )
+
   private lazy val toSingleDataset: List[Dataset] => IO[Option[Dataset]] = {
     case Nil            => ME.pure(None)
     case dataset +: Nil => ME.pure(Some(dataset))
@@ -111,13 +128,13 @@ private class BaseDetailsFinder(
 }
 
 private object BaseDetailsFinder {
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe.Decoder
 
   private[rest] implicit val maybeRecordDecoder: Decoder[List[Dataset]] = {
     import Decoder._
     import ch.datascience.graph.model.datasets._
     import ch.datascience.knowledgegraph.datasets.model._
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
     def extract[T](property: String, from: HCursor)(implicit decoder: Decoder[T]): Result[T] =
       from.downField(property).downField("value").as[T]
@@ -143,10 +160,22 @@ private object BaseDetailsFinder {
         maybeDescription,
         DatasetPublishing(maybePublishedDate, Set.empty),
         parts    = List.empty,
-        projects = List.empty
+        projects = List.empty,
+        keywords = List.empty
       )
     }
 
     _.downField("results").downField("bindings").as(decodeList(dataset))
+  }
+
+  private implicit val keywordsDecoder: Decoder[List[Keyword]] = {
+
+    implicit val keywordDecoder: Decoder[Keyword] = { cursor =>
+      for {
+        keywordString <- cursor.downField("keyword").downField("value").as[String]
+      } yield Keyword(keywordString)
+    }
+
+    _.downField("results").downField("bindings").as(decodeList[Keyword])
   }
 }

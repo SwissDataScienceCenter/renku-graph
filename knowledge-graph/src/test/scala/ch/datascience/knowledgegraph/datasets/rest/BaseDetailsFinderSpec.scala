@@ -37,6 +37,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
   private implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
   import BaseDetailsFinder._
+  import io.circe.syntax._
 
   "dataset decoder" should {
 
@@ -51,6 +52,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
               .copy(maybeDescription = None)
               .copy(parts = Nil)
               .copy(projects = Nil)
+              .copy(keywords = Nil)
           )
         }
       }
@@ -69,7 +71,8 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
           "publishedDate": {"value": ${publishedDate.value}},
           "description": {"value": $blank},
           "url": {"value": $blank},
-          "sameAs": {"value": $blank}
+          "sameAs": {"value": $blank},
+          "keywords": {"value": ${dataset.keywords.map(_.value).asJson}}
         }
       ]
     }
