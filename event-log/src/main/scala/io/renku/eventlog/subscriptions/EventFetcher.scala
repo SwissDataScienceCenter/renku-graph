@@ -31,7 +31,6 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import doobie.free.connection.ConnectionOp
 import doobie.implicits._
-import doobie.implicits.javatime._
 import doobie.util.fragments._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus._
