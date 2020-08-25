@@ -122,7 +122,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
   private trait TestCase {
     val subscriberUrl = subscriberUrls.generateOne
 
-    val subscriptions   = mock[TestIOSubscriptions]
+    val subscriptions   = mock[Subscriptions[IO]]
     val logger          = TestLogger[IO]()
     val addSubscription = new SubscriptionsEndpoint[IO](subscriptions, logger).addSubscription _
   }

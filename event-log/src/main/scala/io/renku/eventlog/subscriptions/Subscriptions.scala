@@ -21,28 +21,43 @@ package io.renku.eventlog.subscriptions
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.MonadError
+import cats.effect.{ContextShift, IO, Timer}
 import cats.effect.concurrent.Ref
 import cats.implicits._
 import io.chrisdavenport.log4cats.Logger
 
-import scala.language.higherKinds
+import scala.concurrent.duration._
+import scala.language.{higherKinds, postfixOps}
 
-class Subscriptions[Interpretation[_]] private[subscriptions] (
-    currentUrl: Ref[Interpretation, Option[SubscriberUrl]],
-    logger:     Logger[Interpretation]
-)(implicit ME:  MonadError[Interpretation, Throwable]) {
+trait Subscriptions[Interpretation[_]] {
+  def add(subscriberUrl: SubscriberUrl): Interpretation[Unit]
+  def nextFree: Interpretation[Option[SubscriberUrl]]
+  def isNext:   Interpretation[Boolean]
+  def hasOtherThan(url: SubscriberUrl): Interpretation[Boolean]
+  def getAll: Interpretation[List[SubscriberUrl]]
+  def remove(subscriberUrl:   SubscriberUrl): Interpretation[Unit]
+  def markBusy(subscriberUrl: SubscriberUrl): Interpretation[Unit]
+}
+
+class SubscriptionsImpl private[subscriptions] (
+    currentUrl: Ref[IO, Option[SubscriberUrl]],
+    logger:     Logger[IO],
+    busySleep:  FiniteDuration
+)(implicit ME:  MonadError[IO, Throwable], contextShift: ContextShift[IO], timer: Timer[IO])
+    extends Subscriptions[IO] {
+
   import scala.collection.JavaConverters._
 
   private val subscriptionsPool = new ConcurrentHashMap[SubscriberUrl, Unit]()
 
-  def add(subscriberUrl: SubscriberUrl): Interpretation[Unit] = ME.catchNonFatal {
+  override def add(subscriberUrl: SubscriberUrl): IO[Unit] = ME.catchNonFatal {
     val present = subscriptionsPool.containsKey(subscriberUrl)
     subscriptionsPool.putIfAbsent(subscriberUrl, ())
     if (!present) logger.info(s"$subscriberUrl added")
     ()
   }
 
-  def next: Interpretation[Option[SubscriberUrl]] = {
+  override def nextFree: IO[Option[SubscriberUrl]] = {
 
     def replaceCurrentUrl(maybeUrl: Option[SubscriberUrl]) = currentUrl.set(maybeUrl) map (_ => maybeUrl)
 
@@ -61,27 +76,48 @@ class Subscriptions[Interpretation[_]] private[subscriptions] (
     }
   }
 
-  def isNext: Interpretation[Boolean] = (!subscriptionsPool.isEmpty).pure[Interpretation]
+  override def isNext: IO[Boolean] = (!subscriptionsPool.isEmpty).pure[IO]
 
-  def hasOtherThan(url: SubscriberUrl): Interpretation[Boolean] = getAll map (_.exists(_ != url))
+  override def hasOtherThan(url: SubscriberUrl): IO[Boolean] = getAll map (_.exists(_ != url))
 
-  def getAll: Interpretation[List[SubscriberUrl]] = ME.catchNonFatal {
+  override def getAll: IO[List[SubscriberUrl]] = ME.catchNonFatal {
     subscriptionsPool.keys().asScala.toList
   }
 
-  def remove(subscriberUrl: SubscriberUrl): Interpretation[Unit] = ME.catchNonFatal {
+  override def remove(subscriberUrl: SubscriberUrl): IO[Unit] = ME.catchNonFatal {
     val present = subscriptionsPool.containsKey(subscriberUrl)
     subscriptionsPool remove subscriberUrl
     if (present) logger.info(s"$subscriberUrl removed")
     ()
   }
+
+  override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =
+    for {
+      _ <- remove(subscriberUrl)
+      _ <- currentUrl.get flatMap {
+            case Some(`subscriberUrl`) => currentUrl.set(None)
+            case _                     => IO.unit
+          }
+      _ <- waitAndAdd(subscriberUrl).start
+    } yield ()
+
+  private def waitAndAdd(subscriberUrl: SubscriberUrl): IO[Unit] =
+    for {
+      _ <- timer sleep busySleep
+      _ <- add(subscriberUrl)
+    } yield ()
 }
 
 object Subscriptions {
   import cats.effect.IO
 
-  def apply(logger: Logger[IO]): IO[Subscriptions[IO]] =
+  private val busySleep: FiniteDuration = 1 second
+
+  def apply(
+      logger:              Logger[IO],
+      busySleep:           FiniteDuration = Subscriptions.busySleep
+  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[Subscriptions[IO]] =
     for {
       currentUrl <- Ref.of[IO, Option[SubscriberUrl]](None)
-    } yield new Subscriptions[IO](currentUrl, logger)
+    } yield new SubscriptionsImpl(currentUrl, logger, busySleep)
 }

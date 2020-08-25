@@ -49,6 +49,7 @@ class EventsDispatcher(
 )(implicit timer:         Timer[IO]) {
 
   import eventsSender._
+  import subscriptions._
   import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
 
   def run: IO[Unit] = waitForSubscriptions(andThen = popEvent)
@@ -74,14 +75,14 @@ class EventsDispatcher(
       }
 
   private def dispatch(id: CompoundEventId, body: EventBody): IO[Unit] =
-    subscriptions.next flatMap {
+    subscriptions.nextFree flatMap {
       case Some(url) => {
         for {
           result <- sendEvent(url, id, body)
           _      <- logStatement(result, url, id)
           _ <- result match {
                 case Delivered    => IO.unit
-                case ServiceBusy  => reDispatch(id, body, url)
+                case ServiceBusy  => markBusy(url) flatMap (_ => reDispatch(id, body, url))
                 case Misdelivered => removeUrlAndRollback(id, body, url)
               }
         } yield ()
@@ -93,7 +94,7 @@ class EventsDispatcher(
 
   private def logStatement(result: SendingResult, url: SubscriberUrl, id: CompoundEventId): IO[Unit] = result match {
     case result @ Delivered    => logger.info(s"Event $id, url = $url -> $result")
-    case result @ ServiceBusy  => IO.unit
+    case ServiceBusy           => IO.unit
     case result @ Misdelivered => logger.error(s"Event $id, url = $url -> $result")
   }
 
