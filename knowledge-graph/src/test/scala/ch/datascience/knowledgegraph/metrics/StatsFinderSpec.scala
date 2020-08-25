@@ -21,19 +21,17 @@ package ch.datascience.knowledgegraph.metrics
 import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{listOf, nonBlankStrings, nonEmptyList, nonEmptyStrings, setOf}
+import ch.datascience.generators.Generators.{nonBlankStrings, nonEmptyList, nonEmptyStrings}
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
-import ch.datascience.graph.model.datasets
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasetProjects
-import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetProject}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
-import ch.datascience.rdfstore.entities.bundles.{generateProject, renkuBaseUrl}
-import ch.datascience.rdfstore.entities.{Activity, Agent, Association, DataSet, Generation, ProcessRun, Project, RunPlan, WorkflowFile, WorkflowRun}
+import ch.datascience.rdfstore.entities._
+import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
@@ -42,101 +40,65 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
+
   "entitiesCount" should {
+
     "return zero if there are no entity in the DB" in new TestCase {
       stats.entitiesCount.unsafeRunSync() shouldBe KGEntityType.all.map(entityType => entityType -> 0).toMap
     }
 
     "return info about number of objects by types" in new TestCase {
-      implicit class MapOps(entitiesByType: Map[KGEntityType, List[JsonLD]]) {
-        def update(entityType: KGEntityType, entities: List[JsonLD]) =
-          entitiesByType
-            .updated(entityType, entitiesByType.getOrElse(entityType, List.empty[JsonLD]) ++: entities)
-      }
 
-      val datasetProject = nonEmptyList(datasetProjects).generateOne
-      val entitiesToStore = datasetProject.toList.foldLeft(Map.empty[KGEntityType, List[JsonLD]]) {
-        case (entitiesByType, datasetProject) =>
-          val project          = generateProject(datasetProject.path)
-          val commitActivities = listOf(datasetsWithActivity(datasetProject, project)).generateOne
-          val processRuns      = listOf(processRunsJsonLDs(project)).generateOne
-          val workflowRuns = commitActivities.headOption match {
-            case Some(activity) =>
-              listOf(
-                workflowJsonLDs(project, activity)
-              ).generateOne
-            case None => List.empty[JsonLD]
-          }
+      val entitiesByType = Map.empty[KGEntityType, Int]
 
-          entitiesByType
-            .update(KGEntityType.Dataset, commitActivities.map(_.asJsonLD))
-            .update(KGEntityType.ProcessRun, processRuns)
-            .update(KGEntityType.WorkflowRun, workflowRuns)
-      }
+      val datasetsJsons = nonEmptyList(datasetsWithActivities).generateOne.toList
+      val entitiesWithDatasets = entitiesByType
+        .update(KGEntityType.Project, datasetsJsons.size)
+        .update(KGEntityType.Activity, datasetsJsons.size)
+        .update(KGEntityType.Dataset, datasetsJsons.size)
 
-      loadToStore(entitiesToStore.values.flatten.toList: _*)
+      val processRunsJsons = nonEmptyList(processRuns).generateOne.toList
+      val entitiesWithProcessRuns = entitiesWithDatasets
+        .update(KGEntityType.Project, processRunsJsons.size)
+        .update(KGEntityType.Activity, processRunsJsons.size)
+        .update(KGEntityType.ProcessRun, processRunsJsons.size)
 
-      private val numberOfDatasetCommits:  Long = entitiesToStore(KGEntityType.Dataset).size
-      private val numberOfWorkflowRuns:    Long = entitiesToStore(KGEntityType.WorkflowRun).size
-      private val numberOfProcessRuns:     Long = entitiesToStore(KGEntityType.ProcessRun).size + numberOfWorkflowRuns
-      private val totalNumberOfActivities: Long = numberOfDatasetCommits + numberOfProcessRuns
+      val workflowsJsons = nonEmptyList(workflows).generateOne.toList
+      val entitiesWithWorkflows = entitiesWithProcessRuns
+        .update(KGEntityType.Project, workflowsJsons.size)
+        .update(KGEntityType.Activity, workflowsJsons.size)
+        .update(KGEntityType.ProcessRun, workflowsJsons.size)
+        .update(KGEntityType.WorkflowRun, workflowsJsons.size)
 
-      stats.entitiesCount.unsafeRunSync() shouldBe Map[KGEntityType, Long](
-        KGEntityType.Dataset     -> numberOfDatasetCommits,
-        KGEntityType.Project     -> datasetProject.size.toLong,
-        KGEntityType.ProcessRun  -> numberOfProcessRuns,
-        KGEntityType.WorkflowRun -> numberOfWorkflowRuns,
-        KGEntityType.Activity    -> totalNumberOfActivities
-      )
+      loadToStore(datasetsJsons ++ processRunsJsons ++ workflowsJsons: _*)
+
+      stats.entitiesCount.unsafeRunSync() shouldBe entitiesWithWorkflows
     }
-
   }
 
-  trait TestCase {
-    private val logger        = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val stats =
-      new StatsFinderImpl(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(executionTimeRecorder))
-  }
-
-  import eu.timepit.refined.auto._
-
-  private def datasetsWithActivity(datasetProjects: DatasetProject, project: Project): Gen[Activity] =
-    for {
-      dataset <- DatasetsGenerators.datasets
-    } yield toDataSetCommit(dataset.copy(projects = List(datasetProjects)), project)
-
-  private def toDataSetCommit(dataSet: Dataset, project: Project): Activity = {
-
-    val committedDate = committedDates.generateOne
-    Activity(
-      commitIds.generateOne,
-      committedDate,
-      persons.generateOne,
-      project,
-      Agent(cliVersions.generateOne),
-      maybeGenerationFactories = List(
-        Generation.factory(
-          DataSet.factory(
-            dataSet.id,
-            dataSet.title,
-            dataSet.name,
-            dataSet.maybeUrl,
-            createdDate    = datasets.DateCreated(committedDate.value),
-            creators       = setOf(persons).generateOne,
-            partsFactories = List()
-          )
-        )
-      )
+  private trait TestCase {
+    private val logger = TestLogger[IO]()
+    val stats = new StatsFinderImpl(
+      rdfStoreConfig,
+      logger,
+      new SparqlQueryTimeRecorder(TestExecutionTimeRecorder[IO](logger))
     )
   }
 
-  private def processRunsJsonLDs(project: Project): Gen[JsonLD] =
+  private lazy val datasetsWithActivities: Gen[JsonLD] =
     for {
-      commitId   <- commitIds
-      commitDate <- committedDates
-      committer  <- persons
-      cliVersion <- cliVersions
+      datasetId   <- datasetIdentifiers
+      projectPath <- projectPaths
+      projectName <- projectNames
+    } yield dataSetCommit()(projectPath, projectName)(datasetId)
+
+  private lazy val processRuns: Gen[JsonLD] =
+    for {
+      projectPath <- projectPaths
+      commitId    <- commitIds
+      commitDate  <- committedDates
+      committer   <- persons
+      cliVersion  <- cliVersions
       agent = Agent(cliVersion)
       comment      <- nonEmptyStrings()
       workflowFile <- nonBlankStrings()
@@ -145,7 +107,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         commitId,
         commitDate,
         committer,
-        project,
+        generateProject(projectPath),
         agent,
         comment,
         None,
@@ -161,33 +123,42 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
       )
       .asJsonLD
 
-  private def workflowJsonLDs(project: Project, activity: Activity) =
+  private lazy val workflows =
     for {
-      commitId   <- commitIds
-      commitDate <- committedDates
-      committer  <- persons
-      cliVersion <- cliVersions
+      projectPath          <- projectPaths
+      workflowCommitId     <- commitIds
+      workflowCommitDate   <- committedDates
+      informedByCommitId   <- commitIds
+      informedByCommitDate <- committedDates
+      committer            <- persons
+      cliVersion           <- cliVersions
       agent = Agent(cliVersion)
       comment <- nonEmptyStrings()
-    } yield WorkflowRun(
-      commitId,
-      commitDate,
-      committer,
-      project,
-      agent,
-      comment = comment,
-      WorkflowFile.yaml("renku-update.yaml"),
-      informedBy = activity,
-      associationFactory = Association.workflow(
-        agent.copy(cliVersion = cliVersions.generateOne),
-        RunPlan.workflow(
-          inputs       = List(),
-          outputs      = List(),
-          subprocesses = List()
-        )
-      ),
-      processRunsFactories = List(),
-      maybeInvalidation    = None
-    ).asJsonLD
+    } yield {
+      val project = generateProject(projectPath)
+      WorkflowRun(
+        workflowCommitId,
+        workflowCommitDate,
+        committer,
+        project,
+        agent,
+        comment = comment,
+        WorkflowFile.yaml("renku-update.yaml"),
+        informedBy = Activity(informedByCommitId, informedByCommitDate, committer, project, Agent(cliVersion)),
+        associationFactory = Association.workflow(
+          agent.copy(cliVersion = cliVersions.generateOne),
+          RunPlan.workflow(
+            inputs       = List(),
+            outputs      = List(),
+            subprocesses = List()
+          )
+        ),
+        processRunsFactories = List()
+      ).asJsonLD
+    }
 
+  private implicit class MapOps(entitiesByType: Map[KGEntityType, Int]) {
+    def update(entityType: KGEntityType, entities: Int): Map[KGEntityType, Int] =
+      entitiesByType.updated(entityType, entitiesByType.getOrElse(entityType, 0) + entities)
+  }
 }

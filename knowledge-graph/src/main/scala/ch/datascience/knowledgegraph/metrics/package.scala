@@ -44,7 +44,7 @@ package object metrics {
     }
 
     final case object ProcessRun extends KGEntityType {
-      override val value: String = "Process run"
+      override val value: String = "ProcessRun"
       val rdfType = "http://purl.org/wf4ever/wfprov#ProcessRun"
     }
 
