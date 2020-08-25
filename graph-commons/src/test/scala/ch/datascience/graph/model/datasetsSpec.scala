@@ -18,12 +18,14 @@
 
 package ch.datascience.graph.model
 
-import GraphModelGenerators.datasetSameAs
+import GraphModelGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.tinytypes.UrlTinyType
 import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath}
+import io.renku.jsonld.EntityId
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -81,6 +83,78 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
       forAll { sameAs: SameAs =>
         SameAs.fromId(sameAs.value).map(_.hashCode()) shouldBe SameAs.from(sameAs.value).map(_.hashCode())
       }
+    }
+  }
+
+  "SameAs.fromId" should {
+
+    "return an instance of IdSameAs" in {
+      val sameAs = datasetSameAs.generateOne
+
+      val Right(instance) = SameAs.fromId(sameAs.value)
+
+      instance       shouldBe an[IdSameAs]
+      instance.value shouldBe sameAs.value
+    }
+  }
+
+  "SameAs.from" should {
+
+    "return an instance of UrlSameAs" in {
+      val sameAs = datasetSameAs.generateOne
+
+      val Right(instance) = SameAs.from(sameAs.value)
+
+      instance       shouldBe an[UrlSameAs]
+      instance.value shouldBe sameAs.value
+    }
+  }
+
+  "SameAs.apply(EntityId)" should {
+
+    "return an instance of IdSameAs" in {
+      val entityId = EntityId.of(httpUrls().generateOne)
+
+      val instance = SameAs(entityId)
+
+      instance       shouldBe an[IdSameAs]
+      instance.value shouldBe entityId.value
+    }
+  }
+
+  "SameAs jsonLdEncoder" should {
+
+    import SameAs._
+
+    "serialise IdSameAs to an object having url property linked to the SameAs's value" in {
+      val sameAs = datasetIdSameAs.generateOne
+
+      val json = sameAsJsonLdEncoder(sameAs).toJson
+
+      json.hcursor.downField("@type").as[String]                                    shouldBe Right((schema / "URL").toString)
+      json.hcursor.downField((schema / "url").toString).downField("@id").as[String] shouldBe Right(sameAs.toString)
+    }
+
+    "serialise UrlSameAs to an object having url property as the SameAs's value" in {
+      val sameAs = datasetUrlSameAs.generateOne
+
+      val json = sameAsJsonLdEncoder(sameAs).toJson
+
+      json.hcursor.downField("@type").as[String]                                       shouldBe Right((schema / "URL").toString)
+      json.hcursor.downField((schema / "url").toString).downField("@value").as[String] shouldBe Right(sameAs.toString)
+    }
+  }
+
+  "derivedFrom jsonLdEncoder" should {
+
+    import DerivedFrom._
+
+    "serialise derivedFrom to an object having url property linked to the DerivedFrom's value" in {
+      val derivedFrom = datasetDerivedFroms.generateOne
+
+      val json = derivedFromJsonLdEncoder(derivedFrom).toJson
+
+      json.hcursor.downField("@id").as[String] shouldBe Right(derivedFrom.toString)
     }
   }
 }

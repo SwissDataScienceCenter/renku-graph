@@ -22,6 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.CommonGraphGenerators.rdfStoreConfigs
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{FusekiBaseUrl, SparqlQueryTimeRecorder}
@@ -123,7 +124,7 @@ class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with 
         post(s"/${rdfStoreConfig.datasetName}/update")
           .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
-          .withRequestBody(equalTo(s"update=${forUpdate.query}"))
+          .withRequestBody(equalTo(s"update=${urlEncode(forUpdate.query.toString)}"))
           .willReturn(returning)
       }
   }

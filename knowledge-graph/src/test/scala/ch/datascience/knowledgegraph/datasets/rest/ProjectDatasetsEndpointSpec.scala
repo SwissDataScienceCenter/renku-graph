@@ -31,6 +31,7 @@ import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
+import ch.datascience.knowledgegraph.datasets.rest.ProjectDatasetsFinder.SameAsOrDerived
 import ch.datascience.logging.TestExecutionTimeRecorder
 import io.circe.Json
 import io.circe.literal._
@@ -127,8 +128,8 @@ class ProjectDatasetsEndpointSpec
       logger
     ).getProjectDatasets _
 
-    lazy val toJson: ((Identifier, Title, Name, SameAs)) => Json = {
-      case (id, title, name, sameAs) =>
+    lazy val toJson: ((Identifier, Title, Name, SameAsOrDerived)) => Json = {
+      case (id, title, name, Left(sameAs)) =>
         json"""{
           "identifier": ${id.value},
           "title": ${title.value},
@@ -139,13 +140,24 @@ class ProjectDatasetsEndpointSpec
             "href": ${(renkuResourcesUrl / "datasets" / id).value}
           }]
         }"""
+      case (id, title, name, Right(derivedFrom)) =>
+        json"""{
+          "identifier": ${id.value},
+          "title": ${title.value},
+          "name": ${name.value},
+          "derivedFrom": ${derivedFrom.value},
+          "_links": [{
+            "rel": "details",
+            "href": ${(renkuResourcesUrl / "datasets" / id).value}
+          }]
+        }"""
     }
   }
 
-  private implicit val datasetBasicDetails: Gen[(Identifier, Title, Name, SameAs)] = for {
-    id     <- datasetIdentifiers
-    title  <- datasetTitles
-    name   <- datasetNames
-    sameAs <- datasetSameAs
-  } yield (id, title, name, sameAs)
+  private implicit lazy val datasetBasicDetails: Gen[(Identifier, Title, Name, SameAsOrDerived)] = for {
+    id                      <- datasetIdentifiers
+    title                   <- datasetTitles
+    name                    <- datasetNames
+    sameAsEitherDerivedFrom <- Gen.oneOf(datasetSameAs map (Left(_)), datasetDerivedFroms map (Right(_)))
+  } yield (id, title, name, sameAsEitherDerivedFrom)
 }

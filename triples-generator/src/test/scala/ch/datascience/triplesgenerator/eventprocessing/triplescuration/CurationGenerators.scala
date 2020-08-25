@@ -20,9 +20,10 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
 import ch.datascience.generators.Generators._
-import ch.datascience.rdfstore.SparqlQuery
+import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
 import eu.timepit.refined.auto._
+import io.renku.jsonld.JsonLD
 import org.scalacheck.Gen
 
 object CurationGenerators {
@@ -36,6 +37,11 @@ object CurationGenerators {
       triples <- jsonLDTriples
       updates <- updatesGenerator
     } yield CuratedTriples(triples, updates)
+
+  def curatedTriplesObjects(triples: JsonLD): Gen[CuratedTriples] =
+    for {
+      updates <- nonEmptyList(curationUpdates)
+    } yield CuratedTriples(JsonLDTriples(List(triples.toJson)), updates.toList)
 
   implicit lazy val curationUpdates: Gen[Update] = for {
     name    <- nonBlankStrings(minLength = 5)

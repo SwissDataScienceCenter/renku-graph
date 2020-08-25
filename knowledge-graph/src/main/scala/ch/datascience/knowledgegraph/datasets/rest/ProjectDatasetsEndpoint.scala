@@ -24,9 +24,8 @@ import ch.datascience.config.renku
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs, Title}
+import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, Name, SameAs, Title}
 import ch.datascience.graph.model.projects
-import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
@@ -48,6 +47,7 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     logger:                Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
+  import ProjectDatasetsFinder.SameAsOrDerived
   import executionTimeRecorder._
   import org.http4s.circe._
 
@@ -72,17 +72,25 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
     case response if response.status == Ok => s"Finding '$projectPath' datasets finished"
   }
 
-  private implicit val datasetEncoder: Encoder[(Identifier, Title, Name, SameAs)] =
-    Encoder.instance[(Identifier, Title, Name, SameAs)] {
-      case (id, title, name, sameAs) =>
+  private implicit val sameAsOrDerivedEncoder: Encoder[SameAsOrDerived] = Encoder.instance[SameAsOrDerived] {
+    case Left(sameAs:       SameAs)      => json"""{"sameAs": ${sameAs.toString}}"""
+    case Right(derivedFrom: DerivedFrom) => json"""{"derivedFrom": ${derivedFrom.toString}}"""
+  }
+
+  private implicit val datasetEncoder: Encoder[(Identifier, Title, Name, SameAsOrDerived)] =
+    Encoder.instance[(Identifier, Title, Name, SameAsOrDerived)] {
+      case (id, title, name, sameAsOrDerived) =>
         json"""{
           "identifier": ${id.toString},
           "title": ${title.toString},
-          "name": ${name.toString},
-          "sameAs": ${sameAs.toString}
-        }""" deepMerge _links(
-          Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))
-        )
+          "name": ${name.toString}
+        }"""
+          .deepMerge(sameAsOrDerived.asJson)
+          .deepMerge(
+            _links(
+              Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))
+            )
+          )
     }
 }
 

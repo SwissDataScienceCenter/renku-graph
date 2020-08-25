@@ -18,7 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.tinytypes.constraints.NonNegativeInt
+import ch.datascience.tinytypes.constraints.{NonNegativeInt, PathSegment}
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 
 final class Step private (val value: Int) extends AnyVal with IntTinyType

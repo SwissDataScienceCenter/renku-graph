@@ -20,13 +20,12 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.config.RenkuBaseUrl
+import cats.implicits._
 import ch.datascience.graph.model.datasets.{Identifier, Keyword}
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Decoder.decodeList
 import io.circe.HCursor
 
 import scala.concurrent.ExecutionContext
@@ -34,7 +33,6 @@ import scala.language.higherKinds
 
 private class BaseDetailsFinder(
     rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext,
@@ -46,60 +44,28 @@ private class BaseDetailsFinder(
   import BaseDetailsFinder._
 
   def findBaseDetails(identifier: Identifier): IO[Option[Dataset]] =
-    queryExpecting[List[Dataset]](using = query(identifier)) flatMap toSingleDataset
+    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier)) flatMap toSingleDataset
 
-  private def query(identifier: Identifier) = SparqlQuery(
-    name = "ds by id - base details",
+  private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery(
+    name = "ds by id - details",
     Set(
+      "PREFIX prov: <http://www.w3.org/ns/prov#>",
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
+      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
       "PREFIX schema: <http://schema.org/>"
     ),
-    s"""|SELECT DISTINCT ?datasetId ?identifier ?name ?alternateName ?url (?topmostSameAs AS ?sameAs) ?description ?publishedDate 
+    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?description ?publishedDate
         |WHERE {
-        |  {
-        |    SELECT ?topmostSameAs
-        |    WHERE {
-        |      {
-        |        ?l0 rdf:type <http://schema.org/Dataset>;
-        |            schema:identifier "$identifier"
-        |      } {
-        |        {
-        |          {
-        |            ?l0 schema:sameAs+/schema:url ?l1.
-        |            FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
-        |            BIND (?l1 AS ?topmostSameAs)
-        |          } UNION {
-        |            ?l0 rdf:type <http://schema.org/Dataset>.
-        |            FILTER NOT EXISTS { ?l0 schema:sameAs ?l1 }
-        |            BIND (?l0 AS ?topmostSameAs)
-        |          }
-        |        } UNION {
-        |          ?l0 schema:sameAs+/schema:url ?l1.
-        |          ?l1 schema:sameAs+/schema:url ?l2
-        |          FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
-        |          BIND (?l2 AS ?topmostSameAs)
-        |        } UNION {
-        |          ?l0 schema:sameAs+/schema:url ?l1.
-        |          ?l1 schema:sameAs+/schema:url ?l2.
-        |          ?l2 schema:sameAs+/schema:url ?l3
-        |          FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
-        |          BIND (?l3 AS ?topmostSameAs)
-        |        }
-        |      }
-        |    }
-        |    GROUP BY ?topmostSameAs
-        |    HAVING (COUNT(*) > 0)
-        |  } {
-        |    ?datasetId schema:identifier "$identifier" ;
-        |               schema:identifier ?identifier ;
-        |               rdf:type <http://schema.org/Dataset> ;
-        |               schema:name ?name ;
-        |               schema:alternateName ?alternateName .
-        |    OPTIONAL { ?datasetId schema:url ?url } .
-        |    OPTIONAL { ?datasetId schema:description ?description } .
-        |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate } .
-        |  }
+        |    ?datasetId schema:identifier "$identifier";
+        |               schema:identifier ?identifier;
+        |               rdf:type <http://schema.org/Dataset>;
+        |               schema:url ?url;
+        |               schema:name ?name;
+        |               schema:alternateName ?alternateName ;
+        |               renku:topmostSameAs/schema:url ?topmostSameAs .
+        |    OPTIONAL { ?datasetId prov:wasDerivedFrom ?maybeDerivedFrom }.
+        |    OPTIONAL { ?datasetId schema:description ?description }.
+        |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate }.
         |}
         |""".stripMargin
   )
@@ -121,48 +87,60 @@ private class BaseDetailsFinder(
   )
 
   private lazy val toSingleDataset: List[Dataset] => IO[Option[Dataset]] = {
-    case Nil            => ME.pure(None)
-    case dataset +: Nil => ME.pure(Some(dataset))
-    case datasets       => ME.raiseError(new RuntimeException(s"More than one dataset with ${datasets.head.id} id"))
+    case Nil            => Option.empty[Dataset].pure[IO]
+    case dataset +: Nil => Option(dataset).pure[IO]
+    case dataset +: _   => new Exception(s"More than one dataset with ${dataset.id} id").raiseError[IO, Option[Dataset]]
   }
 }
 
 private object BaseDetailsFinder {
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe.Decoder
+  import Decoder._
+  import ch.datascience.graph.model.datasets._
+  import ch.datascience.knowledgegraph.datasets.model._
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-  private[rest] implicit val maybeRecordDecoder: Decoder[List[Dataset]] = {
-    import Decoder._
-    import ch.datascience.graph.model.datasets._
-    import ch.datascience.knowledgegraph.datasets.model._
-
-    def extract[T](property: String, from: HCursor)(implicit decoder: Decoder[T]): Result[T] =
-      from.downField(property).downField("value").as[T]
-
-    val dataset: Decoder[Dataset] = { cursor =>
+  private[rest] implicit val datasetsDecoder: Decoder[List[Dataset]] = {
+    val dataset: Decoder[Dataset] = { implicit cursor =>
       for {
-        id                 <- extract[String]("datasetId", from = cursor)
-        identifier         <- extract[Identifier]("identifier", from = cursor)
-        title              <- extract[Title]("name", from = cursor)
-        name               <- extract[Name]("alternateName", from = cursor)
-        maybeUrl           <- extract[Option[String]]("url", from = cursor).map(blankToNone).flatMap(toOption[Url])
-        maybeSameAs        <- extract[Option[String]]("sameAs", from = cursor).map(blankToNone).flatMap(toOption[SameAs])
-        maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate", from = cursor)
-        maybeDescription <- extract[Option[String]]("description", from = cursor)
+        identifier         <- extract[Identifier]("identifier")
+        title              <- extract[Title]("name")
+        name               <- extract[Name]("alternateName")
+        url                <- extract[Url]("url")
+        maybeDerivedFrom   <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
+        sameAs             <- extract[SameAs]("topmostSameAs")
+        maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate")
+        maybeDescription <- extract[Option[String]]("description")
                              .map(blankToNone)
                              .flatMap(toOption[Description])
-      } yield Dataset(
-        identifier,
-        title,
-        name,
-        maybeSameAs getOrElse SameAs(id),
-        maybeUrl,
-        maybeDescription,
-        DatasetPublishing(maybePublishedDate, Set.empty),
-        parts    = List.empty,
-        projects = List.empty,
-        keywords = List.empty
-      )
+      } yield maybeDerivedFrom match {
+        case Some(derivedFrom) =>
+          ModifiedDataset(
+            identifier,
+            title,
+            name,
+            url,
+            derivedFrom,
+            maybeDescription,
+            DatasetPublishing(maybePublishedDate, Set.empty),
+            parts    = List.empty,
+            projects = List.empty,
+            keywords = List.empty
+          )
+        case None =>
+          NonModifiedDataset(
+            identifier,
+            title,
+            name,
+            url,
+            sameAs,
+            maybeDescription,
+            DatasetPublishing(maybePublishedDate, Set.empty),
+            parts    = List.empty,
+            projects = List.empty,
+            keywords = List.empty
+          )
+      }
     }
 
     _.downField("results").downField("bindings").as(decodeList(dataset))
@@ -178,4 +156,7 @@ private object BaseDetailsFinder {
 
     _.downField("results").downField("bindings").as(decodeList[Keyword])
   }
+
+  private def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =
+    cursor.downField(property).downField("value").as[T]
 }

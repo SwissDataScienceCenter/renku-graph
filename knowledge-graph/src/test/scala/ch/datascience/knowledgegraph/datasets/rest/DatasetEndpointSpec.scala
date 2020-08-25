@@ -145,19 +145,25 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
   private implicit val datasetEntityDecoder: EntityDecoder[IO, Dataset] = jsonOf[IO, Dataset]
 
-  private implicit lazy val datasetDecoder: Decoder[Dataset] = (cursor: HCursor) =>
+  private implicit lazy val datasetDecoder: Decoder[Dataset] = cursor =>
     for {
       id               <- cursor.downField("identifier").as[Identifier]
       title            <- cursor.downField("title").as[Title]
       name             <- cursor.downField("name").as[Name]
-      sameAs           <- cursor.downField("sameAs").as[SameAs]
-      maybeUrl         <- cursor.downField("url").as[Option[Url]]
+      url              <- cursor.downField("url").as[Url]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
       published        <- cursor.downField("published").as[DatasetPublishing]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
       projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
       keywords         <- cursor.downField("keywords").as[List[Keyword]]
-    } yield Dataset(id, title, name, sameAs, maybeUrl, maybeDescription, published, parts, projects, keywords)
+      maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
+      maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
+    } yield maybeSameAs
+      .map(NonModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects, keywords))
+      .orElse(
+        maybeDerivedFrom map (ModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects, keywords))
+      )
+      .getOrElse(fail("Cannot decode payload as Dataset"))
 
   private implicit lazy val datasetPublishingDecoder: Decoder[DatasetPublishing] = (cursor: HCursor) =>
     for {

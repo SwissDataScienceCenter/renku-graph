@@ -47,7 +47,7 @@ object GitLab {
 
   private val logger = new IOLogger(LoggerFactory.getLogger("test"))
   private val port: Int Refined Positive = 2048
-
+  import ch.datascience.graph.model.GraphModelGenerators._
   def `GET <gitlab>/api/v4/projects/:id returning OK`(
       projectId:          Id,
       projectVisibility:  Visibility
@@ -57,7 +57,7 @@ object GitLab {
         .willReturn(okJson(json"""{
           "id":                  ${projectId.value}, 
           "visibility":          ${projectVisibility.value}, 
-          "path_with_namespace": ${relativePaths(minSegments = 2, maxSegments = 2).generateOne}
+          "path_with_namespace": ${projectPaths.generateOne.value}
         }""".noSpaces))
     }
     ()

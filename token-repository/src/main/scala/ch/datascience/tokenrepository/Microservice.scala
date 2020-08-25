@@ -26,7 +26,7 @@ import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEndpoint
-import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
+import ch.datascience.tokenrepository.repository.deletion.{DeleteTokenEndpoint, IODeleteTokenEndpoint, TokenRemover}
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
 import ch.datascience.tokenrepository.repository.init.{DbInitializer, IODbInitializer}
 import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}

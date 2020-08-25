@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
-import CurationGenerators._
 import cats.data.EitherT
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
@@ -28,7 +27,9 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.DataSetInfoEnricher
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.ForkInfoUpdater
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.{PersonDetailsUpdater, UpdatesCreator}
 import org.scalamock.scalatest.MockFactory
@@ -54,7 +55,12 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
         .expects(event, triplesWithPersonDetails, maybeAccessToken)
         .returning(triplesWithForkInfo.toRightT)
 
-      curator.curate(event, triples).value shouldBe Right(triplesWithForkInfo).pure[Try]
+      val triplesWithEnrichedDataset = curatedTriplesObjects.generateOne
+      (dataSetInfoEnricher.enrichDataSetInfo _)
+        .expects(triplesWithForkInfo)
+        .returning(triplesWithEnrichedDataset.toRightT)
+
+      curator.curate(event, triples).value shouldBe Right(triplesWithEnrichedDataset).pure[Try]
     }
 
     "fail with the failure from the person details update" in new TestCase {
@@ -78,6 +84,27 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
       (forkInfoUpdater
         .updateForkInfo(_: CommitEvent, _: CuratedTriples)(_: Option[AccessToken]))
         .expects(event, triplesWithPersonDetails, maybeAccessToken)
+        .returning(exception.toEitherTError)
+
+      curator.curate(event, triples).value shouldBe exception.raiseError[Try, CuratedTriples]
+    }
+
+    "fail with the failure from the dataset enricher update" in new TestCase {
+
+      val triplesWithPersonDetails = curatedTriplesObjects.generateOne
+      (personDetailsUpdater.curate _)
+        .expects(CuratedTriples(triples, updates = Nil))
+        .returning(triplesWithPersonDetails.pure[Try])
+
+      val triplesWithForkInfo = curatedTriplesObjects.generateOne
+      (forkInfoUpdater
+        .updateForkInfo(_: CommitEvent, _: CuratedTriples)(_: Option[AccessToken]))
+        .expects(event, triplesWithPersonDetails, maybeAccessToken)
+        .returning(triplesWithForkInfo.toRightT)
+
+      val exception = exceptions.generateOne
+      (dataSetInfoEnricher.enrichDataSetInfo _)
+        .expects(triplesWithForkInfo)
         .returning(exception.toEitherTError)
 
       curator.curate(event, triples).value shouldBe exception.raiseError[Try, CuratedTriples]
@@ -109,7 +136,8 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
     class TryPersonDetailsUpdater(updatesCreator: UpdatesCreator) extends PersonDetailsUpdater[Try](updatesCreator)
     val personDetailsUpdater = mock[TryPersonDetailsUpdater]
     val forkInfoUpdater      = mock[ForkInfoUpdater[Try]]
-    val curator              = new TriplesCurator[Try](personDetailsUpdater, forkInfoUpdater)
+    val dataSetInfoEnricher  = mock[DataSetInfoEnricher[Try]]
+    val curator              = new TriplesCurator[Try](personDetailsUpdater, forkInfoUpdater, dataSetInfoEnricher)
   }
 
   private implicit class TriplesOps(out: CuratedTriples) {

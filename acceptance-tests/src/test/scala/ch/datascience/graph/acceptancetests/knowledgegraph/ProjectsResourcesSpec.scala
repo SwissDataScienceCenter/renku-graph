@@ -80,10 +80,10 @@ class ProjectsResourcesSpec
     )
   }
   private val dataset1CommitId = commitIds.generateOne
-  private val dataset = datasets.generateOne.copy(
+  private val dataset = nonModifiedDatasets().generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
-    projects         = List(DatasetProject(project.path, project.name, addedToProject.generateOne))
+    projects         = List(DatasetProject(project.path, project.name, addedToProjectObjects.generateOne))
   )
 
   Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
@@ -92,7 +92,7 @@ class ProjectsResourcesSpec
 
       Given("some data in the RDF Store")
       val jsonLDTriples = JsonLD.arr(
-        dataSetCommit(
+        nonModifiedDataSetCommit(
           commitId   = dataset1CommitId,
           cliVersion = currentCliVersion
         )(
@@ -112,10 +112,10 @@ class ProjectsResourcesSpec
             .some,
           projectVersion = project.version
         )(
-          datasetIdentifier    = dataset.id,
-          datasetTitle          = dataset.title,
-          datasetName = dataset.name,
-          maybeDatasetSameAs   = dataset.sameAs.some
+          datasetIdentifier  = dataset.id,
+          datasetTitle       = dataset.title,
+          datasetName        = dataset.name,
+          maybeDatasetSameAs = dataset.sameAs.some
         )
       )
       `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)

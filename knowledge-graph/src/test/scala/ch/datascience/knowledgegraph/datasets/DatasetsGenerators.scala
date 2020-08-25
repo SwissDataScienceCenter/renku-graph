@@ -22,30 +22,63 @@ import cats.Order
 import cats.data.NonEmptyList
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.SameAs
+import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs, Url}
 import ch.datascience.knowledgegraph.datasets.model._
+import ch.datascience.rdfstore.entities.DataSet
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 
 object DatasetsGenerators {
 
-  implicit val datasets: Gen[Dataset] = datasets()
+  implicit val datasets: Gen[NonModifiedDataset] = nonModifiedDatasets()
 
-  def datasets(sameAs:   Gen[SameAs]                       = datasetSameAs,
-               projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)): Gen[Dataset] =
+  def nonModifiedDatasets(
+      sameAs:   Gen[SameAs]                       = datasetSameAs,
+      projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
+  ): Gen[NonModifiedDataset] =
     for {
       id               <- datasetIdentifiers
       title            <- datasetTitles
       name             <- datasetNames
-      maybeUrl         <- Gen.option(datasetUrls)
-      sameas           <- sameAs
+      url              <- datasetUrls
+      sameAs           <- sameAs
       maybeDescription <- Gen.option(datasetDescriptions)
       keywords         <- listOf(datasetKeywords)
       published        <- datasetPublishingInfos
       part             <- listOf(datasetParts)
       projects         <- projects
-    } yield Dataset(id, title, name, sameas, maybeUrl, maybeDescription, published, part, projects.toList, keywords)
+    } yield NonModifiedDataset(id,
+                               title,
+                               name,
+                               url,
+                               sameAs,
+                               maybeDescription,
+                               published,
+                               part,
+                               projects.toList,
+                               keywords)
+
+  def modifiedDatasetsOnFirstProject(dataset: Dataset, derivedFromOverride: Option[DerivedFrom] = None)(
+      implicit renkuBaseUrl:                  RenkuBaseUrl
+  ): Gen[ModifiedDataset] =
+    for {
+      id        <- datasetIdentifiers
+      published <- datasetPublishingInfos
+      keywords  <- listOf(datasetKeywords)
+    } yield ModifiedDataset(
+      id,
+      dataset.title,
+      dataset.name,
+      Url(DataSet.entityId(id).toString),
+      derivedFromOverride getOrElse DerivedFrom(DataSet.entityId(dataset.id)),
+      dataset.maybeDescription,
+      published,
+      dataset.parts,
+      List(dataset.projects.headOption getOrElse (throw new IllegalStateException("No projects on a dataset"))),
+      keywords
+    )
 
   implicit lazy val datasetCreators: Gen[DatasetCreator] = for {
     maybeEmail       <- Gen.option(userEmails)
@@ -69,10 +102,10 @@ object DatasetsGenerators {
   implicit lazy val datasetProjects: Gen[DatasetProject] = for {
     path    <- projectPaths
     name    <- projectNames
-    created <- addedToProject
+    created <- addedToProjectObjects
   } yield DatasetProject(path, name, created)
 
-  implicit lazy val addedToProject: Gen[AddedToProject] = for {
+  implicit lazy val addedToProjectObjects: Gen[AddedToProject] = for {
     createdDate <- datasetInProjectCreationDates
     agent       <- datasetAgents
   } yield AddedToProject(createdDate, agent)
