@@ -48,9 +48,8 @@ class StatsFinderImpl(
 
   override def entitiesCount: IO[Map[KGEntityType, Long]] =
     for {
-      results <- queryExpecting[List[(KGEntityType, Long)]](query)
-      resultsWithDefaultCounts = addMissingStatues(results.toMap)
-    } yield resultsWithDefaultCounts
+      results <- queryExpecting[List[(KGEntityType, Long)]](using = query)
+    } yield addMissingStatues(results.toMap)
 
   private lazy val query = SparqlQuery(
     name = "entities - counts",
