@@ -32,7 +32,7 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
 import ch.datascience.rdfstore.entities.bundles.{generateProject, renkuBaseUrl}
-import ch.datascience.rdfstore.entities.{Activity, Agent, Association, DataSet, Generation, ProcessRun, RunPlan, WorkflowFile, WorkflowRun}
+import ch.datascience.rdfstore.entities.{Activity, Agent, Association, DataSet, Generation, ProcessRun, Project, RunPlan, WorkflowFile, WorkflowRun}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
@@ -54,10 +54,11 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
             .updated(entityType, entitiesByType.getOrElse(entityType, List.empty[JsonLD]) ++: entities)
       }
 
-      val projects = nonEmptyList(datasetProjects).generateOne
-      val entitiesToStore = projects.toList.foldLeft(Map.empty[KGEntityType, List[JsonLD]]) {
-        case (entitiesByType, project) =>
-          val commitActivities = listOf(datasetsWithActivity(project)).generateOne
+      val datasetProject = nonEmptyList(datasetProjects).generateOne
+      val entitiesToStore = datasetProject.toList.foldLeft(Map.empty[KGEntityType, List[JsonLD]]) {
+        case (entitiesByType, datasetProject) =>
+          val project          = generateProject(datasetProject.path)
+          val commitActivities = listOf(datasetsWithActivity(datasetProject, project)).generateOne
           val processRuns      = listOf(processRunsJsonLDs(project)).generateOne
           val workflowRuns = commitActivities.headOption match {
             case Some(activity) =>
@@ -82,7 +83,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
 
       stats.entitiesCount.unsafeRunSync() shouldBe Map[KGEntityType, Long](
         KGEntityType.Dataset     -> numberOfDatasetCommits,
-        KGEntityType.Project     -> projects.size.toLong,
+        KGEntityType.Project     -> datasetProject.size.toLong,
         KGEntityType.ProcessRun  -> numberOfProcessRuns,
         KGEntityType.WorkflowRun -> numberOfWorkflowRuns,
         KGEntityType.Activity    -> totalNumberOfActivities
@@ -100,47 +101,43 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
 
   import eu.timepit.refined.auto._
 
-  private def datasetsWithActivity(datasetProjects: DatasetProject): Gen[Activity] =
+  private def datasetsWithActivity(datasetProjects: DatasetProject, project: Project): Gen[Activity] =
     for {
       dataset <- DatasetsGenerators.datasets
-    } yield toDataSetCommit(dataset.copy(projects = List(datasetProjects)))
+    } yield toDataSetCommit(dataset.copy(projects = List(datasetProjects)), project)
 
-  private def toDataSetCommit(dataSet: Dataset): Activity =
-    dataSet.projects match {
-      case datasetProject +: Nil =>
-        val project       = generateProject(datasetProject.path)
-        val committedDate = committedDates.generateOne
-        Activity(
-          commitIds.generateOne,
-          committedDate,
-          persons.generateOne,
-          project,
-          Agent(cliVersions.generateOne),
-          maybeGenerationFactories = List(
-            Generation.factory(
-              DataSet.factory(
-                dataSet.id,
-                dataSet.title,
-                dataSet.name,
-                dataSet.maybeUrl,
-                createdDate    = datasets.DateCreated(committedDate.value),
-                creators       = setOf(persons).generateOne,
-                partsFactories = List()
-              )
-            )
+  private def toDataSetCommit(dataSet: Dataset, project: Project): Activity = {
+
+    val committedDate = committedDates.generateOne
+    Activity(
+      commitIds.generateOne,
+      committedDate,
+      persons.generateOne,
+      project,
+      Agent(cliVersions.generateOne),
+      maybeGenerationFactories = List(
+        Generation.factory(
+          DataSet.factory(
+            dataSet.id,
+            dataSet.title,
+            dataSet.name,
+            dataSet.maybeUrl,
+            createdDate    = datasets.DateCreated(committedDate.value),
+            creators       = setOf(persons).generateOne,
+            partsFactories = List()
           )
         )
-      case _ => fail("Not prepared to work datasets having multiple projects")
-    }
+      )
+    )
+  }
 
-  private def processRunsJsonLDs(datasetProject: DatasetProject): Gen[JsonLD] =
+  private def processRunsJsonLDs(project: Project): Gen[JsonLD] =
     for {
       commitId   <- commitIds
       commitDate <- committedDates
       committer  <- persons
       cliVersion <- cliVersions
-      project = generateProject(datasetProject.path)
-      agent   = Agent(cliVersion)
+      agent = Agent(cliVersion)
       comment      <- nonEmptyStrings()
       workflowFile <- nonBlankStrings()
     } yield ProcessRun
@@ -164,14 +161,13 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
       )
       .asJsonLD
 
-  private def workflowJsonLDs(datasetProject: DatasetProject, activity: Activity) =
+  private def workflowJsonLDs(project: Project, activity: Activity) =
     for {
       commitId   <- commitIds
       commitDate <- committedDates
       committer  <- persons
       cliVersion <- cliVersions
-      project = generateProject(datasetProject.path)
-      agent   = Agent(cliVersion)
+      agent = Agent(cliVersion)
       comment <- nonEmptyStrings()
     } yield WorkflowRun(
       commitId,
