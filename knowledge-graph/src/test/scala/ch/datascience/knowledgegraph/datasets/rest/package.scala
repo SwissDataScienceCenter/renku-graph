@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonBlankStrings, nonEmptyList, positiveInts, sentenceContaining}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetInProjectCreationDates, datasetTitles, userAffiliations, userEmails}
+import ch.datascience.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetInProjectCreationDates, datasetKeywords, datasetTitles, userAffiliations, userEmails}
 import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, DerivedFrom, Description, Identifier, Name, PublishedDate, SameAs, Title}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.knowledgegraph.datasets.model._
@@ -101,6 +101,7 @@ package object rest {
             datasetCreatedDate        = firstDatasetDateCreated,
             datasetCreators           = dataSet.published.creators map toPerson,
             datasetParts              = dataSet.parts.map(part => (part.name, part.atLocation)),
+            datasetKeywords           = dataSet.keywords,
             overrideTopmostSameAs     = topmostSameAs.some
           ) -> dataSet
 
@@ -126,6 +127,7 @@ package object rest {
               datasetCreatedDate        = projectDateCreated,
               datasetCreators           = dataSet.published.creators map toPerson,
               datasetParts              = dataSet.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords           = dataSet.keywords,
               overrideTopmostSameAs     = topmostSameAs.some
             ) -> dataSet.copy(
               id     = dataSetId,
@@ -225,6 +227,7 @@ package object rest {
             datasetCreatedDate         = DateCreated(firstDatasetDateCreated.value),
             datasetCreators            = dataSet.published.creators map toPerson,
             datasetParts               = dataSet.parts.map(part => (part.name, part.atLocation)),
+            datasetKeywords            = dataSet.keywords,
             overrideTopmostDerivedFrom = topmostDerivedFrom.some
           )
 
@@ -248,6 +251,7 @@ package object rest {
               datasetCreatedDate         = DateCreated(projectDateCreated.value),
               datasetCreators            = dataSet.published.creators map toPerson,
               datasetParts               = dataSet.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords            = dataSet.keywords,
               overrideTopmostDerivedFrom = topmostDerivedFrom.some
             )
           }

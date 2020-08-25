@@ -20,8 +20,8 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.Identifier
-import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetPart, DatasetProject, DatasetPublishing, ModifiedDataset, NonModifiedDataset}
+import ch.datascience.graph.model.datasets.{Identifier, Keyword}
+import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
@@ -49,10 +49,12 @@ private class IODatasetFinder(
   def findDataset(identifier: Identifier): IO[Option[Dataset]] =
     for {
       maybeDetailsFiber <- findBaseDetails(identifier).start
+      keywordsFiber     <- findKeywords(identifier).start
       creatorsFiber     <- findCreators(identifier).start
       partsFiber        <- findParts(identifier).start
       projectsFiber     <- findProjects(identifier).start
       maybeDetails      <- maybeDetailsFiber.join
+      keywords          <- keywordsFiber.join
       creators          <- creatorsFiber.join
       parts             <- partsFiber.join
       projects          <- projectsFiber.join
@@ -60,15 +62,21 @@ private class IODatasetFinder(
       details.copy(
         published = details.published.copy(creators = creators),
         parts     = parts,
-        projects  = projects
+        projects  = projects,
+        keywords  = keywords
       )
     }
 
   private implicit class DatasetOps(dataset: Dataset) {
-    def copy(published: DatasetPublishing, parts: List[DatasetPart], projects: List[DatasetProject]): Dataset =
+    def copy(published: DatasetPublishing,
+             parts:     List[DatasetPart],
+             projects:  List[DatasetProject],
+             keywords:  List[Keyword]): Dataset =
       dataset match {
-        case ds: NonModifiedDataset => ds.copy(published = published, parts = parts, projects = projects)
-        case ds: ModifiedDataset    => ds.copy(published = published, parts = parts, projects = projects)
+        case ds: NonModifiedDataset =>
+          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords)
+        case ds: ModifiedDataset =>
+          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords)
       }
   }
 }

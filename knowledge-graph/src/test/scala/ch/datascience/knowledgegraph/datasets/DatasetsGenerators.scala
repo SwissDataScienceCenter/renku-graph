@@ -32,7 +32,7 @@ import org.scalacheck.Gen
 
 object DatasetsGenerators {
 
-  implicit val datasets: Gen[Dataset] = nonModifiedDatasets()
+  implicit val datasets: Gen[NonModifiedDataset] = nonModifiedDatasets()
 
   def nonModifiedDatasets(
       sameAs:   Gen[SameAs]                       = datasetSameAs,
@@ -45,10 +45,20 @@ object DatasetsGenerators {
       url              <- datasetUrls
       sameAs           <- sameAs
       maybeDescription <- Gen.option(datasetDescriptions)
+      keywords         <- listOf(datasetKeywords)
       published        <- datasetPublishingInfos
       part             <- listOf(datasetParts)
       projects         <- projects
-    } yield NonModifiedDataset(id, title, name, url, sameAs, maybeDescription, published, part, projects.toList)
+    } yield NonModifiedDataset(id,
+                               title,
+                               name,
+                               url,
+                               sameAs,
+                               maybeDescription,
+                               published,
+                               part,
+                               projects.toList,
+                               keywords)
 
   def modifiedDatasetsOnFirstProject(dataset: Dataset, derivedFromOverride: Option[DerivedFrom] = None)(
       implicit renkuBaseUrl:                  RenkuBaseUrl
@@ -56,6 +66,7 @@ object DatasetsGenerators {
     for {
       id        <- datasetIdentifiers
       published <- datasetPublishingInfos
+      keywords  <- listOf(datasetKeywords)
     } yield ModifiedDataset(
       id,
       dataset.title,
@@ -65,7 +76,8 @@ object DatasetsGenerators {
       dataset.maybeDescription,
       published,
       dataset.parts,
-      List(dataset.projects.headOption getOrElse (throw new IllegalStateException("No projects on a dataset")))
+      List(dataset.projects.headOption getOrElse (throw new IllegalStateException("No projects on a dataset"))),
+      keywords
     )
 
   implicit lazy val datasetCreators: Gen[DatasetCreator] = for {

@@ -18,9 +18,10 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
+import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.graph.model.datasets.Identifier
+import ch.datascience.graph.model.datasets.{Identifier, Keyword}
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
@@ -34,7 +35,10 @@ private class BaseDetailsFinder(
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+)(implicit executionContext: ExecutionContext,
+  contextShift:              ContextShift[IO],
+  timer:                     Timer[IO],
+  ME:                        MonadError[IO, Throwable])
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
 
   import BaseDetailsFinder._
@@ -63,6 +67,22 @@ private class BaseDetailsFinder(
         |    OPTIONAL { ?datasetId schema:description ?description }.
         |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate }.
         |}
+        |""".stripMargin
+  )
+
+  def findKeywords(identifier: Identifier): IO[List[Keyword]] =
+    queryExpecting[List[Keyword]](using = queryKeywords(identifier)).flatMap(s => ME.pure(s))
+
+  private def queryKeywords(identifier: Identifier) = SparqlQuery(
+    name = "ds by id - keyword details",
+    Set(
+      "PREFIX schema: <http://schema.org/>"
+    ),
+    s"""|SELECT DISTINCT ?keyword
+        |WHERE {
+        |    ?datasetId schema:identifier "$identifier" ;
+        |               schema:keywords ?keyword .
+        |}ORDER BY ASC(?keyword)
         |""".stripMargin
   )
 
@@ -104,7 +124,8 @@ private object BaseDetailsFinder {
             maybeDescription,
             DatasetPublishing(maybePublishedDate, Set.empty),
             parts    = List.empty,
-            projects = List.empty
+            projects = List.empty,
+            keywords = List.empty
           )
         case None =>
           NonModifiedDataset(
@@ -116,12 +137,24 @@ private object BaseDetailsFinder {
             maybeDescription,
             DatasetPublishing(maybePublishedDate, Set.empty),
             parts    = List.empty,
-            projects = List.empty
+            projects = List.empty,
+            keywords = List.empty
           )
       }
     }
 
     _.downField("results").downField("bindings").as(decodeList(dataset))
+  }
+
+  private implicit val keywordsDecoder: Decoder[List[Keyword]] = {
+
+    implicit val keywordDecoder: Decoder[Keyword] = { cursor =>
+      for {
+        keywordString <- cursor.downField("keyword").downField("value").as[String]
+      } yield Keyword(keywordString)
+    }
+
+    _.downField("results").downField("bindings").as(decodeList[Keyword])
   }
 
   private def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =

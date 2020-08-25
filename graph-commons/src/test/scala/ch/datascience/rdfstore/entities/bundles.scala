@@ -26,10 +26,10 @@ import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DerivedFrom, Description, Identifier, Name, PartLocation, PartName, PublishedDate, SameAs, Title, Url}
+import ch.datascience.graph.model.datasets.{DerivedFrom, Description, Identifier, Keyword, Name, PartLocation, PartName, PublishedDate, SameAs, Title, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path, SchemaVersion}
-import ch.datascience.graph.model.{CliVersion, datasets, projects}
+import ch.datascience.graph.model.{CliVersion, GraphModelGenerators, datasets, projects}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream
 import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
@@ -110,6 +110,7 @@ object bundles extends Schemas {
       datasetCreatedDate:         datasets.DateCreated = datasets.DateCreated(committedDate.value),
       datasetCreators:            Set[Person] = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
       overrideTopmostSameAs:      Option[SameAs] = None,
       overrideTopmostDerivedFrom: Option[DerivedFrom] = None
   )(implicit renkuBaseUrl:        RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
@@ -129,6 +130,7 @@ object bundles extends Schemas {
       datasetCreatedDate,
       datasetCreators,
       datasetParts,
+      datasetKeywords,
       overrideTopmostSameAs,
       overrideTopmostDerivedFrom
     ).asJsonLD
@@ -156,6 +158,7 @@ object bundles extends Schemas {
       datasetCreatedDate:         datasets.DateCreated           = datasets.DateCreated(committedDate.value),
       datasetCreators:            Set[Person]                    = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      datasetKeywords:            List[Keyword]                  = listOf(GraphModelGenerators.datasetKeywords).generateOne,
       overrideTopmostSameAs:      Option[SameAs]                 = None,
       overrideTopmostDerivedFrom: Option[DerivedFrom]            = None
   ): Activity = Activity(
@@ -179,6 +182,7 @@ object bundles extends Schemas {
           datasetParts.map {
             case (name, location) => DataSetPart.factory(name, location, None)(_)
           },
+          datasetKeywords,
           overrideTopmostSameAs      = overrideTopmostSameAs,
           overrideTopmostDerivedFrom = overrideTopmostDerivedFrom
         )
@@ -209,6 +213,7 @@ object bundles extends Schemas {
       datasetCreatedDate:         datasets.DateCreated = datasets.DateCreated(committedDate.value),
       datasetCreators:            Set[Person] = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
       overrideTopmostSameAs:      Option[SameAs] = None,
       overrideTopmostDerivedFrom: Option[DerivedFrom] = None
   )(implicit renkuBaseUrl:        RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
@@ -228,6 +233,7 @@ object bundles extends Schemas {
       datasetCreatedDate,
       datasetCreators,
       datasetParts,
+      datasetKeywords,
       overrideTopmostSameAs,
       overrideTopmostDerivedFrom
     ).asJsonLD
@@ -255,6 +261,7 @@ object bundles extends Schemas {
       datasetCreatedDate:         datasets.DateCreated           = datasets.DateCreated(committedDate.value),
       datasetCreators:            Set[Person]                    = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      datasetKeywords:            List[Keyword]                  = listOf(GraphModelGenerators.datasetKeywords).generateOne,
       overrideTopmostSameAs:      Option[SameAs]                 = None,
       overrideTopmostDerivedFrom: Option[DerivedFrom]            = None
   ): Activity = Activity(
@@ -278,6 +285,7 @@ object bundles extends Schemas {
           datasetParts.map {
             case (name, location) => DataSetPart.factory(name, location, None)(_)
           },
+          datasetKeywords,
           overrideTopmostSameAs      = overrideTopmostSameAs,
           overrideTopmostDerivedFrom = overrideTopmostDerivedFrom
         )

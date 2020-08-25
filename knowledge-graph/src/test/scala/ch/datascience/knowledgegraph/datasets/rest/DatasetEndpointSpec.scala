@@ -66,9 +66,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
         val response = getDataset(dataset.id).unsafeRunSync()
 
-        response.status      shouldBe Ok
-        response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-
+        response.status                    shouldBe Ok
+        response.contentType               shouldBe Some(`Content-Type`(MediaType.application.json))
         response.as[Dataset].unsafeRunSync shouldBe dataset
         response.as[Json].unsafeRunSync._links shouldBe Right(
           Links.of(Self -> Href(renkuResourcesUrl / "datasets" / dataset.id))
@@ -156,12 +155,13 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       published        <- cursor.downField("published").as[DatasetPublishing]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
       projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
+      keywords         <- cursor.downField("keywords").as[List[Keyword]]
       maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
       maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
     } yield maybeSameAs
-      .map(NonModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects))
+      .map(NonModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects, keywords))
       .orElse(
-        maybeDerivedFrom map (ModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects))
+        maybeDerivedFrom map (ModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects, keywords))
       )
       .getOrElse(fail("Cannot decode payload as Dataset"))
 

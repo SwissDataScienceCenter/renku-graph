@@ -99,7 +99,8 @@ class DatasetEndpoint[Interpretation[_]: Effect](
           Some("creator" -> dataset.published.creators.toList.asJson)
         ).flatten: _*)),
         Some("hasPart" -> dataset.parts.asJson),
-        Some("isPartOf" -> dataset.projects.asJson)
+        Some("isPartOf" -> dataset.projects.asJson),
+        Some("keywords" -> dataset.keywords.asJson)
       ).flatten: _*
     ) deepMerge _links(
       Link(Rel.Self -> Href(renkuResourcesUrl / "datasets" / dataset.id))

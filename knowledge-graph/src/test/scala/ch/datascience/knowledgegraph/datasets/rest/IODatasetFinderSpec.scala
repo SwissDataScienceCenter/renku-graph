@@ -22,16 +22,16 @@ import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.datasets.Keyword
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
-import io.renku.jsonld.{EntityId, JsonLD}
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalacheck.Gen
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
@@ -51,7 +51,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           dataset.copy(
             sameAs   = dataset.entityId.asSameAs,
             parts    = dataset.parts.sorted,
-            projects = List(DatasetProject(project.path, project.name, addedToProject))
+            projects = List(DatasetProject(project.path, project.name, addedToProject)),
+            keywords = dataset.keywords.sorted
           )
         )
       }
@@ -82,7 +83,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset1.copy(
               parts = dataset1.parts.sorted,
               projects = List(DatasetProject(project1.path, project1.name, addedToProject1),
-                              DatasetProject(project2.path, project2.name, addedToProject2)).sorted
+                              DatasetProject(project2.path, project2.name, addedToProject2)).sorted,
+              keywords = dataset1.keywords.sorted
             )
           )
 
@@ -90,7 +92,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset2.copy(
               parts = dataset2.parts.sorted,
               projects = List(DatasetProject(project1.path, project1.name, addedToProject1),
-                              DatasetProject(project2.path, project2.name, addedToProject2)).sorted
+                              DatasetProject(project2.path, project2.name, addedToProject2)).sorted,
+              keywords = dataset2.keywords.sorted
             )
           )
       }
@@ -117,13 +120,15 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
           dataset.copy(
             parts    = dataset.parts.sorted,
-            projects = List(DatasetProject(project.path, project.name, addedToProject)).sorted
+            projects = List(DatasetProject(project.path, project.name, addedToProject)).sorted,
+            keywords = dataset.keywords.sorted
           )
         )
         datasetFinder.findDataset(modifiedDataset.id).unsafeRunSync() shouldBe Some(
           modifiedDataset.copy(
             parts    = modifiedDataset.parts.sorted,
-            projects = List(DatasetProject(project.path, project.name, modifiedOnProject)).sorted
+            projects = List(DatasetProject(project.path, project.name, modifiedOnProject)).sorted,
+            keywords = modifiedDataset.keywords.sorted
           )
         )
       }
@@ -166,7 +171,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
                 DatasetProject(project1.path, project1.name, addedToProject1),
                 DatasetProject(project2.path, project2.name, addedToProject2),
                 DatasetProject(project3.path, project3.name, addedToProject3)
-              ).sorted
+              ).sorted,
+              keywords = sourceDataset.keywords.sorted
             )
           )
 
@@ -178,7 +184,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
                 DatasetProject(project1.path, project1.name, addedToProject1),
                 DatasetProject(project2.path, project2.name, addedToProject2),
                 DatasetProject(project3.path, project3.name, addedToProject3)
-              ).sorted
+              ).sorted,
+              keywords = dataset2.keywords.sorted
             )
           )
 
@@ -215,7 +222,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               projects = List(
                 DatasetProject(sourceProject.path, sourceProject.name, addedToProject),
                 DatasetProject(forkProject.path, forkProject.name, addedToProject)
-              ).sorted
+              ).sorted,
+              keywords = dataset.keywords.sorted
             )
           )
       }
@@ -250,7 +258,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
                 DatasetProject(project1.path, project1.name, addedToProject1),
                 DatasetProject(project2.path, project2.name, addedToProject2),
                 DatasetProject(project2Fork.path, project2Fork.name, addedToProject2)
-              ).sorted
+              ).sorted,
+              keywords = dataset.keywords.sorted
             )
           )
 
@@ -261,7 +270,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
                 DatasetProject(project1.path, project1.name, addedToProject1),
                 DatasetProject(project2.path, project2.name, addedToProject2),
                 DatasetProject(project2Fork.path, project2Fork.name, addedToProject2)
-              ).sorted
+              ).sorted,
+              keywords = dataset.keywords.sorted
             )
           )
       }
@@ -293,7 +303,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
                 DatasetProject(grandparentProject.path, grandparentProject.name, addedToProject),
                 DatasetProject(parentProject.path, parentProject.name, addedToProject),
                 DatasetProject(childProject.path, childProject.name, addedToProject)
-              ).sorted
+              ).sorted,
+              keywords = datasetOnGrandparent.keywords.sorted
             )
           )
       }
@@ -328,7 +339,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
           dataset.copy(
             parts    = dataset.parts.sorted,
-            projects = List(DatasetProject(project.path, project.name, addedToProject)).sorted
+            projects = List(DatasetProject(project.path, project.name, addedToProject)).sorted,
+            keywords = dataset.keywords.sorted
           )
         )
         datasetFinder.findDataset(modifiedDataset.id).unsafeRunSync() shouldBe Some(
@@ -337,7 +349,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             projects = List(
               DatasetProject(project.path, project.name, modifiedOnProject),
               DatasetProject(forkedProject.path, forkedProject.name, modifiedOnProject)
-            ).sorted
+            ).sorted,
+            keywords = modifiedDataset.keywords.sorted
           )
         )
       }
@@ -387,7 +400,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset1Project,
             dataset2Project,
             dataset3Project
-          ).sorted
+          ).sorted,
+          keywords = dataset1.keywords.sorted
         )
       )
     }
@@ -425,7 +439,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset1Project,
             dataset2Project,
             dataset3Project
-          ).sorted
+          ).sorted,
+          keywords = dataset1.keywords.sorted
         )
       )
     }
@@ -464,7 +479,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset1Project,
             dataset2Project,
             dataset3Project
-          ).sorted
+          ).sorted,
+          keywords = dataset2.keywords.sorted
         )
       )
 
@@ -476,7 +492,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset1Project,
             dataset2Project,
             dataset3Project
-          ).sorted
+          ).sorted,
+          keywords = dataset3.keywords.sorted
         )
       )
     }
@@ -516,7 +533,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         maybeDescription = datasetDescriptions.generateSome,
         published        = modifiedDataset2.published,
         parts            = modifiedDataset2.parts,
-        projects         = List(dataset3Project)
+        projects         = List(dataset3Project),
+        keywords         = modifiedDataset2.keywords
       )
 
       loadToStore(
@@ -530,13 +548,15 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         dataset1.copy(
           parts    = dataset1.parts.sorted,
           sameAs   = dataset1.entityId.asSameAs,
-          projects = List(dataset1Project, dataset2Project).sorted
+          projects = List(dataset1Project, dataset2Project).sorted,
+          keywords = dataset1.keywords.sorted
         )
       )
       datasetFinder.findDataset(modifiedDataset2.id).unsafeRunSync() shouldBe Some(
         modifiedDataset2.copy(
           parts    = modifiedDataset2.parts.sorted,
-          projects = List(dataset2ModifiedProject, dataset3Project).sorted
+          projects = List(dataset2ModifiedProject, dataset3Project).sorted,
+          keywords = modifiedDataset2.keywords.sorted
         )
       )
     }
@@ -552,4 +572,14 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
       new ProjectsFinder(rdfStoreConfig, logger, timeRecorder)
     )
   }
+
+  private implicit lazy val partsAlphabeticalOrdering: Ordering[DatasetPart] =
+    (part1: DatasetPart, part2: DatasetPart) => part1.name.value compareTo part2.name.value
+
+  private implicit lazy val projectsAlphabeticalOrdering: Ordering[DatasetProject] =
+    (project1: DatasetProject, project2: DatasetProject) => project1.name.value compareTo project2.name.value
+
+  private implicit lazy val keywordsAlphabeticalOrdering: Ordering[Keyword] =
+    (keyword1: Keyword, keyword2: Keyword) => keyword1.value compareTo keyword2.value
+
 }

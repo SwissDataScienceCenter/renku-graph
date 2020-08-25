@@ -34,6 +34,7 @@ object model {
     val published:        DatasetPublishing
     val parts:            List[DatasetPart]
     val projects:         List[DatasetProject]
+    val keywords:         List[Keyword]
   }
 
   final case class NonModifiedDataset(id:               Identifier,
@@ -44,7 +45,8 @@ object model {
                                       maybeDescription: Option[Description],
                                       published:        DatasetPublishing,
                                       parts:            List[DatasetPart],
-                                      projects:         List[DatasetProject])
+                                      projects:         List[DatasetProject],
+                                      keywords:         List[Keyword])
       extends Dataset
 
   final case class ModifiedDataset(id:               Identifier,
@@ -55,7 +57,8 @@ object model {
                                    maybeDescription: Option[Description],
                                    published:        DatasetPublishing,
                                    parts:            List[DatasetPart],
-                                   projects:         List[DatasetProject])
+                                   projects:         List[DatasetProject],
+                                   keywords:         List[Keyword])
       extends Dataset
 
   final case class DatasetPublishing(maybeDate: Option[PublishedDate], creators: Set[DatasetCreator])

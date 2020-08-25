@@ -19,14 +19,17 @@
 package ch.datascience.knowledgegraph
 
 import cats.MonadError
-import cats.effect.{ExitCode, IO}
+import cats.effect.{ContextShift, ExitCode, IO}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
+import ch.datascience.knowledgegraph.metrics.IOKGMetrics
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
@@ -35,6 +38,10 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
     "return Success Exit Code if Sentry initializes and http server starts up" in new TestCase {
 
       (sentryInitializer.run _)
+        .expects()
+        .returning(context.unit)
+
+      (kgMetrics.run _)
         .expects()
         .returning(context.unit)
 
@@ -64,6 +71,10 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(context.unit)
 
+      (kgMetrics.run _)
+        .expects()
+        .returning(context.unit)
+
       (httpServer.run _)
         .expects()
         .returning(context.raiseError(exception))
@@ -72,13 +83,34 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         runner.run(Nil).unsafeRunSync()
       } shouldBe exception
     }
+
+    "return Success ExitCode even if Knowledge Graph Metrics initialisation fails" in new TestCase {
+
+      val exception = exceptions.generateOne
+      (sentryInitializer.run _)
+        .expects()
+        .returning(context.unit)
+
+      (kgMetrics.run _)
+        .expects()
+        .returning(context.raiseError(exception))
+
+      (httpServer.run _)
+        .expects()
+        .returning(context.pure(ExitCode.Success))
+
+      runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
+    }
   }
+
+  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
     val sentryInitializer = mock[IOSentryInitializer]
     val httpServer        = mock[IOHttpServer]
-    val runner            = new MicroserviceRunner(sentryInitializer, httpServer)
+    val kgMetrics         = mock[IOKGMetrics]
+    val runner            = new MicroserviceRunner(sentryInitializer, httpServer, kgMetrics)
   }
 }

@@ -37,6 +37,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
   private implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
   import BaseDetailsFinder._
+  import io.circe.syntax._
 
   "non modified dataset decoder" should {
 
@@ -50,6 +51,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
               .copy(maybeDescription = None)
               .copy(parts = Nil)
               .copy(projects = Nil)
+              .copy(keywords = Nil)
           )
         }
       }
@@ -68,6 +70,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
               .copy(maybeDescription = None)
               .copy(parts = Nil)
               .copy(projects = Nil)
+              .copy(keywords = Nil)
           )
         }
       }
@@ -86,7 +89,8 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
           "publishedDate": {"value": ${publishedDate.value}},
           "description": {"value": $blank},
           "url": {"value": ${dataset.url.value}},
-          "topmostSameAs": {"value": ${SameAs(DataSet.entityId(dataset.id)).toString} }
+          "topmostSameAs": {"value": ${SameAs(DataSet.entityId(dataset.id)).toString} },
+          "keywords": {"value": ${dataset.keywords.map(_.value).asJson}}
         }
       ]
     }
@@ -105,7 +109,8 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
           "description": {"value": $blank},
           "url": {"value": ${dataset.url.value}},
           "maybeDerivedFrom": {"value": ${dataset.derivedFrom.value}},
-          "topmostSameAs": {"value": ${DataSet.entityId(dataset.id).toString} }
+          "topmostSameAs": {"value": ${DataSet.entityId(dataset.id).toString} },
+          "keywords": {"value": ${dataset.keywords.map(_.value).asJson}}
         }
       ]
     }
