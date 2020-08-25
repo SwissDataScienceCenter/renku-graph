@@ -8,7 +8,7 @@ packagedArtifacts := Map.empty
 
 releaseVersionBump := sbtrelease.Version.Bump.Minor
 releaseIgnoreUntrackedFiles := true
-releaseTagName := (version in ThisBuild).value.toString
+releaseTagName := (version in ThisBuild).value
 
 lazy val root = Project(
   id = "renku-graph",
@@ -79,6 +79,8 @@ lazy val triplesGenerator = Project(
 ).settings(
   commonSettings
 ).dependsOn(
+  jsonLd % "compile->compile",
+  jsonLd % "test->test",
   graphCommons % "compile->compile",
   graphCommons % "test->test"
 ).enablePlugins(
@@ -138,7 +140,7 @@ lazy val commonSettings = Seq(
   publishArtifact in(Compile, packageDoc) := false,
   publishArtifact in(Compile, packageSrc) := false,
 
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.10.3"),
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full),
 
   scalacOptions += "-Ypartial-unification",
   scalacOptions += "-feature",
@@ -211,8 +213,8 @@ releaseProcess := Seq[ReleaseStep](
   pushChanges
 )
 
-val setReleaseVersionToChart: ReleaseStep = setReleaseVersionChart(_._1)
-val setNextVersionToChart:    ReleaseStep = setNextReleaseVersionChart(_._2)
+lazy val setReleaseVersionToChart: ReleaseStep = setReleaseVersionChart(_._1)
+lazy val setNextVersionToChart:    ReleaseStep = setNextReleaseVersionChart(_._2)
 
 def setReleaseVersionChart(selectVersion: Versions => String): ReleaseStep = { state: State =>
   val version = findVersion(selectVersion, state)

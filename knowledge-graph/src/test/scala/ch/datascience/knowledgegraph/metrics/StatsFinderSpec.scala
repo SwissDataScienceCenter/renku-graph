@@ -90,7 +90,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
       datasetId   <- datasetIdentifiers
       projectPath <- projectPaths
       projectName <- projectNames
-    } yield dataSetCommit()(projectPath, projectName)(datasetId)
+    } yield nonModifiedDataSetCommit()(projectPath, projectName)(datasetId)
 
   private lazy val processRuns: Gen[JsonLD] =
     for {

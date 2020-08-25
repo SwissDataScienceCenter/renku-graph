@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import cats.MonadError
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.DataSetInfoEnricher
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.ForkInfoUpdater
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater
 
@@ -27,7 +28,8 @@ import scala.util.Try
 object interpreters {
   abstract class TryTriplesCurator(
       personDetailsUpdater: PersonDetailsUpdater[Try],
-      forkInfoUpdater:      ForkInfoUpdater[Try]
+      forkInfoUpdater:      ForkInfoUpdater[Try],
+      dataSetInfoEnricher:  DataSetInfoEnricher[Try]
   )(implicit ME:            MonadError[Try, Throwable])
-      extends TriplesCurator[Try](personDetailsUpdater, forkInfoUpdater)
+      extends TriplesCurator[Try](personDetailsUpdater, forkInfoUpdater, dataSetInfoEnricher)
 }

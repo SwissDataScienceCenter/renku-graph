@@ -18,8 +18,8 @@
 
 package ch.datascience.generators
 
-import java.time.{Instant, LocalDate, LocalDateTime, ZoneId, ZoneOffset, ZonedDateTime}
 import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
+import java.time._
 
 import cats.data.NonEmptyList
 import ch.datascience.config.ServiceUrl
@@ -282,6 +282,9 @@ object Generators {
 
       def generateOne: T = generateExample(generator)
 
+      def generateList(ofSize: Int Refined Positive): List[T] =
+        generateNonEmptyList(minElements = ofSize, maxElements = ofSize).toList
+
       def generateNonEmptyList(minElements: Int Refined Positive = 1,
                                maxElements: Int Refined Positive = 5): NonEmptyList[T] =
         generateExample(nonEmptyList(generator, minElements, maxElements))
@@ -296,6 +299,11 @@ object Generators {
         val generated = generator.sample.getOrElse(generateDifferentThan(value))
         if (generated == value) generateDifferentThan(value)
         else generated
+      }
+
+      def generateGreaterThan(value: T)(implicit ordering: Ordering[T]): T = {
+        val candidate = generator.generateOne
+        if (ordering.compare(candidate, value) > 0) candidate else generateGreaterThan(value)
       }
 
       def toGeneratorOfSomes:   Gen[Option[T]] = generator map Option.apply

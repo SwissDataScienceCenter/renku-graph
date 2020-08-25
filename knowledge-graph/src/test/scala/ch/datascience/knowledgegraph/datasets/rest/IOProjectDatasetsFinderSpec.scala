@@ -19,14 +19,11 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
-import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.SameAs
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.DataSet
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -44,83 +41,84 @@ class IOProjectDatasetsFinderSpec
 
   "findProjectDatasets" should {
 
-    "return all datasets of the given project" in new TestCase {
-      forAll(projectPaths, datasets, datasets) { (projectPath, dataset1, dataset2) =>
+    "return the very last modification of a dataset in the given project" in new TestCase {
+      forAll(datasetProjects, addedToProjectObjects) { (project, addedToProject) =>
+        val originalDataset = nonModifiedDatasets(
+          projects = project.copy(created = addedToProject).toGenerator
+        ).generateOne
+        val datasetModification1Creation = project.copy(created = addedToProject) shiftDateAfter project
+        val datasetModification1 = modifiedDatasetsOnFirstProject(
+          originalDataset.copy(projects = List(datasetModification1Creation))
+        ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
+        val datasetModification2 = modifiedDatasetsOnFirstProject(
+          datasetModification1.copy(
+            projects = List(project.copy(created = addedToProject) shiftDateAfter datasetModification1Creation)
+          )
+        ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
+
         loadToStore(
           randomDataSetCommit,
-          dataSetCommit()(projectPath)(
-            datasetIdentifier  = dataset1.id,
-            datasetTitle       = dataset1.title,
-            datasetName        = dataset1.name,
-            maybeDatasetSameAs = dataset1.sameAs.some
-          ),
-          dataSetCommit()(projectPath)(
-            datasetIdentifier  = dataset2.id,
-            datasetTitle       = dataset2.title,
-            datasetName        = dataset2.name,
-            maybeDatasetSameAs = dataset2.sameAs.some
-          )
+          originalDataset.toJsonLD()(),
+          datasetModification1.toJsonLD(topmostDerivedFrom = originalDataset.entityId.asDerivedFrom),
+          datasetModification2.toJsonLD(topmostDerivedFrom = originalDataset.entityId.asDerivedFrom)
         )
 
-        datasetsFinder.findProjectDatasets(projectPath).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.title, dataset1.name, dataset1.sameAs),
-          (dataset2.id, dataset2.title, dataset2.name, dataset2.sameAs)
+        datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
+          (datasetModification2.id,
+           datasetModification2.title,
+           datasetModification2.name,
+           Right(datasetModification2.derivedFrom))
         )
       }
     }
 
-    "return datasets of the given project with sameAs from the very top ancestor " +
-      "- case with an external dataset" in new TestCase {
-      forAll(projectPaths, datasets, projectPaths, datasets) { (project1, dataset1, project2, dataset2) =>
+    "return non-modified datasets and the very last modifications of project's datasets" in new TestCase {
+      forAll(datasetProjects, addedToProjectObjects) { (project, addedToProject) =>
+        val dataset1 = nonModifiedDatasets(projects = project.toGenerator).generateOne
+        val dataset2 = nonModifiedDatasets(
+          projects = project.copy(created = addedToProject).toGenerator
+        ).generateOne
+        val dataset2Modification = modifiedDatasetsOnFirstProject(
+          dataset2.copy(projects = List(project.copy(created = addedToProject) shiftDateAfter project))
+        ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
+
         loadToStore(
-          dataSetCommit()(project1)(
-            datasetIdentifier  = dataset1.id,
-            datasetTitle       = dataset1.title,
-            datasetName        = dataset1.name,
-            maybeDatasetSameAs = dataset1.sameAs.some
-          ),
-          dataSetCommit()(project2)(
-            datasetIdentifier  = dataset2.id,
-            datasetTitle       = dataset2.title,
-            datasetName        = dataset2.name,
-            maybeDatasetSameAs = DataSet.entityId(dataset1.id).asSameAs.some
-          )
+          dataset1.toJsonLD()(),
+          dataset2.toJsonLD()(),
+          dataset2Modification.toJsonLD()
         )
 
-        datasetsFinder.findProjectDatasets(project1).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.title, dataset1.name, dataset1.sameAs)
-        )
-        datasetsFinder.findProjectDatasets(project2).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset2.id, dataset2.title, dataset2.name, dataset1.sameAs)
+        datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
+          (dataset1.id, dataset1.title, dataset1.name, Left(dataset1.sameAs)),
+          (dataset2Modification.id,
+           dataset2Modification.title,
+           dataset2Modification.name,
+           Right(dataset2Modification.derivedFrom))
         )
       }
     }
 
-    "return datasets of the given project with sameAs from the very top ancestor " +
-      "- case with in-renku created dataset" in new TestCase {
-      forAll(projectPaths, datasets, projectPaths, datasets) { (project1, dataset1, project2, dataset2) =>
-        val dataSet1BasedSameAs = DataSet.entityId(dataset1.id).asSameAs
+    "return all datasets of the given project without merging datasets having the same sameAs" in new TestCase {
+      forAll(datasetProjects) { project =>
+        val sharedSameAs = datasetSameAs.generateOne
+        val dataset1 = nonModifiedDatasets(projects = project.toGenerator).generateOne.copy(
+          sameAs = sharedSameAs
+        )
+        val dataset2 = nonModifiedDatasets(
+          projects = project.copy(created = addedToProjectObjects.generateOne).toGenerator
+        ).generateOne.copy(
+          sameAs = sharedSameAs
+        )
 
         loadToStore(
-          dataSetCommit()(project1)(
-            datasetIdentifier  = dataset1.id,
-            datasetTitle       = dataset1.title,
-            datasetName        = dataset1.name,
-            maybeDatasetSameAs = None
-          ),
-          dataSetCommit()(project2)(
-            datasetIdentifier  = dataset2.id,
-            datasetTitle       = dataset2.title,
-            datasetName        = dataset2.name,
-            maybeDatasetSameAs = dataSet1BasedSameAs.some
-          )
+          randomDataSetCommit,
+          dataset1.toJsonLD()(),
+          dataset2.toJsonLD()()
         )
 
-        datasetsFinder.findProjectDatasets(project1).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.title, dataset1.name, dataSet1BasedSameAs)
-        )
-        datasetsFinder.findProjectDatasets(project2).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset2.id, dataset2.title, dataset2.name, dataSet1BasedSameAs)
+        datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
+          (dataset1.id, dataset1.title, dataset1.name, Left(sharedSameAs)),
+          (dataset2.id, dataset2.title, dataset2.name, Left(sharedSameAs))
         )
       }
     }
@@ -129,10 +127,6 @@ class IOProjectDatasetsFinderSpec
       val projectPath = projectPaths.generateOne
       datasetsFinder.findProjectDatasets(projectPath).unsafeRunSync() shouldBe List.empty
     }
-  }
-
-  private implicit class EntityIdOps(entityId: EntityId) {
-    lazy val asSameAs: SameAs = SameAs.fromId(entityId.value.toString).fold(throw _, identity)
   }
 
   private trait TestCase {

@@ -25,6 +25,7 @@ import ch.datascience.rdfstore.entities.ProcessRun.{ChildProcessRun, StandAloneP
 import ch.datascience.rdfstore.entities.WorkflowRun.ActivityWorkflowRun
 
 import scala.language.postfixOps
+import scala.reflect.ClassTag
 
 class Activity(val commitId:                 CommitId,
                val committedDate:            CommittedDate,
@@ -43,6 +44,13 @@ class Activity(val commitId:                 CommitId,
       .flatMap(_.maybeReverseEntity)
       .find(_.location == location)
       .getOrElse(throw new IllegalStateException(s"No entity for $location on Activity for $commitId"))
+
+  def entity[T](implicit tag: ClassTag[T]): T =
+    generations
+      .flatMap(_.maybeReverseEntity)
+      .find(entity => tag.runtimeClass isAssignableFrom entity.getClass)
+      .getOrElse(throw new IllegalStateException(s"No entity of type ${tag.runtimeClass} on Activity for $commitId"))
+      .asInstanceOf[T]
 }
 
 object Activity {

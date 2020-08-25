@@ -129,7 +129,7 @@ Response body example:
   "title" : "dataset title",
   "name" : "dataset alternate name",
   "url" : "http://host/url1",  // optional property
-  "sameAs" : "http://host/url1",
+   "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
   "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
   "published" : {
     "datePublished" : "2012-10-14T03:02:25.639Z", // optional property
@@ -373,6 +373,7 @@ Response body example:
       "title": "rmDaYfpehl",
       "name": "mniouUnmal",
       "sameAs": "http://host/url1",
+      "derivedFrom" : "http://host/url1",  
       "_links": [  
          {  
             "rel": "details",
@@ -383,7 +384,8 @@ Response body example:
    {  
       "identifier": "a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
       "name": "a",
-      "sameAs": "http://host/url2",
+      "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
+      "derivedFrom" : "http://host/url2",             // optional property when no "sameAs" exists
       "_links": [  
          {  
             "rel": "details",

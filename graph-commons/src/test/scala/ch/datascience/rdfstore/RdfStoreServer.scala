@@ -19,16 +19,14 @@
 package ch.datascience.rdfstore
 
 import java.net.BindException
-import java.nio.file.Files
 
-import cats.effect.{ExitCode, IO, IOApp, Timer}
+import cats.effect._
 import cats.implicits._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import org.apache.jena.fuseki.FusekiException
 import org.apache.jena.fuseki.main.FusekiServer
-import org.apache.lucene.store.MMapDirectory
 
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -37,17 +35,36 @@ object RdfStoreServer extends IOApp {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      _ <- new RdfStoreServer(3030, DatasetName("renku")).start
+      _ <- new RdfStoreServer(3030, DatasetName("renku"), muteLogging = false).start
     } yield ExitCode.Success
 }
 
-class RdfStoreServer(port: Int Refined Positive, datasetName: DatasetName)(implicit timer: Timer[IO]) {
+class RdfStoreServer(
+    port:         Int Refined Positive,
+    datasetName:  DatasetName,
+    muteLogging:  Boolean = true
+)(implicit timer: Timer[IO]) {
+
+  if (!muteLogging) {
+    import org.apache.jena.atlas.logging.LogCtl
+    import org.apache.jena.fuseki.Fuseki._
+    import org.slf4j.event.Level._
+
+    LogCtl.setJavaLogging()
+    LogCtl.setLevel(requestLogName, INFO.toString)
+    LogCtl.setLevel(actionLogName, INFO.toString)
+    LogCtl.setLevel(serverLogName, ERROR.toString)
+    LogCtl.setLevel(adminLogName, ERROR.toString)
+    LogCtl.setLevel("org.eclipse.jetty", ERROR.toString)
+  }
 
   private lazy val dataset = {
+    import java.nio.file.Files
+
     import org.apache.jena.graph.NodeFactory
     import org.apache.jena.query.DatasetFactory
     import org.apache.jena.query.text.{EntityDefinition, TextDatasetFactory, TextIndexConfig}
-    import org.apache.lucene.store.RAMDirectory
+    import org.apache.lucene.store.MMapDirectory
 
     val entityDefinition: EntityDefinition = {
       val definition = new EntityDefinition("uri", "name")

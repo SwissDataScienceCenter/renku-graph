@@ -16,13 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.json
+package ch.datascience.tinytypes
 
 import java.time.{Instant, LocalDate}
 
-import ch.datascience.tinytypes._
-
-private object DecodingTestTypes {
+private object TestTinyTypes {
 
   class StringTestType private (val value: String) extends AnyVal with StringTinyType
   implicit object StringTestType extends TinyTypeFactory[StringTestType](new StringTestType(_)) {

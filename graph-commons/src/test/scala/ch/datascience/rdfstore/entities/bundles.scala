@@ -22,13 +22,15 @@ import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}
+import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Keyword, Name, PartLocation, PartName, PublishedDate, SameAs, Title, Url}
+import ch.datascience.graph.model.datasets.{DerivedFrom, Description, Identifier, Keyword, Name, PartLocation, PartName, PublishedDate, SameAs, Title, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path, SchemaVersion}
 import ch.datascience.graph.model.{CliVersion, GraphModelGenerators, datasets, projects}
+import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream
 import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
 import ch.datascience.rdfstore.entities.CommandParameter._
@@ -36,7 +38,6 @@ import ch.datascience.rdfstore.entities.DataSetPart.{DataSetPartArtifact, dataSe
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.ProcessRun.StandAloneProcessRun
 import ch.datascience.rdfstore.entities.RunPlan.{Command, ProcessRunPlan}
-import ch.datascience.rdfstore.{FusekiBaseUrl, Schemas}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
@@ -81,9 +82,12 @@ object bundles extends Schemas {
     ).asJsonLD
 
   def randomDataSetCommit(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
-    dataSetCommit()()()
+    randomDataSetActivity.asJsonLD
 
-  def dataSetCommit(
+  def randomDataSetActivity: Activity =
+    Gen.oneOf(nonModifiedDataSetActivity()()(), modifiedDataSetActivity()()()).generateOne
+
+  def nonModifiedDataSetCommit(
       commitId:      CommitId      = commitIds.generateOne,
       committedDate: CommittedDate = committedDates.generateOne,
       committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
@@ -96,47 +100,198 @@ object bundles extends Schemas {
       maybeParent:         Option[Project]      = None,
       projectVersion:      SchemaVersion        = projectSchemaVersions.generateOne
   )(
-      datasetIdentifier:         Identifier = datasetIdentifiers.generateOne,
-      datasetTitle:              Title = datasetTitles.generateOne,
-      datasetName:               Name = datasetNames.generateOne,
-      maybeDatasetUrl:           Option[Url] = Gen.option(datasetUrls).generateOne,
-      maybeDatasetSameAs:        Option[SameAs] = Gen.option(datasetSameAs).generateOne,
-      maybeDatasetDescription:   Option[Description] = Gen.option(datasetDescriptions).generateOne,
-      maybeDatasetPublishedDate: Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
-      datasetCreatedDate:        datasets.DateCreated = datasets.DateCreated(committedDate.value),
-      datasetCreators:           Set[Person] = setOf(persons).generateOne,
-      datasetParts:              List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
-      datasetKeywords:           List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne
-  )(implicit renkuBaseUrl:       RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = {
-    val project =
-      Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion)
-    Activity(
+      datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
+      datasetTitle:               Title = datasetTitles.generateOne,
+      datasetName:                Name = datasetNames.generateOne,
+      datasetUrl:                 Url = datasetUrls.generateOne,
+      maybeDatasetSameAs:         Option[SameAs] = Gen.option(datasetSameAs).generateOne,
+      maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
+      maybeDatasetPublishedDate:  Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
+      datasetCreatedDate:         datasets.DateCreated = datasets.DateCreated(committedDate.value),
+      datasetCreators:            Set[Person] = setOf(persons).generateOne,
+      datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
+      overrideTopmostSameAs:      Option[SameAs] = None,
+      overrideTopmostDerivedFrom: Option[DerivedFrom] = None
+  )(implicit renkuBaseUrl:        RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
+    nonModifiedDataSetActivity(
       commitId,
       committedDate,
       committer,
-      project,
-      Agent(cliVersion),
-      maybeGenerationFactories = List(
-        Generation.factory(
-          DataSet.factory(
-            datasetIdentifier,
-            datasetTitle,
-            datasetName,
-            maybeDatasetUrl,
-            maybeDatasetSameAs,
-            maybeDatasetDescription,
-            maybeDatasetPublishedDate,
-            datasetCreatedDate,
-            datasetCreators,
-            datasetParts.map {
-              case (name, location) => DataSetPart.factory(name, location, None)(_)
-            },
-            datasetKeywords
-          )
+      cliVersion
+    )(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion)(
+      datasetIdentifier,
+      datasetTitle,
+      datasetName,
+      datasetUrl,
+      maybeDatasetSameAs,
+      maybeDatasetDescription,
+      maybeDatasetPublishedDate,
+      datasetCreatedDate,
+      datasetCreators,
+      datasetParts,
+      datasetKeywords,
+      overrideTopmostSameAs,
+      overrideTopmostDerivedFrom
+    ).asJsonLD
+
+  def nonModifiedDataSetActivity(
+      commitId:      CommitId      = commitIds.generateOne,
+      committedDate: CommittedDate = committedDates.generateOne,
+      committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion:    CliVersion    = cliVersions.generateOne
+  )(
+      projectPath:         Path                 = projectPaths.generateOne,
+      projectName:         projects.Name        = projectNames.generateOne,
+      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
+      maybeParent:         Option[Project]      = None,
+      projectVersion:      SchemaVersion        = projectSchemaVersions.generateOne
+  )(
+      datasetIdentifier:          Identifier                     = datasetIdentifiers.generateOne,
+      datasetTitle:               Title                          = datasetTitles.generateOne,
+      datasetName:                Name                           = datasetNames.generateOne,
+      datasetUrl:                 Url                            = datasetUrls.generateOne,
+      maybeDatasetSameAs:         Option[SameAs]                 = Gen.option(datasetSameAs).generateOne,
+      maybeDatasetDescription:    Option[Description]            = Gen.option(datasetDescriptions).generateOne,
+      maybeDatasetPublishedDate:  Option[PublishedDate]          = Gen.option(datasetPublishedDates).generateOne,
+      datasetCreatedDate:         datasets.DateCreated           = datasets.DateCreated(committedDate.value),
+      datasetCreators:            Set[Person]                    = setOf(persons).generateOne,
+      datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      datasetKeywords:            List[Keyword]                  = listOf(GraphModelGenerators.datasetKeywords).generateOne,
+      overrideTopmostSameAs:      Option[SameAs]                 = None,
+      overrideTopmostDerivedFrom: Option[DerivedFrom]            = None
+  ): Activity = Activity(
+    commitId,
+    committedDate,
+    committer,
+    Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion),
+    Agent(cliVersion),
+    maybeGenerationFactories = List(
+      Generation.factory(
+        DataSet.nonModifiedFactory(
+          datasetIdentifier,
+          datasetTitle,
+          datasetName,
+          datasetUrl,
+          maybeDatasetSameAs,
+          maybeDatasetDescription,
+          maybeDatasetPublishedDate,
+          datasetCreatedDate,
+          datasetCreators,
+          datasetParts.map {
+            case (name, location) => DataSetPart.factory(name, location, None)(_)
+          },
+          datasetKeywords,
+          overrideTopmostSameAs      = overrideTopmostSameAs,
+          overrideTopmostDerivedFrom = overrideTopmostDerivedFrom
         )
       )
+    )
+  )
+
+  def modifiedDataSetCommit(
+      commitId:      CommitId      = commitIds.generateOne,
+      committedDate: CommittedDate = committedDates.generateOne,
+      committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion:    CliVersion    = cliVersions.generateOne
+  )(
+      projectPath:         Path                 = projectPaths.generateOne,
+      projectName:         projects.Name        = projectNames.generateOne,
+      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
+      maybeParent:         Option[Project]      = None,
+      projectVersion:      SchemaVersion        = projectSchemaVersions.generateOne
+  )(
+      datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
+      datasetTitle:               Title = datasetTitles.generateOne,
+      datasetName:                Name = datasetNames.generateOne,
+      datasetUrl:                 Url = datasetUrls.generateOne,
+      datasetDerivedFrom:         DerivedFrom = datasetDerivedFroms.generateOne,
+      maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
+      maybeDatasetPublishedDate:  Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
+      datasetCreatedDate:         datasets.DateCreated = datasets.DateCreated(committedDate.value),
+      datasetCreators:            Set[Person] = setOf(persons).generateOne,
+      datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
+      overrideTopmostSameAs:      Option[SameAs] = None,
+      overrideTopmostDerivedFrom: Option[DerivedFrom] = None
+  )(implicit renkuBaseUrl:        RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
+    modifiedDataSetActivity(
+      commitId,
+      committedDate,
+      committer,
+      cliVersion
+    )(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion)(
+      datasetIdentifier,
+      datasetTitle,
+      datasetName,
+      datasetUrl,
+      datasetDerivedFrom,
+      maybeDatasetDescription,
+      maybeDatasetPublishedDate,
+      datasetCreatedDate,
+      datasetCreators,
+      datasetParts,
+      datasetKeywords,
+      overrideTopmostSameAs,
+      overrideTopmostDerivedFrom
     ).asJsonLD
-  }
+
+  def modifiedDataSetActivity(
+      commitId:      CommitId      = commitIds.generateOne,
+      committedDate: CommittedDate = committedDates.generateOne,
+      committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion:    CliVersion    = cliVersions.generateOne
+  )(
+      projectPath:         Path                 = projectPaths.generateOne,
+      projectName:         projects.Name        = projectNames.generateOne,
+      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
+      maybeParent:         Option[Project]      = None,
+      projectVersion:      SchemaVersion        = projectSchemaVersions.generateOne
+  )(
+      datasetIdentifier:          Identifier                     = datasetIdentifiers.generateOne,
+      datasetTitle:               Title                          = datasetTitles.generateOne,
+      datasetName:                Name                           = datasetNames.generateOne,
+      datasetUrl:                 Url                            = datasetUrls.generateOne,
+      datasetDerivedFrom:         DerivedFrom                    = datasetDerivedFroms.generateOne,
+      maybeDatasetDescription:    Option[Description]            = Gen.option(datasetDescriptions).generateOne,
+      maybeDatasetPublishedDate:  Option[PublishedDate]          = Gen.option(datasetPublishedDates).generateOne,
+      datasetCreatedDate:         datasets.DateCreated           = datasets.DateCreated(committedDate.value),
+      datasetCreators:            Set[Person]                    = setOf(persons).generateOne,
+      datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
+      datasetKeywords:            List[Keyword]                  = listOf(GraphModelGenerators.datasetKeywords).generateOne,
+      overrideTopmostSameAs:      Option[SameAs]                 = None,
+      overrideTopmostDerivedFrom: Option[DerivedFrom]            = None
+  ): Activity = Activity(
+    commitId,
+    committedDate,
+    committer,
+    Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion),
+    Agent(cliVersion),
+    maybeGenerationFactories = List(
+      Generation.factory(
+        DataSet.modifiedFactory(
+          datasetIdentifier,
+          datasetTitle,
+          datasetName,
+          datasetUrl,
+          datasetDerivedFrom,
+          maybeDatasetDescription,
+          maybeDatasetPublishedDate,
+          datasetCreatedDate,
+          datasetCreators,
+          datasetParts.map {
+            case (name, location) => DataSetPart.factory(name, location, None)(_)
+          },
+          datasetKeywords,
+          overrideTopmostSameAs      = overrideTopmostSameAs,
+          overrideTopmostDerivedFrom = overrideTopmostDerivedFrom
+        )
+      )
+    )
+  )
 
   object exemplarLineageFlow {
 
@@ -179,10 +334,11 @@ object bundles extends Schemas {
 
       def dataSetGenerationFactory(partsFactories: List[Activity => DataSetPartArtifact]) =
         Generation.factory(
-          entityFactory = DataSet.factory(
+          entityFactory = DataSet.nonModifiedFactory(
             id             = dataSetId,
             title          = datasets.Title("zhbikes"),
             name           = datasets.Name("zhbikes"),
+            url            = datasetUrls.generateOne,
             createdDate    = datasetCreatedDates.generateOne,
             creators       = dataSetCreators,
             partsFactories = partsFactories

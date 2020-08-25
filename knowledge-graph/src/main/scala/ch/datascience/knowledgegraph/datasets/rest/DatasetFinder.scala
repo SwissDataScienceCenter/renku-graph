@@ -20,8 +20,8 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.Identifier
-import ch.datascience.knowledgegraph.datasets.model.Dataset
+import ch.datascience.graph.model.datasets.{Identifier, Keyword}
+import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
@@ -66,6 +66,19 @@ private class IODatasetFinder(
         keywords  = keywords
       )
     }
+
+  private implicit class DatasetOps(dataset: Dataset) {
+    def copy(published: DatasetPublishing,
+             parts:     List[DatasetPart],
+             projects:  List[DatasetProject],
+             keywords:  List[Keyword]): Dataset =
+      dataset match {
+        case ds: NonModifiedDataset =>
+          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords)
+        case ds: ModifiedDataset =>
+          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords)
+      }
+  }
 }
 
 private object IODatasetFinder {
@@ -82,9 +95,9 @@ private object IODatasetFinder {
       config       <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl
     } yield new IODatasetFinder(
-      new BaseDetailsFinder(config, renkuBaseUrl, logger, timeRecorder),
+      new BaseDetailsFinder(config, logger, timeRecorder),
       new CreatorsFinder(config, renkuBaseUrl, logger, timeRecorder),
       new PartsFinder(config, renkuBaseUrl, logger, timeRecorder),
-      new ProjectsFinder(config, renkuBaseUrl, logger, timeRecorder)
+      new ProjectsFinder(config, logger, timeRecorder)
     )
 }

@@ -20,7 +20,7 @@ package ch.datascience.tinytypes.json
 
 import java.time.format.DateTimeFormatter.{ISO_DATE, ISO_INSTANT}
 
-import DecodingTestTypes._
+import ch.datascience.tinytypes.TestTinyTypes._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import io.circe.Json

@@ -26,12 +26,12 @@ import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.constraints.NonNegativeInt
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.collection.NonEmpty
+import eu.timepit.refined.predicates.all.NonEmpty
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -74,9 +74,9 @@ private class IODatasetsFinder(
   override def findDatasets(maybePhrase:   Option[Phrase],
                             sort:          Sort.By,
                             pagingRequest: PagingRequest): IO[PagingResponse[DatasetSearchResult]] = {
+    val phrase = maybePhrase getOrElse Phrase("*")
     implicit val resultsFinder: PagedResultsFinder[IO, DatasetSearchResult] = pagedResultsFinder(
-      sparqlQuery(maybePhrase, sort),
-      maybeCountQuery = Some(countQuery(maybePhrase))
+      sparqlQuery(phrase, sort)
     )
     for {
       page                 <- findPage(pagingRequest)
@@ -85,360 +85,71 @@ private class IODatasetsFinder(
     } yield updatedPage
   }
 
-  private def sparqlQuery(maybePhrase: Option[Phrase], sort: Sort.By): SparqlQuery = SparqlQuery(
-    name = queryName(maybePhrase, "ds free-text search"),
+  private def sparqlQuery(phrase: Phrase, sort: Sort.By): SparqlQuery = SparqlQuery(
+    name = queryName(phrase, "ds free-text search"),
     Set(
+      "PREFIX prov: <http://www.w3.org/ns/prov#>",
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>",
-      "PREFIX schema: <http://schema.org/>",
-      "PREFIX prov: <http://www.w3.org/ns/prov#>",
-      "PREFIX text: <http://jena.apache.org/text#>"
-    ),
-    maybePhrase match {
-      case Some(phrase) if phrase.value.trim != "*" =>
-        s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?projectsCount
-            |WHERE {
-            |  {
-            |    # locating earliest commit (date) where dataset with same origin was added
-            |    SELECT ?topmostSameAs (MIN(?dateCreated) AS ?minDateCreated) ?projectsCount
-            |    WHERE {
-            |      {
-            |        # grouping datasets by sameAs and finding number of projects sharing the sameAs
-            |        SELECT ?topmostSameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
-            |        WHERE {
-            |          {
-            |            # finding datasets matching the phrase 
-            |            # (to narrow down the ds ids set and to prevent from additional lookups to lucene)
-            |            SELECT ?topmostSameAs
-            |            WHERE {
-            |              {
-            |                SELECT ?l0
-            |                WHERE {
-            |                  {
-            |                    ?l0 text:query (schema:name '$phrase') ;
-            |                        rdf:type <http://schema.org/Dataset> .
-            |                  } UNION {
-            |                    ?l0 text:query (schema:description '$phrase') ;
-            |                        rdf:type <http://schema.org/Dataset> .
-            |                  } UNION {
-            |                    {
-            |                      SELECT ?personId
-            |                      WHERE {
-            |                        ?personId text:query (schema:name '$phrase') ;
-            |                                  rdf:type <http://schema.org/Person> .
-            |                      }
-            |                      GROUP BY ?personId
-            |                    } {
-            |                      ?l0 schema:creator ?personId ;
-            |                          rdf:type <http://schema.org/Dataset> .
-            |                    }
-            |                  }
-            |                }
-            |                GROUP BY ?l0
-            |                HAVING (COUNT(*) > 0)
-            |              } {
-            |                # flattening project the import hierarchy
-            |                {
-            |                  {
-            |                    ?l0 schema:sameAs+/schema:url ?l1.
-            |                    FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
-            |                    BIND (?l1 AS ?topmostSameAs)
-            |                  } UNION {
-            |                    ?l0 rdf:type <http://schema.org/Dataset>.
-            |                    FILTER NOT EXISTS { ?l0 schema:sameAs ?l1 }
-            |                    BIND (?l0 AS ?topmostSameAs)
-            |                  }
-            |                } UNION {
-            |                  ?l0 schema:sameAs+/schema:url ?l1.
-            |                  ?l1 schema:sameAs+/schema:url ?l2.
-            |                  FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
-            |                  BIND (?l2 AS ?topmostSameAs)
-            |                } UNION {
-            |                  ?l0 schema:sameAs+/schema:url ?l1.
-            |                  ?l1 schema:sameAs+/schema:url ?l2.
-            |                  ?l2 schema:sameAs+/schema:url ?l3.
-            |                  FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
-            |                  BIND (?l3 AS ?topmostSameAs)
-            |                } UNION {
-            |                  ?l0 schema:sameAs+/schema:url ?l1.
-            |                  ?l1 schema:sameAs+/schema:url ?l2.
-            |                  ?l2 schema:sameAs+/schema:url ?l3.
-            |                  ?l3 schema:sameAs+/schema:url ?l4.
-            |                  FILTER NOT EXISTS { ?l4 schema:sameAs ?l5 }
-            |                  BIND (?l4 AS ?topmostSameAs)
-            |                }
-            |              }
-            |            }
-            |            GROUP BY ?topmostSameAs
-            |            HAVING (COUNT(*) > 0)
-            |          } {
-            |            {
-            |              {
-            |                ?l0 schema:sameAs+/schema:url ?topmostSameAs;
-            |                    schema:isPartOf ?projectId.
-            |                FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l2 }
-            |              } UNION {
-            |                ?topmostSameAs rdf:type <http://schema.org/Dataset>;
-            |                    schema:isPartOf ?projectId.
-            |                FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l1 }
-            |              }
-            |            } UNION {
-            |              ?l0 schema:sameAs+/schema:url ?l1;
-            |                  schema:isPartOf ?projectId.
-            |              ?l1 schema:sameAs+/schema:url ?topmostSameAs
-            |              FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l3 }
-            |            } UNION {
-            |              ?l0 schema:sameAs+/schema:url ?l1;
-            |                  schema:isPartOf ?projectId.
-            |              ?l1 schema:sameAs+/schema:url ?l2.
-            |              ?l2 schema:sameAs+/schema:url ?topmostSameAs
-            |              FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l4 }
-            |            } UNION {
-            |              ?l0 schema:sameAs+/schema:url ?l1;
-            |                  schema:isPartOf ?projectId.
-            |              ?l1 schema:sameAs+/schema:url ?l2.
-            |              ?l2 schema:sameAs+/schema:url ?l3.
-            |              ?l3 schema:sameAs+/schema:url ?topmostSameAs
-            |              FILTER NOT EXISTS { ?topmostSameAs schema:sameAs ?l4 }
-            |            }
-            |          }
-            |        }
-            |        GROUP BY ?topmostSameAs
-            |        HAVING (COUNT(*) > 0)
-            |      } {
-            |        ?dsId schema:sameAs/schema:url ?topmostSameAs;
-            |              prov:qualifiedGeneration/prov:activity ?activityId.
-            |        ?activityId prov:startedAtTime ?dateCreated
-            |      } UNION {
-            |        ?topmostSameAs rdf:type <http://schema.org/Dataset>;
-            |                       schema:identifier ?id;
-            |                       prov:qualifiedGeneration/prov:activity ?activityId.
-            |        ?activityId prov:startedAtTime ?dateCreated
-            |      }
-            |    }
-            |    GROUP BY ?topmostSameAs ?projectsCount
-            |    HAVING (COUNT(*) > 0)
-            |  } {
-            |    ?dsId schema:sameAs/schema:url ?topmostSameAs;
-            |          schema:identifier ?identifier ;
-            |          schema:name ?name ;
-            |          schema:alternateName ?alternateName ;
-            |          prov:qualifiedGeneration/prov:activity ?activityId .
-            |    ?activityId prov:startedAtTime ?minDateCreated
-            |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
-            |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
-            |  } UNION {
-            |    ?topmostSameAs rdf:type <http://schema.org/Dataset>;
-            |                   schema:identifier ?identifier .
-            |    ?dsId schema:identifier ?identifier;
-            |          schema:name ?name ;
-            |          schema:alternateName ?alternateName ;
-            |          prov:qualifiedGeneration/prov:activity ?activityId .
-            |    ?activityId prov:startedAtTime ?minDateCreated
-            |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
-            |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
-            |  }
-            |}
-            |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?projectsCount
-            |HAVING (COUNT(*) > 0)
-            |${`ORDER BY`(sort)}
-            |""".stripMargin
-      case _ =>
-        s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?projectsCount
-            |WHERE {
-            |  {
-            |    # locating earliest commit (date) where dataset with same origin was added
-            |    SELECT ?topmostSameAs (MIN(?dateCreated) AS ?minDateCreated) ?projectsCount
-            |    WHERE {
-            |      {
-            |        # grouping datasets by sameAs and finding number of projects sharing the sameAs 
-            |        SELECT ?topmostSameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
-            |        WHERE {
-            |          # flattening project the import hierarchy
-            |          {
-            |            {
-            |              ?l0 schema:sameAs+/schema:url ?l1;
-            |                  schema:isPartOf ?projectId.
-            |              FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
-            |              BIND (?l1 AS ?topmostSameAs)
-            |            } UNION {
-            |              ?l0 rdf:type <http://schema.org/Dataset>;
-            |                  schema:isPartOf ?projectId.
-            |              FILTER NOT EXISTS { ?l0 schema:sameAs ?l1 }
-            |              BIND (?l0 AS ?topmostSameAs)
-            |            }
-            |          } UNION {
-            |            ?l0 schema:sameAs+/schema:url ?l1;
-            |                schema:isPartOf ?projectId.
-            |            ?l1 schema:sameAs+/schema:url ?l2
-            |            FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
-            |            BIND (?l2 AS ?topmostSameAs)
-            |          } UNION {
-            |            ?l0 schema:sameAs+/schema:url ?l1;
-            |                schema:isPartOf ?projectId.
-            |            ?l1 schema:sameAs+/schema:url ?l2.
-            |            ?l2 schema:sameAs+/schema:url ?l3.
-            |            FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
-            |            BIND (?l3 AS ?topmostSameAs)
-            |          } UNION {
-            |            ?l0 schema:sameAs+/schema:url ?l1;
-            |                schema:isPartOf ?projectId.
-            |            ?l1 schema:sameAs+/schema:url ?l2.
-            |            ?l2 schema:sameAs+/schema:url ?l3.
-            |            ?l3 schema:sameAs+/schema:url ?l4.
-            |            FILTER NOT EXISTS { ?l4 schema:sameAs ?l5 }
-            |            BIND (?l4 AS ?topmostSameAs)
-            |          }
-            |        }
-            |        GROUP BY ?topmostSameAs
-            |        HAVING (COUNT(*) >0)
-            |      } {
-            |        ?dsId schema:sameAs/schema:url ?topmostSameAs;
-            |              prov:qualifiedGeneration/prov:activity ?activityId .
-            |        ?activityId prov:startedAtTime ?dateCreated
-            |      } UNION {
-            |        ?topmostSameAs rdf:type <http://schema.org/Dataset>;
-            |                       schema:identifier ?id .
-            |        ?dsId schema:identifier ?id;
-            |              prov:qualifiedGeneration/prov:activity ?activityId .
-            |        ?activityId prov:startedAtTime ?dateCreated
-            |      }
-            |    }
-            |    GROUP BY ?topmostSameAs ?projectsCount
-            |  } {
-            |    ?dsId schema:sameAs/schema:url ?topmostSameAs;
-            |          schema:identifier ?identifier ;
-            |          schema:name ?name ;
-            |          schema:alternateName ?alternateName ;
-            |          prov:qualifiedGeneration/prov:activity ?activityId .
-            |    ?activityId prov:startedAtTime ?minDateCreated
-            |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
-            |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
-            |  } UNION {
-            |    ?topmostSameAs rdf:type <http://schema.org/Dataset>;
-            |                   schema:identifier ?identifier .
-            |    ?dsId schema:identifier ?identifier;
-            |          schema:name ?name ;
-            |          schema:alternateName ?alternateName ;
-            |          prov:qualifiedGeneration/prov:activity ?activityId .
-            |    ?activityId prov:startedAtTime ?minDateCreated
-            |    OPTIONAL { ?dsId schema:description ?maybeDescription } .
-            |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
-            |  }
-            |}
-            |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?projectsCount
-            |HAVING (COUNT(*) > 0)
-            |${`ORDER BY`(sort)}
-            |""".stripMargin
-    }
-  )
-
-  private def countQuery(maybePhrase: Option[Phrase]): SparqlQuery = SparqlQuery(
-    name = queryName(maybePhrase, "ds free-text search - count"),
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
       "PREFIX schema: <http://schema.org/>",
       "PREFIX text: <http://jena.apache.org/text#>"
     ),
-    maybePhrase match {
-      case Some(phrase) if phrase.value.trim != "*" =>
-        s"""|SELECT ?topmostSameAs
-            |WHERE {
-            |  {
-            |    SELECT ?l0
-            |    WHERE {
-            |      {
-            |        ?l0 text:query (schema:name '$phrase') ;
-            |            rdf:type <http://schema.org/Dataset> .
-            |      } UNION {
-            |        ?l0 text:query (schema:description '$phrase') ;
-            |            rdf:type <http://schema.org/Dataset> .
-            |      } UNION {
-            |        {
-            |          SELECT ?personId
-            |          WHERE {
-            |            ?personId text:query (schema:name '$phrase') ;
-            |                      rdf:type <http://schema.org/Person> .
-            |          }
-            |          GROUP BY ?personId
-            |        } {
-            |          ?l0 schema:creator ?personId ;
-            |              rdf:type <http://schema.org/Dataset> .
-            |        }
-            |      }
-            |    }
-            |    GROUP BY ?l0
-            |    HAVING (COUNT(*) > 0)
-            |  } {
-            |    {
-            |      {
-            |        ?l0 schema:sameAs+/schema:url ?l1
-            |        FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
-            |        BIND (?l1 AS ?topmostSameAs)
-            |      } UNION {
-            |        ?l0 rdf:type <http://schema.org/Dataset>.
-            |        FILTER NOT EXISTS { ?l0 schema:sameAs ?l1 }
-            |        BIND (?l0 AS ?topmostSameAs)
-            |      }
-            |    } UNION {
-            |      ?l0 schema:sameAs+/schema:url ?l1.
-            |      ?l1 schema:sameAs+/schema:url ?l2.
-            |      FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
-            |      BIND (?l2 AS ?topmostSameAs)
-            |    } UNION {
-            |      ?l0 schema:sameAs+/schema:url ?l1.
-            |      ?l1 schema:sameAs+/schema:url ?l2.
-            |      ?l2 schema:sameAs+/schema:url ?l3.
-            |      FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
-            |      BIND (?l3 AS ?topmostSameAs)
-            |    } UNION {
-            |      ?l0 schema:sameAs+/schema:url ?l1.
-            |      ?l1 schema:sameAs+/schema:url ?l2.
-            |      ?l2 schema:sameAs+/schema:url ?l3.
-            |      ?l3 schema:sameAs+/schema:url ?l4.
-            |      FILTER NOT EXISTS { ?l4 schema:sameAs ?l5 }
-            |      BIND (?l4 AS ?topmostSameAs)
-            |    }
-            |  }
-            |}
-            |GROUP BY ?topmostSameAs
-            |""".stripMargin
-      case _ =>
-        s"""|SELECT ?topmostSameAs
-            |WHERE {
-            |  {
-            |    {
-            |      ?l0 schema:sameAs+/schema:url ?l1
-            |      FILTER NOT EXISTS { ?l1 schema:sameAs ?l2 }
-            |      BIND (?l1 AS ?topmostSameAs)
-            |    } UNION {
-            |      ?l0 rdf:type <http://schema.org/Dataset>.
-            |      FILTER NOT EXISTS { ?l0 schema:sameAs ?l1 }
-            |      BIND (?l0 AS ?topmostSameAs)
-            |    }
-            |  } UNION {
-            |    ?l0 schema:sameAs+/schema:url ?l1.
-            |    ?l1 schema:sameAs+/schema:url ?l2.
-            |    FILTER NOT EXISTS { ?l2 schema:sameAs ?l3 }
-            |    BIND (?l2 AS ?topmostSameAs)
-            |  } UNION {
-            |    ?l0 schema:sameAs+/schema:url ?l1.
-            |    ?l1 schema:sameAs+/schema:url ?l2.
-            |    ?l2 schema:sameAs+/schema:url ?l3.
-            |    FILTER NOT EXISTS { ?l3 schema:sameAs ?l4 }
-            |    BIND (?l3 AS ?topmostSameAs)
-            |  } UNION {
-            |    ?l0 schema:sameAs+/schema:url ?l1.
-            |    ?l1 schema:sameAs+/schema:url ?l2.
-            |    ?l2 schema:sameAs+/schema:url ?l3.
-            |    ?l3 schema:sameAs+/schema:url ?l4.
-            |    FILTER NOT EXISTS { ?l4 schema:sameAs ?l5 }
-            |    BIND (?l4 AS ?topmostSameAs)
-            |  }
-            |}
-            |GROUP BY ?topmostSameAs
-            |""".stripMargin
-    }
+    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs ?projectsCount
+        |WHERE {
+        |  {
+        |    SELECT (MIN(?dateCreated) AS ?earliestCreated) ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
+        |    WHERE {
+        |      {
+        |        SELECT ?sameAs
+        |        WHERE {
+        |          {
+        |            SELECT ?id
+        |            WHERE { ?id text:query (schema:name schema:description schema:alternateName '$phrase') }
+        |            GROUP BY ?id
+        |            HAVING (COUNT(*) > 0)
+        |          } {
+        |            ?id rdf:type <http://schema.org/Dataset>;
+        |            	renku:topmostSameAs/schema:url ?sameAs.
+        |          } UNION {
+        |            ?id rdf:type <http://schema.org/Person>.
+        |            ?luceneDsId schema:creator ?id;
+        |                        rdf:type <http://schema.org/Dataset>;
+        |                        renku:topmostSameAs/schema:url ?sameAs.
+        |          }
+        |        }
+        |        GROUP BY ?sameAs
+        |        HAVING (COUNT(*) > 0)
+        |      } {
+        |        ?allDsId rdf:type <http://schema.org/Dataset>;
+        |                 renku:topmostSameAs/schema:url ?sameAs;
+        |                 prov:qualifiedGeneration/prov:activity ?activityId;
+        |                 schema:isPartOf ?projectId.
+        |        ?activityId prov:startedAtTime ?dateCreated.
+        |        FILTER NOT EXISTS {
+        |          ?someId prov:wasDerivedFrom ?allDsId.
+        |          ?someId schema:isPartOf ?projectId.
+        |        }
+        |      }
+        |    }
+        |    GROUP BY ?sameAs
+        |    HAVING (COUNT(*) > 0)
+        |  } {
+        |    ?dsId rdf:type <http://schema.org/Dataset>;
+        |          renku:topmostSameAs/schema:url ?sameAs;
+        |          schema:identifier ?identifier;
+        |          schema:name ?name ;
+        |          schema:alternateName ?alternateName ;
+        |          prov:qualifiedGeneration/prov:activity ?activityId.
+        |    ?activityId prov:startedAtTime ?earliestCreated.
+        |    OPTIONAL { ?dsId schema:description ?maybeDescription }
+        |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
+        |    OPTIONAL { ?dsId prov:wasDerivedFrom ?maybeDerivedFrom }
+        |    OPTIONAL { ?dsId schema:url ?maybeUrl }
+        |  }
+        |}
+        |${`ORDER BY`(sort)}
+        |""".stripMargin
   )
 
   private def `ORDER BY`(sort: Sort.By): String = sort.property match {
@@ -452,10 +163,10 @@ private class IODatasetsFinder(
       findCreators(dataset.id)
         .map(creators => dataset.copy(published = dataset.published.copy(creators = creators)))
 
-  private def queryName(maybePhrase: Option[Phrase], name: String Refined NonEmpty): String Refined NonEmpty =
-    maybePhrase match {
-      case Some(phrase) if phrase.value.trim != "*" => name
-      case _                                        => Refined.unsafeApply(s"$name *")
+  private def queryName(phrase: Phrase, name: String Refined NonEmpty): String Refined NonEmpty =
+    phrase.value match {
+      case "*" => Refined.unsafeApply(s"$name *")
+      case _   => name
     }
 }
 

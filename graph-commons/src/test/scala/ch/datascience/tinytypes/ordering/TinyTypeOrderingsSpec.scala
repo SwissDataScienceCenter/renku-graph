@@ -16,14 +16,24 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.tinytypes.ordering
 
-import ch.datascience.tinytypes.constraints.{NonNegativeInt, PathSegment}
-import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
+import ch.datascience.generators.Generators._
+import ch.datascience.tinytypes.TestTinyTypes.InstantTestType
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-final class Step private (val value: Int) extends AnyVal with IntTinyType
-object Step extends TinyTypeFactory[Step](new Step(_)) with NonNegativeInt {
-  val one:   Step = Step(1)
-  val two:   Step = Step(2)
-  val three: Step = Step(3)
+class TinyTypeOrderingsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+
+  import TinyTypeOrderings._
+
+  "compareTo" should {
+
+    "work for InstantTinyTypes" in {
+      forAll(timestamps, timestamps) { (instant1, instant2) =>
+        InstantTestType(instant1) compareTo InstantTestType(instant2) shouldBe (instant1 compareTo instant2)
+      }
+    }
+  }
 }

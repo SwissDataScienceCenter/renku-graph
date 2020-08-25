@@ -31,7 +31,7 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, Title}
+import ch.datascience.graph.model.datasets.{Description, Identifier, Name, Title}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.client.AccessToken
@@ -77,18 +77,18 @@ class DatasetsResourcesSpec
       )
     }
     val dataset1CommitId = commitIds.generateOne
-    val dataset1Creation = addedToProject.generateOne.copy(
+    val dataset1Creation = addedToProjectObjects.generateOne.copy(
       agent = DatasetAgent(project.created.maybeCreator.flatMap(_.maybeEmail),
                            project.created.maybeCreator.map(_.name).getOrElse(userNames.generateOne))
     )
-    val dataset1 = datasets.generateOne.copy(
+    val dataset1 = nonModifiedDatasets().generateOne.copy(
       maybeDescription = Some(datasetDescriptions.generateOne),
       published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
       projects         = List(DatasetProject(project.path, project.name, dataset1Creation))
     )
-    val dataset2Creation = addedToProject.generateOne
+    val dataset2Creation = addedToProjectObjects.generateOne
     val dataset2CommitId = commitIds.generateOne
-    val dataset2 = datasets.generateOne.copy(
+    val dataset2 = nonModifiedDatasets().generateOne.copy(
       maybeDescription = None,
       published        = datasetPublishingInfos.generateOne.copy(maybeDate = None),
       projects         = List(DatasetProject(project.path, project.name, dataset2Creation))
@@ -98,7 +98,7 @@ class DatasetsResourcesSpec
 
       Given("some data in the RDF Store")
       val jsonLDTriples = JsonLD.arr(
-        dataSetCommit(
+        nonModifiedDataSetCommit(
           commitId      = dataset1CommitId,
           committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer     = Person(dataset1Creation.agent.name, dataset1Creation.agent.maybeEmail),
@@ -119,7 +119,7 @@ class DatasetsResourcesSpec
           datasetCreators           = dataset1.published.creators.map(toPerson),
           datasetParts              = dataset1.parts.map(part => (part.name, part.atLocation))
         ),
-        dataSetCommit(
+        nonModifiedDataSetCommit(
           commitId      = dataset2CommitId,
           committedDate = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer     = Person(dataset2Creation.agent.name, dataset2Creation.agent.maybeEmail),
@@ -202,18 +202,18 @@ class DatasetsResourcesSpec
 
       val text             = nonBlankStrings(minLength = 10).generateOne
       val dataset1Projects = nonEmptyList(projects).generateOne.toList
-      val dataset1 = datasets.generateOne.copy(
+      val dataset1 = nonModifiedDatasets().generateOne.copy(
         title    = sentenceContaining(text).map(_.value).map(Title.apply).generateOne,
         projects = dataset1Projects map toDatasetProject
       )
       val dataset2Projects = nonEmptyList(projects).generateOne.toList
-      val dataset2 = datasets.generateOne.copy(
+      val dataset2 = nonModifiedDatasets().generateOne.copy(
         maybeDescription = Some(sentenceContaining(text).map(_.value).map(Description.apply).generateOne),
         projects         = dataset2Projects map toDatasetProject
       )
       val dataset3Projects = nonEmptyList(projects).generateOne.toList
       val dataset3 = {
-        val dataset = datasets.generateOne
+        val dataset = nonModifiedDatasets().generateOne
         dataset.copy(
           published = dataset.published.copy(
             creators = Set(
@@ -224,16 +224,24 @@ class DatasetsResourcesSpec
           projects = dataset3Projects map toDatasetProject
         )
       }
-      val dataset4Projects = List(projects.generateOne)
-      val dataset4 = datasets.generateOne.copy(
+
+      val dataset4Projects = nonEmptyList(projects).generateOne.toList
+      val dataset4 = nonModifiedDatasets().generateOne.copy(
+        name     = sentenceContaining(text).map(_.value).map(Name.apply).generateOne,
         projects = dataset4Projects map toDatasetProject
       )
 
-      Given("some datasets with description, name and author containing some arbitrary chosen text")
+      val dataset5Projects = List(projects.generateOne)
+      val dataset5 = nonModifiedDatasets().generateOne.copy(
+        projects = dataset5Projects map toDatasetProject
+      )
+
+      Given("some datasets with title, description, name and author containing some arbitrary chosen text")
       pushToStore(dataset1, dataset1Projects)
       pushToStore(dataset2, dataset2Projects)
       pushToStore(dataset3, dataset3Projects)
       pushToStore(dataset4, dataset4Projects)
+      pushToStore(dataset5, dataset5Projects)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>")
       val datasetsSearchResponse = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}"
@@ -245,7 +253,8 @@ class DatasetsResourcesSpec
       foundDatasets.flatMap(sortCreators) should contain theSameElementsAs List(
         searchResultJson(dataset1),
         searchResultJson(dataset2),
-        searchResultJson(dataset3)
+        searchResultJson(dataset3),
+        searchResultJson(dataset4)
       ).flatMap(sortCreators)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc")
@@ -258,9 +267,10 @@ class DatasetsResourcesSpec
       val datasetsSortedByName = List(
         searchResultJson(dataset1),
         searchResultJson(dataset2),
-        searchResultJson(dataset3)
+        searchResultJson(dataset3),
+        searchResultJson(dataset4)
       ).flatMap(sortCreators)
-        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'name' property found")))
+        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
       foundDatasetsSortedByName.flatMap(sortCreators) shouldBe datasetsSortedByName
 
       When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc&page=2&per_page=1")
@@ -280,9 +290,10 @@ class DatasetsResourcesSpec
         searchResultJson(dataset1),
         searchResultJson(dataset2),
         searchResultJson(dataset3),
-        searchResultJson(dataset4)
+        searchResultJson(dataset4),
+        searchResultJson(dataset5)
       ).flatMap(sortCreators)
-        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'name' property found")))
+        .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
 
       When("user uses the response header link with the rel='first'")
       val firstPageLink     = searchForPage.headerLink(rel = "first")
@@ -294,7 +305,7 @@ class DatasetsResourcesSpec
         .flatMap(sortCreators)
     }
 
-    def pushToStore(dataset: Dataset, projects: List[Project])(implicit accessToken: AccessToken): Unit = {
+    def pushToStore(dataset: NonModifiedDataset, projects: List[Project])(implicit accessToken: AccessToken): Unit = {
       val firstProject +: otherProjects = projects
 
       val commitId      = commitIds.generateOne
@@ -321,15 +332,16 @@ class DatasetsResourcesSpec
     def toDataSetCommit(project:              Project,
                         commitId:             CommitId,
                         committedDate:        CommittedDate,
-                        dataset:              Dataset,
-                        overriddenIdentifier: Option[Identifier] = None) =
-      dataSetCommit(
+                        dataset:              NonModifiedDataset,
+                        overriddenIdentifier: Option[Identifier] = None): JsonLD =
+      nonModifiedDataSetCommit(
         commitId      = commitId,
         committedDate = committedDate,
         cliVersion    = currentCliVersion
       )(
-        projectPath = project.path,
-        projectName = project.name
+        projectPath    = project.path,
+        projectName    = project.name,
+        projectVersion = project.version
       )(
         datasetIdentifier         = overriddenIdentifier getOrElse dataset.id,
         datasetTitle              = dataset.title,
@@ -341,7 +353,7 @@ class DatasetsResourcesSpec
       )
 
     def toDatasetProject(project: Project) =
-      DatasetProject(project.path, project.name, addedToProject.generateOne)
+      DatasetProject(project.path, project.name, addedToProjectObjects.generateOne)
   }
 }
 
@@ -350,7 +362,7 @@ object DatasetsResources {
   import ch.datascience.json.JsonOps._
   import ch.datascience.tinytypes.json.TinyTypeEncoders._
 
-  def briefJson(dataset: Dataset): Json = json"""{
+  def briefJson(dataset: NonModifiedDataset): Json = json"""{
     "identifier": ${dataset.id.value},
     "title": ${dataset.title.value},
     "name": ${dataset.name.value},

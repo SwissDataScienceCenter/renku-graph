@@ -16,14 +16,18 @@
  * limitations under the License.
  */
 
-package ch.datascience.rdfstore.entities
+package ch.datascience.tinytypes.ordering
 
-import ch.datascience.tinytypes.constraints.{NonNegativeInt, PathSegment}
-import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
+import java.time.Instant
 
-final class Step private (val value: Int) extends AnyVal with IntTinyType
-object Step extends TinyTypeFactory[Step](new Step(_)) with NonNegativeInt {
-  val one:   Step = Step(1)
-  val two:   Step = Step(2)
-  val three: Step = Step(3)
+import ch.datascience.tinytypes.TinyType
+
+object TinyTypeOrderings {
+
+  implicit class TinyTypeOps[V](tinyType: TinyType { type V })(implicit val valueOrdering: Ordering[V]) {
+    def compareTo(other: TinyType { type V }): Int =
+      valueOrdering.compare(tinyType.value.asInstanceOf[V], other.value.asInstanceOf[V])
+  }
+
+  implicit val instantOrdering: Ordering[Instant] = (x: Instant, y: Instant) => x compareTo y
 }
