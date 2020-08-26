@@ -23,8 +23,8 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ UTC
 
 # Installing Renku and other dependencies
-RUN apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip py3-wheel openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev yaml-dev && \
-    python3 -m pip install 'renku==0.11.1' sentry-sdk && \
+RUN apk update && apk add --no-cache tzdata git git-lfs curl bash python3-dev py3-pip openssl-dev libffi-dev linux-headers gcc libxml2-dev libxslt-dev libc-dev yaml-dev && \
+    python3 -m pip install wheel 'renku==0.11.1' sentry-sdk  && \
     chown -R daemon:daemon . && \
     git config --global user.name 'renku'  && \
     git config --global user.email 'renku@renkulab.io'  && \
