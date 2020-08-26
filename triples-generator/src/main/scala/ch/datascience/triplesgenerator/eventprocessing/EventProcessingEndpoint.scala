@@ -29,6 +29,7 @@ import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
+import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 
@@ -116,6 +117,7 @@ object IOEventProcessingEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply(
+      subscriber:          Subscriber,
       triplesGeneration:   TriplesGeneration,
       metricsRegistry:     MetricsRegistry[IO],
       gitLabThrottler:     Throttler[IO, GitLab],
@@ -131,7 +133,7 @@ object IOEventProcessingEndpoint {
                                                      gitLabThrottler,
                                                      timeRecorder,
                                                      logger)
-      eventsProcessingRunner <- IOEventsProcessingRunner(commitEventProcessor, logger)
+      eventsProcessingRunner <- IOEventsProcessingRunner(commitEventProcessor, subscriber, logger)
       bodyDeserialiser = new EventBodyDeserialiser[IO]()
     } yield new EventProcessingEndpoint[IO](bodyDeserialiser, eventsProcessingRunner, logger)
 }

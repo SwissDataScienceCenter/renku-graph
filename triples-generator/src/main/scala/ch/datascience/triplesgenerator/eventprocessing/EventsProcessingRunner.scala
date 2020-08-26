@@ -27,6 +27,7 @@ import ch.datascience.config.ConfigLoader
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult._
+import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -51,10 +52,12 @@ object EventsProcessingRunner {
 }
 
 private class IOEventsProcessingRunner private (
-    eventProcessor: EventProcessor[IO],
-    semaphore:      Semaphore[IO],
-    logger:         Logger[IO]
-)(implicit cs:      ContextShift[IO])
+    eventProcessor:      EventProcessor[IO],
+    generationProcesses: Long Refined Positive,
+    semaphore:           Semaphore[IO],
+    subscriber:          Subscriber,
+    logger:              Logger[IO]
+)(implicit cs:           ContextShift[IO])
     extends EventsProcessingRunner[IO] {
 
   override def scheduleForProcessing(eventId: CompoundEventId,
@@ -72,22 +75,32 @@ private class IOEventsProcessingRunner private (
   private def process(eventId: CompoundEventId, events: NonEmptyList[CommitEvent]) = {
     for {
       _ <- eventProcessor.process(eventId, events)
-      _ <- semaphore.release
+      _ <- releaseAndNotify()
     } yield ()
   } recoverWith {
     case NonFatal(exception) =>
       for {
-        _ <- semaphore.release
+        _ <- releaseAndNotify()
         _ <- logger.error(exception)(s"Processing event $eventId failed")
       } yield ()
   }
 
   private def releasingSemaphore[O]: PartialFunction[Throwable, IO[O]] = {
     case NonFatal(exception) =>
-      semaphore.release flatMap { _ =>
-        exception.raiseError[IO, O]
+      semaphore.available flatMap {
+        case available if available == generationProcesses.value => exception.raiseError[IO, O]
+        case _ =>
+          semaphore.release flatMap { _ =>
+            exception.raiseError[IO, O]
+          }
       }
   }
+
+  private def releaseAndNotify(): IO[Unit] =
+    for {
+      _ <- semaphore.release
+      _ <- subscriber.notifyAvailability.start
+    } yield ()
 }
 
 private object IOEventsProcessingRunner {
@@ -99,11 +112,12 @@ private object IOEventsProcessingRunner {
 
   def apply(
       eventProcessor:      EventProcessor[IO],
+      subscriber:          Subscriber,
       logger:              Logger[IO],
       config:              Config = ConfigFactory.load()
   )(implicit contextShift: ContextShift[IO]): IO[EventsProcessingRunner[IO]] =
     for {
       generationProcesses <- find[IO, Long Refined Positive]("generation-processes-number", config)
       semaphore           <- Semaphore(generationProcesses.value)
-    } yield new IOEventsProcessingRunner(eventProcessor, semaphore, logger)
+    } yield new IOEventsProcessingRunner(eventProcessor, generationProcesses, semaphore, subscriber, logger)
 }

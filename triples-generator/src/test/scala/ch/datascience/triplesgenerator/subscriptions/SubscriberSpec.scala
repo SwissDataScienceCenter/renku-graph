@@ -41,6 +41,49 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
     interval = scaled(Span(150, Millis))
   )
 
+  "notifyAvailability" should {
+
+    "send subscription for events" in new TestCase {
+      val subscriberUrl = subscriberUrls.generateOne
+      (urlFinder.findSubscriberUrl _)
+        .expects()
+        .returning(subscriberUrl.pure[IO])
+
+      (subscriptionSender.postToEventLog _)
+        .expects(subscriberUrl)
+        .returning(IO.unit)
+
+      subscriber.notifyAvailability.unsafeRunSync() shouldBe ((): Unit)
+    }
+
+    "fail if finding the subscriber url fails" in new TestCase {
+      val exception = exceptions.generateOne
+      (urlFinder.findSubscriberUrl _)
+        .expects()
+        .returning(exception.raiseError[IO, SubscriberUrl])
+
+      intercept[Exception] {
+        subscriber.notifyAvailability.unsafeRunSync()
+      } shouldBe exception
+    }
+
+    "fail if posting the subscriber url fails" in new TestCase {
+      val subscriberUrl = subscriberUrls.generateOne
+      (urlFinder.findSubscriberUrl _)
+        .expects()
+        .returning(subscriberUrl.pure[IO])
+
+      val exception = exceptions.generateOne
+      (subscriptionSender.postToEventLog _)
+        .expects(subscriberUrl)
+        .returning(exception.raiseError[IO, Unit])
+
+      intercept[Exception] {
+        subscriber.notifyAvailability.unsafeRunSync()
+      } shouldBe exception
+    }
+  }
+
   "run" should {
 
     "send/resend subscription for events" in new TestCase {
@@ -51,7 +94,7 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .returning(subscriberUrl.pure[IO])
         .atLeastOnce()
 
-      (subscriptionSender.send _)
+      (subscriptionSender.postToEventLog _)
         .expects(subscriberUrl)
         .returning(IO.unit)
         .atLeastOnce()
@@ -78,7 +121,7 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .returning(subscriberUrl.pure[IO])
         .atLeastOnce()
 
-      (subscriptionSender.send _)
+      (subscriptionSender.postToEventLog _)
         .expects(subscriberUrl)
         .returning(IO.unit)
         .atLeastOnce()
@@ -102,10 +145,10 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .atLeastTwice()
 
       val exception = exceptions.generateOne
-      (subscriptionSender.send _)
+      (subscriptionSender.postToEventLog _)
         .expects(subscriberUrl)
         .returning(exception.raiseError[IO, Unit])
-      (subscriptionSender.send _)
+      (subscriptionSender.postToEventLog _)
         .expects(subscriberUrl)
         .returning(IO.unit)
         .atLeastOnce()
