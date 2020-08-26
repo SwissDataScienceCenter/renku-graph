@@ -28,7 +28,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait SubscriptionSender[Interpretation[_]] {
-  def send(subscriberUrl: SubscriberUrl): Interpretation[Unit]
+  def postToEventLog(subscriberUrl: SubscriberUrl): Interpretation[Unit]
 }
 
 private class IOSubscriptionSender(
@@ -49,7 +49,7 @@ private class IOSubscriptionSender(
 
   private val statuses = Set("NEW", "RECOVERABLE_FAILURE")
 
-  override def send(subscriberUrl: SubscriberUrl): IO[Unit] =
+  override def postToEventLog(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
       uri           <- validateUri(s"$eventLogUrl/subscriptions")
       sendingResult <- send(request(POST, uri).withEntity((subscriberUrl -> statuses).asJson))(mapResponse)

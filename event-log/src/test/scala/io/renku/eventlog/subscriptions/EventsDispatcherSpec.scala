@@ -102,7 +102,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       }
     }
 
-    "dispatch found event to the second subscriber " +
+    "mark subscriber busy and dispatch found event to some other subscriber " +
       s"if delivery to the first one resulted in $ServiceBusy" in new TestCase {
 
       val event = events.generateOne
@@ -114,6 +114,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
         nextUrl(returning  = url1.some)
         sending(event, got = ServiceBusy, forUrl = url1)
+        expectMarkedBusy(url1)
 
         hasOtherUrls(than  = url1, returning = true)
         nextUrl(returning  = url2.some)
@@ -142,14 +143,17 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
         nextUrl(returning  = url1.some)
         sending(event, got = ServiceBusy, forUrl = url1)
+        expectMarkedBusy(url1)
 
         hasOtherUrls(than  = url1, returning = true)
         nextUrl(returning  = url2.some)
         sending(event, got = ServiceBusy, forUrl = url2)
+        expectMarkedBusy(url2)
 
         hasOtherUrls(than  = url2, returning = true)
         nextUrl(returning  = url1.some)
         sending(event, got = ServiceBusy, forUrl = url1)
+        expectMarkedBusy(url1)
 
         hasOtherUrls(than  = url1, returning = true)
         nextUrl(returning  = url2.some)
@@ -178,10 +182,12 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
         nextUrl(returning  = url1.some)
         sending(event, got = ServiceBusy, forUrl = url1)
+        expectMarkedBusy(url1)
 
         hasOtherUrls(than  = url1, returning = false)
         nextUrl(returning  = url1.some)
         sending(event, got = ServiceBusy, forUrl = url1)
+        expectMarkedBusy(url1)
 
         hasOtherUrls(than  = url1, returning = false)
         nextUrl(returning  = url1.some)
@@ -494,7 +500,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
     val waitingEventsGauge   = mock[LabeledGauge[IO, projects.Path]]
     val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val subscriptions        = mock[TestIOSubscriptions]
+    val subscriptions        = mock[Subscriptions[IO]]
     val eventsFinder         = mock[EventFetcher[IO]]
     val statusUpdatesRunner  = mock[StatusUpdatesRunner[IO]]
     val eventsSender         = mock[EventsSender[IO]]
@@ -548,13 +554,18 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         .returning(returning.pure[IO])
 
     def nextUrl(returning: Option[SubscriberUrl]) =
-      (subscriptions.next _)
+      (subscriptions.nextFree _)
         .expects()
         .returning(returning.pure[IO])
 
     def expectRemoval(of: SubscriberUrl) =
       (subscriptions.remove _)
         .expects(of)
+        .returning(IO.unit)
+
+    def expectMarkedBusy(subscriberUrl: SubscriberUrl) =
+      (subscriptions.markBusy _)
+        .expects(subscriberUrl)
         .returning(IO.unit)
 
     def findingEvent(returning: Option[Event]) =

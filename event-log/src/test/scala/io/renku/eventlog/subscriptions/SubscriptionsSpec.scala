@@ -18,20 +18,27 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.IO
+import java.lang.Thread.sleep
+
+import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
 
   "add and getAll" should {
 
     "add the given Subscriber URL to the pool " +
-      "if it's not present there yet" in new TestCase {
+      "if it hasn't been added yet" in new TestCase {
       subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
       subscriptions.getAll.unsafeRunSync()             shouldBe List(subscriberUrl)
 
@@ -75,17 +82,30 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  "next" should {
+  "nextFree" should {
 
     "return None if there are no URLs" in new TestCase {
-      subscriptions.next.unsafeRunSync() shouldBe None
+      subscriptions.nextFree.unsafeRunSync() shouldBe None
     }
 
-    "return the only URL even if there just one" in new TestCase {
+    "return the only URL when the method called several times" in new TestCase {
       subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
-      subscriptions.next.unsafeRunSync() shouldBe subscriberUrl.some
-      subscriptions.next.unsafeRunSync() shouldBe subscriberUrl.some
+      subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
+      subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
+    }
+
+    "return the only URL after the sleep time passes if the URL was marked as Busy" in new TestCase {
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
+
+      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.nextFree.unsafeRunSync()                shouldBe None
+
+      sleep(busySleep.toMillis + 50)
+
+      subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
     }
 
     "iterate over all the added urls" in new TestCase {
@@ -94,9 +114,9 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
       subscriptions.add(otherUrl).unsafeRunSync() shouldBe ((): Unit)
 
       val receivedUrls = List(
-        subscriptions.next.unsafeRunSync(),
-        subscriptions.next.unsafeRunSync(),
-        subscriptions.next.unsafeRunSync()
+        subscriptions.nextFree.unsafeRunSync(),
+        subscriptions.nextFree.unsafeRunSync(),
+        subscriptions.nextFree.unsafeRunSync()
       ).flatten
       receivedUrls should have size 3
       val first = receivedUrls.head
@@ -109,12 +129,30 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
       val otherUrl = subscriberUrls.generateOne
       subscriptions.add(otherUrl).unsafeRunSync() shouldBe ((): Unit)
 
-      val Some(first) = subscriptions.next.unsafeRunSync()
+      val Some(first) = subscriptions.nextFree.unsafeRunSync()
 
       val expectedNext = if (first == subscriberUrl) otherUrl else subscriberUrl
       (subscriptions remove expectedNext).unsafeRunSync()
 
-      subscriptions.next.unsafeRunSync() shouldBe Some(first)
+      subscriptions.nextFree.unsafeRunSync() shouldBe Some(first)
+    }
+
+    "skip over busy item even if it supposed to be the next one" in new TestCase {
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      val otherUrl = subscriberUrls.generateOne
+      subscriptions.add(otherUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      val subscribers = Set(subscriberUrl, otherUrl)
+
+      val busySubscriber = Gen.oneOf(subscriberUrl, otherUrl).generateOne
+      subscriptions.markBusy(busySubscriber).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.nextFree.unsafeRunSync() shouldBe (subscribers - busySubscriber).headOption
+      subscriptions.nextFree.unsafeRunSync() shouldBe (subscribers - busySubscriber).headOption
+
+      sleep(busySleep.toMillis + 50)
+
+      subscriptions.nextFree.unsafeRunSync() shouldBe Some(busySubscriber)
     }
   }
 
@@ -122,6 +160,20 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
 
     "return false if there are no URLs" in new TestCase {
       subscriptions.isNext.unsafeRunSync() shouldBe false
+    }
+
+    "return false if the only URL is marked busy" in new TestCase {
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.isNext.unsafeRunSync() shouldBe true
+
+      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.isNext.unsafeRunSync() shouldBe false
+
+      sleep(busySleep.toMillis + 50)
+
+      subscriptions.isNext.unsafeRunSync() shouldBe true
     }
 
     "return true if there's at least a single URL" in new TestCase {
@@ -154,12 +206,54 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
 
       subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe true
     }
+
+    "return false if there are other URLs but they are marked busy" in new TestCase {
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      val otherSubscriber = subscriberUrls.generateOne
+      subscriptions.add(otherSubscriber).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe true
+
+      subscriptions.markBusy(otherSubscriber).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe false
+
+      sleep(busySleep.toMillis + 50)
+
+      subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe true
+    }
+  }
+
+  "markBusy" should {
+
+    "succeed if there is subscriber with the given url" in new TestCase {
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.nextFree.unsafeRunSync() shouldBe None
+
+      sleep(busySleep.toMillis + 50)
+
+      subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
+    }
+
+    "succeed if there is no subscriber with the given url" in new TestCase {
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.markBusy(subscriberUrls.generateOne).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
+    }
   }
 
   private trait TestCase {
     val subscriberUrl = subscriberUrls.generateOne
+    val busySleep     = 500 millis
 
+    private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+    private implicit val timer: Timer[IO]        = IO.timer(global)
     val logger        = TestLogger[IO]()
-    val subscriptions = Subscriptions(logger).unsafeRunSync()
+    val subscriptions = Subscriptions(logger, busySleep).unsafeRunSync()
   }
 }

@@ -38,6 +38,12 @@ class Subscriber(
   import subscriptionSender._
   import subscriptionUrlFinder._
 
+  def notifyAvailability: IO[Unit] =
+    for {
+      subscriberUrl <- findSubscriberUrl
+      _             <- postToEventLog(subscriberUrl)
+    } yield ()
+
   def run: IO[Unit] =
     for {
       _ <- timer sleep initialDelay
@@ -47,7 +53,7 @@ class Subscriber(
   private def subscribeForEvents(initOrError: Boolean): IO[Unit] = {
     for {
       subscriberUrl <- findSubscriberUrl
-      _             <- send(subscriberUrl) recoverWith errorLoggedAndRetry("Subscribing for events failed")
+      _             <- postToEventLog(subscriberUrl) recoverWith errorLoggedAndRetry("Subscribing for events failed")
       _             <- if (initOrError) logger.info(s"Subscribed for events with $subscriberUrl") else IO.unit
       _             <- timer sleep renewDelay
       _             <- subscribeForEvents(initOrError = false)

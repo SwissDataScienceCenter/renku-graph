@@ -21,7 +21,6 @@ package io.renku.eventlog
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors.newFixedThreadPool
 
-import cats.FlatMap.ops.toAllFlatMapOps
 import cats.effect._
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
@@ -54,10 +53,10 @@ object Microservice extends IOMicroservice {
   override def run(args: List[String]): IO[ExitCode] =
     for {
       transactorResource <- new EventLogDbConfigProvider[IO] map DbTransactorResource[IO, EventLogDB]
-      exitCode           <- runMicroservice(transactorResource, args)
+      exitCode           <- runMicroservice(transactorResource)
     } yield exitCode
 
-  private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB], args: List[String]) =
+  private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB]) =
     transactorResource.use { transactor =>
       for {
         _                    <- new IODbInitializer(transactor, ApplicationLogger).run
@@ -110,7 +109,7 @@ object Microservice extends IOMicroservice {
                        eventsDispatcher,
                        httpServer,
                        subProcessesCancelTokens
-                     ) run args
+                     ).run()
                    }
       } yield exitcode
 
@@ -126,7 +125,7 @@ private class MicroserviceRunner(
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
 )(implicit contextShift:      ContextShift[IO]) {
 
-  def run(args: List[String]): IO[ExitCode] =
+  def run(): IO[ExitCode] =
     for {
       _      <- sentryInitializer.run
       _      <- metrics.run.start map gatherCancelToken

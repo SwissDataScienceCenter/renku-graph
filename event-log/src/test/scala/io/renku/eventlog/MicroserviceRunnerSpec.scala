@@ -61,7 +61,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(context.pure(ExitCode.Success))
 
-      runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
+      runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
 
     "fail if Sentry initialisation fails" in new TestCase {
@@ -72,7 +72,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         .returning(context.raiseError(exception))
 
       intercept[Exception] {
-        runner.run(Nil).unsafeRunSync()
+        runner.run().unsafeRunSync()
       } shouldBe exception
     }
 
@@ -96,7 +96,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         .returning(context.raiseError(exception))
 
       intercept[Exception] {
-        runner.run(Nil).unsafeRunSync()
+        runner.run().unsafeRunSync()
       } shouldBe exception
     }
 
@@ -118,7 +118,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(context.pure(ExitCode.Success))
 
-      runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
+      runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
 
     "return Success ExitCode even if Event Log Metrics initialisation fails" in new TestCase {
@@ -139,7 +139,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(context.pure(ExitCode.Success))
 
-      runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
+      runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
   }
 
