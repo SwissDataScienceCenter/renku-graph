@@ -207,7 +207,7 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
       subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe true
     }
 
-    "return false if there are other URLs but there are marked busy" in new TestCase {
+    "return false if there are other URLs but they are marked busy" in new TestCase {
       subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
       val otherSubscriber = subscriberUrls.generateOne
       subscriptions.add(otherSubscriber).unsafeRunSync() shouldBe ((): Unit)
