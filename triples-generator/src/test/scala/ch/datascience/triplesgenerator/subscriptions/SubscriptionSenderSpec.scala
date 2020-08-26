@@ -36,7 +36,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
 
-  "send" should {
+  "postToEventLog" should {
 
     s"succeed if posting Subscriber URL and statuses NEW and RECOVERABLE_FAILURE results with $Accepted" in new TestCase {
 
@@ -46,7 +46,7 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
-      sender.send(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      sender.postToEventLog(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "fail when posting the payload results in any other status" in new TestCase {
@@ -59,7 +59,7 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
       }
 
       intercept[Exception] {
-        sender.send(subscriberUrl).unsafeRunSync()
+        sender.postToEventLog(subscriberUrl).unsafeRunSync()
       }.getMessage shouldBe s"POST $eventLogUrl/subscriptions returned $BadRequest; body: $message"
     }
   }

@@ -111,7 +111,7 @@ class SubscriptionsImpl private[subscriptions] (
 object Subscriptions {
   import cats.effect.IO
 
-  private val busySleep: FiniteDuration = 1 second
+  private val busySleep: FiniteDuration = 5 minutes
 
   def apply(
       logger:              Logger[IO],

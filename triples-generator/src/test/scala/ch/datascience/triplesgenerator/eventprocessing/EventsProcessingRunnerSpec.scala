@@ -23,6 +23,7 @@ import java.lang.Thread.sleep
 import EventProcessingGenerators._
 import cats.data.NonEmptyList
 import cats.effect._
+import cats.effect.concurrent.Semaphore
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
@@ -31,7 +32,9 @@ import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult.{Accepted, Busy}
+import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import com.typesafe.config.ConfigFactory
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
@@ -41,7 +44,12 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class EventsProcessingRunnerSpec extends AnyWordSpec with Eventually with IntegrationPatience with should.Matchers {
+class EventsProcessingRunnerSpec
+    extends AnyWordSpec
+    with MockFactory
+    with Eventually
+    with IntegrationPatience
+    with should.Matchers {
 
   "scheduleForProcessing" should {
 
@@ -60,8 +68,10 @@ class EventsProcessingRunnerSpec extends AnyWordSpec with Eventually with Integr
       // any new job to get the Busy status
       processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Busy
 
+      expectAvailabilityIsCommunicated
+
       // once at least one process is done, new events should be accepted again
-      sleep(eventProcessingTime + eventProcessingTime / 2)
+      sleep(eventProcessingTime + 50)
       processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
     }
 
@@ -74,8 +84,10 @@ class EventsProcessingRunnerSpec extends AnyWordSpec with Eventually with Integr
       // any new job to get the Busy status
       processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Busy
 
+      expectAvailabilityIsCommunicated
+
       // once at least one process is done, new events should be accepted again
-      sleep(eventProcessingTime + eventProcessingTime / 2)
+      sleep(eventProcessingTime + 50)
       processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
 
       eventually {
@@ -112,6 +124,13 @@ class EventsProcessingRunnerSpec extends AnyWordSpec with Eventually with Integr
     )
 
     val logger           = TestLogger[IO]()
-    val processingRunner = IOEventsProcessingRunner(eventProcessor, logger, config).unsafeRunSync()
+    val subscriber       = mock[Subscriber]
+    val processingRunner = IOEventsProcessingRunner(eventProcessor, subscriber, logger, config).unsafeRunSync()
+
+    def expectAvailabilityIsCommunicated =
+      (subscriber.notifyAvailability _)
+        .expects()
+        .returning(IO.unit)
+        .atLeastOnce()
   }
 }
