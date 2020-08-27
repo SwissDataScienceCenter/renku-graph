@@ -200,6 +200,42 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
       sleep(busySleep.toMillis + 50)
 
       subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
+
+      logger.loggedOnly(
+        Info(s"$subscriberUrl added"),
+        Info(s"$subscriberUrl busy - putting on hold"),
+        Info(s"$subscriberUrl taken from on hold")
+      )
+    }
+
+    "do not put on hold twice if it's already made busy" in new TestCase {
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.nextFree.unsafeRunSync() shouldBe None
+
+      // if we mark busy subscriber which is already put on hold
+      sleep(busySleep.toMillis / 2)
+      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      // and it's bring back after configured timeout (from the first markBusy call)
+      sleep(busySleep.toMillis / 2 + 50)
+      subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
+
+      // and removed permanently
+      subscriptions.remove(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      // it shouldn't be bring back by the second call to markBusy
+      sleep(busySleep.toMillis / 2 + 50)
+      subscriptions.nextFree.unsafeRunSync() shouldBe None
+
+      logger.loggedOnly(
+        Info(s"$subscriberUrl added"),
+        Info(s"$subscriberUrl busy - putting on hold"),
+        Info(s"$subscriberUrl taken from on hold"),
+        Info(s"$subscriberUrl gone - removing")
+      )
     }
 
     "succeed if there is no subscriber with the given url" in new TestCase {
@@ -208,6 +244,8 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
       subscriptions.markBusy(subscriberUrls.generateOne).unsafeRunSync() shouldBe ((): Unit)
 
       subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
+
+      logger.loggedOnly(Info(s"$subscriberUrl added"))
     }
   }
 

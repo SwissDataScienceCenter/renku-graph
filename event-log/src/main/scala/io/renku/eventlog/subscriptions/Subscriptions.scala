@@ -85,20 +85,20 @@ class SubscriptionsImpl private[subscriptions] (
   }
 
   override def remove(subscriberUrl: SubscriberUrl): IO[Unit] =
-    removeAndLog(subscriberUrl, logMessage = s"$subscriberUrl gone - removing")
+    removeAndLog(subscriberUrl, logMessage = s"$subscriberUrl gone - removing") map (_ => ())
 
-  private def removeAndLog(subscriberUrl: SubscriberUrl, logMessage: String): IO[Unit] =
+  private def removeAndLog(subscriberUrl: SubscriberUrl, logMessage: String): IO[Boolean] =
     for {
       removed <- IO(Option(subscriptionsPool remove subscriberUrl).isDefined)
       _       <- clearCurrentUrl(subscriberUrl)
       _       <- if (removed) logger.info(logMessage) else IO.unit
-    } yield ()
+    } yield removed
 
   override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
-      _ <- removeAndLog(subscriberUrl, logMessage = s"$subscriberUrl busy - putting on hold")
-      _ <- clearCurrentUrl(subscriberUrl)
-      _ <- waitAndAdd(subscriberUrl).start
+      removed <- removeAndLog(subscriberUrl, logMessage = s"$subscriberUrl busy - putting on hold")
+      _       <- clearCurrentUrl(subscriberUrl)
+      _       <- if (removed) waitAndAdd(subscriberUrl).start else IO.unit
     } yield ()
 
   private def clearCurrentUrl(ifSetTo: SubscriberUrl): IO[Unit] =
