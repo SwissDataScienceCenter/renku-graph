@@ -73,7 +73,7 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
 
       logger.loggedOnly(
         Info(s"$subscriberUrl added"),
-        Info(s"$subscriberUrl removed")
+        Info(s"$subscriberUrl gone - removing")
       )
     }
 

@@ -20,9 +20,8 @@ package io.renku.eventlog.subscriptions
 
 import java.util.concurrent.ConcurrentHashMap
 
-import cats.MonadError
-import cats.effect.{ContextShift, IO, Timer}
 import cats.effect.concurrent.Ref
+import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
 import io.chrisdavenport.log4cats.Logger
 
@@ -40,20 +39,24 @@ trait Subscriptions[Interpretation[_]] {
 }
 
 class SubscriptionsImpl private[subscriptions] (
-    currentUrl: Ref[IO, Option[SubscriberUrl]],
-    logger:     Logger[IO],
-    busySleep:  FiniteDuration
-)(implicit ME:  MonadError[IO, Throwable], contextShift: ContextShift[IO], timer: Timer[IO])
+    currentUrl:          Ref[IO, Option[SubscriberUrl]],
+    logger:              Logger[IO],
+    busySleep:           FiniteDuration
+)(implicit contextShift: ContextShift[IO], timer: Timer[IO])
     extends Subscriptions[IO] {
 
   import scala.collection.JavaConverters._
 
   private val subscriptionsPool = new ConcurrentHashMap[SubscriberUrl, Unit]()
 
-  override def add(subscriberUrl: SubscriberUrl): IO[Unit] = ME.catchNonFatal {
-    val present = subscriptionsPool.containsKey(subscriberUrl)
-    subscriptionsPool.putIfAbsent(subscriberUrl, ())
-    if (!present) logger.info(s"$subscriberUrl added")
+  override def add(subscriberUrl: SubscriberUrl): IO[Unit] =
+    addAndLog(subscriberUrl, logMessage = s"$subscriberUrl added")
+
+  private def addAndLog(subscriberUrl: SubscriberUrl, logMessage: String): IO[Unit] = IO {
+    val added = Option {
+      subscriptionsPool.putIfAbsent(subscriberUrl, ())
+    }.isEmpty
+    if (added) logger.info(logMessage)
     ()
   }
 
@@ -80,31 +83,37 @@ class SubscriptionsImpl private[subscriptions] (
 
   override def hasOtherThan(url: SubscriberUrl): IO[Boolean] = getAll map (_.exists(_ != url))
 
-  override def getAll: IO[List[SubscriberUrl]] = ME.catchNonFatal {
+  override def getAll: IO[List[SubscriberUrl]] = IO {
     subscriptionsPool.keys().asScala.toList
   }
 
-  override def remove(subscriberUrl: SubscriberUrl): IO[Unit] = ME.catchNonFatal {
-    val present = subscriptionsPool.containsKey(subscriberUrl)
-    subscriptionsPool remove subscriberUrl
-    if (present) logger.info(s"$subscriberUrl removed")
-    ()
-  }
+  override def remove(subscriberUrl: SubscriberUrl): IO[Unit] =
+    removeAndLog(subscriberUrl, logMessage = s"$subscriberUrl gone - removing")
+
+  private def removeAndLog(subscriberUrl: SubscriberUrl, logMessage: String): IO[Unit] =
+    for {
+      removed <- IO(Option(subscriptionsPool remove subscriberUrl).isDefined)
+      _       <- clearCurrentUrl(subscriberUrl)
+      _       <- if (removed) logger.info(logMessage) else IO.unit
+    } yield ()
 
   override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
-      _ <- remove(subscriberUrl)
-      _ <- currentUrl.get flatMap {
-            case Some(`subscriberUrl`) => currentUrl.set(None)
-            case _                     => IO.unit
-          }
+      _ <- removeAndLog(subscriberUrl, logMessage = s"$subscriberUrl busy - putting on hold")
+      _ <- clearCurrentUrl(subscriberUrl)
       _ <- waitAndAdd(subscriberUrl).start
     } yield ()
+
+  private def clearCurrentUrl(ifSetTo: SubscriberUrl): IO[Unit] =
+    currentUrl.get flatMap {
+      case Some(`ifSetTo`) => currentUrl.set(None)
+      case _               => IO.unit
+    }
 
   private def waitAndAdd(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
       _ <- timer sleep busySleep
-      _ <- add(subscriberUrl)
+      _ <- addAndLog(subscriberUrl, logMessage = s"$subscriberUrl taken from on hold")
     } yield ()
 }
 

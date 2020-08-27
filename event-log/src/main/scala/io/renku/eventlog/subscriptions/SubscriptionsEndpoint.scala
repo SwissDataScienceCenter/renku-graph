@@ -46,6 +46,7 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
       urlAndStatuses <- request.as[UrlAndStatuses] recoverWith badRequest
       (subscriberUrl, statuses) = urlAndStatuses
       _        <- badRequestIf(statuses, not = New, RecoverableFailure)
+      _        <- logger.info(s"Subscription added : $subscriberUrl")
       _        <- subscriptions add subscriberUrl
       response <- Accepted(InfoMessage("Subscription added"))
     } yield response
