@@ -42,10 +42,11 @@ class Subscriber(
     for {
       subscriberUrl <- findSubscriberUrl
       _             <- postToEventLog(subscriberUrl)
-      _             <- logger.info("Event-log notified about readiness")
     } yield ()
   } recoverWith {
-    case NonFatal(exception) => logger.error(exception)("Problem with notifying event-log")
+    case NonFatal(exception) =>
+      logger.error(exception)("Problem with notifying event-log")
+      exception.raiseError[IO, Unit]
   }
 
   def run: IO[Unit] =
