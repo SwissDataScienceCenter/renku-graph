@@ -32,8 +32,7 @@ trait Subscriptions[Interpretation[_]] {
   def add(subscriberUrl: SubscriberUrl): Interpretation[Unit]
   def nextFree: Interpretation[Option[SubscriberUrl]]
   def isNext:   Interpretation[Boolean]
-  def hasOtherThan(url: SubscriberUrl): Interpretation[Boolean]
-  def getAll: Interpretation[List[SubscriberUrl]]
+  def getAll:   Interpretation[List[SubscriberUrl]]
   def remove(subscriberUrl:   SubscriberUrl): Interpretation[Unit]
   def markBusy(subscriberUrl: SubscriberUrl): Interpretation[Unit]
 }
@@ -80,8 +79,6 @@ class SubscriptionsImpl private[subscriptions] (
   }
 
   override def isNext: IO[Boolean] = (!subscriptionsPool.isEmpty).pure[IO]
-
-  override def hasOtherThan(url: SubscriberUrl): IO[Boolean] = getAll map (_.exists(_ != url))
 
   override def getAll: IO[List[SubscriberUrl]] = IO {
     subscriptionsPool.keys().asScala.toList

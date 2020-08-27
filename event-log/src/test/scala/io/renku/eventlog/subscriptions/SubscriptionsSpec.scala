@@ -188,42 +188,6 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
     }
   }
 
-  "hasOtherThan" should {
-
-    "return false if there are no URLs" in new TestCase {
-      subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe false
-    }
-
-    "return false if there is only one URL the same as given" in new TestCase {
-      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-
-      subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe false
-    }
-
-    "return true if there are other URLs then the given one" in new TestCase {
-      subscriptions.add(subscriberUrl).unsafeRunSync()              shouldBe ((): Unit)
-      subscriptions.add(subscriberUrls.generateOne).unsafeRunSync() shouldBe ((): Unit)
-
-      subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe true
-    }
-
-    "return false if there are other URLs but they are marked busy" in new TestCase {
-      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-      val otherSubscriber = subscriberUrls.generateOne
-      subscriptions.add(otherSubscriber).unsafeRunSync() shouldBe ((): Unit)
-
-      subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe true
-
-      subscriptions.markBusy(otherSubscriber).unsafeRunSync() shouldBe ((): Unit)
-
-      subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe false
-
-      sleep(busySleep.toMillis + 50)
-
-      subscriptions.hasOtherThan(subscriberUrl).unsafeRunSync() shouldBe true
-    }
-  }
-
   "markBusy" should {
 
     "succeed if there is subscriber with the given url" in new TestCase {

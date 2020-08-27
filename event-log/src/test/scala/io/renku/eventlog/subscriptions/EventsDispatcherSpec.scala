@@ -37,10 +37,10 @@ import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult.{Delivered, Misdelivered, ServiceBusy}
 import io.renku.eventlog.{Event, EventMessage}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.concurrent.Eventually
+import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -60,12 +60,12 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       val event = events.generateOne
 
       inSequence {
-        (subscriptions.isNext _).expects().returning(false.pure[IO])
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
+        isNextSubscriber(returning = false)
+        isNextSubscriber(returning = true)
 
         findingEvent(returning = Some(event))
 
-        nextUrl(returning  = url1.some)
+        nextFree(returning = url1.some)
         sending(event, got = Delivered, forUrl = url1)
 
         givenNoMoreEvents()
@@ -86,10 +86,10 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       val event = events.generateOne
 
       inSequence {
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
+        isNextSubscriber(returning = true)
 
         findingEvent(returning = Some(event))
-        nextUrl(returning      = url1.some)
+        nextFree(returning     = url1.some)
         sending(event, got     = Delivered, forUrl = url1)
 
         givenNoMoreEvents()
@@ -108,16 +108,15 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       val event = events.generateOne
 
       inSequence {
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
+        isNextSubscriber(returning = true)
 
         findingEvent(returning = Some(event))
 
-        nextUrl(returning  = url1.some)
+        nextFree(returning = url1.some)
         sending(event, got = ServiceBusy, forUrl = url1)
         expectMarkedBusy(url1)
 
-        hasOtherUrls(than  = url1, returning = true)
-        nextUrl(returning  = url2.some)
+        nextFree(returning = url2.some)
         sending(event, got = Delivered, forUrl = url2)
 
         givenNoMoreEvents()
@@ -137,29 +136,26 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       val event = events.generateOne
 
       inSequence {
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
+        isNextSubscriber(returning = true)
 
         findingEvent(returning = Some(event))
 
-        nextUrl(returning  = url1.some)
+        nextFree(returning = url1.some)
         sending(event, got = ServiceBusy, forUrl = url1)
         expectMarkedBusy(url1)
 
-        hasOtherUrls(than  = url1, returning = true)
-        nextUrl(returning  = url2.some)
+        nextFree(returning = url2.some)
         sending(event, got = ServiceBusy, forUrl = url2)
         expectMarkedBusy(url2)
 
-        hasOtherUrls(than  = url2, returning = true)
-        nextUrl(returning  = url1.some)
+        nextFree(returning = url1.some)
         sending(event, got = ServiceBusy, forUrl = url1)
         expectMarkedBusy(url1)
 
-        hasOtherUrls(than  = url1, returning = true)
-        nextUrl(returning  = url2.some)
+        nextFree(returning = url2.some)
         sending(event, got = Delivered, forUrl = url2)
 
-        findingEvent(returning = None)
+        givenNoMoreEvents()
       }
 
       dispatcher.run.unsafeRunAsyncAndForget()
@@ -176,30 +172,40 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       val event = events.generateOne
 
       inSequence {
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
+        isNextSubscriber(returning = true)
 
         findingEvent(returning = Some(event))
 
-        nextUrl(returning  = url1.some)
+        nextFree(returning = url1.some)
         sending(event, got = ServiceBusy, forUrl = url1)
         expectMarkedBusy(url1)
 
-        hasOtherUrls(than  = url1, returning = false)
-        nextUrl(returning  = url1.some)
-        sending(event, got = ServiceBusy, forUrl = url1)
+        nextFree(returning = None)
+
+        isNextSubscriber(returning = false)
+
+        isNextSubscriber(returning = true)
+        nextFree(returning         = url1.some)
+        sending(event, got         = ServiceBusy, forUrl = url1)
         expectMarkedBusy(url1)
 
-        hasOtherUrls(than  = url1, returning = false)
-        nextUrl(returning  = url1.some)
-        sending(event, got = Delivered, forUrl = url1)
+        nextFree(returning = None)
 
-        findingEvent(returning = None)
+        isNextSubscriber(returning = false)
+
+        isNextSubscriber(returning = true)
+        nextFree(returning         = url1.some)
+        sending(event, got         = Delivered, forUrl = url1)
+
+        givenNoMoreEvents()
       }
 
       dispatcher.run.unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
+          Info("Waiting for subscribers"),
+          Info("Waiting for subscribers"),
           Info(s"Event ${event.compoundEventId}, url = $url1 -> $Delivered")
         )
       }
@@ -211,56 +217,16 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       val event = events.generateOne
 
       inSequence {
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
+        isNextSubscriber(returning = true)
 
         findingEvent(returning = Some(event))
 
-        nextUrl(returning  = url1.some)
+        nextFree(returning = url1.some)
         sending(event, got = Misdelivered, forUrl = url1)
         expectRemoval(of   = url1)
 
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
-
-        nextUrl(returning  = url2.some)
+        nextFree(returning = url2.some)
         sending(event, got = Delivered, forUrl = url2)
-
-        findingEvent(returning = None)
-      }
-
-      dispatcher.run.unsafeRunAsyncAndForget()
-
-      eventually {
-        logger.loggedOnly(
-          Error(s"Event ${event.compoundEventId}, url = $url1 -> $Misdelivered"),
-          Info(s"Event ${event.compoundEventId}, url = $url2 -> $Delivered")
-        )
-      }
-    }
-
-    s"remove subscriber which returned $Misdelivered on event dispatching " +
-      "and return event back to the pool if there are no more subscribers" in new TestCase {
-
-      val event = events.generateOne
-
-      inSequence {
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
-
-        findingEvent(returning = Some(event))
-
-        nextUrl(returning  = url1.some)
-        sending(event, got = Misdelivered, forUrl = url1)
-        expectRemoval(of   = url1)
-
-        (subscriptions.isNext _).expects().returning(false.pure[IO])
-
-        sending(
-          ToNew[IO](event.compoundEventId, waitingEventsGauge, underProcessingGauge),
-          returning = Updated.pure[IO]
-        )
-
-        findingEvent(returning = Some(event))
-        nextUrl(returning      = url2.some)
-        sending(event, got     = Delivered, forUrl = url2)
 
         givenNoMoreEvents()
       }
@@ -283,12 +249,12 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       val nextEvent    = events.generateOne
 
       inSequence {
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
+        isNextSubscriber(returning = true)
 
         // failing event
         findingEvent(returning = Some(failingEvent))
 
-        nextUrl(returning = url1.some)
+        nextFree(returning = url1.some)
 
         (eventsSender.sendEvent _)
           .expects(url1, failingEvent.compoundEventId, failingEvent.body)
@@ -323,7 +289,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       inSequence {
         (subscriptions.isNext _).expects().returning(exception.raiseError[IO, Boolean])
 
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
+        isNextSubscriber(returning = true)
 
         givenEvent(event, got = Delivered, forUrl = url1)
 
@@ -346,7 +312,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       val event     = events.generateOne
 
       inSequence {
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
+        isNextSubscriber(returning = true)
 
         (eventsFinder.popEvent _)
           .expects()
@@ -369,25 +335,25 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
     }
 
     "do not fail the process but re-dispatch the event " +
-      "if removing a subscription fails" in new TestCase {
+      "if marking a subscription busy fails" in new TestCase {
 
       val event     = events.generateOne
       val exception = exceptions.generateOne
 
       inSequence {
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
+        isNextSubscriber(returning = true)
 
         findingEvent(returning = Some(event))
 
-        nextUrl(returning = url1.some)
+        nextFree(returning = url1.some)
 
-        sending(event, Misdelivered, forUrl = url1)
+        sending(event, ServiceBusy, forUrl = url1)
 
-        (subscriptions.remove _)
+        (subscriptions.markBusy _)
           .expects(url1)
           .returning(exception.raiseError[IO, Unit])
 
-        nextUrl(returning  = url2.some)
+        nextFree(returning = url2.some)
         sending(event, got = Delivered, forUrl = url2)
 
         givenNoMoreEvents()
@@ -397,7 +363,40 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
       eventually {
         logger.loggedOnly(
-          Error("Removing subscription failed", exception),
+          Info(s"Event ${event.compoundEventId}, url = $url2 -> $Delivered")
+        )
+      }
+    }
+
+    "do not fail the process but re-dispatch the event " +
+      "if removing a subscription fails" in new TestCase {
+
+      val event     = events.generateOne
+      val exception = exceptions.generateOne
+
+      inSequence {
+        isNextSubscriber(returning = true)
+
+        findingEvent(returning = Some(event))
+
+        nextFree(returning = url1.some)
+
+        sending(event, Misdelivered, forUrl = url1)
+
+        (subscriptions.remove _)
+          .expects(url1)
+          .returning(exception.raiseError[IO, Unit])
+
+        nextFree(returning = url2.some)
+        sending(event, got = Delivered, forUrl = url2)
+
+        givenNoMoreEvents()
+      }
+
+      dispatcher.run.unsafeRunAsyncAndForget()
+
+      eventually {
+        logger.loggedOnly(
           Error(s"Event ${event.compoundEventId}, url = $url1 -> $Misdelivered"),
           Info(s"Event ${event.compoundEventId}, url = $url2 -> $Delivered")
         )
@@ -411,11 +410,11 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       val nextEvent    = events.generateOne
 
       inSequence {
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
+        isNextSubscriber(returning = true)
 
         findingEvent(returning = Some(failingEvent))
 
-        nextUrl(returning = url1.some)
+        nextFree(returning = url1.some)
 
         (eventsSender.sendEvent _)
           .expects(url1, failingEvent.compoundEventId, failingEvent.body)
@@ -434,7 +433,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
         // next event
         findingEvent(returning = Some(nextEvent))
-        nextUrl(returning      = url2.some)
+        nextFree(returning     = url2.some)
         sending(nextEvent, got = Delivered, forUrl = url2)
 
         givenNoMoreEvents()
@@ -450,55 +449,15 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         )
       }
     }
-
-    "do not fail the process but try to re-deliver the event " +
-      "when rolling back an event fails" in new TestCase {
-
-      val event     = events.generateOne
-      val exception = exceptions.generateOne
-
-      inSequence {
-        (subscriptions.isNext _).expects().returning(true.pure[IO])
-
-        findingEvent(returning = Some(event))
-
-        nextUrl(returning  = url1.some)
-        sending(event, got = Misdelivered, forUrl = url1)
-        expectRemoval(of   = url1)
-
-        (subscriptions.isNext _).expects().returning(false.pure[IO])
-
-        sending(
-          ToNew[IO](event.compoundEventId, waitingEventsGauge, underProcessingGauge),
-          returning = exception.raiseError[IO, UpdateResult]
-        )
-
-        nextUrl(returning  = url2.some)
-        sending(event, got = Delivered, forUrl = url2)
-
-        givenNoMoreEvents()
-      }
-
-      dispatcher.run.unsafeRunAsyncAndForget()
-
-      eventually {
-        logger.loggedOnly(
-          Error(s"Event ${event.compoundEventId}, url = $url1 -> $Misdelivered"),
-          Error(s"Event ${event.compoundEventId} problems to rollback event", exception),
-          Info(s"Event ${event.compoundEventId}, url = $url2 -> $Delivered")
-        )
-      }
-    }
   }
 
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
 
-    val urls @ url1 +: url2 +: Nil =
+    val url1 +: url2 +: Nil =
       subscriberUrls.generateNonEmptyList(minElements = 2, maxElements = 2).toList
 
-    val waitingEventsGauge   = mock[LabeledGauge[IO, projects.Path]]
     val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
     val subscriptions        = mock[Subscriptions[IO]]
     val eventsFinder         = mock[EventFetcher[IO]]
@@ -510,7 +469,6 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       eventsFinder,
       statusUpdatesRunner,
       eventsSender,
-      waitingEventsGauge,
       underProcessingGauge,
       logger,
       noSubscriptionSleep = 500 millis,
@@ -532,7 +490,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
       findingEvent(returning = Some(event))
 
-      nextUrl(returning = forUrl.some)
+      nextFree(returning = forUrl.some)
 
       sending(event, got, forUrl)
 
@@ -548,12 +506,10 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       event
     }
 
-    def hasOtherUrls(than: SubscriberUrl, returning: Boolean) =
-      (subscriptions.hasOtherThan _)
-        .expects(than)
-        .returning(returning.pure[IO])
+    def isNextSubscriber(returning: Boolean) =
+      (subscriptions.isNext _).expects().returning(returning.pure[IO])
 
-    def nextUrl(returning: Option[SubscriberUrl]) =
+    def nextFree(returning: Option[SubscriberUrl]) =
       (subscriptions.nextFree _)
         .expects()
         .returning(returning.pure[IO])
