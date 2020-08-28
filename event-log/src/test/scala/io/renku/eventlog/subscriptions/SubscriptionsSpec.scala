@@ -238,6 +238,40 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
       )
     }
 
+    "replace the old mark busy process for the subscriber " +
+      "if the subscriber was added and marked busy while the old process was still running" in new TestCase {
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      subscriptions.nextFree.unsafeRunSync() shouldBe None
+
+      // if we add the subscriber while the markBusy process is running
+      sleep(busySleep.toMillis / 2)
+      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.nextFree.unsafeRunSync()           shouldBe subscriberUrl.some
+
+      // and if we mark the subscriber busy while the process is running
+      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscriptions.nextFree.unsafeRunSync()                shouldBe None
+
+      // the subscriber should not be available after the initial timeout
+      sleep(busySleep.toMillis / 2 + 50)
+      subscriptions.nextFree.unsafeRunSync() shouldBe None
+
+      // but after the timeout initiated with the second markBusy
+      sleep(busySleep.toMillis + 1000)
+      subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
+
+      logger.loggedOnly(
+        Info(s"$subscriberUrl added"),
+        Info(s"$subscriberUrl busy - putting on hold"),
+        Info(s"$subscriberUrl added"),
+        Info(s"$subscriberUrl busy - putting on hold"),
+        Info(s"$subscriberUrl taken from on hold")
+      )
+    }
+
     "succeed if there is no subscriber with the given url" in new TestCase {
       subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
@@ -251,7 +285,7 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
 
   private trait TestCase {
     val subscriberUrl = subscriberUrls.generateOne
-    val busySleep     = 500 millis
+    val busySleep     = 1000 millis
 
     private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
     private implicit val timer: Timer[IO]        = IO.timer(global)

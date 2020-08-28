@@ -19,12 +19,14 @@
 package io.renku.eventlog.subscriptions
 
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 import cats.effect.concurrent.Ref
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ContextShift, Fiber, IO, Timer}
 import cats.implicits._
 import io.chrisdavenport.log4cats.Logger
 
+import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
 
@@ -41,12 +43,13 @@ class SubscriptionsImpl private[subscriptions] (
     currentUrl:          Ref[IO, Option[SubscriberUrl]],
     logger:              Logger[IO],
     busySleep:           FiniteDuration
-)(implicit contextShift: ContextShift[IO], timer: Timer[IO])
+)(implicit contextShift: ContextShift[IO], timer: Timer[IO], executionContext: ExecutionContext)
     extends Subscriptions[IO] {
 
   import scala.collection.JavaConverters._
 
   private val subscriptionsPool = new ConcurrentHashMap[SubscriberUrl, Unit]()
+  private val onHoldPool        = new ConcurrentHashMap[SubscriberUrl, AddWithDelay]()
 
   override def add(subscriberUrl: SubscriberUrl): IO[Unit] =
     addAndLog(subscriberUrl, logMessage = s"$subscriberUrl added")
@@ -98,7 +101,7 @@ class SubscriptionsImpl private[subscriptions] (
     for {
       removed <- removeAndLog(subscriberUrl, logMessage = s"$subscriberUrl busy - putting on hold")
       _       <- clearCurrentUrl(subscriberUrl)
-      _       <- if (removed) waitAndAdd(subscriberUrl).start else IO.unit
+      _       <- if (removed) waitAndBringBack(subscriberUrl) else IO.unit
     } yield ()
 
   private def clearCurrentUrl(ifSetTo: SubscriberUrl): IO[Unit] =
@@ -107,11 +110,26 @@ class SubscriptionsImpl private[subscriptions] (
       case _               => IO.unit
     }
 
-  private def waitAndAdd(subscriberUrl: SubscriberUrl): IO[Unit] =
+  private def waitAndBringBack(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
-      _ <- timer sleep busySleep
-      _ <- addAndLog(subscriberUrl, logMessage = s"$subscriberUrl taken from on hold")
+      _ <- Option(onHoldPool.get(subscriberUrl)).fold(IO.unit)(_.cancel)
+      addWithDelay = AddWithDelay(subscriberUrl)
+      _ <- addWithDelay.start
+      _ = onHoldPool.put(subscriberUrl, addWithDelay)
     } yield ()
+
+  private case class AddWithDelay(subscriberUrl: SubscriberUrl) {
+    private val active = new AtomicBoolean(true)
+
+    def start: IO[Fiber[IO, Unit]] = {
+      for {
+        _ <- timer sleep busySleep
+        _ <- if (active.get()) addAndLog(subscriberUrl, logMessage = s"$subscriberUrl taken from on hold") else IO.unit
+      } yield ()
+    }.start
+
+    def cancel: IO[Unit] = IO(active.set(false))
+  }
 }
 
 object Subscriptions {
@@ -122,7 +140,9 @@ object Subscriptions {
   def apply(
       logger:              Logger[IO],
       busySleep:           FiniteDuration = Subscriptions.busySleep
-  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[Subscriptions[IO]] =
+  )(implicit contextShift: ContextShift[IO],
+    timer:                 Timer[IO],
+    executionContext:      ExecutionContext): IO[Subscriptions[IO]] =
     for {
       currentUrl <- Ref.of[IO, Option[SubscriberUrl]](None)
     } yield new SubscriptionsImpl(currentUrl, logger, busySleep)
