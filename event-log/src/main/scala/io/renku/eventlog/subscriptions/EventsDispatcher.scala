@@ -40,7 +40,6 @@ class EventsDispatcher(
     eventsFinder:         EventFetcher[IO],
     statusUpdatesRunner:  StatusUpdatesRunner[IO],
     eventsSender:         EventsSender[IO],
-    waitingEventsGauge:   LabeledGauge[IO, projects.Path],
     underProcessingGauge: LabeledGauge[IO, projects.Path],
     logger:               Logger[IO],
     noSubscriptionSleep:  FiniteDuration,
@@ -49,8 +48,8 @@ class EventsDispatcher(
 )(implicit timer:         Timer[IO]) {
 
   import eventsSender._
-  import subscriptions._
   import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
+  import subscriptions._
 
   def run: IO[Unit] = waitForSubscriptions(andThen = popEvent)
 
@@ -76,21 +75,19 @@ class EventsDispatcher(
 
   private def dispatch(id: CompoundEventId, body: EventBody): IO[Unit] =
     subscriptions.nextFree flatMap {
+      case None => waitForSubscriptions(andThen = dispatch(id, body))
       case Some(url) => {
         for {
           result <- sendEvent(url, id, body)
           _      <- logStatement(result, url, id)
           _ <- result match {
                 case Delivered    => IO.unit
-                case ServiceBusy  => markBusy(url) flatMap (_ => reDispatch(id, body, url))
-                case Misdelivered => removeUrlAndRollback(id, body, url)
+                case ServiceBusy  => markBusy(url) recover withNothing flatMap (_ => dispatch(id, body))
+                case Misdelivered => remove(url) recover withNothing flatMap (_ => dispatch(id, body))
               }
         } yield ()
-      } recoverWith markEventAsRecoverable(url, id)
-      case None => waitForSubscriptions(andThen = dispatch(id, body))
+      } recoverWith markEventAsNonRecoverable(url, id)
     }
-
-  private def toNew(id: CompoundEventId) = ToNew[IO](id, waitingEventsGauge, underProcessingGauge)
 
   private def logStatement(result: SendingResult, url: SubscriberUrl, id: CompoundEventId): IO[Unit] = result match {
     case result @ Delivered    => logger.info(s"Event $id, url = $url -> $result")
@@ -98,38 +95,11 @@ class EventsDispatcher(
     case result @ Misdelivered => logger.error(s"Event $id, url = $url -> $result")
   }
 
-  private def reDispatch(id: CompoundEventId, body: EventBody, url: SubscriberUrl) =
-    (subscriptions hasOtherThan url) flatMap {
-      case true  => dispatch(id, body)
-      case false => (timer sleep noSubscriptionSleep) flatMap (_ => dispatch(id, body))
-    }
-
-  private def removeUrlAndRollback(id: CompoundEventId, body: EventBody, url: SubscriberUrl) = {
-    for {
-      _ <- subscriptions remove url
-      _ <- subscriptions.isNext flatMap {
-            case true => dispatch(id, body)
-            case false =>
-              statusUpdatesRunner run toNew(id) map (_ => ()) recoverWith retryDispatching(
-                id,
-                body,
-                s"Event $id problems to rollback event"
-              )
-          }
-    } yield ()
-  } recoverWith retryDispatching(id, body, "Removing subscription failed")
-
-  private def retryDispatching(id:      CompoundEventId,
-                               body:    EventBody,
-                               message: String): PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) =>
-      for {
-        _ <- logger.error(exception)(message)
-        _ <- dispatch(id, body)
-      } yield ()
+  private lazy val withNothing: PartialFunction[Throwable, Unit] = {
+    case NonFatal(_) => ()
   }
 
-  private def markEventAsRecoverable(url: SubscriberUrl, id: CompoundEventId): PartialFunction[Throwable, IO[Unit]] = {
+  private def markEventAsNonRecoverable(url: SubscriberUrl, id: CompoundEventId): PartialFunction[Throwable, IO[Unit]] = {
     case NonFatal(exception) =>
       val markEventFailed = ToNonRecoverableFailure[IO](id, EventMessage(exception), underProcessingGauge)
       for {
@@ -181,7 +151,6 @@ object EventsDispatcher {
                                  eventsFinder,
                                  updateCommandRunner,
                                  eventsSender,
-                                 waitingEventsGauge,
                                  underProcessingGauge,
                                  logger,
                                  noSubscriptionSleep = NoSubscriptionSleep,

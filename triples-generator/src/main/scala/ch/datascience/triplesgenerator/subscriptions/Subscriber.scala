@@ -38,11 +38,16 @@ class Subscriber(
   import subscriptionSender._
   import subscriptionUrlFinder._
 
-  def notifyAvailability: IO[Unit] =
+  def notifyAvailability: IO[Unit] = {
     for {
       subscriberUrl <- findSubscriberUrl
       _             <- postToEventLog(subscriberUrl)
     } yield ()
+  } recoverWith {
+    case NonFatal(exception) =>
+      logger.error(exception)("Problem with notifying event-log")
+      exception.raiseError[IO, Unit]
+  }
 
   def run: IO[Unit] =
     for {
