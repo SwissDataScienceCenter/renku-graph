@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
-import PersonDetailsUpdater.{Person => UpdatePerson}
+import cats.MonadError
 import cats.data.NonEmptyList
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
@@ -32,6 +32,7 @@ import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples, entities}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.{Person => UpdatePerson}
 import eu.timepit.refined.auto._
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath.root
@@ -81,13 +82,15 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers {
       curatedPersons.filter(blankIds)    shouldBe allPersons.filter(blankIds)
       curatedPersons.filterNot(blankIds) shouldBe allPersons.filterNot(blankIds).map(noEmailAndName)
 
-      curatedTriples.updates should contain theSameElementsAs updatesCreator.prepareUpdates(
-        (
-          datasetCreatorsSet.map(maybeUpdatePerson) +
-            maybeUpdatePerson(entities.Person(projectCreatorName, projectCreatorEmail)) +
-            maybeUpdatePerson(entities.Person(committerName, committerEmail))
-        ).flatten
-      )
+      curatedTriples.updates.map(_.apply()) should contain theSameElementsAs updatesCreator
+        .prepareUpdates[Try](
+          (
+            datasetCreatorsSet.map(maybeUpdatePerson) +
+              maybeUpdatePerson(entities.Person(projectCreatorName, projectCreatorEmail)) +
+              maybeUpdatePerson(entities.Person(committerName, committerEmail))
+          ).flatten
+        )
+        .map(_.apply())
     }
   }
 
@@ -104,6 +107,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers {
   }
 
   private trait TestCase {
+    val context = MonadError[Try, Throwable]
     implicit val renkuBaseUrl:  RenkuBaseUrl  = renkuBaseUrls.generateOne
     implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 

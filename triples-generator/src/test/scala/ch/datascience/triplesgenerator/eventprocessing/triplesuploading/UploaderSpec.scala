@@ -19,15 +19,19 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
 import cats.MonadError
+import cats.data.EitherT
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import ch.datascience.rdfstore.SparqlQuery
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
@@ -40,9 +44,14 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
           .expects(curatedTriples.triples)
           .returning(context.pure(DeliverySuccess))
 
-        (updatesUploader.send _)
-          .expects(curatedTriples.updates)
-          .returning(context.pure(DeliverySuccess))
+        curatedTriples.updates.map { update =>
+          update()
+            .fold(throw _,
+                  query =>
+                    (updatesUploader.send _)
+                      .expects(query)
+                      .returning(context.pure(DeliverySuccess)))
+        }
       }
 
       uploader.upload(curatedTriples) shouldBe context.pure(DeliverySuccess)
@@ -58,6 +67,25 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
       uploader.upload(curatedTriples) shouldBe context.pure(failure)
     }
 
+    s"return $RecoverableFailure if the given updates fails on query creation" in new TestCase {
+      val exception = exceptions.generateOne
+      val failure   = RecoverableFailure(exception.getMessage)
+
+      val updatedCuratedTriples = curatedTriples.copy(updates = curatedTriples.updates.map { update =>
+        update.copy(
+          queryGenerator =
+            () => EitherT.leftT[Try, SparqlQuery](new Exception(exception.getMessage) with ProcessingRecoverableError)
+        )
+      })
+
+      inSequence {
+        (triplesUploader.upload _)
+          .expects(updatedCuratedTriples.triples)
+          .returning(context.pure(DeliverySuccess))
+      }
+      uploader.upload(updatedCuratedTriples) shouldBe Failure(failure)
+    }
+
     s"return $RecoverableFailure if updates uploading failed with such failure" in new TestCase {
 
       (triplesUploader.upload _)
@@ -65,9 +93,15 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .returning(context.pure(DeliverySuccess))
 
       val failure = RecoverableFailure("error")
-      (updatesUploader.send _)
-        .expects(curatedTriples.updates)
-        .returning(context.pure(failure))
+
+      curatedTriples.updates.map(
+        update =>
+          update().fold(err => throw err,
+                        query =>
+                          (updatesUploader.send _)
+                            .expects(query)
+                            .returning(context.pure(failure)))
+      )
 
       uploader.upload(curatedTriples) shouldBe context.pure(failure)
     }
@@ -88,22 +122,29 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .expects(curatedTriples.triples)
         .returning(context.pure(DeliverySuccess))
 
-      val failure = InvalidUpdatesFailure("error")
-      (updatesUploader.send _)
-        .expects(curatedTriples.updates)
-        .returning(context.pure(failure))
+      val failureMessage    = "error"
+      val aggregatedFailure = InvalidUpdatesFailure(curatedTriples.updates.map(_ => "error").mkString("; "))
+      val failure           = InvalidUpdatesFailure(failureMessage)
+      curatedTriples.updates.map { update =>
+        update().fold(err => throw err,
+                      query =>
+                        (updatesUploader.send _)
+                          .expects(query)
+                          .returning(context.pure(failure)))
+      }
 
-      uploader.upload(curatedTriples) shouldBe context.pure(failure)
+      uploader.upload(curatedTriples) shouldBe context.pure(aggregatedFailure)
     }
   }
 
   private trait TestCase {
     val context = MonadError[Try, Throwable]
 
-    val curatedTriples = curatedTriplesObjects.generateOne
+    val curatedTriples = curatedTriplesObjects[Try].generateOne
 
     val triplesUploader = mock[TriplesUploader[Try]]
     val updatesUploader = mock[UpdatesUploader[Try]]
     val uploader        = new Uploader[Try](triplesUploader, updatesUploader)
   }
+
 }

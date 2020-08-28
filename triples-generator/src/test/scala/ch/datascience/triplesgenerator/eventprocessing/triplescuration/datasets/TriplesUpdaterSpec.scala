@@ -18,6 +18,8 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
+import cats.MonadError
+import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators.fusekiBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -32,6 +34,9 @@ import io.circe.optics.{JsonPath, JsonTraversalPath}
 import io.renku.jsonld.{EntityId, Property}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import scala.language.higherKinds
+import scala.util.Try
 
 class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
 
@@ -48,7 +53,7 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
 
       val topmostData = topmostDatas(datasetId).generateOne
 
-      val updatedTriples = updater.mergeTopmostDataIntoTriples(curatedTriples.copy(triples = triples), topmostData)
+      val updatedTriples = updater.mergeTopmostDataIntoTriples[Try](curatedTriples.copy(triples = triples), topmostData)
 
       val Some(updatedDataset) = updatedTriples.triples.findDataset(datasetId)
 
@@ -61,7 +66,8 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
   }
 
   private trait TestCase {
-    val curatedTriples = curatedTriplesObjects.generateOne
+    val context        = MonadError[Try, Throwable]
+    val curatedTriples = curatedTriplesObjects[Try].generateOne
 
     val updater = new TriplesUpdater()
   }

@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 package datasets
 
+import cats.MonadError
 import cats.data.EitherT
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
@@ -35,6 +36,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.language.higherKinds
 import scala.util.{Failure, Success, Try}
 
 class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.Matchers {
@@ -64,18 +66,22 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
         topmostData
       }
 
-      val updatedCuratedTriples = topmostDatas.foldLeft(curatedTriples) { (triples, topmostData) =>
-        val updatedTriples = curatedTriplesObjects.generateOne
-        (triplesUpdater.mergeTopmostDataIntoTriples _)
+      val updatedCuratedTriples = topmostDatas.foldLeft(curatedTriples) { (triples, _) =>
+        val updatedTriples = curatedTriplesObjects[Try].generateOne
+        (triplesUpdater.mergeTopmostDataIntoTriples[Try] _)
           .expects(triples, *)
           .returning(updatedTriples)
         updatedTriples
       }
 
-      val curatedTriplesWithUpdates = topmostDatas.foldLeft(updatedCuratedTriples) { (triples, topmostData) =>
-        val triplesWithUpdates = curatedTriplesObjects.generateOne
-        (descendantsUpdater.prepareUpdates _)
-          .expects(triples, *)
+      val curatedTriplesWithUpdates = topmostDatas.foldLeft(updatedCuratedTriples) { (triples, _) =>
+        val triplesWithUpdates = curatedTriplesObjects[Try].generateOne
+        (descendantsUpdater
+          .prepareUpdates[Try](
+            _: CuratedTriples[Try],
+            _: TopmostData
+          )(_: MonadError[Try, Throwable]))
+          .expects(triples, *, *)
           .returning(triplesWithUpdates)
         triplesWithUpdates
       }
@@ -147,9 +153,9 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
         topmostData
       }
 
-      val updatedCuratedTriples = topmostDatas.foldLeft(curatedTriples) { (triples, topmostData) =>
-        val updatedTriples = curatedTriplesObjects.generateOne
-        (triplesUpdater.mergeTopmostDataIntoTriples _)
+      val updatedCuratedTriples = topmostDatas.foldLeft(curatedTriples) { (triples, _) =>
+        val updatedTriples = curatedTriplesObjects[Try].generateOne
+        (triplesUpdater.mergeTopmostDataIntoTriples[Try] _)
           .expects(triples, *)
           .returning(updatedTriples)
         updatedTriples
@@ -157,8 +163,12 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
 
       val exception = exceptions.generateOne
 
-      (descendantsUpdater.prepareUpdates _)
-        .expects(updatedCuratedTriples, *)
+      (descendantsUpdater
+        .prepareUpdates[Try](
+          _: CuratedTriples[Try],
+          _: TopmostData
+        )(_: MonadError[Try, Throwable]))
+        .expects(updatedCuratedTriples, *, *)
         .throwing(exception)
 
       enricher.enrichDataSetInfo(curatedTriples).value shouldBe Failure(exception)
@@ -166,7 +176,8 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
   }
 
   private trait TestCase {
-    val curatedTriples = curatedTriplesObjects.generateOne
+    implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
+    val curatedTriples = curatedTriplesObjects[Try].generateOne
 
     val infoFinder         = mock[DataSetInfoFinder[Try]]
     val triplesUpdater     = mock[TriplesUpdater]

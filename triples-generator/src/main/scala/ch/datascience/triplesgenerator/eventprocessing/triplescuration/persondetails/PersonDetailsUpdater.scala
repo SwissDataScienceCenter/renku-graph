@@ -38,11 +38,11 @@ private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
   import PersonDetailsUpdater._
   import updatesCreator._
 
-  def curate(curatedTriples: CuratedTriples): Interpretation[CuratedTriples] =
+  def curate(curatedTriples: CuratedTriples[Interpretation]): Interpretation[CuratedTriples[Interpretation]] =
     for {
       triplesAndPersons <- removePersonsAttributes(curatedTriples.triples)
       (newTriples, persons) = triplesAndPersons
-      newUpdates <- ME.catchNonFatal(prepareUpdates(persons))
+      newUpdates <- ME.catchNonFatal(prepareUpdates[Interpretation](persons))
     } yield CuratedTriples(newTriples, curatedTriples.updates ++ newUpdates)
 
   private object removePersonsAttributes extends (JsonLDTriples => Interpretation[(JsonLDTriples, Set[Person])]) {

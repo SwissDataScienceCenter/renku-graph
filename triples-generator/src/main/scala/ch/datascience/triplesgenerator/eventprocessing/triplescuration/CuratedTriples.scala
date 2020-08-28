@@ -47,14 +47,4 @@ object CuratedTriples {
                                      () => EitherT.rightT[Interpretation, ProcessingRecoverableError](sparqlQuery))
   }
 
-  implicit class CuratedTriplesOps[Interpretation[_]](curatedTriples: CuratedTriples[Interpretation]) {
-
-    def transformTriples(f: JsonLDTriples => JsonLDTriples): CuratedTriples[Interpretation] = curatedTriples.copy(
-      triples = f(curatedTriples.triples)
-    )
-
-    def add(updateFunctions: Seq[UpdateFunction[Interpretation]]): CuratedTriples[Interpretation] = curatedTriples.copy(
-      updates = curatedTriples.updates ++ updateFunctions
-    )
-  }
 }

@@ -61,7 +61,7 @@ private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
                          .recover(maybeToRecoverableError)
                      )
       updatedTriples = topmostInfos.foldLeft(curatedTriples)(mergeTopmostDataIntoTriples)
-    } yield topmostInfos.foldLeft(updatedTriples)(descendantsUpdater.prepareUpdates)
+    } yield topmostInfos.foldLeft(updatedTriples)(descendantsUpdater.prepareUpdates[Interpretation])
 
   private lazy val maybeToRecoverableError
       : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[TopmostData]]] = {

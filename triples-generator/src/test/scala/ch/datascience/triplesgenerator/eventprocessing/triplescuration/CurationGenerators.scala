@@ -32,28 +32,37 @@ import scala.language.higherKinds
 
 object CurationGenerators {
 
-  implicit def curatedTriplesObjects[Interpretation[_]]: Gen[CuratedTriples[Interpretation]] = curatedTriplesObjects(
-    nonEmptyList(curationUpdateFunctions).map(_.toList)
-  )
+  implicit def curatedTriplesObjects[Interpretation[_]](
+                                                         implicit ME: MonadError[Interpretation, Throwable]
+                                                       ): Gen[CuratedTriples[Interpretation]] =
+    curatedTriplesObjects[Interpretation](
+      nonEmptyList(curationUpdateFunctions[Interpretation]).map(_.toList)
+    )
 
   def curatedTriplesObjects[Interpretation[_]](
-      updatesGenerator: Gen[List[UpdateFunction[Interpretation]]]
-  ): Gen[CuratedTriples[Interpretation]] =
+                                                updatesGenerator: Gen[List[UpdateFunction[Interpretation]]]
+                                              )(implicit ME: MonadError[Interpretation, Throwable]): Gen[CuratedTriples[Interpretation]] =
     for {
       triples <- jsonLDTriples
       updates <- updatesGenerator
-    } yield CuratedTriples(triples, updates)
+    } yield CuratedTriples[Interpretation](triples, updates)
 
-  def curatedTriplesObjects[Interpretation[_]](triples: JsonLD): Gen[CuratedTriples[Interpretation]] =
+  def curatedTriplesObjects[Interpretation[_]](
+                                                triples: JsonLD
+                                              )(implicit ME: MonadError[Interpretation, Throwable]): Gen[CuratedTriples[Interpretation]] =
     for {
-      updates <- nonEmptyList(curationUpdateFunctions)
+      updates <- nonEmptyList(curationUpdateFunctions[Interpretation])
     } yield CuratedTriples(JsonLDTriples(List(triples.toJson)), updates.toList)
 
   implicit def curationUpdateFunctions[Interpretation[_]](
-      implicit ME: MonadError[Interpretation, Throwable]
-  ): Gen[UpdateFunction[Interpretation]] =
+                                                           implicit ME: MonadError[Interpretation, Throwable]
+                                                         ): Gen[UpdateFunction[Interpretation]] =
     for {
-      name        <- nonBlankStrings(minLength = 5)
-      sparqlQuery <- sentences() map (v => SparqlQuery("curation update", Set.empty, v.value))
-    } yield UpdateFunction(name, () => sparqlQuery.pure[Interpretation])
+      name <- nonBlankStrings(minLength = 5)
+      sparqlQuery <- sparqlQueries
+    } yield UpdateFunction[Interpretation](name, sparqlQuery)
+
+  implicit lazy val sparqlQueries = for {
+    sparqlQuery <- sentences() map (v => SparqlQuery("curation update", Set.empty, v.value))
+  } yield sparqlQuery
 }

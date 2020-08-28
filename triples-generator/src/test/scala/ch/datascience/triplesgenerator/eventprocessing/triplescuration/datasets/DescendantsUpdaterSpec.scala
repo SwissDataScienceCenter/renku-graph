@@ -18,12 +18,15 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
+import cats.MonadError
+import cats.effect.IO
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, SameAs}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators.curatedTriplesObjects
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
 import io.renku.jsonld.generators.JsonLDGenerators.entityIds
@@ -65,11 +68,14 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
                                   overrideTopmostDerivedFrom    = dataset5DerivedFrom.some)
       )
 
-      val updatedTriples = updater.prepareUpdates(curatedTriples, topmostData)
+      val updatedTriples = updater.prepareUpdates[IO](curatedTriples, topmostData)
 
       updatedTriples.triples shouldBe curatedTriples.triples
 
-      (updatedTriples.updates map (_.query) map runUpdate).sequence.unsafeRunSync()
+      updatedTriples.updates
+        .map(update => update().fold(err => throw err, runUpdate).unsafeRunSync())
+        .sequence
+        .unsafeRunSync()
       findTopmostData(dataset1Id) shouldBe topmostData.sameAs -> dataset1DerivedFrom
       findTopmostData(dataset2Id) shouldBe topmostData.sameAs -> dataset2DerivedFrom
       findTopmostData(dataset3Id) shouldBe dataset3SameAs     -> topmostData.derivedFrom
@@ -79,8 +85,9 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
   }
 
   private trait TestCase {
-    val curatedTriples = curatedTriplesObjects.generateOne.copy(updates = Nil)
-    val topmostData    = topmostDatas.generateOne
+    implicit val context = MonadError[IO, Throwable]
+    val curatedTriples: CuratedTriples[IO] = curatedTriplesObjects[IO].generateOne.copy(updates = Nil)
+    val topmostData = topmostDatas.generateOne
 
     val updater = new DescendantsUpdater()
   }

@@ -40,29 +40,4 @@ class CuratedTriplesSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
       }
     }
   }
-
-  "add" should {
-
-    "append the given updates to what's already in the curated triples" in {
-      forAll { (curatedTriples: CuratedTriples[Try], updateFunctions: List[UpdateFunction[Try]]) =>
-        curatedTriples.add(updateFunctions) shouldBe CuratedTriples(
-          curatedTriples.triples,
-          curatedTriples.updates ++ updateFunctions
-        )
-      }
-    }
-  }
-
-  "transformTriples" should {
-
-    "transform triples with the given function" in {
-      val curatedTriples = curatedTriplesObjects[Try].generateOne
-
-      val transformedTriples = jsonLDTriples.generateOne
-      val f                  = mockFunction[JsonLDTriples, JsonLDTriples]
-      f.expects(curatedTriples.triples).returning(transformedTriples)
-
-      curatedTriples.transformTriples(f).triples shouldBe transformedTriples
-    }
-  }
 }

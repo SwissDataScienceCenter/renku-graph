@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import java.time.Instant
 
+import cats.effect.IO
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, userEmails}
@@ -30,9 +31,10 @@ import ch.datascience.rdfstore.entities.{Person, Project}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
+import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
-class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
+class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Matchers {
 
   "deleteWasDerivedFrom" should {
 
@@ -49,7 +51,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
         parent.resourceId.value -> None
       )
 
-      updatesCreator.deleteWasDerivedFrom(child1.resourceId).run
+      updatesCreator.deleteWasDerivedFrom[IO](child1.resourceId).run
 
       findDerivedFrom should contain theSameElementsAs Set(
         child1.resourceId.value -> None,
@@ -74,7 +76,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
         parent.resourceId.value -> None
       )
 
-      updatesCreator.insertWasDerivedFrom(child1.resourceId, parent.path).run
+      updatesCreator.insertWasDerivedFrom[IO](child1.resourceId, parent.path).run
 
       findDerivedFrom should contain theSameElementsAs Set(
         child1.resourceId.value -> Some(parent.resourceId.value),
@@ -101,7 +103,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
         parent2.resourceId.value -> None
       )
 
-      updatesCreator.recreateWasDerivedFrom(child1.resourceId, parent2.path).run
+      updatesCreator.recreateWasDerivedFrom[IO](child1.resourceId, parent2.path).run
 
       findDerivedFrom should contain theSameElementsAs Set(
         child1.resourceId.value  -> Some(parent2.resourceId.value),
@@ -127,7 +129,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
         (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
       )
 
-      updatesCreator.swapCreator(project1.resourceId, creator2.resourceId).run
+      updatesCreator.swapCreator[IO](project1.resourceId, creator2.resourceId).run
 
       findCreators should contain theSameElementsAs Set(
         (project1.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value)),
@@ -153,8 +155,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
 
       val newCreator = entitiesPersons().generateOne
 
-      updatesCreator.addNewCreator(project1.resourceId, newCreator.maybeEmail, newCreator.name.some).run
-
+      updatesCreator.addNewCreator[IO](project1.resourceId, newCreator.maybeEmail, newCreator.name.some).run
       findCreators should contain theSameElementsAs Set(
         (project1.resourceId.value, newCreator.name.value, newCreator.maybeEmail.map(_.value)),
         (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
@@ -177,7 +178,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
 
       val newDateCreated = projectCreatedDates.generateOne
 
-      updatesCreator.recreateDateCreated(project1.resourceId, newDateCreated).run
+      updatesCreator.recreateDateCreated[IO](project1.resourceId, newDateCreated).run
 
       findDateCreated should contain theSameElementsAs Set(
         (project1.resourceId.value, newDateCreated),
@@ -202,8 +203,9 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       .getOrElse(fail("users.ResourceId cannot be obtained"))
   }
 
-  private implicit class UpdatesRunner(updates: List[CuratedTriples.UpdateFunction]) {
-    lazy val run = (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
+  private implicit class UpdatesRunner(updates: List[CuratedTriples.UpdateFunction[IO]]) {
+    lazy val run =
+      updates.map(update => update().fold(throw _, query => runUpdate(query)).unsafeRunSync()).sequence.unsafeRunSync()
   }
 
   private def findDerivedFrom: Set[(String, Option[String])] =
@@ -218,12 +220,12 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       .toSet
 
   private def findCreators: Set[(String, String, Option[String])] =
-    runQuery(s"""|SELECT ?id ?name ?email 
+    runQuery(s"""|SELECT ?id ?name ?email ?creatorId 
                  |WHERE {
                  |  ?id rdf:type schema:Project;
                  |      schema:creator ?creatorId.
-                 |  ?creatorId schema:name ?name. 
-                 |  OPTIONAL { ?creatorId schema:email ?email } 
+                 |  ?creatorId schema:name ?name.
+                 |  OPTIONAL { ?creatorId schema:email ?email }
                  |}
                  |""".stripMargin)
       .unsafeRunSync()
@@ -231,7 +233,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       .toSet
 
   private def findDateCreated: Set[(String, DateCreated)] =
-    runQuery(s"""|SELECT ?id ?dateCreated 
+    runQuery(s"""|SELECT ?id ?dateCreated
                  |WHERE {
                  |  ?id rdf:type schema:Project;
                  |      schema:dateCreated ?dateCreated.
