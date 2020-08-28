@@ -18,22 +18,43 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
+import cats.MonadError
+import cats.data.EitherT
+import cats.implicits._
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
 
-final case class CuratedTriples(triples: JsonLDTriples, updates: List[Update])
+import scala.language.higherKinds
+
+final case class CuratedTriples[Interpretation[_]](triples: JsonLDTriples,
+                                                   updates: List[UpdateFunction[Interpretation]])
 
 object CuratedTriples {
-  final case class Update(name: String, query: SparqlQuery)
+  private[eventprocessing] type UpdateResult[Interpretation[_]] =
+    EitherT[Interpretation, ProcessingRecoverableError, SparqlQuery]
 
-  implicit class CuratedTriplesOps(curatedTriples: CuratedTriples) {
+  final case class UpdateFunction[Interpretation[_]](name: String, queryGenerator: () => UpdateResult[Interpretation])
+      extends (() => UpdateResult[Interpretation]) {
+    override def apply(): UpdateResult[Interpretation] = queryGenerator()
+  }
 
-    def transformTriples(f: JsonLDTriples => JsonLDTriples): CuratedTriples = curatedTriples.copy(
+  object UpdateFunction {
+    def apply[Interpretation[_]](name: String, sparqlQuery: SparqlQuery)(
+        implicit ME:                   MonadError[Interpretation, Throwable]
+    ): UpdateFunction[Interpretation] =
+      UpdateFunction[Interpretation](name,
+                                     () => EitherT.rightT[Interpretation, ProcessingRecoverableError](sparqlQuery))
+  }
+
+  implicit class CuratedTriplesOps[Interpretation[_]](curatedTriples: CuratedTriples[Interpretation]) {
+
+    def transformTriples(f: JsonLDTriples => JsonLDTriples): CuratedTriples[Interpretation] = curatedTriples.copy(
       triples = f(curatedTriples.triples)
     )
 
-    def addUpdates(updates: Seq[Update]): CuratedTriples = curatedTriples.copy(
-      updates = curatedTriples.updates ++ updates
+    def add(updateFunctions: Seq[UpdateFunction[Interpretation]]): CuratedTriples[Interpretation] = curatedTriples.copy(
+      updates = curatedTriples.updates ++ updateFunctions
     )
   }
 }

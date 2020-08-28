@@ -18,17 +18,23 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
+import cats.MonadError
 import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
 import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
 
+import scala.language.higherKinds
+
 private class DescendantsUpdater {
 
-  def prepareUpdates(curatedTriples: CuratedTriples, topmostData: TopmostData): CuratedTriples = curatedTriples.copy(
+  def prepareUpdates[Interpretation[_]](
+      curatedTriples: CuratedTriples[Interpretation],
+      topmostData:    TopmostData
+  )(implicit ME:      MonadError[Interpretation, Throwable]): CuratedTriples[Interpretation] = curatedTriples.copy(
     updates =
       curatedTriples.updates ++: List(
         prepareSameAsUpdate(topmostData.datasetId, topmostData.sameAs),
@@ -36,27 +42,32 @@ private class DescendantsUpdater {
       )
   )
 
-  private def prepareSameAsUpdate(entityId: EntityId, topmostSameAs: SameAs) = Update(
-    s"Updating Dataset $entityId topmostSameAs",
-    SparqlQuery(
-      "upload - topmostSameAs update",
-      Set(
-        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-        "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-        "PREFIX schema: <http://schema.org/>"
-      ),
-      s"""|DELETE { ?sameAs schema:url <$entityId> }
-          |INSERT { ?sameAs schema:url <$topmostSameAs> }
-          |WHERE {
-          |  ?dsId rdf:type schema:Dataset;
-          |        renku:topmostSameAs ?sameAs.
-          |  ?sameAs schema:url <$entityId>
-          |}
-          |""".stripMargin
+  private def prepareSameAsUpdate[Interpretation[_]](entityId: EntityId, topmostSameAs: SameAs)(
+      implicit ME:                                             MonadError[Interpretation, Throwable]
+  ) =
+    UpdateFunction[Interpretation](
+      s"Updating Dataset $entityId topmostSameAs",
+      SparqlQuery(
+        "upload - topmostSameAs update",
+        Set(
+          "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+          "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
+          "PREFIX schema: <http://schema.org/>"
+        ),
+        s"""|DELETE { ?sameAs schema:url <$entityId> }
+            |INSERT { ?sameAs schema:url <$topmostSameAs> }
+            |WHERE {
+            |  ?dsId rdf:type schema:Dataset;
+            |        renku:topmostSameAs ?sameAs.
+            |  ?sameAs schema:url <$entityId>
+            |}
+            |""".stripMargin
+      )
     )
-  )
 
-  private def prepareDerivedFromUpdate(entityId: EntityId, topmostDerivedFrom: DerivedFrom) = Update(
+  private def prepareDerivedFromUpdate[Interpretation[_]](entityId: EntityId, topmostDerivedFrom: DerivedFrom)(
+      implicit ME:                                                  MonadError[Interpretation, Throwable]
+  ) = UpdateFunction[Interpretation](
     s"Updating Dataset $entityId topmostDerivedFrom",
     SparqlQuery(
       "upload - topmostDerivedFrom update",

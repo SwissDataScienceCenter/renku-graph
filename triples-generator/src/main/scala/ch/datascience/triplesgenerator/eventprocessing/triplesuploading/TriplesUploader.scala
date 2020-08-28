@@ -77,13 +77,14 @@ private class IOTriplesUploader(
     case (Ok, _, _)                         => IO.pure(DeliverySuccess)
     case (BadRequest, _, response)          => singleLineBody(response).map(InvalidTriplesFailure.apply)
     case (InternalServerError, _, response) => singleLineBody(response).map(InvalidTriplesFailure.apply)
-    case (other, _, response)               => singleLineBody(response).map(message => s"$other: $message").map(DeliveryFailure.apply)
+    case (other, _, response) =>
+      singleLineBody(response).map(message => s"$other: $message").map(RecoverableFailure.apply)
   }
 
   private def singleLineBody(response: Response[IO]): IO[String] =
     response.as[String].map(LogMessage.toSingleLine)
 
   private lazy val withUploadingError: PartialFunction[Throwable, TriplesUploadResult] = {
-    case NonFatal(exception) => DeliveryFailure(exception.getMessage)
+    case NonFatal(exception) => RecoverableFailure(exception.getMessage)
   }
 }

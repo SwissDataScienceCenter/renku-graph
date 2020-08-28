@@ -33,7 +33,7 @@ import scala.language.higherKinds
 package object triplescuration {
 
   private[eventprocessing] type CurationResults[Interpretation[_]] =
-    EitherT[Interpretation, ProcessingRecoverableError, CuratedTriples]
+    EitherT[Interpretation, ProcessingRecoverableError, CuratedTriples[Interpretation]]
 
   def `INSERT DATA`[TT <: TinyType { type V = String }](resource: String, property: String, value: TT): String =
     s"INSERT DATA { $resource $property '${sparqlEncode(value.value)}'}"

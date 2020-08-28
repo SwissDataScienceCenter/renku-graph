@@ -250,7 +250,7 @@ class CommitEventProcessorSpec
     }
 
     "succeed and mark event with RecoverableFailure " +
-      s"if uploading triples to the dataset fails with $DeliveryFailure for at least one event" in new TestCase {
+      s"if uploading triples to the dataset fails with $RecoverableFailure for at least one event" in new TestCase {
 
       val commitEvents              = commitsLists(size = Gen.const(2)).generateOne
       val commit1 +: commit2 +: Nil = commitEvents.toList
@@ -270,7 +270,7 @@ class CommitEventProcessorSpec
         .expects(commit1, rawTriples, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
-      val uploadingError = nonEmptyStrings().map(DeliveryFailure.apply).generateOne
+      val uploadingError = nonEmptyStrings().map(RecoverableFailure.apply).generateOne
       (uploader
         .upload(_: CuratedTriples))
         .expects(curatedTriples)

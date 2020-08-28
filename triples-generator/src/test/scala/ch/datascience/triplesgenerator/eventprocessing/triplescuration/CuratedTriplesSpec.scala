@@ -18,25 +18,36 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
+import cats.implicits._
 import CurationGenerators._
 import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import scala.util.Try
+
 class CuratedTriplesSpec extends AnyWordSpec with ScalaCheckPropertyChecks with MockFactory with should.Matchers {
 
-  "addUpdates" should {
+  "apply" should {
+    "call the given query creation function" in {
+      forAll { updateFunction: UpdateFunction[Try] =>
+        updateFunction() shouldBe updateFunction.queryGenerator()
+      }
+    }
+  }
+
+  "add" should {
 
     "append the given updates to what's already in the curated triples" in {
-      forAll { (curatedTriples: CuratedTriples, updates: List[Update]) =>
-        curatedTriples.addUpdates(updates) shouldBe CuratedTriples(
+      forAll { (curatedTriples: CuratedTriples[Try], updateFunctions: List[UpdateFunction[Try]]) =>
+        curatedTriples.add(updateFunctions) shouldBe CuratedTriples(
           curatedTriples.triples,
-          curatedTriples.updates ++ updates
+          curatedTriples.updates ++ updateFunctions
         )
       }
     }
@@ -45,7 +56,7 @@ class CuratedTriplesSpec extends AnyWordSpec with ScalaCheckPropertyChecks with 
   "transformTriples" should {
 
     "transform triples with the given function" in {
-      val curatedTriples = curatedTriplesObjects.generateOne
+      val curatedTriples = curatedTriplesObjects[Try].generateOne
 
       val transformedTriples = jsonLDTriples.generateOne
       val f                  = mockFunction[JsonLDTriples, JsonLDTriples]

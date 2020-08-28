@@ -18,22 +18,30 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
+import cats.MonadError
 import cats.data.NonEmptyList
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.TinyType
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.Person
+
+import scala.language.higherKinds
 
 private[triplescuration] class UpdatesCreator {
 
   import eu.timepit.refined.auto._
 
-  def prepareUpdates(persons: Set[Person]): List[Update] = persons.toList flatMap updates
+  def prepareUpdates[Interpretation[_]](
+      persons:   Set[Person]
+  )(implicit ME: MonadError[Interpretation, Throwable]): List[UpdateFunction[Interpretation]] =
+    persons.toList flatMap updates
 
-  private lazy val updates: Person => List[Update] = {
+  private def updates[Interpretation[_]](
+      implicit ME: MonadError[Interpretation, Throwable]
+  ): Person => List[UpdateFunction[Interpretation]] = {
     case Person(id, names, emails) =>
       List(
         namesUpdate(id, names),
@@ -42,9 +50,11 @@ private[triplescuration] class UpdatesCreator {
       ).flatten
   }
 
-  private def namesUpdate(id: ResourceId, names: NonEmptyList[Name]) = Some {
+  private def namesUpdate[Interpretation[_]](id: ResourceId, names: NonEmptyList[Name])(
+      implicit ME:                               MonadError[Interpretation, Throwable]
+  ) = Some {
     val resource = id.showAs[RdfResource]
-    Update(
+    UpdateFunction[Interpretation](
       s"Updating Person $resource schema:name",
       SparqlQuery(
         name = "upload - person name update",
@@ -63,9 +73,11 @@ private[triplescuration] class UpdatesCreator {
     )
   }
 
-  private def emailsUpdate(id: ResourceId, emails: Set[Email]) = Some {
+  private def emailsUpdate[Interpretation[_]](id: ResourceId, emails: Set[Email])(
+      implicit ME:                                MonadError[Interpretation, Throwable]
+  ) = Some {
     val resource = id.showAs[RdfResource]
-    Update(
+    UpdateFunction[Interpretation](
       s"Updating Person $resource schema:email",
       SparqlQuery(
         name = "upload - person email update",
@@ -84,19 +96,20 @@ private[triplescuration] class UpdatesCreator {
     )
   }
 
-  private def labelsDelete(id: ResourceId) = Some {
-    val resource = id.showAs[RdfResource]
-    Update(
-      s"Deleting Person $resource rdfs:label",
-      SparqlQuery(
-        name = "upload - person label delete",
-        Set("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"),
-        s"""|DELETE { $resource rdfs:label ?label }
-            |WHERE  { $resource rdfs:label ?label }
-            |""".stripMargin
+  private def labelsDelete[Interpretation[_]](id: ResourceId)(implicit ME: MonadError[Interpretation, Throwable]) =
+    Some {
+      val resource = id.showAs[RdfResource]
+      UpdateFunction[Interpretation](
+        s"Deleting Person $resource rdfs:label",
+        SparqlQuery(
+          name = "upload - person label delete",
+          Set("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"),
+          s"""|DELETE { $resource rdfs:label ?label }
+              |WHERE  { $resource rdfs:label ?label }
+              |""".stripMargin
+        )
       )
-    )
-  }
+    }
 
   private def INSERT[TT <: TinyType { type V = String }](resource: String,
                                                          property: String,

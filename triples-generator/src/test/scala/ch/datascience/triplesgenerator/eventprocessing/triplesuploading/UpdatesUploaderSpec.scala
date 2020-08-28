@@ -18,6 +18,7 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
+import cats.implicits._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.CommonGraphGenerators.rdfStoreConfigs
 import ch.datascience.generators.Generators.Implicits._
@@ -25,11 +26,11 @@ import ch.datascience.generators.Generators._
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.{FusekiBaseUrl, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.{FusekiBaseUrl, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
-import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult.{DeliveryFailure, DeliverySuccess, InvalidUpdatesFailure}
+import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult.{DeliverySuccess, InvalidUpdatesFailure, RecoverableFailure}
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
@@ -46,48 +47,62 @@ class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with 
   "send" should {
 
     s"return $DeliverySuccess if all the given updates pass" in new TestCase {
-      val updates = nonEmptyList(curationUpdates).generateOne.toList
+      val updateFunctions = nonEmptyList(curationUpdateFunctions[IO]).generateOne.toList
 
-      updates foreach { update =>
-        givenStore(forUpdate = update, returning = ok())
+      updateFunctions foreach { updateFunction =>
+        givenStore(forUpdate = updateFunction(), returning = ok())
       }
 
-      updater.send(updates).unsafeRunSync() shouldBe DeliverySuccess
+      updater.send(updateFunctions).unsafeRunSync() shouldBe DeliverySuccess
+    }
+
+    s"return $InvalidUpdatesFailure if all the given updates fails on query creation" in new TestCase {
+      val updateFunction1 = curationUpdateFunctions[IO].generateOne
+      val exception       = exceptions.generateOne
+      val updateFunction2 =
+        UpdateFunction(nonEmptyStrings().generateOne, () => exception.raiseError[IO, SparqlQuery])
+      val updateFunction3 = curationUpdateFunctions[IO].generateOne
+
+      givenStore(forUpdate = updateFunction1(), returning = ok())
+
+      updater
+        .send(List(updateFunction1, updateFunction2, updateFunction3))
+        .unsafeRunSync() shouldBe InvalidUpdatesFailure(exception.getMessage)
     }
 
     s"return $InvalidUpdatesFailure if one or more of the given updates is invalid (RDF store responds with BAD_REQUEST 400)" in new TestCase {
 
-      val update1 = curationUpdates.generateOne
-      givenStore(forUpdate = update1, returning = ok())
+      val updateFunction1 = curationUpdateFunctions[IO].generateOne
+      givenStore(forUpdate = updateFunction1(), returning = ok())
 
-      val update2      = curationUpdates.generateOne
-      val errorMessage = nonEmptyStrings().generateOne
-      givenStore(forUpdate = update2, returning = badRequest().withBody(errorMessage))
+      val updateFunction2 = curationUpdateFunctions[IO].generateOne
+      val errorMessage    = nonEmptyStrings().generateOne
+      givenStore(forUpdate = updateFunction2(), returning = badRequest().withBody(errorMessage))
 
-      val updates = List(update1, update2)
+      val updateFunctions = List(updateFunction1, updateFunction2)
 
-      updater.send(updates).unsafeRunSync() shouldBe InvalidUpdatesFailure(
-        s"Triples curation update '${update2.name}' failed: $errorMessage"
+      updater.send(updateFunctions).unsafeRunSync() shouldBe InvalidUpdatesFailure(
+        s"Triples curation update '${updateFunction2.name}' failed: $errorMessage"
       )
     }
 
-    s"return $DeliveryFailure if remote responds with status different than OK or BAD_REQUEST for at least one update" in new TestCase {
+    s"return $RecoverableFailure if remote responds with status different than OK or BAD_REQUEST for at least one update" in new TestCase {
 
-      val update1 = curationUpdates.generateOne
-      givenStore(forUpdate = update1, returning = ok())
+      val updateFunction1 = curationUpdateFunctions[IO].generateOne
+      givenStore(forUpdate = updateFunction1(), returning = ok())
 
-      val update2      = curationUpdates.generateOne
-      val errorMessage = nonEmptyStrings().generateOne
-      givenStore(forUpdate = update2, returning = serviceUnavailable().withBody(errorMessage))
+      val updateFunction2 = curationUpdateFunctions[IO].generateOne
+      val errorMessage    = nonEmptyStrings().generateOne
+      givenStore(forUpdate = updateFunction2(), returning = serviceUnavailable().withBody(errorMessage))
 
-      val updates = List(update1, update2)
+      val updateFunctions = List(updateFunction1, updateFunction2)
 
-      updater.send(updates).unsafeRunSync() shouldBe DeliveryFailure(
+      updater.send(updateFunctions).unsafeRunSync() shouldBe RecoverableFailure(
         s"Triples curation update failed: ${Status.ServiceUnavailable}: $errorMessage"
       )
     }
 
-    s"return $DeliveryFailure for connectivity issues" in new TestCase {
+    s"return $RecoverableFailure for connectivity issues" in new TestCase {
 
       val fusekiBaseUrl = localHttpUrls.map(FusekiBaseUrl.apply).generateOne
       override val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
@@ -96,7 +111,7 @@ class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with 
       val connectionExceptionMessage =
         s"Error connecting to $fusekiBaseUrl using address ${fusekiBaseUrl.toString.replaceFirst("http[s]?://", "")} (unresolved: false)"
 
-      updater.send(List(curationUpdates.generateOne)).unsafeRunSync() shouldBe DeliveryFailure(
+      updater.send(List(curationUpdateFunctions[IO].generateOne)).unsafeRunSync() shouldBe RecoverableFailure(
         s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/update error: $connectionExceptionMessage"
       )
     }
@@ -119,12 +134,12 @@ class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with 
       maxRetries    = 1
     )
 
-    def givenStore(forUpdate: Update, returning: ResponseDefinitionBuilder) =
+    def givenStore(forUpdate: IO[SparqlQuery], returning: ResponseDefinitionBuilder) =
       stubFor {
         post(s"/${rdfStoreConfig.datasetName}/update")
           .withBasicAuth(rdfStoreConfig.authCredentials.username.value, rdfStoreConfig.authCredentials.password.value)
           .withHeader("content-type", equalTo("application/x-www-form-urlencoded"))
-          .withRequestBody(equalTo(s"update=${urlEncode(forUpdate.query.toString)}"))
+          .withRequestBody(equalTo(s"update=${urlEncode(forUpdate.unsafeRunSync().toString)}"))
           .willReturn(returning)
       }
   }

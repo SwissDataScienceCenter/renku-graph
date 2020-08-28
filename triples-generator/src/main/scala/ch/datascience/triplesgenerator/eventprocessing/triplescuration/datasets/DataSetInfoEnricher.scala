@@ -34,7 +34,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private[triplescuration] trait DataSetInfoEnricher[Interpretation[_]] {
-  def enrichDataSetInfo(curatedTriples: CuratedTriples): CurationResults[Interpretation]
+  def enrichDataSetInfo(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation]
 }
 
 private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
@@ -49,7 +49,7 @@ private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
   import topmostDataFinder._
   import triplesUpdater._
 
-  def enrichDataSetInfo(curatedTriples: CuratedTriples): CurationResults[Interpretation] =
+  def enrichDataSetInfo(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation] =
     for {
       datasetInfos <- findDatasetsInfo(curatedTriples.triples).asRightT
       topmostInfos <- EitherT(

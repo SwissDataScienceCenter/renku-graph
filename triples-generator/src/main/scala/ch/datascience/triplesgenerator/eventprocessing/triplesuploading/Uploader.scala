@@ -21,8 +21,9 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 import cats.MonadError
 import cats.effect.{ContextShift, Timer}
 import cats.implicits._
-import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -35,18 +36,47 @@ class Uploader[Interpretation[_]](
 
   import TriplesUploadResult._
 
-  def upload(curatedTriples: CuratedTriples): Interpretation[TriplesUploadResult] =
+  def upload(curatedTriples: CuratedTriples[Interpretation]): Interpretation[TriplesUploadResult] =
     for {
-      triplesUploadingResult <- triplesUploader upload curatedTriples.triples
-      maybeUpdatesSendingResult <- if (triplesUploadingResult.failure) ME.pure(Option.empty[TriplesUploadResult])
-                                  else updatesUploader send curatedTriples.updates map Option.apply
+      triplesUploadingResult    <- triplesUploader upload curatedTriples.triples
+      maybeUpdatesSendingResult <- prepareAndRun(curatedTriples.updates, when = triplesUploadingResult.failure)
     } yield merge(triplesUploadingResult, maybeUpdatesSendingResult)
+
+  private def prepareAndRun(
+      updateFunctions: List[UpdateFunction[Interpretation]],
+      when:            Boolean
+  ): Interpretation[Option[TriplesUploadResult]] =
+    if (when) Option.empty[TriplesUploadResult].pure[Interpretation]
+    else
+      prepareUpdates(updateFunctions)
+        .map(_.flatMap(updatesUploader.send))
+        .sequence
+        .map(mergeResults) map Option.apply
+
+  private def prepareUpdates(updateFunctions: List[UpdateFunction[Interpretation]]): List[Interpretation[SparqlQuery]] =
+    updateFunctions.map { updateFunction =>
+      updateFunction().foldF(error => RecoverableFailure(error.getMessage).raiseError[Interpretation, SparqlQuery],
+                             query => query.pure[Interpretation])
+    }
 
   private lazy val merge: (TriplesUploadResult, Option[TriplesUploadResult]) => TriplesUploadResult = {
     case (DeliverySuccess, Some(DeliverySuccess)) => DeliverySuccess
     case (DeliverySuccess, Some(updatesFailure))  => updatesFailure
     case (triplesFailure, _)                      => triplesFailure
   }
+
+  private def mergeResults(results: List[TriplesUploadResult]): TriplesUploadResult =
+    results.filterNot(_ == DeliverySuccess) match {
+      case Nil => DeliverySuccess
+      case failures =>
+        failures.find {
+          case _: RecoverableFailure => true
+          case _ => false
+        } match {
+          case Some(recoverableFailure) => recoverableFailure
+          case _                        => InvalidUpdatesFailure(failures.map(_.message).mkString("; "))
+        }
+    }
 }
 
 object IOUploader {
@@ -75,7 +105,7 @@ object TriplesUploadResult {
   }
   type DeliverySuccess = DeliverySuccess.type
   sealed trait TriplesUploadFailure extends TriplesUploadResult { val failure: Boolean = true }
-  final case class DeliveryFailure(message:       String) extends Exception(message) with TriplesUploadFailure
+  final case class RecoverableFailure(message:    String) extends Exception(message) with TriplesUploadFailure
   final case class InvalidTriplesFailure(message: String) extends Exception(message) with TriplesUploadFailure
   final case class InvalidUpdatesFailure(message: String) extends Exception(message) with TriplesUploadFailure
 }

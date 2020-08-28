@@ -32,7 +32,7 @@ import ch.datascience.http.client.RestClientError.{BadRequestException, Connecti
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators.{curatedTriplesObjects, curationUpdates}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators.{curatedTriplesObjects, curationUpdateFunctions}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import eu.timepit.refined.auto._
 import org.scalamock.handlers.CallHandler
@@ -899,10 +899,10 @@ class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Match
       }
     }
 
-    implicit class CallHandlerOps(handler: CallHandler[List[CuratedTriples.Update]]) {
-      private val updates = listOf(curationUpdates, maxElements = 3).generateOne
+    implicit class CallHandlerOps(handler: CallHandler[List[CuratedTriples.UpdateFunction]]) {
+      private val updates = listOf(curationUpdateFunctions, maxElements = 3).generateOne
 
-      lazy val returningUpdates: List[CuratedTriples.Update] = {
+      lazy val returningUpdates: List[CuratedTriples.UpdateFunction] = {
         handler.returning(updates)
         updates
       }

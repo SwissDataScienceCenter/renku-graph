@@ -86,7 +86,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
 
   "recreateWasDerivedFrom" should {
 
-    "generate queries deleting and inserting 'prov:wasDerivedFrom' triple to a given project" in new TestCase {
+    "generate update query for 'prov:wasDerivedFrom' triple to a given project" in new TestCase {
       val maybeParent1 @ Some(parent1) = entitiesProjects().generateSome
       val maybeParent2 @ Some(parent2) = entitiesProjects().generateSome
       val child1                       = entitiesProjects(maybeParentProject = maybeParent1).generateOne
@@ -202,7 +202,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       .getOrElse(fail("users.ResourceId cannot be obtained"))
   }
 
-  private implicit class UpdatesRunner(updates: List[CuratedTriples.Update]) {
+  private implicit class UpdatesRunner(updates: List[CuratedTriples.UpdateFunction]) {
     lazy val run = (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
   }
 

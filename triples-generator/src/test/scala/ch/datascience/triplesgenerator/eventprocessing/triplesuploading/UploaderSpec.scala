@@ -48,9 +48,9 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
       uploader.upload(curatedTriples) shouldBe context.pure(DeliverySuccess)
     }
 
-    s"return $DeliveryFailure if triples uploading failed with such failure" in new TestCase {
+    s"return $RecoverableFailure if triples uploading failed with such failure" in new TestCase {
 
-      val failure = DeliveryFailure("error")
+      val failure = RecoverableFailure("error")
       (triplesUploader.upload _)
         .expects(curatedTriples.triples)
         .returning(context.pure(failure))
@@ -58,13 +58,13 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
       uploader.upload(curatedTriples) shouldBe context.pure(failure)
     }
 
-    s"return $DeliveryFailure if updates uploading failed with such failure" in new TestCase {
+    s"return $RecoverableFailure if updates uploading failed with such failure" in new TestCase {
 
       (triplesUploader.upload _)
         .expects(curatedTriples.triples)
         .returning(context.pure(DeliverySuccess))
 
-      val failure = DeliveryFailure("error")
+      val failure = RecoverableFailure("error")
       (updatesUploader.send _)
         .expects(curatedTriples.updates)
         .returning(context.pure(failure))

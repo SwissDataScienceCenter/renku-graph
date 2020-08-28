@@ -29,9 +29,14 @@ import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 import monocle.function.Plated
 
+import scala.language.higherKinds
+
 private class TriplesUpdater {
 
-  def mergeTopmostDataIntoTriples(curatedTriples: CuratedTriples, topmostData: TopmostData): CuratedTriples =
+  def mergeTopmostDataIntoTriples[Interpretation[_]](
+      curatedTriples: CuratedTriples[Interpretation],
+      topmostData:    TopmostData
+  ): CuratedTriples[Interpretation] =
     curatedTriples.copy(
       triples = JsonLDTriples(Plated.transform(updateDataset(topmostData))(curatedTriples.triples.value))
     )

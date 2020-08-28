@@ -39,7 +39,7 @@ import scala.language.higherKinds
 private[triplescuration] trait ForkInfoUpdater[Interpretation[_]] {
   def updateForkInfo(
       commit:                  CommitEvent,
-      givenCuratedTriples:     CuratedTriples
+      givenCuratedTriples:     CuratedTriples[Interpretation]
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
 }
 
@@ -55,7 +55,7 @@ private[triplescuration] class IOForkInfoUpdater(
 
   def updateForkInfo(
       commit:                  CommitEvent,
-      givenCuratedTriples:     CuratedTriples
+      givenCuratedTriples:     CuratedTriples[IO]
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[IO] = EitherT {
     (gitLab.findProject(commit.project.path), kg.findProject(commit.project.path))
       .parMapN {
@@ -67,7 +67,7 @@ private[triplescuration] class IOForkInfoUpdater(
         case `forks are different, creators and dates same`(projectResource, gitLabForkPath) =>
           givenCuratedTriples
             .transformTriples(projectPropertiesRemover)
-            .addUpdates(recreateWasDerivedFrom(projectResource, gitLabForkPath))
+            .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
             .pure[IO]
         case `not only forks are different`(projectResource, gitLabForkPath, gitLabProject) =>
           OptionT
@@ -76,16 +76,16 @@ private[triplescuration] class IOForkInfoUpdater(
             .map { existingUserResource =>
               givenCuratedTriples
                 .transformTriples(projectPropertiesRemover)
-                .addUpdates(recreateWasDerivedFrom(projectResource, gitLabForkPath))
-                .addUpdates(swapCreator(projectResource, existingUserResource))
-                .addUpdates(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+                .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
+                .add(swapCreator(projectResource, existingUserResource))
+                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
             }
             .getOrElse {
               givenCuratedTriples
                 .transformTriples(projectPropertiesRemover)
-                .addUpdates(recreateWasDerivedFrom(projectResource, gitLabForkPath))
-                .addUpdates(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-                .addUpdates(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+                .add(recreateWasDerivedFrom(projectResource, gitLabForkPath))
+                .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
             }
         case `no fork in the KG project`(projectResource, gitLabForkPath, gitLabProject) =>
           OptionT
@@ -94,16 +94,16 @@ private[triplescuration] class IOForkInfoUpdater(
             .map { existingUserResource =>
               givenCuratedTriples
                 .transformTriples(projectPropertiesRemover)
-                .addUpdates(insertWasDerivedFrom(projectResource, gitLabForkPath))
-                .addUpdates(swapCreator(projectResource, existingUserResource))
-                .addUpdates(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+                .add(insertWasDerivedFrom(projectResource, gitLabForkPath))
+                .add(swapCreator(projectResource, existingUserResource))
+                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
             }
             .getOrElse {
               givenCuratedTriples
                 .transformTriples(projectPropertiesRemover)
-                .addUpdates(insertWasDerivedFrom(projectResource, gitLabForkPath))
-                .addUpdates(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-                .addUpdates(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+                .add(insertWasDerivedFrom(projectResource, gitLabForkPath))
+                .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
             }
         case `no fork in the GitLab project`(projectResource, gitLabProject) =>
           OptionT
@@ -112,16 +112,16 @@ private[triplescuration] class IOForkInfoUpdater(
             .map { existingUserResource =>
               givenCuratedTriples
                 .transformTriples(projectPropertiesRemover)
-                .addUpdates(deleteWasDerivedFrom(projectResource))
-                .addUpdates(swapCreator(projectResource, existingUserResource))
-                .addUpdates(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+                .add(deleteWasDerivedFrom(projectResource))
+                .add(swapCreator(projectResource, existingUserResource))
+                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
             }
             .getOrElse {
               givenCuratedTriples
                 .transformTriples(projectPropertiesRemover)
-                .addUpdates(deleteWasDerivedFrom(projectResource))
-                .addUpdates(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
-                .addUpdates(recreateDateCreated(projectResource, gitLabProject.dateCreated))
+                .add(deleteWasDerivedFrom(projectResource))
+                .add(addNewCreator(projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName))
+                .add(recreateDateCreated(projectResource, gitLabProject.dateCreated))
             }
         case _ => givenCuratedTriples.pure[IO]
       }
@@ -235,7 +235,7 @@ private[triplescuration] class IOForkInfoUpdater(
   }
 
   private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, Either[ProcessingRecoverableError, CuratedTriples]] = {
+      : PartialFunction[Throwable, Either[ProcessingRecoverableError, CuratedTriples[IO]]] = {
     case e: UnexpectedResponseException =>
       Left[ProcessingRecoverableError, CuratedTriples](CurationRecoverableError("Problem with finding fork info", e))
     case e: ConnectivityException =>

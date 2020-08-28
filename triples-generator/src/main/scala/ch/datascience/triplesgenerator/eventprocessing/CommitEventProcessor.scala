@@ -109,7 +109,7 @@ private class CommitEventProcessor[Interpretation[_]](
 
   private def toUploadingResult(commit: CommitEvent): TriplesUploadResult => UploadingResult = {
     case DeliverySuccess => Uploaded(commit)
-    case error @ DeliveryFailure(message) =>
+    case error @ RecoverableFailure(message) =>
       logger.error(s"${logMessageCommon(commit)} $message")
       RecoverableError(commit, error)
     case error @ InvalidTriplesFailure(message) =>

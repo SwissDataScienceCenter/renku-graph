@@ -18,33 +18,42 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
+import cats.MonadError
+import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
 import ch.datascience.generators.Generators._
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
 import org.scalacheck.Gen
 
+import scala.language.higherKinds
+
 object CurationGenerators {
 
-  implicit lazy val curatedTriplesObjects: Gen[CuratedTriples] = curatedTriplesObjects(
-    nonEmptyList(curationUpdates).map(_.toList)
+  implicit def curatedTriplesObjects[Interpretation[_]]: Gen[CuratedTriples[Interpretation]] = curatedTriplesObjects(
+    nonEmptyList(curationUpdateFunctions).map(_.toList)
   )
 
-  def curatedTriplesObjects(updatesGenerator: Gen[List[Update]]): Gen[CuratedTriples] =
+  def curatedTriplesObjects[Interpretation[_]](
+      updatesGenerator: Gen[List[UpdateFunction[Interpretation]]]
+  ): Gen[CuratedTriples[Interpretation]] =
     for {
       triples <- jsonLDTriples
       updates <- updatesGenerator
     } yield CuratedTriples(triples, updates)
 
-  def curatedTriplesObjects(triples: JsonLD): Gen[CuratedTriples] =
+  def curatedTriplesObjects[Interpretation[_]](triples: JsonLD): Gen[CuratedTriples[Interpretation]] =
     for {
-      updates <- nonEmptyList(curationUpdates)
+      updates <- nonEmptyList(curationUpdateFunctions)
     } yield CuratedTriples(JsonLDTriples(List(triples.toJson)), updates.toList)
 
-  implicit lazy val curationUpdates: Gen[Update] = for {
-    name    <- nonBlankStrings(minLength = 5)
-    message <- sentences() map (v => SparqlQuery("curation update", Set.empty, v.value))
-  } yield Update(name, message)
+  implicit def curationUpdateFunctions[Interpretation[_]](
+      implicit ME: MonadError[Interpretation, Throwable]
+  ): Gen[UpdateFunction[Interpretation]] =
+    for {
+      name        <- nonBlankStrings(minLength = 5)
+      sparqlQuery <- sentences() map (v => SparqlQuery("curation update", Set.empty, v.value))
+    } yield UpdateFunction(name, () => sparqlQuery.pure[Interpretation])
 }

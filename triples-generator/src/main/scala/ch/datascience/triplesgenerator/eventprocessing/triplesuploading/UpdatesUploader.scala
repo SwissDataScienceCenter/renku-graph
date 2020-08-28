@@ -21,8 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.chrisdavenport.log4cats.Logger
@@ -32,7 +31,7 @@ import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
 private trait UpdatesUploader[Interpretation[_]] {
-  def send(updates: List[Update]): Interpretation[TriplesUploadResult]
+  def send(updateQuery: SparqlQuery): Interpretation[TriplesUploadResult]
 }
 
 private class IOUpdatesUploader(
@@ -56,41 +55,24 @@ private class IOUpdatesUploader(
 
   import scala.util.control.NonFatal
 
-  override def send(updates: List[Update]): IO[TriplesUploadResult] =
-    updates
-      .map(update => updateWitMapping(update.query, responseMapper(update)))
-      .sequence
-      .map(mergeResults)
-      .recoverWith(deliveryFailure)
+  override def send(updateQuery: SparqlQuery): IO[TriplesUploadResult] =
+    updateWitMapping(updateQuery, responseMapper(updateQuery)) recoverWith deliveryFailure
 
   private def responseMapper(
-      update: Update
+      updateQuery: SparqlQuery
   ): PartialFunction[(Status, Request[IO], Response[IO]), IO[TriplesUploadResult]] = {
     case (Ok, _, _)                => IO.pure(DeliverySuccess)
-    case (BadRequest, _, response) => response.as[String] map toSingleLine map toInvalidUpdatesFailure(update)
+    case (BadRequest, _, response) => response.as[String] map toSingleLine map toInvalidUpdatesFailure(updateQuery)
     case (other, _, response)      => response.as[String] map toSingleLine map toDeliveryFailure(other)
   }
 
-  private def toInvalidUpdatesFailure(update: Update)(responseMessage: String) =
-    InvalidUpdatesFailure(s"Triples curation update '${update.name}' failed: $responseMessage")
+  private def toInvalidUpdatesFailure(updateQuery: SparqlQuery)(responseMessage: String) =
+    InvalidUpdatesFailure(s"Triples curation update '${updateQuery.name}' failed: $responseMessage")
 
   private def toDeliveryFailure(status: Status)(message: String) =
-    DeliveryFailure(s"Triples curation update failed: $status: $message")
+    RecoverableFailure(s"Triples curation update failed: $status: $message")
 
   private def deliveryFailure: PartialFunction[Throwable, IO[TriplesUploadResult]] = {
-    case NonFatal(exception) => ME.pure(DeliveryFailure(exception.getMessage))
+    case NonFatal(exception) => ME.pure(RecoverableFailure(exception.getMessage))
   }
-
-  private def mergeResults(results: List[TriplesUploadResult]): TriplesUploadResult =
-    results.filterNot(_ == DeliverySuccess) match {
-      case Nil => DeliverySuccess
-      case failures =>
-        failures.partition {
-          case _: DeliveryFailure => true
-          case _ => false
-        } match {
-          case (deliveryFailure +: _, _) => deliveryFailure
-          case (Nil, otherFailures)      => InvalidUpdatesFailure(otherFailures.map(_.message).mkString("; "))
-        }
-    }
 }
