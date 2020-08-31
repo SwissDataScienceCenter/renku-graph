@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.rdfstore._
+import ch.datascience.triplesgenerator.reprovisioning.TriplesRemover.TriplesRemovalBatchSize
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -27,6 +28,10 @@ import scala.language.higherKinds
 
 private trait TriplesRemover[Interpretation[_]] {
   def removeAllTriples(): Interpretation[Unit]
+}
+
+private object TriplesRemover {
+  val TriplesRemovalBatchSize: Long = 50000
 }
 
 private class IOTriplesRemover(
@@ -44,6 +49,12 @@ private class IOTriplesRemover(
   private val removeTriplesBatch = SparqlQuery(
     name     = "all triples remove",
     prefixes = Set.empty,
-    body     = "CLEAR DEFAULT"
+    body     = s"""|DELETE { ?s ?p ?o }
+               |WHERE { 
+               |  SELECT  ?s ?p ?o 
+               |  WHERE { ?s ?p ?o }
+               |  LIMIT $TriplesRemovalBatchSize
+               |}
+               |""".stripMargin
   )
 }
