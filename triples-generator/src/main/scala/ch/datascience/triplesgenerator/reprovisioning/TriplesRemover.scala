@@ -20,7 +20,6 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.rdfstore._
-import ch.datascience.triplesgenerator.reprovisioning.TriplesRemover.TriplesRemovalBatchSize
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -42,19 +41,59 @@ private class IOTriplesRemover(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with TriplesRemover[IO] {
 
+  import TriplesRemover._
+  import cats.implicits._
   import eu.timepit.refined.auto._
+  import io.circe.Decoder
 
-  override def removeAllTriples(): IO[Unit] = updateWitNoResult(removeTriplesBatch)
+  import scala.util.Try
+
+  override def removeAllTriples(): IO[Unit] =
+    queryExpecting[Long](findTriplesCount)(countDecoder) flatMap {
+      case 0 => IO.unit
+      case _ =>
+        for {
+          _ <- updateWitNoResult(removeTriplesBatch)
+          _ <- removeAllTriples()
+        } yield ()
+    }
+
+  private val findTriplesCount = SparqlQuery(
+    name     = "triples remove - count",
+    prefixes = Set.empty,
+    """|SELECT (COUNT(*) AS ?count)
+       |WHERE { ?s ?p ?o }
+       |""".stripMargin
+  )
 
   private val removeTriplesBatch = SparqlQuery(
-    name     = "all triples remove",
+    name     = "triples remove - delete",
     prefixes = Set.empty,
-    body     = s"""|DELETE { ?s ?p ?o }
-               |WHERE { 
-               |  SELECT  ?s ?p ?o 
-               |  WHERE { ?s ?p ?o }
-               |  LIMIT $TriplesRemovalBatchSize
-               |}
-               |""".stripMargin
+    s"""|DELETE { ?s ?p ?o }
+        |WHERE { 
+        |  SELECT  ?s ?p ?o 
+        |  WHERE { ?s ?p ?o }
+        |  LIMIT $TriplesRemovalBatchSize
+        |}
+        |""".stripMargin
   )
+
+  private implicit val countDecoder: Decoder[Long] = {
+    import io.circe.Decoder.decodeList
+    import io.circe.DecodingFailure
+
+    val rows: Decoder[Long] = _.downField("count")
+      .downField("value")
+      .as[String]
+      .flatMap { count =>
+        Try(count.toLong).toEither.leftMap { ex =>
+          DecodingFailure(s"Triples count in non-number format: $ex", Nil)
+        }
+      }
+
+    _.downField("results")
+      .downField("bindings")
+      .as[List[Long]](decodeList(rows))
+      .map(_.headOption.getOrElse(0))
+  }
 }
