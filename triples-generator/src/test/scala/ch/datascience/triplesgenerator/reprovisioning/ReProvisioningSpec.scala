@@ -44,15 +44,15 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(false.pure[IO])
 
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
+
         (triplesRemover.removeAllTriples _)
           .expects()
           .returning(IO.unit)
 
         (eventsReScheduler.triggerEventsReScheduling _)
-          .expects()
-          .returning(IO.unit)
-
-        (triplesVersionCreator.insertCliVersion _)
           .expects()
           .returning(IO.unit)
       }
@@ -104,6 +104,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(false.pure[IO])
 
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
+
         (triplesRemover.removeAllTriples _)
           .expects()
           .returning(exception.raiseError[IO, Unit])
@@ -112,15 +116,15 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(false.pure[IO])
 
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
+
         (triplesRemover.removeAllTriples _)
           .expects()
           .returning(IO.unit)
 
         (eventsReScheduler.triggerEventsReScheduling _)
-          .expects()
-          .returning(IO.unit)
-
-        (triplesVersionCreator.insertCliVersion _)
           .expects()
           .returning(IO.unit)
       }
@@ -143,6 +147,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(false.pure[IO])
 
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
+
         (triplesRemover.removeAllTriples _)
           .expects()
           .returning(IO.unit)
@@ -155,15 +163,15 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(false.pure[IO])
 
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
+
         (triplesRemover.removeAllTriples _)
           .expects()
           .returning(IO.unit)
 
         (eventsReScheduler.triggerEventsReScheduling _)
-          .expects()
-          .returning(IO.unit)
-
-        (triplesVersionCreator.insertCliVersion _)
           .expects()
           .returning(IO.unit)
       }
@@ -186,15 +194,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(false.pure[IO])
 
-        (triplesRemover.removeAllTriples _)
-          .expects()
-          .returning(IO.unit)
-
-        (eventsReScheduler.triggerEventsReScheduling _)
-          .expects()
-          .returning(IO.unit)
-
-        (triplesVersionCreator.insertCliVersion _)
+        (triplesVersionCreator.updateCliVersion _)
           .expects()
           .returning(exception.raiseError[IO, Unit])
 
@@ -202,15 +202,15 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(false.pure[IO])
 
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
+
         (triplesRemover.removeAllTriples _)
           .expects()
           .returning(IO.unit)
 
         (eventsReScheduler.triggerEventsReScheduling _)
-          .expects()
-          .returning(IO.unit)
-
-        (triplesVersionCreator.insertCliVersion _)
           .expects()
           .returning(IO.unit)
       }

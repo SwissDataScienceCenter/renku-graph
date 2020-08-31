@@ -30,23 +30,30 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class TriplesVersionCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
-  "insertCliVersion" should {
+  "updateCliVersion" should {
 
-    "create a renku:CliVersion object with the given version" in new TestCase {
+    "create/update a renku:CliVersion object with the given version" in new TestCase {
       findVersionInDB shouldBe Set.empty
 
-      creator.insertCliVersion().unsafeRunSync()
+      creator0.updateCliVersion().unsafeRunSync()
 
       findVersionInDB shouldBe Set(currentCliVersion)
+
+      creator1.updateCliVersion().unsafeRunSync()
+
+      findVersionInDB shouldBe Set(newCliVersion)
+
     }
   }
 
   private trait TestCase {
     val currentCliVersion    = cliVersions.generateOne
+    val newCliVersion        = cliVersions.generateOne
     private val renkuBaseUrl = renkuBaseUrls.generateOne
     private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val creator              = new IOTriplesVersionCreator(rdfStoreConfig, currentCliVersion, renkuBaseUrl, logger, timeRecorder)
+    val creator0             = new IOTriplesVersionCreator(rdfStoreConfig, currentCliVersion, renkuBaseUrl, logger, timeRecorder)
+    val creator1             = new IOTriplesVersionCreator(rdfStoreConfig, newCliVersion, renkuBaseUrl, logger, timeRecorder)
   }
 
   private def findVersionInDB: Set[CliVersion] =

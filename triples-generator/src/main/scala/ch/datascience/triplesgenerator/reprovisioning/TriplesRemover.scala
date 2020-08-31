@@ -59,20 +59,31 @@ private class IOTriplesRemover(
     }
 
   private val findTriplesCount = SparqlQuery(
-    name     = "triples remove - count",
-    prefixes = Set.empty,
+    name = "triples remove - count",
+    prefixes = Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
+    ),
     """|SELECT (COUNT(*) AS ?count)
-       |WHERE { ?s ?p ?o }
+       |WHERE { ?s ?p ?o 
+       | MINUS {?s rdf:type renku:CliVersion}
+       |}
+       | 
        |""".stripMargin
   )
 
   private val removeTriplesBatch = SparqlQuery(
-    name     = "triples remove - delete",
-    prefixes = Set.empty,
+    name = "triples remove - delete",
+    prefixes = Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
+    ),
     s"""|DELETE { ?s ?p ?o }
         |WHERE { 
         |  SELECT  ?s ?p ?o 
-        |  WHERE { ?s ?p ?o }
+        |  WHERE { ?s ?p ?o 
+        |   MINUS {?s rdf:type renku:CliVersion}
+        |  }
         |  LIMIT $TriplesRemovalBatchSize
         |}
         |""".stripMargin

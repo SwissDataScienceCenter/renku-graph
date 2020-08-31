@@ -29,7 +29,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait TriplesVersionCreator[Interpretation[_]] {
-  def insertCliVersion(): Interpretation[Unit]
+  def updateCliVersion(): Interpretation[Unit]
 }
 
 private class IOTriplesVersionCreator(
@@ -44,7 +44,7 @@ private class IOTriplesVersionCreator(
   import ch.datascience.rdfstore.SparqlQuery
   import eu.timepit.refined.auto._
 
-  override def insertCliVersion(): IO[Unit] = updateWitNoResult {
+  override def updateCliVersion(): IO[Unit] = updateWitNoResult {
     val entityId = (renkuBaseUrl / "cli-version").showAs[RdfResource]
     SparqlQuery(
       name = "cli version create",
@@ -52,11 +52,19 @@ private class IOTriplesVersionCreator(
         "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
         "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
       ),
-      s"""|INSERT DATA { 
-          |  $entityId rdf:type renku:CliVersion.
-          |  $entityId renku:version '$currentCliVersion'.
-          |}
-          |""".stripMargin
+      s"""DELETE {$entityId renku:version ?o}
+         |
+         |INSERT { 
+         |  $entityId rdf:type renku:CliVersion ;
+         |  renku:version '$currentCliVersion'.
+         |
+         |}
+         |WHERE {
+         |   OPTIONAL {
+         |       $entityId ?p ?o
+         |   }
+         |}
+         |""".stripMargin
     )
   }
 }
