@@ -44,13 +44,12 @@ class IOAccessTokenRemoverSpec extends AnyWordSpec with MockFactory with Externa
     "succeed if removing token for the given projectId on a remote is successful" in new TestCase {
 
       stubFor {
-        stubFor {
-          delete(s"/projects/$projectId/tokens")
-            .willReturn(noContent())
-        }
-
-        tokenRemover.removeAccessToken(projectId).unsafeRunSync() shouldBe ((): Unit)
+        delete(s"/projects/$projectId/tokens")
+          .willReturn(noContent())
       }
+
+      tokenRemover.removeAccessToken(projectId).unsafeRunSync() shouldBe ((): Unit)
+    }
 
     "return an Exception if remote client responds with a status other than NO_CONTENT" in new TestCase {
       val accessToken = accessTokens.generateOne

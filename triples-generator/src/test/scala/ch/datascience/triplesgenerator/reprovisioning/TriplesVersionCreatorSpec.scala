@@ -51,7 +51,6 @@ class TriplesVersionCreatorSpec extends AnyWordSpec with InMemoryRdfStore with s
     val newCliVersion        = cliVersions.generateOne
     private val renkuBaseUrl = renkuBaseUrls.generateOne
     private val logger       = TestLogger[IO]()
-    private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
 
     def newCreator(version: CliVersion): IOTriplesVersionCreator =
