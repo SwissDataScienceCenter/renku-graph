@@ -54,7 +54,9 @@ class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should
         .removeAllTriples()
         .unsafeRunSync() shouldBe ((): Unit)
 
-      rdfStoreSize shouldBe cliVersionJsonLD.properties.size + 1
+      val totalNumberOfTriples = cliVersionJsonLD.properties.size + 1 // +1 for rdf:type
+      rdfStoreSize shouldBe totalNumberOfTriples
+      rdfStoreSize shouldBe totalNumberOfTriples
     }
   }
 

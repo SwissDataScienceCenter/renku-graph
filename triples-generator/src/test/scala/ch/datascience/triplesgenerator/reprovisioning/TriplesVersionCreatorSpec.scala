@@ -35,11 +35,11 @@ class TriplesVersionCreatorSpec extends AnyWordSpec with InMemoryRdfStore with s
     "create/update a renku:CliVersion object with the given version" in new TestCase {
       findVersionInDB shouldBe Set.empty
 
-      creator0.updateCliVersion().unsafeRunSync()
+      newCreator(version = currentCliVersion).updateCliVersion().unsafeRunSync()
 
       findVersionInDB shouldBe Set(currentCliVersion)
 
-      creator1.updateCliVersion().unsafeRunSync()
+      newCreator(version = newCliVersion).updateCliVersion().unsafeRunSync()
 
       findVersionInDB shouldBe Set(newCliVersion)
 
@@ -51,9 +51,11 @@ class TriplesVersionCreatorSpec extends AnyWordSpec with InMemoryRdfStore with s
     val newCliVersion        = cliVersions.generateOne
     private val renkuBaseUrl = renkuBaseUrls.generateOne
     private val logger       = TestLogger[IO]()
+    private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val creator0             = new IOTriplesVersionCreator(rdfStoreConfig, currentCliVersion, renkuBaseUrl, logger, timeRecorder)
-    val creator1             = new IOTriplesVersionCreator(rdfStoreConfig, newCliVersion, renkuBaseUrl, logger, timeRecorder)
+
+    def newCreator(version: CliVersion): IOTriplesVersionCreator =
+      new IOTriplesVersionCreator(rdfStoreConfig, version, renkuBaseUrl, logger, timeRecorder)
   }
 
   private def findVersionInDB: Set[CliVersion] =

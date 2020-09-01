@@ -52,19 +52,19 @@ private class IOTriplesVersionCreator(
         "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
         "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
       ),
-      s"""DELETE {$entityId renku:version ?o}
-         |
-         |INSERT { 
-         |  $entityId rdf:type renku:CliVersion ;
-         |  renku:version '$currentCliVersion'.
-         |
-         |}
-         |WHERE {
-         |   OPTIONAL {
-         |       $entityId ?p ?o
-         |   }
-         |}
-         |""".stripMargin
+      s"""|DELETE {$entityId renku:version ?o}
+          |
+          |INSERT { 
+          |  $entityId rdf:type renku:CliVersion ;
+          |  renku:version '$currentCliVersion'.
+          |
+          |}
+          |WHERE {
+          |   OPTIONAL {
+          |       $entityId ?p ?o
+          |   }
+          |}
+          |""".stripMargin
     )
   }
 }
