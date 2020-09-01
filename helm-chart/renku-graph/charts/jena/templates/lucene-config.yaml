@@ -35,7 +35,7 @@ data:
       text:index     <#indexLucene> ;
     .
 
-    :{{ .Values.global.graph.jena.dataset }} rdf:type tdb:DatasetTDB2 ;
+    :{{ .Values.global.graph.jena.dataset }} rdf:type tdb:DatasetTDB ;
       tdb:location "/fuseki/databases/{{ .Values.global.graph.jena.dataset }}" ;
     .
 
