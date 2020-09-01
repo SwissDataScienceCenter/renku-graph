@@ -19,22 +19,33 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.IO
+import ch.datascience.generators.Generators.Implicits.GenOps
+import ch.datascience.generators.Generators.nonEmptyList
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.jsonld.{EntityId, EntityType, EntityTypes, JsonLD}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import io.renku.jsonld.generators.JsonLDGenerators._
 
 class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   "removeAllTriples" should {
 
-    "remove all the triples from the storage" in new TestCase {
+    "remove all the triples from the storage except for CLI version" in new TestCase {
+
+      val cliVersionJsonLD = JsonLD.entity(
+        id         = entityIds.generateOne,
+        types      = EntityTypes.of(EntityType.of(renku / "CliVersion")),
+        properties = nonEmptyList(properties).generateOne.map(property => (property, jsonLDValues.generateOne))
+      )
 
       loadToStore(
         randomDataSetCommit,
-        randomDataSetCommit
+        randomDataSetCommit,
+        cliVersionJsonLD
       )
 
       rdfStoreSize should be > 0
@@ -43,7 +54,8 @@ class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should
         .removeAllTriples()
         .unsafeRunSync() shouldBe ((): Unit)
 
-      rdfStoreSize shouldBe 0
+      val totalNumberOfTriples = cliVersionJsonLD.properties.size + 1 // +1 for rdf:type
+      rdfStoreSize shouldBe totalNumberOfTriples
     }
   }
 
