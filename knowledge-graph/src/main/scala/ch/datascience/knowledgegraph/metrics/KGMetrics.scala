@@ -36,14 +36,14 @@ class IOKGMetrics(
     statsFinder:    StatsFinder[IO],
     logger:         Logger[IO],
     countsGauge:    LabeledGauge[IO, KGEntityType],
-    interval:       FiniteDuration = IOKGMetrics.interval,
-    countsInterval: FiniteDuration = IOKGMetrics.statusesInterval
+    initialDelay:   FiniteDuration = IOKGMetrics.initialDelay,
+    countsInterval: FiniteDuration = IOKGMetrics.countsInterval
 )(implicit ME:      MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
     extends KGMetrics[IO] {
 
   def run: IO[Unit] =
     for {
-      _ <- timer sleep interval
+      _ <- timer sleep initialDelay
       _ <- updateCounts()
     } yield ()
 
@@ -64,7 +64,7 @@ class IOKGMetrics(
     case NonFatal(exception) =>
       for {
         _ <- logger.error(exception)("Problem with gathering metrics")
-        _ <- timer sleep interval
+        _ <- timer sleep initialDelay
         _ <- continueWith
       } yield ()
   }
@@ -77,8 +77,9 @@ object IOKGMetrics {
 
   import scala.concurrent.duration._
 
-  private val interval:         FiniteDuration = 10 seconds
-  private val statusesInterval: FiniteDuration = 5 seconds
+  private val initialDelay:   FiniteDuration = 10 seconds
+  private val countsInterval: FiniteDuration = 1 minute
+
   def apply(
       statsFinder:         StatsFinder[IO],
       metricsRegistry:     MetricsRegistry[IO],
