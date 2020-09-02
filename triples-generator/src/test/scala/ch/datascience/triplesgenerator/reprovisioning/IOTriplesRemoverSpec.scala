@@ -19,14 +19,14 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.IO
+import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
-import io.renku.jsonld.generators.JsonLDGenerators._
-import io.renku.jsonld.{EntityType, EntityTypes, JsonLD}
+import io.renku.jsonld.{EntityTypes, JsonLD}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -37,15 +37,22 @@ class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should
     "remove all the triples from the storage except for CLI version" in new TestCase {
 
       val cliVersionJsonLD = JsonLD.entity(
-        id         = entityIds.generateOne,
-        types      = EntityTypes.of(EntityType.of(renku / "CliVersion")),
-        properties = nonEmptyList(properties).generateOne.map(property => (property, jsonLDValues.generateOne))
+        id    = CliVersionJsonLD.id,
+        types = EntityTypes.of(CliVersionJsonLD.ObjectType),
+        CliVersionJsonLD.version -> JsonLD.fromString(cliVersions.generateOne.toString)
+      )
+
+      val reprovisioningJsonLD = JsonLD.entity(
+        id    = ReProvisioningJsonLD.id,
+        types = EntityTypes.of(ReProvisioningJsonLD.ObjectType),
+        ReProvisioningJsonLD.CurrentlyReProvisioning -> JsonLD.fromBoolean(true)
       )
 
       loadToStore(
         randomDataSetCommit,
         randomDataSetCommit,
-        cliVersionJsonLD
+        cliVersionJsonLD,
+        reprovisioningJsonLD
       )
 
       rdfStoreSize should be > 0
@@ -54,7 +61,7 @@ class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should
         .removeAllTriples()
         .unsafeRunSync() shouldBe ((): Unit)
 
-      val totalNumberOfTriples = cliVersionJsonLD.properties.size + 1 // +1 for rdf:type
+      val totalNumberOfTriples = cliVersionJsonLD.properties.size + 1 + reprovisioningJsonLD.properties.size + 1 // +1 for rdf:type
       rdfStoreSize shouldBe totalNumberOfTriples
     }
   }

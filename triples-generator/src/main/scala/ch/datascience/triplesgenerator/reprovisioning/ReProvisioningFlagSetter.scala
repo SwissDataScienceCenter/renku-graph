@@ -20,59 +20,53 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.CliVersion
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore._
+import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.jsonld.EntityId
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private trait TriplesVersionCreator[Interpretation[_]] {
-  def updateCliVersion(): Interpretation[Unit]
+private trait ReProvisioningFlagSetter[Interpretation[_]] {
+  def setUnderReProvisioningFlag(): Interpretation[Unit]
+  def clearUnderReProvisioningFlag: Interpretation[Unit]
 }
 
-private case object CliVersionJsonLD {
+private case object ReProvisioningJsonLD {
   import ch.datascience.graph.Schemas._
 
-  def id(implicit renkuBaseUrl: RenkuBaseUrl) = EntityId.of((renkuBaseUrl / "cli-version").toString)
-  val ObjectType = renku / "CliVersion"
-  val version    = renku / "version"
+  def id(implicit renkuBaseUrl: RenkuBaseUrl) = EntityId.of((renkuBaseUrl / "reprovisioning").toString)
+  val ObjectType              = renku / "ReProvisioning"
+  val CurrentlyReProvisioning = renku / "currentlyReProvisioning"
 }
 
-private class IOTriplesVersionCreator(
+private class ReProvisioningFlagSetterImpl(
     rdfStoreConfig:          RdfStoreConfig,
-    currentCliVersion:       CliVersion,
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
-    with TriplesVersionCreator[IO] {
-  import ch.datascience.rdfstore.SparqlQuery
-  import eu.timepit.refined.auto._
+    with ReProvisioningFlagSetter[IO] {
 
-  override def updateCliVersion(): IO[Unit] = updateWitNoResult {
-    val entityId = (renkuBaseUrl / "cli-version").showAs[RdfResource]
+  import ReProvisioningJsonLD._
+
+  override def setUnderReProvisioningFlag(): IO[Unit] = updateWitNoResult {
     SparqlQuery(
-      name = "reprovisioning - cli version create",
+      name = "reprovisioning - flag insert",
       Set(
         "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
         "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
-      ),
-      s"""|DELETE {$entityId <${CliVersionJsonLD.version}> ?o}
-          |
-          |INSERT { 
-          |  <${CliVersionJsonLD.id(renkuBaseUrl)}> rdf:type <${CliVersionJsonLD.ObjectType}> ;
-          |                                         <${CliVersionJsonLD.version}> '$currentCliVersion'.
-          |}
-          |WHERE {
-          |  OPTIONAL {
-          |    $entityId ?p ?o
-          |  }
-          |}
-          |""".stripMargin
+      ), {
+        s"""|INSERT DATA { 
+            |  <${id(renkuBaseUrl)}> rdf:type <$ObjectType>;
+            |                        <$CurrentlyReProvisioning> 'true'.
+            |}
+            |""".stripMargin
+      }
     )
   }
+
+  override def clearUnderReProvisioningFlag: IO[Unit] = ???
 }

@@ -39,19 +39,21 @@ trait ReProvisioning[Interpretation[_]] {
 }
 
 class ReProvisioningImpl[Interpretation[_]](
-    triplesVersionFinder:  TriplesVersionFinder[Interpretation],
-    triplesRemover:        TriplesRemover[Interpretation],
-    eventsReScheduler:     EventsReScheduler[Interpretation],
-    triplesVersionCreator: TriplesVersionCreator[Interpretation],
-    reProvisioningDelay:   ReProvisioningDelay,
-    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-    logger:                Logger[Interpretation],
-    sleepWhenBusy:         FiniteDuration
-)(implicit ME:             MonadError[Interpretation, Throwable], timer: Timer[Interpretation])
+    triplesVersionFinder:     TriplesVersionFinder[Interpretation],
+    triplesRemover:           TriplesRemover[Interpretation],
+    eventsReScheduler:        EventsReScheduler[Interpretation],
+    reProvisioningFlagSetter: ReProvisioningFlagSetter[Interpretation],
+    triplesVersionCreator:    TriplesVersionCreator[Interpretation],
+    reProvisioningDelay:      ReProvisioningDelay,
+    executionTimeRecorder:    ExecutionTimeRecorder[Interpretation],
+    logger:                   Logger[Interpretation],
+    sleepWhenBusy:            FiniteDuration
+)(implicit ME:                MonadError[Interpretation, Throwable], timer: Timer[Interpretation])
     extends ReProvisioning[Interpretation] {
 
   import eventsReScheduler._
   import executionTimeRecorder._
+  import reProvisioningFlagSetter._
   import triplesRemover._
   import triplesVersionCreator._
   import triplesVersionFinder._
@@ -66,15 +68,17 @@ class ReProvisioningImpl[Interpretation[_]](
     triplesUpToDate.flatMap {
       case false => triggerReProvisioning
       case true  => logger.info("All projects' triples up to date")
-    } recoverWith tryAgain
+    } recoverWith tryAgain(startReProvisioning)
 
   private def triggerReProvisioning =
     measureExecutionTime {
       for {
         _ <- logger.info("The triples are not up to date - clearing DB and re-scheduling all the events")
+        _ <- setUnderReProvisioningFlag()
         _ <- updateCliVersion()
-        _ <- removeAllTriples()
-        _ <- triggerEventsReScheduling
+        _ <- removeAllTriples() recoverWith tryAgain(removeAllTriples())
+        _ <- triggerEventsReScheduling recoverWith tryAgain(triggerEventsReScheduling)
+        _ <- clearUnderReProvisioningFlag recoverWith tryAgain(clearUnderReProvisioningFlag)
       } yield ()
     } flatMap logSummary
 
@@ -82,13 +86,14 @@ class ReProvisioningImpl[Interpretation[_]](
     case (elapsedTime, _) => logger.info(s"ReProvisioning triggered in ${elapsedTime}ms")
   }
 
-  private lazy val tryAgain: PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
+  private def tryAgain(step: => Interpretation[Unit]): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) => {
       for {
         _ <- logger.error(exception)("Re-provisioning failure")
         _ <- timer sleep sleepWhenBusy
-        _ <- startReProvisioning
+        _ <- step
       } yield ()
+    } recoverWith tryAgain(step)
   }
 }
 
@@ -130,6 +135,7 @@ object IOReProvisioning {
       new IOTriplesVersionFinder(rdfStoreConfig, currentCliVersion, logger, timeRecorder),
       triplesRemover,
       eventsReScheduler,
+      new ReProvisioningFlagSetterImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
       new IOTriplesVersionCreator(rdfStoreConfig, currentCliVersion, renkuBaseUrl, logger, timeRecorder),
       initialDelay,
       executionTimeRecorder,

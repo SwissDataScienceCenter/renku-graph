@@ -60,12 +60,15 @@ private class IOTriplesRemover(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
     ),
-    """|SELECT ?subject
-       |WHERE { ?subject ?p ?o 
-       |  MINUS {?subject rdf:type renku:CliVersion}
-       |}
-       |LIMIT 1
-       |""".stripMargin
+    s"""|SELECT ?subject
+        |WHERE { ?subject ?p ?o 
+        |  MINUS {
+        |    ?subject rdf:type ?type
+        |    FILTER (?type IN (<${CliVersionJsonLD.ObjectType}>, <${ReProvisioningJsonLD.ObjectType}>)) 
+        |  }
+        |}
+        |LIMIT 1
+        |""".stripMargin
   )
 
   private val removeTriplesBatch = SparqlQuery(
@@ -78,7 +81,10 @@ private class IOTriplesRemover(
         |WHERE { 
         |  SELECT ?s ?p ?o
         |  WHERE { ?s ?p ?o 
-        |    MINUS {?s rdf:type renku:CliVersion}
+        |    MINUS {
+        |      ?s rdf:type ?type
+        |      FILTER (?type IN (<${CliVersionJsonLD.ObjectType}>, <${ReProvisioningJsonLD.ObjectType}>)) 
+        |    }
         |  }
         |  LIMIT ${removalBatchSize.value}
         |}
