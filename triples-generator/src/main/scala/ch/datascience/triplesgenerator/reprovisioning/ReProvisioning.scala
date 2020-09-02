@@ -125,9 +125,10 @@ object IOReProvisioning {
       initialDelay <- find[IO, FiniteDuration]("re-provisioning-initial-delay", configuration)
                        .flatMap(delay => ME.fromEither(ReProvisioningDelay.from(delay)))
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+      triplesRemover        <- IOTriplesRemover(rdfStoreConfig, logger, timeRecorder)
     } yield new ReProvisioningImpl[IO](
       new IOTriplesVersionFinder(rdfStoreConfig, currentCliVersion, logger, timeRecorder),
-      new IOTriplesRemover(rdfStoreConfig, logger, timeRecorder),
+      triplesRemover,
       eventsReScheduler,
       new IOTriplesVersionCreator(rdfStoreConfig, currentCliVersion, renkuBaseUrl, logger, timeRecorder),
       initialDelay,

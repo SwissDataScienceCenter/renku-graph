@@ -20,6 +20,9 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.rdfstore._
+import com.typesafe.config.{Config, ConfigFactory}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -29,11 +32,8 @@ private trait TriplesRemover[Interpretation[_]] {
   def removeAllTriples(): Interpretation[Unit]
 }
 
-private object TriplesRemover {
-  val TriplesRemovalBatchSize: Long = 50000
-}
-
 private class IOTriplesRemover(
+    removalBatchSize:        Long Refined Positive,
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
@@ -41,7 +41,6 @@ private class IOTriplesRemover(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with TriplesRemover[IO] {
 
-  import TriplesRemover._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
@@ -77,11 +76,11 @@ private class IOTriplesRemover(
     ),
     s"""|DELETE { ?s ?p ?o }
         |WHERE { 
-        |  SELECT  ?s ?p ?o 
+        |  SELECT ?s ?p ?o
         |  WHERE { ?s ?p ?o 
         |    MINUS {?s rdf:type renku:CliVersion}
         |  }
-        |  LIMIT $TriplesRemovalBatchSize
+        |  LIMIT ${removalBatchSize.value}
         |}
         |""".stripMargin
   )
@@ -98,4 +97,21 @@ private class IOTriplesRemover(
       .as[List[String]](decodeList(subject))
       .map(_.isEmpty)
   }
+}
+
+private object IOTriplesRemover {
+  import ch.datascience.config.ConfigLoader._
+  import eu.timepit.refined.pureconfig._
+
+  def apply(
+      rdfStoreConfig:          RdfStoreConfig,
+      logger:                  Logger[IO],
+      timeRecorder:            SparqlQueryTimeRecorder[IO],
+      config:                  Config = ConfigFactory.load()
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[TriplesRemover[IO]] =
+    find[IO, Long Refined Positive]("re-provisioning-removal-batch-size", config) map { removalBatchSize =>
+      new IOTriplesRemover(removalBatchSize, rdfStoreConfig, logger, timeRecorder)
+    }
 }

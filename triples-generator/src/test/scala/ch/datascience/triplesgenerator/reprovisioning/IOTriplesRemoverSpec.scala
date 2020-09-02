@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits.GenOps
-import ch.datascience.generators.Generators.nonEmptyList
+import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
@@ -60,9 +60,10 @@ class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should
   }
 
   private trait TestCase {
+    private val removalBatchSize      = positiveLongs(max = 100000).generateOne
     val logger                        = TestLogger[IO]()
     private val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     private val sparqlTimeRecorder    = new SparqlQueryTimeRecorder(executionTimeRecorder)
-    val triplesRemover                = new IOTriplesRemover(rdfStoreConfig, logger, sparqlTimeRecorder)
+    val triplesRemover                = new IOTriplesRemover(removalBatchSize, rdfStoreConfig, logger, sparqlTimeRecorder)
   }
 }
