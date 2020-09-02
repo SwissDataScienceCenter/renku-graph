@@ -42,33 +42,30 @@ private class IOTriplesRemover(
     with TriplesRemover[IO] {
 
   import TriplesRemover._
-  import cats.implicits._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
-  import scala.util.Try
-
   override def removeAllTriples(): IO[Unit] =
-    queryExpecting[Long](findTriplesCount)(countDecoder) flatMap {
-      case 0 => IO.unit
-      case _ =>
+    queryExpecting(checkIfEmpty)(storeEmptyFlagDecoder) flatMap { isEmpty =>
+      if (isEmpty) IO.unit
+      else
         for {
           _ <- updateWitNoResult(removeTriplesBatch)
           _ <- removeAllTriples()
         } yield ()
     }
 
-  private val findTriplesCount = SparqlQuery(
+  private val checkIfEmpty = SparqlQuery(
     name = "triples remove - count",
     prefixes = Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
     ),
-    """|SELECT (COUNT(*) AS ?count)
-       |WHERE { ?s ?p ?o 
-       | MINUS {?s rdf:type renku:CliVersion}
+    """|SELECT ?subject
+       |WHERE { ?subject ?p ?o 
+       |  MINUS {?subject rdf:type renku:CliVersion}
        |}
-       | 
+       |LIMIT 1
        |""".stripMargin
   )
 
@@ -82,29 +79,23 @@ private class IOTriplesRemover(
         |WHERE { 
         |  SELECT  ?s ?p ?o 
         |  WHERE { ?s ?p ?o 
-        |   MINUS {?s rdf:type renku:CliVersion}
+        |    MINUS {?s rdf:type renku:CliVersion}
         |  }
         |  LIMIT $TriplesRemovalBatchSize
         |}
         |""".stripMargin
   )
 
-  private implicit val countDecoder: Decoder[Long] = {
+  private implicit val storeEmptyFlagDecoder: Decoder[Boolean] = {
     import io.circe.Decoder.decodeList
-    import io.circe.DecodingFailure
 
-    val rows: Decoder[Long] = _.downField("count")
+    val subject: Decoder[String] = _.downField("subject")
       .downField("value")
       .as[String]
-      .flatMap { count =>
-        Try(count.toLong).toEither.leftMap { ex =>
-          DecodingFailure(s"Triples count in non-number format: $ex", Nil)
-        }
-      }
 
     _.downField("results")
       .downField("bindings")
-      .as[List[Long]](decodeList(rows))
-      .map(_.headOption.getOrElse(0))
+      .as[List[String]](decodeList(subject))
+      .map(_.isEmpty)
   }
 }

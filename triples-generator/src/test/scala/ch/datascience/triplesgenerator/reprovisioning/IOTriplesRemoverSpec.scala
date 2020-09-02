@@ -25,10 +25,10 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
-import io.renku.jsonld.{EntityId, EntityType, EntityTypes, JsonLD}
+import io.renku.jsonld.generators.JsonLDGenerators._
+import io.renku.jsonld.{EntityType, EntityTypes, JsonLD}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import io.renku.jsonld.generators.JsonLDGenerators._
 
 class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
