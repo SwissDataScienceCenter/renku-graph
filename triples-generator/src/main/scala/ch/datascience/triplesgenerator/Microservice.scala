@@ -33,7 +33,7 @@ import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.init._
-import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning}
+import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningFlag}
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -64,8 +64,10 @@ object Microservice extends IOMicroservice {
       gitLabThrottler          <- Throttler[IO, GitLab](gitLabRateLimit)
       sparqlTimeRecorder       <- SparqlQueryTimeRecorder(metricsRegistry)
       reProvisioning           <- IOReProvisioning(triplesGeneration, sparqlTimeRecorder, ApplicationLogger)
+      reProvisioningFlag       <- ReProvisioningFlag[IO]()
       eventProcessingEndpoint <- IOEventProcessingEndpoint(subscriber,
                                                            triplesGeneration,
+                                                           reProvisioningFlag,
                                                            metricsRegistry,
                                                            gitLabThrottler,
                                                            sparqlTimeRecorder,

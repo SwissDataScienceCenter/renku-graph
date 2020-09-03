@@ -34,6 +34,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult.Busy
+import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningFlag
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -53,6 +54,8 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
     "decode an event from the request, " +
       "schedule triples generation " +
       s"and return $Accepted if event processor accepted the event" in new TestCase {
+
+      givenReProvisioningFlag(false)
 
       val commitEvents = eventBody.toCommitEvents
       (eventBodyDeserializer.toCommitEvents _)
@@ -80,6 +83,8 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
       "schedule triples generation " +
       s"and return $TooManyRequests if event processor returned $Busy" in new TestCase {
 
+      givenReProvisioningFlag(false)
+
       val commitEvents = eventBody.toCommitEvents
       (eventBodyDeserializer.toCommitEvents _)
         .expects(eventBody)
@@ -100,7 +105,24 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
       logger.expectNoLogs()
     }
 
+    s"return $ServiceUnavailable if reprovisioning flag set to true" in new TestCase {
+
+      givenReProvisioningFlag(true)
+
+      val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
+
+      val response = processEvent(request).unsafeRunSync()
+
+      response.status                        shouldBe ServiceUnavailable
+      response.contentType                   shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Temporarily unavailable: currently reprovisioning")
+
+      logger.expectNoLogs()
+    }
+
     s"return $BadRequest if decoding an event body from the request fails" in new TestCase {
+
+      givenReProvisioningFlag(false)
 
       val payload = jsons.generateOne.asJson
       val request = Request(Method.POST, uri"events").withEntity(payload)
@@ -115,6 +137,8 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
     }
 
     s"return $BadRequest if decoding an event from the request fails" in new TestCase {
+
+      givenReProvisioningFlag(false)
 
       val exception = exceptions.generateOne
       (eventBodyDeserializer.toCommitEvents _)
@@ -134,6 +158,8 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
     }
 
     s"return $InternalServerError when event processor fails while accepting the event" in new TestCase {
+
+      givenReProvisioningFlag(false)
 
       val commitEvents = eventBody.toCommitEvents
       (eventBodyDeserializer.toCommitEvents _)
@@ -158,14 +184,22 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
   }
 
   private trait TestCase {
-    val context   = MonadError[IO, Throwable]
     val eventId   = compoundEventIds.generateOne
     val eventBody = eventBodies.generateOne
 
     val eventBodyDeserializer = mock[IOEventBodyDeserialiser]
     val processingRunner      = mock[EventsProcessingRunner[IO]]
+    val reprovisioningFlag    = mock[ReProvisioningFlag[IO]]
     val logger                = TestLogger[IO]()
-    val processEvent          = new EventProcessingEndpoint[IO](eventBodyDeserializer, processingRunner, logger).processEvent _
+    val processEvent = new EventProcessingEndpoint[IO](eventBodyDeserializer,
+                                                       processingRunner,
+                                                       reprovisioningFlag,
+                                                       logger).processEvent _
+
+    def givenReProvisioningFlag(flag: Boolean) =
+      (reprovisioningFlag.currentlyReProvisioning _)
+        .expects()
+        .returning(flag.pure[IO])
   }
 
   private implicit lazy val eventEncoder: Encoder[(CompoundEventId, EventBody)] =

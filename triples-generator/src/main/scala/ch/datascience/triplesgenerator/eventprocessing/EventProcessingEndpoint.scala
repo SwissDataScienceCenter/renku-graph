@@ -29,6 +29,7 @@ import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
+import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningFlag
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
@@ -40,6 +41,7 @@ import scala.util.control.NonFatal
 class EventProcessingEndpoint[Interpretation[_]: Effect](
     eventBodyDeserializer:  EventBodyDeserialiser[Interpretation],
     eventsProcessingRunner: EventsProcessingRunner[Interpretation],
+    reProvisioningFlag:     ReProvisioningFlag[Interpretation],
     logger:                 Logger[Interpretation]
 )(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
@@ -54,7 +56,13 @@ class EventProcessingEndpoint[Interpretation[_]: Effect](
   import org.http4s._
   import org.http4s.circe._
 
-  def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] =
+    reProvisioningFlag.currentlyReProvisioning flatMap { isReprovisioning =>
+      if (isReprovisioning) ServiceUnavailable(InfoMessage("Temporarily unavailable: currently reprovisioning"))
+      else process(request)
+    }
+
+  private def process(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
       eventAndBody <- request.as[IdAndBody] recoverWith badRequest("Event deserialization error")
       commitEvents <- toCommitEvents(eventAndBody._2) recoverWith badRequest("Event body deserialization error")
@@ -119,6 +127,7 @@ object IOEventProcessingEndpoint {
   def apply(
       subscriber:          Subscriber,
       triplesGeneration:   TriplesGeneration,
+      reProvisioningFlag:  ReProvisioningFlag[IO],
       metricsRegistry:     MetricsRegistry[IO],
       gitLabThrottler:     Throttler[IO, GitLab],
       timeRecorder:        SparqlQueryTimeRecorder[IO],
@@ -135,5 +144,5 @@ object IOEventProcessingEndpoint {
                                                      logger)
       eventsProcessingRunner <- IOEventsProcessingRunner(commitEventProcessor, subscriber, logger)
       bodyDeserialiser = new EventBodyDeserialiser[IO]()
-    } yield new EventProcessingEndpoint[IO](bodyDeserialiser, eventsProcessingRunner, logger)
+    } yield new EventProcessingEndpoint[IO](bodyDeserialiser, eventsProcessingRunner, reProvisioningFlag, logger)
 }
