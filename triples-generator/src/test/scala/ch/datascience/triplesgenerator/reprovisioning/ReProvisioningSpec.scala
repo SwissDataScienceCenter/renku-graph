@@ -25,6 +25,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -60,6 +61,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
 
         (reProvisioningFlagSetter.clearUnderReProvisioningFlag _)
+          .expects()
+          .returning(IO.unit)
+
+        (subscriber.notifyAvailability _)
           .expects()
           .returning(IO.unit)
       }
@@ -138,6 +143,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         (reProvisioningFlagSetter.clearUnderReProvisioningFlag _)
           .expects()
           .returning(IO.unit)
+
+        (subscriber.notifyAvailability _)
+          .expects()
+          .returning(IO.unit)
       }
 
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
@@ -189,6 +198,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         (reProvisioningFlagSetter.clearUnderReProvisioningFlag _)
           .expects()
           .returning(IO.unit)
+
+        (subscriber.notifyAvailability _)
+          .expects()
+          .returning(IO.unit)
       }
 
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
@@ -230,6 +243,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
 
         (reProvisioningFlagSetter.clearUnderReProvisioningFlag _)
+          .expects()
+          .returning(IO.unit)
+
+        (subscriber.notifyAvailability _)
           .expects()
           .returning(IO.unit)
       }
@@ -279,6 +296,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         (reProvisioningFlagSetter.clearUnderReProvisioningFlag _)
           .expects()
           .returning(IO.unit)
+
+        (subscriber.notifyAvailability _)
+          .expects()
+          .returning(IO.unit)
       }
 
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
@@ -322,6 +343,56 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         (reProvisioningFlagSetter.clearUnderReProvisioningFlag _)
           .expects()
           .returning(IO.unit)
+
+        (subscriber.notifyAvailability _)
+          .expects()
+          .returning(IO.unit)
+      }
+
+      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
+
+      logger.loggedOnly(
+        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Error("Re-provisioning failure", exception),
+        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+      )
+    }
+
+    "do not fail but retry from the notification about availability step if it fails" in new TestCase {
+      val exception = exceptions.generateOne
+
+      inSequence {
+        (triplesVersionFinder.triplesUpToDate _)
+          .expects()
+          .returning(false.pure[IO])
+
+        (reProvisioningFlagSetter.setUnderReProvisioningFlag _)
+          .expects()
+          .returning(IO.unit)
+
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
+
+        (triplesRemover.removeAllTriples _)
+          .expects()
+          .returning(IO.unit)
+
+        (eventsReScheduler.triggerEventsReScheduling _)
+          .expects()
+          .returning(IO.unit)
+
+        (reProvisioningFlagSetter.clearUnderReProvisioningFlag _)
+          .expects()
+          .returning(IO.unit)
+
+        (subscriber.notifyAvailability _)
+          .expects()
+          .returning(exception.raiseError[IO, Unit])
+
+        (subscriber.notifyAvailability _)
+          .expects()
+          .returning(IO.unit)
       }
 
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
@@ -348,6 +419,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         eventsReScheduler,
         reProvisioningFlagSetter,
         triplesVersionCreator,
+        subscriber,
         someInitialDelay,
         executionTimeRecorder,
         logger,
@@ -369,6 +441,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
     val reProvisioningFlagSetter = mock[ReProvisioningFlagSetter[IO]]
     val triplesVersionCreator    = mock[TriplesVersionCreator[IO]]
     val initialDelay             = ReProvisioningDelay(durations(100 millis).generateOne)
+    val subscriber               = mock[Subscriber[IO]]
     val logger                   = TestLogger[IO]()
     val executionTimeRecorder    = TestExecutionTimeRecorder(logger)
     val reProvisioning = new ReProvisioningImpl[IO](
@@ -377,6 +450,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       eventsReScheduler,
       reProvisioningFlagSetter,
       triplesVersionCreator,
+      subscriber,
       initialDelay,
       executionTimeRecorder,
       logger,

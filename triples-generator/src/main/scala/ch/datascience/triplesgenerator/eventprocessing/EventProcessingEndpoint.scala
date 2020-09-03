@@ -125,7 +125,7 @@ object IOEventProcessingEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply(
-      subscriber:          Subscriber,
+      subscriber:          Subscriber[IO],
       triplesGeneration:   TriplesGeneration,
       reProvisioningFlag:  ReProvisioningFlag[IO],
       metricsRegistry:     MetricsRegistry[IO],

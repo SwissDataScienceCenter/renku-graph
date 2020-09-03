@@ -63,7 +63,7 @@ object Microservice extends IOMicroservice {
       gitLabRateLimit          <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler          <- Throttler[IO, GitLab](gitLabRateLimit)
       sparqlTimeRecorder       <- SparqlQueryTimeRecorder(metricsRegistry)
-      reProvisioning           <- IOReProvisioning(triplesGeneration, sparqlTimeRecorder, ApplicationLogger)
+      reProvisioning           <- IOReProvisioning(triplesGeneration, subscriber, sparqlTimeRecorder, ApplicationLogger)
       reProvisioningFlag       <- ReProvisioningFlag(ApplicationLogger, sparqlTimeRecorder)
       eventProcessingEndpoint <- IOEventProcessingEndpoint(subscriber,
                                                            triplesGeneration,
@@ -90,7 +90,7 @@ object Microservice extends IOMicroservice {
 private class MicroserviceRunner(
     sentryInitializer:        SentryInitializer[IO],
     datasetInitializer:       FusekiDatasetInitializer[IO],
-    subscriber:               Subscriber,
+    subscriber:               Subscriber[IO],
     reProvisioning:           ReProvisioning[IO],
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]

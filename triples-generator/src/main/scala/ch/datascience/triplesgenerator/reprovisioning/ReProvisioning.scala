@@ -27,6 +27,7 @@ import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.config.TriplesGeneration
+import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import com.typesafe.config.{Config, ConfigFactory}
 import io.chrisdavenport.log4cats.Logger
 
@@ -44,6 +45,7 @@ class ReProvisioningImpl[Interpretation[_]](
     eventsReScheduler:        EventsReScheduler[Interpretation],
     reProvisioningFlagSetter: ReProvisioningFlagSetter[Interpretation],
     triplesVersionCreator:    TriplesVersionCreator[Interpretation],
+    subscriber:               Subscriber[Interpretation],
     reProvisioningDelay:      ReProvisioningDelay,
     executionTimeRecorder:    ExecutionTimeRecorder[Interpretation],
     logger:                   Logger[Interpretation],
@@ -54,6 +56,7 @@ class ReProvisioningImpl[Interpretation[_]](
   import eventsReScheduler._
   import executionTimeRecorder._
   import reProvisioningFlagSetter._
+  import subscriber.notifyAvailability
   import triplesRemover._
   import triplesVersionCreator._
   import triplesVersionFinder._
@@ -79,6 +82,7 @@ class ReProvisioningImpl[Interpretation[_]](
         _ <- removeAllTriples() recoverWith tryAgain(removeAllTriples())
         _ <- triggerEventsReScheduling recoverWith tryAgain(triggerEventsReScheduling)
         _ <- clearUnderReProvisioningFlag recoverWith tryAgain(clearUnderReProvisioningFlag)
+        _ <- notifyAvailability recoverWith tryAgain(notifyAvailability)
       } yield ()
     } flatMap logSummary
 
@@ -115,6 +119,7 @@ object IOReProvisioning {
 
   def apply(
       triplesGeneration: TriplesGeneration,
+      subscriber:        Subscriber[IO],
       timeRecorder:      SparqlQueryTimeRecorder[IO],
       logger:            Logger[IO],
       configuration:     Config = ConfigFactory.load()
@@ -137,6 +142,7 @@ object IOReProvisioning {
       eventsReScheduler,
       new ReProvisioningFlagSetterImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
       new IOTriplesVersionCreator(rdfStoreConfig, currentCliVersion, renkuBaseUrl, logger, timeRecorder),
+      subscriber,
       initialDelay,
       executionTimeRecorder,
       logger,
