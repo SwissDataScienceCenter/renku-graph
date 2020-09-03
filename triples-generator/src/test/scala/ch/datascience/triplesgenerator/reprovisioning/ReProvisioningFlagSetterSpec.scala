@@ -23,6 +23,27 @@ class ReProvisioningFlagSetterSpec extends AnyWordSpec with should.Matchers with
     }
   }
 
+  "clearUnderReProvisioningFlag" should {
+    "completely remove the ReProvisioning object" in new TestCase {
+      flagSetter.setUnderReProvisioningFlag().unsafeRunSync() shouldBe ((): Unit)
+
+      findFlag shouldBe true
+
+      flagSetter.clearUnderReProvisioningFlag.unsafeRunSync() should be((): Unit)
+
+      findFlag shouldBe false
+    }
+
+    "not throw an error if the ReProvisioning object isn't there" in new TestCase {
+
+      findFlag shouldBe false
+
+      flagSetter.clearUnderReProvisioningFlag.unsafeRunSync() should be((): Unit)
+
+      findFlag shouldBe false
+    }
+  }
+
   private trait TestCase {
     private val renkuBaseUrl = renkuBaseUrls.generateOne
     private val logger       = TestLogger[IO]()

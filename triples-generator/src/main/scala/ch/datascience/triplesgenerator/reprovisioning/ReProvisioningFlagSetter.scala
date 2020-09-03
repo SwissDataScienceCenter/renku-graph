@@ -56,17 +56,29 @@ private class ReProvisioningFlagSetterImpl(
     SparqlQuery(
       name = "reprovisioning - flag insert",
       Set(
-        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-        "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
-      ), {
-        s"""|INSERT DATA { 
-            |  <${id(renkuBaseUrl)}> rdf:type <$ObjectType>;
-            |                        <$CurrentlyReProvisioning> 'true'.
-            |}
-            |""".stripMargin
-      }
+        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
+      ),
+      s"""|INSERT DATA { 
+          |  <${id(renkuBaseUrl)}> rdf:type <$ObjectType>;
+          |                        <$CurrentlyReProvisioning> 'true'.
+          |}
+          |""".stripMargin
     )
   }
 
-  override def clearUnderReProvisioningFlag: IO[Unit] = ???
+  override def clearUnderReProvisioningFlag: IO[Unit] = updateWitNoResult {
+    SparqlQuery(
+      name = "reprovisioning - flag remove",
+      Set(
+        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
+      ),
+      s"""
+         |DELETE { ?s ?p ?o } 
+         |WHERE {
+         | ?s ?p ?o;
+         |    rdf:type <$ObjectType> .
+         |}
+         |""".stripMargin
+    )
+  }
 }
