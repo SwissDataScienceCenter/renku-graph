@@ -403,33 +403,6 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
       )
     }
-
-    "start re-provisioning after the initial delay" in new TestCase {
-      (triplesVersionFinder.triplesUpToDate _)
-        .expects()
-        .returning(true.pure[IO])
-
-      val someInitialDelay: ReProvisioningDelay = ReProvisioningDelay(500 millis)
-
-      val startTime = System.currentTimeMillis()
-
-      new ReProvisioningImpl[IO](
-        triplesVersionFinder,
-        triplesRemover,
-        eventsReScheduler,
-        reProvisioningFlagSetter,
-        triplesVersionCreator,
-        subscriber,
-        someInitialDelay,
-        executionTimeRecorder,
-        logger,
-        5 millis
-      ).run.unsafeRunSync() shouldBe ((): Unit)
-
-      val endTime = System.currentTimeMillis()
-
-      (endTime - startTime) should be >= someInitialDelay.value.toMillis
-    }
   }
 
   private implicit val timer: Timer[IO] = IO.timer(global)
@@ -440,7 +413,6 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
     val eventsReScheduler        = mock[EventsReScheduler[IO]]
     val reProvisioningFlagSetter = mock[ReProvisioningFlagSetter[IO]]
     val triplesVersionCreator    = mock[TriplesVersionCreator[IO]]
-    val initialDelay             = ReProvisioningDelay(durations(100 millis).generateOne)
     val subscriber               = mock[Subscriber[IO]]
     val logger                   = TestLogger[IO]()
     val executionTimeRecorder    = TestExecutionTimeRecorder(logger)
@@ -451,7 +423,6 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       reProvisioningFlagSetter,
       triplesVersionCreator,
       subscriber,
-      initialDelay,
       executionTimeRecorder,
       logger,
       5 millis

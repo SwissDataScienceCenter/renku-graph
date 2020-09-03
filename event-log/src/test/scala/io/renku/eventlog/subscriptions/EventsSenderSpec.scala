@@ -34,6 +34,8 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
 
@@ -74,7 +76,7 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with sho
     }
 
     "return Misdelivered if call to the remote fails with Connect Exception" in new TestCase {
-      override val sender = new IOEventsSender(TestLogger())
+      override val sender = new IOEventsSender(TestLogger(), retryInterval = 10 millis)
 
       sender
         .sendEvent(SubscriberUrl("http://unexisting"), event.compoundEventId, event.body)

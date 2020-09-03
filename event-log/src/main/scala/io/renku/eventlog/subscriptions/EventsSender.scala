@@ -23,11 +23,13 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.IORestClient.SleepAfterConnectionIssue
 import ch.datascience.http.client.RestClientError.ConnectivityException
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
 private trait EventsSender[Interpretation[_]] {
@@ -44,12 +46,13 @@ private object EventsSender {
 }
 
 private class IOEventsSender(
-    logger:         Logger[IO]
+    logger:         Logger[IO],
+    retryInterval:  FiniteDuration = SleepAfterConnectionIssue
 )(implicit ME:      MonadError[IO, Throwable],
   executionContext: ExecutionContext,
   contextShift:     ContextShift[IO],
   timer:            Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
+    extends IORestClient(Throttler.noThrottling, logger, retryInterval = retryInterval)
     with EventsSender[IO] {
 
   import SendingResult._

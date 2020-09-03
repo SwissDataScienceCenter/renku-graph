@@ -25,7 +25,6 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
-import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import com.typesafe.config.{Config, ConfigFactory}
@@ -46,7 +45,6 @@ class ReProvisioningImpl[Interpretation[_]](
     reProvisioningFlagSetter: ReProvisioningFlagSetter[Interpretation],
     triplesVersionCreator:    TriplesVersionCreator[Interpretation],
     subscriber:               Subscriber[Interpretation],
-    reProvisioningDelay:      ReProvisioningDelay,
     executionTimeRecorder:    ExecutionTimeRecorder[Interpretation],
     logger:                   Logger[Interpretation],
     sleepWhenBusy:            FiniteDuration
@@ -62,16 +60,10 @@ class ReProvisioningImpl[Interpretation[_]](
   import triplesVersionFinder._
 
   override def run: Interpretation[Unit] =
-    for {
-      _ <- timer sleep reProvisioningDelay.value
-      _ <- startReProvisioning
-    } yield ()
-
-  private def startReProvisioning: Interpretation[Unit] =
     triplesUpToDate.flatMap {
       case false => triggerReProvisioning
       case true  => logger.info("All projects' triples up to date")
-    } recoverWith tryAgain(startReProvisioning)
+    } recoverWith tryAgain(run)
 
   private def triggerReProvisioning =
     measureExecutionTime {
@@ -101,16 +93,10 @@ class ReProvisioningImpl[Interpretation[_]](
   }
 }
 
-class ReProvisioningDelay private (val value: FiniteDuration) extends TinyType {
-  type V = FiniteDuration
-}
-object ReProvisioningDelay extends TinyTypeFactory[ReProvisioningDelay](new ReProvisioningDelay(_))
-
 object IOReProvisioning {
 
   import cats.MonadError
   import cats.effect.{ContextShift, IO, Timer}
-  import ch.datascience.config.ConfigLoader._
 
   import scala.concurrent.ExecutionContext
   import scala.concurrent.duration._
@@ -128,12 +114,10 @@ object IOReProvisioning {
     contextShift:        ContextShift[IO],
     timer:               Timer[IO]): IO[ReProvisioning[IO]] =
     for {
-      rdfStoreConfig    <- RdfStoreConfig[IO](configuration)
-      currentCliVersion <- CliVersionFinder[IO](triplesGeneration)
-      eventsReScheduler <- IOEventsReScheduler(logger)
-      renkuBaseUrl      <- RenkuBaseUrl[IO]()
-      initialDelay <- find[IO, FiniteDuration]("re-provisioning-initial-delay", configuration)
-                       .flatMap(delay => ME.fromEither(ReProvisioningDelay.from(delay)))
+      rdfStoreConfig        <- RdfStoreConfig[IO](configuration)
+      currentCliVersion     <- CliVersionFinder[IO](triplesGeneration)
+      eventsReScheduler     <- IOEventsReScheduler(logger)
+      renkuBaseUrl          <- RenkuBaseUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
       triplesRemover        <- IOTriplesRemover(rdfStoreConfig, logger, timeRecorder)
     } yield new ReProvisioningImpl[IO](
@@ -143,7 +127,6 @@ object IOReProvisioning {
       new ReProvisioningFlagSetterImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
       new IOTriplesVersionCreator(rdfStoreConfig, currentCliVersion, renkuBaseUrl, logger, timeRecorder),
       subscriber,
-      initialDelay,
       executionTimeRecorder,
       logger,
       SleepWhenBusy

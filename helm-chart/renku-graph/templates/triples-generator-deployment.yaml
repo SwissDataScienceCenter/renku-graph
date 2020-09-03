@@ -60,8 +60,6 @@ spec:
               value: "{{ .Values.triplesGenerator.renkuLogTimeout }}"
             - name: RENKU_DISABLE_VERSION_CHECK
               value: "true"
-            - name: RE_PROVISIONING_INITIAL_DELAY
-              value: "{{ .Values.triplesGenerator.reProvisioningInitialDelay }}"
             - name: RE_PROVISIONING_REMOVAL_BATCH_SIZE
               value: "{{ .Values.triplesGenerator.reProvisioningRemovalBatchSize }}"
             - name: SENTRY_DSN
