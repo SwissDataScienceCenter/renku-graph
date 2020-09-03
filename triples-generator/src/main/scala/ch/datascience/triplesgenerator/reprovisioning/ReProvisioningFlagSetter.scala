@@ -60,7 +60,7 @@ private class ReProvisioningFlagSetterImpl(
       ),
       s"""|INSERT DATA { 
           |  <${id(renkuBaseUrl)}> rdf:type <$ObjectType>;
-          |                        <$CurrentlyReProvisioning> 'true'.
+          |                        <$CurrentlyReProvisioning> true.
           |}
           |""".stripMargin
     )

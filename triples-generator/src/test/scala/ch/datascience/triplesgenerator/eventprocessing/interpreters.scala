@@ -19,11 +19,13 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.IO
+import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningFlag
 import io.chrisdavenport.log4cats.Logger
 
 private class IOEventBodyDeserialiser extends EventBodyDeserialiser[IO]
 
 abstract class IOEventProcessingEndpoint(eventBodyDeserializer:  EventBodyDeserialiser[IO],
                                          eventsProcessingRunner: EventsProcessingRunner[IO],
+                                         reProvisioningFlag:     ReProvisioningFlag[IO],
                                          logger:                 Logger[IO])
-    extends EventProcessingEndpoint[IO](eventBodyDeserializer, eventsProcessingRunner, logger)
+    extends EventProcessingEndpoint[IO](eventBodyDeserializer, eventsProcessingRunner, reProvisioningFlag, logger)

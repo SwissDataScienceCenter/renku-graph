@@ -64,7 +64,7 @@ private class IOTriplesVersionFinder(
     )
   }
 
-  private implicit lazy val agentsDecoder: Decoder[List[String]] =
+  private implicit lazy val versionsDecoder: Decoder[List[String]] =
     _.downField("results")
       .downField("bindings")
       .as(decodeList(ofVersions))

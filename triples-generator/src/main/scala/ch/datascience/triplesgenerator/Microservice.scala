@@ -64,7 +64,7 @@ object Microservice extends IOMicroservice {
       gitLabThrottler          <- Throttler[IO, GitLab](gitLabRateLimit)
       sparqlTimeRecorder       <- SparqlQueryTimeRecorder(metricsRegistry)
       reProvisioning           <- IOReProvisioning(triplesGeneration, sparqlTimeRecorder, ApplicationLogger)
-      reProvisioningFlag       <- ReProvisioningFlag[IO]()
+      reProvisioningFlag       <- ReProvisioningFlag(ApplicationLogger, sparqlTimeRecorder)
       eventProcessingEndpoint <- IOEventProcessingEndpoint(subscriber,
                                                            triplesGeneration,
                                                            reProvisioningFlag,
