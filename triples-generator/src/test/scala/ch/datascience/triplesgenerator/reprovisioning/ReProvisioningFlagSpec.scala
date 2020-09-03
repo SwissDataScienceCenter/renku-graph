@@ -18,7 +18,10 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
+import java.lang.Thread.sleep
+
 import cats.effect.IO
+import cats.effect.concurrent.Ref
 import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
@@ -27,27 +30,45 @@ import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.concurrent.duration._
+import scala.language.postfixOps
+
 class ReProvisioningFlagSpec extends AnyWordSpec with should.Matchers with InMemoryRdfStore {
 
   "currentlyReProvisioning" should {
 
-    "reflects the state of the re-provisioning flag in the DB" in new TestCase {
-      flagSetter.clearUnderReProvisioningFlag.unsafeRunSync() shouldBe ((): Unit)
-
-      reProvisioning.currentlyReProvisioning.unsafeRunSync() shouldBe false
-
+    "reflect the state of the re-provisioning flag in the DB" in new TestCase {
       flagSetter.setUnderReProvisioningFlag().unsafeRunSync() shouldBe ((): Unit)
 
+      reProvisioning.currentlyReProvisioning.unsafeRunSync() shouldBe true
+    }
+
+    "cache the value of the flag in DB once it's set to false" in new TestCase {
+      flagSetter.setUnderReProvisioningFlag().unsafeRunSync() shouldBe ((): Unit)
+
+      reProvisioning.currentlyReProvisioning.unsafeRunSync() shouldBe true
+      reProvisioning.currentlyReProvisioning.unsafeRunSync() shouldBe true
+
+      flagSetter.clearUnderReProvisioningFlag.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.currentlyReProvisioning.unsafeRunSync()  shouldBe false
+
+      flagSetter.setUnderReProvisioningFlag().unsafeRunSync() shouldBe ((): Unit)
+      sleep(cacheRefresh.toMillis - 500)
+      reProvisioning.currentlyReProvisioning.unsafeRunSync() shouldBe false
+
+      sleep(500 + 100)
       reProvisioning.currentlyReProvisioning.unsafeRunSync() shouldBe true
     }
   }
 
   private trait TestCase {
+    val cacheRefresh         = 1 second
     private val renkuBaseUrl = renkuBaseUrls.generateOne
     private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+    private val flagCheck    = Ref.of[IO, Boolean](true).unsafeRunSync()
     val flagSetter           = new ReProvisioningFlagSetterImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
 
-    val reProvisioning = new ReProvisioningFlagImpl(rdfStoreConfig, logger, timeRecorder)
+    val reProvisioning = new ReProvisioningFlagImpl(rdfStoreConfig, logger, timeRecorder, cacheRefresh, flagCheck)
   }
 }

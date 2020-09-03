@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
-import cats.MonadError
+import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.rdfstore._
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningJsonLD.{CurrentlyReProvisioning, ObjectType}
@@ -29,7 +29,8 @@ import io.circe.Decoder.decodeList
 import io.circe.{Decoder, DecodingFailure}
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
+import scala.concurrent.duration._
+import scala.language.{higherKinds, postfixOps}
 import scala.util.Try
 
 trait ReProvisioningFlag[Interpretation[_]] {
@@ -39,12 +40,29 @@ trait ReProvisioningFlag[Interpretation[_]] {
 class ReProvisioningFlagImpl(
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
+    timeRecorder:            SparqlQueryTimeRecorder[IO],
+    cacheRefresh:            FiniteDuration,
+    flagCheck:               Ref[IO, Boolean]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with ReProvisioningFlag[IO] {
 
   override def currentlyReProvisioning: IO[Boolean] =
+    for {
+      checkNeeded <- flagCheck.get
+      flag <- if (checkNeeded) findValueInDB flatMap {
+               case true  => (flagCheck set true) map (_ => true)
+               case false => (flagCheck set false) flatMap (_ => waitAndClearRef.start) map (_ => false)
+             } else IO.pure(false)
+    } yield flag
+
+  private def waitAndClearRef =
+    for {
+      _ <- timer sleep cacheRefresh
+      _ <- flagCheck set true
+    } yield ()
+
+  private def findValueInDB: IO[Boolean] =
     queryExpecting[Boolean] {
       SparqlQuery(
         name = "reprovisioning - get flag",
@@ -76,19 +94,17 @@ class ReProvisioningFlagImpl(
 
 object ReProvisioningFlag {
 
+  private val CacheRefresh: FiniteDuration = 2 minutes
+
   def apply(
-      logger:         Logger[IO],
-      timeRecorder:   SparqlQueryTimeRecorder[IO],
-      configuration:  Config = ConfigFactory.load()
-  )(implicit ME:      MonadError[IO, Throwable],
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO]): IO[ReProvisioningFlag[IO]] =
-    RdfStoreConfig[IO](configuration) flatMap { rdfStoreConfig =>
-      ME.fromTry {
-        Try {
-          new ReProvisioningFlagImpl(rdfStoreConfig, logger, timeRecorder)
-        }
-      }
-    }
+      logger:                  Logger[IO],
+      timeRecorder:            SparqlQueryTimeRecorder[IO],
+      configuration:           Config = ConfigFactory.load()
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[ReProvisioningFlag[IO]] =
+    for {
+      rdfStoreConfig <- RdfStoreConfig[IO](configuration)
+      flagCheck      <- Ref.of[IO, Boolean](true)
+    } yield new ReProvisioningFlagImpl(rdfStoreConfig, logger, timeRecorder, CacheRefresh, flagCheck)
 }
