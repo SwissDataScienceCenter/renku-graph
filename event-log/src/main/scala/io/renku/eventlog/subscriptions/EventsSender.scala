@@ -86,7 +86,7 @@ private class IOEventsSender(
     case (TooManyRequests, _, _)    => ServiceBusy.pure[IO]
     case (NotFound, _, _)           => Misdelivered.pure[IO]
     case (BadGateway, _, _)         => Misdelivered.pure[IO]
-    case (ServiceUnavailable, _, _) => Misdelivered.pure[IO]
+    case (ServiceUnavailable, _, _) => ServiceBusy.pure[IO]
   }
 
   private def connectivityException(to: SendingResult): PartialFunction[Throwable, IO[SendingResult]] = {
