@@ -29,7 +29,7 @@ import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
-import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningFlag
+import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
@@ -41,7 +41,7 @@ import scala.util.control.NonFatal
 class EventProcessingEndpoint[Interpretation[_]: Effect](
     eventBodyDeserializer:  EventBodyDeserialiser[Interpretation],
     eventsProcessingRunner: EventsProcessingRunner[Interpretation],
-    reProvisioningFlag:     ReProvisioningFlag[Interpretation],
+    reProvisioningStatus:   ReProvisioningStatus[Interpretation],
     logger:                 Logger[Interpretation]
 )(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
@@ -57,8 +57,8 @@ class EventProcessingEndpoint[Interpretation[_]: Effect](
   import org.http4s.circe._
 
   def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] =
-    reProvisioningFlag.currentlyReProvisioning flatMap { isReprovisioning =>
-      if (isReprovisioning) ServiceUnavailable(InfoMessage("Temporarily unavailable: currently reprovisioning"))
+    reProvisioningStatus.isReProvisioning flatMap { isReProvisioning =>
+      if (isReProvisioning) ServiceUnavailable(InfoMessage("Temporarily unavailable: currently re-provisioning"))
       else process(request)
     }
 
@@ -125,16 +125,16 @@ object IOEventProcessingEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply(
-      subscriber:          Subscriber[IO],
-      triplesGeneration:   TriplesGeneration,
-      reProvisioningFlag:  ReProvisioningFlag[IO],
-      metricsRegistry:     MetricsRegistry[IO],
-      gitLabThrottler:     Throttler[IO, GitLab],
-      timeRecorder:        SparqlQueryTimeRecorder[IO],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO],
-    executionContext:      ExecutionContext,
-    timer:                 Timer[IO]): IO[EventProcessingEndpoint[IO]] =
+      subscriber:           Subscriber[IO],
+      triplesGeneration:    TriplesGeneration,
+      reProvisioningStatus: ReProvisioningStatus[IO],
+      metricsRegistry:      MetricsRegistry[IO],
+      gitLabThrottler:      Throttler[IO, GitLab],
+      timeRecorder:         SparqlQueryTimeRecorder[IO],
+      logger:               Logger[IO]
+  )(implicit contextShift:  ContextShift[IO],
+    executionContext:       ExecutionContext,
+    timer:                  Timer[IO]): IO[EventProcessingEndpoint[IO]] =
     for {
       triplesGenerator <- TriplesGenerator(triplesGeneration)
       commitEventProcessor <- IOCommitEventProcessor(triplesGenerator,
@@ -144,5 +144,5 @@ object IOEventProcessingEndpoint {
                                                      logger)
       eventsProcessingRunner <- IOEventsProcessingRunner(commitEventProcessor, subscriber, logger)
       bodyDeserialiser = new EventBodyDeserialiser[IO]()
-    } yield new EventProcessingEndpoint[IO](bodyDeserialiser, eventsProcessingRunner, reProvisioningFlag, logger)
+    } yield new EventProcessingEndpoint[IO](bodyDeserialiser, eventsProcessingRunner, reProvisioningStatus, logger)
 }

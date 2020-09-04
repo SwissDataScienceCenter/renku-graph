@@ -1,0 +1,140 @@
+/*
+ * Copyright 2020 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.datascience.triplesgenerator.reprovisioning
+
+import java.lang.Thread.sleep
+
+import cats.effect.IO
+import cats.effect.concurrent.Ref
+import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningJsonLD.Running
+import ch.datascience.triplesgenerator.subscriptions.Subscriber
+import org.scalamock.scalatest.MockFactory
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+
+import scala.concurrent.duration._
+import scala.language.postfixOps
+
+class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with MockFactory with InMemoryRdfStore {
+
+  "setRunning" should {
+
+    "insert the ReProvisioningJsonLD object" in new TestCase {
+
+      findStatus shouldBe None
+
+      reProvisioningStatus.setRunning.unsafeRunSync() shouldBe ((): Unit)
+
+      findStatus shouldBe Some(Running.toString)
+    }
+  }
+
+  "clear" should {
+
+    "completely remove the ReProvisioning object" in new TestCase {
+      reProvisioningStatus.setRunning.unsafeRunSync() shouldBe ((): Unit)
+
+      findStatus shouldBe Some(Running.toString)
+
+      reProvisioningStatus.clear.unsafeRunSync() should be((): Unit)
+
+      findStatus shouldBe None
+    }
+
+    "not throw an error if the ReProvisioning object isn't there" in new TestCase {
+
+      findStatus shouldBe None
+
+      reProvisioningStatus.clear.unsafeRunSync() should be((): Unit)
+
+      findStatus shouldBe None
+    }
+  }
+
+  "isReProvisioning" should {
+
+    "reflect the state of the re-provisioning status in the DB" in new TestCase {
+      reProvisioningStatus.setRunning.unsafeRunSync() shouldBe ((): Unit)
+
+      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
+    }
+
+    "cache the value of the flag in DB once it's set to false" in new TestCase {
+      reProvisioningStatus.setRunning.unsafeRunSync() shouldBe ((): Unit)
+
+      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
+      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
+
+      reProvisioningStatus.clear.unsafeRunSync()            shouldBe ((): Unit)
+      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe false
+
+      reProvisioningStatus.setRunning.unsafeRunSync() shouldBe ((): Unit)
+      sleep(cacheRefresh.toMillis - 500)
+      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe false
+
+      sleep(500 + 100)
+      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
+    }
+  }
+
+//  "clear" should {
+//
+//    "turn the flag state into false and notify event-log about availability" in new TestCase {
+//      reProvisioningFlag.set.unsafeRunSync() shouldBe ((): Unit)
+//
+//      reProvisioningFlag.currentlyReProvisioning.unsafeRunSync() shouldBe true
+//
+//      (subscriber.notifyAvailability _)
+//        .expects()
+//        .returning(IO.unit)
+//
+//      reProvisioningFlag.clear.unsafeRunSync() shouldBe ((): Unit)
+//
+//      reProvisioningFlag.currentlyReProvisioning.unsafeRunSync() shouldBe false
+//    }
+//  }
+
+  private trait TestCase {
+    val cacheRefresh         = 1 second
+    private val renkuBaseUrl = renkuBaseUrls.generateOne
+    private val logger       = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+    private val flagCheck    = Ref.of[IO, Boolean](true).unsafeRunSync()
+    val subscriber           = mock[Subscriber[IO]]
+
+    val reProvisioningStatus =
+      new ReProvisioningStatusImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder, cacheRefresh, flagCheck)
+  }
+
+  private def findStatus: Option[String] =
+    runQuery(s"""|SELECT DISTINCT ?status
+                 |WHERE {
+                 |  ?id rdf:type renku:ReProvisioning;
+                 |      renku:reProvisioningStatus ?status
+                 |}
+                 |""".stripMargin)
+      .unsafeRunSync()
+      .map(row => row("status"))
+      .headOption
+}

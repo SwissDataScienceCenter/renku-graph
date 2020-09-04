@@ -38,14 +38,14 @@ class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should
 
       val cliVersionJsonLD = JsonLD.entity(
         id    = CliVersionJsonLD.id,
-        types = EntityTypes.of(CliVersionJsonLD.ObjectType),
+        types = EntityTypes.of(CliVersionJsonLD.objectType),
         CliVersionJsonLD.version -> JsonLD.fromString(cliVersions.generateOne.toString)
       )
 
       val reprovisioningJsonLD = JsonLD.entity(
         id    = ReProvisioningJsonLD.id,
-        types = EntityTypes.of(ReProvisioningJsonLD.ObjectType),
-        ReProvisioningJsonLD.CurrentlyReProvisioning -> JsonLD.fromBoolean(true)
+        types = EntityTypes.of(ReProvisioningJsonLD.objectType),
+        ReProvisioningJsonLD.reProvisioningStatus -> JsonLD.fromBoolean(true)
       )
 
       loadToStore(

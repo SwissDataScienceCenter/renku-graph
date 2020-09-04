@@ -37,7 +37,7 @@ private case object CliVersionJsonLD {
   import ch.datascience.graph.Schemas._
 
   def id(implicit renkuBaseUrl: RenkuBaseUrl) = EntityId.of((renkuBaseUrl / "cli-version").toString)
-  val ObjectType = renku / "CliVersion"
+  val objectType = renku / "CliVersion"
   val version    = renku / "version"
 }
 
@@ -64,7 +64,7 @@ private class IOTriplesVersionCreator(
       s"""|DELETE {$entityId <${CliVersionJsonLD.version}> ?o}
           |
           |INSERT { 
-          |  <${CliVersionJsonLD.id(renkuBaseUrl)}> rdf:type <${CliVersionJsonLD.ObjectType}> ;
+          |  <${CliVersionJsonLD.id(renkuBaseUrl)}> rdf:type <${CliVersionJsonLD.objectType}> ;
           |                                         <${CliVersionJsonLD.version}> '$currentCliVersion'.
           |}
           |WHERE {
