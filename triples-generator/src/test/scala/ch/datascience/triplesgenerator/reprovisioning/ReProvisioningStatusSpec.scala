@@ -44,7 +44,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
 
       findStatus shouldBe None
 
-      reProvisioningStatus.setRunning.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
 
       findStatus shouldBe Some(Running.toString)
     }
@@ -53,13 +53,13 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
   "clear" should {
 
     "completely remove the ReProvisioning object" in new TestCase {
-      reProvisioningStatus.setRunning.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
 
       findStatus shouldBe Some(Running.toString)
 
       expectNotificationSent
 
-      reProvisioningStatus.clear.unsafeRunSync() should be((): Unit)
+      reProvisioningStatus.clear().unsafeRunSync() should be((): Unit)
 
       findStatus shouldBe None
     }
@@ -70,7 +70,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
 
       expectNotificationSent
 
-      reProvisioningStatus.clear.unsafeRunSync() should be((): Unit)
+      reProvisioningStatus.clear().unsafeRunSync() should be((): Unit)
 
       findStatus shouldBe None
     }
@@ -79,22 +79,22 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
   "isReProvisioning" should {
 
     "reflect the state of the re-provisioning status in the DB" in new TestCase {
-      reProvisioningStatus.setRunning.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
 
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
     }
 
     "cache the value of the flag in DB once it's set to false" in new TestCase {
-      reProvisioningStatus.setRunning.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
 
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
 
       expectNotificationSent
-      reProvisioningStatus.clear.unsafeRunSync()            shouldBe ((): Unit)
+      reProvisioningStatus.clear().unsafeRunSync()          shouldBe ((): Unit)
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe false
 
-      reProvisioningStatus.setRunning.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
       sleep(cacheRefresh.toMillis - 500)
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe false
 

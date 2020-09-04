@@ -65,11 +65,11 @@ class ReProvisioningImpl[Interpretation[_]](
     measureExecutionTime {
       for {
         _ <- logger.info("The triples are not up to date - clearing DB and re-scheduling all the events")
-        _ <- reProvisioningStatus.setRunning
+        _ <- reProvisioningStatus.setRunning()
         _ <- updateCliVersion()
         _ <- removeAllTriples() recoverWith tryAgain(removeAllTriples())
         _ <- triggerEventsReScheduling recoverWith tryAgain(triggerEventsReScheduling)
-        _ <- reProvisioningStatus.clear recoverWith tryAgain(reProvisioningStatus.clear)
+        _ <- reProvisioningStatus.clear() recoverWith tryAgain(reProvisioningStatus.clear())
       } yield ()
     } flatMap logSummary
 

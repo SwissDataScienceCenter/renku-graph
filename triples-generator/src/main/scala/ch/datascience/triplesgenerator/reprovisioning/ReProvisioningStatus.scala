@@ -38,8 +38,8 @@ import scala.language.{higherKinds, postfixOps}
 
 trait ReProvisioningStatus[Interpretation[_]] {
   def isReProvisioning: Interpretation[Boolean]
-  def setRunning:       Interpretation[Unit]
-  def clear:            Interpretation[Unit]
+  def setRunning():     Interpretation[Unit]
+  def clear():          Interpretation[Unit]
 }
 
 private class ReProvisioningStatusImpl(
@@ -57,7 +57,7 @@ private class ReProvisioningStatusImpl(
   import cats.implicits._
   import ReProvisioningJsonLD._
 
-  override def setRunning: IO[Unit] = updateWitNoResult {
+  override def setRunning(): IO[Unit] = updateWitNoResult {
     SparqlQuery(
       name = "reprovisioning - status insert",
       Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),
@@ -69,13 +69,13 @@ private class ReProvisioningStatusImpl(
     )
   }
 
-  override def clear: IO[Unit] =
+  override def clear(): IO[Unit] =
     for {
-      _ <- deleteFromDb
+      _ <- deleteFromDb()
       _ <- subscriber.notifyAvailability
     } yield ()
 
-  private def deleteFromDb = updateWitNoResult {
+  private def deleteFromDb() = updateWitNoResult {
     SparqlQuery(
       name = "reprovisioning - status remove",
       Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),
