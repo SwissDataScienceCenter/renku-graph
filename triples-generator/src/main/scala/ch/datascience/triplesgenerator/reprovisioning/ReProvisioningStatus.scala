@@ -18,6 +18,8 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
+import java.util.concurrent.TimeUnit
+
 import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
@@ -39,25 +41,24 @@ trait ReProvisioningStatus[Interpretation[_]] {
   def clear:            Interpretation[Unit]
 }
 
-class ReProvisioningStatusImpl(
+private class ReProvisioningStatusImpl(
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO],
-    cacheRefresh:            FiniteDuration,
-    flagCheck:               Ref[IO, Boolean]
+    cacheRefreshTime:        FiniteDuration,
+    lastCheckTimeRef:        Ref[IO, Long]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with ReProvisioningStatus[IO] {
 
+  import cats.implicits._
   import ReProvisioningJsonLD._
 
   override def setRunning: IO[Unit] = updateWitNoResult {
     SparqlQuery(
       name = "reprovisioning - status insert",
-      Set(
-        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
-      ),
+      Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),
       s"""|INSERT DATA { 
           |  <${id(renkuBaseUrl)}> rdf:type <$objectType>;
           |                        <$reProvisioningStatus> '$Running'.
@@ -69,9 +70,7 @@ class ReProvisioningStatusImpl(
   override def clear: IO[Unit] = updateWitNoResult {
     SparqlQuery(
       name = "reprovisioning - status remove",
-      Set(
-        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
-      ),
+      Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),
       s"""
          |DELETE { ?s ?p ?o } 
          |WHERE {
@@ -84,17 +83,23 @@ class ReProvisioningStatusImpl(
 
   override def isReProvisioning: IO[Boolean] =
     for {
-      checkNeeded <- flagCheck.get
-      flag <- if (checkNeeded) fetchStatus flatMap {
-               case Some(Running) => (flagCheck set true) map (_ => true)
-               case _             => (flagCheck set false) flatMap (_ => waitAndClearRef.start) map (_ => false)
-             } else IO.pure(false)
+      isCacheExpired <- isCacheExpired
+      flag <- if (isCacheExpired) fetchStatus flatMap {
+               case Some(Running) => true.pure[IO]
+               case _             => updateLastCheckTime() map (_ => false)
+             } else false.pure[IO]
     } yield flag
 
-  private def waitAndClearRef =
+  private def isCacheExpired: IO[Boolean] =
     for {
-      _ <- timer sleep cacheRefresh
-      _ <- flagCheck set true
+      lastCheckTime <- lastCheckTimeRef.get
+      currentTime   <- timer.clock.monotonic(TimeUnit.MILLISECONDS)
+    } yield currentTime - lastCheckTime > cacheRefreshTime.toMillis
+
+  private def updateLastCheckTime() =
+    for {
+      currentTime <- timer.clock.monotonic(TimeUnit.MILLISECONDS)
+      _           <- lastCheckTimeRef set currentTime
     } yield ()
 
   private def fetchStatus: IO[Option[Status]] =
@@ -138,8 +143,13 @@ object ReProvisioningStatus {
     for {
       rdfStoreConfig <- RdfStoreConfig[IO](configuration)
       renkuBaseUrl   <- RenkuBaseUrl[IO]()
-      flagCheck      <- Ref.of[IO, Boolean](true)
-    } yield new ReProvisioningStatusImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder, CacheRefresh, flagCheck)
+      lastCheckTime  <- Ref.of[IO, Long](0)
+    } yield new ReProvisioningStatusImpl(rdfStoreConfig,
+                                         renkuBaseUrl,
+                                         logger,
+                                         timeRecorder,
+                                         CacheRefresh,
+                                         lastCheckTime)
 }
 
 private case object ReProvisioningJsonLD {

@@ -116,15 +116,15 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
 //  }
 
   private trait TestCase {
-    val cacheRefresh         = 1 second
-    private val renkuBaseUrl = renkuBaseUrls.generateOne
-    private val logger       = TestLogger[IO]()
-    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    private val flagCheck    = Ref.of[IO, Boolean](true).unsafeRunSync()
-    val subscriber           = mock[Subscriber[IO]]
+    val cacheRefresh              = 1 second
+    private val renkuBaseUrl      = renkuBaseUrls.generateOne
+    private val logger            = TestLogger[IO]()
+    private val timeRecorder      = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+    private val statusCheckNeeded = Ref.of[IO, Long](0L).unsafeRunSync()
+    val subscriber                = mock[Subscriber[IO]]
 
     val reProvisioningStatus =
-      new ReProvisioningStatusImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder, cacheRefresh, flagCheck)
+      new ReProvisioningStatusImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder, cacheRefresh, statusCheckNeeded)
   }
 
   private def findStatus: Option[String] =
