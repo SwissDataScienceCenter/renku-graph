@@ -57,6 +57,8 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
 
       findStatus shouldBe Some(Running.toString)
 
+      expectNotificationSent
+
       reProvisioningStatus.clear.unsafeRunSync() should be((): Unit)
 
       findStatus shouldBe None
@@ -65,6 +67,8 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     "not throw an error if the ReProvisioning object isn't there" in new TestCase {
 
       findStatus shouldBe None
+
+      expectNotificationSent
 
       reProvisioningStatus.clear.unsafeRunSync() should be((): Unit)
 
@@ -86,6 +90,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
 
+      expectNotificationSent
       reProvisioningStatus.clear.unsafeRunSync()            shouldBe ((): Unit)
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe false
 
@@ -98,23 +103,6 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     }
   }
 
-//  "clear" should {
-//
-//    "turn the flag state into false and notify event-log about availability" in new TestCase {
-//      reProvisioningFlag.set.unsafeRunSync() shouldBe ((): Unit)
-//
-//      reProvisioningFlag.currentlyReProvisioning.unsafeRunSync() shouldBe true
-//
-//      (subscriber.notifyAvailability _)
-//        .expects()
-//        .returning(IO.unit)
-//
-//      reProvisioningFlag.clear.unsafeRunSync() shouldBe ((): Unit)
-//
-//      reProvisioningFlag.currentlyReProvisioning.unsafeRunSync() shouldBe false
-//    }
-//  }
-
   private trait TestCase {
     val cacheRefresh              = 1 second
     private val renkuBaseUrl      = renkuBaseUrls.generateOne
@@ -123,8 +111,18 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     private val statusCheckNeeded = Ref.of[IO, Long](0L).unsafeRunSync()
     val subscriber                = mock[Subscriber[IO]]
 
-    val reProvisioningStatus =
-      new ReProvisioningStatusImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder, cacheRefresh, statusCheckNeeded)
+    val reProvisioningStatus = new ReProvisioningStatusImpl(subscriber,
+                                                            rdfStoreConfig,
+                                                            renkuBaseUrl,
+                                                            logger,
+                                                            timeRecorder,
+                                                            cacheRefresh,
+                                                            statusCheckNeeded)
+
+    def expectNotificationSent =
+      (subscriber.notifyAvailability _)
+        .expects()
+        .returning(IO.unit)
   }
 
   private def findStatus: Option[String] =

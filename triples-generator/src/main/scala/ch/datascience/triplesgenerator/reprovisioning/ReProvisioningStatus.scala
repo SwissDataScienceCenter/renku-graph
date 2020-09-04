@@ -24,6 +24,7 @@ import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore._
+import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
@@ -42,6 +43,7 @@ trait ReProvisioningStatus[Interpretation[_]] {
 }
 
 private class ReProvisioningStatusImpl(
+    subscriber:              Subscriber[IO],
     rdfStoreConfig:          RdfStoreConfig,
     renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO],
@@ -67,17 +69,22 @@ private class ReProvisioningStatusImpl(
     )
   }
 
-  override def clear: IO[Unit] = updateWitNoResult {
+  override def clear: IO[Unit] =
+    for {
+      _ <- deleteFromDb
+      _ <- subscriber.notifyAvailability
+    } yield ()
+
+  private def deleteFromDb = updateWitNoResult {
     SparqlQuery(
       name = "reprovisioning - status remove",
       Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),
-      s"""
-         |DELETE { ?s ?p ?o } 
-         |WHERE {
-         | ?s ?p ?o;
-         |    rdf:type <$objectType> .
-         |}
-         |""".stripMargin
+      s"""|DELETE { ?s ?p ?o }
+          |WHERE {
+          | ?s ?p ?o;
+          |    rdf:type <$objectType> .
+          |}
+          |""".stripMargin
     )
   }
 
@@ -134,6 +141,7 @@ object ReProvisioningStatus {
   private val CacheRefresh: FiniteDuration = 2 minutes
 
   def apply(
+      subscriber:              Subscriber[IO],
       logger:                  Logger[IO],
       timeRecorder:            SparqlQueryTimeRecorder[IO],
       configuration:           Config = ConfigFactory.load()
@@ -144,7 +152,8 @@ object ReProvisioningStatus {
       rdfStoreConfig <- RdfStoreConfig[IO](configuration)
       renkuBaseUrl   <- RenkuBaseUrl[IO]()
       lastCheckTime  <- Ref.of[IO, Long](0)
-    } yield new ReProvisioningStatusImpl(rdfStoreConfig,
+    } yield new ReProvisioningStatusImpl(subscriber,
+                                         rdfStoreConfig,
                                          renkuBaseUrl,
                                          logger,
                                          timeRecorder,
