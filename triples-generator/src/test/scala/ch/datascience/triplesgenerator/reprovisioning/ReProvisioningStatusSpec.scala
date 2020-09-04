@@ -25,9 +25,10 @@ import cats.effect.concurrent.Ref
 import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.interpreters.TestLogger
+import eu.timepit.refined.auto._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningJsonLD.Running
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
+import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningJsonLD.{Running, objectType}
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -90,34 +91,46 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
 
-      expectNotificationSent
-      reProvisioningStatus.clear().unsafeRunSync()          shouldBe ((): Unit)
+      clearStatus()
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe false
 
       reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
-      sleep(cacheRefresh.toMillis - 500)
+      sleep(cacheRefreshInterval.toMillis - 500)
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe false
 
       sleep(500 + 100)
       reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
     }
+
+    "check if re-provisioning is done and notify availability to event-log" in new TestCase {
+      reProvisioningStatus.setRunning().unsafeRunSync()     shouldBe ((): Unit)
+      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
+
+      clearStatus()
+
+      expectNotificationSent
+      sleep(statusRefreshInterval.toMillis)
+      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe false
+    }
   }
 
   private trait TestCase {
-    val cacheRefresh              = 1 second
-    private val renkuBaseUrl      = renkuBaseUrls.generateOne
-    private val logger            = TestLogger[IO]()
-    private val timeRecorder      = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    private val statusCheckNeeded = Ref.of[IO, Long](0L).unsafeRunSync()
-    val subscriber                = mock[Subscriber[IO]]
+    val cacheRefreshInterval            = 1 second
+    val statusRefreshInterval           = 1 second
+    private val renkuBaseUrl            = renkuBaseUrls.generateOne
+    private val logger                  = TestLogger[IO]()
+    private val timeRecorder            = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+    private val statusCacheCheckTimeRef = Ref.of[IO, Long](0L).unsafeRunSync()
+    val subscriber                      = mock[Subscriber[IO]]
 
     val reProvisioningStatus = new ReProvisioningStatusImpl(subscriber,
                                                             rdfStoreConfig,
                                                             renkuBaseUrl,
                                                             logger,
                                                             timeRecorder,
-                                                            cacheRefresh,
-                                                            statusCheckNeeded)
+                                                            statusRefreshInterval,
+                                                            cacheRefreshInterval,
+                                                            statusCacheCheckTimeRef)
 
     def expectNotificationSent =
       (subscriber.notifyAvailability _)
@@ -135,4 +148,18 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
       .unsafeRunSync()
       .map(row => row("status"))
       .headOption
+
+  private def clearStatus(): Unit =
+    runUpdate {
+      SparqlQuery(
+        name = "re-provisioning - status remove",
+        Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),
+        s"""|DELETE { ?s ?p ?o }
+            |WHERE {
+            | ?s ?p ?o;
+            |    rdf:type <$objectType> .
+            |}
+            |""".stripMargin
+      )
+    }.unsafeRunSync()
 }
