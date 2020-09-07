@@ -20,6 +20,9 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.rdfstore._
+import com.typesafe.config.{Config, ConfigFactory}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -29,11 +32,8 @@ private trait TriplesRemover[Interpretation[_]] {
   def removeAllTriples(): Interpretation[Unit]
 }
 
-private object TriplesRemover {
-  val TriplesRemovalBatchSize: Long = 50000
-}
-
 private class IOTriplesRemover(
+    removalBatchSize:        Long Refined Positive,
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
@@ -41,35 +41,34 @@ private class IOTriplesRemover(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with TriplesRemover[IO] {
 
-  import TriplesRemover._
-  import cats.implicits._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
-  import scala.util.Try
-
   override def removeAllTriples(): IO[Unit] =
-    queryExpecting[Long](findTriplesCount)(countDecoder) flatMap {
-      case 0 => IO.unit
-      case _ =>
+    queryExpecting(checkIfEmpty)(storeEmptyFlagDecoder) flatMap { isEmpty =>
+      if (isEmpty) IO.unit
+      else
         for {
-          _ <- updateWitNoResult(removeTriplesBatch)
+          _ <- updateWithNoResult(removeTriplesBatch)
           _ <- removeAllTriples()
         } yield ()
     }
 
-  private val findTriplesCount = SparqlQuery(
+  private val checkIfEmpty = SparqlQuery(
     name = "triples remove - count",
     prefixes = Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
     ),
-    """|SELECT (COUNT(*) AS ?count)
-       |WHERE { ?s ?p ?o 
-       | MINUS {?s rdf:type renku:CliVersion}
-       |}
-       | 
-       |""".stripMargin
+    s"""|SELECT ?subject
+        |WHERE { ?subject ?p ?o 
+        |  MINUS {
+        |    ?subject rdf:type ?type
+        |    FILTER (?type IN (<${CliVersionJsonLD.objectType}>, <${ReProvisioningJsonLD.objectType}>)) 
+        |  }
+        |}
+        |LIMIT 1
+        |""".stripMargin
   )
 
   private val removeTriplesBatch = SparqlQuery(
@@ -80,31 +79,45 @@ private class IOTriplesRemover(
     ),
     s"""|DELETE { ?s ?p ?o }
         |WHERE { 
-        |  SELECT  ?s ?p ?o 
+        |  SELECT ?s ?p ?o
         |  WHERE { ?s ?p ?o 
-        |   MINUS {?s rdf:type renku:CliVersion}
+        |    MINUS {
+        |      ?s rdf:type ?type
+        |      FILTER (?type IN (<${CliVersionJsonLD.objectType}>, <${ReProvisioningJsonLD.objectType}>)) 
+        |    }
         |  }
-        |  LIMIT $TriplesRemovalBatchSize
+        |  LIMIT ${removalBatchSize.value}
         |}
         |""".stripMargin
   )
 
-  private implicit val countDecoder: Decoder[Long] = {
+  private implicit val storeEmptyFlagDecoder: Decoder[Boolean] = {
     import io.circe.Decoder.decodeList
-    import io.circe.DecodingFailure
 
-    val rows: Decoder[Long] = _.downField("count")
+    val subject: Decoder[String] = _.downField("subject")
       .downField("value")
       .as[String]
-      .flatMap { count =>
-        Try(count.toLong).toEither.leftMap { ex =>
-          DecodingFailure(s"Triples count in non-number format: $ex", Nil)
-        }
-      }
 
     _.downField("results")
       .downField("bindings")
-      .as[List[Long]](decodeList(rows))
-      .map(_.headOption.getOrElse(0))
+      .as[List[String]](decodeList(subject))
+      .map(_.isEmpty)
   }
+}
+
+private object IOTriplesRemover {
+  import ch.datascience.config.ConfigLoader._
+  import eu.timepit.refined.pureconfig._
+
+  def apply(
+      rdfStoreConfig:          RdfStoreConfig,
+      logger:                  Logger[IO],
+      timeRecorder:            SparqlQueryTimeRecorder[IO],
+      config:                  Config = ConfigFactory.load()
+  )(implicit executionContext: ExecutionContext,
+    contextShift:              ContextShift[IO],
+    timer:                     Timer[IO]): IO[TriplesRemover[IO]] =
+    find[IO, Long Refined Positive]("re-provisioning-removal-batch-size", config) map { removalBatchSize =>
+      new IOTriplesRemover(removalBatchSize, rdfStoreConfig, logger, timeRecorder)
+    }
 }

@@ -351,7 +351,7 @@ class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with
       logger:         Logger[IO] = TestLogger[IO]()
   ) extends IORdfStoreClient(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))) {
 
-    def sendUpdate: IO[Unit] = updateWitNoResult(query)
+    def sendUpdate: IO[Unit] = updateWithNoResult(query)
 
     def sendUpdate[ResultType](
         mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]

@@ -57,7 +57,7 @@ abstract class IORdfStoreClient(
   import org.http4s.{Request, Response, Status}
   import rdfStoreConfig._
 
-  protected def updateWitNoResult(using: SparqlQuery): IO[Unit] =
+  protected def updateWithNoResult(using: SparqlQuery): IO[Unit] =
     updateWitMapping[Unit](using, toFullResponseMapper(_ => IO.unit))
 
   protected def updateWitMapping[ResultType](

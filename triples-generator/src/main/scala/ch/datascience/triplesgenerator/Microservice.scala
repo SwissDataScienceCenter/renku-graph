@@ -33,7 +33,7 @@ import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.init._
-import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning}
+import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -63,9 +63,11 @@ object Microservice extends IOMicroservice {
       gitLabRateLimit          <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler          <- Throttler[IO, GitLab](gitLabRateLimit)
       sparqlTimeRecorder       <- SparqlQueryTimeRecorder(metricsRegistry)
-      reProvisioning           <- IOReProvisioning(triplesGeneration, sparqlTimeRecorder, ApplicationLogger)
+      reProvisioningStatus     <- ReProvisioningStatus(subscriber, ApplicationLogger, sparqlTimeRecorder)
+      reProvisioning           <- IOReProvisioning(triplesGeneration, reProvisioningStatus, sparqlTimeRecorder, ApplicationLogger)
       eventProcessingEndpoint <- IOEventProcessingEndpoint(subscriber,
                                                            triplesGeneration,
+                                                           reProvisioningStatus,
                                                            metricsRegistry,
                                                            gitLabThrottler,
                                                            sparqlTimeRecorder,
@@ -88,7 +90,7 @@ object Microservice extends IOMicroservice {
 private class MicroserviceRunner(
     sentryInitializer:        SentryInitializer[IO],
     datasetInitializer:       FusekiDatasetInitializer[IO],
-    subscriber:               Subscriber,
+    subscriber:               Subscriber[IO],
     reProvisioning:           ReProvisioning[IO],
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]

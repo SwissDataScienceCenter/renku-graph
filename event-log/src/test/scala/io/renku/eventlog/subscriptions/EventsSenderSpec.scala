@@ -34,6 +34,8 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
 
@@ -49,17 +51,19 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with sho
       sender.sendEvent(subscriberUrl, event.compoundEventId, event.body).unsafeRunSync() shouldBe Delivered
     }
 
-    s"return ServiceBusy if remote responds with $TooManyRequests" in new TestCase {
-      stubFor {
-        post("/")
-          .withRequestBody(equalToJson(event.asJson.spaces2))
-          .willReturn(aResponse().withStatus(TooManyRequests.code))
-      }
+    TooManyRequests +: ServiceUnavailable +: Nil foreach { status =>
+      s"return ServiceBusy if remote responds with $status" in new TestCase {
+        stubFor {
+          post("/")
+            .withRequestBody(equalToJson(event.asJson.spaces2))
+            .willReturn(aResponse().withStatus(TooManyRequests.code))
+        }
 
-      sender.sendEvent(subscriberUrl, event.compoundEventId, event.body).unsafeRunSync() shouldBe ServiceBusy
+        sender.sendEvent(subscriberUrl, event.compoundEventId, event.body).unsafeRunSync() shouldBe ServiceBusy
+      }
     }
 
-    NotFound +: BadGateway +: ServiceUnavailable +: Nil foreach { status =>
+    NotFound +: BadGateway +: Nil foreach { status =>
       s"return Misdelivered if remote responds with $status" in new TestCase {
         stubFor {
           post("/")
@@ -72,7 +76,7 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with sho
     }
 
     "return Misdelivered if call to the remote fails with Connect Exception" in new TestCase {
-      override val sender = new IOEventsSender(TestLogger())
+      override val sender = new IOEventsSender(TestLogger(), retryInterval = 10 millis)
 
       sender
         .sendEvent(SubscriberUrl("http://unexisting"), event.compoundEventId, event.body)

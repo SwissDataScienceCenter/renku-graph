@@ -200,7 +200,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
         )
       }
 
-    def runUpdate(query: SparqlQuery): IO[Unit] = updateWitNoResult(using = query)
+    def runUpdate(query: SparqlQuery): IO[Unit] = updateWithNoResult(using = query)
 
     private implicit lazy val valuesDecoder: Decoder[List[Map[String, String]]] = { cursor =>
       for {

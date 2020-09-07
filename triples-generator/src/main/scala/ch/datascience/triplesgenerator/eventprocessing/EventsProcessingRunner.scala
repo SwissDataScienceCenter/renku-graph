@@ -55,7 +55,7 @@ private class IOEventsProcessingRunner private (
     eventProcessor:      EventProcessor[IO],
     generationProcesses: Long Refined Positive,
     semaphore:           Semaphore[IO],
-    subscriber:          Subscriber,
+    subscriber:          Subscriber[IO],
     logger:              Logger[IO]
 )(implicit cs:           ContextShift[IO])
     extends EventsProcessingRunner[IO] {
@@ -112,7 +112,7 @@ private object IOEventsProcessingRunner {
 
   def apply(
       eventProcessor:      EventProcessor[IO],
-      subscriber:          Subscriber,
+      subscriber:          Subscriber[IO],
       logger:              Logger[IO],
       config:              Config = ConfigFactory.load()
   )(implicit contextShift: ContextShift[IO]): IO[EventsProcessingRunner[IO]] =

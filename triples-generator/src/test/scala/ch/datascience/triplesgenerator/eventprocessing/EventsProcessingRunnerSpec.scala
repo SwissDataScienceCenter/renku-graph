@@ -124,7 +124,7 @@ class EventsProcessingRunnerSpec
     )
 
     val logger           = TestLogger[IO]()
-    val subscriber       = mock[Subscriber]
+    val subscriber       = mock[Subscriber[IO]]
     val processingRunner = IOEventsProcessingRunner(eventProcessor, subscriber, logger, config).unsafeRunSync()
 
     def expectAvailabilityIsCommunicated =
