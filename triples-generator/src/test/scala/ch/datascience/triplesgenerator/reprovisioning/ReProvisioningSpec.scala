@@ -67,8 +67,8 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
-        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
@@ -143,10 +143,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
         Error("Re-provisioning failure", exception),
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
-        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
@@ -194,10 +194,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
         Error("Re-provisioning failure", exception),
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
-        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
@@ -237,9 +237,9 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
         Error("Re-provisioning failure", exception),
-        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
@@ -284,10 +284,10 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
         Error("Re-provisioning failure", exception1),
         Error("Re-provisioning failure", exception2),
-        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
@@ -327,9 +327,9 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
         Error("Re-provisioning failure", exception),
-        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
   }

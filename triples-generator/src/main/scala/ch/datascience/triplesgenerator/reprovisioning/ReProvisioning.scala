@@ -64,7 +64,7 @@ class ReProvisioningImpl[Interpretation[_]](
   private def triggerReProvisioning =
     measureExecutionTime {
       for {
-        _ <- logger.info("The triples are not up to date - clearing DB and re-scheduling all the events")
+        _ <- logger.info("The triples are not up to date - re-provisioning is clearing DB")
         _ <- reProvisioningStatus.setRunning()
         _ <- updateCliVersion()
         _ <- removeAllTriples() recoverWith tryAgain(removeAllTriples())
@@ -74,7 +74,7 @@ class ReProvisioningImpl[Interpretation[_]](
     } flatMap logSummary
 
   private def logSummary: ((ElapsedTime, Unit)) => Interpretation[Unit] = {
-    case (elapsedTime, _) => logger.info(s"ReProvisioning triggered in ${elapsedTime}ms")
+    case (elapsedTime, _) => logger.info(s"Clearing DB finished in ${elapsedTime}ms - re-processing all the events")
   }
 
   private def tryAgain(step: => Interpretation[Unit]): PartialFunction[Throwable, Interpretation[Unit]] = {
