@@ -61,7 +61,7 @@ private class ReProvisioningStatusImpl(
 
   private val runningStatusCheckStarted = new AtomicBoolean(false)
 
-  override def setRunning(): IO[Unit] = updateWitNoResult {
+  override def setRunning(): IO[Unit] = updateWithNoResult {
     SparqlQuery(
       name = "re-provisioning - status insert",
       Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),
@@ -79,7 +79,7 @@ private class ReProvisioningStatusImpl(
       _ <- subscriber.notifyAvailability
     } yield ()
 
-  private def deleteFromDb() = updateWitNoResult {
+  private def deleteFromDb() = updateWithNoResult {
     SparqlQuery(
       name = "re-provisioning - status remove",
       Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),

@@ -53,7 +53,7 @@ private class IOTriplesVersionCreator(
   import ch.datascience.rdfstore.SparqlQuery
   import eu.timepit.refined.auto._
 
-  override def updateCliVersion(): IO[Unit] = updateWitNoResult {
+  override def updateCliVersion(): IO[Unit] = updateWithNoResult {
     val entityId = (renkuBaseUrl / "cli-version").showAs[RdfResource]
     SparqlQuery(
       name = "reprovisioning - cli version create",

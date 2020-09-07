@@ -49,7 +49,7 @@ private class IOTriplesRemover(
       if (isEmpty) IO.unit
       else
         for {
-          _ <- updateWitNoResult(removeTriplesBatch)
+          _ <- updateWithNoResult(removeTriplesBatch)
           _ <- removeAllTriples()
         } yield ()
     }
