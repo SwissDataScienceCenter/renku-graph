@@ -44,13 +44,15 @@ class StatusUpdatesRunnerImpl(
 
   import doobie.implicits._
 
-  override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] =
+  override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] = {
+    val shouldThrowError = 1 / 0
     for {
       queryResult  <- measureExecutionTime(command.query) transact transactor.get
       updateResult <- ME.catchNonFatal(command mapResult queryResult)
       _            <- logInfo(command, updateResult)
       _            <- command updateGauges updateResult
     } yield updateResult
+  }
 
   private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {
     case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
