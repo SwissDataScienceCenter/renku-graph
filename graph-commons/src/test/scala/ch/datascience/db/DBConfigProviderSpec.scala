@@ -45,6 +45,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val password       = nonEmptyStrings().generateOne
       val connectionPool = positiveInts().generateOne
       val maxLifetime    = durations(30 minutes).generateOne
+      val idleTimeout    = durations(1 minute).generateOne
 
       val config = ConfigFactory.parseMap(
         Map(
@@ -55,7 +56,8 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> user,
             "db-pass"                 -> password,
             "connection-pool"         -> connectionPool.value,
-            "max-connection-lifetime" -> maxLifetime.toString()
+            "max-connection-lifetime" -> maxLifetime.toString(),
+            "idle-timeout"            -> idleTimeout.toString()
           ).asJava
         ).asJava
       )
@@ -68,6 +70,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       dbConfig.pass           shouldBe password
       dbConfig.connectionPool shouldBe connectionPool
       dbConfig.maxLifetime    shouldBe maxLifetime
+      dbConfig.idleTimeout    shouldBe idleTimeout
     }
 
     "fail if there is no db config namespace in the config" in new TestCase {
@@ -87,7 +90,8 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString(),
+            "idle-timeout"            -> durations(1 minute).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -107,7 +111,8 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString(),
+            "idle-timeout"            -> durations(1 minute).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -127,7 +132,8 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> "",
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString(),
+            "idle-timeout"            -> durations(1 minute).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -146,7 +152,8 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString(),
+            "idle-timeout"            -> durations(1 minute).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -165,7 +172,8 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString(),
+            "idle-timeout"            -> durations(1 minute).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -204,7 +212,8 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString(),
+            "idle-timeout"            -> durations(1 minute).generateOne.toString()
           ).asJava
         ).asJava
       )
