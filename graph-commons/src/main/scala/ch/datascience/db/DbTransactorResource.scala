@@ -72,7 +72,7 @@ private class DataSourceUpdater[TargetDB](dbConfig: DBConfig[TargetDB]) extends 
     dataSource setMaxLifetime dbConfig.maxLifetime.toMillis
     dataSource setIdleTimeout {
       if (dbConfig.maxLifetime.toMillis > (30 seconds).toMillis) (dbConfig.maxLifetime - (30 seconds)).toMillis
-      else dbConfig.maxLifetime.toMillis
+      else dbConfig.maxLifetime.toMillis / 2
     }
 
     {
