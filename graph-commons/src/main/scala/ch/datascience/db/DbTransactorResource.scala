@@ -70,10 +70,7 @@ private class DataSourceUpdater[TargetDB](dbConfig: DBConfig[TargetDB]) extends 
     dataSource setPassword dbConfig.pass
     dataSource setMaximumPoolSize dbConfig.connectionPool.value
     dataSource setMaxLifetime dbConfig.maxLifetime.toMillis
-    dataSource setIdleTimeout {
-      if (dbConfig.maxLifetime.toMillis > (30 seconds).toMillis) (dbConfig.maxLifetime - (30 seconds)).toMillis
-      else dbConfig.maxLifetime.toMillis / 2
-    }
+    dataSource setIdleTimeout (dbConfig.maxLifetime.toMillis / 2)
 
     {
       val minimumIdle = (dbConfig.connectionPool.value * 0.75).ceil.toInt
