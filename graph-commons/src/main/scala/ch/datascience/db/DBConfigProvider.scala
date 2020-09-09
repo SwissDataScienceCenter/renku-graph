@@ -52,9 +52,10 @@ class DBConfigProvider[Interpretation[_], TargetDB](
       pass           <- find[DBConfig.Pass](s"$namespace.db-pass", config)
       connectionPool <- find[DBConfig.ConnectionPool](s"$namespace.connection-pool", config)
       maxLifetime    <- find[DBConfig.MaxLifetime](s"$namespace.max-connection-lifetime", config)
+      idleTimeout    <- find[DBConfig.IdleTimeout](s"$namespace.idle-timeout", config)
       urlTemplate    <- find[DBConfig.UrlTemplate](s"$namespace.db-url-template", config)
       url            <- findUrl(urlTemplate, host)
-    } yield DBConfig(driver, url, user, pass, connectionPool, maxLifetime)
+    } yield DBConfig(driver, url, user, pass, connectionPool, maxLifetime, idleTimeout)
 
   private def findUrl(urlTeplate: DBConfig.UrlTemplate, host: DBConfig.Host): Interpretation[DBConfig.Url] =
     ME.fromEither {
@@ -72,7 +73,8 @@ object DBConfigProvider {
                                 user:           User,
                                 pass:           Pass,
                                 connectionPool: ConnectionPool,
-                                maxLifetime:    MaxLifetime)
+                                maxLifetime:    MaxLifetime,
+                                idleTimeout:    IdleTimeout)
   object DBConfig {
     type Driver         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type Url            = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
@@ -83,5 +85,6 @@ object DBConfigProvider {
     type Pass           = String
     type ConnectionPool = Int Refined Positive
     type MaxLifetime    = FiniteDuration
+    type IdleTimeout    = FiniteDuration
   }
 }
