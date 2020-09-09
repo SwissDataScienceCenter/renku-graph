@@ -36,8 +36,7 @@ private object DbConfigGenerator {
     pass           <- nonEmptyStrings()
     connectionPool <- positiveInts() map (_.value) map (RefType.applyRef[ConnectionPool](_).getOrError)
     maxLifetime    <- durations(max = 60 minutes)
-    idleTimeout    <- durations(max = 30 seconds)
-  } yield DBConfig(driver, url, user, pass, connectionPool, maxLifetime, idleTimeout)
+  } yield DBConfig(driver, url, user, pass, connectionPool, maxLifetime)
 
   implicit class RefinedOps[V](maybeValue: Either[String, V]) {
     lazy val getOrError: V = maybeValue.fold(s => throw new IllegalArgumentException(s), identity)

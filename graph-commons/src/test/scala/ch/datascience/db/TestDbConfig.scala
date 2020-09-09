@@ -38,8 +38,7 @@ object TestDbConfig {
       user           = "user",
       pass           = "",
       connectionPool = 20,
-      maxLifetime    = 5 seconds,
-      idleTimeout    = 2 second
+      maxLifetime    = 5 seconds
     )
   }
 
