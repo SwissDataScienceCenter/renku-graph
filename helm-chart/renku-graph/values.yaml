@@ -12,8 +12,8 @@ tokenRepository:
     port: 9003
   resources:
     limits:
-      memory: 250Mi
-  jvmXmx: 100m
+      memory: 1900Mi
+  jvmXmx: 100M
   gitlab:
     rateLimit: 50/sec
   connectionPool: 2
@@ -32,8 +32,8 @@ triplesGenerator:
     port: 9002
   resources:
     limits:
-      memory: 2000Mi
-  jvmXmx: 1G
+      memory: 4500Mi
+  jvmXmx: 1536M
   renkuLogTimeout: 60 minutes
   reProvisioningRemovalBatchSize: 1000
   gitlab:
@@ -54,8 +54,8 @@ webhookService:
     port: 80
   resources:
     limits:
-      memory: 750Mi
-  jvmXmx: 500m
+      memory: 2100Mi
+  jvmXmx: 300M
   eventsSynchronization:
     initialDelay: 2 minutes
     interval: 30 minutes
@@ -77,10 +77,10 @@ knowledgeGraph:
     port: 80
   resources:
     limits:
-      memory: 500Mi
+      memory: 2200Mi
   gitlab:
     rateLimit: 100/sec
-  jvmXmx: 200m
+  jvmXmx: 500M
   threadsNumber: 4
   services:
     renku:
@@ -98,8 +98,8 @@ eventLog:
     port: 9005
   resources:
     limits:
-      memory: 250Mi
-  jvmXmx: 250m
+      memory: 2000Mi
+  jvmXmx: 200M
   threadsNumber: 6
   connectionPool: 10
 
