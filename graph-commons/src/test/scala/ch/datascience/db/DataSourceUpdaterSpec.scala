@@ -21,6 +21,7 @@ package ch.datascience.db
 import DbConfigGenerator._
 import ch.datascience.db.DBConfigProvider.DBConfig._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import com.zaxxer.hikari.HikariDataSource
 import eu.timepit.refined.api.RefType.applyRef
 import org.scalacheck.Gen.choose
@@ -73,14 +74,11 @@ class DataSourceUpdaterSpec extends AnyWordSpec with MockFactory with should.Mat
     }
 
     "set idleTimeout on the data source as (maxLifetime - 30s) if maxLifetime > 30s" in new TestCase {
-      new DataSourceUpdater(dbConfig.copy(maxLifetime = 35 seconds))(dataSource)
-      (dataSource.setIdleTimeout(_: Long)) verify (5 seconds).toMillis
+      val maxLifetime = durations(max = 10 minutes).generateOne
+      new DataSourceUpdater(dbConfig.copy(maxLifetime = maxLifetime))(dataSource)
+      (dataSource.setIdleTimeout(_: Long)) verify (maxLifetime / 2).toMillis
     }
 
-    "set idleTimeout on the data source to maxLifetime if maxLifetime <= 30s" in new TestCase {
-      new DataSourceUpdater(dbConfig.copy(maxLifetime = 30 seconds))(dataSource)
-      (dataSource.setIdleTimeout(_: Long)) verify (30 seconds).toMillis
-    }
   }
 
   private trait TestCase {
