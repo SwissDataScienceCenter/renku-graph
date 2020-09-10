@@ -30,7 +30,6 @@ import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.{Person, Project}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import io.renku.jsonld.syntax._
-import org.scalatest.matchers.should
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -64,9 +63,9 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Matchers
   "insertWasDerivedFrom" should {
 
     "generate query inserting 'prov:wasDerivedFrom' triple to a given project" in new TestCase {
-      val maybeParent @ Some(parent) = entitiesProjects().generateSome
-      val child1                     = entitiesProjects(maybeParentProject = None).generateOne
-      val child2                     = entitiesProjects(maybeParentProject = None).generateOne
+      val Some(parent) = entitiesProjects().generateSome
+      val child1       = entitiesProjects(maybeParentProject = None).generateOne
+      val child2       = entitiesProjects(maybeParentProject = None).generateOne
 
       loadToStore(child1.asJsonLD, child2.asJsonLD, parent.asJsonLD)
 
@@ -140,7 +139,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Matchers
 
   "addNewCreator" should {
 
-    "create a new Person and link it to the given Project" in new TestCase {
+    "create a new Person and link it to the given Project - case of Person with email" in new TestCase {
       val creator1 = entitiesPersons().generateOne
       val creator2 = entitiesPersons().generateOne
       val project1 = entitiesProjects(creator1.some).generateOne
@@ -153,9 +152,33 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Matchers
         (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
       )
 
-      val newCreator = entitiesPersons().generateOne
+      val newCreator = entitiesPersons(userEmails.toGeneratorOfSomes).generateOne
 
       updatesCreator.addNewCreator[IO](project1.resourceId, newCreator.maybeEmail, newCreator.name.some).run
+
+      findCreators should contain theSameElementsAs Set(
+        (project1.resourceId.value, newCreator.name.value, newCreator.maybeEmail.map(_.value)),
+        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
+      )
+    }
+
+    "create a new Person and link it to the given Project - case of Person without email" in new TestCase {
+      val creator1 = entitiesPersons().generateOne
+      val creator2 = entitiesPersons().generateOne
+      val project1 = entitiesProjects(creator1.some).generateOne
+      val project2 = entitiesProjects(creator2.some).generateOne
+
+      loadToStore(project1.asJsonLD, project2.asJsonLD)
+
+      findCreators should contain theSameElementsAs Set(
+        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value)),
+        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
+      )
+
+      val newCreator = entitiesPersons(userEmails.toGeneratorOfNones).generateOne
+
+      updatesCreator.addNewCreator[IO](project1.resourceId, newCreator.maybeEmail, newCreator.name.some).run
+
       findCreators should contain theSameElementsAs Set(
         (project1.resourceId.value, newCreator.name.value, newCreator.maybeEmail.map(_.value)),
         (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
@@ -205,7 +228,12 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Matchers
 
   private implicit class UpdatesRunner(updates: List[CuratedTriples.UpdateFunction[IO]]) {
     lazy val run =
-      updates.map(update => update().fold(throw _, query => runUpdate(query)).unsafeRunSync()).sequence.unsafeRunSync()
+      updates
+        .map { updateFunction =>
+          updateFunction().fold(throw _, identity) flatMap runUpdate
+        }
+        .sequence
+        .unsafeRunSync()
   }
 
   private def findDerivedFrom: Set[(String, Option[String])] =
@@ -220,7 +248,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Matchers
       .toSet
 
   private def findCreators: Set[(String, String, Option[String])] =
-    runQuery(s"""|SELECT ?id ?name ?email ?creatorId 
+    runQuery(s"""|SELECT ?id ?name ?email ?creatorId
                  |WHERE {
                  |  ?id rdf:type schema:Project;
                  |      schema:creator ?creatorId.

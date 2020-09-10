@@ -40,13 +40,13 @@ trait DataSet {
   val datasetCreators:                   Set[Person]
   val datasetParts:                      List[DataSetPartArtifact]
   val datasetKeywords:                   List[Keyword]
-  val overrideDatasetTopmostSameAs:      Option[SameAs]
+  val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]
   val overrideDatasetTopmostDerivedFrom: Option[DerivedFrom]
 
-  def topmostSameAs(implicit renkuBaseUrl: RenkuBaseUrl): SameAs =
+  def topmostSameAs(implicit renkuBaseUrl: RenkuBaseUrl): TopmostSameAs =
     overrideDatasetTopmostSameAs
-      .orElse(maybeDatasetSameAs)
-      .getOrElse(SameAs(DataSet.entityId(datasetId)))
+      .orElse(maybeDatasetSameAs map TopmostSameAs.apply)
+      .getOrElse(TopmostSameAs(DataSet entityId datasetId))
 
   def topmostDerivedFrom(implicit renkuBaseUrl: RenkuBaseUrl): DerivedFrom =
     overrideDatasetTopmostDerivedFrom
@@ -77,7 +77,7 @@ object DataSet {
                          creators:                   Set[Person],
                          partsFactories:             List[Activity => DataSetPartArtifact],
                          keywords:                   List[Keyword] = Nil,
-                         overrideTopmostSameAs:      Option[SameAs] = None,
+                         overrideTopmostSameAs:      Option[TopmostSameAs] = None,
                          overrideTopmostDerivedFrom: Option[DerivedFrom] = None)(activity: Activity): DataSetEntity =
     new Entity(activity.commitId,
                Location(".renku") / "datasets" / id,
@@ -96,7 +96,7 @@ object DataSet {
       override val datasetCreators:                   Set[Person]               = creators
       override val datasetParts:                      List[DataSetPartArtifact] = partsFactories.map(_.apply(activity))
       override val datasetKeywords:                   List[Keyword]             = keywords
-      override val overrideDatasetTopmostSameAs:      Option[SameAs]            = overrideTopmostSameAs
+      override val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]     = overrideTopmostSameAs
       override val overrideDatasetTopmostDerivedFrom: Option[DerivedFrom]       = overrideTopmostDerivedFrom
     }
 
@@ -111,7 +111,7 @@ object DataSet {
                       creators:                   Set[Person],
                       partsFactories:             List[Activity => DataSetPartArtifact],
                       keywords:                   List[Keyword] = Nil,
-                      overrideTopmostSameAs:      Option[SameAs] = None,
+                      overrideTopmostSameAs:      Option[TopmostSameAs] = None,
                       overrideTopmostDerivedFrom: Option[DerivedFrom] = None)(activity: Activity): DataSetEntity =
     new Entity(activity.commitId,
                Location(".renku") / "datasets" / id,
@@ -130,7 +130,7 @@ object DataSet {
       override val datasetCreators:                   Set[Person]               = creators
       override val datasetParts:                      List[DataSetPartArtifact] = partsFactories.map(_.apply(activity))
       override val datasetKeywords:                   List[Keyword]             = keywords
-      override val overrideDatasetTopmostSameAs:      Option[SameAs]            = overrideTopmostSameAs
+      override val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]     = overrideTopmostSameAs
       override val overrideDatasetTopmostDerivedFrom: Option[DerivedFrom]       = overrideTopmostDerivedFrom
     }
 

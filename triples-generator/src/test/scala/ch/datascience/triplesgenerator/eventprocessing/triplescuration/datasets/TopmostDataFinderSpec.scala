@@ -17,16 +17,16 @@
  */
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
-import io.renku.jsonld.generators.JsonLDGenerators._
+import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.matchers.should
-import cats.implicits._
+import ch.datascience.graph.model.datasets.{DerivedFrom, TopmostSameAs}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
+import io.renku.jsonld.generators.JsonLDGenerators._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Failure, Try}
 
@@ -38,7 +38,7 @@ class TopmostDataFinderSpec extends AnyWordSpec with MockFactory with should.Mat
       "if there is no sameAs and derivedFrom in the DatasetInfo" in new TestCase {
       topmostDataFinder.findTopmostData(entityId, None, None) shouldBe TopmostData(
         entityId,
-        SameAs(entityId),
+        TopmostSameAs(entityId),
         DerivedFrom(entityId)
       ).pure[Try]
     }
@@ -48,7 +48,7 @@ class TopmostDataFinderSpec extends AnyWordSpec with MockFactory with should.Mat
 
       topmostDataFinder.findTopmostData(entityId, Some(sameAs), None) shouldBe TopmostData(
         entityId,
-        sameAs,
+        TopmostSameAs(sameAs),
         DerivedFrom(entityId)
       ).pure[Try]
     }
@@ -57,13 +57,13 @@ class TopmostDataFinderSpec extends AnyWordSpec with MockFactory with should.Mat
       "if sameAs is pointing to a renku dataset and there's a parent dataset" in new TestCase {
       val sameAs = datasetIdSameAs.generateOne
 
-      val parentSameAs = datasetSameAs.generateOne
+      val parentTopmostSameAs = datasetTopmostSameAs.generateOne
 
-      (kgDatasetInfoFinder.findTopmostSameAs _).expects(sameAs).returning(Some(parentSameAs).pure[Try])
+      (kgDatasetInfoFinder.findTopmostSameAs _).expects(sameAs).returning(Some(parentTopmostSameAs).pure[Try])
 
       topmostDataFinder.findTopmostData(entityId, Some(sameAs), None) shouldBe TopmostData(
         entityId,
-        parentSameAs,
+        parentTopmostSameAs,
         DerivedFrom(entityId)
       ).pure[Try]
     }
@@ -76,7 +76,7 @@ class TopmostDataFinderSpec extends AnyWordSpec with MockFactory with should.Mat
 
       topmostDataFinder.findTopmostData(entityId, Some(sameAs), None) shouldBe TopmostData(
         entityId,
-        sameAs,
+        TopmostSameAs(sameAs),
         DerivedFrom(entityId)
       ).pure[Try]
     }
@@ -90,7 +90,7 @@ class TopmostDataFinderSpec extends AnyWordSpec with MockFactory with should.Mat
 
       topmostDataFinder.findTopmostData(entityId, None, Some(derivedFrom)) shouldBe TopmostData(
         entityId,
-        SameAs(entityId),
+        TopmostSameAs(entityId),
         parentDerivedFrom
       ).pure[Try]
     }
@@ -103,7 +103,7 @@ class TopmostDataFinderSpec extends AnyWordSpec with MockFactory with should.Mat
 
       topmostDataFinder.findTopmostData(entityId, None, Some(derivedFrom)) shouldBe TopmostData(
         entityId,
-        SameAs(entityId),
+        TopmostSameAs(entityId),
         derivedFrom
       ).pure[Try]
     }

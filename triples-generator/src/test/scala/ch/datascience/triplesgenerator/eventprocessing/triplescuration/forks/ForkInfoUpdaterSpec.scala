@@ -28,7 +28,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators.commitEvents
+import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators.{commitEvents, curationRecoverableErrors}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
@@ -62,7 +62,7 @@ class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Match
     }
 
     "return a ProcessingRecoverableError if the triple transformation fails" in new TestCase {
-      val error = processingRecoverableErrors.generateOne
+      val error = curationRecoverableErrors.generateOne
       (payloadTransformer
         .transform(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(event, givenCuratedTriples.triples, maybeAccessToken)
@@ -85,7 +85,7 @@ class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Match
         .expects(event, givenCuratedTriples.triples, maybeAccessToken)
         .returning(rightT[IO, ProcessingRecoverableError](transformedTriples))
 
-      val error = processingRecoverableErrors.generateOne
+      val error = curationRecoverableErrors.generateOne
       (updateFunctionsCreator
         .create(_: CommitEvent)(_: Option[AccessToken]))
         .expects(event, maybeAccessToken)

@@ -110,19 +110,19 @@ private class IODatasetsFinder(
         |            HAVING (COUNT(*) > 0)
         |          } {
         |            ?id rdf:type <http://schema.org/Dataset>;
-        |            	renku:topmostSameAs/schema:url ?sameAs.
+        |            	renku:topmostSameAs ?sameAs.
         |          } UNION {
         |            ?id rdf:type <http://schema.org/Person>.
         |            ?luceneDsId schema:creator ?id;
         |                        rdf:type <http://schema.org/Dataset>;
-        |                        renku:topmostSameAs/schema:url ?sameAs.
+        |                        renku:topmostSameAs ?sameAs.
         |          }
         |        }
         |        GROUP BY ?sameAs
         |        HAVING (COUNT(*) > 0)
         |      } {
         |        ?allDsId rdf:type <http://schema.org/Dataset>;
-        |                 renku:topmostSameAs/schema:url ?sameAs;
+        |                 renku:topmostSameAs ?sameAs;
         |                 prov:qualifiedGeneration/prov:activity ?activityId;
         |                 schema:isPartOf ?projectId.
         |        ?activityId prov:startedAtTime ?dateCreated.
@@ -136,7 +136,7 @@ private class IODatasetsFinder(
         |    HAVING (COUNT(*) > 0)
         |  } {
         |    ?dsId rdf:type <http://schema.org/Dataset>;
-        |          renku:topmostSameAs/schema:url ?sameAs;
+        |          renku:topmostSameAs ?sameAs;
         |          schema:identifier ?identifier;
         |          schema:name ?name ;
         |          schema:alternateName ?alternateName ;

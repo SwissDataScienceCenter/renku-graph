@@ -61,9 +61,9 @@ private class ProjectsFinder(
         |    WHERE {
         |      ?dsId rdf:type <http://schema.org/Dataset>;
         |            schema:identifier '$identifier';
-        |            renku:topmostSameAs/schema:url ?topmostSameAs.
+        |            renku:topmostSameAs ?topmostSameAs.
         |      ?allDsId rdf:type <http://schema.org/Dataset>;
-        |               renku:topmostSameAs/schema:url ?topmostSameAs;
+        |               renku:topmostSameAs ?topmostSameAs;
         |               schema:isPartOf ?projectId;
         |               prov:qualifiedGeneration/prov:activity ?activityId.
         |      ?activityId prov:startedAtTime ?dateCreated.

@@ -26,7 +26,7 @@ import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DerivedFrom, Description, Identifier, Keyword, Name, PartLocation, PartName, PublishedDate, SameAs, Title, Url}
+import ch.datascience.graph.model.datasets.{DerivedFrom, Description, Identifier, Keyword, Name, PartLocation, PartName, PublishedDate, SameAs, Title, TopmostSameAs, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path, SchemaVersion}
 import ch.datascience.graph.model.{CliVersion, GraphModelGenerators, datasets, projects}
@@ -111,7 +111,7 @@ object bundles extends Schemas {
       datasetCreators:            Set[Person] = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
       datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
-      overrideTopmostSameAs:      Option[SameAs] = None,
+      overrideTopmostSameAs:      Option[TopmostSameAs] = None,
       overrideTopmostDerivedFrom: Option[DerivedFrom] = None
   )(implicit renkuBaseUrl:        RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
     nonModifiedDataSetActivity(
@@ -159,7 +159,7 @@ object bundles extends Schemas {
       datasetCreators:            Set[Person]                    = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
       datasetKeywords:            List[Keyword]                  = listOf(GraphModelGenerators.datasetKeywords).generateOne,
-      overrideTopmostSameAs:      Option[SameAs]                 = None,
+      overrideTopmostSameAs:      Option[TopmostSameAs]          = None,
       overrideTopmostDerivedFrom: Option[DerivedFrom]            = None
   ): Activity = Activity(
     commitId,
@@ -214,7 +214,7 @@ object bundles extends Schemas {
       datasetCreators:            Set[Person] = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
       datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
-      overrideTopmostSameAs:      Option[SameAs] = None,
+      overrideTopmostSameAs:      Option[TopmostSameAs] = None,
       overrideTopmostDerivedFrom: Option[DerivedFrom] = None
   )(implicit renkuBaseUrl:        RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
     modifiedDataSetActivity(
@@ -262,7 +262,7 @@ object bundles extends Schemas {
       datasetCreators:            Set[Person]                    = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
       datasetKeywords:            List[Keyword]                  = listOf(GraphModelGenerators.datasetKeywords).generateOne,
-      overrideTopmostSameAs:      Option[SameAs]                 = None,
+      overrideTopmostSameAs:      Option[TopmostSameAs]          = None,
       overrideTopmostDerivedFrom: Option[DerivedFrom]            = None
   ): Activity = Activity(
     commitId,

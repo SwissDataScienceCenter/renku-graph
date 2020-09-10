@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
 import cats.MonadError
-import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
@@ -42,9 +42,10 @@ private class DescendantsUpdater {
       )
   )
 
-  private def prepareSameAsUpdate[Interpretation[_]](entityId: EntityId, topmostSameAs: SameAs)(
-      implicit ME:                                             MonadError[Interpretation, Throwable]
-  ) =
+  private def prepareSameAsUpdate[Interpretation[_]](
+      entityId:      EntityId,
+      topmostSameAs: TopmostSameAs
+  )(implicit ME:     MonadError[Interpretation, Throwable]) =
     UpdateFunction[Interpretation](
       s"Updating Dataset $entityId topmostSameAs",
       SparqlQuery(
@@ -54,20 +55,20 @@ private class DescendantsUpdater {
           "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
           "PREFIX schema: <http://schema.org/>"
         ),
-        s"""|DELETE { ?sameAs schema:url <$entityId> }
-            |INSERT { ?sameAs schema:url <$topmostSameAs> }
+        s"""|DELETE { ?dsId renku:topmostSameAs <$entityId> }
+            |INSERT { ?dsId renku:topmostSameAs <$topmostSameAs> }
             |WHERE {
             |  ?dsId rdf:type schema:Dataset;
-            |        renku:topmostSameAs ?sameAs.
-            |  ?sameAs schema:url <$entityId>
+            |        renku:topmostSameAs <$entityId>.
             |}
             |""".stripMargin
       )
     )
 
-  private def prepareDerivedFromUpdate[Interpretation[_]](entityId: EntityId, topmostDerivedFrom: DerivedFrom)(
-      implicit ME:                                                  MonadError[Interpretation, Throwable]
-  ) = UpdateFunction[Interpretation](
+  private def prepareDerivedFromUpdate[Interpretation[_]](
+      entityId:           EntityId,
+      topmostDerivedFrom: DerivedFrom
+  )(implicit ME:          MonadError[Interpretation, Throwable]) = UpdateFunction[Interpretation](
     s"Updating Dataset $entityId topmostDerivedFrom",
     SparqlQuery(
       "upload - topmostDerivedFrom update",

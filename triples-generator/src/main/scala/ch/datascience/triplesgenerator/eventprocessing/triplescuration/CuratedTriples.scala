@@ -20,7 +20,6 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import cats.MonadError
 import cats.data.EitherT
-import cats.implicits._
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction

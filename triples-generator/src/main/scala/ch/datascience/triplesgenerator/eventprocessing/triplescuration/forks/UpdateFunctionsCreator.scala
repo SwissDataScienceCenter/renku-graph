@@ -27,6 +27,7 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
@@ -38,7 +39,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private[triplescuration] trait UpdateFunctionsCreator[Interpretation[_]] {
-  def updateForkInfo(commit:     CommitEvent)(
+  def create(commit:             CommitEvent)(
       implicit maybeAccessToken: Option[AccessToken]
   ): EitherT[Interpretation, ProcessingRecoverableError, List[UpdateFunction[Interpretation]]]
 }
@@ -52,63 +53,70 @@ private[triplescuration] class UpdateFunctionsCreatorImpl(
 
   import updatesCreator._
 
-  def updateForkInfo(commit:     CommitEvent)(
+  def create(commit:             CommitEvent)(
       implicit maybeAccessToken: Option[AccessToken]
-  ): EitherT[IO, ProcessingRecoverableError, List[UpdateFunction[IO]]] = EitherT {
-    (gitLab.findProject(commit.project.path), kg.findProject(commit.project.path))
-      .parMapN {
-        case `no forks in GitLab and KG`() => List.empty[UpdateFunction[IO]].pure[IO]
-        case `forks are the same`()        => List.empty[UpdateFunction[IO]].pure[IO]
-        case `forks are different, creators and dates same`(projectResource, gitLabForkPath) =>
-          recreateWasDerivedFrom[IO](projectResource, gitLabForkPath).pure[IO]
-        case `not only forks are different`(projectResource, gitLabForkPath, gitLabProject) =>
-          OptionT
-            .fromOption[IO](gitLabProject.maybeEmail)
-            .flatMapF(kg.findCreatorId)
-            .map { existingUserResource =>
-              recreateWasDerivedFrom[IO](projectResource, gitLabForkPath) ++
-                swapCreator[IO](projectResource, existingUserResource) ++
-                recreateDateCreated[IO](projectResource, gitLabProject.dateCreated)
-            }
-            .getOrElse {
-              recreateWasDerivedFrom[IO](projectResource, gitLabForkPath) ++
-                addNewCreator[IO](projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName) ++
-                recreateDateCreated[IO](projectResource, gitLabProject.dateCreated)
-            }
-        case `no fork in the KG project`(projectResource, gitLabForkPath, gitLabProject) =>
-          OptionT
-            .fromOption[IO](gitLabProject.maybeEmail)
-            .flatMapF(kg.findCreatorId)
-            .map { existingUserResource =>
-              insertWasDerivedFrom[IO](projectResource, gitLabForkPath) ++
-                swapCreator[IO](projectResource, existingUserResource) ++
-                recreateDateCreated[IO](projectResource, gitLabProject.dateCreated)
-            }
-            .getOrElse {
-              insertWasDerivedFrom[IO](projectResource, gitLabForkPath) ++
-                addNewCreator[IO](projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName) ++
-                recreateDateCreated[IO](projectResource, gitLabProject.dateCreated)
-            }
-        case `no fork in the GitLab project`(projectResource, gitLabProject) =>
-          OptionT
-            .fromOption[IO](gitLabProject.maybeEmail)
-            .flatMapF(kg.findCreatorId)
-            .map { existingUserResource =>
-              deleteWasDerivedFrom[IO](projectResource) ++
-                swapCreator[IO](projectResource, existingUserResource) ++
-                recreateDateCreated[IO](projectResource, gitLabProject.dateCreated)
+  ): EitherT[IO, ProcessingRecoverableError, List[UpdateFunction[IO]]] = {
+    ApplicationLogger.info(s"calling updates create")
+    EitherT {
+      (gitLab.findProject(commit.project.path), kg.findProject(commit.project.path))
+        .parMapN {
+          case `no forks in GitLab and KG`() => List.empty[UpdateFunction[IO]].pure[IO]
+          case `forks are the same`()        => List.empty[UpdateFunction[IO]].pure[IO]
+          case `forks are different, creators and dates same`(projectResource, gitLabForkPath) =>
+            recreateWasDerivedFrom[IO](projectResource, gitLabForkPath).pure[IO]
+          case `not only forks are different`(projectResource, gitLabForkPath, gitLabProject) =>
+            OptionT
+              .fromOption[IO](gitLabProject.maybeEmail)
+              .flatMapF(kg.findCreatorId)
+              .map { existingUserResource =>
+                recreateWasDerivedFrom[IO](projectResource, gitLabForkPath) ++
+                  swapCreator[IO](projectResource, existingUserResource) ++
+                  recreateDateCreated[IO](projectResource, gitLabProject.dateCreated)
+              }
+              .getOrElse {
+                recreateWasDerivedFrom[IO](projectResource, gitLabForkPath) ++
+                  addNewCreator[IO](projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName) ++
+                  recreateDateCreated[IO](projectResource, gitLabProject.dateCreated)
+              }
+          case `no fork in the KG project`(projectResource, gitLabForkPath, gitLabProject) =>
+            ApplicationLogger.info(s"in the UpdateFunctionsCreator's case - should happen after triples are uploaded")
+            OptionT
+              .fromOption[IO](gitLabProject.maybeEmail)
+              .flatMapF(kg.findCreatorId)
+              .map { existingUserResource =>
+                insertWasDerivedFrom[IO](projectResource, gitLabForkPath) ++
+                  swapCreator[IO](projectResource, existingUserResource) ++
+                  recreateDateCreated[IO](projectResource, gitLabProject.dateCreated)
+              }
+              .getOrElse {
+                insertWasDerivedFrom[IO](projectResource, gitLabForkPath) ++
+                  addNewCreator[IO](projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName) ++
+                  recreateDateCreated[IO](projectResource, gitLabProject.dateCreated)
+              }
+          case `no fork in the GitLab project`(projectResource, gitLabProject) =>
+            OptionT
+              .fromOption[IO](gitLabProject.maybeEmail)
+              .flatMapF(kg.findCreatorId)
+              .map { existingUserResource =>
+                deleteWasDerivedFrom[IO](projectResource) ++
+                  swapCreator[IO](projectResource, existingUserResource) ++
+                  recreateDateCreated[IO](projectResource, gitLabProject.dateCreated)
 
-            }
-            .getOrElse {
-              deleteWasDerivedFrom[IO](projectResource) ++
-                addNewCreator[IO](projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName) ++
-                recreateDateCreated[IO](projectResource, gitLabProject.dateCreated)
-            }
-        case _ => List.empty[UpdateFunction[IO]].pure[IO]
-      }
-      .flatten
-      .map(_.asRight[ProcessingRecoverableError])
-      .recover(maybeToRecoverableError)
+              }
+              .getOrElse {
+                deleteWasDerivedFrom[IO](projectResource) ++
+                  addNewCreator[IO](projectResource, gitLabProject.maybeEmail, gitLabProject.maybeName) ++
+                  recreateDateCreated[IO](projectResource, gitLabProject.dateCreated)
+              }
+          case _ => List.empty[UpdateFunction[IO]].pure[IO]
+        }
+        .flatten
+        .map { updates =>
+          ApplicationLogger.info(s"update created -> ${updates.headOption.map(_.name).getOrElse("no updates")}")
+          updates.asRight[ProcessingRecoverableError]
+        }
+        .recover(maybeToRecoverableError)
+    }
   }
 
   private object `no forks in GitLab and KG` {

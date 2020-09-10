@@ -25,6 +25,7 @@ import ch.datascience.graph.model.projects.{DateCreated, Path, ResourceId}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
@@ -72,6 +73,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
   def insertWasDerivedFrom[Interpretation[_]](resourceId: ResourceId, forkPath: Path)(
       implicit ME:                                        MonadError[Interpretation, Throwable]
   ) = List {
+    ApplicationLogger.info(s"creating insertWasDerivedFrom function - should happen after triples are uploaded")
     val rdfResource  = resourceId.showAs[RdfResource]
     val forkResource = ResourceId(renkuBaseUrl, forkPath).showAs[RdfResource]
     UpdateFunction[Interpretation](
@@ -84,11 +86,12 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
     )
   }
 
-  def swapCreator[Interpretation[_]](resourceId: ResourceId, newResourceId: users.ResourceId)(
-      implicit ME:                               MonadError[Interpretation, Throwable]
-  ): List[UpdateFunction[Interpretation]] = {
-    val rdfResource     = resourceId.showAs[RdfResource]
-    val creatorResource = newResourceId.showAs[RdfResource]
+  def swapCreator[Interpretation[_]](
+      projectId: ResourceId,
+      creatorId: users.ResourceId
+  )(implicit ME: MonadError[Interpretation, Throwable]): List[UpdateFunction[Interpretation]] = {
+    val rdfResource     = projectId.showAs[RdfResource]
+    val creatorResource = creatorId.showAs[RdfResource]
     List(
       UpdateFunction[Interpretation](
         s"Update Project $rdfResource schema:creator",
@@ -104,23 +107,64 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
     )
   }
 
-  def addNewCreator[Interpretation[_]](
-      resourceId:        ResourceId,
-      maybeCreatorEmail: Option[Email],
-      maybeCreatorName:  Option[users.Name]
-  )(implicit ME:         MonadError[Interpretation, Throwable]): List[UpdateFunction[Interpretation]] = {
-    val creatorResource = findCreatorId(maybeCreatorEmail)
-    insertOrUpdateCreator[Interpretation](maybeCreatorEmail, maybeCreatorName) ++ swapCreator[Interpretation](
-      resourceId,
-      creatorResource
+  def swapCreatorWithoutEmail[Interpretation[_]](
+      projectId:   ResourceId,
+      creatorName: users.Name
+  )(implicit ME:   MonadError[Interpretation, Throwable]): List[UpdateFunction[Interpretation]] = {
+    val rdfResource = projectId.showAs[RdfResource]
+    List(
+      UpdateFunction[Interpretation](
+        s"Delete Project $rdfResource schema:creator",
+        SparqlQuery(
+          name = "upload - project creator delete",
+          Set("PREFIX schema: <http://schema.org/>"),
+          s"""|DELETE { $rdfResource schema:creator ?creatorId }
+              |WHERE  { $rdfResource schema:creator ?creatorId }
+              |""".stripMargin
+        )
+      ),
+      UpdateFunction[Interpretation](
+        s"Insert Project $rdfResource schema:creator",
+        SparqlQuery(
+          name = "upload - project creator insert",
+          Set(
+            "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+            "PREFIX schema: <http://schema.org/>"
+          ),
+          s"""|INSERT DATA {
+              |  _:b0 rdf:type <http://schema.org/Person>;
+              |       schema:name '${sparqlEncode(creatorName.value)}'.
+              |  $rdfResource schema:creator _:b0.
+              |}
+              |""".stripMargin
+        )
+      )
     )
   }
 
+  def addNewCreator[Interpretation[_]](
+      projectId:         ResourceId,
+      maybeCreatorEmail: Option[Email],
+      maybeCreatorName:  Option[users.Name]
+  )(implicit ME:         MonadError[Interpretation, Throwable]): List[UpdateFunction[Interpretation]] =
+    maybeCreatorEmail match {
+      case Some(creatorEmail) =>
+        val creatorResource = findCreatorId(creatorEmail)
+        insertOrUpdateCreator[Interpretation](creatorResource, maybeCreatorEmail, maybeCreatorName) ++
+          swapCreator[Interpretation](projectId, creatorResource)
+      case None =>
+        maybeCreatorName match {
+          case None              => List.empty
+          case Some(creatorName) => swapCreatorWithoutEmail[Interpretation](projectId, creatorName)
+        }
+    }
+
   private def insertOrUpdateCreator[Interpretation[_]](
+      personId:          users.ResourceId,
       maybeCreatorEmail: Option[Email],
       maybeCreatorName:  Option[users.Name]
   )(implicit ME:         MonadError[Interpretation, Throwable]): List[UpdateFunction[Interpretation]] = {
-    val creatorResource = findCreatorId(maybeCreatorEmail).showAs[RdfResource]
+    val creatorResource = personId.showAs[RdfResource]
     List(
       maybeCreatorEmail -> maybeCreatorName match {
         case (Some(email), Some(name)) =>
@@ -128,16 +172,19 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
             s"Updating Creator $creatorResource schema:name",
             SparqlQuery(
               name = "upload - creator update",
-              Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>", "PREFIX schema: <http://schema.org/>"),
+              Set(
+                "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+                "PREFIX schema: <http://schema.org/>"
+              ),
               s"""|DELETE { $creatorResource schema:name ?name }
                   |INSERT { $creatorResource rdf:type <http://schema.org/Person>;
                   |         schema:email '${sparqlEncode(email.value)}';
                   |         schema:name '${sparqlEncode(name.value)}' .
                   |}
                   |WHERE  { 
-                  | OPTIONAL { $creatorResource schema:name ?maybeName} 
-                  | BIND (IF(BOUND(?maybeName), ?maybeName, "nonexisting") AS ?name)
-                  | }
+                  |  OPTIONAL { $creatorResource schema:name ?maybeName} 
+                  |  BIND (IF(BOUND(?maybeName), ?maybeName, "nonexisting") AS ?name)
+                  |}
                   |""".stripMargin
             )
           ).some
@@ -146,7 +193,10 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
             s"Inserting Creator $creatorResource schema:email",
             SparqlQuery(
               name = "upload - creator insert email",
-              Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>", "PREFIX schema: <http://schema.org/>"),
+              Set(
+                "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+                "PREFIX schema: <http://schema.org/>"
+              ),
               s"""|INSERT DATA {
                   |  $creatorResource rdf:type <http://schema.org/Person>;
                   |                   schema:email '${sparqlEncode(email.value)}' .
@@ -158,7 +208,10 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
             s"Inserting Creator $creatorResource schema:name",
             SparqlQuery(
               name = "upload - creator insert name",
-              Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>", "PREFIX schema: <http://schema.org/>"),
+              Set(
+                "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+                "PREFIX schema: <http://schema.org/>"
+              ),
               s"""|INSERT DATA {
                   |  $creatorResource rdf:type <http://schema.org/Person>;
                   |                   schema:name '${sparqlEncode(name.value)}' .
@@ -170,13 +223,7 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
     ).flatten
   }
 
-  private lazy val findCreatorId: Option[Email] => users.ResourceId = {
-    case None => users.ResourceId(s"_:${java.util.UUID.randomUUID()}")
-    case Some(email) =>
-      val username     = email.extractName.value
-      val encodedEmail = email.value.replace(username, sparqlEncode(username))
-      users.ResourceId(s"mailto:$encodedEmail")
-  }
+  private def findCreatorId(email: Email): users.ResourceId = users.ResourceId(s"mailto:$email")
 
   def recreateDateCreated[Interpretation[_]](resourceId: ResourceId, dateCreated: DateCreated)(
       implicit ME:                                       MonadError[Interpretation, Throwable]

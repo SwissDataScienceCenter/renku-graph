@@ -61,7 +61,7 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
         .returning(datasetInfoList.toList.toSet.pure[Try])
 
       val topmostDatas = datasetInfoList map { datasetInfo =>
-        val topmostData = TopmostData(datasetInfo._1, datasetSameAs.generateOne, datasetDerivedFroms.generateOne)
+        val topmostData = TopmostData(datasetInfo._1, datasetTopmostSameAs.generateOne, datasetDerivedFroms.generateOne)
         (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(topmostData.pure[Try])
         topmostData
       }
@@ -148,7 +148,7 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
         .returning(datasetInfoList.toList.toSet.pure[Try])
 
       val topmostDatas = datasetInfoList map { datasetInfo =>
-        val topmostData = TopmostData(datasetInfo._1, datasetSameAs.generateOne, datasetDerivedFroms.generateOne)
+        val topmostData = TopmostData(datasetInfo._1, datasetTopmostSameAs.generateOne, datasetDerivedFroms.generateOne)
         (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(topmostData.pure[Try])
         topmostData
       }

@@ -24,8 +24,8 @@ import java.util.UUID
 import ch.datascience.graph.Schemas._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
-import io.renku.jsonld.syntax._
 import io.renku.jsonld._
+import io.renku.jsonld.syntax._
 
 object datasets {
 
@@ -97,6 +97,16 @@ object datasets {
         schema / "url" -> sameAs.value.asJsonLD
       )
     }
+  }
+  final class TopmostSameAs private[datasets] (val value: String) extends AnyVal with UrlTinyType
+  implicit object TopmostSameAs extends TinyTypeFactory[TopmostSameAs](new TopmostSameAs(_)) with constraints.Url {
+
+    final def apply(sameAs: SameAs): TopmostSameAs = apply(sameAs.value)
+
+    final def apply(entityId: EntityId): TopmostSameAs = apply(entityId.toString)
+
+    implicit lazy val topmostSameAsJsonLdEncoder: JsonLDEncoder[TopmostSameAs] =
+      sameAs => EntityId.of(sameAs.value).asJsonLD
   }
 
   final class DateCreatedInProject private (val value: Instant) extends AnyVal with InstantTinyType

@@ -20,7 +20,6 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import ch.datascience.generators.CommonGraphGenerators.{fusekiBaseUrls, renkuBaseUrls}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.{Path, ResourceId}
@@ -28,8 +27,6 @@ import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.{Person, Project}
-import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import org.scalacheck.Gen
 
 package object forks {
@@ -93,9 +90,4 @@ package object forks {
       name       <- userNames
       maybeEmail <- maybeEmailGen
     } yield Person(name, maybeEmail)
-
-  private[forks] lazy val processingRecoverableErrors: Gen[ProcessingRecoverableError] = for {
-    message   <- nonEmptyStrings()
-    exception <- exceptions
-  } yield CurationRecoverableError(message, exception)
 }

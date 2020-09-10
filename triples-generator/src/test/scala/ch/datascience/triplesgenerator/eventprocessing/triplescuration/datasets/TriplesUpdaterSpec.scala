@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
-import cats.MonadError
 import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators.fusekiBaseUrls
 import ch.datascience.generators.Generators.Implicits._
@@ -66,7 +65,6 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
   }
 
   private trait TestCase {
-    val context        = MonadError[Try, Throwable]
     val curatedTriples = curatedTriplesObjects[Try].generateOne
 
     val updater = new TriplesUpdater()
@@ -75,18 +73,16 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
   private def findIdentifier(json: Json) = (root / (schema / "identifier")).`@value`.string.getOption(json)
 
   private def findTopmostSameAs(json: Json) =
-    (root / (renku / "topmostSameAs") / (schema / "url")).`@value`.string
-      .getOption(json)
-      .orElse((root / (renku / "topmostSameAs") / (schema / "url")).`@id`.string.getOption(json))
+    (root / (renku / "topmostSameAs")).`@id`.string.getOption(json)
 
   private def findTopmostDerivedFrom(json: Json) =
     (root / (renku / "topmostDerivedFrom")).`@id`.string.getOption(json)
 
   private def topmostDatas(datasetId: EntityId) =
     for {
-      sameAs      <- datasetSameAs
-      derivedFrom <- datasetDerivedFroms
-    } yield TopmostData(datasetId, sameAs, derivedFrom)
+      topmostSameAs <- datasetTopmostSameAs
+      derivedFrom   <- datasetDerivedFroms
+    } yield TopmostData(datasetId, topmostSameAs, derivedFrom)
 
   private implicit class JsonLdOps(jsonLd: JsonLDTriples) {
     private val json = jsonLd.value

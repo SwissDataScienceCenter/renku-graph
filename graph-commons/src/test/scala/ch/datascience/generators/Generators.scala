@@ -307,6 +307,7 @@ object Generators {
       }
 
       def toGeneratorOfSomes:   Gen[Option[T]] = generator map Option.apply
+      def toGeneratorOfNones:   Gen[Option[T]] = Gen.const(None)
       def toGeneratorOfOptions: Gen[Option[T]] = Gen.option(generator)
 
       private def generateExample[O](generator: Gen[O]): O =
