@@ -23,11 +23,13 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.IORestClient.SleepAfterConnectionIssue
 import ch.datascience.http.client.RestClientError.ConnectivityException
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 
 private trait EventsSender[Interpretation[_]] {
@@ -44,12 +46,13 @@ private object EventsSender {
 }
 
 private class IOEventsSender(
-    logger:         Logger[IO]
+    logger:         Logger[IO],
+    retryInterval:  FiniteDuration = SleepAfterConnectionIssue
 )(implicit ME:      MonadError[IO, Throwable],
   executionContext: ExecutionContext,
   contextShift:     ContextShift[IO],
   timer:            Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
+    extends IORestClient(Throttler.noThrottling, logger, retryInterval = retryInterval)
     with EventsSender[IO] {
 
   import SendingResult._
@@ -86,7 +89,7 @@ private class IOEventsSender(
     case (TooManyRequests, _, _)    => ServiceBusy.pure[IO]
     case (NotFound, _, _)           => Misdelivered.pure[IO]
     case (BadGateway, _, _)         => Misdelivered.pure[IO]
-    case (ServiceUnavailable, _, _) => Misdelivered.pure[IO]
+    case (ServiceUnavailable, _, _) => ServiceBusy.pure[IO]
   }
 
   private def connectivityException(to: SendingResult): PartialFunction[Throwable, IO[SendingResult]] = {

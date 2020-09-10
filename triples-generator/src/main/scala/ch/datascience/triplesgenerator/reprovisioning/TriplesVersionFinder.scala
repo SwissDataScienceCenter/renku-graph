@@ -51,20 +51,17 @@ private class IOTriplesVersionFinder(
   private def findCliVersion = queryExpecting[List[String]] {
     SparqlQuery(
       name = "cli version find",
-      Set(
-        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-        "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
-      ),
+      Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),
       s"""|SELECT DISTINCT ?version
           |WHERE {
-          |  ?id rdf:type renku:CliVersion;
-          |      renku:version ?version.
+          |  ?id rdf:type <${CliVersionJsonLD.objectType}>;
+          |      <${CliVersionJsonLD.version}> ?version.
           |}
           |""".stripMargin
     )
   }
 
-  private implicit lazy val agentsDecoder: Decoder[List[String]] =
+  private implicit lazy val versionsDecoder: Decoder[List[String]] =
     _.downField("results")
       .downField("bindings")
       .as(decodeList(ofVersions))

@@ -171,6 +171,6 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
     val subscriptionSender = mock[SubscriptionSender[IO]]
     val logger             = TestLogger[IO]()
     val subscriber =
-      new Subscriber(urlFinder, subscriptionSender, logger, initialDelay = 5 millis, renewDelay = 500 millis)
+      new SubscriberImpl(urlFinder, subscriptionSender, logger, initialDelay = 5 millis, renewDelay = 500 millis)
   }
 }

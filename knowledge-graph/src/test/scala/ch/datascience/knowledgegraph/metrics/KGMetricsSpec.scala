@@ -109,7 +109,7 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
       statsFinder,
       logger,
       countsGauge,
-      interval       = 100 millis,
+      initialDelay   = 100 millis,
       countsInterval = 500 millis
     )
   }

@@ -103,7 +103,7 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
       subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
       subscriptions.nextFree.unsafeRunSync()                shouldBe None
 
-      sleep(busySleep.toMillis + 50)
+      sleep(busySleep.toMillis + 100)
 
       subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
     }
@@ -150,7 +150,7 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
       subscriptions.nextFree.unsafeRunSync() shouldBe (subscribers - busySubscriber).headOption
       subscriptions.nextFree.unsafeRunSync() shouldBe (subscribers - busySubscriber).headOption
 
-      sleep(busySleep.toMillis + 50)
+      sleep(busySleep.toMillis + 100)
 
       subscriptions.nextFree.unsafeRunSync() shouldBe Some(busySubscriber)
     }
@@ -171,7 +171,7 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
 
       subscriptions.isNext.unsafeRunSync() shouldBe false
 
-      sleep(busySleep.toMillis + 50)
+      sleep(busySleep.toMillis + 100)
 
       subscriptions.isNext.unsafeRunSync() shouldBe true
     }
@@ -197,7 +197,7 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
 
       subscriptions.nextFree.unsafeRunSync() shouldBe None
 
-      sleep(busySleep.toMillis + 50)
+      sleep(busySleep.toMillis + 100)
 
       subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
 
@@ -220,14 +220,14 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
       subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
       // and it's bring back after configured timeout (from the first markBusy call)
-      sleep(busySleep.toMillis / 2 + 50)
+      sleep(busySleep.toMillis / 2 + 100)
       subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
 
       // and removed permanently
       subscriptions.remove(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
       // it shouldn't be bring back by the second call to markBusy
-      sleep(busySleep.toMillis / 2 + 50)
+      sleep(busySleep.toMillis / 2 + 100)
       subscriptions.nextFree.unsafeRunSync() shouldBe None
 
       logger.loggedOnly(
@@ -256,7 +256,7 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
       subscriptions.nextFree.unsafeRunSync()                shouldBe None
 
       // the subscriber should not be available after the initial timeout
-      sleep(busySleep.toMillis / 2 + 50)
+      sleep(busySleep.toMillis / 2 + 100)
       subscriptions.nextFree.unsafeRunSync() shouldBe None
 
       // but after the timeout initiated with the second markBusy

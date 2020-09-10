@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
-import cats.MonadError
 import cats.effect.{IO, Timer}
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
@@ -44,6 +43,14 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(false.pure[IO])
 
+        (reProvisioningStatus.setRunning _)
+          .expects()
+          .returning(IO.unit)
+
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
+
         (triplesRemover.removeAllTriples _)
           .expects()
           .returning(IO.unit)
@@ -52,7 +59,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(IO.unit)
 
-        (triplesVersionCreator.insertCliVersion _)
+        (reProvisioningStatus.clear _)
           .expects()
           .returning(IO.unit)
       }
@@ -60,8 +67,8 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
-        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
@@ -96,7 +103,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       )
     }
 
-    "do not fail but simply retry if removing outdated triples fails" in new TestCase {
+    "do not fail but simply retry if setting the re-provisioning flag fails" in new TestCase {
       val exception = exceptions.generateOne
 
       inSequence {
@@ -104,13 +111,21 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(false.pure[IO])
 
-        (triplesRemover.removeAllTriples _)
+        (reProvisioningStatus.setRunning _)
           .expects()
           .returning(exception.raiseError[IO, Unit])
 
         (triplesVersionFinder.triplesUpToDate _)
           .expects()
           .returning(false.pure[IO])
+
+        (reProvisioningStatus.setRunning _)
+          .expects()
+          .returning(IO.unit)
+
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
           .expects()
@@ -120,7 +135,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(IO.unit)
 
-        (triplesVersionCreator.insertCliVersion _)
+        (reProvisioningStatus.clear _)
           .expects()
           .returning(IO.unit)
       }
@@ -128,14 +143,14 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
         Error("Re-provisioning failure", exception),
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
-        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
-    "do not fail but simply retry if re-scheduling events fails" in new TestCase {
+    "do not fail but simply retry if updating CLI version fails" in new TestCase {
       val exception = exceptions.generateOne
 
       inSequence {
@@ -143,11 +158,11 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(false.pure[IO])
 
-        (triplesRemover.removeAllTriples _)
+        (reProvisioningStatus.setRunning _)
           .expects()
           .returning(IO.unit)
 
-        (eventsReScheduler.triggerEventsReScheduling _)
+        (triplesVersionCreator.updateCliVersion _)
           .expects()
           .returning(exception.raiseError[IO, Unit])
 
@@ -155,6 +170,14 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(false.pure[IO])
 
+        (reProvisioningStatus.setRunning _)
+          .expects()
+          .returning(IO.unit)
+
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
+
         (triplesRemover.removeAllTriples _)
           .expects()
           .returning(IO.unit)
@@ -163,7 +186,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(IO.unit)
 
-        (triplesVersionCreator.insertCliVersion _)
+        (reProvisioningStatus.clear _)
           .expects()
           .returning(IO.unit)
       }
@@ -171,14 +194,14 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
         Error("Re-provisioning failure", exception),
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
-        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
-    "do not fail but simply retry if creating the triples version fails" in new TestCase {
+    "do not fail but retry from the removing outdated triples step if it fails" in new TestCase {
       val exception = exceptions.generateOne
 
       inSequence {
@@ -186,22 +209,18 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(false.pure[IO])
 
+        (reProvisioningStatus.setRunning _)
+          .expects()
+          .returning(IO.unit)
+
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
+
         (triplesRemover.removeAllTriples _)
-          .expects()
-          .returning(IO.unit)
-
-        (eventsReScheduler.triggerEventsReScheduling _)
-          .expects()
-          .returning(IO.unit)
-
-        (triplesVersionCreator.insertCliVersion _)
           .expects()
           .returning(exception.raiseError[IO, Unit])
 
-        (triplesVersionFinder.triplesUpToDate _)
-          .expects()
-          .returning(false.pure[IO])
-
         (triplesRemover.removeAllTriples _)
           .expects()
           .returning(IO.unit)
@@ -210,7 +229,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(IO.unit)
 
-        (triplesVersionCreator.insertCliVersion _)
+        (reProvisioningStatus.clear _)
           .expects()
           .returning(IO.unit)
       }
@@ -218,49 +237,111 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
         Error("Re-provisioning failure", exception),
-        Info("The triples are not up to date - clearing DB and re-scheduling all the events"),
-        Info(s"ReProvisioning triggered in ${executionTimeRecorder.elapsedTime}ms")
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
 
-    "start re-provisioning after the initial delay" in new TestCase {
-      (triplesVersionFinder.triplesUpToDate _)
-        .expects()
-        .returning(true.pure[IO])
+    "do not fail but retry from the re-scheduling events step if it fails" in new TestCase {
+      val exception1 = exceptions.generateOne
+      val exception2 = exceptions.generateOne
 
-      val someInitialDelay: ReProvisioningDelay = ReProvisioningDelay(500 millis)
+      inSequence {
+        (triplesVersionFinder.triplesUpToDate _)
+          .expects()
+          .returning(false.pure[IO])
 
-      val startTime = System.currentTimeMillis()
+        (reProvisioningStatus.setRunning _)
+          .expects()
+          .returning(IO.unit)
 
-      new ReProvisioningImpl[IO](
-        triplesVersionFinder,
-        triplesRemover,
-        eventsReScheduler,
-        triplesVersionCreator,
-        someInitialDelay,
-        executionTimeRecorder,
-        logger,
-        5 millis
-      ).run.unsafeRunSync() shouldBe ((): Unit)
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
 
-      val endTime = System.currentTimeMillis()
+        (triplesRemover.removeAllTriples _)
+          .expects()
+          .returning(IO.unit)
 
-      (endTime - startTime) should be >= someInitialDelay.value.toMillis
+        (eventsReScheduler.triggerEventsReScheduling _)
+          .expects()
+          .returning(exception1.raiseError[IO, Unit])
+
+        (eventsReScheduler.triggerEventsReScheduling _)
+          .expects()
+          .returning(exception2.raiseError[IO, Unit])
+
+        (eventsReScheduler.triggerEventsReScheduling _)
+          .expects()
+          .returning(IO.unit)
+
+        (reProvisioningStatus.clear _)
+          .expects()
+          .returning(IO.unit)
+      }
+
+      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
+
+      logger.loggedOnly(
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
+        Error("Re-provisioning failure", exception1),
+        Error("Re-provisioning failure", exception2),
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+      )
+    }
+
+    "do not fail but retry from the clearing the re-provisioning flag step if it fails" in new TestCase {
+      val exception = exceptions.generateOne
+
+      inSequence {
+        (triplesVersionFinder.triplesUpToDate _)
+          .expects()
+          .returning(false.pure[IO])
+
+        (reProvisioningStatus.setRunning _)
+          .expects()
+          .returning(IO.unit)
+
+        (triplesVersionCreator.updateCliVersion _)
+          .expects()
+          .returning(IO.unit)
+
+        (triplesRemover.removeAllTriples _)
+          .expects()
+          .returning(IO.unit)
+
+        (eventsReScheduler.triggerEventsReScheduling _)
+          .expects()
+          .returning(IO.unit)
+
+        (reProvisioningStatus.clear _)
+          .expects()
+          .returning(exception.raiseError[IO, Unit])
+
+        (reProvisioningStatus.clear _)
+          .expects()
+          .returning(IO.unit)
+      }
+
+      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
+
+      logger.loggedOnly(
+        Info("The triples are not up to date - re-provisioning is clearing DB"),
+        Error("Re-provisioning failure", exception),
+        Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
+      )
     }
   }
 
   private implicit val timer: Timer[IO] = IO.timer(global)
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
-
     val triplesVersionFinder  = mock[TriplesVersionFinder[IO]]
     val triplesRemover        = mock[TriplesRemover[IO]]
     val eventsReScheduler     = mock[EventsReScheduler[IO]]
     val triplesVersionCreator = mock[TriplesVersionCreator[IO]]
-    val initialDelay          = ReProvisioningDelay(durations(100 millis).generateOne)
+    val reProvisioningStatus  = mock[ReProvisioningStatus[IO]]
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder(logger)
     val reProvisioning = new ReProvisioningImpl[IO](
@@ -268,7 +349,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       triplesRemover,
       eventsReScheduler,
       triplesVersionCreator,
-      initialDelay,
+      reProvisioningStatus,
       executionTimeRecorder,
       logger,
       5 millis

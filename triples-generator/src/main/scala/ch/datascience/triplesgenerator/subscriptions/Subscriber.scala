@@ -26,19 +26,25 @@ import scala.concurrent.duration.FiniteDuration
 import scala.language.higherKinds
 import scala.util.control.NonFatal
 
-class Subscriber(
+trait Subscriber[Interpretation[_]] {
+  def notifyAvailability: Interpretation[Unit]
+  def run:                Interpretation[Unit]
+}
+
+class SubscriberImpl(
     subscriptionUrlFinder: SubscriptionUrlFinder[IO],
     subscriptionSender:    SubscriptionSender[IO],
     logger:                Logger[IO],
     initialDelay:          FiniteDuration,
     renewDelay:            FiniteDuration
-)(implicit timer:          Timer[IO]) {
+)(implicit timer:          Timer[IO])
+    extends Subscriber[IO] {
 
   import cats.implicits._
   import subscriptionSender._
   import subscriptionUrlFinder._
 
-  def notifyAvailability: IO[Unit] = {
+  override def notifyAvailability: IO[Unit] = {
     for {
       subscriberUrl <- findSubscriberUrl
       _             <- postToEventLog(subscriberUrl)
@@ -49,7 +55,7 @@ class Subscriber(
       exception.raiseError[IO, Unit]
   }
 
-  def run: IO[Unit] =
+  override def run: IO[Unit] =
     for {
       _ <- timer sleep initialDelay
       _ <- subscribeForEvents(initOrError = true)
@@ -86,10 +92,10 @@ object Subscriber {
   def apply(
       logger:                  Logger[IO],
       configuration:           Config = ConfigFactory.load()
-  )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]): IO[Subscriber] =
+  )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]): IO[Subscriber[IO]] =
     for {
       initialDelay       <- find[IO, FiniteDuration]("event-subscription-initial-delay", configuration)
       urlFinder          <- IOSubscriptionUrlFinder()
       subscriptionSender <- IOSubscriptionSender(logger)
-    } yield new Subscriber(urlFinder, subscriptionSender, logger, initialDelay, RenewDelay)
+    } yield new SubscriberImpl(urlFinder, subscriptionSender, logger, initialDelay, RenewDelay)
 }

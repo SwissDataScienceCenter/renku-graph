@@ -171,7 +171,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
   private trait TestCase {
     val sentryInitializer  = mock[IOSentryInitializer]
     val datasetInitializer = mock[IOFusekiDatasetInitializer]
-    val subscriber         = mock[Subscriber]
+    val subscriber         = mock[Subscriber[IO]]
     val reProvisioning     = mock[ReProvisioning[IO]]
     val httpServer         = mock[IOHttpServer]
     val microserviceRunner = new MicroserviceRunner(

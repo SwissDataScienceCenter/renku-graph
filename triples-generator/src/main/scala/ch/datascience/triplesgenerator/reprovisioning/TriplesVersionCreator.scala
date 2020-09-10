@@ -24,12 +24,21 @@ import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
+import io.renku.jsonld.EntityId
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait TriplesVersionCreator[Interpretation[_]] {
-  def insertCliVersion(): Interpretation[Unit]
+  def updateCliVersion(): Interpretation[Unit]
+}
+
+private case object CliVersionJsonLD {
+  import ch.datascience.graph.Schemas._
+
+  def id(implicit renkuBaseUrl: RenkuBaseUrl) = EntityId.of((renkuBaseUrl / "cli-version").toString)
+  val objectType = renku / "CliVersion"
+  val version    = renku / "version"
 }
 
 private class IOTriplesVersionCreator(
@@ -44,17 +53,24 @@ private class IOTriplesVersionCreator(
   import ch.datascience.rdfstore.SparqlQuery
   import eu.timepit.refined.auto._
 
-  override def insertCliVersion(): IO[Unit] = updateWitNoResult {
+  override def updateCliVersion(): IO[Unit] = updateWithNoResult {
     val entityId = (renkuBaseUrl / "cli-version").showAs[RdfResource]
     SparqlQuery(
-      name = "cli version create",
+      name = "reprovisioning - cli version create",
       Set(
         "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
         "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>"
       ),
-      s"""|INSERT DATA { 
-          |  $entityId rdf:type renku:CliVersion.
-          |  $entityId renku:version '$currentCliVersion'.
+      s"""|DELETE {$entityId <${CliVersionJsonLD.version}> ?o}
+          |
+          |INSERT { 
+          |  <${CliVersionJsonLD.id(renkuBaseUrl)}> rdf:type <${CliVersionJsonLD.objectType}> ;
+          |                                         <${CliVersionJsonLD.version}> '$currentCliVersion'.
+          |}
+          |WHERE {
+          |  OPTIONAL {
+          |    $entityId ?p ?o
+          |  }
           |}
           |""".stripMargin
     )
