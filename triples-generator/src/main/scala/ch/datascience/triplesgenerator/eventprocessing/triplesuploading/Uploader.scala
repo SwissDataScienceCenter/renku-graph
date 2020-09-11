@@ -21,10 +21,9 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 import cats.MonadError
 import cats.effect.{ContextShift, Timer}
 import cats.implicits._
-import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -41,32 +40,34 @@ class Uploader[Interpretation[_]](
   def upload(curatedTriples: CuratedTriples[Interpretation]): Interpretation[TriplesUploadResult] =
     for {
       triplesUploadingResult    <- triplesUploader upload curatedTriples.triples
-      maybeUpdatesSendingResult <- prepareAndRun(curatedTriples.updates, when = triplesUploadingResult.failure)
+      maybeUpdatesSendingResult <- prepareAndRun(curatedTriples.updatesGroups, when = triplesUploadingResult.failure)
     } yield merge(triplesUploadingResult, maybeUpdatesSendingResult)
 
   private def prepareAndRun(
-      updateFunctions: List[UpdateFunction[Interpretation]],
-      when:            Boolean
+      updatesGroups: List[CurationUpdatesGroup[Interpretation]],
+      when:          Boolean
   ): Interpretation[Option[TriplesUploadResult]] =
     if (when) Option.empty[TriplesUploadResult].pure[Interpretation]
     else
-      updateFunctions
-        .map(createUpdateAndSend)
-        .sequence
+      updatesGroups
+        .map(createUpdatesAndSend)
+        .flatSequence
         .map(mergeResults) map Option.apply
 
-  private def createUpdateAndSend(updateFunction: UpdateFunction[Interpretation]): Interpretation[TriplesUploadResult] =
-    updateFunction()
-      .map { q =>
-        ApplicationLogger.info(s"update function run and got query: ${q.name}"); q
-      }
+  private def createUpdatesAndSend(
+      updatesGroup: CurationUpdatesGroup[Interpretation]
+  ): Interpretation[List[TriplesUploadResult]] =
+    updatesGroup
+      .generateUpdates()
       .foldF(
-        recoverableError => (RecoverableFailure(recoverableError.getMessage): TriplesUploadResult).pure[Interpretation],
-        query => updatesUploader send query
+        recoverableError =>
+          List(RecoverableFailure(recoverableError.getMessage): TriplesUploadResult).pure[Interpretation],
+        queries => (queries map updatesUploader.send).sequence
       ) recoverWith invalidUpdatesFailure
 
-  private lazy val invalidUpdatesFailure: PartialFunction[Throwable, Interpretation[TriplesUploadResult]] = {
-    case NonFatal(exception) => (InvalidUpdatesFailure(exception.getMessage): TriplesUploadResult).pure[Interpretation]
+  private lazy val invalidUpdatesFailure: PartialFunction[Throwable, Interpretation[List[TriplesUploadResult]]] = {
+    case NonFatal(exception) =>
+      List(InvalidUpdatesFailure(exception.getMessage): TriplesUploadResult).pure[Interpretation]
   }
 
   private lazy val merge: (TriplesUploadResult, Option[TriplesUploadResult]) => TriplesUploadResult = {

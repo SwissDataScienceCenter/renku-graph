@@ -32,6 +32,7 @@ import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples, entities}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.{Person => UpdatePerson}
 import eu.timepit.refined.auto._
 import io.circe.optics.JsonOptics._
@@ -39,13 +40,15 @@ import io.circe.optics.JsonPath.root
 import io.circe.{Decoder, Encoder, Json}
 import io.renku.jsonld.syntax._
 import monocle.function.Plated
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
+import scala.language.higherKinds
 
-class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers {
+class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   "curate" should {
 
@@ -76,42 +79,49 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers {
       allPersons.filter(blankIds)    should not be empty
       allPersons.filterNot(blankIds) should not be empty
 
-      val Success(curatedTriples) = curator curate CuratedTriples(jsonTriples, updates = Nil)
+      val allPersonsInPayload = datasetCreatorsSet +
+        entities.Person(projectCreatorName, projectCreatorEmail) +
+        entities.Person(committerName, committerEmail)
+
+      val expectedUpdatesGroups = allPersonsInPayload
+        .map(maybeUpdatedPerson)
+        .flatten
+        .map { person =>
+          val updatesGroup = curationUpdatesGroups[Try].generateOne
+          (updatesCreator
+            .prepareUpdates[Try](_: UpdatePerson)(_: MonadError[Try, Throwable]))
+            .expects(person, *)
+            .returning(updatesGroup)
+          updatesGroup
+        }
+
+      val Success(curatedTriples) = curator curate CuratedTriples(jsonTriples, updatesGroups = Nil)
 
       val curatedPersons = curatedTriples.triples.collectAllPersons
       curatedPersons.filter(blankIds)    shouldBe allPersons.filter(blankIds)
       curatedPersons.filterNot(blankIds) shouldBe allPersons.filterNot(blankIds).map(noEmailAndName)
 
-      curatedTriples.updates.map(_.apply()) should contain theSameElementsAs updatesCreator
-        .prepareUpdates[Try](
-          (
-            datasetCreatorsSet.map(maybeUpdatePerson) +
-              maybeUpdatePerson(entities.Person(projectCreatorName, projectCreatorEmail)) +
-              maybeUpdatePerson(entities.Person(committerName, committerEmail))
-          ).flatten
-        )
-        .map(_.apply())
+      curatedTriples.updatesGroups shouldBe expectedUpdatesGroups.toList
+    }
+
+    "fail if there's a Person entity without a name" in new TestCase {
+
+      val jsonTriples = JsonLDTriples(randomDataSetCommit.toJson)
+
+      val noNamesJson = JsonLDTriples(jsonTriples.removePersonsNames)
+
+      val result = curator curate CuratedTriples(noNamesJson, updatesGroups = Nil)
+
+      result                       shouldBe a[Failure[_]]
+      result.failed.get.getMessage should include regex "No names for person with '(.*)' id found in generated JSON-LD".r
     }
   }
 
-  "fail if there's a Person entity without a name" in new TestCase {
-
-    val jsonTriples = JsonLDTriples(randomDataSetCommit.toJson)
-
-    val noNamesJson = JsonLDTriples(jsonTriples.removePersonsNames)
-
-    val result = curator curate CuratedTriples(noNamesJson, updates = Nil)
-
-    result                       shouldBe a[Failure[_]]
-    result.failed.get.getMessage should include regex "No names for person with '(.*)' id found in generated JSON-LD".r
-  }
-
   private trait TestCase {
-    val context = MonadError[Try, Throwable]
     implicit val renkuBaseUrl:  RenkuBaseUrl  = renkuBaseUrls.generateOne
     implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 
-    val updatesCreator = new UpdatesCreator
+    val updatesCreator = mock[UpdatesCreator]
     val curator        = new PersonDetailsUpdater[Try](updatesCreator)
   }
 
@@ -152,7 +162,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers {
                             maybeEmail:       Option[Email],
                             maybeAffiliation: Option[Affiliation])
 
-  private lazy val maybeUpdatePerson: entities.Person => Option[UpdatePerson] = { person =>
+  private lazy val maybeUpdatedPerson: entities.Person => Option[UpdatePerson] = { person =>
     person.maybeEmail map { email =>
       val entityId = person.asJsonLD.entityId getOrElse (throw new Exception(s"Cannot find entity id for $person"))
       UpdatePerson(ResourceId(entityId), NonEmptyList.of(person.name), Set(email))

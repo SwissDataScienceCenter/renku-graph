@@ -19,11 +19,10 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import cats.MonadError
-import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
 import ch.datascience.generators.Generators._
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
 import org.scalacheck.Gen
@@ -33,36 +32,36 @@ import scala.language.higherKinds
 object CurationGenerators {
 
   implicit def curatedTriplesObjects[Interpretation[_]](
-                                                         implicit ME: MonadError[Interpretation, Throwable]
-                                                       ): Gen[CuratedTriples[Interpretation]] =
+      implicit ME: MonadError[Interpretation, Throwable]
+  ): Gen[CuratedTriples[Interpretation]] =
     curatedTriplesObjects[Interpretation](
-      nonEmptyList(curationUpdateFunctions[Interpretation]).map(_.toList)
+      nonEmptyList(curationUpdatesGroups[Interpretation]).map(_.toList)
     )
 
   def curatedTriplesObjects[Interpretation[_]](
-                                                updatesGenerator: Gen[List[UpdateFunction[Interpretation]]]
-                                              )(implicit ME: MonadError[Interpretation, Throwable]): Gen[CuratedTriples[Interpretation]] =
+      updatesGenerator: Gen[List[CurationUpdatesGroup[Interpretation]]]
+  )(implicit ME:        MonadError[Interpretation, Throwable]): Gen[CuratedTriples[Interpretation]] =
     for {
       triples <- jsonLDTriples
       updates <- updatesGenerator
     } yield CuratedTriples[Interpretation](triples, updates)
 
   def curatedTriplesObjects[Interpretation[_]](
-                                                triples: JsonLD
-                                              )(implicit ME: MonadError[Interpretation, Throwable]): Gen[CuratedTriples[Interpretation]] =
+      triples:   JsonLD
+  )(implicit ME: MonadError[Interpretation, Throwable]): Gen[CuratedTriples[Interpretation]] =
     for {
-      updates <- nonEmptyList(curationUpdateFunctions[Interpretation])
+      updates <- nonEmptyList(curationUpdatesGroups[Interpretation])
     } yield CuratedTriples(JsonLDTriples(List(triples.toJson)), updates.toList)
 
-  implicit def curationUpdateFunctions[Interpretation[_]](
-                                                           implicit ME: MonadError[Interpretation, Throwable]
-                                                         ): Gen[UpdateFunction[Interpretation]] =
+  implicit def curationUpdatesGroups[Interpretation[_]](
+      implicit ME: MonadError[Interpretation, Throwable]
+  ): Gen[CurationUpdatesGroup[Interpretation]] =
     for {
-      name <- nonBlankStrings(minLength = 5)
+      name        <- nonBlankStrings(minLength = 5)
       sparqlQuery <- sparqlQueries
-    } yield UpdateFunction[Interpretation](name, sparqlQuery)
+    } yield CurationUpdatesGroup[Interpretation](name, sparqlQuery)
 
-  implicit lazy val sparqlQueries = for {
+  implicit lazy val sparqlQueries: Gen[SparqlQuery] = for {
     sparqlQuery <- sentences() map (v => SparqlQuery("curation update", Set.empty, v.value))
   } yield sparqlQuery
 }

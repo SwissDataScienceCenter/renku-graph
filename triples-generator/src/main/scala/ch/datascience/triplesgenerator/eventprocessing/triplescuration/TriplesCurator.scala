@@ -53,7 +53,7 @@ private[eventprocessing] class TriplesCuratorImpl[Interpretation[_]](
       triples:                 JsonLDTriples
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] =
     for {
-      triplesWithPersonDetails    <- personDetailsUpdater.curate(CuratedTriples(triples, updates = Nil)).toRight
+      triplesWithPersonDetails    <- personDetailsUpdater.curate(CuratedTriples(triples, updatesGroups = Nil)).toRight
       triplesWithForkInfo         <- updateForkInfo(commit, triplesWithPersonDetails)
       triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithForkInfo)
     } yield triplesWithEnrichedDatasets

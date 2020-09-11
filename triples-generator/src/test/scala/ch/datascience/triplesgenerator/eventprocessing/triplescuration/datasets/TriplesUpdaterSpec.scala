@@ -60,7 +60,7 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
       findTopmostSameAs(updatedDataset)      shouldBe Some(topmostData.sameAs.toString)
       findTopmostDerivedFrom(updatedDataset) shouldBe Some(topmostData.derivedFrom.toString)
 
-      updatedTriples.updates shouldBe curatedTriples.updates
+      updatedTriples.updatesGroups shouldBe curatedTriples.updatesGroups
     }
   }
 

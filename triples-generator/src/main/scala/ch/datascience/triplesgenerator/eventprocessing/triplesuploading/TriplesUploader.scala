@@ -23,7 +23,6 @@ import cats.implicits._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.{JsonLDTriples, RdfStoreConfig}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -63,7 +62,6 @@ private class IOTriplesUploader(
   private lazy val dataUploadUrl = rdfStoreConfig.fusekiBaseUrl / rdfStoreConfig.datasetName / "data"
 
   def upload(triples: JsonLDTriples): IO[TriplesUploadResult] = {
-    ApplicationLogger.info(s"uploading triples")
     for {
       uri          <- validateUri(dataUploadUrl.value)
       uploadResult <- send(uploadRequest(uri, triples))(mapResponse)

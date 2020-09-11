@@ -21,9 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.logging.ApplicationLogger
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.chrisdavenport.log4cats.Logger
@@ -57,10 +55,8 @@ private class IOUpdatesUploader(
 
   import scala.util.control.NonFatal
 
-  override def send(updateQuery: SparqlQuery): IO[TriplesUploadResult] = {
-    ApplicationLogger.info(s"update send -> ${updateQuery.name}")
+  override def send(updateQuery: SparqlQuery): IO[TriplesUploadResult] =
     updateWitMapping(updateQuery, responseMapper(updateQuery)) recoverWith deliveryFailure
-  }
 
   private def responseMapper(
       updateQuery: SparqlQuery

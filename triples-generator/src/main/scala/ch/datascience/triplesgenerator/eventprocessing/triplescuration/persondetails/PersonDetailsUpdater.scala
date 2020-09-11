@@ -39,11 +39,11 @@ private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
   import updatesCreator._
 
   def curate(curatedTriples: CuratedTriples[Interpretation]): Interpretation[CuratedTriples[Interpretation]] =
-    for {
-      triplesAndPersons <- removePersonsAttributes(curatedTriples.triples)
-      (newTriples, persons) = triplesAndPersons
-      newUpdates <- ME.catchNonFatal(prepareUpdates[Interpretation](persons))
-    } yield CuratedTriples(newTriples, curatedTriples.updates ++ newUpdates)
+    removePersonsAttributes(curatedTriples.triples) map {
+      case (updatedTriples, persons) =>
+        val newUpdatesGroups = persons map prepareUpdates[Interpretation]
+        CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
+    }
 
   private object removePersonsAttributes extends (JsonLDTriples => Interpretation[(JsonLDTriples, Set[Person])]) {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._

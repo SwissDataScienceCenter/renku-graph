@@ -20,14 +20,11 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.effect.IO._
 import cats.effect._
-import cats.implicits._
-import cats.kernel.Semigroup
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
-import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{CuratedTriples, CurationResults}
 import io.chrisdavenport.log4cats.Logger
 
@@ -43,21 +40,18 @@ trait ForkInfoUpdater[Interpretation[_]] {
 
 class ForkInfoUpdaterImpl(
     payloadTransformer:     PayloadTransformer[IO],
-    updateFunctionsCreator: UpdateFunctionsCreator[IO]
+    updateFunctionsCreator: UpdatesCreator[IO]
 ) extends ForkInfoUpdater[IO] {
 
   override def updateForkInfo(
       commit:                  CommitEvent,
       curatedTriples:          CuratedTriples[IO]
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[IO] =
-    (payloadTransformer.transform(commit, curatedTriples.triples), updateFunctionsCreator.create(commit))
-      .parMapN {
-        case (transformedTriples, updateFunctions) =>
-          CuratedTriples(transformedTriples, curatedTriples.updates ++ updateFunctions)
+    payloadTransformer
+      .transform(commit, curatedTriples.triples)
+      .map { transformedTriples =>
+        CuratedTriples(transformedTriples, curatedTriples.updatesGroups :+ updateFunctionsCreator.create(commit))
       }
-
-  private implicit lazy val processingRecoverableErrorSemiGroup: Semigroup[ProcessingRecoverableError] =
-    (x: ProcessingRecoverableError, _: ProcessingRecoverableError) => x
 }
 
 object IOForkInfoUpdater {

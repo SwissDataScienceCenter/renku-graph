@@ -23,8 +23,8 @@ import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, TopmostSameAs}
-import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators.curatedTriplesObjects
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
@@ -75,10 +75,16 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
 
       updatedTriples.triples shouldBe curatedTriples.triples
 
-      updatedTriples.updates
-        .map(update => update().fold(err => throw err, runUpdate).unsafeRunSync())
+      updatedTriples.updatesGroups
+        .map(updateGroup => updateGroup.generateUpdates().value)
         .sequence
+        .map(_.foldLeft(List.empty[SparqlQuery]) {
+          case (allQueries, Right(currentQueries)) => allQueries ++ currentQueries
+          case (_, Left(error))                    => throw error
+        })
+        .flatMap(_.runAll)
         .unsafeRunSync()
+
       findTopmostData(dataset1Id) shouldBe topmostData.sameAs    -> dataset1DerivedFrom
       findTopmostData(dataset2Id) shouldBe topmostData.sameAs    -> dataset2DerivedFrom
       findTopmostData(dataset3Id) shouldBe dataset3TopmostSameAs -> topmostData.derivedFrom
@@ -88,7 +94,7 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
   }
 
   private trait TestCase {
-    val curatedTriples: CuratedTriples[IO] = curatedTriplesObjects[IO].generateOne.copy(updates = Nil)
+    val curatedTriples: CuratedTriples[IO] = curatedTriplesObjects[IO].generateOne.copy(updatesGroups = Nil)
     val topmostData = topmostDatas.generateOne
 
     val updater = new DescendantsUpdater()

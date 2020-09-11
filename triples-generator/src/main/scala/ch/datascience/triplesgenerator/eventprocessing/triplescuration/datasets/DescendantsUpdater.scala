@@ -22,7 +22,7 @@ import cats.MonadError
 import ch.datascience.graph.model.datasets.{DerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
 import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
@@ -35,55 +35,43 @@ private class DescendantsUpdater {
       curatedTriples: CuratedTriples[Interpretation],
       topmostData:    TopmostData
   )(implicit ME:      MonadError[Interpretation, Throwable]): CuratedTriples[Interpretation] = curatedTriples.copy(
-    updates =
-      curatedTriples.updates ++: List(
+    updatesGroups =
+      curatedTriples.updatesGroups :+ CurationUpdatesGroup(
+        name = "Dataset descendants updates",
         prepareSameAsUpdate(topmostData.datasetId, topmostData.sameAs),
         prepareDerivedFromUpdate(topmostData.datasetId, topmostData.derivedFrom)
       )
   )
 
-  private def prepareSameAsUpdate[Interpretation[_]](
-      entityId:      EntityId,
-      topmostSameAs: TopmostSameAs
-  )(implicit ME:     MonadError[Interpretation, Throwable]) =
-    UpdateFunction[Interpretation](
-      s"Updating Dataset $entityId topmostSameAs",
-      SparqlQuery(
-        "upload - topmostSameAs update",
-        Set(
-          "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-          "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-          "PREFIX schema: <http://schema.org/>"
-        ),
-        s"""|DELETE { ?dsId renku:topmostSameAs <$entityId> }
-            |INSERT { ?dsId renku:topmostSameAs <$topmostSameAs> }
-            |WHERE {
-            |  ?dsId rdf:type schema:Dataset;
-            |        renku:topmostSameAs <$entityId>.
-            |}
-            |""".stripMargin
-      )
-    )
+  private def prepareSameAsUpdate(entityId: EntityId, topmostSameAs: TopmostSameAs) = SparqlQuery(
+    name = "upload - topmostSameAs update",
+    Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
+      "PREFIX schema: <http://schema.org/>"
+    ),
+    s"""|DELETE { ?dsId renku:topmostSameAs <$entityId> }
+        |INSERT { ?dsId renku:topmostSameAs <$topmostSameAs> }
+        |WHERE {
+        |  ?dsId rdf:type schema:Dataset;
+        |        renku:topmostSameAs <$entityId>.
+        |}
+        |""".stripMargin
+  )
 
-  private def prepareDerivedFromUpdate[Interpretation[_]](
-      entityId:           EntityId,
-      topmostDerivedFrom: DerivedFrom
-  )(implicit ME:          MonadError[Interpretation, Throwable]) = UpdateFunction[Interpretation](
-    s"Updating Dataset $entityId topmostDerivedFrom",
-    SparqlQuery(
-      "upload - topmostDerivedFrom update",
-      Set(
-        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-        "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-        "PREFIX schema: <http://schema.org/>"
-      ),
-      s"""|DELETE { ?dsId renku:topmostDerivedFrom <$entityId> }
-          |INSERT { ?dsId renku:topmostDerivedFrom <$topmostDerivedFrom> }
-          |WHERE {
-          |  ?dsId rdf:type schema:Dataset;
-          |        renku:topmostDerivedFrom <$entityId>
-          |}
-          |""".stripMargin
-    )
+  private def prepareDerivedFromUpdate(entityId: EntityId, topmostDerivedFrom: DerivedFrom) = SparqlQuery(
+    name = "upload - topmostDerivedFrom update",
+    Set(
+      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
+      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
+      "PREFIX schema: <http://schema.org/>"
+    ),
+    s"""|DELETE { ?dsId renku:topmostDerivedFrom <$entityId> }
+        |INSERT { ?dsId renku:topmostDerivedFrom <$topmostDerivedFrom> }
+        |WHERE {
+        |  ?dsId rdf:type schema:Dataset;
+        |        renku:topmostDerivedFrom <$entityId>
+        |}
+        |""".stripMargin
   )
 }

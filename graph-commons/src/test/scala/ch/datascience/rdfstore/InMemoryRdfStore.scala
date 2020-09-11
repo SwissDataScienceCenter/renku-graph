@@ -43,6 +43,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 import cats.MonadError
 import cats.data.Validated
 import cats.effect._
+import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyStrings
@@ -234,6 +235,10 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   protected def runQuery(query: String): IO[List[Map[String, String]]] = queryRunner.runQuery(query)
 
   protected def runUpdate(query: SparqlQuery): IO[Unit] = queryRunner.runUpdate(query)
+
+  protected implicit class UpdatesRunner(updates: List[SparqlQuery]) {
+    lazy val runAll: IO[Unit] = updates.map(runUpdate).sequence.void
+  }
 
   protected def rdfStoreSize: Int =
     runQuery("SELECT (COUNT(*) as ?triples) WHERE { ?s ?p ?o }")

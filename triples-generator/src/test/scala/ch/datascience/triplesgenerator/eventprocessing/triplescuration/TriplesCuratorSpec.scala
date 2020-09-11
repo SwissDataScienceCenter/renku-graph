@@ -31,7 +31,7 @@ import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.DataSetInfoEnricher
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.{ForkInfoUpdater, PayloadTransformer}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.ForkInfoUpdater
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.{PersonDetailsUpdater, UpdatesCreator}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -47,7 +47,7 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
 
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.curate _)
-        .expects(CuratedTriples[Try](triples, updates = Nil))
+        .expects(CuratedTriples[Try](triples, updatesGroups = Nil))
         .returning(triplesWithPersonDetails.pure[Try])
 
       val triplesWithForkInfo = curatedTriplesObjects[Try].generateOne
@@ -68,7 +68,7 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
 
       val exception = exceptions.generateOne
       (personDetailsUpdater.curate _)
-        .expects(CuratedTriples[Try](triples, updates = Nil))
+        .expects(CuratedTriples[Try](triples, updatesGroups = Nil))
         .returning(exception.raiseError[Try, CuratedTriples[Try]])
 
       curator.curate(event, triples).value shouldBe exception.raiseError[Try, CuratedTriples[Try]]
@@ -78,7 +78,7 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
 
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.curate _)
-        .expects(CuratedTriples[Try](triples, updates = Nil))
+        .expects(CuratedTriples[Try](triples, updatesGroups = Nil))
         .returning(triplesWithPersonDetails.pure[Try])
 
       val exception = exceptions.generateOne
@@ -94,7 +94,7 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
 
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.curate _)
-        .expects(CuratedTriples[Try](triples, updates = Nil))
+        .expects(CuratedTriples[Try](triples, updatesGroups = Nil))
         .returning(triplesWithPersonDetails.pure[Try])
 
       val triplesWithForkInfo = curatedTriplesObjects[Try].generateOne
@@ -115,7 +115,7 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
 
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.curate _)
-        .expects(CuratedTriples[Try](triples, updates = Nil))
+        .expects(CuratedTriples[Try](triples, updatesGroups = Nil))
         .returning(triplesWithPersonDetails.pure[Try])
 
       val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)

@@ -18,12 +18,10 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
-import cats.implicits._
 import CurationGenerators._
-import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
+import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -33,10 +31,11 @@ import scala.util.Try
 
 class CuratedTriplesSpec extends AnyWordSpec with ScalaCheckPropertyChecks with MockFactory with should.Matchers {
 
-  "apply" should {
+  "generateUpdates" should {
+
     "call the given query creation function" in {
-      forAll { updateFunction: UpdateFunction[Try] =>
-        updateFunction() shouldBe updateFunction.queryGenerator()
+      forAll { updateFunction: CurationUpdatesGroup[Try] =>
+        updateFunction.generateUpdates() shouldBe updateFunction.queryGenerator()
       }
     }
   }

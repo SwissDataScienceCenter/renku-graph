@@ -18,8 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
-import cats.MonadError
-import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.CommonGraphGenerators.rdfStoreConfigs
 import ch.datascience.generators.Generators.Implicits._
@@ -29,8 +27,6 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{FusekiBaseUrl, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.UpdateFunction
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult.{DeliverySuccess, InvalidUpdatesFailure, RecoverableFailure}
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
@@ -90,12 +86,12 @@ class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with 
     }
   }
 
-  private implicit val cs: ContextShift[IO] = IO.contextShift(global)
-  private implicit val timer: Timer[IO] = IO.timer(global)
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val query = sparqlQueries.generateOne
-    val logger = TestLogger[IO]()
+    val query                = sparqlQueries.generateOne
+    val logger               = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
       fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
@@ -105,7 +101,7 @@ class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with 
       logger,
       timeRecorder,
       retryInterval = 100 millis,
-      maxRetries = 1
+      maxRetries    = 1
     )
 
     def givenStore(forUpdate: SparqlQuery, returning: ResponseDefinitionBuilder) =

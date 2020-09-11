@@ -26,8 +26,10 @@ import ch.datascience.generators.Generators._
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
+import org.scalamock.handlers.CallHandler1
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -45,13 +47,10 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
           .expects(curatedTriples.triples)
           .returning(DeliverySuccess.pure[Try])
 
-        curatedTriples.updates.map { update =>
-          update()
-            .fold(throw _,
-                  query =>
-                    (updatesUploader.send _)
-                      .expects(query)
-                      .returning(DeliverySuccess.pure[Try]))
+        curatedTriples.updatesGroups.map { updatesGroup =>
+          updatesGroup
+            .generateUpdates()
+            .expectExecuteQueries(returning = DeliverySuccess.pure[Try])
         }
       }
 
@@ -71,9 +70,9 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
     s"return $RecoverableFailure if the given updates fail on query creation with a ProcessingRecoverableError" in new TestCase {
       val recoverableError = processingRecoverableErrors.generateOne
 
-      val updatedCuratedTriples = curatedTriples.copy(updates = curatedTriples.updates.map { update =>
-        update.copy(
-          queryGenerator = () => EitherT.leftT[Try, SparqlQuery](recoverableError)
+      val updatedCuratedTriples = curatedTriples.copy(updatesGroups = curatedTriples.updatesGroups.map { updatesGroup =>
+        updatesGroup.copy(
+          queryGenerator = () => EitherT.leftT[Try, List[SparqlQuery]](recoverableError)
         )
       })
 
@@ -87,9 +86,9 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
     s"return $InvalidUpdatesFailure if the given updates fail on query creation" in new TestCase {
       val exception = exceptions.generateOne
 
-      val updatedCuratedTriples = curatedTriples.copy(updates = curatedTriples.updates.map { update =>
-        update.copy(
-          queryGenerator = () => right[ProcessingRecoverableError](exception.raiseError[Try, SparqlQuery])
+      val updatedCuratedTriples = curatedTriples.copy(updatesGroups = curatedTriples.updatesGroups.map { updatesGroup =>
+        updatesGroup.copy(
+          queryGenerator = () => right[ProcessingRecoverableError](exception.raiseError[Try, List[SparqlQuery]])
         )
       })
 
@@ -98,7 +97,7 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .returning(DeliverySuccess.pure[Try])
 
       uploader.upload(updatedCuratedTriples) shouldBe InvalidUpdatesFailure(
-        curatedTriples.updates.map(_ => exception.getMessage).mkString("; ")
+        curatedTriples.updatesGroups.map(_ => exception.getMessage).mkString("; ")
       ).pure[Try]
     }
 
@@ -110,13 +109,11 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
       val failure = RecoverableFailure(nonEmptyStrings().generateOne)
 
-      curatedTriples.updates.map(
-        update =>
-          update().fold(throw _,
-                        query =>
-                          (updatesUploader.send _)
-                            .expects(query)
-                            .returning(failure.pure[Try]))
+      curatedTriples.updatesGroups.map(
+        updatesGroup =>
+          updatesGroup
+            .generateUpdates()
+            .expectExecuteQueries(failure.pure[Try])
       )
 
       uploader.upload(curatedTriples) shouldBe failure.pure[Try]
@@ -139,16 +136,14 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .returning(DeliverySuccess.pure[Try])
 
       val failureMessage = nonEmptyStrings().generateOne
-      curatedTriples.updates.map { update =>
-        update().fold(throw _,
-                      query =>
-                        (updatesUploader.send _)
-                          .expects(query)
-                          .returning(InvalidUpdatesFailure(failureMessage).pure[Try]))
+      curatedTriples.updatesGroups.map { update =>
+        update
+          .generateUpdates()
+          .expectExecuteQueries(InvalidUpdatesFailure(failureMessage).pure[Try])
       }
 
       uploader.upload(curatedTriples) shouldBe InvalidUpdatesFailure(
-        curatedTriples.updates.map(_ => failureMessage).mkString("; ")
+        curatedTriples.updatesGroups.map(_ => failureMessage).mkString("; ")
       ).pure[Try]
     }
   }
@@ -159,5 +154,13 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
     val triplesUploader = mock[TriplesUploader[Try]]
     val updatesUploader = mock[UpdatesUploader[Try]]
     val uploader        = new Uploader[Try](triplesUploader, updatesUploader)
+
+    implicit class GeneratedQueriesOps(generatedQueries: CuratedTriples.GeneratedQueries[Try]) {
+      def expectExecuteQueries(
+          returning: Try[TriplesUploadResult]
+      ): Try[List[CallHandler1[SparqlQuery, Try[TriplesUploadResult]]]] =
+        generatedQueries.fold(throw _, _.map(query => (updatesUploader.send _).expects(query).returning(returning)))
+    }
   }
+
 }
