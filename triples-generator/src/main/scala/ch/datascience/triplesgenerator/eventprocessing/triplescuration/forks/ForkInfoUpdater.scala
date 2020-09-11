@@ -61,7 +61,7 @@ object IOForkInfoUpdater {
       timeRecorder:            SparqlQueryTimeRecorder[IO]
   )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[ForkInfoUpdater[IO]] =
     for {
-      payloadTransformer     <- IOPayloadTransformer(gitLabThrottler, logger, timeRecorder)
+      payloadTransformer     <- IOPayloadTransformer(gitLabThrottler, logger)
       updateFunctionsCreator <- IOUpdateFunctionsCreator(gitLabThrottler, logger, timeRecorder)
     } yield new ForkInfoUpdaterImpl(payloadTransformer, updateFunctionsCreator)
 }

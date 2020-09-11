@@ -24,7 +24,7 @@ import cats.effect.{ContextShift, IO}
 import cats.implicits._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
@@ -42,7 +42,6 @@ private[triplescuration] trait PayloadTransformer[Interpretation[_]] {
 
 private[triplescuration] class PayloadTransformerImpl(
     gitLab:                   GitLabInfoFinder[IO],
-    kg:                       KGInfoFinder[IO],
     projectPropertiesRemover: JsonLDTriples => JsonLDTriples
 )(implicit ME:                MonadError[IO, Throwable], cs: ContextShift[IO])
     extends PayloadTransformer[IO] {
@@ -51,28 +50,15 @@ private[triplescuration] class PayloadTransformerImpl(
       commit:                  CommitEvent,
       triples:                 JsonLDTriples
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = EitherT {
-    (gitLab.findProject(commit.project.path), kg.findProject(commit.project.path))
-      .parMapN {
-        case `no forks in GitLab and KG`()  => triples.pure[IO]
-        case `no project in Gitlab or KG`() => triples.pure[IO]
-        case _                              => projectPropertiesRemover(triples).pure[IO]
+    gitLab
+      .findProject(commit.project.path)
+      .map {
+        case None => triples.pure[IO]
+        case _    => projectPropertiesRemover(triples).pure[IO]
       }
       .flatten
       .map(_.asRight[ProcessingRecoverableError])
       .recover(maybeToRecoverableError)
-  }
-
-  private object `no forks in GitLab and KG` {
-    def unapply(tuple: (Option[GitLabProject], Option[KGProject])): Boolean = tuple match {
-      case (Some(gitLabProject), Some(kgProject)) =>
-        kgProject.maybeParentResourceId.isEmpty && gitLabProject.maybeParentPath.isEmpty
-      case _ => false
-    }
-  }
-
-  private object `no project in Gitlab or KG` {
-    def unapply(tuple: (Option[GitLabProject], Option[KGProject])): Boolean =
-      tuple.mapN((_, _) => false).getOrElse(true)
   }
 
   private lazy val maybeToRecoverableError
@@ -95,12 +81,10 @@ private[triplescuration] object IOPayloadTransformer {
 
   def apply(
       gitLabThrottler:         Throttler[IO, GitLab],
-      logger:                  Logger[IO],
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
+      logger:                  Logger[IO]
   )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[PayloadTransformer[IO]] =
     for {
       gitLabInfoFinder <- IOGitLabInfoFinder(gitLabThrottler, logger)
-      kgInfoFinder     <- IOKGInfoFinder(timeRecorder, logger)
       triplesTransformer = new ProjectPropertiesRemover
-    } yield new PayloadTransformerImpl(gitLabInfoFinder, kgInfoFinder, triplesTransformer)
+    } yield new PayloadTransformerImpl(gitLabInfoFinder, triplesTransformer)
 }
