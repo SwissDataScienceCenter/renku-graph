@@ -25,17 +25,19 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, userEmails}
 import ch.datascience.graph.model.projects.{DateCreated, ResourceId}
 import ch.datascience.graph.model.users
-import ch.datascience.rdfstore.InMemoryRdfStore
+import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
 import ch.datascience.rdfstore.entities.{Person, Project}
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+import eu.timepit.refined.auto._
 
 class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Matchers {
 
-  "deleteWasDerivedFrom" should {
+  "updateWasDerivedFrom" should {
 
-    "generate query deleting 'prov:wasDerivedFrom' triple from a given project" in new TestCase {
+    "generate query deleting 'prov:wasDerivedFrom' triple from a given project when there is no fork" in new TestCase {
       val maybeParent @ Some(parent) = entitiesProjects().generateSome
       val child1                     = entitiesProjects(maybeParentProject = maybeParent).generateOne
       val child2                     = entitiesProjects(maybeParentProject = maybeParent).generateOne
@@ -48,7 +50,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
         parent.resourceId.value -> None
       )
 
-      updatesQueryCreator.deleteWasDerivedFrom(child1.resourceId).runAll.unsafeRunSync()
+      updatesQueryCreator.updateWasDerivedFrom(child1.path, None).runAll.unsafeRunSync()
 
       findDerivedFrom should contain theSameElementsAs Set(
         child1.resourceId.value -> None,
@@ -56,11 +58,8 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
         parent.resourceId.value -> None
       )
     }
-  }
 
-  "insertWasDerivedFrom" should {
-
-    "generate query inserting 'prov:wasDerivedFrom' triple to a given project" in new TestCase {
+    "generate query inserting 'prov:wasDerivedFrom' triple to a given project when there is no derivedFrom" in new TestCase {
       val Some(parent) = entitiesProjects().generateSome
       val child1       = entitiesProjects(maybeParentProject = None).generateOne
       val child2       = entitiesProjects(maybeParentProject = None).generateOne
@@ -73,7 +72,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
         parent.resourceId.value -> None
       )
 
-      updatesQueryCreator.insertWasDerivedFrom(child1.resourceId, parent.path).runAll.unsafeRunSync()
+      updatesQueryCreator.updateWasDerivedFrom(child1.path, parent.path.some).runAll.unsafeRunSync()
 
       findDerivedFrom should contain theSameElementsAs Set(
         child1.resourceId.value -> Some(parent.resourceId.value),
@@ -81,11 +80,8 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
         parent.resourceId.value -> None
       )
     }
-  }
 
-  "recreateWasDerivedFrom" should {
-
-    "generate update query for 'prov:wasDerivedFrom' triple to a given project" in new TestCase {
+    "generate a query updating 'prov:wasDerivedFrom' triple to a given project when there is already a derivedFrom" in new TestCase {
       val maybeParent1 @ Some(parent1) = entitiesProjects().generateSome
       val maybeParent2 @ Some(parent2) = entitiesProjects().generateSome
       val child1                       = entitiesProjects(maybeParentProject = maybeParent1).generateOne
@@ -100,7 +96,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
         parent2.resourceId.value -> None
       )
 
-      updatesQueryCreator.recreateWasDerivedFrom(child1.resourceId, parent2.path).runAll.unsafeRunSync()
+      updatesQueryCreator.updateWasDerivedFrom(child1.path, parent2.path.some).runAll.unsafeRunSync()
 
       findDerivedFrom should contain theSameElementsAs Set(
         child1.resourceId.value  -> Some(parent2.resourceId.value),
@@ -113,7 +109,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
   "swapCreator" should {
 
-    "change Project's link to a Person to the given one" in new TestCase {
+    "replace the current Project's creator with the given one" in new TestCase {
       val creator1 = entitiesPersons(userEmails.generateSome).generateOne
       val creator2 = entitiesPersons(userEmails.generateSome).generateOne
       val project1 = entitiesProjects(creator1.some).generateOne
@@ -126,11 +122,30 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
         (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
       )
 
-      updatesQueryCreator.swapCreator(project1.resourceId, creator2.resourceId).runAll.unsafeRunSync()
+      updatesQueryCreator.swapCreator(project1.path, creator2.resourceId).runAll.unsafeRunSync()
 
       findCreators should contain theSameElementsAs Set(
         (project1.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value)),
         (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
+      )
+    }
+
+    "add a new creator to the Project when there is no creator linked to the project" in new TestCase {
+      val creator1 = entitiesPersons(userEmails.generateSome).generateOne
+      val project1 = entitiesProjects(None).generateOne
+      val project2 = entitiesProjects(creator1.some).generateOne
+
+      loadToStore(project1.asJsonLD, project2.asJsonLD)
+
+      findCreators should contain theSameElementsAs Set(
+        (project2.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value))
+      )
+
+      updatesQueryCreator.swapCreator(project1.path, creator1.resourceId).runAll.unsafeRunSync()
+
+      findCreators should contain theSameElementsAs Set(
+        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value)),
+        (project2.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value))
       )
     }
   }
@@ -153,7 +168,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
       val newCreator = entitiesPersons(userEmails.toGeneratorOfSomes).generateOne
 
       updatesQueryCreator
-        .addNewCreator(project1.resourceId, newCreator.maybeEmail, newCreator.name.some)
+        .addNewCreator(project1.path, newCreator.maybeEmail, newCreator.name.some)
         .runAll
         .unsafeRunSync()
 
@@ -179,12 +194,36 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
       val newCreator = entitiesPersons(userEmails.toGeneratorOfNones).generateOne
 
       updatesQueryCreator
-        .addNewCreator(project1.resourceId, newCreator.maybeEmail, newCreator.name.some)
+        .addNewCreator(project1.path, None, newCreator.name.some)
         .runAll
         .unsafeRunSync()
 
       findCreators should contain theSameElementsAs Set(
-        (project1.resourceId.value, newCreator.name.value, newCreator.maybeEmail.map(_.value)),
+        (project1.resourceId.value, newCreator.name.value, None),
+        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
+      )
+    }
+
+    "do nothing - case of Person without email and name" in new TestCase {
+      val creator1 = entitiesPersons().generateOne
+      val creator2 = entitiesPersons().generateOne
+      val project1 = entitiesProjects(creator1.some).generateOne
+      val project2 = entitiesProjects(creator2.some).generateOne
+
+      loadToStore(project1.asJsonLD, project2.asJsonLD)
+
+      findCreators should contain theSameElementsAs Set(
+        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value)),
+        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
+      )
+
+      updatesQueryCreator
+        .addNewCreator(project1.path, None, None)
+        .runAll
+        .unsafeRunSync()
+
+      findCreators should contain theSameElementsAs Set(
+        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value)),
         (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
       )
     }
@@ -192,24 +231,47 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
   "recreateDateCreated" should {
 
-    "create a new Person and link it to the given Project" in new TestCase {
+    "update the Project's createdDate - case when there is already a dateCreated" in new TestCase {
       val project1 = entitiesProjects().generateOne
       val project2 = entitiesProjects().generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 
       findDateCreated should contain theSameElementsAs Set(
-        (project1.resourceId.value, project1.dateCreated),
-        (project2.resourceId.value, project2.dateCreated)
+        (project1.resourceId.value, project1.dateCreated.some),
+        (project2.resourceId.value, project2.dateCreated.some)
       )
 
       val newDateCreated = projectCreatedDates.generateOne
 
-      updatesQueryCreator.recreateDateCreated(project1.resourceId, newDateCreated).runAll.unsafeRunSync()
+      updatesQueryCreator.recreateDateCreated(project1.path, newDateCreated).runAll.unsafeRunSync()
 
       findDateCreated should contain theSameElementsAs Set(
-        (project1.resourceId.value, newDateCreated),
-        (project2.resourceId.value, project2.dateCreated)
+        (project1.resourceId.value, newDateCreated.some),
+        (project2.resourceId.value, project2.dateCreated.some)
+      )
+    }
+
+    "update the Project's createdDate - case when there is no dateCreated" in new TestCase {
+      val project1 = entitiesProjects().generateOne
+      val project2 = entitiesProjects().generateOne
+
+      loadToStore(project1.asJsonLD, project2.asJsonLD)
+
+      removeDateCreated(project1.resourceId)
+
+      findDateCreated should contain theSameElementsAs Set(
+        (project1.resourceId.value, None),
+        (project2.resourceId.value, project2.dateCreated.some)
+      )
+
+      val newDateCreated = projectCreatedDates.generateOne
+
+      updatesQueryCreator.recreateDateCreated(project1.path, newDateCreated).runAll.unsafeRunSync()
+
+      findDateCreated should contain theSameElementsAs Set(
+        (project1.resourceId.value, newDateCreated.some),
+        (project2.resourceId.value, project2.dateCreated.some)
       )
     }
   }
@@ -254,14 +316,25 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
       .map(row => (row("id"), row("name"), row.get("email")))
       .toSet
 
-  private def findDateCreated: Set[(String, DateCreated)] =
+  private def findDateCreated: Set[(String, Option[DateCreated])] =
     runQuery(s"""|SELECT ?id ?dateCreated
                  |WHERE {
-                 |  ?id rdf:type schema:Project;
-                 |      schema:dateCreated ?dateCreated.
+                 |  ?id rdf:type schema:Project
+                 |  OPTIONAL { ?id  schema:dateCreated ?dateCreated }
                  |}
                  |""".stripMargin)
       .unsafeRunSync()
-      .map(row => (row("id"), DateCreated(Instant.parse(row("dateCreated")))))
+      .map(row => (row("id"), row.get("dateCreated").map(dateCreated => DateCreated(Instant.parse(dateCreated)))))
       .toSet
+
+  private def removeDateCreated(projectId: ResourceId): Unit =
+    runUpdate(
+      SparqlQuery(
+        name     = "delete date created",
+        prefixes = Set("PREFIX schema: <http://schema.org/>"),
+        s"""| DELETE { ${projectId.showAs[RdfResource]} schema:dateCreated ?dateCreated }
+            | WHERE { ${projectId.showAs[RdfResource]} schema:dateCreated ?dateCreated }
+            |""".stripMargin
+      )
+    ).unsafeRunSync()
 }

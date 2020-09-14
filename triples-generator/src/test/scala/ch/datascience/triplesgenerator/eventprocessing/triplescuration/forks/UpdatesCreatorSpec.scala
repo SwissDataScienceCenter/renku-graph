@@ -24,7 +24,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.{DateCreated, Path, ResourceId}
+import ch.datascience.graph.model.projects.{DateCreated, Path}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
 import ch.datascience.http.client.AccessToken
@@ -46,43 +46,109 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
 
   "create" should {
 
-    "do nothing if both projects from GitLab and KG have no forks" in new TestCase {
+    "do nothing if no project in Gitlab" in new TestCase {
 
-      given(gitLabProjects(maybeParentPaths   = emptyOptionOf[Path]).generateOne).existsInGitLab
-      given(kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne).existsInKG
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List.empty[SparqlQuery]
-      )
-    }
-
-    "do nothing if no projects in GitLab and in KG" in new TestCase {
-
-      given(gitLabProjects(maybeParentPaths   = emptyOptionOf[Path]).generateOne).doesNotExistsInGitLab
-      given(kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne).doesNotExistsInKG
+      given(gitLabProjects(projectPath = event.project.path, maybeParentPaths = emptyOptionOf[Path]).generateOne).doesNotExistsInGitLab
 
       updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
         List.empty[SparqlQuery]
       )
     }
 
-    "do nothing if no projects in GitLab" in new TestCase {
+    "update the wasDerivedFrom triple, recreate dateCreated and update the project creator" +
+      "if Gitlab project's creator has an email and the user exists in KG" in new TestCase {
 
-      given(gitLabProjects(maybeParentPaths   = emptyOptionOf[Path]).generateOne).doesNotExistsInGitLab
-      given(kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne).existsInKG
+      val emailInGitLab = userEmails.generateOne
+      val gitLabProject = given {
+        gitLabProjects(event.project.path).generateOne.copy(
+          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+        )
+      }.existsInGitLab
+
+      val newCreatorId = userResourceIds(Some(emailInGitLab)).generateOne
+      given(
+        creatorId = newCreatorId,
+        forEmail  = emailInGitLab
+      ).existsInKG
+
+      val wasDerivedFromUpdates = (updatesQueryCreator
+        .updateWasDerivedFrom(_: Path, _: Option[Path]))
+        .expects(gitLabProject.path, gitLabProject.maybeParentPath)
+        .returningUpdates
+
+      val creatorUpdates = (updatesQueryCreator
+        .swapCreator(_: Path, _: users.ResourceId))
+        .expects(gitLabProject.path, newCreatorId)
+        .returningUpdates
+
+      val recreateDateCreated = (updatesQueryCreator
+        .recreateDateCreated(_: Path, _: DateCreated))
+        .expects(gitLabProject.path, gitLabProject.dateCreated)
+        .returningUpdates
 
       updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List.empty[SparqlQuery]
+        List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
       )
     }
 
-    "do nothing if no projects in KG" in new TestCase {
+    "update the wasDerivedFrom triple, recreate dateCreated and update the project creator" +
+      "if Gitlab project's creator has an email and the user does not exist in KG" in new TestCase {
 
-      given(gitLabProjects(maybeParentPaths   = emptyOptionOf[Path]).generateOne).existsInGitLab
-      given(kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne).doesNotExistsInKG
+      val emailInGitLab = userEmails.generateOne
+      val gitLabProject = given {
+        gitLabProjects(event.project.path).generateOne.copy(
+          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+        )
+      }.existsInGitLab
+
+      val wasDerivedFromUpdates = (updatesQueryCreator
+        .updateWasDerivedFrom(_: Path, _: Option[Path]))
+        .expects(gitLabProject.path, gitLabProject.maybeParentPath)
+        .returningUpdates
+
+      givenNoUser(forEmail = emailInGitLab).existsInKG
+
+      val creatorUpdates = (updatesQueryCreator
+        .addNewCreator(_: Path, _: Option[Email], _: Option[users.Name]))
+        .expects(gitLabProject.path, Some(emailInGitLab), gitLabProject.maybeCreator.flatMap(_.maybeName))
+        .returningUpdates
+
+      val recreateDateCreated = (updatesQueryCreator
+        .recreateDateCreated(_: Path, _: DateCreated))
+        .expects(gitLabProject.path, gitLabProject.dateCreated)
+        .returningUpdates
 
       updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List.empty[SparqlQuery]
+        List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
+      )
+    }
+
+    "update the wasDerivedFrom triple, recreate dateCreated and update the project creator" +
+      "if Gitlab project's creator does not have an email" in new TestCase {
+
+      val gitLabProject = given {
+        gitLabProjects(event.project.path).generateOne.copy(
+          maybeCreator = gitLabCreator(maybeEmail = None).generateSome
+        )
+      }.existsInGitLab
+
+      val wasDerivedFromUpdates = (updatesQueryCreator
+        .updateWasDerivedFrom(_: Path, _: Option[Path]))
+        .expects(gitLabProject.path, gitLabProject.maybeParentPath)
+        .returningUpdates
+
+      val creatorUpdates = (updatesQueryCreator
+        .addNewCreator(_: Path, _: Option[Email], _: Option[users.Name]))
+        .expects(gitLabProject.path, None, gitLabProject.maybeCreator.flatMap(_.maybeName))
+        .returningUpdates
+
+      val recreateDateCreated = (updatesQueryCreator
+        .recreateDateCreated(_: Path, _: DateCreated))
+        .expects(gitLabProject.path, gitLabProject.dateCreated)
+        .returningUpdates
+
+      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
+        List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
       )
     }
 
@@ -92,8 +158,6 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
       UnauthorizedException
     ) foreach { exception =>
       s"fail if finding GitLab project fails with ${exception.getClass}" in new TestCase {
-
-        given(kgProjects().generateOne).existsInKG
 
         (gitLabInfoFinder
           .findProject(_: Path)(_: Option[AccessToken]))
@@ -105,14 +169,19 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
         } shouldBe exception
       }
 
-      s"fail if finding KG project fails with ${exception.getClass}" in new TestCase {
+      s"fail if finding Person with an email in the KG fails with ${exception.getClass}" in new TestCase {
 
-        given(gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne).existsInGitLab
+        val emailInGitLab = userEmails.generateOne
+        given {
+          gitLabProjects(projectPaths.generateOne).generateOne.copy(
+            maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+          )
+        }.existsInGitLab
 
         (kgInfoFinder
-          .findProject(_: Path))
-          .expects(event.project.path)
-          .returning(exception.raiseError[IO, Option[KGProject]])
+          .findCreatorId(_: Email))
+          .expects(emailInGitLab)
+          .returning(exception.raiseError[IO, Option[users.ResourceId]])
 
         intercept[Exception] {
           updatesCreator.create(event).generateUpdates().value.unsafeRunSync()
@@ -126,8 +195,6 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
     ) foreach { exception =>
       s"return $CurationRecoverableError if finding GitLab project fails with ${exception.getClass.getSimpleName}" in new TestCase {
 
-        given(kgProjects().generateOne).existsInKG
-
         (gitLabInfoFinder
           .findProject(_: Path)(_: Option[AccessToken]))
           .expects(event.project.path, maybeAccessToken)
@@ -138,657 +205,24 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
         }
       }
 
-      s"return $CurationRecoverableError if finding KG project fails ${exception.getClass.getSimpleName}" in new TestCase {
+      s"return $CurationRecoverableError if finding Person with an email in the KG fails with ${exception.getClass.getSimpleName}" in new TestCase {
 
-        given(gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne).existsInGitLab
+        val emailInGitLab = userEmails.generateOne
+        given {
+          gitLabProjects(projectPaths.generateOne).generateOne.copy(
+            maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+          )
+        }.existsInGitLab
 
         (kgInfoFinder
-          .findProject(_: Path))
-          .expects(event.project.path)
-          .returning(exception.raiseError[IO, Option[KGProject]])
+          .findCreatorId(_: Email))
+          .expects(emailInGitLab)
+          .returning(exception.raiseError[IO, Option[users.ResourceId]])
 
         updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Left {
           CurationRecoverableError("Problem with finding fork info", exception)
         }
       }
-    }
-  }
-
-  "updateForkInfo - cases when forks in KG and in GitLab" should {
-
-    "do nothing if forks are the same" in new TestCase {
-
-      val commonFork = projectPaths.generateOne
-      given(gitLabProjects(commonFork).generateOne).existsInGitLab
-      given(kgProjects(commonFork).generateOne).existsInKG
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(List.empty[SparqlQuery])
-    }
-
-    "recreate wasDerivedFrom " +
-      "if forks are different " +
-      "but emails and dateCreated are the same" in new TestCase {
-
-      val forkInGitLab        = projectPaths.generateOne
-      val commonEmail         = userEmails.generateSome
-      val dateCreatedInGitLab = projectCreatedDates.generateOne
-
-      given {
-        gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(commonEmail).generateSome,
-          dateCreated  = dateCreatedInGitLab
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          maybeCreator = kgCreator(commonEmail).generateSome,
-          dateCreated  = dateCreatedInGitLab
-        )
-      }.existsInKG
-
-      val wasDerivedFromRecreate = (updatesQueryCreator
-        .recreateWasDerivedFrom(_: ResourceId, _: Path))
-        .expects(kgProject.resourceId, forkInGitLab)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(wasDerivedFromRecreate)
-    }
-
-    "recreate wasDerivedFrom " +
-      "if forks are different " +
-      "but user names and dateCreated are the same in the absence of emails" in new TestCase {
-
-      val forkInGitLab        = projectPaths.generateOne
-      val commonUserName      = userNames.generateOne
-      val dateCreatedInGitLab = projectCreatedDates.generateOne
-
-      given {
-        gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(maybeEmail = None, maybeName = commonUserName.some).generateSome,
-          dateCreated  = dateCreatedInGitLab
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          maybeCreator = kgCreator(maybeEmail = None, name = commonUserName).generateSome,
-          dateCreated  = dateCreatedInGitLab
-        )
-      }.existsInKG
-
-      val wasDerivedFromRecreate = (updatesQueryCreator
-        .recreateWasDerivedFrom(_: ResourceId, _: Path))
-        .expects(kgProject.resourceId, forkInGitLab)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(wasDerivedFromRecreate)
-    }
-
-    "recreate wasDerivedFrom and dateCreated and link a new creator " +
-      "if many fields are different" +
-      "and there is a Person with the new email already in the KG" in new TestCase {
-
-      val forkInGitLab  = projectPaths.generateOne
-      val emailInGitLab = userEmails.generateOne
-      val gitLabProject = given {
-        gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          maybeCreator = kgCreator(userEmails.generateSome).generateSome
-        )
-      }.existsInKG
-
-      val wasDerivedFromRecreate = (updatesQueryCreator
-        .recreateWasDerivedFrom(_: ResourceId, _: Path))
-        .expects(kgProject.resourceId, forkInGitLab)
-        .returningUpdates
-
-      val newCreatorId = userResourceIds(Some(emailInGitLab)).generateOne
-      given(
-        newCreatorId = Some(newCreatorId),
-        forEmail     = emailInGitLab
-      ).existsInKG
-      val creatorUpdates = (updatesQueryCreator
-        .swapCreator(_: ResourceId, _: users.ResourceId))
-        .expects(kgProject.resourceId, newCreatorId)
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: ResourceId, _: DateCreated))
-        .expects(kgProject.resourceId, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(
-          wasDerivedFromRecreate,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
-    }
-
-    "recreate wasDerivedFrom and dateCreated and create and link a new creator " +
-      "if many fields are different " +
-      "and there is no Person with the new email in the KG" in new TestCase {
-
-      val forkInGitLab  = projectPaths.generateOne
-      val emailInGitLab = userEmails.generateOne
-      val gitLabProject = given {
-        gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          maybeCreator = kgCreator(userEmails.generateSome).generateSome
-        )
-      }.existsInKG
-
-      val wasDerivedFromRecreate = (updatesQueryCreator
-        .recreateWasDerivedFrom(_: ResourceId, _: Path))
-        .expects(kgProject.resourceId, forkInGitLab)
-        .returningUpdates
-
-      given(newCreatorId = None, forEmail = emailInGitLab).existsInKG
-      val creatorUpdates = (updatesQueryCreator
-        .addNewCreator(_: ResourceId, _: Option[Email], _: Option[users.Name]))
-        .expects(kgProject.resourceId,
-                 gitLabProject.maybeCreator.flatMap(_.maybeEmail),
-                 gitLabProject.maybeCreator.flatMap(_.maybeName))
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: ResourceId, _: DateCreated))
-        .expects(kgProject.resourceId, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(
-          wasDerivedFromRecreate,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
-    }
-
-    "recreate wasDerivedFrom and dateCreated and create and link a new creator " +
-      "if many fields are different " +
-      "and there's only creator username in GitLab" in new TestCase {
-
-      val forkInGitLab = projectPaths.generateOne
-      val gitLabProject = given {
-        gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(maybeEmail = None).generateSome.map(_.copy(maybeName = userNames.generateSome))
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
-      }.existsInKG
-
-      val wasDerivedFromRecreate = (updatesQueryCreator
-        .recreateWasDerivedFrom(_: ResourceId, _: Path))
-        .expects(kgProject.resourceId, forkInGitLab)
-        .returningUpdates
-
-      val creatorUpdates = (updatesQueryCreator
-        .addNewCreator(_: ResourceId, _: Option[Email], _: Option[users.Name]))
-        .expects(kgProject.resourceId,
-                 gitLabProject.maybeCreator.flatMap(_.maybeEmail),
-                 gitLabProject.maybeCreator.flatMap(_.maybeName))
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: ResourceId, _: DateCreated))
-        .expects(kgProject.resourceId, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(
-          wasDerivedFromRecreate,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
-    }
-
-    "recreate wasDerivedFrom and dateCreated and only unlink creator " +
-      "if many fields are different " +
-      "and email and name do not exist in GitLab" in new TestCase {
-
-      val forkInGitLab = projectPaths.generateOne
-      val gitLabProject = given {
-        gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(maybeEmail = None).generateSome.map(_.copy(maybeName = None))
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
-      }.existsInKG
-
-      val wasDerivedFromRecreate = (updatesQueryCreator
-        .recreateWasDerivedFrom(_: ResourceId, _: Path))
-        .expects(kgProject.resourceId, forkInGitLab)
-        .returningUpdates
-
-      val creatorUpdates = (updatesQueryCreator
-        .addNewCreator(_: ResourceId, _: Option[Email], _: Option[users.Name]))
-        .expects(kgProject.resourceId,
-                 gitLabProject.maybeCreator.flatMap(_.maybeEmail),
-                 gitLabProject.maybeCreator.flatMap(_.maybeName))
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: ResourceId, _: DateCreated))
-        .expects(kgProject.resourceId, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(
-          wasDerivedFromRecreate,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
-
-    }
-
-    "fail if finding Person with an email in the KG fails" in new TestCase {
-
-      val emailInGitLab = userEmails.generateOne
-      given {
-        gitLabProjects(projectPaths.generateOne).generateOne.copy(
-          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
-        )
-      }.existsInGitLab
-
-      given {
-        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne.copy(
-          maybeCreator = kgCreator(userEmails.generateSome).generateSome
-        )
-      }.existsInKG
-
-      val exception = exceptions.generateOne
-      (kgInfoFinder
-        .findCreatorId(_: Email))
-        .expects(emailInGitLab)
-        .returning(exception.raiseError[IO, Option[users.ResourceId]])
-
-      intercept[Exception] {
-        updatesCreator.create(event).generateUpdates().value.unsafeRunSync()
-      } shouldBe exception
-    }
-  }
-
-  "updateForkInfo - cases when fork only in GitLab" should {
-
-    "create wasDerivedFrom and dateCreated and link a new creator " +
-      "if there's a Person with the new email already in the KG" in new TestCase {
-
-      val forkInGitLab  = projectPaths.generateOne
-      val emailInGitLab = userEmails.generateOne
-      val gitLabProject = given {
-        gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
-      }.existsInKG
-
-      val wasDerivedFromInsert = (updatesQueryCreator
-        .insertWasDerivedFrom(_: ResourceId, _: Path))
-        .expects(kgProject.resourceId, forkInGitLab)
-        .returningUpdates
-
-      val newCreatorId = userResourceIds(Some(emailInGitLab)).generateOne
-      given(
-        newCreatorId = Some(newCreatorId),
-        forEmail     = emailInGitLab
-      ).existsInKG
-      val creatorUpdates = (updatesQueryCreator
-        .swapCreator(_: ResourceId, _: users.ResourceId))
-        .expects(kgProject.resourceId, newCreatorId)
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: ResourceId, _: DateCreated))
-        .expects(kgProject.resourceId, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(
-          wasDerivedFromInsert,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
-    }
-
-    "create wasDerivedFrom, dateCreated and creator " +
-      "and link the new creator to the project in KG " +
-      "if there is no Person with the new email in the KG yet" in new TestCase {
-
-      val forkInGitLab  = projectPaths.generateOne
-      val emailInGitLab = userEmails.generateOne
-      val gitLabProject = given {
-        gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
-      }.existsInKG
-
-      val wasDerivedFromInsert = (updatesQueryCreator
-        .insertWasDerivedFrom(_: ResourceId, _: Path))
-        .expects(kgProject.resourceId, forkInGitLab)
-        .returningUpdates
-
-      given(newCreatorId = None, forEmail = emailInGitLab).existsInKG
-      val creatorUpdates = (updatesQueryCreator
-        .addNewCreator(_: ResourceId, _: Option[Email], _: Option[users.Name]))
-        .expects(kgProject.resourceId,
-                 gitLabProject.maybeCreator.flatMap(_.maybeEmail),
-                 gitLabProject.maybeCreator.flatMap(_.maybeName))
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: ResourceId, _: DateCreated))
-        .expects(kgProject.resourceId, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(
-          wasDerivedFromInsert,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
-    }
-
-    "create wasDerivedFrom, dateCreated and creator " +
-      "and link the new creator to the project in KG " +
-      "if there's only creator username in GitLab" in new TestCase {
-
-      val forkInGitLab = projectPaths.generateOne
-      val gitLabProject = given {
-        gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(maybeEmail = None).generateSome.map(_.copy(maybeName = userNames.generateSome))
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
-      }.existsInKG
-
-      val wasDerivedFromInsert = (updatesQueryCreator
-        .insertWasDerivedFrom(_: ResourceId, _: Path))
-        .expects(kgProject.resourceId, forkInGitLab)
-        .returningUpdates
-
-      val creatorUpdates = (updatesQueryCreator
-        .addNewCreator(_: ResourceId, _: Option[Email], _: Option[users.Name]))
-        .expects(kgProject.resourceId,
-                 gitLabProject.maybeCreator.flatMap(_.maybeEmail),
-                 gitLabProject.maybeCreator.flatMap(_.maybeName))
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: ResourceId, _: DateCreated))
-        .expects(kgProject.resourceId, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(
-          wasDerivedFromInsert,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
-    }
-
-    "create wasDerivedFrom and dateCreated and effectively only unlink the creator " +
-      "if creator email and name cannot be found in GitLab" in new TestCase {
-
-      val forkInGitLab = projectPaths.generateOne
-      val gitLabProject = given {
-        gitLabProjects(forkInGitLab).generateOne.copy(
-          maybeCreator = gitLabCreator(maybeEmail = None).generateSome.map(_.copy(maybeName = None))
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
-      }.existsInKG
-
-      val wasDerivedFromInsert = (updatesQueryCreator
-        .insertWasDerivedFrom(_: ResourceId, _: Path))
-        .expects(kgProject.resourceId, forkInGitLab)
-        .returningUpdates
-
-      val creatorUpdates = (updatesQueryCreator
-        .addNewCreator(_: ResourceId, _: Option[Email], _: Option[users.Name]))
-        .expects(kgProject.resourceId,
-                 gitLabProject.maybeCreator.flatMap(_.maybeEmail),
-                 gitLabProject.maybeCreator.flatMap(_.maybeName))
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: ResourceId, _: DateCreated))
-        .expects(kgProject.resourceId, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(
-          wasDerivedFromInsert,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
-    }
-
-    "fail if finding Person with an email in the KG fails" in new TestCase {
-
-      val emailInGitLab = userEmails.generateOne
-      given {
-        gitLabProjects(projectPaths.generateOne).generateOne.copy(
-          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
-        )
-      }.existsInGitLab
-
-      given {
-        kgProjects(maybeParentResourceIds = emptyOptionOf[ResourceId]).generateOne
-      }.existsInKG
-
-      val exception = exceptions.generateOne
-      (kgInfoFinder
-        .findCreatorId(_: Email))
-        .expects(emailInGitLab)
-        .returning(exception.raiseError[IO, Option[users.ResourceId]])
-
-      intercept[Exception] {
-        updatesCreator.create(event).generateUpdates().value.unsafeRunSync()
-      } shouldBe exception
-    }
-  }
-
-  "updateForkInfo - cases when fork only in KG" should {
-
-    "remove the wasDerivedFrom triple, recreate dateCreated and link a new creator " +
-      "if there's a Person with the new email already in the KG" in new TestCase {
-
-      val forkInGitLab  = projectPaths.generateOne
-      val emailInGitLab = userEmails.generateOne
-      val gitLabProject = given {
-        gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne.copy(
-          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
-      }.existsInKG
-
-      val wasDerivedFromDelete = (updatesQueryCreator
-        .deleteWasDerivedFrom(_: ResourceId))
-        .expects(kgProject.resourceId)
-        .returningUpdates
-
-      val newCreatorId = userResourceIds(Some(emailInGitLab)).generateOne
-      given(
-        newCreatorId = Some(newCreatorId),
-        forEmail     = emailInGitLab
-      ).existsInKG
-      val creatorUpdates = (updatesQueryCreator
-        .swapCreator(_: ResourceId, _: users.ResourceId))
-        .expects(kgProject.resourceId, newCreatorId)
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: ResourceId, _: DateCreated))
-        .expects(kgProject.resourceId, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(
-          wasDerivedFromDelete,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
-    }
-
-    "remove the wasDerivedFrom triple, recreate dateCreated and creator " +
-      "and link the new creator to the project in KG " +
-      "if there is no Person with the new email in the KG yet" in new TestCase {
-
-      val forkInGitLab  = projectPaths.generateOne
-      val emailInGitLab = userEmails.generateOne
-      val gitLabProject = given {
-        gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne.copy(
-          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
-      }.existsInKG
-
-      val wasDerivedFromDelete = (updatesQueryCreator
-        .deleteWasDerivedFrom(_: ResourceId))
-        .expects(kgProject.resourceId)
-        .returningUpdates
-
-      given(newCreatorId = None, forEmail = emailInGitLab).existsInKG
-      val creatorUpdates = (updatesQueryCreator
-        .addNewCreator(_: ResourceId, _: Option[Email], _: Option[users.Name]))
-        .expects(kgProject.resourceId,
-                 gitLabProject.maybeCreator.flatMap(_.maybeEmail),
-                 gitLabProject.maybeCreator.flatMap(_.maybeName))
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: ResourceId, _: DateCreated))
-        .expects(kgProject.resourceId, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(
-          wasDerivedFromDelete,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
-    }
-
-    "remove the wasDerivedFrom triple, recreate dateCreated and create and link a new creator " +
-      "if there's only creator username in GitLab" in new TestCase {
-
-      val forkInGitLab = projectPaths.generateOne
-      val gitLabProject = given {
-        gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne.copy(
-          maybeCreator = gitLabCreator(maybeEmail = None).generateSome.map(_.copy(maybeName = userNames.generateSome))
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
-      }.existsInKG
-
-      val wasDerivedFromDelete = (updatesQueryCreator
-        .deleteWasDerivedFrom(_: ResourceId))
-        .expects(kgProject.resourceId)
-        .returningUpdates
-
-      val creatorUpdates = (updatesQueryCreator
-        .addNewCreator(_: ResourceId, _: Option[Email], _: Option[users.Name]))
-        .expects(kgProject.resourceId,
-                 gitLabProject.maybeCreator.flatMap(_.maybeEmail),
-                 gitLabProject.maybeCreator.flatMap(_.maybeName))
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: ResourceId, _: DateCreated))
-        .expects(kgProject.resourceId, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(
-          wasDerivedFromDelete,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
-    }
-
-    "remove the wasDerivedFrom triple, recreate dateCreated and effectively only unlink the creator " +
-      "if creator email and name cannot be found in GitLab" in new TestCase {
-
-      val forkInGitLab = projectPaths.generateOne
-      val gitLabProject = given {
-        gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne.copy(
-          maybeCreator = gitLabCreator(maybeEmail = None).generateSome.map(_.copy(maybeName = None))
-        )
-      }.existsInGitLab
-
-      val kgProject = given {
-        kgProjects(projectResourceIds.toGeneratorOfSomes).generateOne
-      }.existsInKG
-
-      val wasDerivedFromDelete = (updatesQueryCreator
-        .deleteWasDerivedFrom(_: ResourceId))
-        .expects(kgProject.resourceId)
-        .returningUpdates
-
-      val creatorUpdates = (updatesQueryCreator
-        .addNewCreator(_: ResourceId, _: Option[Email], _: Option[users.Name]))
-        .expects(kgProject.resourceId,
-                 gitLabProject.maybeCreator.flatMap(_.maybeEmail),
-                 gitLabProject.maybeCreator.flatMap(_.maybeName))
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: ResourceId, _: DateCreated))
-        .expects(kgProject.resourceId, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(
-          wasDerivedFromDelete,
-          creatorUpdates,
-          recreateDateCreated
-        ).flatten
-      )
     }
   }
 
@@ -820,29 +254,21 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
       }
     }
 
-    def given(kgProject: KGProject) = new {
-      lazy val existsInKG: KGProject = {
-        (kgInfoFinder
-          .findProject(_: Path))
-          .expects(event.project.path)
-          .returning(Option(kgProject).pure[IO])
-        kgProject
-      }
-
-      lazy val doesNotExistsInKG = {
-        (kgInfoFinder
-          .findProject(_: Path))
-          .expects(event.project.path)
-          .returning(Option.empty.pure[IO])
-      }
-    }
-
-    def given(newCreatorId: Option[users.ResourceId], forEmail: Email) = new {
+    def given(creatorId: users.ResourceId, forEmail: Email) = new {
       lazy val existsInKG = {
         (kgInfoFinder
           .findCreatorId(_: Email))
           .expects(forEmail)
-          .returning(newCreatorId.pure[IO])
+          .returning(creatorId.some.pure[IO])
+      }
+    }
+
+    def givenNoUser(forEmail: Email) = new {
+      lazy val existsInKG = {
+        (kgInfoFinder
+          .findCreatorId(_: Email))
+          .expects(forEmail)
+          .returning(Option.empty.pure[IO])
       }
     }
 

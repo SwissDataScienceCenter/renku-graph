@@ -44,14 +44,14 @@ class PayloadTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "do nothing if there's no project in GitLab" in new TestCase {
 
-      given(gitLabProjects(maybeParentPaths = emptyOptionOf[Path]).generateOne).doesNotExistsInGitLab
+      given(gitLabProjects(event.project.path, maybeParentPaths = emptyOptionOf[Path]).generateOne).doesNotExistsInGitLab
 
       transformer.transform(event, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(givenCuratedTriples)
     }
 
     "transform the triples if there's project in Gitlab" in new TestCase {
 
-      given(gitLabProjects(maybeParentPaths = projectPaths.generateSome).generateOne).existsInGitLab
+      given(gitLabProjects(event.project.path, maybeParentPaths = projectPaths.generateSome).generateOne).existsInGitLab
       val transformedTriples = givenTriplesTransformationCalled()
 
       transformer.transform(event, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(transformedTriples)

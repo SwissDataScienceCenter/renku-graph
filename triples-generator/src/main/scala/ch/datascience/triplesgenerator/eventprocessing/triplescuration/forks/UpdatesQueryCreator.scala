@@ -32,42 +32,35 @@ import scala.language.higherKinds
 
 private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
 
-  def recreateWasDerivedFrom(resourceId: ResourceId, forkPath: Path) = List {
-    val rdfResource  = resourceId.showAs[RdfResource]
-    val forkResource = ResourceId(renkuBaseUrl, forkPath).showAs[RdfResource]
-    SparqlQuery(
-      name = "upload - project derived update",
-      Set("PREFIX prov: <http://www.w3.org/ns/prov#>"),
-      s"""|DELETE { $rdfResource prov:wasDerivedFrom ?parentId }
-          |INSERT { $rdfResource prov:wasDerivedFrom $forkResource }
-          |WHERE  { $rdfResource prov:wasDerivedFrom ?parentId }
-          |""".stripMargin
-    )
+  def updateWasDerivedFrom(projectPath: Path, maybeForkPath: Option[Path]) = List {
+    val rdfResource = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]
+    maybeForkPath match {
+      case Some(forkPath) =>
+        val q = SparqlQuery(
+          name = "upload - project derived update",
+          Set("PREFIX prov: <http://www.w3.org/ns/prov#>"),
+          s"""|DELETE { $rdfResource prov:wasDerivedFrom ?parentId }
+              |INSERT { $rdfResource prov:wasDerivedFrom ${ResourceId(renkuBaseUrl, forkPath).showAs[RdfResource]} }
+              |WHERE  { 
+              | OPTIONAL { $rdfResource prov:wasDerivedFrom ?maybeParentId } 
+              |  BIND (IF(BOUND(?maybeParentId), ?maybeParentId, "nonexisting") AS ?parentId)
+              |}
+              |""".stripMargin
+        )
+        q
+      case _ =>
+        SparqlQuery(
+          name = "upload - project derived delete",
+          Set("PREFIX prov: <http://www.w3.org/ns/prov#>"),
+          s"""|DELETE { $rdfResource prov:wasDerivedFrom ?parentId }
+              |WHERE  { $rdfResource prov:wasDerivedFrom ?parentId }
+              |""".stripMargin
+        )
+    }
   }
 
-  def deleteWasDerivedFrom(resourceId: ResourceId) = List {
-    val rdfResource = resourceId.showAs[RdfResource]
-    SparqlQuery(
-      name = "upload - project derived delete",
-      Set("PREFIX prov: <http://www.w3.org/ns/prov#>"),
-      s"""|DELETE { $rdfResource prov:wasDerivedFrom ?parentId }
-          |WHERE  { $rdfResource prov:wasDerivedFrom ?parentId }
-          |""".stripMargin
-    )
-  }
-
-  def insertWasDerivedFrom(resourceId: ResourceId, forkPath: Path) = List {
-    val rdfResource  = resourceId.showAs[RdfResource]
-    val forkResource = ResourceId(renkuBaseUrl, forkPath).showAs[RdfResource]
-    SparqlQuery(
-      name = "upload - project derived insert",
-      Set("PREFIX prov: <http://www.w3.org/ns/prov#>"),
-      s"""INSERT DATA { $rdfResource prov:wasDerivedFrom $forkResource }"""
-    )
-  }
-
-  def swapCreator(projectId: ResourceId, creatorId: users.ResourceId): List[SparqlQuery] = {
-    val rdfResource     = projectId.showAs[RdfResource]
+  def swapCreator(projectPath: Path, creatorId: users.ResourceId): List[SparqlQuery] = {
+    val rdfResource     = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]
     val creatorResource = creatorId.showAs[RdfResource]
     List(
       SparqlQuery(
@@ -75,7 +68,10 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
         Set("PREFIX schema: <http://schema.org/>"),
         s"""|DELETE { $rdfResource schema:creator ?creatorId }
             |INSERT { $rdfResource schema:creator $creatorResource }
-            |WHERE  { $rdfResource schema:creator ?creatorId }
+            |WHERE  { 
+            |  OPTIONAL { $rdfResource schema:creator ?maybeCreatorId } 
+            |  BIND (IF(BOUND(?maybeCreatorId), ?maybeCreatorId, "nonexisting") AS ?creatorId)
+            |}
             |""".stripMargin
       )
     )
@@ -107,20 +103,22 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
     )
   }
 
-  def addNewCreator(projectId:         ResourceId,
+  def addNewCreator(projectPath:       Path,
                     maybeCreatorEmail: Option[Email],
-                    maybeCreatorName:  Option[users.Name]): List[SparqlQuery] =
+                    maybeCreatorName:  Option[users.Name]): List[SparqlQuery] = {
+    val projectId = ResourceId(renkuBaseUrl, projectPath)
     maybeCreatorEmail match {
       case Some(creatorEmail) =>
         val creatorResource = findCreatorId(creatorEmail)
         insertOrUpdateCreator(creatorResource, maybeCreatorEmail, maybeCreatorName) ++
-          swapCreator(projectId, creatorResource)
+          swapCreator(projectPath, creatorResource)
       case None =>
         maybeCreatorName match {
           case None              => List.empty
           case Some(creatorName) => swapCreatorWithoutEmail(projectId, creatorName)
         }
     }
+  }
 
   private def insertOrUpdateCreator(
       personId:          users.ResourceId,
@@ -179,20 +177,19 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
 
   private def findCreatorId(email: Email): users.ResourceId = users.ResourceId(s"mailto:$email")
 
-  def recreateDateCreated(resourceId: ResourceId, dateCreated: DateCreated): List[SparqlQuery] = {
-    val rdfResource = resourceId.showAs[RdfResource]
+  def recreateDateCreated(projectPath: Path, dateCreated: DateCreated): List[SparqlQuery] = {
+    val rdfResource = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]
     List(
       SparqlQuery(
-        name = "upload - project dateCreated delete",
-        Set("PREFIX schema: <http://schema.org/>"),
-        s"""|DELETE { $rdfResource schema:dateCreated ?date }
-            |WHERE  { $rdfResource schema:dateCreated ?date }
-            |""".stripMargin
-      ),
-      SparqlQuery(
-        name = "upload - project dateCreated insert",
+        name = "upload - project dateCreated updated",
         Set("PREFIX schema: <http://schema.org/>", "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>"),
-        s"""INSERT DATA { $rdfResource schema:dateCreated '$dateCreated'^^xsd:dateTime }"""
+        s"""|DELETE { $rdfResource schema:dateCreated ?date }
+            |INSERT { $rdfResource schema:dateCreated '$dateCreated'^^xsd:dateTime }
+            |WHERE  {
+            |  OPTIONAL { $rdfResource schema:dateCreated ?maybeDate } 
+            |  BIND (IF(BOUND(?maybeDate), ?maybeDate, "nonexisting") AS ?date)
+            |}
+            |""".stripMargin
       )
     )
   }

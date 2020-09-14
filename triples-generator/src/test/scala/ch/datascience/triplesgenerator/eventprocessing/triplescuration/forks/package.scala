@@ -22,7 +22,7 @@ import ch.datascience.generators.CommonGraphGenerators.{fusekiBaseUrls, renkuBas
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.{Path, ResourceId}
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.FusekiBaseUrl
@@ -34,37 +34,22 @@ package object forks {
   implicit val renkuBaseUrl:  RenkuBaseUrl  = renkuBaseUrls.generateOne
   implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 
-  def gitLabProjects(parentPath: Path): Gen[GitLabProject] = gitLabProjects(
-    maybeParentPaths = Gen.const(parentPath).toGeneratorOfSomes
-  )
+  def gitLabProjects(projectPath: Path, parentPath: Path): Gen[GitLabProject] =
+    gitLabProjects(projectPath = projectPath, maybeParentPaths = Gen.const(parentPath).toGeneratorOfSomes)
 
   def gitLabProjects(
+      projectPath:      Path,
       maybeParentPaths: Gen[Option[Path]] = projectPaths.toGeneratorOfOptions
   ): Gen[GitLabProject] =
     for {
-      path            <- projectPaths
       maybeParentPath <- maybeParentPaths
       maybeCreator    <- gitLabCreator().toGeneratorOfOptions
       dateCreated     <- projectCreatedDates
-    } yield GitLabProject(path, maybeParentPath, maybeCreator, dateCreated)
-
-  def kgProjects(parentPath: Path): Gen[KGProject] = kgProjects(
-    maybeParentResourceIds = Gen.const(ResourceId(renkuBaseUrl, parentPath)).toGeneratorOfSomes
-  )
+    } yield GitLabProject(projectPath, maybeParentPath, maybeCreator, dateCreated)
 
   def gitLabCreator(maybeEmail: Option[Email]      = userEmails.generateOption,
                     maybeName:  Option[users.Name] = userNames.generateOption): Gen[GitLabCreator] =
     GitLabCreator(maybeEmail, maybeName)
-
-  def kgProjects(
-      maybeParentResourceIds: Gen[Option[ResourceId]] = projectResourceIds.toGeneratorOfOptions
-  ): Gen[KGProject] =
-    for {
-      resourceId            <- projectResourceIds
-      maybeParentResourceId <- maybeParentResourceIds
-      maybeCreator          <- kgCreator().toGeneratorOfOptions
-      dateCreated           <- projectCreatedDates
-    } yield KGProject(resourceId, maybeParentResourceId, maybeCreator, dateCreated)
 
   def kgCreator(maybeEmail: Option[Email] = userEmails.generateOption,
                 name:       users.Name    = userNames.generateOne): Gen[KGCreator] =

@@ -26,7 +26,7 @@ import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning._
 import ch.datascience.graph.acceptancetests.knowledgegraph.DatasetsResources.briefJson
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
-import ch.datascience.graph.acceptancetests.tooling.GraphServices
+import ch.datascience.graph.acceptancetests.tooling.{GraphServices, RDFStore}
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.EventsGenerators.commitIds
@@ -61,15 +61,15 @@ class ProjectsResourcesSpec
   import ProjectsResources._
 
   private implicit val accessToken: AccessToken = accessTokens.generateOne
-  private val parentProject = {
-    val initParent = parents.generateOne
-    ParentProject(
-      initParent.resourceId.toUnsafe[Path],
-      initParent.name,
-      Creation(initParent.created.date,
-               initParent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name)))
-    )
-  }
+  private val fullParentProject = projects.generateOne
+
+  private val parentProject = ParentProject(
+    fullParentProject.path,
+    fullParentProject.name,
+    Creation(fullParentProject.created.date,
+             fullParentProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name)))
+  )
+
   private val project = {
     val initProject = projects.generateOne
     initProject.copy(
@@ -79,7 +79,8 @@ class ProjectsResourcesSpec
       )
     )
   }
-  private val dataset1CommitId = commitIds.generateOne
+  private val dataset1CommitId    = commitIds.generateOne
+  private val parentProjectCommit = commitIds.generateOne
   private val dataset = nonModifiedDatasets().generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
     published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
@@ -91,6 +92,28 @@ class ProjectsResourcesSpec
     Scenario("As a user I would like to find project's details by calling a REST endpoint") {
 
       Given("some data in the RDF Store")
+      val parentProjectEntity = entities
+        .Project(
+          parentProject.path,
+          parentProject.name,
+          parentProject.created.date,
+          maybeCreator =
+            parentProject.created.maybeCreator.map(creator => entities.Person(creator.name, creator.maybeEmail)),
+          version = projectSchemaVersions.generateOne
+        )
+
+      val jsonLDParentProjectTriples = JsonLD.arr(
+        nonModifiedDataSetCommit(commitId = parentProjectCommit)(
+          projectPath        = parentProject.path,
+          projectName        = parentProject.name,
+          projectDateCreated = parentProject.created.date,
+          maybeProjectCreator =
+            parentProject.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
+          projectVersion = fullParentProject.version
+        )()
+      )
+      `data in the RDF store`(fullParentProject, parentProjectCommit, jsonLDParentProjectTriples)
+
       val jsonLDTriples = JsonLD.arr(
         nonModifiedDataSetCommit(
           commitId   = dataset1CommitId,
@@ -100,17 +123,8 @@ class ProjectsResourcesSpec
           projectName         = project.name,
           projectDateCreated  = project.created.date,
           maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-          maybeParent = entities
-            .Project(
-              parentProject.path,
-              parentProject.name,
-              parentProject.created.date,
-              maybeCreator =
-                parentProject.created.maybeCreator.map(creator => entities.Person(creator.name, creator.maybeEmail)),
-              version = projectSchemaVersions.generateOne
-            )
-            .some,
-          projectVersion = project.version
+          maybeParent         = parentProjectEntity.some,
+          projectVersion      = project.version
         )(
           datasetIdentifier  = dataset.id,
           datasetTitle       = dataset.title,
