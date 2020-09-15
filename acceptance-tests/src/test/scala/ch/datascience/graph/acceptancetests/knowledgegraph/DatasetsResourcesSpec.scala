@@ -177,7 +177,7 @@ class DatasetsResourcesSpec
       val expectedDataset = List(dataset1, dataset2)
         .find(dataset => someDatasetDetailsLink.value contains urlEncode(dataset.id.value))
         .getOrFail(message = "Returned 'details' link does not point to any dataset in the RDF store")
-      foundDatasetDetails.hcursor.downField("identifier").as[Identifier] shouldBe Right(expectedDataset.id)
+      findIdentifier(foundDatasetDetails) shouldBe expectedDataset.id
 
       When("user fetches details of the dataset project with the link from the response")
       val datasetProjectLink = foundDatasetDetails.hcursor
@@ -196,7 +196,7 @@ class DatasetsResourcesSpec
 
   Feature("GET knowledge-graph/datasets?query=<text> to find datasets with a free-text search") {
 
-    Scenario("As a user I would like to be able to search for datasets by some free-text search") {
+    Scenario("As a user I would like to be able to search for datasets by free-text search") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
 
@@ -237,11 +237,11 @@ class DatasetsResourcesSpec
       )
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
-      pushToStore(dataset1, dataset1Projects)
-      pushToStore(dataset2, dataset2Projects)
-      pushToStore(dataset3, dataset3Projects)
-      pushToStore(dataset4, dataset4Projects)
-      pushToStore(dataset5, dataset5Projects)
+      val sameAs1Ids = pushToStore(dataset1, dataset1Projects)
+      val sameAs2Ids = pushToStore(dataset2, dataset2Projects)
+      val sameAs3Ids = pushToStore(dataset3, dataset3Projects)
+      val sameAs4Ids = pushToStore(dataset4, dataset4Projects)
+      val sameAs5Ids = pushToStore(dataset5, dataset5Projects)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>")
       val datasetsSearchResponse = knowledgeGraphClient GET s"knowledge-graph/datasets?query=${urlEncode(text.value)}"
@@ -251,10 +251,10 @@ class DatasetsResourcesSpec
 
       val Right(foundDatasets) = datasetsSearchResponse.bodyAsJson.as[List[Json]]
       foundDatasets.flatMap(sortCreators) should contain theSameElementsAs List(
-        searchResultJson(dataset1),
-        searchResultJson(dataset2),
-        searchResultJson(dataset3),
-        searchResultJson(dataset4)
+        searchResultJson(dataset1, sameAs1Ids, foundDatasets),
+        searchResultJson(dataset2, sameAs2Ids, foundDatasets),
+        searchResultJson(dataset3, sameAs3Ids, foundDatasets),
+        searchResultJson(dataset4, sameAs4Ids, foundDatasets)
       ).flatMap(sortCreators)
 
       When("user calls the GET knowledge-graph/datasets?query=<text>&sort=title:asc")
@@ -265,10 +265,10 @@ class DatasetsResourcesSpec
 
       val Right(foundDatasetsSortedByName) = searchSortedByName.bodyAsJson.as[List[Json]]
       val datasetsSortedByName = List(
-        searchResultJson(dataset1),
-        searchResultJson(dataset2),
-        searchResultJson(dataset3),
-        searchResultJson(dataset4)
+        searchResultJson(dataset1, sameAs1Ids, foundDatasetsSortedByName),
+        searchResultJson(dataset2, sameAs2Ids, foundDatasetsSortedByName),
+        searchResultJson(dataset3, sameAs3Ids, foundDatasetsSortedByName),
+        searchResultJson(dataset4, sameAs4Ids, foundDatasetsSortedByName)
       ).flatMap(sortCreators)
         .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
       foundDatasetsSortedByName.flatMap(sortCreators) shouldBe datasetsSortedByName
@@ -287,11 +287,11 @@ class DatasetsResourcesSpec
       Then("he should get OK response with all the datasets")
       val Right(foundDatasetsWithoutPhrase) = searchWithoutPhrase.bodyAsJson.as[List[Json]]
       foundDatasetsWithoutPhrase.flatMap(sortCreators) should contain allElementsOf List(
-        searchResultJson(dataset1),
-        searchResultJson(dataset2),
-        searchResultJson(dataset3),
-        searchResultJson(dataset4),
-        searchResultJson(dataset5)
+        searchResultJson(dataset1, sameAs1Ids, foundDatasetsWithoutPhrase),
+        searchResultJson(dataset2, sameAs2Ids, foundDatasetsWithoutPhrase),
+        searchResultJson(dataset3, sameAs3Ids, foundDatasetsWithoutPhrase),
+        searchResultJson(dataset4, sameAs4Ids, foundDatasetsWithoutPhrase),
+        searchResultJson(dataset5, sameAs5Ids, foundDatasetsWithoutPhrase)
       ).flatMap(sortCreators)
         .sortBy(_.hcursor.downField("title").as[String].getOrElse(fail("No 'title' property found")))
 
@@ -303,9 +303,23 @@ class DatasetsResourcesSpec
       val Right(foundFirstPage) = firstPageResponse.bodyAsJson.as[List[Json]]
       foundFirstPage.flatMap(sortCreators) should contain theSameElementsAs List(datasetsSortedByName.head)
         .flatMap(sortCreators)
+
+      When("user uses 'details' link of one of the found datasets")
+      val someDatasetJson = Random.shuffle(foundDatasets).head
+
+      val detailsLinkResponse = restClient GET someDatasetJson._links
+        .get(Rel("details"))
+        .getOrFail(message = "No link with rel 'details'")
+        .toString
+      detailsLinkResponse.status shouldBe Ok
+
+      Then("he should get the same result as he'd call the knowledge-graph/datasets/:id endpoint directly")
+      val datasetDetailsResponse = knowledgeGraphClient GET s"knowledge-graph/datasets/${urlEncode(findIdentifier(someDatasetJson).toString)}"
+      detailsLinkResponse.bodyAsJson shouldBe datasetDetailsResponse.bodyAsJson
     }
 
-    def pushToStore(dataset: NonModifiedDataset, projects: List[Project])(implicit accessToken: AccessToken): Unit = {
+    def pushToStore(dataset:  NonModifiedDataset,
+                    projects: List[Project])(implicit accessToken: AccessToken): List[Identifier] = {
       val firstProject +: otherProjects = projects
 
       val commitId      = commitIds.generateOne
@@ -314,8 +328,10 @@ class DatasetsResourcesSpec
       `data in the RDF store`(firstProject, commitId, datasetJsonLD)
       `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
 
-      otherProjects foreach { project =>
-        val commitId = commitIds.generateOne
+      otherProjects.foldLeft(List(dataset.id)) { (datasetsIds, project) =>
+        val commitId  = commitIds.generateOne
+        val datasetId = datasetIdentifiers.generateOne
+
         `data in the RDF store`(
           project,
           commitId,
@@ -323,9 +339,12 @@ class DatasetsResourcesSpec
                           commitId,
                           CommittedDate(committedDate.value plusSeconds positiveInts().generateOne.value),
                           dataset,
-                          datasetIdentifiers.generateSome)
+                          datasetId.some)
         )
+
         `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
+
+        datasetsIds :+ datasetId
       }
     }
 
@@ -373,9 +392,15 @@ object DatasetsResources {
     )
   }
 
-  def searchResultJson(dataset: Dataset): Json =
+  def searchResultJson(dataset: Dataset, sameAsIds: List[Identifier], actualResults: List[Json]): Json = {
+    val actualIdentifier = actualResults
+      .findId(dataset.title)
+      .getOrElse(fail(s"No ${dataset.title} dataset found among the results"))
+
+    sameAsIds should contain(actualIdentifier)
+
     json"""{
-      "identifier": ${dataset.id.value},
+      "identifier": ${actualIdentifier.value},
       "title": ${dataset.title.value},
       "name": ${dataset.name.value},
       "published": ${dataset.published},
@@ -384,9 +409,10 @@ object DatasetsResources {
       .addIfDefined("description" -> dataset.maybeDescription)
       .deepMerge {
         _links(
-          Link(Rel("details"), Href(renkuResourcesUrl / "datasets" / dataset.id))
+          Link(Rel("details"), Href(renkuResourcesUrl / "datasets" / actualIdentifier))
         )
       }
+  }
 
   private implicit lazy val publishingEncoder: Encoder[DatasetPublishing] = Encoder.instance[DatasetPublishing] {
     case DatasetPublishing(maybeDate, creators) =>
@@ -416,4 +442,15 @@ object DatasetsResources {
   }
 
   lazy val toPerson: DatasetCreator => Person = creator => Person(creator.name, creator.maybeEmail, None)
+
+  implicit class JsonsOps(jsons: List[Json]) {
+
+    def findId(title: Title): Option[Identifier] =
+      jsons
+        .find { _.hcursor.downField("title").as[String].fold(throw _, _ == title.toString) }
+        .map { _.hcursor.downField("identifier").as[Identifier].fold(throw _, identity) }
+  }
+
+  def findIdentifier(json: Json): Identifier =
+    json.hcursor.downField("identifier").as[Identifier].fold(throw _, identity)
 }

@@ -98,16 +98,14 @@ private class IODatasetsFinder(
     s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs ?projectsCount
         |WHERE {
         |  {
-        |    SELECT (MIN(?dateCreated) AS ?earliestCreated) ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
+        |    SELECT (MIN(?dsId) AS ?dsIdExample) ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
         |    WHERE {
         |      {
-        |        SELECT ?sameAs
+        |        SELECT DISTINCT ?sameAs
         |        WHERE {
         |          {
-        |            SELECT ?id
+        |            SELECT DISTINCT ?id
         |            WHERE { ?id text:query (schema:name schema:description schema:alternateName '$phrase') }
-        |            GROUP BY ?id
-        |            HAVING (COUNT(*) > 0)
         |          } {
         |            ?id rdf:type <http://schema.org/Dataset>;
         |            	renku:topmostSameAs ?sameAs.
@@ -118,16 +116,12 @@ private class IODatasetsFinder(
         |                        renku:topmostSameAs ?sameAs.
         |          }
         |        }
-        |        GROUP BY ?sameAs
-        |        HAVING (COUNT(*) > 0)
         |      } {
-        |        ?allDsId rdf:type <http://schema.org/Dataset>;
-        |                 renku:topmostSameAs ?sameAs;
-        |                 prov:qualifiedGeneration/prov:activity ?activityId;
-        |                 schema:isPartOf ?projectId.
-        |        ?activityId prov:startedAtTime ?dateCreated.
+        |        ?dsId rdf:type <http://schema.org/Dataset>;
+        |              renku:topmostSameAs ?sameAs;
+        |              schema:isPartOf ?projectId.
         |        FILTER NOT EXISTS {
-        |          ?someId prov:wasDerivedFrom ?allDsId.
+        |          ?someId prov:wasDerivedFrom ?dsId.
         |          ?someId schema:isPartOf ?projectId.
         |        }
         |      }
@@ -135,17 +129,20 @@ private class IODatasetsFinder(
         |    GROUP BY ?sameAs
         |    HAVING (COUNT(*) > 0)
         |  } {
-        |    ?dsId rdf:type <http://schema.org/Dataset>;
+        |    ?dsIdExample rdf:type <http://schema.org/Dataset>;
         |          renku:topmostSameAs ?sameAs;
         |          schema:identifier ?identifier;
         |          schema:name ?name ;
-        |          schema:alternateName ?alternateName ;
-        |          prov:qualifiedGeneration/prov:activity ?activityId.
-        |    ?activityId prov:startedAtTime ?earliestCreated.
-        |    OPTIONAL { ?dsId schema:description ?maybeDescription }
-        |    OPTIONAL { ?dsId schema:datePublished ?maybePublishedDate }
-        |    OPTIONAL { ?dsId prov:wasDerivedFrom ?maybeDerivedFrom }
-        |    OPTIONAL { ?dsId schema:url ?maybeUrl }
+        |          schema:alternateName ?alternateName;
+        |          schema:isPartOf ?projectId.
+        |    OPTIONAL { ?dsIdExample schema:description ?maybeDescription }
+        |    OPTIONAL { ?dsIdExample schema:datePublished ?maybePublishedDate }
+        |    OPTIONAL { ?dsIdExample prov:wasDerivedFrom ?maybeDerivedFrom }
+        |    OPTIONAL { ?dsIdExample schema:url ?maybeUrl }
+        |        FILTER NOT EXISTS {
+        |      ?someId prov:wasDerivedFrom ?dsIdExample.
+        |      ?someId schema:isPartOf ?projectId.
+        |    }
         |  }
         |}
         |${`ORDER BY`(sort)}
