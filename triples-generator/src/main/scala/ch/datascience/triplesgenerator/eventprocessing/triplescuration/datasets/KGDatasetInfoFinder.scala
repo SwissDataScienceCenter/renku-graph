@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs, TopmostSameAs}
 import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder
@@ -29,7 +29,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait KGDatasetInfoFinder[Interpretation[_]] {
-  def findTopmostSameAs(idSameAs:         IdSameAs):    Interpretation[Option[SameAs]]
+  def findTopmostSameAs(idSameAs:         IdSameAs):    Interpretation[Option[TopmostSameAs]]
   def findTopmostDerivedFrom(derivedFrom: DerivedFrom): Interpretation[Option[DerivedFrom]]
 }
 
@@ -45,8 +45,9 @@ private class KGDatasetInfoFinderImpl(
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eu.timepit.refined.auto._
 
-  override def findTopmostSameAs(sameAs: IdSameAs): IO[Option[SameAs]] =
-    queryExpecting[Set[SameAs]](using = queryFindingSameAs(sameAs)) flatMap toOption(sameAs)
+  override def findTopmostSameAs(sameAs: IdSameAs): IO[Option[TopmostSameAs]] =
+    queryExpecting[Set[TopmostSameAs]](using = queryFindingSameAs(sameAs))
+      .flatMap(toOption[TopmostSameAs, IdSameAs](sameAs))
 
   private def queryFindingSameAs(sameAs: IdSameAs) = SparqlQuery(
     name = "upload - ds topmostSameAs",
@@ -58,18 +59,20 @@ private class KGDatasetInfoFinderImpl(
     s"""|SELECT ?maybeTopmostSameAs
         |WHERE {
         |  <$sameAs> rdf:type <http://schema.org/Dataset>;
-        |            renku:topmostSameAs/schema:url ?maybeTopmostSameAs.
+        |            renku:topmostSameAs ?maybeTopmostSameAs.
         |}
         |""".stripMargin
   )
 
-  private implicit val topmostSameAsDecoder: Decoder[Set[SameAs]] = {
-    val sameAs: Decoder[Option[SameAs]] = _.downField("maybeTopmostSameAs").downField("value").as[Option[SameAs]]
-    _.downField("results").downField("bindings").as(decodeList(sameAs)).map(_.flatten.toSet)
+  private implicit val topmostSameAsDecoder: Decoder[Set[TopmostSameAs]] = {
+    val topmostSameAs: Decoder[Option[TopmostSameAs]] =
+      _.downField("maybeTopmostSameAs").downField("value").as[Option[TopmostSameAs]]
+    _.downField("results").downField("bindings").as(decodeList(topmostSameAs)).map(_.flatten.toSet)
   }
 
   override def findTopmostDerivedFrom(derivedFrom: DerivedFrom): IO[Option[DerivedFrom]] =
-    queryExpecting[Set[DerivedFrom]](using = queryFindingDerivedFrom(derivedFrom)) flatMap toOption(derivedFrom)
+    queryExpecting[Set[DerivedFrom]](using = queryFindingDerivedFrom(derivedFrom))
+      .flatMap(toOption[DerivedFrom, DerivedFrom](derivedFrom))
 
   private def queryFindingDerivedFrom(derivedFrom: DerivedFrom) = SparqlQuery(
     name = "upload - ds topmostDerivedFrom",
@@ -91,12 +94,12 @@ private class KGDatasetInfoFinderImpl(
     _.downField("results").downField("bindings").as(decodeList(derivedFrom)).map(_.flatten.toSet)
   }
 
-  private def toOption[T](datasetId: T)(implicit entityTypeInfo: T => String): Set[T] => IO[Option[T]] = {
+  private def toOption[T, ID](id: ID)(implicit entityTypeInfo: ID => String): Set[T] => IO[Option[T]] = {
     case set if set.isEmpty   => Option.empty[T].pure[IO]
     case set if set.size == 1 => set.headOption.pure[IO]
     case _ =>
       new Exception(
-        s"More than one ${entityTypeInfo(datasetId)} found for dataset $datasetId"
+        s"More than one ${entityTypeInfo(id)} found for dataset $id"
       ).raiseError[IO, Option[T]]
   }
 

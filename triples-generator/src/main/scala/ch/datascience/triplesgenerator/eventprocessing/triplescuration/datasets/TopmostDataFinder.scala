@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits._
-import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs, UrlSameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, TopmostSameAs, UrlSameAs}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.DataSetInfoFinder.DatasetInfo
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
@@ -42,18 +42,18 @@ private class TopmostDataFinderImpl[Interpretation[_]](
 
   def findTopmostData(datasetInfo: DatasetInfo): Interpretation[TopmostData] = datasetInfo match {
     case (entityId, None, None) =>
-      TopmostData(entityId, SameAs(entityId), DerivedFrom(entityId)).pure[Interpretation]
+      TopmostData(entityId, TopmostSameAs(entityId), DerivedFrom(entityId)).pure[Interpretation]
     case (entityId, Some(sameAs: UrlSameAs), None) =>
-      TopmostData(entityId, sameAs, DerivedFrom(entityId)).pure[Interpretation]
+      TopmostData(entityId, TopmostSameAs(sameAs), DerivedFrom(entityId)).pure[Interpretation]
     case (entityId, Some(sameAs: IdSameAs), None) =>
       kgDatasetInfoFinder.findTopmostSameAs(sameAs).map {
-        case Some(parentSameAs) => TopmostData(entityId, parentSameAs, DerivedFrom(entityId))
-        case None               => TopmostData(entityId, sameAs, DerivedFrom(entityId))
+        case Some(parentTopmostSameAs) => TopmostData(entityId, parentTopmostSameAs, DerivedFrom(entityId))
+        case None                      => TopmostData(entityId, TopmostSameAs(sameAs), DerivedFrom(entityId))
       }
     case (entityId, None, Some(derivedFrom)) =>
       kgDatasetInfoFinder.findTopmostDerivedFrom(derivedFrom).map {
-        case Some(parentDerivedFrom) => TopmostData(entityId, SameAs(entityId), parentDerivedFrom)
-        case None                    => TopmostData(entityId, SameAs(entityId), derivedFrom)
+        case Some(parentDerivedFrom) => TopmostData(entityId, TopmostSameAs(entityId), parentDerivedFrom)
+        case None                    => TopmostData(entityId, TopmostSameAs(entityId), derivedFrom)
       }
     case (entityId, Some(_), Some(_)) =>
       new IllegalStateException(
@@ -74,5 +74,5 @@ private object IOTopmostDataFinder {
 }
 
 private object TopmostDataFinder {
-  final case class TopmostData(datasetId: EntityId, sameAs: SameAs, derivedFrom: DerivedFrom)
+  final case class TopmostData(datasetId: EntityId, sameAs: TopmostSameAs, derivedFrom: DerivedFrom)
 }

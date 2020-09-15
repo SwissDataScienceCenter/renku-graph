@@ -26,9 +26,11 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonBlankStrings, nonEmptyList, positiveInts, sentenceContaining}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetInProjectCreationDates, datasetKeywords, datasetTitles, userAffiliations, userEmails}
-import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, DerivedFrom, Description, Identifier, Name, PublishedDate, SameAs, Title}
+import ch.datascience.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetInProjectCreationDates, userAffiliations, userEmails}
+import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, DerivedFrom, Description, Name, PublishedDate, SameAs, Title, TopmostSameAs}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
+import ch.datascience.graph.model.users.{Name => UserName}
+import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasetProjects
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.rdfstore.FusekiBaseUrl
@@ -36,8 +38,6 @@ import ch.datascience.rdfstore.entities.bundles.{modifiedDataSetCommit, nonModif
 import ch.datascience.rdfstore.entities.{DataSet, Person}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import ch.datascience.graph.model.users.{Name => UserName}
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasetProjects
 import io.renku.jsonld.{EntityId, JsonLD}
 import org.scalacheck.Gen
 
@@ -46,8 +46,9 @@ package object rest {
   implicit val searchEndpointSorts: Gen[DatasetsSearchEndpoint.Sort.By] = sortBys(DatasetsSearchEndpoint.Sort)
 
   implicit class EntityIdOps(entityId: EntityId) {
-    lazy val asSameAs:      SameAs      = SameAs.fromId(entityId.value.toString).fold(throw _, identity)
-    lazy val asDerivedFrom: DerivedFrom = DerivedFrom(entityId.value.toString)
+    lazy val asSameAs:        SameAs        = SameAs.fromId(entityId.value.toString).fold(throw _, identity)
+    lazy val asTopmostSameAs: TopmostSameAs = TopmostSameAs(entityId)
+    lazy val asDerivedFrom:   DerivedFrom   = DerivedFrom(entityId.value.toString)
   }
 
   implicit class NonModifiedDatasetOps(
@@ -64,9 +65,10 @@ package object rest {
     }
 
     def toJsonLD(
-        noSameAs:    Boolean  = false,
-        commitId:    CommitId = commitIds.generateOne
-    )(topmostSameAs: SameAs   = if (noSameAs) dataSet.entityId.asSameAs else dataSet.sameAs): JsonLD =
+        noSameAs:    Boolean       = false,
+        commitId:    CommitId      = commitIds.generateOne
+    )(topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs))
+        : JsonLD =
       toJsonLDsAndDatasets(
         firstDatasetDateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
         noSameAs                = noSameAs,
@@ -80,7 +82,8 @@ package object rest {
         firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
         noSameAs:                Boolean,
         commitId:                CommitId = commitIds.generateOne
-    )(topmostSameAs:             SameAs = if (noSameAs) dataSet.entityId.asSameAs else dataSet.sameAs): List[(JsonLD, Dataset)] =
+    )(topmostSameAs:             TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs))
+        : List[(JsonLD, Dataset)] =
       dataSet.projects match {
         case firstProject +: otherProjects =>
           val firstTuple = nonModifiedDataSetCommit(

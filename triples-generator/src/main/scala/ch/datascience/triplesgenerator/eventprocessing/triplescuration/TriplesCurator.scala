@@ -32,25 +32,33 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private[eventprocessing] class TriplesCurator[Interpretation[_]](
+trait TriplesCurator[Interpretation[_]] {
+  def curate(
+      commit:                  CommitEvent,
+      triples:                 JsonLDTriples
+  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
+}
+
+private[eventprocessing] class TriplesCuratorImpl[Interpretation[_]](
     personDetailsUpdater: PersonDetailsUpdater[Interpretation],
     forkInfoUpdater:      ForkInfoUpdater[Interpretation],
     dataSetInfoEnricher:  DataSetInfoEnricher[Interpretation]
-)(implicit ME:            MonadError[Interpretation, Throwable]) {
+)(implicit ME:            MonadError[Interpretation, Throwable])
+    extends TriplesCurator[Interpretation] {
 
   import forkInfoUpdater._
 
-  def curate(
+  override def curate(
       commit:                  CommitEvent,
       triples:                 JsonLDTriples
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] =
     for {
-      triplesWithPersonDetails    <- personDetailsUpdater.curate(CuratedTriples(triples, updates = Nil)).toRight
+      triplesWithPersonDetails    <- personDetailsUpdater.curate(CuratedTriples(triples, updatesGroups = Nil)).toRight
       triplesWithForkInfo         <- updateForkInfo(commit, triplesWithPersonDetails)
       triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithForkInfo)
     } yield triplesWithEnrichedDatasets
 
-  private implicit class InterpretationOps(out: Interpretation[CuratedTriples]) {
+  private implicit class InterpretationOps(out: Interpretation[CuratedTriples[Interpretation]]) {
     lazy val toRight: CurationResults[Interpretation] = EitherT.right[ProcessingRecoverableError](out)
   }
 }
@@ -73,7 +81,7 @@ private[eventprocessing] object IOTriplesCurator {
     for {
       forkInfoUpdater     <- IOForkInfoUpdater(gitLabThrottler, logger, timeRecorder)
       dataSetInfoEnricher <- IODataSetInfoEnricher(logger, timeRecorder)
-    } yield new TriplesCurator[IO](
+    } yield new TriplesCuratorImpl[IO](
       PersonDetailsUpdater[IO](),
       forkInfoUpdater,
       dataSetInfoEnricher

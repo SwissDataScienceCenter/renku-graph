@@ -18,9 +18,8 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
-import PersonDetailsUpdater.{Person => UpdaterPerson}
 import cats.data.NonEmptyList
-import cats.implicits._
+import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -28,6 +27,7 @@ import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles.renkuBaseUrl
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.{Person => UpdatedPerson}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
@@ -44,15 +44,14 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
         val personId = Person(name, email).asJsonLD.entityId.get
 
-        val updates = updatesCreator.prepareUpdates(
-          Set(
-            UpdaterPerson(ResourceId(personId), NonEmptyList.of(name), Set(email))
-          )
+        val updatesGroup = updatesCreator.prepareUpdates[IO](
+          UpdatedPerson(ResourceId(personId), NonEmptyList.of(name), Set(email))
         )
 
-        (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
+        updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
 
-        findPersons should contain theSameElementsAs Set(
+        val persons = findPersons
+        persons should contain theSameElementsAs Set(
           (personId.value, Some(name.value), Some(email.value), None)
         )
 
@@ -65,13 +64,11 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       val name     = userNames.generateOne
       val personId = Person(name).asJsonLD.entityId.get
 
-      val updates = updatesCreator.prepareUpdates(
-        Set(
-          UpdaterPerson(ResourceId(personId), NonEmptyList.of(name), emails = Set.empty)
-        )
+      val updatesGroup = updatesCreator.prepareUpdates[IO](
+        UpdatedPerson(ResourceId(personId), NonEmptyList.of(name), emails = Set.empty)
       )
 
-      (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
+      updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
 
       val actual = findPersons
       actual should have size 1
@@ -95,13 +92,11 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
         val name1Updated = userNames.generateOne
 
-        val updates = updatesCreator.prepareUpdates(
-          Set(
-            UpdaterPerson(ResourceId(person1Id), NonEmptyList.of(name1Updated), Set(email1))
-          )
+        val updatesGroup = updatesCreator.prepareUpdates[IO](
+          UpdatedPerson(ResourceId(person1Id), NonEmptyList.of(name1Updated), Set(email1))
         )
 
-        (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
+        updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
 
         findPersons should contain theSameElementsAs Set(
           (person1Id.value, Some(name1Updated.value), Some(email1.value), None),
@@ -128,13 +123,11 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
         val name1Updated = userNames.generateOne
 
-        val updates = updatesCreator.prepareUpdates(
-          Set(
-            UpdaterPerson(ResourceId(person1Id), NonEmptyList.of(name1Updated), emails = Set.empty)
-          )
+        val updatesGroup = updatesCreator.prepareUpdates[IO](
+          UpdatedPerson(ResourceId(person1Id), NonEmptyList.of(name1Updated), emails = Set.empty)
         )
 
-        (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
+        updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
 
         findPersons should contain theSameElementsAs Set(
           (person1Id.value, Some(name1Updated.value), None, None),
@@ -163,13 +156,11 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         val name1Updates  = nonEmptyList(userNames, minElements = 2).generateOne
         val email1Updates = nonEmptySet(userEmails, minElements = 2).generateOne
 
-        val updates = updatesCreator.prepareUpdates(
-          Set(
-            UpdaterPerson(ResourceId(person1Id), name1Updates, email1Updates)
-          )
+        val updatesGroup = updatesCreator.prepareUpdates[IO](
+          UpdatedPerson(ResourceId(person1Id), name1Updates, email1Updates)
         )
 
-        (updates.map(_.query) map runUpdate).sequence.unsafeRunSync()
+        updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
 
         val results = findPersons
         results.filter(_._1 == person1Id.value).map(_._2) shouldBe name1Updates.map(v => Some(v.value)).toList.toSet

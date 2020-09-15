@@ -19,12 +19,9 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.MonadError
-import cats.implicits._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users
-import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 
@@ -32,13 +29,11 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait KGInfoFinder[Interpretation[_]] {
-  def findProject(path:    Path):        Interpretation[Option[KGProject]]
   def findCreatorId(email: users.Email): Interpretation[Option[users.ResourceId]]
 }
 
 private class IOKGInfoFinder(
     rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext,
@@ -52,37 +47,8 @@ private class IOKGInfoFinder(
   import io.circe.Decoder
   import Decoder._
   import SparqlValueEncoder.sparqlEncode
-  import ch.datascience.graph.model.projects._
-  import ch.datascience.graph.model.users.{Email, Name => UserName}
+  import ch.datascience.graph.model.users.Email
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
-
-  override def findProject(path: Path): IO[Option[KGProject]] = {
-    implicit val decoder: Decoder[List[KGProject]] = recordsDecoder(projectDecoder)
-    queryExpecting[List[KGProject]](using = projectFindingQuery(path)) flatMap toSingleResult(path)
-  }
-
-  private def projectFindingQuery(path: Path) = SparqlQuery(
-    name = "upload - project by path",
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX schema: <http://schema.org/>",
-      "PREFIX prov: <http://www.w3.org/ns/prov#>"
-    ),
-    s"""|SELECT DISTINCT ?projectId ?maybeParentProjectId ?dateCreated ?maybeCreatorId ?maybeCreatorName ?maybeCreatorEmail
-        |WHERE {
-        |  BIND (${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} AS ?projectId)
-        |  ?projectId rdf:type <http://schema.org/Project>;
-        |             schema:dateCreated ?dateCreated.
-        |  OPTIONAL { 
-        |    ?projectId schema:creator ?maybeCreatorId.
-        |    ?maybeCreatorId rdf:type <http://schema.org/Person>;
-        |                    schema:name ?maybeCreatorName.
-        |    OPTIONAL { ?maybeCreatorId schema:email ?maybeCreatorEmail }
-        |  }           
-        |  OPTIONAL { ?projectId prov:wasDerivedFrom ?maybeParentProjectId }
-        |}
-        |""".stripMargin
-  )
 
   override def findCreatorId(email: users.Email): IO[Option[users.ResourceId]] = {
     implicit val decoder: Decoder[List[users.ResourceId]] = recordsDecoder(resourceIdDecoder)
@@ -106,22 +72,6 @@ private class IOKGInfoFinder(
   private def recordsDecoder[T](rowDecoder: Decoder[T]): Decoder[List[T]] =
     _.downField("results").downField("bindings").as(decodeList(rowDecoder))
 
-  private val projectDecoder: Decoder[KGProject] = { cursor =>
-    for {
-      resourceId             <- cursor.downField("projectId").downField("value").as[ResourceId]
-      maybeParentProjectId   <- cursor.downField("maybeParentProjectId").downField("value").as[Option[ResourceId]]
-      dateCreated            <- cursor.downField("dateCreated").downField("value").as[DateCreated]
-      maybeCreatorResourceId <- cursor.downField("maybeCreatorId").downField("value").as[Option[users.ResourceId]]
-      maybeCreatorName       <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
-      maybeCreatorEmail      <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[Email]]
-    } yield KGProject(
-      resourceId,
-      maybeParentProjectId,
-      (maybeCreatorResourceId -> maybeCreatorName) mapN (KGCreator(_, maybeCreatorEmail, _)),
-      dateCreated
-    )
-  }
-
   private val resourceIdDecoder: Decoder[users.ResourceId] =
     _.downField("id").downField("value").as[users.ResourceId]
 
@@ -136,13 +86,11 @@ private object IOKGInfoFinder {
   def apply(
       timeRecorder:            SparqlQueryTimeRecorder[IO],
       logger:                  Logger[IO],
-      rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO]()
+      rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO]()
   )(implicit executionContext: ExecutionContext,
     contextShift:              ContextShift[IO],
     timer:                     Timer[IO]): IO[KGInfoFinder[IO]] =
     for {
-      config       <- rdfStoreConfig
-      renkuBaseUrl <- renkuBaseUrl
-    } yield new IOKGInfoFinder(config, renkuBaseUrl, logger, timeRecorder)
+      config <- rdfStoreConfig
+    } yield new IOKGInfoFinder(config, logger, timeRecorder)
 }

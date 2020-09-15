@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.Keyword
+import ch.datascience.graph.model.datasets.{Keyword, TopmostSameAs}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
@@ -74,8 +74,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           ).generateOne
 
           loadToStore(
-            dataset1.toJsonLD()(topmostSameAs = sameAs),
-            dataset2.toJsonLD()(topmostSameAs = sameAs),
+            dataset1.toJsonLD()(topmostSameAs = TopmostSameAs(sameAs)),
+            dataset2.toJsonLD()(topmostSameAs = TopmostSameAs(sameAs)),
             randomDataSetCommit
           )
 
@@ -157,9 +157,9 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           ) // to simulate adding the first project's original data-set to another project
 
           loadToStore(
-            sourceDataset.toJsonLD(noSameAs = true)(topmostSameAs = sourceDataset.entityId.asSameAs),
-            dataset2.toJsonLD()(topmostSameAs = sourceDataset.entityId.asSameAs),
-            dataset3.toJsonLD()(topmostSameAs = sourceDataset.entityId.asSameAs),
+            sourceDataset.toJsonLD(noSameAs = true)(topmostSameAs = sourceDataset.entityId.asTopmostSameAs),
+            dataset2.toJsonLD()(topmostSameAs = sourceDataset.entityId.asTopmostSameAs),
+            dataset3.toJsonLD()(topmostSameAs = sourceDataset.entityId.asTopmostSameAs),
             randomDataSetCommit
           )
 
@@ -246,9 +246,9 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           )
 
           loadToStore(
-            dataset.toJsonLD()(topmostSameAs = dataset.sameAs),
-            importedDataset.toJsonLD(commitId = project2DatasetCommit)(topmostSameAs = dataset.sameAs),
-            forkedDataset.toJsonLD(commitId   = project2DatasetCommit)(topmostSameAs = dataset.sameAs)
+            dataset.toJsonLD()(topmostSameAs = TopmostSameAs(dataset.sameAs)),
+            importedDataset.toJsonLD(commitId = project2DatasetCommit)(topmostSameAs = TopmostSameAs(dataset.sameAs)),
+            forkedDataset.toJsonLD(commitId   = project2DatasetCommit)(topmostSameAs = TopmostSameAs(dataset.sameAs))
           )
 
           datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
@@ -326,7 +326,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           )
 
         loadToStore(
-          dataset.toJsonLD()(topmostSameAs = dataset.sameAs),
+          dataset.toJsonLD()(topmostSameAs = TopmostSameAs(dataset.sameAs)),
           modifiedDataset.toJsonLD(
             commitId           = projectDatasetModificationCommit,
             topmostDerivedFrom = dataset.entityId.asDerivedFrom
@@ -387,10 +387,10 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
       )
 
       loadToStore(
-        dataset1.toJsonLD()(topmostSameAs               = sharedSameAs),
-        dataset2.toJsonLD()(topmostSameAs               = sharedSameAs),
-        dataset2ModifiedOldWay.toJsonLD()(topmostSameAs = sharedSameAs),
-        dataset3.toJsonLD()(topmostSameAs               = sharedSameAs)
+        dataset1.toJsonLD()(topmostSameAs               = TopmostSameAs(sharedSameAs)),
+        dataset2.toJsonLD()(topmostSameAs               = TopmostSameAs(sharedSameAs)),
+        dataset2ModifiedOldWay.toJsonLD()(topmostSameAs = TopmostSameAs(sharedSameAs)),
+        dataset3.toJsonLD()(topmostSameAs               = TopmostSameAs(sharedSameAs))
       )
 
       datasetFinder.findDataset(dataset1.id).unsafeRunSync() shouldBe Some(
@@ -426,9 +426,9 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
       )
 
       loadToStore(
-        dataset1.toJsonLD(noSameAs = true)(topmostSameAs = dataset1.entityId.asSameAs),
-        dataset2.toJsonLD()(topmostSameAs = dataset1.entityId.asSameAs),
-        dataset3.toJsonLD()(topmostSameAs = dataset1.entityId.asSameAs)
+        dataset1.toJsonLD(noSameAs = true)(topmostSameAs = dataset1.entityId.asTopmostSameAs),
+        dataset2.toJsonLD()(topmostSameAs = dataset1.entityId.asTopmostSameAs),
+        dataset3.toJsonLD()(topmostSameAs = dataset1.entityId.asTopmostSameAs)
       )
 
       datasetFinder.findDataset(dataset1.id).unsafeRunSync() shouldBe Some(
@@ -466,9 +466,9 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
       )
 
       loadToStore(
-        dataset1.toJsonLD(noSameAs = true)(topmostSameAs = dataset1.entityId.asSameAs),
-        dataset2.toJsonLD()(topmostSameAs = dataset1.entityId.asSameAs),
-        dataset3.toJsonLD()(topmostSameAs = dataset1.entityId.asSameAs)
+        dataset1.toJsonLD(noSameAs = true)(topmostSameAs = dataset1.entityId.asTopmostSameAs),
+        dataset2.toJsonLD()(topmostSameAs = dataset1.entityId.asTopmostSameAs),
+        dataset3.toJsonLD()(topmostSameAs = dataset1.entityId.asTopmostSameAs)
       )
 
       datasetFinder.findDataset(dataset2.id).unsafeRunSync() shouldBe Some(
@@ -538,10 +538,10 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
       )
 
       loadToStore(
-        dataset1.toJsonLD()(topmostSameAs            = dataset1.entityId.asSameAs),
-        dataset2.toJsonLD()(topmostSameAs            = dataset1.entityId.asSameAs),
+        dataset1.toJsonLD()(topmostSameAs            = dataset1.entityId.asTopmostSameAs),
+        dataset2.toJsonLD()(topmostSameAs            = dataset1.entityId.asTopmostSameAs),
         modifiedDataset2.toJsonLD(topmostDerivedFrom = dataset2.entityId.asDerivedFrom),
-        dataset3.toJsonLD()(topmostSameAs            = modifiedDataset2.entityId.asSameAs)
+        dataset3.toJsonLD()(topmostSameAs            = modifiedDataset2.entityId.asTopmostSameAs)
       )
 
       datasetFinder.findDataset(dataset1.id).unsafeRunSync() shouldBe Some(

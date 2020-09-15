@@ -16,159 +16,124 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration
+package forks
 
+import cats.MonadError
+import cats.data.{EitherT, OptionT}
+import cats.effect.{ContextShift, IO}
+import cats.implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects.{DateCreated, Path, ResourceId}
 import ch.datascience.graph.model.users
-import ch.datascience.graph.model.users.Email
-import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.rdfstore.SparqlQuery
-import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import ch.datascience.http.client.AccessToken
+import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
+import ch.datascience.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
+import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import eu.timepit.refined.auto._
+import io.chrisdavenport.log4cats.Logger
 
-private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
+import scala.concurrent.ExecutionContext
+import scala.language.higherKinds
 
-  def recreateWasDerivedFrom(resourceId: ResourceId, forkPath: Path) =
-    deleteWasDerivedFrom(resourceId) ++ insertWasDerivedFrom(resourceId, forkPath)
+private[triplescuration] trait UpdatesCreator[Interpretation[_]] {
+  def create(commit:             CommitEvent)(
+      implicit maybeAccessToken: Option[AccessToken]
+  ): CurationUpdatesGroup[Interpretation]
+}
 
-  def deleteWasDerivedFrom(resourceId: ResourceId) = List {
-    val rdfResource = resourceId.showAs[RdfResource]
-    Update(
-      s"Deleting Project $rdfResource prov:wasDerivedFrom",
-      SparqlQuery(
-        name = "upload - project derived delete",
-        Set("PREFIX prov: <http://www.w3.org/ns/prov#>"),
-        s"""|DELETE { $rdfResource prov:wasDerivedFrom ?parentId }
-            |WHERE  { $rdfResource prov:wasDerivedFrom ?parentId }
-            |""".stripMargin
-      )
+private[triplescuration] class UpdatesCreatorImpl(
+    gitLab:              GitLabInfoFinder[IO],
+    kg:                  KGInfoFinder[IO],
+    updatesQueryCreator: UpdatesQueryCreator
+)(implicit ME:           MonadError[IO, Throwable], cs: ContextShift[IO])
+    extends UpdatesCreator[IO] {
+
+  import updatesQueryCreator._
+
+  override def create(
+      commit:                  CommitEvent
+  )(implicit maybeAccessToken: Option[AccessToken]): CurationUpdatesGroup[IO] =
+    CurationUpdatesGroup[IO](
+      "Fork info updates",
+      () =>
+        EitherT {
+          gitLab
+            .findProject(commit.project.path)
+            .flatMap { forkInfoUpdates }
+            .map { _.asRight[ProcessingRecoverableError] }
+            .recover(maybeToRecoverableError)
+        }
     )
+
+  private lazy val forkInfoUpdates: Option[GitLabProject] => IO[List[SparqlQuery]] = {
+    case `when creator has an email`(creatorEmail, gitLabProject) =>
+      OptionT(kg.findCreatorId(creatorEmail))
+        .map { existingUserResource =>
+          updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
+            swapCreator(gitLabProject.path, existingUserResource) ++
+            recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
+        }
+        .getOrElse {
+          updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
+            addNewCreator(gitLabProject.path, gitLabProject.maybeEmail, gitLabProject.maybeName) ++
+            recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
+        }
+    case `when creator has no email`(gitLabProject) =>
+      (updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
+        addNewCreator(gitLabProject.path, gitLabProject.maybeEmail, gitLabProject.maybeName) ++
+        recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)).pure[IO]
+    case _ => List.empty[SparqlQuery].pure[IO]
   }
 
-  def insertWasDerivedFrom(resourceId: ResourceId, forkPath: Path) = List {
-    val rdfResource  = resourceId.showAs[RdfResource]
-    val forkResource = ResourceId(renkuBaseUrl, forkPath).showAs[RdfResource]
-    Update(
-      s"Inserting Project $rdfResource prov:wasDerivedFrom",
-      SparqlQuery(
-        name = "upload - project derived insert",
-        Set("PREFIX prov: <http://www.w3.org/ns/prov#>"),
-        s"""INSERT DATA { $rdfResource prov:wasDerivedFrom $forkResource }"""
+  private object `when creator has an email` {
+    def unapply(maybeProject: Option[GitLabProject]): Option[(users.Email, GitLabProject)] = maybeProject match {
+      case Some(gitLabProject) => gitLabProject.maybeEmail.map(_ -> gitLabProject)
+      case _                   => None
+    }
+  }
+
+  private object `when creator has no email` {
+    def unapply(maybeProject: Option[GitLabProject]): Option[GitLabProject] = maybeProject match {
+      case Some(gitLabProject) if gitLabProject.maybeEmail.isEmpty => Some(gitLabProject)
+      case _                                                       => None
+    }
+  }
+
+  private implicit class GitLabProjectOps(gitLabProject: GitLabProject) {
+
+    lazy val maybeEmail = gitLabProject.maybeCreator.flatMap(_.maybeEmail)
+    lazy val maybeName  = gitLabProject.maybeCreator.flatMap(_.maybeName)
+  }
+
+  private lazy val maybeToRecoverableError
+      : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[SparqlQuery]]] = {
+    case e: UnexpectedResponseException =>
+      Left[ProcessingRecoverableError, List[SparqlQuery]](
+        CurationRecoverableError("Problem with finding fork info", e)
       )
-    )
-  }
-
-  def swapCreator(resourceId: ResourceId, newResourceId: users.ResourceId): List[Update] =
-    unlinkCreator(resourceId) ++ linkCreator(resourceId, newResourceId)
-
-  def addNewCreator(resourceId:        ResourceId,
-                    maybeCreatorEmail: Option[Email],
-                    maybeCreatorName:  Option[users.Name]): List[Update] =
-    unlinkCreator(resourceId) ++ insertCreator(resourceId, maybeCreatorEmail, maybeCreatorName)
-
-  private def unlinkCreator(resourceId: ResourceId): List[Update] = List {
-    val rdfResource = resourceId.showAs[RdfResource]
-    Update(
-      s"Deleting Project $rdfResource schema:creator",
-      SparqlQuery(
-        name = "upload - project creator unlink",
-        Set("PREFIX schema: <http://schema.org/>"),
-        s"""|DELETE { $rdfResource schema:creator ?creatorId }
-            |WHERE  { $rdfResource schema:creator ?creatorId }
-            |""".stripMargin
+    case e: ConnectivityException =>
+      Left[ProcessingRecoverableError, List[SparqlQuery]](
+        CurationRecoverableError("Problem with finding fork info", e)
       )
-    )
   }
+}
 
-  private def linkCreator(resourceId: ResourceId, newResourceId: users.ResourceId): List[Update] = List {
-    val rdfResource     = resourceId.showAs[RdfResource]
-    val creatorResource = newResourceId.showAs[RdfResource]
-    Update(
-      s"Inserting Project $rdfResource schema:creator",
-      SparqlQuery(
-        name = "upload - project creator link",
-        Set("PREFIX schema: <http://schema.org/>"),
-        s"""INSERT DATA { $rdfResource schema:creator $creatorResource }"""
-      )
-    )
-  }
+private[triplescuration] object IOUpdateFunctionsCreator {
+  import cats.effect.Timer
+  import ch.datascience.config.GitLab
+  import ch.datascience.control.Throttler
 
-  private def insertCreator(resourceId:        ResourceId,
-                            maybeCreatorEmail: Option[Email],
-                            maybeCreatorName:  Option[users.Name]) = {
-    val rdfResource     = resourceId.showAs[RdfResource]
-    val creatorResource = findCreatorId(maybeCreatorEmail)
-    List(
-      maybeCreatorEmail orElse maybeCreatorName map { _ =>
-        Update(
-          s"Inserting Project $rdfResource schema:creator",
-          SparqlQuery(
-            name = "upload - project creator insert",
-            Set("PREFIX schema: <http://schema.org/>"),
-            s"""INSERT DATA { $rdfResource schema:creator $creatorResource }"""
-          )
-        )
-      },
-      maybeCreatorEmail map { email =>
-        Update(
-          s"Inserting Creator $creatorResource schema:email",
-          SparqlQuery(
-            name = "upload - creator email insert",
-            Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>", "PREFIX schema: <http://schema.org/>"),
-            s"""|INSERT DATA {
-                |  $creatorResource rdf:type <http://schema.org/Person>;
-                |                   schema:email '${sparqlEncode(email.value)}'
-                |}""".stripMargin
-          )
-        )
-      },
-      maybeCreatorName map { name =>
-        Update(
-          s"Inserting Creator $creatorResource schema:name",
-          SparqlQuery(
-            name = "upload - creator name insert",
-            Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>", "PREFIX schema: <http://schema.org/>"),
-            s"""|INSERT DATA {
-                |  $creatorResource rdf:type <http://schema.org/Person>;
-                |                   schema:name '${sparqlEncode(name.value)}'.
-                |}""".stripMargin
-          )
-        )
-      }
-    ).flatten
-  }
-
-  private lazy val findCreatorId: Option[Email] => String = {
-    case None => s"<_:${java.util.UUID.randomUUID()}>"
-    case Some(email) =>
-      val username     = email.extractName.value
-      val encodedEmail = email.value.replace(username, sparqlEncode(username))
-      s"<mailto:$encodedEmail>"
-  }
-
-  def recreateDateCreated(resourceId: ResourceId, dateCreated: DateCreated) = {
-    val rdfResource = resourceId.showAs[RdfResource]
-    List(
-      Update(
-        s"Deleting Project $rdfResource schema:dateCreated",
-        SparqlQuery(
-          name = "upload - project dateCreated delete",
-          Set("PREFIX schema: <http://schema.org/>"),
-          s"""|DELETE { $rdfResource schema:dateCreated ?date }
-              |WHERE  { $rdfResource schema:dateCreated ?date }
-              |""".stripMargin
-        )
-      ),
-      Update(
-        s"Inserting Project $rdfResource schema:dateCreated",
-        SparqlQuery(
-          name = "upload - project dateCreated insert",
-          Set("PREFIX schema: <http://schema.org/>", "PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>"),
-          s"""INSERT DATA { $rdfResource schema:dateCreated '$dateCreated'^^xsd:dateTime }"""
-        )
-      )
-    )
-  }
+  def apply(
+      gitLabThrottler:         Throttler[IO, GitLab],
+      logger:                  Logger[IO],
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[UpdatesCreator[IO]] =
+    for {
+      renkuBaseUrl     <- RenkuBaseUrl[IO]()
+      gitLabInfoFinder <- IOGitLabInfoFinder(gitLabThrottler, logger)
+      kgInfoFinder     <- IOKGInfoFinder(timeRecorder, logger)
+    } yield new UpdatesCreatorImpl(gitLabInfoFinder, kgInfoFinder, new UpdatesQueryCreator(renkuBaseUrl))
 }

@@ -42,10 +42,9 @@ import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.IOCommitEventProcessor.eventsProcessingTimesBuilder
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{CuratedTriples, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.interpreters.TryTriplesCurator
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.GenerationResult.{MigrationEvent, Triples}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.{GenerationResult, TriplesGenerator}
@@ -211,7 +210,7 @@ class CommitEventProcessorSpec
       (triplesCurator
         .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit, rawTriples, maybeAccessToken)
-        .returning(leftT[Try, CuratedTriples](exception))
+        .returning(leftT[Try, CuratedTriples[Try]](exception))
 
       expectEventMarkedAsRecoverableFailure(commit.compoundEventId, exception)
 
@@ -239,7 +238,7 @@ class CommitEventProcessorSpec
       (triplesCurator
         .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit, rawTriples, maybeAccessToken)
-        .returning(EitherT.liftF[Try, ProcessingRecoverableError, CuratedTriples](context.raiseError(exception)))
+        .returning(EitherT.liftF[Try, ProcessingRecoverableError, CuratedTriples[Try]](context.raiseError(exception)))
 
       expectEventMarkedAsNonRecoverableFailure(commit.compoundEventId, exception)
 
@@ -250,7 +249,7 @@ class CommitEventProcessorSpec
     }
 
     "succeed and mark event with RecoverableFailure " +
-      s"if uploading triples to the dataset fails with $DeliveryFailure for at least one event" in new TestCase {
+      s"if uploading triples to the dataset fails with $RecoverableFailure for at least one event" in new TestCase {
 
       val commitEvents              = commitsLists(size = Gen.const(2)).generateOne
       val commit1 +: commit2 +: Nil = commitEvents.toList
@@ -264,15 +263,15 @@ class CommitEventProcessorSpec
         .expects(commit1, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](Triples(rawTriples)))
 
-      val curatedTriples = curatedTriplesObjects.generateOne
+      val curatedTriples = curatedTriplesObjects[Try].generateOne
       (triplesCurator
         .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit1, rawTriples, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
-      val uploadingError = nonEmptyStrings().map(DeliveryFailure.apply).generateOne
+      val uploadingError = nonEmptyStrings().map(RecoverableFailure.apply).generateOne
       (uploader
-        .upload(_: CuratedTriples))
+        .upload(_: CuratedTriples[Try]))
         .expects(curatedTriples)
         .returning(context.pure(uploadingError))
 
@@ -306,14 +305,14 @@ class CommitEventProcessorSpec
           .expects(commit1, maybeAccessToken)
           .returning(rightT[Try, ProcessingRecoverableError](Triples(rawTriples)))
 
-        val curatedTriples = curatedTriplesObjects.generateOne
+        val curatedTriples = curatedTriplesObjects[Try].generateOne
         (triplesCurator
           .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
           .expects(commit1, rawTriples, maybeAccessToken)
           .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
         (uploader
-          .upload(_: CuratedTriples))
+          .upload(_: CuratedTriples[Try]))
           .expects(curatedTriples)
           .returning(context.pure(failure))
 
@@ -421,7 +420,7 @@ class CommitEventProcessorSpec
 
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
     val triplesFinder         = mock[TriplesGenerator[Try]]
-    val triplesCurator        = mock[TryTriplesCurator]
+    val triplesCurator        = mock[TriplesCurator[Try]]
     val uploader              = mock[TryUploader]
     val eventStatusUpdater    = mock[EventStatusUpdater[Try]]
     val logger                = TestLogger[Try]()
@@ -451,14 +450,14 @@ class CommitEventProcessorSpec
         .expects(commit, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](Triples(triples)))
 
-      val curatedTriples = curatedTriplesObjects.generateOne
+      val curatedTriples = curatedTriplesObjects[Try].generateOne
       (triplesCurator
         .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit, triples, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
       (uploader
-        .upload(_: CuratedTriples))
+        .upload(_: CuratedTriples[Try]))
         .expects(curatedTriples)
         .returning(context.pure(DeliverySuccess))
     }

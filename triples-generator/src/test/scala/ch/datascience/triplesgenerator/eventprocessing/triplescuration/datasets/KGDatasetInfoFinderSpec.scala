@@ -115,7 +115,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
         body = s"""|DELETE { <$datasetId> renku:topmostSameAs ?sameAs }
                    |WHERE {
                    |  <$datasetId> rdf:type schema:Dataset;
-                   |        renku:topmostSameAs ?sameAs.
+                   |               renku:topmostSameAs ?sameAs.
                    |}
                    |""".stripMargin
       )
@@ -133,7 +133,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
         body = s"""|DELETE { <$datasetId> renku:topmostDerivedFrom ?derivedFrom }
                    |WHERE {
                    |  <$datasetId> rdf:type schema:Dataset;
-                   |        renku:topmostDerivedFrom ?derivedFrom.
+                   |               renku:topmostDerivedFrom ?derivedFrom.
                    |}
                    |""".stripMargin
       )

@@ -23,10 +23,12 @@ import cats.effect.{ContextShift, Timer}
 import cats.implicits._
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
+import scala.util.control.NonFatal
 
 class Uploader[Interpretation[_]](
     triplesUploader: TriplesUploader[Interpretation],
@@ -35,21 +37,61 @@ class Uploader[Interpretation[_]](
 
   import TriplesUploadResult._
 
-  def upload(curatedTriples: CuratedTriples): Interpretation[TriplesUploadResult] =
+  def upload(curatedTriples: CuratedTriples[Interpretation]): Interpretation[TriplesUploadResult] =
     for {
-      triplesUploadingResult <- triplesUploader upload curatedTriples.triples
-      maybeUpdatesSendingResult <- if (triplesUploadingResult.failure) ME.pure(Option.empty[TriplesUploadResult])
-                                  else updatesUploader send curatedTriples.updates map Option.apply
+      triplesUploadingResult    <- triplesUploader upload curatedTriples.triples
+      maybeUpdatesSendingResult <- prepareAndRun(curatedTriples.updatesGroups, when = triplesUploadingResult.failure)
     } yield merge(triplesUploadingResult, maybeUpdatesSendingResult)
+
+  private def prepareAndRun(
+      updatesGroups: List[CurationUpdatesGroup[Interpretation]],
+      when:          Boolean
+  ): Interpretation[Option[TriplesUploadResult]] =
+    if (when) Option.empty[TriplesUploadResult].pure[Interpretation]
+    else
+      updatesGroups
+        .map(createUpdatesAndSend)
+        .flatSequence
+        .map(mergeResults) map Option.apply
+
+  private def createUpdatesAndSend(
+      updatesGroup: CurationUpdatesGroup[Interpretation]
+  ): Interpretation[List[TriplesUploadResult]] =
+    updatesGroup
+      .generateUpdates()
+      .foldF(
+        recoverableError =>
+          List(RecoverableFailure(recoverableError.getMessage): TriplesUploadResult).pure[Interpretation],
+        queries => (queries map updatesUploader.send).sequence
+      ) recoverWith invalidUpdatesFailure
+
+  private lazy val invalidUpdatesFailure: PartialFunction[Throwable, Interpretation[List[TriplesUploadResult]]] = {
+    case NonFatal(exception) =>
+      List(InvalidUpdatesFailure(exception.getMessage): TriplesUploadResult).pure[Interpretation]
+  }
 
   private lazy val merge: (TriplesUploadResult, Option[TriplesUploadResult]) => TriplesUploadResult = {
     case (DeliverySuccess, Some(DeliverySuccess)) => DeliverySuccess
     case (DeliverySuccess, Some(updatesFailure))  => updatesFailure
     case (triplesFailure, _)                      => triplesFailure
   }
+
+  private def mergeResults(results: List[TriplesUploadResult]): TriplesUploadResult =
+    results.filterNot(_ == DeliverySuccess) match {
+      case Nil => DeliverySuccess
+      case failures =>
+        failures.find {
+          case _: RecoverableFailure => true
+          case _ => false
+        } match {
+          case Some(recoverableFailure) => recoverableFailure
+          case _                        => InvalidUpdatesFailure(failures.map(_.message).mkString("; "))
+        }
+    }
 }
 
-object IOUploader {
+private[eventprocessing] object IOUploader {
+
   import cats.effect.IO
 
   def apply(
@@ -68,14 +110,24 @@ sealed trait TriplesUploadResult extends Product with Serializable {
   val failure: Boolean
   val message: String
 }
+
 object TriplesUploadResult {
+
   final case object DeliverySuccess extends TriplesUploadResult {
     val failure: Boolean = false
     val message: String  = "Delivery success"
   }
+
   type DeliverySuccess = DeliverySuccess.type
-  sealed trait TriplesUploadFailure extends TriplesUploadResult { val failure: Boolean = true }
-  final case class DeliveryFailure(message:       String) extends Exception(message) with TriplesUploadFailure
+
+  sealed trait TriplesUploadFailure extends TriplesUploadResult {
+    val failure: Boolean = true
+  }
+
+  final case class RecoverableFailure(message: String) extends Exception(message) with TriplesUploadFailure
+
   final case class InvalidTriplesFailure(message: String) extends Exception(message) with TriplesUploadFailure
+
   final case class InvalidUpdatesFailure(message: String) extends Exception(message) with TriplesUploadFailure
+
 }

@@ -22,7 +22,6 @@ import cats.effect.IO
 import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.ResourceId
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
 import ch.datascience.graph.model.views.RdfResource
@@ -35,48 +34,6 @@ import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class KGInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
-
-  "findProject" should {
-
-    "return details of the project from the KG if it exists and it has creator" in new TestCase {
-      forAll(entitiesPersons(userEmails.toGeneratorOfSomes)) { person =>
-        val entitiesProject = entitiesProjects(person.some).generateOne
-
-        loadToStore(entitiesProject.asJsonLD)
-
-        val Some(kgProject) = finder.findProject(entitiesProject.path).unsafeRunSync()
-
-        kgProject.resourceId shouldBe ResourceId(renkuBaseUrl, entitiesProject.path)
-        kgProject.maybeParentResourceId shouldBe entitiesProject.maybeParentProject.map(
-          parent => ResourceId(renkuBaseUrl, parent.path)
-        )
-        kgProject.dateCreated                        shouldBe entitiesProject.dateCreated
-        kgProject.maybeCreator.flatMap(_.maybeEmail) shouldBe person.maybeEmail
-        kgProject.maybeCreator.map(_.name)           shouldBe person.name.some
-      }
-    }
-
-    "return details of the project from the KG if it exists and it has no creator" in new TestCase {
-      forAll(entitiesProjects(maybeCreator = None)) { entitiesProject =>
-        loadToStore(entitiesProject.asJsonLD)
-
-        val Some(kgProject) = finder.findProject(entitiesProject.path).unsafeRunSync()
-
-        kgProject.resourceId shouldBe ResourceId(renkuBaseUrl, entitiesProject.path)
-        kgProject.maybeParentResourceId shouldBe entitiesProject.maybeParentProject.map(
-          parent => ResourceId(renkuBaseUrl, parent.path)
-        )
-        kgProject.dateCreated  shouldBe entitiesProject.dateCreated
-        kgProject.maybeCreator shouldBe None
-      }
-    }
-
-    "return no details if the project does not exists in the KG" in new TestCase {
-      finder
-        .findProject(projectPaths.generateOne)
-        .unsafeRunSync() shouldBe None
-    }
-  }
 
   "findCreatorId" should {
 
@@ -102,7 +59,7 @@ class KGInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheck
   private trait TestCase {
     private val logger       = TestLogger[IO]()
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
-    val finder               = new IOKGInfoFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+    val finder               = new IOKGInfoFinder(rdfStoreConfig, logger, timeRecorder)
   }
 
   private def findPerson(resourceId: users.ResourceId): Set[(String, String)] =

@@ -70,7 +70,7 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
       }
     }
 
-    s"return $DeliveryFailure if remote responds with status different than $Ok, $BadRequest or $InternalServerError" in new TestCase {
+    s"return $RecoverableFailure if remote responds with status different than $Ok, $BadRequest or $InternalServerError" in new TestCase {
 
       val errorMessage = nonEmptyStrings().generateOne
 
@@ -82,10 +82,10 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
           .willReturn(unauthorized().withBody(errorMessage))
       }
 
-      triplesUploader.upload(triples).unsafeRunSync() shouldBe DeliveryFailure(s"$Unauthorized: $errorMessage")
+      triplesUploader.upload(triples).unsafeRunSync() shouldBe RecoverableFailure(s"$Unauthorized: $errorMessage")
     }
 
-    s"return $DeliveryFailure for connectivity issues" in new TestCase {
+    s"return $RecoverableFailure for connectivity issues" in new TestCase {
 
       val fusekiBaseUrl = localHttpUrls.map(FusekiBaseUrl.apply).generateOne
       override val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
@@ -96,7 +96,7 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
 
       triplesUploader
         .upload(triples)
-        .unsafeRunSync() shouldBe DeliveryFailure(
+        .unsafeRunSync() shouldBe RecoverableFailure(
         s"POST $fusekiBaseUrl/${rdfStoreConfig.datasetName}/data error: $exceptionMessage"
       )
     }

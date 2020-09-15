@@ -18,6 +18,7 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
+import cats.implicits._
 import ch.datascience.generators.CommonGraphGenerators.fusekiBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -32,6 +33,9 @@ import io.circe.optics.{JsonPath, JsonTraversalPath}
 import io.renku.jsonld.{EntityId, Property}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import scala.language.higherKinds
+import scala.util.Try
 
 class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
 
@@ -48,7 +52,7 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
 
       val topmostData = topmostDatas(datasetId).generateOne
 
-      val updatedTriples = updater.mergeTopmostDataIntoTriples(curatedTriples.copy(triples = triples), topmostData)
+      val updatedTriples = updater.mergeTopmostDataIntoTriples[Try](curatedTriples.copy(triples = triples), topmostData)
 
       val Some(updatedDataset) = updatedTriples.triples.findDataset(datasetId)
 
@@ -56,12 +60,12 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
       findTopmostSameAs(updatedDataset)      shouldBe Some(topmostData.sameAs.toString)
       findTopmostDerivedFrom(updatedDataset) shouldBe Some(topmostData.derivedFrom.toString)
 
-      updatedTriples.updates shouldBe curatedTriples.updates
+      updatedTriples.updatesGroups shouldBe curatedTriples.updatesGroups
     }
   }
 
   private trait TestCase {
-    val curatedTriples = curatedTriplesObjects.generateOne
+    val curatedTriples = curatedTriplesObjects[Try].generateOne
 
     val updater = new TriplesUpdater()
   }
@@ -69,18 +73,16 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
   private def findIdentifier(json: Json) = (root / (schema / "identifier")).`@value`.string.getOption(json)
 
   private def findTopmostSameAs(json: Json) =
-    (root / (renku / "topmostSameAs") / (schema / "url")).`@value`.string
-      .getOption(json)
-      .orElse((root / (renku / "topmostSameAs") / (schema / "url")).`@id`.string.getOption(json))
+    (root / (renku / "topmostSameAs")).`@id`.string.getOption(json)
 
   private def findTopmostDerivedFrom(json: Json) =
     (root / (renku / "topmostDerivedFrom")).`@id`.string.getOption(json)
 
   private def topmostDatas(datasetId: EntityId) =
     for {
-      sameAs      <- datasetSameAs
-      derivedFrom <- datasetDerivedFroms
-    } yield TopmostData(datasetId, sameAs, derivedFrom)
+      topmostSameAs <- datasetTopmostSameAs
+      derivedFrom   <- datasetDerivedFroms
+    } yield TopmostData(datasetId, topmostSameAs, derivedFrom)
 
   private implicit class JsonLdOps(jsonLd: JsonLDTriples) {
     private val json = jsonLd.value

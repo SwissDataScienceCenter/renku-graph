@@ -19,39 +19,24 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import CurationGenerators._
-import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
+import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import scala.util.Try
+
 class CuratedTriplesSpec extends AnyWordSpec with ScalaCheckPropertyChecks with MockFactory with should.Matchers {
 
-  "addUpdates" should {
+  "generateUpdates" should {
 
-    "append the given updates to what's already in the curated triples" in {
-      forAll { (curatedTriples: CuratedTriples, updates: List[Update]) =>
-        curatedTriples.addUpdates(updates) shouldBe CuratedTriples(
-          curatedTriples.triples,
-          curatedTriples.updates ++ updates
-        )
+    "call the given query creation function" in {
+      forAll { updateFunction: CurationUpdatesGroup[Try] =>
+        updateFunction.generateUpdates() shouldBe updateFunction.queryGenerator()
       }
-    }
-  }
-
-  "transformTriples" should {
-
-    "transform triples with the given function" in {
-      val curatedTriples = curatedTriplesObjects.generateOne
-
-      val transformedTriples = jsonLDTriples.generateOne
-      val f                  = mockFunction[JsonLDTriples, JsonLDTriples]
-      f.expects(curatedTriples.triples).returning(transformedTriples)
-
-      curatedTriples.transformTriples(f).triples shouldBe transformedTriples
     }
   }
 }

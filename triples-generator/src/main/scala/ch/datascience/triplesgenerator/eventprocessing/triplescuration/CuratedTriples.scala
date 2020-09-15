@@ -18,22 +18,40 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
+import cats.MonadError
+import cats.data.EitherT
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.Update
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
 
-final case class CuratedTriples(triples: JsonLDTriples, updates: List[Update])
+import scala.language.higherKinds
+
+final case class CuratedTriples[Interpretation[_]](triples:       JsonLDTriples,
+                                                   updatesGroups: List[CurationUpdatesGroup[Interpretation]])
 
 object CuratedTriples {
-  final case class Update(name: String, query: SparqlQuery)
+  private[eventprocessing] type GeneratedQueries[Interpretation[_]] =
+    EitherT[Interpretation, ProcessingRecoverableError, List[SparqlQuery]]
 
-  implicit class CuratedTriplesOps(curatedTriples: CuratedTriples) {
-
-    def transformTriples(f: JsonLDTriples => JsonLDTriples): CuratedTriples = curatedTriples.copy(
-      triples = f(curatedTriples.triples)
-    )
-
-    def addUpdates(updates: Seq[Update]): CuratedTriples = curatedTriples.copy(
-      updates = curatedTriples.updates ++ updates
-    )
+  final case class CurationUpdatesGroup[Interpretation[_]](
+      name:           String Refined NonEmpty,
+      queryGenerator: () => GeneratedQueries[Interpretation]
+  ) {
+    def generateUpdates(): GeneratedQueries[Interpretation] = queryGenerator()
   }
+
+  object CurationUpdatesGroup {
+    def apply[Interpretation[_]](
+        name:          String Refined NonEmpty,
+        sparqlQueries: SparqlQuery*
+    )(implicit ME:     MonadError[Interpretation, Throwable]): CurationUpdatesGroup[Interpretation] =
+      CurationUpdatesGroup[Interpretation](
+        name,
+        () => EitherT.rightT[Interpretation, ProcessingRecoverableError](sparqlQueries.toList)
+      )
+
+  }
+
 }

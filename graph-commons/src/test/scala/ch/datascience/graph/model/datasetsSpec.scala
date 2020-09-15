@@ -145,11 +145,24 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
     }
   }
 
+  "TopmostSameAs jsonLdEncoder" should {
+
+    import TopmostSameAs._
+
+    "serialise TopmostSameAs to an object having @id property as the SameAs's value" in {
+      val sameAs = datasetTopmostSameAs.generateOne
+
+      val json = topmostSameAsJsonLdEncoder(sameAs).toJson
+
+      json.hcursor.downField("@id").as[String] shouldBe Right(sameAs.toString)
+    }
+  }
+
   "derivedFrom jsonLdEncoder" should {
 
     import DerivedFrom._
 
-    "serialise derivedFrom to an object having url property linked to the DerivedFrom's value" in {
+    "serialise derivedFrom to an object having @id property linked to the DerivedFrom's value" in {
       val derivedFrom = datasetDerivedFroms.generateOne
 
       val json = derivedFromJsonLdEncoder(derivedFrom).toJson
