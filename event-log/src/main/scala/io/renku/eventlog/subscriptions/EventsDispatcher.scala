@@ -51,7 +51,35 @@ class EventsDispatcher(
   import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
   import subscriptions._
 
-  def run: IO[Unit] = waitForSubscriptions(andThen = popEvent)
+  def run: IO[Unit] =
+    for {
+      _ <- popEventN flatMap {
+            case (eventId, eventBody) => runOnFreeSubscriber(dispatchN(eventId, eventBody))
+          }
+      _ <- run
+    } yield ()
+
+  private def popEventN: IO[(CompoundEventId, EventBody)] =
+    eventsFinder.popEvent
+      .recoverWith(loggingError("Finding events to process failed", retry = eventsFinder.popEvent))
+      .flatMap {
+        case None            => (timer sleep noEventSleep) flatMap (_ => popEventN)
+        case Some(idAndBody) => idAndBody.pure[IO]
+      }
+
+  private def dispatchN(id: CompoundEventId, body: EventBody)(subscriber: SubscriberUrl): IO[Unit] = {
+    for {
+      result <- sendEvent(subscriber, id, body)
+      _      <- logStatement(result, subscriber, id)
+      _ <- result match {
+            case Delivered    => IO.unit
+            case ServiceBusy  => markBusy(subscriber) recover withNothing flatMap (_ => dispatch(id, body))
+            case Misdelivered => remove(subscriber) recover withNothing flatMap (_ => dispatch(id, body))
+          }
+    } yield ()
+  } recoverWith markEventAsNonRecoverable(subscriber, id)
+
+  def oldrun: IO[Unit] = waitForSubscriptions(andThen = popEvent)
 
   private def waitForSubscriptions(andThen: => IO[Unit]): IO[Unit] = {
     subscriptions.isNext flatMap {

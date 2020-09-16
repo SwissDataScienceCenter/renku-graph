@@ -31,6 +31,8 @@ import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
 
 trait Subscriptions[Interpretation[_]] {
+  def runOnFreeSubscriber(f: SubscriberUrl => Interpretation[Unit]): Interpretation[Unit] = ???
+
   def add(subscriberUrl: SubscriberUrl): Interpretation[Unit]
   def nextFree: Interpretation[Option[SubscriberUrl]]
   def isNext:   Interpretation[Boolean]
