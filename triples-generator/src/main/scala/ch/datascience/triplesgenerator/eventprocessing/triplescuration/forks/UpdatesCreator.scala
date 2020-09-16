@@ -22,7 +22,7 @@ package forks
 import cats.MonadError
 import cats.data.{EitherT, OptionT}
 import cats.effect.{ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken

@@ -21,13 +21,12 @@ package io.renku.eventlog.eventspatching
 import java.time.Instant
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.SqlQuery
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
-import doobie.implicits.javatime._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.eventlog.EventStatus.New

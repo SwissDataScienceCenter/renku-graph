@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, TopmostSameAs, UrlSameAs}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.DataSetInfoFinder.DatasetInfo

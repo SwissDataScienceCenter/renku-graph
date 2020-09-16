@@ -40,7 +40,7 @@ class SubscriberImpl(
 )(implicit timer:          Timer[IO])
     extends Subscriber[IO] {
 
-  import cats.implicits._
+  import cats.syntax.all._
   import subscriptionSender._
   import subscriptionUrlFinder._
 
@@ -82,10 +82,11 @@ class SubscriberImpl(
 }
 
 object Subscriber {
-  import scala.concurrent.duration._
-  import scala.language.postfixOps
   import ch.datascience.config.ConfigLoader.find
   import com.typesafe.config.{Config, ConfigFactory}
+
+  import scala.concurrent.duration._
+  import scala.language.postfixOps
 
   private val RenewDelay = 5 minutes
 

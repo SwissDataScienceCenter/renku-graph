@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, TopmostSameAs}

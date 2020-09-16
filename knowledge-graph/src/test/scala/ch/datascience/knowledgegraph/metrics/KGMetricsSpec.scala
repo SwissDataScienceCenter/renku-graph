@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.metrics
 import java.lang.Thread.sleep
 
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger

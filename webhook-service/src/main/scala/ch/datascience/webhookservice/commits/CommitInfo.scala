@@ -33,7 +33,7 @@ case class CommitInfo(
 
 object CommitInfo {
 
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
 

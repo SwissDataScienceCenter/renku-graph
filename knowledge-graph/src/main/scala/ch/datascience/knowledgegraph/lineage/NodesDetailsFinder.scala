@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.ResourceId

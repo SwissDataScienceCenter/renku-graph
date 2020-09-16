@@ -20,7 +20,7 @@ package io.renku.eventlog.processingstatus
 
 import cats.data.OptionT
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.controllers.InfoMessage.InfoMessage
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
@@ -35,8 +35,8 @@ import io.circe.Decoder
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._
-import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
+import org.http4s.implicits._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

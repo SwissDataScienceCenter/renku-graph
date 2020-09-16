@@ -18,7 +18,7 @@
 
 package ch.datascience.config
 
-import cats.implicits._
+
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.config.renku.{ResourceUrl, ResourcesUrl}
 import ch.datascience.generators.CommonGraphGenerators._

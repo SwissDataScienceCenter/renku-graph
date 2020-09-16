@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.init
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.triplesgenerator.config.FusekiAdminConfig
 import io.chrisdavenport.log4cats.Logger

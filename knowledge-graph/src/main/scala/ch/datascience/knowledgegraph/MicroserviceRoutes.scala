@@ -19,8 +19,8 @@
 package ch.datascience.knowledgegraph
 
 import cats.data.{Validated, ValidatedNel}
-import cats.effect.{Clock, ConcurrentEffect, Resource}
-import cats.implicits._
+import cats.effect.{Clock, ConcurrentEffect}
+import cats.syntax.all._
 import ch.datascience.graph.model
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
@@ -87,7 +87,6 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 
   private implicit class PathPartsOps(parts: List[String]) {
     import cats.MonadError
-    import cats.implicits._
     import ch.datascience.controllers.InfoMessage
     import ch.datascience.controllers.InfoMessage._
     import org.http4s.{Response, Status}

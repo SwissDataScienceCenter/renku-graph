@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.init
 
 import cats.MonadError
-import cats.implicits._
+
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}

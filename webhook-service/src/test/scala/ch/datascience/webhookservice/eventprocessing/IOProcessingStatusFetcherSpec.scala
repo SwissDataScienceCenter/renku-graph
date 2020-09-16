@@ -18,16 +18,16 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
-import ProcessingStatusFetcher.ProcessingStatus
-import ProcessingStatusGenerator._
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
+import ch.datascience.webhookservice.eventprocessing.ProcessingStatusGenerator._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.Refined
 import io.circe.Encoder

@@ -33,7 +33,7 @@ class ProcessingStatusEndpoint[Interpretation[_]](
 )(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.controllers.ErrorMessage._
   import ch.datascience.controllers.{ErrorMessage, InfoMessage}
   import ch.datascience.graph.model.projects

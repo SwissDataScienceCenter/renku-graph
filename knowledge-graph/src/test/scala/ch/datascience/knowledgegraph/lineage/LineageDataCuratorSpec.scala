@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.lineage
 
 import cats.data.OptionT
-import cats.implicits._
+
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage}

@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.subscriptions
 
 import java.net.NetworkInterface
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.triplesgenerator.Microservice
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

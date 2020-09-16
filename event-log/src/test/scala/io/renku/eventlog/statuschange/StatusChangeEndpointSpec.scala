@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange
 
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
@@ -42,12 +42,12 @@ import io.renku.eventlog.statuschange.commands._
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
-import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
+import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.prop.TableDrivenPropertyChecks
+import org.scalatest.wordspec.AnyWordSpec
 
 class StatusChangeEndpointSpec
     extends AnyWordSpec

@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}

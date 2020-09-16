@@ -22,7 +22,7 @@ import ammonite.ops.{CommandResult, root}
 import cats.data.EitherT
 import cats.data.EitherT._
 import cats.effect.{ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._

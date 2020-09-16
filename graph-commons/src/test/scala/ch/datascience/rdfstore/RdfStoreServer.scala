@@ -21,7 +21,7 @@ package ch.datascience.rdfstore
 import java.net.BindException
 
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive

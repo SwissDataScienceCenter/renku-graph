@@ -21,7 +21,7 @@ package ch.datascience.rdfstore.entities
 import java.time.Instant
 import java.time.temporal.ChronoUnit._
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.FusekiBaseUrl

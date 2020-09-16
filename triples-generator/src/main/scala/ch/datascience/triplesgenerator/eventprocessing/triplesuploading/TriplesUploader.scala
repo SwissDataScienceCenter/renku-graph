@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}

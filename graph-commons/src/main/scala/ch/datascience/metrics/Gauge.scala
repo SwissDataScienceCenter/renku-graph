@@ -19,7 +19,7 @@
 package ch.datascience.metrics
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Gauge => LibGauge}

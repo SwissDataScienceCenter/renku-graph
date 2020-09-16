@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository
 
 import cats.effect.{Clock, ConcurrentEffect, Resource}
-import cats.implicits._
+
 import ch.datascience.graph.http.server.binders.{ProjectId, ProjectPath}
 import ch.datascience.metrics.RoutesMetrics
 import ch.datascience.tokenrepository.repository.association.AssociateTokenEndpoint

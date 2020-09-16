@@ -20,7 +20,7 @@ package io.renku.eventlog.statuschange
 
 import cats.MonadError
 import cats.effect.{ContextShift, Effect}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects

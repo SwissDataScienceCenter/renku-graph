@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.{Bracket, ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB

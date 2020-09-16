@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets
 
 import cats.data.NonEmptyList
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.sortBys
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._

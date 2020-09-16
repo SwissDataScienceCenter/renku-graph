@@ -19,7 +19,7 @@
 package ch.datascience.http.rest.paging
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.renku
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Total

@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.{IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}

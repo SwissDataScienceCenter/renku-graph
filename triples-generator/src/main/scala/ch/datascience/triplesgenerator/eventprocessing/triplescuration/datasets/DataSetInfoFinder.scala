@@ -21,7 +21,7 @@ package datasets
 
 import cats.MonadError
 import cats.data.OptionT
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.json.TinyTypeDecoders._

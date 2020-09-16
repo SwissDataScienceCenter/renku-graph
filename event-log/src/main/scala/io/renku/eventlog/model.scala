@@ -20,7 +20,7 @@ package io.renku.eventlog
 
 import java.time.Instant
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}

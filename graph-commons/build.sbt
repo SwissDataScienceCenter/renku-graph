@@ -36,14 +36,17 @@ libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
 
 libraryDependencies += "io.sentry" % "sentry-logback" % "1.7.30"
 
-val doobieVersion = "0.9.0"
+val doobieVersion = "0.9.2"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 
-libraryDependencies += "org.typelevel" %% "cats-core" % "2.1.1"
+val catsVersion = "2.2.0"
+libraryDependencies += "org.typelevel" %% "cats-core"   % catsVersion
+libraryDependencies += "org.typelevel" %% "cats-effect" % catsVersion
+libraryDependencies += "org.typelevel" %% "cats-free"   % catsVersion
 
-val http4sVersion = "0.21.6"
+val http4sVersion = "0.21.7"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
@@ -52,7 +55,7 @@ libraryDependencies += "org.http4s" %% "http4s-dsl"                % http4sVersi
 libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sVersion
 
 // Test dependencies
-libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.27.1" % Test
+libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.27.2" % Test
 
 val jenaVersion = "3.16.0"
 libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % Test
@@ -61,8 +64,8 @@ libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % 
 
 libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.0.0"   % Test
 libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test
-libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.0.0" % Test
-libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.1"   % Test
+libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
+libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.2"   % Test
 
 libraryDependencies += "org.tpolecat" %% "doobie-h2"        % doobieVersion % Test
 libraryDependencies += "org.tpolecat" %% "doobie-scalatest" % doobieVersion % Test

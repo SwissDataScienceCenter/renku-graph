@@ -48,7 +48,7 @@ class EventProcessingEndpoint[Interpretation[_]: Effect](
 
   import EventProcessingEndpoint._
   import EventsProcessingRunner.EventSchedulingResult
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.controllers.InfoMessage._
   import ch.datascience.controllers.{ErrorMessage, InfoMessage}
   import eventBodyDeserializer._

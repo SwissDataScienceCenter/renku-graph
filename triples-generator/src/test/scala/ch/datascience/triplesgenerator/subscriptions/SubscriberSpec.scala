@@ -19,16 +19,16 @@
 package ch.datascience.triplesgenerator.subscriptions
 
 import cats.effect.{IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.concurrent.Eventually
+import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._

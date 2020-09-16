@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.MonadError
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
@@ -161,7 +161,16 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
     } yield maybeSameAs
       .map(NonModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects, keywords))
       .orElse(
-        maybeDerivedFrom map (ModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects, keywords))
+        maybeDerivedFrom map (ModifiedDataset(id,
+                                              title,
+                                              name,
+                                              url,
+                                              _,
+                                              maybeDescription,
+                                              published,
+                                              parts,
+                                              projects,
+                                              keywords))
       )
       .getOrElse(fail("Cannot decode payload as Dataset"))
 

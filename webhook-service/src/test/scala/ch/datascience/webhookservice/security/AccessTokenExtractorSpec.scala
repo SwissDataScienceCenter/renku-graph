@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.security
 
 import cats.MonadError
-import cats.implicits._
+
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.http.client.RestClientError.UnauthorizedException

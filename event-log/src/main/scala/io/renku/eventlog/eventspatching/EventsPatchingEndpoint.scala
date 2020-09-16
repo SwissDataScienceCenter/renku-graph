@@ -46,7 +46,7 @@ class EventsPatchingEndpointImpl(
     extends Http4sDsl[IO]
     with EventsPatchingEndpoint[IO] {
 
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.controllers.InfoMessage
   import ch.datascience.controllers.InfoMessage._
   import eventsPatcher._

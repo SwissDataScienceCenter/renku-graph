@@ -21,13 +21,12 @@ package io.renku.eventlog.statuschange.commands
 import java.time.Instant
 
 import cats.effect.Bracket
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
-import doobie.implicits.javatime._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus.{Processing, Skipped}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath

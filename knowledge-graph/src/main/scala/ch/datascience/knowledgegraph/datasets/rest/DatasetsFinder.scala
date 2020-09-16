@@ -44,6 +44,7 @@ private trait DatasetsFinder[Interpretation[_]] {
 }
 
 private object DatasetsFinder {
+
   final case class DatasetSearchResult(
       id:               Identifier,
       title:            Title,
@@ -54,7 +55,9 @@ private object DatasetsFinder {
   )
 
   final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
+
   implicit object ProjectsCount extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_)) with NonNegativeInt
+
 }
 
 private class IODatasetsFinder(
@@ -68,7 +71,7 @@ private class IODatasetsFinder(
     with Paging[IO, DatasetSearchResult] {
 
   import IODatasetsFinder._
-  import cats.implicits._
+  import cats.syntax.all._
   import creatorsFinder._
 
   override def findDatasets(maybePhrase:   Option[Phrase],

@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.crypto
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.graph.model.projects.Id

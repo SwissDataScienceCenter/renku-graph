@@ -35,7 +35,7 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
 
   import EventStatus.{New, RecoverableFailure}
   import SubscriptionsEndpoint._
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.controllers.InfoMessage._
   import ch.datascience.controllers.{ErrorMessage, InfoMessage}
   import org.http4s.circe._

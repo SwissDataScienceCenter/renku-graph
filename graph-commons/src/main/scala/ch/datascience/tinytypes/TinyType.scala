@@ -21,6 +21,7 @@ package ch.datascience.tinytypes
 import java.time.{Instant, LocalDate}
 
 import cats.MonadError
+import cats.syntax.all._
 import ch.datascience.tinytypes.constraints.PathSegment
 import io.circe.Json
 
@@ -69,8 +70,6 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     with Constraints[TT#V]
     with ValueTransformation[TT#V]
     with TypeName {
-
-  import cats.implicits._
 
   import scala.util.Try
 

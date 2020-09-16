@@ -18,13 +18,11 @@
 
 package ch.datascience.http.client
 
-import java.net.ConnectException
-
-import IORestClient._
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.http.client.IORestClient._
 import ch.datascience.http.client.RestClientError.{BadRequestException, ConnectivityException, MappingException, UnexpectedResponseException}
 import ch.datascience.logging.ExecutionTimeRecorder
 import eu.timepit.refined.api.Refined
@@ -35,8 +33,8 @@ import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.Status.BadRequest
 import org.http4s._
-import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.client.blaze.BlazeClientBuilder
+import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.headers.Authorization
 
 import scala.concurrent.ExecutionContext

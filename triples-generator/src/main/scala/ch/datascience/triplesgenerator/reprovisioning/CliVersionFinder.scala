@@ -53,7 +53,7 @@ private object CliVersionFinder {
       implicit ME: MonadError[Interpretation, Throwable]
   ): Interpretation[CliVersion] = {
     import ammonite.ops._
-    import cats.implicits._
+    import cats.syntax.all._
 
     for {
       versionAsString <- ME.fromTry { Try(%%('renku, "--version")(pwd).out.string.trim) }

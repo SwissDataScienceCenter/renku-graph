@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository.repository
 
 import cats.effect.IO
-import cats.implicits._
+
 import ch.datascience.generators.CommonGraphGenerators.aesCryptoSecrets
 import ch.datascience.generators.Generators.Implicits._
 

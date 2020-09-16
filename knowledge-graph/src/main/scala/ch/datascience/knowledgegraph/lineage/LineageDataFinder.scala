@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.data.OptionT
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource

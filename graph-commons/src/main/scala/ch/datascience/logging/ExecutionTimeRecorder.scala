@@ -20,7 +20,7 @@ package ch.datascience.logging
 
 import cats.MonadError
 import cats.effect.Clock
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.ConfigLoader.find
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.tinytypes.{LongTinyType, TinyTypeFactory}

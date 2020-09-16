@@ -19,7 +19,7 @@
 package ch.datascience.config.sentry
 
 import cats.MonadError
-import cats.implicits._
+
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._

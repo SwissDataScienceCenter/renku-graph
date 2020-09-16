@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.projects.rest
 
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.{GitLab, renku}
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.InfoMessage._

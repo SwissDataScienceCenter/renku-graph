@@ -19,6 +19,7 @@
 package ch.datascience.control
 
 import cats.MonadError
+import cats.syntax.all._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.tinytypes.TypeName
 import com.typesafe.config.{Config, ConfigFactory}
@@ -72,7 +73,6 @@ object RateLimitUnit extends TypeName {
 }
 
 object RateLimit extends TypeName {
-  import cats.implicits._
 
   private val RateExtractor = """(\d+)[ ]*/(\w+)""".r
 

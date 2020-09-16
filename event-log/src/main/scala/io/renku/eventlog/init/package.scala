@@ -19,7 +19,7 @@
 package io.renku.eventlog
 
 import cats.effect.Bracket
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import doobie.implicits._
 import doobie.util.fragment.Fragment

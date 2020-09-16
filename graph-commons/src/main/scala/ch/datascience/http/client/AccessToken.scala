@@ -18,7 +18,7 @@
 
 package ch.datascience.http.client
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{Sensitive, StringTinyType, TinyTypeFactory}
 import io.circe._

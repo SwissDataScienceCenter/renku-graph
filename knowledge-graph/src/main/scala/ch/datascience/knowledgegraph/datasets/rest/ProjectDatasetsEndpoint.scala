@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.renku
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._

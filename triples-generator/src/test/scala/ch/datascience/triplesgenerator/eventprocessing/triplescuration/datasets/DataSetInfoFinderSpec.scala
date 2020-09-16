@@ -18,16 +18,16 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.{fusekiBaseUrls, jsonLDTriples}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.datasets.{IdSameAs, UrlSameAs}
 import ch.datascience.rdfstore.entities.DataSet
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import cats.implicits._
-import ch.datascience.graph.model.datasets.{IdSameAs, UrlSameAs}
 
 import scala.util.{Success, Try}
 

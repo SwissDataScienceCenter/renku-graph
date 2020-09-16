@@ -65,7 +65,7 @@ private class IOGitLabProjectFinder(
     with GitLabProjectFinder[IO] {
 
   import cats.effect._
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.http.client.UrlEncoder.urlEncode
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
