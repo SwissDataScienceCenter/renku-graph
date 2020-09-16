@@ -38,7 +38,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
   "findTopmostSameAs" should {
 
     "return None if there's no dataset with the given id" in new TestCase {
-      val sameAs = datasetIdSameAs.generateOne
+      val sameAs = datasetSameAs.generateOne
       kgDatasetInfoFinder.findTopmostSameAs(sameAs).unsafeRunSync() shouldBe Option.empty[SameAs]
     }
 

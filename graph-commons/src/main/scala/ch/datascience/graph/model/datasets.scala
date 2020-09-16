@@ -49,52 +49,23 @@ object datasets {
 
   final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
   implicit object DerivedFrom extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_)) with constraints.Url {
+
     def apply(datasetEntityId: EntityId): DerivedFrom = DerivedFrom(datasetEntityId.toString)
 
     implicit val derivedFromJsonLdEncoder: JsonLDEncoder[DerivedFrom] = derivedFrom =>
       EntityId.of(derivedFrom.value).asJsonLD
   }
 
-  sealed trait SameAs extends Any with UrlTinyType {
+  final class SameAs private (val value: String) extends AnyVal with UrlTinyType
+  implicit object SameAs extends TinyTypeFactory[SameAs](new SameAs(_)) with constraints.Url {
 
-    override def equals(obj: Any): Boolean =
-      Option(obj).exists {
-        case v: SameAs => v.value == value
-        case _ => false
-      }
+    def apply(datasetEntityId: EntityId): SameAs = SameAs(datasetEntityId.toString)
 
-    override def hashCode(): Int = value.hashCode
-  }
-  final class IdSameAs private[datasets] (val value:  String) extends SameAs
-  final class UrlSameAs private[datasets] (val value: String) extends SameAs
-  implicit object SameAs extends TinyTypeFactory[SameAs](new UrlSameAs(_)) with constraints.Url {
-
-    final def fromId(value: String): Either[IllegalArgumentException, IdSameAs] =
-      from(value) map (sameAs => new IdSameAs(sameAs.value))
-
-    final def fromUrl(value: String): Either[IllegalArgumentException, UrlSameAs] =
-      from(value) map (sameAs => new UrlSameAs(sameAs.value))
-
-    def apply(datasetEntityId: EntityId): IdSameAs = new IdSameAs(datasetEntityId.toString)
-
-    implicit val sameAsJsonLdEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
-      case v: IdSameAs  => idSameAsJsonLdEncoder(v)
-      case v: UrlSameAs => urlSameAsJsonLdEncoder(v)
-    }
-
-    private lazy val idSameAsJsonLdEncoder: JsonLDEncoder[IdSameAs] = JsonLDEncoder.instance { sameAs =>
+    implicit val sameAsJsonLdEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
         EntityId of s"_:${UUID.randomUUID()}",
         EntityTypes of (schema / "URL"),
         schema / "url" -> EntityId.of(sameAs.value).asJsonLD
-      )
-    }
-
-    private lazy val urlSameAsJsonLdEncoder: JsonLDEncoder[UrlSameAs] = JsonLDEncoder.instance { sameAs =>
-      JsonLD.entity(
-        EntityId of s"_:${UUID.randomUUID()}",
-        EntityTypes of (schema / "URL"),
-        schema / "url" -> sameAs.value.asJsonLD
       )
     }
   }
