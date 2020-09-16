@@ -22,6 +22,7 @@ package datasets
 import cats.MonadError
 import cats.data.OptionT
 import cats.syntax.all._
+import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -48,7 +49,7 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
 
   private def collectDatasetInfo(collected: mutable.Set[DatasetInfo]): Json => Interpretation[Json] = { json =>
     root.`@type`.each.string.getAll(json) match {
-      case types if types.contains("http://schema.org/Dataset") =>
+      case types if types.contains((schema / "Dataset").toString) =>
         json.get[EntityId]("@id") match {
           case Some(entityId) =>
             for {
@@ -63,22 +64,22 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
   }
 
   private def getSameAs(json: Json): Interpretation[Option[SameAs]] =
-    json.get[Json]("http://schema.org/sameAs") match {
+    json.get[Json]((schema / "sameAs").toString) match {
       case Some(sameAs) =>
         sameAs
-          .getValue[Interpretation, SameAs]("http://schema.org/url")
+          .getValue[Interpretation, SameAs]((schema / "url").toString)
           .orElse(getIdSameAs(sameAs))
           .value
       case None => Option.empty[SameAs].pure[Interpretation]
     }
 
   private def getIdSameAs(json: Json): OptionT[Interpretation, SameAs] =
-    json.get[Json]("http://schema.org/url") match {
+    json.get[Json]((schema / "url").toString) match {
       case Some(value) =>
         value.get[String]("@id") match {
           case Some(id) =>
             SameAs
-              .fromId(id)
+              .from(id)
               .fold(e => OptionT.liftF(e.raiseError[Interpretation, SameAs]), OptionT.some[Interpretation](_))
           case None => OptionT.none[Interpretation, SameAs]
         }
@@ -86,7 +87,7 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
     }
 
   private def getDerivedFrom(json: Json): Interpretation[Option[DerivedFrom]] =
-    json.get[Json]("http://www.w3.org/ns/prov#wasDerivedFrom") match {
+    json.get[Json]((prov / "wasDerivedFrom").toString) match {
       case Some(derivedFrom) => derivedFrom.get[DerivedFrom]("@id").pure[Interpretation]
       case None              => Option.empty[DerivedFrom].pure[Interpretation]
     }

@@ -46,7 +46,7 @@ package object rest {
   implicit val searchEndpointSorts: Gen[DatasetsSearchEndpoint.Sort.By] = sortBys(DatasetsSearchEndpoint.Sort)
 
   implicit class EntityIdOps(entityId: EntityId) {
-    lazy val asSameAs:        SameAs        = SameAs.fromId(entityId.value.toString).fold(throw _, identity)
+    lazy val asSameAs:        SameAs        = SameAs(entityId)
     lazy val asTopmostSameAs: TopmostSameAs = TopmostSameAs(entityId)
     lazy val asDerivedFrom:   DerivedFrom   = DerivedFrom(entityId.value.toString)
   }
