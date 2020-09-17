@@ -18,7 +18,7 @@
 
 package ch.datascience.knowledgegraph.lineage
 
-import cats.implicits._
+
 import ch.datascience.generators.Generators._
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.rdfstore.entities.bundles._

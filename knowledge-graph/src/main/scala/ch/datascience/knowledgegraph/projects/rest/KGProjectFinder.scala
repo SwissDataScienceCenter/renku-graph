@@ -64,7 +64,7 @@ private class IOKGProjectFinder(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with KGProjectFinder[IO] {
 
-  import cats.implicits._
+  import cats.syntax.all._
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 

@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.personde
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -45,8 +45,8 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.mutable
-import scala.util.{Failure, Success, Try}
 import scala.language.higherKinds
+import scala.util.{Failure, Success, Try}
 
 class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory {
 

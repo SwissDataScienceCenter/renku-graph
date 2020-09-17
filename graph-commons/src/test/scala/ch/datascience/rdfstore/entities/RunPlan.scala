@@ -18,7 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.rdfstore.entities.CommandParameter.Argument.ArgumentFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory._

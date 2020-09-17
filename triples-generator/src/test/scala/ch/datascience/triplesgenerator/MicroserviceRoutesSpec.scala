@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator
 
 import cats.effect.{Clock, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessingEndpoint

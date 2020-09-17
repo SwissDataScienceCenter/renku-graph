@@ -32,7 +32,7 @@ trait DataSetPart {
 
 object DataSetPart {
 
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.graph.config.RenkuBaseUrl
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._

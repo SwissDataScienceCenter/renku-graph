@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.implicits._
+
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._

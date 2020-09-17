@@ -49,7 +49,7 @@ private class IOUpdatesUploader(
 
   import LogMessage._
   import TriplesUploadResult._
-  import cats.implicits._
+  import cats.syntax.all._
   import org.http4s.Status.{BadRequest, Ok}
   import org.http4s.{Request, Response, Status}
 

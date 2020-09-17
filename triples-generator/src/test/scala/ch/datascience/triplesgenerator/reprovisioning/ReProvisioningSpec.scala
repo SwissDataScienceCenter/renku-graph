@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.{IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger

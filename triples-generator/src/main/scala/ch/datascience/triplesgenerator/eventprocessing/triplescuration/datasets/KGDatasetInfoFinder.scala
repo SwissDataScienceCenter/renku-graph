@@ -41,7 +41,7 @@ private class KGDatasetInfoFinderImpl(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with KGDatasetInfoFinder[IO] {
 
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eu.timepit.refined.auto._
 

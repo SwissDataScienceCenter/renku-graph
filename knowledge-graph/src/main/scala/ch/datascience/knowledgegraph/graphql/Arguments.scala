@@ -44,7 +44,7 @@ object Arguments {
         exceptionMessage: NonBlank
     ): ScalarType[TT] = {
 
-      import cats.implicits._
+      import cats.syntax.all._
 
       ScalarType[TT](
         name         = name.value,

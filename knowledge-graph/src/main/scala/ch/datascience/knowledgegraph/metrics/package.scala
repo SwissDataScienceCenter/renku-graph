@@ -18,7 +18,7 @@
 
 package ch.datascience.knowledgegraph
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
 import io.circe.Decoder.decodeString

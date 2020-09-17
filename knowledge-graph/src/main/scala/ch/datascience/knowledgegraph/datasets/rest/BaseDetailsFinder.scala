@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{Identifier, Keyword}
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore._

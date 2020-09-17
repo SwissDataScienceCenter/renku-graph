@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.project
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.ConfigLoader.{find, stringTinyTypeReader}
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}

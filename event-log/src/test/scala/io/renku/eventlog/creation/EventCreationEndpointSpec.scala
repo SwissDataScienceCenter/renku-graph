@@ -19,7 +19,7 @@
 package io.renku.eventlog.creation
 
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}

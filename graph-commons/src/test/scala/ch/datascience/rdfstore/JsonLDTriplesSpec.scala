@@ -18,7 +18,7 @@
 
 package ch.datascience.rdfstore
 
-import cats.implicits._
+
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import io.circe.ParsingFailure

@@ -18,7 +18,7 @@
 
 package ch.datascience.metrics
 
-import cats.implicits._
+import cats.syntax.all._
 import io.prometheus.client.Collector
 import io.prometheus.client.Collector.MetricFamilySamples.Sample
 

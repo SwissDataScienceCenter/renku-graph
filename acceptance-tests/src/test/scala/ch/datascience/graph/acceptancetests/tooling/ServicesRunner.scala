@@ -40,7 +40,7 @@ class ServicesRunner(
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) {
 
   import ServiceClient.ServiceReadiness._
-  import cats.implicits._
+  import cats.syntax.all._
 
   import scala.concurrent.duration._
   import scala.language.postfixOps

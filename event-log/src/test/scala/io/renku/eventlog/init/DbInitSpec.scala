@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.init
 
-import cats.implicits._
+import cats.syntax.all._
 import doobie.implicits._
 import doobie.util.fragment.Fragment
 import io.renku.eventlog.InMemoryEventLogDb

@@ -20,7 +20,7 @@ package io.renku.eventlog
 
 import cats.data.ValidatedNel
 import cats.effect.{Clock, ConcurrentEffect, ContextShift, Resource}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.http.server.binders._

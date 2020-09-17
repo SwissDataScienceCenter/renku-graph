@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.EitherT.right
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}

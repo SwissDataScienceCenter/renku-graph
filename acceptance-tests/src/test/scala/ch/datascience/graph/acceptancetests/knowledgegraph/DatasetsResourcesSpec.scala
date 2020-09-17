@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -429,7 +429,6 @@ object DatasetsResources {
   }
 
   def sortCreators(json: Json): Option[Json] = {
-    import cats.implicits._
 
     def orderByName(creators: Vector[Json]): Vector[Json] = creators.sortWith {
       case (json1, json2) =>

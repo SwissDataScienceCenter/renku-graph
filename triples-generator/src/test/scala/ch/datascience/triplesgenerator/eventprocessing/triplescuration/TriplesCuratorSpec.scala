@@ -18,9 +18,10 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
+import cats.syntax.all._
 import cats.MonadError
 import cats.data.EitherT
-import cats.implicits._
+
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._

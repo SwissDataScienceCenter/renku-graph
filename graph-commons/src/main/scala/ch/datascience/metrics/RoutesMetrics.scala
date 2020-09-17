@@ -18,12 +18,10 @@
 
 package ch.datascience.metrics
 
-import cats.Applicative
-import cats.effect.{Bracket, Clock, ConcurrentEffect, Resource, Sync}
-import cats.implicits._
+import cats.effect.{Clock, Resource, Sync}
+import cats.syntax.all._
 import org.http4s.HttpRoutes
 import org.http4s.metrics.prometheus.{Prometheus, PrometheusExportService}
-import org.http4s.server.Router
 import org.http4s.server.middleware.{Metrics => ServerMetrics}
 
 import scala.language.higherKinds

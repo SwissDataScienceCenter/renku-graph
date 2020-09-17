@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.{IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
@@ -36,6 +36,7 @@ import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult.{Delivered, Misdelivered, ServiceBusy}
 import io.renku.eventlog.{Event, EventMessage}
+import org.scalamock.matchers.ArgCapture.CaptureAll
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
@@ -248,6 +249,8 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       val exception    = exceptions.generateOne
       val nextEvent    = events.generateOne
 
+      val capturedFailure = CaptureAll[ToNonRecoverableFailure[IO]]()
+
       inSequence {
         isNextSubscriber(returning = true)
 
@@ -260,11 +263,9 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
           .expects(url1, failingEvent.compoundEventId, failingEvent.body)
           .returning(exception.raiseError[IO, SendingResult])
 
-        sending(
-          ToNonRecoverableFailure[IO](failingEvent.compoundEventId, EventMessage(exception), underProcessingGauge),
-          returning = Updated.pure[IO]
-        )
-
+        (statusUpdatesRunner.run _)
+          .expects(capture(capturedFailure))
+          .returning(Updated.pure[IO])
         // next event
         givenEvent(nextEvent, got = Delivered, forUrl = url2)
 
@@ -272,6 +273,10 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       }
 
       dispatcher.run.unsafeRunAsyncAndForget()
+
+      capturedFailure.value.eventId              shouldBe failingEvent.compoundEventId
+      capturedFailure.value.underProcessingGauge shouldBe underProcessingGauge
+      capturedFailure.value.maybeMessage         shouldBe EventMessage(exception)
 
       eventually {
         logger.loggedOnly(
@@ -409,6 +414,8 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       val exception    = exceptions.generateOne
       val nextEvent    = events.generateOne
 
+      val capturedFailure = CaptureAll[ToNonRecoverableFailure[IO]]()
+
       inSequence {
         isNextSubscriber(returning = true)
 
@@ -420,16 +427,14 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
           .expects(url1, failingEvent.compoundEventId, failingEvent.body)
           .returning(exception.raiseError[IO, SendingResult])
 
-        sending(
-          ToNonRecoverableFailure[IO](failingEvent.compoundEventId, EventMessage(exception), underProcessingGauge),
-          returning = exception.raiseError[IO, UpdateResult]
-        )
+        (statusUpdatesRunner.run _)
+          .expects(capture(capturedFailure))
+          .returning(exception.raiseError[IO, UpdateResult])
 
         // retrying
-        sending(
-          ToNonRecoverableFailure[IO](failingEvent.compoundEventId, EventMessage(exception), underProcessingGauge),
-          returning = Updated.pure[IO]
-        )
+        (statusUpdatesRunner.run _)
+          .expects(capture(capturedFailure))
+          .returning(Updated.pure[IO])
 
         // next event
         findingEvent(returning = Some(nextEvent))
@@ -440,6 +445,10 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       }
 
       dispatcher.run.unsafeRunAsyncAndForget()
+
+      capturedFailure.value.eventId              shouldBe failingEvent.compoundEventId
+      capturedFailure.value.underProcessingGauge shouldBe underProcessingGauge
+      capturedFailure.value.maybeMessage         shouldBe EventMessage(exception)
 
       eventually {
         logger.loggedOnly(
@@ -537,10 +546,6 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       (eventsSender.sendEvent _)
         .expects(forUrl, event.compoundEventId, event.body)
         .returning(got.pure[IO])
-
-    def sending(statusUpdateCommand: ChangeStatusCommand[IO], returning: IO[UpdateResult]) =
-      (statusUpdatesRunner.run _)
-        .expects(statusUpdateCommand)
-        .returning(returning)
   }
+
 }

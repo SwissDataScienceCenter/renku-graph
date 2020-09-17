@@ -20,7 +20,7 @@ package ch.datascience.rdfstore.entities
 
 import java.util.UUID.randomUUID
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory._

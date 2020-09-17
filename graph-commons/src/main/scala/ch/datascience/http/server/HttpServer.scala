@@ -20,7 +20,7 @@ package ch.datascience.http.server
 
 import cats.data.Kleisli
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.InfoMessage
 import ch.datascience.controllers.InfoMessage._
 import org.http4s.server.blaze._

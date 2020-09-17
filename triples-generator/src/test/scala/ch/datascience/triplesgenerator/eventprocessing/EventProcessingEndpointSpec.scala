@@ -18,11 +18,9 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
-import EventProcessingGenerators._
-import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.Generators.Implicits._
@@ -32,6 +30,7 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult.Busy
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
@@ -41,8 +40,8 @@ import io.circe.{Encoder, Json}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
-import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
+import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

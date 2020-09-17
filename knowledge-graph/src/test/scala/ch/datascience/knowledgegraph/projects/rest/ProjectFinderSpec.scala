@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.projects.rest
 
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions

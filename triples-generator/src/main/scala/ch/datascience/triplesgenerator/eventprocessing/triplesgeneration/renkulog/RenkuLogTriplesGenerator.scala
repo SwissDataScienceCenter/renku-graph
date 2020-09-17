@@ -23,7 +23,7 @@ import java.security.SecureRandom
 import cats.data.EitherT
 import cats.data.EitherT.{right, rightT}
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabUrl, RenkuLogTimeout}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken

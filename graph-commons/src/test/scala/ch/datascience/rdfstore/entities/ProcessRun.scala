@@ -18,7 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.entities.Association.{ChildRunPlanAssociation, ProcessRunPlanAssociation, WorkflowRunPlanAssociation}
 import ch.datascience.rdfstore.entities.RunPlan.{ProcessRunPlan, WorkflowRunPlan}

@@ -20,7 +20,7 @@ package io.renku.eventlog.latestevents
 
 import cats.MonadError
 import cats.effect.Effect
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.SqlQuery
 import ch.datascience.metrics.LabeledHistogram
 import io.chrisdavenport.log4cats.Logger

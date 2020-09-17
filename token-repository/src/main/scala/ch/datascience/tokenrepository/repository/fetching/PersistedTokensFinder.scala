@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository.repository.fetching
 
 import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken

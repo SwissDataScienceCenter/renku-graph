@@ -20,7 +20,7 @@ package ch.datascience.logging
 
 import cats.MonadError
 import cats.effect.Clock
-import cats.implicits._
+
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger

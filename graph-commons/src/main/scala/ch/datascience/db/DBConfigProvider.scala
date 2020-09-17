@@ -19,7 +19,7 @@
 package ch.datascience.db
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.db.DBConfigProvider.DBConfig
 import com.typesafe.config.{Config, ConfigFactory}

@@ -22,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.MonadError
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.control.RateLimitUnit._
 import eu.timepit.refined.auto._
 import org.scalatest.matchers.should

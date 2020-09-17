@@ -22,13 +22,13 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._

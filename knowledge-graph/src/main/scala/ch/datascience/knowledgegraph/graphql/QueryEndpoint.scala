@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.graphql
 
 import cats.MonadError
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.knowledgegraph.lineage
 import io.chrisdavenport.log4cats.Logger

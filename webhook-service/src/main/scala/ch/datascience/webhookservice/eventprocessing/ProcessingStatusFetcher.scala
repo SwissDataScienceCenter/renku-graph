@@ -18,15 +18,15 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
-import ProcessingStatusFetcher.ProcessingStatus
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.IORestClient
+import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.{NonNegative, Positive}
 import io.chrisdavenport.log4cats.Logger
@@ -88,7 +88,6 @@ private class IOProcessingStatusFetcher(
   import IOProcessingStatusFetcher._
   import ProcessingStatusFetcher._
   import cats.effect._
-  import cats.implicits._
   import org.http4s.Method.GET
   import org.http4s._
   import org.http4s.circe.jsonOf

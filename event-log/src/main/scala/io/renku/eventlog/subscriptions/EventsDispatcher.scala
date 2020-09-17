@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects

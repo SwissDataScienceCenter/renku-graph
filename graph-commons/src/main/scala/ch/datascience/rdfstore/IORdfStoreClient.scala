@@ -20,6 +20,7 @@ package ch.datascience.rdfstore
 
 import cats.MonadError
 import cats.effect._
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
 import ch.datascience.http.client.{HttpRequest, IORestClient}
@@ -114,7 +115,7 @@ abstract class IORdfStoreClient(
       maybeCountQuery: Option[SparqlQuery] = None
   )(implicit decoder:  Decoder[ResultType]): PagedResultsFinder[IO, ResultType] =
     new PagedResultsFinder[IO, ResultType] {
-      import cats.implicits._
+
       import ch.datascience.http.rest.paging.model.Total
       import ch.datascience.tinytypes.json.TinyTypeDecoders._
 

@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.MonadError
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config._
 import ch.datascience.config.renku.ResourceUrl
 import ch.datascience.controllers.ErrorMessage

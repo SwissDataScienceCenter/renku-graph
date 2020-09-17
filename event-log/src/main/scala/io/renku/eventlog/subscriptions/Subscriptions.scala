@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, Fiber, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

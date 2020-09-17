@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
 import cats.MonadError
-import cats.implicits._
+
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._

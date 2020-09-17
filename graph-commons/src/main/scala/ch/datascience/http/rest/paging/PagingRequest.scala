@@ -18,13 +18,13 @@
 
 package ch.datascience.http.rest.paging
 
-import model._
+import cats.syntax.all._
+import ch.datascience.http.rest.paging.model._
 
 final case class PagingRequest(page: Page, perPage: PerPage)
 
 object PagingRequest {
   import cats.data._
-  import cats.implicits._
   import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
   import org.http4s.{ParseFailure, QueryParamDecoder}
 

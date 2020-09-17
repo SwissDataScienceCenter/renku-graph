@@ -21,13 +21,12 @@ package io.renku.eventlog.init
 import java.time.Instant
 
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.BatchDate
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
-import doobie.implicits.javatime._
 import io.circe.literal._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.{CreatedDate, Event}

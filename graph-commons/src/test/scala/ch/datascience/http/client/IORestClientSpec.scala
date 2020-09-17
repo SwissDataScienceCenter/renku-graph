@@ -18,8 +18,6 @@
 
 package ch.datascience.http.client
 
-import java.net.ConnectException
-
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.control.Throttler

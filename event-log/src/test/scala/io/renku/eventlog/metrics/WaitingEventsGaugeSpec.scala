@@ -20,7 +20,7 @@ package io.renku.eventlog.metrics
 
 import cats.MonadError
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, nonEmptySet, nonNegativeLongs}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths

@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.config
 
+import cats.syntax.all._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 
 import scala.concurrent.duration.FiniteDuration
@@ -27,7 +28,6 @@ final class RenkuLogTimeout private (val value: FiniteDuration) extends AnyVal w
 object RenkuLogTimeout extends TinyTypeFactory[RenkuLogTimeout](new RenkuLogTimeout(_)) {
 
   import cats.MonadError
-  import cats.implicits._
   import ch.datascience.config.ConfigLoader.find
   import com.typesafe.config.{Config, ConfigFactory}
 

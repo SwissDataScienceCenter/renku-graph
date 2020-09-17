@@ -18,14 +18,14 @@
 
 package ch.datascience.knowledgegraph.lineage
 
-import LineageGenerators._
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model.Node
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory

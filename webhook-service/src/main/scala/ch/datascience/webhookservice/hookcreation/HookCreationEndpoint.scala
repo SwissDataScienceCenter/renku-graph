@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.hookcreation
 
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._

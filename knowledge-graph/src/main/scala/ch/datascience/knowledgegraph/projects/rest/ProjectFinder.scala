@@ -19,14 +19,14 @@
 package ch.datascience.knowledgegraph.projects.rest
 
 import cats.MonadError
-import cats.implicits._
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
-import IOAccessTokenFinder._
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
+import cats.syntax.all._
 import ch.datascience.config.GitLab
+import ch.datascience.control.Throttler
+import ch.datascience.graph.model.projects.Path
+import ch.datascience.graph.tokenrepository.IOAccessTokenFinder._
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.{KGProject, Parent}

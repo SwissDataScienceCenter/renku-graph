@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import CurationGenerators._
-import cats.implicits._
+
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import org.scalamock.scalatest.MockFactory

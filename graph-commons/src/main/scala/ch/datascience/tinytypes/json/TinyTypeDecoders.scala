@@ -21,7 +21,7 @@ package ch.datascience.tinytypes.json
 import java.time.ZoneOffset.UTC
 import java.time.{Instant, LocalDate, OffsetDateTime}
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.tinytypes._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.collection.NonEmpty

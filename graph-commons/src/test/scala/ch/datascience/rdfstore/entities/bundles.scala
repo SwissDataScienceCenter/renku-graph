@@ -18,7 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}

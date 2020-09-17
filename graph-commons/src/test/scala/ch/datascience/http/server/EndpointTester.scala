@@ -20,7 +20,7 @@ package ch.datascience.http.server
 
 import cats.data.Kleisli
 import cats.effect.{ContextShift, IO, Resource, Sync}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.{Href, Rel}
@@ -28,7 +28,7 @@ import eu.timepit.refined.api.RefType
 import io.circe._
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.headers.`Content-Type`
-import org.http4s.{EntityDecoder, EntityEncoder, HttpRoutes, Request, Response, Status}
+import org.http4s._
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds

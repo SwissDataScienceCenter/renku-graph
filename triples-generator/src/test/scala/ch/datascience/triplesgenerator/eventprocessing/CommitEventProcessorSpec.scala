@@ -23,7 +23,7 @@ import cats.MonadError
 import cats.data.EitherT.{leftT, rightT}
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._

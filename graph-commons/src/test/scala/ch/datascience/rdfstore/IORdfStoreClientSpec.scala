@@ -105,7 +105,7 @@ class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with
 
   "send sparql query with paging request" should {
 
-    import cats.implicits._
+
     import io.circe.literal._
 
     "do a single call to the store if not full page returned" in new QueryClientTestCase {

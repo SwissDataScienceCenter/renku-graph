@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.eventprocessing.startcommit
 
 import cats.effect.IO
-import cats.implicits._
+
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.commits.CommitInfoFinder

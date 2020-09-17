@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.effect.{ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._

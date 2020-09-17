@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.lineage
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 

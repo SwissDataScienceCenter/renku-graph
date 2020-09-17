@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._

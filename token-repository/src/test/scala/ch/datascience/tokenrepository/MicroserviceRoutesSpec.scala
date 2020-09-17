@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository
 
 import cats.data.OptionT
 import cats.effect.{Clock, IO}
-import cats.implicits._
+
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects

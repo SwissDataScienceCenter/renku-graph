@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.MonadError
 import cats.effect.Timer
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}

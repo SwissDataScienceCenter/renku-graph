@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.eventprocessing.startcommit
 
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import cats.{Monad, MonadError}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler

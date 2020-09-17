@@ -19,7 +19,7 @@
 package ch.datascience.http.rest.paging
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder

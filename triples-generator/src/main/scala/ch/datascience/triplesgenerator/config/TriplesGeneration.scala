@@ -29,7 +29,7 @@ object TriplesGeneration {
   final case object RenkuLog                extends TriplesGeneration
   final case object RemoteTriplesGeneration extends TriplesGeneration
 
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.config.ConfigLoader._
 
   def apply[Interpretation[_]](
