@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository.repository
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.http.client.AccessToken

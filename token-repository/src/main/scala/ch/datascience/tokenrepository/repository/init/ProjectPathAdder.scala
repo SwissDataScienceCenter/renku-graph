@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository.repository.init
 
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken

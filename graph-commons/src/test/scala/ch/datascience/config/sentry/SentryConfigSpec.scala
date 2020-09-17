@@ -18,7 +18,7 @@
 
 package ch.datascience.config.sentry
 
-import cats.implicits._
+
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._

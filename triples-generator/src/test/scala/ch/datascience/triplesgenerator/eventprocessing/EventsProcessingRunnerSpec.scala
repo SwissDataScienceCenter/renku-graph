@@ -20,24 +20,23 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import java.lang.Thread.sleep
 
-import EventProcessingGenerators._
 import cats.data.NonEmptyList
 import cats.effect._
-import cats.effect.concurrent.Semaphore
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult.{Accepted, Busy}
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext

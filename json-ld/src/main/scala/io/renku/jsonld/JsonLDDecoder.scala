@@ -18,6 +18,7 @@
 
 package io.renku.jsonld
 
+import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.jsonld.JsonLD.JsonLDValue
 import io.renku.jsonld.JsonLDDecoder.Result
@@ -30,8 +31,6 @@ trait JsonLDDecoder[A] extends Serializable {
 }
 
 object JsonLDDecoder {
-
-  import cats.implicits._
 
   type Result[A] = Either[DecodingFailure, A]
 

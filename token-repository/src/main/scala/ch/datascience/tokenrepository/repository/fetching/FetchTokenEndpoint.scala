@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository.repository.fetching
 
 import cats.data.OptionT
 import cats.effect.{ContextShift, Effect, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.DbTransactor

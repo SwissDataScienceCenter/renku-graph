@@ -21,7 +21,7 @@ package io.renku.eventlog.metrics
 import java.lang.Thread.sleep
 
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
@@ -31,9 +31,9 @@ import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._

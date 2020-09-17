@@ -46,7 +46,7 @@ private class IOProjectPathFinder(
     with ProjectPathFinder[IO] {
 
   import cats.effect._
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
   import org.http4s.Method.GET

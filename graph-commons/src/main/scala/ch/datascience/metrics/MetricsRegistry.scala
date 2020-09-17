@@ -37,7 +37,7 @@ trait MetricsRegistry[Interpretation[_]] {
 object MetricsRegistry {
 
   import cats.effect.IO
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.config.ConfigLoader.find
   import com.typesafe.config.{Config, ConfigFactory}
 

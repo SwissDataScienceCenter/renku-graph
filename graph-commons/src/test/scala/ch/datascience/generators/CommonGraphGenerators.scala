@@ -21,7 +21,7 @@ package ch.datascience.generators
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
 
-import cats.implicits._
+
 import ch.datascience.config.renku
 import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}

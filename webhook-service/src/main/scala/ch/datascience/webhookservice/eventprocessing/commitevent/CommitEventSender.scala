@@ -18,15 +18,16 @@
 
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
-import CommitEventSender.EventSendingResult
-import CommitEventSender.EventSendingResult.{EventCreated, EventExisted}
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.EventBody
 import ch.datascience.http.client.IORestClient
 import ch.datascience.webhookservice.eventprocessing.CommitEvent
+import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender.EventSendingResult
+import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender.EventSendingResult.{EventCreated, EventExisted}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
 
@@ -57,7 +58,6 @@ class IOCommitEventSender(
     with CommitEventSender[IO] {
 
   import cats.effect._
-  import cats.implicits._
   import commitEventSerializer._
   import io.circe.Encoder
   import io.circe.literal._

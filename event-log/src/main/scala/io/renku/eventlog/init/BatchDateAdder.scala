@@ -21,7 +21,7 @@ package io.renku.eventlog.init
 import java.time.Instant
 
 import cats.effect.Bracket
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import doobie.implicits._
 import doobie.implicits.javatime._

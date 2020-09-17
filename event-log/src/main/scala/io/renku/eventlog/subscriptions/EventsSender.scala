@@ -57,7 +57,7 @@ private class IOEventsSender(
 
   import SendingResult._
   import cats.effect._
-  import cats.implicits._
+  import cats.syntax.all._
   import io.circe.Encoder
   import io.circe.literal._
   import io.circe.syntax._

@@ -22,7 +22,7 @@ import java.net.{MalformedURLException, URL}
 import java.time.Instant
 
 import cats.data.Validated
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.model.projects.{DateCreated, Description, Id, Name, Path, SchemaVersion, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.knowledgegraph.projects.model.Statistics._

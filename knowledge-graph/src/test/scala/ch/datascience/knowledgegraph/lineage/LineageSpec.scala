@@ -18,7 +18,7 @@
 
 package ch.datascience.knowledgegraph.lineage
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._

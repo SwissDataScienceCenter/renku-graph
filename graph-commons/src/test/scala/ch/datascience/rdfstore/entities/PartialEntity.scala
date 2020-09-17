@@ -19,8 +19,8 @@
 package ch.datascience.rdfstore.entities
 
 import cats.data.NonEmptyList
-import cats.implicits._
 import cats.kernel.Semigroup
+import cats.syntax.all._
 import io.renku.jsonld._
 
 final case class PartialEntity(maybeId:      Option[EntityId],

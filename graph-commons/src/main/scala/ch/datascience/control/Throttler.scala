@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
 import cats.MonadError
 import cats.effect.concurrent.{Ref, Semaphore}
 import cats.effect.{Concurrent, Timer}
-import cats.implicits._
+import cats.syntax.all._
 
 import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}

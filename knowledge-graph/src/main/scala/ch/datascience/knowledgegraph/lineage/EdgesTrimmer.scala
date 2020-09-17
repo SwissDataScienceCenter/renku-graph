@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.MonadError
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.knowledgegraph.lineage.IOLineageDataTrimmer.EntityIdOps
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import ch.datascience.knowledgegraph.lineage.model.{EdgeMap, Node}

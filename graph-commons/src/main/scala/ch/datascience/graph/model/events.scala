@@ -20,6 +20,7 @@ package ch.datascience.graph.model
 
 import java.time.{Clock, Instant}
 
+import cats.syntax.all._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 
@@ -45,7 +46,7 @@ object events {
   implicit object EventBody extends TinyTypeFactory[EventBody](new EventBody(_)) with NonBlank {
 
     implicit class EventBodyOps(eventBody: EventBody) {
-      import cats.implicits._
+
       import io.circe.parser.parse
       import io.circe.{Decoder, DecodingFailure, Json}
 

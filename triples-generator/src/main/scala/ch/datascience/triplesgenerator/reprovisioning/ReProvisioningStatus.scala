@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore._
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
@@ -57,7 +58,6 @@ private class ReProvisioningStatusImpl(
     with ReProvisioningStatus[IO] {
 
   import ReProvisioningJsonLD._
-  import cats.implicits._
 
   private val runningStatusCheckStarted = new AtomicBoolean(false)
 

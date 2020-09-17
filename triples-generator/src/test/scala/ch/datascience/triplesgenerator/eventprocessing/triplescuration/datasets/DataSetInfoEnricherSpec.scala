@@ -21,7 +21,7 @@ package datasets
 
 import cats.MonadError
 import cats.data.EitherT
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -176,7 +176,6 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
   }
 
   private trait TestCase {
-    implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
     val curatedTriples = curatedTriplesObjects[Try].generateOne
 
     val infoFinder         = mock[DataSetInfoFinder[Try]]

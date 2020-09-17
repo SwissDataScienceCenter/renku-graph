@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
 import cats.MonadError
-import cats.implicits._
+
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.webhookservice.eventprocessing.{CommitEvent, Person}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._

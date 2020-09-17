@@ -18,6 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.FusekiBaseUrl
@@ -76,7 +77,6 @@ object Activity {
                  maybeInvalidation,
                  maybeGenerationFactories)
 
-  import cats.implicits._
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 

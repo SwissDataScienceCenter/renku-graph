@@ -36,9 +36,7 @@ private class SubscriptionUrlFinderImpl[Interpretation[_]]()(implicit ME: MonadE
     extends SubscriptionUrlFinder[Interpretation] {
 
   import java.net.NetworkInterface
-
-  import cats.implicits._
-
+  import cats.syntax.all._
   import scala.collection.JavaConverters._
 
   override def findSubscriberUrl: Interpretation[SubscriberUrl] =

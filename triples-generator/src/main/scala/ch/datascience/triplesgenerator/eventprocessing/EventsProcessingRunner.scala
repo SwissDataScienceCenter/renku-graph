@@ -22,7 +22,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO._
 import cats.effect._
 import cats.effect.concurrent.Semaphore
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult

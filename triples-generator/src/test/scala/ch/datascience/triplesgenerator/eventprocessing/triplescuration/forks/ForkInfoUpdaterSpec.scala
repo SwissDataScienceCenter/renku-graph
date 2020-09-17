@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.data.EitherT
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.{accessTokens, jsonLDTriples}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._

@@ -18,7 +18,7 @@
 
 package ch.datascience.http.rest.paging
 
-import cats.implicits._
+
 import ch.datascience.config.renku
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._

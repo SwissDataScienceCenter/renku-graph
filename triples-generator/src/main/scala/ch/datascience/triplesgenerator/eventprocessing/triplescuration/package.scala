@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.MonadError
 import cats.data.{EitherT, OptionT}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.Schemas.schema
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.TinyType
@@ -40,7 +40,7 @@ package object triplescuration {
     s"INSERT DATA { $resource $property '${sparqlEncode(value.value)}'}"
 
   implicit class JsonOps(json: Json) {
-    import cats.implicits._
+
     import io.circe.Decoder.decodeList
     import io.circe.Encoder.encodeList
     import io.circe.optics.JsonPath.root

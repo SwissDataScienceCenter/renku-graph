@@ -18,9 +18,9 @@
 
 package ch.datascience.config.sentry
 
-import SentryConfig._
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
+import ch.datascience.config.sentry.SentryConfig._
 import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}

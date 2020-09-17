@@ -23,7 +23,7 @@ import java.time.{Duration, Instant}
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.CommonGraphGenerators.renkuLogTimeouts
 import ch.datascience.generators.Generators.Implicits._

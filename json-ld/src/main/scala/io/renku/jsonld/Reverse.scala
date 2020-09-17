@@ -18,7 +18,7 @@
 
 package io.renku.jsonld
 
-import cats.implicits._
+import cats.syntax.all._
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity}
 

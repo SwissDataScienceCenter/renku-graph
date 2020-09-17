@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.eventprocessing
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._

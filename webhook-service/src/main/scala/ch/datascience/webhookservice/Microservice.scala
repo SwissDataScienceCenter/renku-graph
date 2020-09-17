@@ -21,6 +21,7 @@ package ch.datascience.webhookservice
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
+import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
@@ -100,7 +101,6 @@ object Microservice extends IOMicroservice {
 class MicroserviceRunner(sentryInitializer:              SentryInitializer[IO],
                          eventsSynchronizationScheduler: EventsSynchronizationScheduler[IO],
                          httpServer:                     HttpServer[IO])(implicit contextShift: ContextShift[IO]) {
-  import cats.implicits._
 
   def run(args: List[String]): IO[ExitCode] =
     for {

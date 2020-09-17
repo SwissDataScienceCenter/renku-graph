@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
-import cats.implicits._
+
 
 import scala.util.Try
 

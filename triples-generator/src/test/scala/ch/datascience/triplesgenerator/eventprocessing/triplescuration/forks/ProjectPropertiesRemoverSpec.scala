@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId, SchemaVersion}
 import ch.datascience.graph.model.users

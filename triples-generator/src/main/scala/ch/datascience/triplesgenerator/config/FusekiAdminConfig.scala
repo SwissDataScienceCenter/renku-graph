@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.config
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import ch.datascience.rdfstore.{DatasetName, FusekiBaseUrl}

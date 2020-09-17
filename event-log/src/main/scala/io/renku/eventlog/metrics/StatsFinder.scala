@@ -20,7 +20,7 @@ package io.renku.eventlog.metrics
 
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.metrics.LabeledHistogram

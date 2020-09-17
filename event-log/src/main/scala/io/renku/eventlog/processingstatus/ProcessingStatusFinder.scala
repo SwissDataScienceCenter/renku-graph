@@ -21,7 +21,7 @@ package io.renku.eventlog.processingstatus
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.metrics.LabeledHistogram
@@ -88,7 +88,7 @@ object IOProcessingStatusFinder {
   }
 }
 
-import ProcessingStatus._
+import io.renku.eventlog.processingstatus.ProcessingStatus._
 
 final case class ProcessingStatus private (
     done:     Done,

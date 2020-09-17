@@ -87,7 +87,7 @@ private object Commands {
         %%('git, 'clone, url.toString, destinationDir.toString)(workDir)
   ) {
     import cats.data.EitherT
-    import cats.implicits._
+    import cats.syntax.all._
     import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
     def checkout(commitId: CommitId, repositoryDirectory: Path): IO[Unit] =
@@ -133,7 +133,7 @@ private object Commands {
     ME:                    MonadError[IO, Throwable],
     executionContext:      ExecutionContext) {
 
-    import cats.implicits._
+    import cats.syntax.all._
 
     import scala.util.Try
 
