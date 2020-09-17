@@ -18,6 +18,8 @@
 
 package ch.datascience.db
 
+import cats.MonadError
+
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.db.DBConfigProvider.DBConfig._
 import ch.datascience.generators.Generators.Implicits._
@@ -212,6 +214,8 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       exception shouldBe a[ConfigLoadingException]
     }
   }
+
+  private implicit val context: MonadError[Try, Throwable] = MonadError[Try, Throwable]
 
   private trait TestCase {
     sealed trait TestDB
