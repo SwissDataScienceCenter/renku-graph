@@ -60,7 +60,8 @@ class DataSetInfoFinderSpec extends AnyWordSpec with should.Matchers {
       }
 
       val Success(datasetInfos) = infoFinder.findDatasetsInfo(triples)
-      datasetInfos             shouldBe (Set((entityId, sameAs, None)))
+
+      datasetInfos             shouldBe Set((entityId, sameAs, None))
       datasetInfos.head._2.get shouldBe an[UrlSameAs]
     }
 
@@ -73,7 +74,8 @@ class DataSetInfoFinderSpec extends AnyWordSpec with should.Matchers {
       }
 
       val Success(datasetInfos) = infoFinder.findDatasetsInfo(triples)
-      datasetInfos             shouldBe (Set((entityId, sameAs, None)))
+
+      datasetInfos             shouldBe Set((entityId, sameAs, None))
       datasetInfos.head._2.get shouldBe an[IdSameAs]
     }
 

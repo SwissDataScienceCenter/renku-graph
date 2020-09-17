@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 import cats.MonadError
 import cats.data.{EitherT, OptionT}
 import cats.implicits._
+import ch.datascience.graph.Schemas.schema
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
@@ -45,8 +46,44 @@ package object triplescuration {
     import io.circe.optics.JsonPath.root
     import io.circe.{Decoder, Encoder}
 
+    def findTypes: List[String] = {
+      val t  = root.`@type`.each.string.getAll(json)
+      val tt = root.`@type`.string.getOption(json).toList
+      t ++ tt
+    }
+
     def get[T](property: String)(implicit decode: Decoder[T], encode: Encoder[T]): Option[T] =
       root.selectDynamic(property).as[T].getOption(json)
+
+    def getValue[F[_], T](implicit decode: Decoder[T], ME: MonadError[F, Throwable]): OptionT[F, T] = {
+      val valueJson = json.hcursor.downField("@value")
+      (valueJson.as[Option[List[T]]] orElse valueJson.as[Option[T]].map(_.map(List(_))))
+        .fold(
+          fail("No @value property found in Json"),
+          toSingleValue
+        )
+    }
+
+    def getId[F[_], T](implicit decode: Decoder[T], ME: MonadError[F, Throwable]): OptionT[F, T] =
+      json.hcursor
+        .downField("@id")
+        .as[Option[T]]
+        .fold(
+          fail("No @id property found in Json"),
+          OptionT.fromOption[F](_)
+        )
+
+    private def fail[F[_], T](
+        message: String
+    )(exception: Throwable)(implicit ME: MonadError[F, Throwable]): OptionT[F, T] =
+      OptionT.liftF(new IllegalStateException(message, exception).raiseError[F, T])
+
+    private def toSingleValue[F[_], T](implicit ME: MonadError[F, Throwable]): Option[List[T]] => OptionT[F, T] = {
+      case Some(v +: Nil) => OptionT.some[F](v)
+      case Some(Nil)      => OptionT.none[F, T]
+      case None           => OptionT.none[F, T]
+      case _              => OptionT.liftF(new IllegalStateException(s"Multiple values found in Json").raiseError[F, T])
+    }
 
     def getValues[T](
         property:      String
