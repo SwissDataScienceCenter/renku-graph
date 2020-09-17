@@ -260,7 +260,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
           .expects(url1, failingEvent.compoundEventId, failingEvent.body)
           .returning(exception.raiseError[IO, SendingResult])
 
-        sending(
+        sendingAndExpectingException(
           ToNonRecoverableFailure[IO](failingEvent.compoundEventId, EventMessage(exception), underProcessingGauge),
           returning = Updated.pure[IO]
         )
@@ -420,13 +420,13 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
           .expects(url1, failingEvent.compoundEventId, failingEvent.body)
           .returning(exception.raiseError[IO, SendingResult])
 
-        sending(
+        sendingAndExpectingException(
           ToNonRecoverableFailure[IO](failingEvent.compoundEventId, EventMessage(exception), underProcessingGauge),
           returning = exception.raiseError[IO, UpdateResult]
         )
 
         // retrying
-        sending(
+        sendingAndExpectingException(
           ToNonRecoverableFailure[IO](failingEvent.compoundEventId, EventMessage(exception), underProcessingGauge),
           returning = Updated.pure[IO]
         )
@@ -538,9 +538,29 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         .expects(forUrl, event.compoundEventId, event.body)
         .returning(got.pure[IO])
 
-    def sending(statusUpdateCommand: ChangeStatusCommand[IO], returning: IO[UpdateResult]) =
+    def sendingAndExpectingException(statusUpdateCommand: ToNonRecoverableFailure[IO], returning: IO[UpdateResult]) =
       (statusUpdatesRunner.run _)
-        .expects(statusUpdateCommand)
+        .expects(where { failure: ChangeStatusCommand[IO] =>
+          failure match {
+            case f: ToNonRecoverableFailure[IO] => f.ignoreExceptionStackTrace(statusUpdateCommand)
+            case _ => false
+          }
+        })
         .returning(returning)
+
+    implicit class ToNonRecoverableFailureOps(failure: ToNonRecoverableFailure[IO]) {
+      def ignoreExceptionStackTrace(of: ToNonRecoverableFailure[IO]): Boolean =
+        failure.eventId == of.eventId &&
+          failure.underProcessingGauge == of.underProcessingGauge &&
+          failure.now == of.now && {
+          (failure.maybeMessage, of.maybeMessage) match {
+            case (Some(_), Some(_)) => true
+            case (None, None)       => true
+            case _                  => false
+          }
+        }
+
+    }
   }
+
 }
