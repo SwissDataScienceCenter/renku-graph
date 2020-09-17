@@ -79,7 +79,7 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
         value.get[String]("@id") match {
           case Some(id) =>
             SameAs
-              .from(id)
+              .fromId(id)
               .fold(e => OptionT.liftF(e.raiseError[Interpretation, SameAs]), OptionT.some[Interpretation](_))
           case None => OptionT.none[Interpretation, SameAs]
         }
