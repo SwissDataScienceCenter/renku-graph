@@ -21,7 +21,6 @@ package ch.datascience.triplesgenerator.eventprocessing
 import cats.MonadError
 import cats.data.{EitherT, OptionT}
 import cats.syntax.all._
-import ch.datascience.graph.Schemas.schema
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
@@ -55,23 +54,31 @@ package object triplescuration {
     def get[T](property: String)(implicit decode: Decoder[T], encode: Encoder[T]): Option[T] =
       root.selectDynamic(property).as[T].getOption(json)
 
-    def getValue[F[_], T](implicit decode: Decoder[T], ME: MonadError[F, Throwable]): OptionT[F, T] = {
-      val valueJson = json.hcursor.downField("@value")
-      (valueJson.as[Option[List[T]]] orElse valueJson.as[Option[T]].map(_.map(List(_))))
-        .fold(
-          fail("No @value property found in Json"),
-          toSingleValue
-        )
-    }
+    def getValue[F[_], T](implicit decode: Decoder[T], ME: MonadError[F, Throwable]): OptionT[F, T] =
+      singleValueJson(ME).flatMap {
+        _.hcursor
+          .downField("@value")
+          .as[Option[T]]
+          .fold(
+            fail("No @value property found in Json"),
+            OptionT.fromOption[F](_)
+          )
+      }
 
     def getId[F[_], T](implicit decode: Decoder[T], ME: MonadError[F, Throwable]): OptionT[F, T] =
-      json.hcursor
-        .downField("@id")
-        .as[Option[T]]
-        .fold(
-          fail("No @id property found in Json"),
-          OptionT.fromOption[F](_)
-        )
+      singleValueJson(ME).flatMap {
+        _.hcursor
+          .downField("@id")
+          .as[Option[T]]
+          .fold(
+            fail("No @value property found in Json"),
+            OptionT.fromOption[F](_)
+          )
+      }
+
+    private def singleValueJson[F[_]](implicit ME: MonadError[F, Throwable]) =
+      if (json.isArray) toSingleValue(ME)(json.asArray.map(_.toList))
+      else OptionT.some[F](json)
 
     private def fail[F[_], T](
         message: String

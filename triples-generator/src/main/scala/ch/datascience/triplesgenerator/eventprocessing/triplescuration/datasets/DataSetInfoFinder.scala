@@ -77,8 +77,10 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
 
   private def getSameAsUrl(json: Json): OptionT[Interpretation, EntityId] =
     json.get[Json]((schema / "sameAs").toString) match {
-      case Some(sameAs) => sameAs.getId[Interpretation, EntityId]
-      case None         => OptionT.none[Interpretation, EntityId]
+      case Some(sameAs) =>
+        sameAs.getId[Interpretation, EntityId]
+      case None =>
+        OptionT.none[Interpretation, EntityId]
     }
 
   private def getDerivedFrom(json: Json): OptionT[Interpretation, DerivedFrom] =
