@@ -70,7 +70,7 @@ object Microservice extends IOMicroservice {
                              )
       processingStatusEndpoint <-
         IOProcessingStatusEndpoint(projectHookUrl, gitLabThrottler, executionTimeRecorder, ApplicationLogger)
-      hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler)
+      hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler, ApplicationLogger)
       eventsSynchronizationScheduler <-
         IOEventsSynchronizationScheduler(gitLabThrottler, executionTimeRecorder, ApplicationLogger)
 
