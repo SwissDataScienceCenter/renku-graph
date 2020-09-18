@@ -83,8 +83,8 @@ class QueryEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       val response = handleQuery(request).unsafeRunSync()
 
-      response.status                                 shouldBe BadRequest
-      response.contentType                            shouldBe Some(`Content-Type`(application.json))
+      response.status                               shouldBe BadRequest
+      response.contentType                          shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync().value should include("Invalid JSON")
     }
 

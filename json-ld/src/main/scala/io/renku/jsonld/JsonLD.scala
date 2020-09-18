@@ -37,15 +37,15 @@ object JsonLD {
 
   val Null: JsonLD = JsonLDNull
 
-  def fromString(value:    String): JsonLD = JsonLDValue(value)
-  def fromInt(value:       Int): JsonLD = JsonLDValue(value)
-  def fromLong(value:      Long): JsonLD = JsonLDValue(value)
-  def fromInstant(value:   Instant): JsonLD = JsonLDValue(value, "http://www.w3.org/2001/XMLSchema#dateTime")
+  def fromString(value:    String):    JsonLD = JsonLDValue(value)
+  def fromInt(value:       Int):       JsonLD = JsonLDValue(value)
+  def fromLong(value:      Long):      JsonLD = JsonLDValue(value)
+  def fromInstant(value:   Instant):   JsonLD = JsonLDValue(value, "http://www.w3.org/2001/XMLSchema#dateTime")
   def fromLocalDate(value: LocalDate): JsonLD = JsonLDValue(value, "http://schema.org/Date")
   def fromBoolean(value:   Boolean): JsonLD = JsonLDValue(value)
   def fromOption[V](value: Option[V])(implicit encoder: JsonLDEncoder[V]): JsonLD = JsonLDOptionValue(value)
-  def fromEntityId(id:     EntityId): JsonLD = JsonLDEntityId(id)
-  def arr(jsons:           JsonLD*): JsonLD = JsonLDArray(jsons)
+  def fromEntityId(id:     EntityId):  JsonLD = JsonLDEntityId(id)
+  def arr(jsons:           JsonLD*):   JsonLD = JsonLDArray(jsons)
 
   def entity(
       id:            EntityId,
@@ -79,8 +79,8 @@ object JsonLD {
   private[jsonld] final case class JsonLDEntity(id:         EntityId,
                                                 types:      EntityTypes,
                                                 properties: NonEmptyList[(Property, JsonLD)],
-                                                reverse:    Reverse)
-      extends JsonLD {
+                                                reverse:    Reverse
+  ) extends JsonLD {
 
     override lazy val toJson: Json = Json.obj(
       List(
@@ -112,7 +112,7 @@ object JsonLD {
       extends JsonLD {
     override lazy val toJson: Json = maybeType match {
       case None    => Json.obj("@value" -> value.asJson)
-      case Some(t) => Json.obj("@type"  -> t.asJson, "@value" -> value.asJson)
+      case Some(t) => Json.obj("@type" -> t.asJson, "@value" -> value.asJson)
     }
 
     override lazy val entityId:    Option[EntityId]    = None

@@ -99,8 +99,8 @@ object CommandParameter {
       case object StdOut extends IOStream("stdout") with Out
       case object StdErr extends IOStream("stderr") with Out
 
-      private[entities] implicit def converter[IO <: IOStream](
-          implicit renkuBaseUrl: RenkuBaseUrl
+      private[entities] implicit def converter[IO <: IOStream](implicit
+          renkuBaseUrl: RenkuBaseUrl
       ): PartialEntityConverter[IO] =
         new PartialEntityConverter[IO] {
           override def convert[T <: IO]: T => Either[Exception, PartialEntity] =
@@ -111,15 +111,15 @@ object CommandParameter {
               ).asRight
 
           override def toEntityId: IO => Option[EntityId] =
-            e => EntityId.of { renkuBaseUrl / "iostreams" / e.name.toString() }.some
+            e => EntityId.of(renkuBaseUrl / "iostreams" / e.name.toString()).some
         }
 
       implicit def encoder[IO <: IOStream](implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[IO] =
-        JsonLDEncoder.instance[IO] { _.asPartialJsonLD[IO].getOrFail }
+        JsonLDEncoder.instance[IO](_.asPartialJsonLD[IO].getOrFail)
     }
 
-    private[entities] implicit def converter[M <: Mapping](
-        implicit renkuBaseUrl: RenkuBaseUrl
+    private[entities] implicit def converter[M <: Mapping](implicit
+        renkuBaseUrl: RenkuBaseUrl
     ): PartialEntityConverter[M] = new NoEntityIdPartialConverter[M] {
       override def convert[T <: M]: T => Either[Exception, PartialEntity] =
         entity =>
@@ -131,8 +131,8 @@ object CommandParameter {
 
   sealed abstract class EntityCommandParameter(override val maybePrefix: Option[Prefix],
                                                override val runPlan:     Entity with RunPlan,
-                                               val entity:               Entity with Artifact)
-      extends CommandParameter(maybePrefix, runPlan) {
+                                               val entity:               Entity with Artifact
+  ) extends CommandParameter(maybePrefix, runPlan) {
     override lazy val value: Value = Value(entity.location)
   }
 
@@ -156,8 +156,8 @@ object CommandParameter {
 
   final class Argument(override val position:    Position,
                        override val maybePrefix: Option[Prefix],
-                       override val runPlan:     Entity with RunPlan)
-      extends CommandParameter(maybePrefix, runPlan)
+                       override val runPlan:     Entity with RunPlan
+  ) extends CommandParameter(maybePrefix, runPlan)
       with PositionInfo {
     override val value:         Value  = Value("input_path")
     override lazy val toString: String = s"argument_$position"
@@ -170,9 +170,9 @@ object CommandParameter {
     def factory(maybePrefix: Option[Prefix] = None): ArgumentFactory =
       position => runPlan => new Argument(position, maybePrefix, runPlan)
 
-    private implicit def converter(
-        implicit renkuBaseUrl: RenkuBaseUrl,
-        fusekiBaseUrl:         FusekiBaseUrl
+    private implicit def converter(implicit
+        renkuBaseUrl:  RenkuBaseUrl,
+        fusekiBaseUrl: FusekiBaseUrl
     ): PartialEntityConverter[CommandParameter with Argument] =
       new PartialEntityConverter[CommandParameter with Argument] {
 
@@ -187,8 +187,10 @@ object CommandParameter {
           argument.runPlan.getEntityId map (_ / "arguments" / argument)
       }
 
-    implicit def argumentEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                                 fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[CommandParameter with Argument] =
+    implicit def argumentEncoder(implicit
+        renkuBaseUrl:  RenkuBaseUrl,
+        fusekiBaseUrl: FusekiBaseUrl
+    ): JsonLDEncoder[CommandParameter with Argument] =
       JsonLDEncoder.instance[CommandParameter with Argument] { entity =>
         entity
           .asPartialJsonLD[CommandParameter]
@@ -231,7 +233,8 @@ object CommandParameter {
 
     def from(entity:      Entity with Artifact,
              maybePrefix: Option[Prefix],
-             maybeUsedIn: Option[Step]): PositionInputFactory =
+             maybeUsedIn: Option[Step]
+    ): PositionInputFactory =
       positionArg =>
         runPlan =>
           new EntityCommandParameter(maybePrefix, runPlan, entity) with Input with PositionInfo {
@@ -245,7 +248,8 @@ object CommandParameter {
 
     def streamFrom(entity:      Entity with Artifact,
                    maybePrefix: Option[Prefix],
-                   maybeUsedIn: Option[Step]): MappedInputFactory =
+                   maybeUsedIn: Option[Step]
+    ): MappedInputFactory =
       runPlan =>
         new EntityCommandParameter(maybePrefix, runPlan, entity) with Input with InputMapping {
           protected override val identifier: String       = StdIn.name.value
@@ -258,7 +262,8 @@ object CommandParameter {
 
     def withoutPositionFrom(entity:      Entity with Artifact,
                             maybePrefix: Option[Prefix],
-                            maybeUsedIn: Option[Step]): NoPositionInputFactory =
+                            maybeUsedIn: Option[Step]
+    ): NoPositionInputFactory =
       runPlan =>
         new EntityCommandParameter(maybePrefix, runPlan, entity) with Input {
           protected override val identifier: String       = randomUUID().toString
@@ -266,7 +271,8 @@ object CommandParameter {
         }
 
     def factory(entityFactory: Activity => Entity with Artifact,
-                maybePrefix:   Option[Prefix] = None): ActivityPositionInputFactory =
+                maybePrefix:   Option[Prefix] = None
+    ): ActivityPositionInputFactory =
       activity =>
         positionArg =>
           runPlan =>
@@ -276,8 +282,10 @@ object CommandParameter {
               override val position:             Position     = positionArg
             }
 
-    private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
-                                   fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Input] =
+    private implicit def converter(implicit
+        renkuBaseUrl:  RenkuBaseUrl,
+        fusekiBaseUrl: FusekiBaseUrl
+    ): PartialEntityConverter[CommandParameter with Input] =
       new PartialEntityConverter[CommandParameter with Input] {
         override def convert[T <: CommandParameter with Input]: T => Either[Exception, PartialEntity] = {
           case input: EntityCommandParameter with Input =>
@@ -298,8 +306,10 @@ object CommandParameter {
           }
       }
 
-    implicit def inputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                              fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[CommandParameter with Input] =
+    implicit def inputEncoder(implicit
+        renkuBaseUrl:  RenkuBaseUrl,
+        fusekiBaseUrl: FusekiBaseUrl
+    ): JsonLDEncoder[CommandParameter with Input] =
       JsonLDEncoder.instance[CommandParameter with Input] {
         case entity: CommandParameter with Input with PositionInfo =>
           entity
@@ -409,8 +419,10 @@ object CommandParameter {
             protected override val identifier: String         = randomUUID().toString
           }
 
-    private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
-                                   fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[CommandParameter with Output] =
+    private implicit def converter(implicit
+        renkuBaseUrl:  RenkuBaseUrl,
+        fusekiBaseUrl: FusekiBaseUrl
+    ): PartialEntityConverter[CommandParameter with Output] =
       new PartialEntityConverter[CommandParameter with Output] {
         override def convert[T <: CommandParameter with Output]: T => Either[Exception, PartialEntity] = {
           case output: EntityCommandParameter with Output =>
@@ -433,8 +445,10 @@ object CommandParameter {
             }
       }
 
-    implicit def outputEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                               fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[CommandParameter with Output] =
+    implicit def outputEncoder(implicit
+        renkuBaseUrl:  RenkuBaseUrl,
+        fusekiBaseUrl: FusekiBaseUrl
+    ): JsonLDEncoder[CommandParameter with Output] =
       JsonLDEncoder.instance {
         case entity: CommandParameter with Output with PositionInfo =>
           entity

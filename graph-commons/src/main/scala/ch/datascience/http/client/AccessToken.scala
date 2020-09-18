@@ -34,7 +34,7 @@ object AccessToken {
   object OAuthAccessToken extends TinyTypeFactory[OAuthAccessToken](new OAuthAccessToken(_)) with NonBlank
 
   implicit val accessTokenEncoder: Encoder[AccessToken] = {
-    case OAuthAccessToken(token)    => Json.obj("oauthAccessToken"    -> Json.fromString(token))
+    case OAuthAccessToken(token)    => Json.obj("oauthAccessToken" -> Json.fromString(token))
     case PersonalAccessToken(token) => Json.obj("personalAccessToken" -> Json.fromString(token))
   }
 
@@ -43,7 +43,8 @@ object AccessToken {
       maybeOauth    <- cursor.downField("oauthAccessToken").as[Option[String]].flatMap(to(OAuthAccessToken.from))
       maybePersonal <- cursor.downField("personalAccessToken").as[Option[String]].flatMap(to(PersonalAccessToken.from))
       token <- Either.fromOption(maybeOauth orElse maybePersonal,
-                                 ifNone = DecodingFailure("Access token cannot be deserialized", Nil))
+                                 ifNone = DecodingFailure("Access token cannot be deserialized", Nil)
+               )
     } yield token
   }
 

@@ -101,7 +101,7 @@ class UpdatesUploaderSpec extends AnyWordSpec with ExternalServiceStubbing with 
       logger,
       timeRecorder,
       retryInterval = 100 millis,
-      maxRetries    = 1
+      maxRetries = 1
     )
 
     def givenStore(forUpdate: SparqlQuery, returning: ResponseDefinitionBuilder) =

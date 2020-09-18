@@ -47,8 +47,9 @@ private class IOTriplesUploader(
     extends IORestClient[Any](Throttler.noThrottling,
                               logger,
                               maybeTimeRecorder = None,
-                              retryInterval     = retryInterval,
-                              maxRetries        = maxRetries)
+                              retryInterval = retryInterval,
+                              maxRetries = maxRetries
+    )
     with TriplesUploader[IO] {
 
   import TriplesUploadResult._
@@ -84,7 +85,7 @@ private class IOTriplesUploader(
   private def singleLineBody(response: Response[IO]): IO[String] =
     response.as[String].map(LogMessage.toSingleLine)
 
-  private lazy val withUploadingError: PartialFunction[Throwable, TriplesUploadResult] = {
-    case NonFatal(exception) => RecoverableFailure(exception.getMessage)
+  private lazy val withUploadingError: PartialFunction[Throwable, TriplesUploadResult] = { case NonFatal(exception) =>
+    RecoverableFailure(exception.getMessage)
   }
 }

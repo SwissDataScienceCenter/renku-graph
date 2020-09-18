@@ -42,7 +42,8 @@ object KGProjectFinder {
                              name:        Name,
                              created:     ProjectCreation,
                              maybeParent: Option[Parent],
-                             version:     SchemaVersion)
+                             version:     SchemaVersion
+  )
 
   final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
 
@@ -53,15 +54,16 @@ object KGProjectFinder {
 }
 
 private class IOKGProjectFinder(
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext,
-  contextShift:              ContextShift[IO],
-  timer:                     Timer[IO],
-  ME:                        MonadError[IO, Throwable])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    rdfStoreConfig: RdfStoreConfig,
+    renkuBaseUrl:   RenkuBaseUrl,
+    logger:         Logger[IO],
+    timeRecorder:   SparqlQueryTimeRecorder[IO]
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO],
+    ME:               MonadError[IO, Throwable]
+) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with KGProjectFinder[IO] {
 
   import cats.syntax.all._
@@ -127,21 +129,23 @@ private class IOKGProjectFinder(
         maybeParentDateCreated <- cursor.downField("maybeParentDateCreated").downField("value").as[Option[DateCreated]]
         maybeParentCreatorName <- cursor.downField("maybeParentCreatorName").downField("value").as[Option[users.Name]]
         maybeParentCreatorEmail <- cursor
-                                    .downField("maybeParentCreatorEmail")
-                                    .downField("value")
-                                    .as[Option[users.Email]]
+                                     .downField("maybeParentCreatorEmail")
+                                     .downField("value")
+                                     .as[Option[users.Email]]
         version <- cursor.downField("schemaVersion").downField("value").as[SchemaVersion]
       } yield KGProject(
         path,
         name,
         ProjectCreation(dateCreated, maybeCreatorName map (name => ProjectCreator(maybeCreatorEmail, name))),
-        maybeParent = (maybeParentId, maybeParentName, maybeParentDateCreated) mapN {
-          case (parentId, name, dateCreated) =>
+        maybeParent =
+          (maybeParentId, maybeParentName, maybeParentDateCreated) mapN { case (parentId, name, dateCreated) =>
             Parent(parentId,
                    name,
                    ProjectCreation(dateCreated,
-                                   maybeParentCreatorName.map(name => ProjectCreator(maybeParentCreatorEmail, name))))
-        },
+                                   maybeParentCreatorName.map(name => ProjectCreator(maybeParentCreatorEmail, name))
+                   )
+            )
+          },
         version
       )
     }
@@ -159,13 +163,15 @@ private class IOKGProjectFinder(
 private object IOKGProjectFinder {
 
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
-      logger:                  Logger[IO] = ApplicationLogger
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[KGProjectFinder[IO]] =
+      timeRecorder:   SparqlQueryTimeRecorder[IO],
+      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
+      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
+      logger:         Logger[IO] = ApplicationLogger
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[KGProjectFinder[IO]] =
     for {
       config       <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl

@@ -66,7 +66,7 @@ object datasets {
 
     override def hashCode(): Int = value.hashCode
   }
-  final class IdSameAs private[datasets] (val value:  String) extends SameAs
+  final class IdSameAs private[datasets] (val value: String) extends SameAs
   final class UrlSameAs private[datasets] (val value: String) extends SameAs
   implicit object SameAs extends TinyTypeFactory[SameAs](new UrlSameAs(_)) with constraints.Url {
 

@@ -46,14 +46,17 @@ object DataSetPart {
                Location(location.value),
                activity.project,
                maybeInvalidationActivity = None,
-               maybeGeneration           = None) with Artifact with DataSetPart {
+               maybeGeneration = None
+    ) with Artifact with DataSetPart {
       override val partName:        PartName    = name
       override val partDateCreated: DateCreated = DateCreated(activity.committedDate.value)
       override val maybePartUrl:    Option[Url] = maybeUrl
     }
 
-  private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
-                                           fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[DataSetPartArtifact] =
+  private[entities] implicit def converter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): PartialEntityConverter[DataSetPartArtifact] =
     new PartialEntityConverter[DataSetPartArtifact] {
       override def convert[T <: DataSetPartArtifact]: T => Either[Exception, PartialEntity] = { entity =>
         PartialEntity(
@@ -67,8 +70,10 @@ object DataSetPart {
       override val toEntityId: DataSetPartArtifact => Option[EntityId] = _ => None
     }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[DataSetPartArtifact] =
+  implicit def encoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): JsonLDEncoder[DataSetPartArtifact] =
     JsonLDEncoder.instance { entity =>
       entity
         .asPartialJsonLD[Artifact]

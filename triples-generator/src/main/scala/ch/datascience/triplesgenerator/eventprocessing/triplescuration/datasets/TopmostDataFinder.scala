@@ -63,10 +63,10 @@ private class TopmostDataFinderImpl[Interpretation[_]](
 }
 
 private object IOTopmostDataFinder {
-  def apply(logger:              Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(
-      implicit executionContext: ExecutionContext,
-      contextShift:              ContextShift[IO],
-      timer:                     Timer[IO]
+  def apply(logger:     Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
   ): IO[TopmostDataFinderImpl[IO]] =
     for {
       kgDatasetInfoFinder <- IOKGDatasetInfoFinder(logger, timeRecorder)

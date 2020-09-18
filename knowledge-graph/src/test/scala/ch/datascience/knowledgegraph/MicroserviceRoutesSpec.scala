@@ -69,41 +69,46 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         Request(Method.GET, uri"metrics")
       )
 
-      response.status       shouldBe Ok
+      response.status     shouldBe Ok
       response.body[String] should include("server_response_duration_seconds")
     }
 
     s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Ok " +
       "when a valid 'query' and no 'sort', `page` and `per_page` parameters given" in new TestCase {
 
-      val phrase  = nonEmptyStrings().generateOne
-      val request = Request[IO](Method.GET, uri"knowledge-graph/datasets" withQueryParam (query.parameterName, phrase))
-      (datasetsSearchEndpoint
-        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
-        .expects(Phrase(phrase).some, Sort.By(TitleProperty, Direction.Asc), PagingRequest(Page.first, PerPage.default))
-        .returning(IO.pure(Response[IO](Ok)))
+        val phrase = nonEmptyStrings().generateOne
+        val request =
+          Request[IO](Method.GET, uri"knowledge-graph/datasets" withQueryParam (query.parameterName, phrase))
+        (datasetsSearchEndpoint
+          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+          .expects(Phrase(phrase).some,
+                   Sort.By(TitleProperty, Direction.Asc),
+                   PagingRequest(Page.first, PerPage.default)
+          )
+          .returning(IO.pure(Response[IO](Ok)))
 
-      val response = routes.call(request)
+        val response = routes.call(request)
 
-      response.status shouldBe Ok
-    }
+        response.status shouldBe Ok
+      }
 
     s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $Ok " +
       s"when no ${query.parameterName} parameter given" in new TestCase {
 
-      val request = Request[IO](Method.GET, uri"knowledge-graph/datasets")
+        val request = Request[IO](Method.GET, uri"knowledge-graph/datasets")
 
-      (datasetsSearchEndpoint
-        .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
-        .expects(Option.empty[Phrase],
-                 Sort.By(TitleProperty, Direction.Asc),
-                 PagingRequest(Page.first, PerPage.default))
-        .returning(IO.pure(Response[IO](Ok)))
+        (datasetsSearchEndpoint
+          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+          .expects(Option.empty[Phrase],
+                   Sort.By(TitleProperty, Direction.Asc),
+                   PagingRequest(Page.first, PerPage.default)
+          )
+          .returning(IO.pure(Response[IO](Ok)))
 
-      val response = routes.call(request)
+        val response = routes.call(request)
 
-      response.status shouldBe Ok
-    }
+        response.status shouldBe Ok
+      }
 
     s"define a GET /knowledge-graph/datasets?query=<phrase>&sort=name:desc endpoint returning $Ok when ${query.parameterName} and ${Sort.sort.parameterName} parameters given" in new TestCase {
       forAll(phrases, sortBys(Sort)) { (phrase, sortBy) =>
@@ -154,31 +159,31 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       s"${PagingRequest.Decoders.page.parameterName} parameter and " +
       s"${PagingRequest.Decoders.perPage.parameterName} parameter" in new TestCase {
 
-      val sortProperty     = "invalid"
-      val requestedPage    = nonPositiveInts().generateOne
-      val requestedPerPage = nonPositiveInts().generateOne
+        val sortProperty     = "invalid"
+        val requestedPage    = nonPositiveInts().generateOne
+        val requestedPerPage = nonPositiveInts().generateOne
 
-      val response = routes.call {
-        Request(
-          Method.GET,
-          uri"knowledge-graph/datasets"
-            .withQueryParam("query", blankStrings().generateOne)
-            .withQueryParam("sort", s"$sortProperty:${Direction.Asc}")
-            .withQueryParam("page", requestedPage.toString)
-            .withQueryParam("per_page", requestedPerPage.toString)
+        val response = routes.call {
+          Request(
+            Method.GET,
+            uri"knowledge-graph/datasets"
+              .withQueryParam("query", blankStrings().generateOne)
+              .withQueryParam("sort", s"$sortProperty:${Direction.Asc}")
+              .withQueryParam("page", requestedPage.toString)
+              .withQueryParam("per_page", requestedPerPage.toString)
+          )
+        }
+
+        response.status shouldBe BadRequest
+        response.body[ErrorMessage] shouldBe ErrorMessage(
+          List(
+            s"'${query.parameterName}' parameter with invalid value",
+            Sort.sort.errorMessage(sortProperty),
+            PagingRequest.Decoders.page.errorMessage(requestedPage.value.toString),
+            PagingRequest.Decoders.perPage.errorMessage(requestedPerPage.value.toString)
+          ).mkString("; ")
         )
       }
-
-      response.status shouldBe BadRequest
-      response.body[ErrorMessage] shouldBe ErrorMessage(
-        List(
-          s"'${query.parameterName}' parameter with invalid value",
-          Sort.sort.errorMessage(sortProperty),
-          PagingRequest.Decoders.page.errorMessage(requestedPage.value.toString),
-          PagingRequest.Decoders.perPage.errorMessage(requestedPerPage.value.toString)
-        ).mkString("; ")
-      )
-    }
 
     s"define a GET /knowledge-graph/datasets/:id endpoint returning $Ok when valid :id path parameter given" in new TestCase {
       val id = datasetIdentifiers.generateOne

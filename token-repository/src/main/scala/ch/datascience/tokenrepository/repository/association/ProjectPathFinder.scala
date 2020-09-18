@@ -75,10 +75,12 @@ private class IOProjectPathFinder(
 object IOProjectPathFinder {
 
   def apply(
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[ProjectPathFinder[IO]] =
+      logger: Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ProjectPathFinder[IO]] =
     for {
       gitLabRateLimit <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler <- Throttler[IO, GitLab](gitLabRateLimit)

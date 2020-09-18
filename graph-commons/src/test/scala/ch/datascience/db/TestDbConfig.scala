@@ -33,12 +33,12 @@ object TestDbConfig {
   def newDbConfig[TargetDb]: DBConfig[TargetDb] = {
     val dbName = nonEmptyStrings().map(suffix => s"db_$suffix").generateOne
     DBConfig[TargetDb](
-      driver         = "org.h2.Driver",
-      url            = toUrl(s"jdbc:h2:mem:$dbName;DB_CLOSE_DELAY=-1;MODE=PostgreSQL"),
-      user           = "user",
-      pass           = "",
+      driver = "org.h2.Driver",
+      url = toUrl(s"jdbc:h2:mem:$dbName;DB_CLOSE_DELAY=-1;MODE=PostgreSQL"),
+      user = "user",
+      pass = "",
       connectionPool = 20,
-      maxLifetime    = 5 seconds
+      maxLifetime = 5 seconds
     )
   }
 

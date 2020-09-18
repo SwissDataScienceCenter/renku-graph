@@ -32,8 +32,8 @@ object model {
 
   object Lineage {
 
-    def from[Interpretation[_]](edges: Set[Edge], nodes: Set[Node])(
-        implicit ME:                   MonadError[Interpretation, Throwable]
+    def from[Interpretation[_]](edges: Set[Edge], nodes: Set[Node])(implicit
+        ME:                            MonadError[Interpretation, Throwable]
     ): Interpretation[Lineage] = {
       val allEdgesLocations = collectLocations(edges)
       val allNodesLocations = nodes.map(_.location)
@@ -45,8 +45,8 @@ object model {
     }
 
     private def collectLocations(edges: Set[Edge]): Set[Node.Location] =
-      edges.foldLeft(Set.empty[Node.Location]) {
-        case (acc, Edge(source, target)) => acc + source + target
+      edges.foldLeft(Set.empty[Node.Location]) { case (acc, Edge(source, target)) =>
+        acc + source + target
       }
   }
 

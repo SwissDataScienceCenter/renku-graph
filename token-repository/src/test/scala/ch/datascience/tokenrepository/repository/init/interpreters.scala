@@ -25,5 +25,5 @@ import io.chrisdavenport.log4cats.Logger
 
 abstract class IODbInitializer(projectPathAdder: ProjectPathAdder[IO],
                                transactor:       DbTransactor[IO, ProjectsTokensDB],
-                               logger:           Logger[IO])
-    extends DbInitializer(projectPathAdder, transactor, logger)
+                               logger:           Logger[IO]
+) extends DbInitializer(projectPathAdder, transactor, logger)

@@ -110,13 +110,15 @@ private object IOTriplesRemover {
   import eu.timepit.refined.pureconfig._
 
   def apply(
-      rdfStoreConfig:          RdfStoreConfig,
-      logger:                  Logger[IO],
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      config:                  Config = ConfigFactory.load()
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[TriplesRemover[IO]] =
+      rdfStoreConfig: RdfStoreConfig,
+      logger:         Logger[IO],
+      timeRecorder:   SparqlQueryTimeRecorder[IO],
+      config:         Config = ConfigFactory.load()
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[TriplesRemover[IO]] =
     find[IO, Long Refined Positive]("re-provisioning-removal-batch-size", config) map { removalBatchSize =>
       new IOTriplesRemover(removalBatchSize, rdfStoreConfig, logger, timeRecorder)
     }

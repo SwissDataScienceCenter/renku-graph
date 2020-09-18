@@ -26,9 +26,9 @@ import scala.language.higherKinds
 
 sealed trait ProjectsTokensDB
 
-class ProjectsTokensDbConfigProvider[Interpretation[_]](
-    implicit ME: MonadError[Interpretation, Throwable]
+class ProjectsTokensDbConfigProvider[Interpretation[_]](implicit
+    ME: MonadError[Interpretation, Throwable]
 ) extends DBConfigProvider[Interpretation, ProjectsTokensDB](
       namespace = "projects-tokens",
-      dbName    = "projects_tokens"
+      dbName = "projects_tokens"
     )

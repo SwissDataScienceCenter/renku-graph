@@ -57,11 +57,13 @@ private class TokenAssociator[Interpretiation[_]](
 
 private object IOTokenAssociator {
   def apply(
-      transactor:              DbTransactor[IO, ProjectsTokensDB],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[TokenAssociator[IO]] =
+      transactor: DbTransactor[IO, ProjectsTokensDB],
+      logger:     Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[TokenAssociator[IO]] =
     for {
       pathFinder        <- IOProjectPathFinder(logger)
       accessTokenCrypto <- AccessTokenCrypto[IO]()

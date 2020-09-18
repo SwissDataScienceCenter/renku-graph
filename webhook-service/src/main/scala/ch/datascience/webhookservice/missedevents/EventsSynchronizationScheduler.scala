@@ -69,9 +69,11 @@ object IOEventsSynchronizationScheduler {
       gitLabThrottler:       Throttler[IO, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[IO],
       logger:                Logger[IO]
-  )(implicit timer:          Timer[IO],
-    contextShift:            ContextShift[IO],
-    executionContext:        ExecutionContext): IO[EventsSynchronizationScheduler[IO]] =
+  )(implicit
+      timer:            Timer[IO],
+      contextShift:     ContextShift[IO],
+      executionContext: ExecutionContext
+  ): IO[EventsSynchronizationScheduler[IO]] =
     for {
       missedEventsLoader <- IOMissedEventsLoader(gitLabThrottler, executionTimeRecorder, logger)
     } yield new EventsSynchronizationScheduler[IO](new SchedulerConfigProvider[IO](), missedEventsLoader)

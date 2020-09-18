@@ -32,14 +32,15 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private class BaseDetailsFinder(
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext,
-  contextShift:              ContextShift[IO],
-  timer:                     Timer[IO],
-  ME:                        MonadError[IO, Throwable])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
+    rdfStoreConfig: RdfStoreConfig,
+    logger:         Logger[IO],
+    timeRecorder:   SparqlQueryTimeRecorder[IO]
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO],
+    ME:               MonadError[IO, Throwable]
+) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
 
   import BaseDetailsFinder._
 
@@ -111,8 +112,8 @@ private object BaseDetailsFinder {
         sameAs             <- extract[SameAs]("topmostSameAs")
         maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate")
         maybeDescription <- extract[Option[String]]("description")
-                             .map(blankToNone)
-                             .flatMap(toOption[Description])
+                              .map(blankToNone)
+                              .flatMap(toOption[Description])
       } yield maybeDerivedFrom match {
         case Some(derivedFrom) =>
           ModifiedDataset(
@@ -123,7 +124,7 @@ private object BaseDetailsFinder {
             derivedFrom,
             maybeDescription,
             DatasetPublishing(maybePublishedDate, Set.empty),
-            parts    = List.empty,
+            parts = List.empty,
             projects = List.empty,
             keywords = List.empty
           )
@@ -136,7 +137,7 @@ private object BaseDetailsFinder {
             sameAs,
             maybeDescription,
             DatasetPublishing(maybePublishedDate, Set.empty),
-            parts    = List.empty,
+            parts = List.empty,
             projects = List.empty,
             keywords = List.empty
           )

@@ -47,22 +47,25 @@ package object forks {
       dateCreated     <- projectCreatedDates
     } yield GitLabProject(projectPath, maybeParentPath, maybeCreator, dateCreated)
 
-  def gitLabCreator(maybeEmail: Option[Email]      = userEmails.generateOption,
-                    maybeName:  Option[users.Name] = userNames.generateOption): Gen[GitLabCreator] =
+  def gitLabCreator(maybeEmail: Option[Email] = userEmails.generateOption,
+                    maybeName:  Option[users.Name] = userNames.generateOption
+  ): Gen[GitLabCreator] =
     GitLabCreator(maybeEmail, maybeName)
 
   def kgCreator(maybeEmail: Option[Email] = userEmails.generateOption,
-                name:       users.Name    = userNames.generateOne): Gen[KGCreator] =
+                name:       users.Name = userNames.generateOne
+  ): Gen[KGCreator] =
     for {
       resourceId <- userResourceIds(maybeEmail)
     } yield KGCreator(resourceId, maybeEmail, name)
 
   implicit val entitiesProjects: Gen[Project] = entitiesProjects(
-    maybeCreator       = entitiesPersons(userEmails.generateSome).generateOption,
+    maybeCreator = entitiesPersons(userEmails.generateSome).generateOption,
     maybeParentProject = entitiesProjects(entitiesPersons(userEmails.generateSome).generateOption).generateOption
   )
-  def entitiesProjects(maybeCreator:       Option[Person]  = entitiesPersons().generateOption,
-                       maybeParentProject: Option[Project] = None): Gen[Project] =
+  def entitiesProjects(maybeCreator:       Option[Person] = entitiesPersons().generateOption,
+                       maybeParentProject: Option[Project] = None
+  ): Gen[Project] =
     for {
       path        <- projectPaths
       name        <- projectNames

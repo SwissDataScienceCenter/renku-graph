@@ -39,18 +39,18 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
 
     "add the given Subscriber URL to the pool " +
       "if it hasn't been added yet" in new TestCase {
-      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-      subscriptions.getAll.unsafeRunSync()             shouldBe List(subscriberUrl)
+        subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+        subscriptions.getAll.unsafeRunSync()             shouldBe List(subscriberUrl)
 
-      val otherSubscriberUrl = subscriberUrls.generateOne
-      subscriptions.add(otherSubscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-      subscriptions.getAll.unsafeRunSync()                  should contain theSameElementsAs List(subscriberUrl, otherSubscriberUrl)
+        val otherSubscriberUrl = subscriberUrls.generateOne
+        subscriptions.add(otherSubscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+        subscriptions.getAll.unsafeRunSync()                    should contain theSameElementsAs List(subscriberUrl, otherSubscriberUrl)
 
-      logger.loggedOnly(
-        Info(s"$subscriberUrl added"),
-        Info(s"$otherSubscriberUrl added")
-      )
-    }
+        logger.loggedOnly(
+          Info(s"$subscriberUrl added"),
+          Info(s"$otherSubscriberUrl added")
+        )
+      }
 
     "do nothing if the given Subscriber URL is already present in the pool" in new TestCase {
       subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
@@ -120,7 +120,7 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
       ).flatten
       receivedUrls should have size 3
       val first = receivedUrls.head
-      receivedUrls.last      shouldBe first
+      receivedUrls.last    shouldBe first
       receivedUrls.tail.head should not be first
     }
 
@@ -240,37 +240,37 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers {
 
     "replace the old mark busy process for the subscriber " +
       "if the subscriber was added and marked busy while the old process was still running" in new TestCase {
-      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+        subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
-      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+        subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
-      subscriptions.nextFree.unsafeRunSync() shouldBe None
+        subscriptions.nextFree.unsafeRunSync() shouldBe None
 
-      // if we add the subscriber while the markBusy process is running
-      sleep(busySleep.toMillis / 2)
-      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-      subscriptions.nextFree.unsafeRunSync()           shouldBe subscriberUrl.some
+        // if we add the subscriber while the markBusy process is running
+        sleep(busySleep.toMillis / 2)
+        subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+        subscriptions.nextFree.unsafeRunSync()           shouldBe subscriberUrl.some
 
-      // and if we mark the subscriber busy while the process is running
-      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-      subscriptions.nextFree.unsafeRunSync()                shouldBe None
+        // and if we mark the subscriber busy while the process is running
+        subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+        subscriptions.nextFree.unsafeRunSync()                shouldBe None
 
-      // the subscriber should not be available after the initial timeout
-      sleep(busySleep.toMillis / 2 + 100)
-      subscriptions.nextFree.unsafeRunSync() shouldBe None
+        // the subscriber should not be available after the initial timeout
+        sleep(busySleep.toMillis / 2 + 100)
+        subscriptions.nextFree.unsafeRunSync() shouldBe None
 
-      // but after the timeout initiated with the second markBusy
-      sleep(busySleep.toMillis + 1000)
-      subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
+        // but after the timeout initiated with the second markBusy
+        sleep(busySleep.toMillis + 1000)
+        subscriptions.nextFree.unsafeRunSync() shouldBe subscriberUrl.some
 
-      logger.loggedOnly(
-        Info(s"$subscriberUrl added"),
-        Info(s"$subscriberUrl busy - putting on hold"),
-        Info(s"$subscriberUrl added"),
-        Info(s"$subscriberUrl busy - putting on hold"),
-        Info(s"$subscriberUrl taken from on hold")
-      )
-    }
+        logger.loggedOnly(
+          Info(s"$subscriberUrl added"),
+          Info(s"$subscriberUrl busy - putting on hold"),
+          Info(s"$subscriberUrl added"),
+          Info(s"$subscriberUrl busy - putting on hold"),
+          Info(s"$subscriberUrl taken from on hold")
+        )
+      }
 
     "succeed if there is no subscriber with the given url" in new TestCase {
       subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)

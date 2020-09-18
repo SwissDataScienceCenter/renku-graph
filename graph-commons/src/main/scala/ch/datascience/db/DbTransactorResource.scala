@@ -55,10 +55,10 @@ class DbTransactorResource[Interpretation[_], TargetDB](
       _          <- Resource.liftF(Async[Interpretation] delay Class.forName(dbConfig.driver.value))
       transactor <- initial[Interpretation](connectionsThreadPool, blocker)
       _ <- Resource.liftF {
-            transactor.configure { dataSource =>
-              Async[Interpretation] delay dataSourceUpdater(dataSource)
-            }
-          }
+             transactor.configure { dataSource =>
+               Async[Interpretation] delay dataSourceUpdater(dataSource)
+             }
+           }
     } yield transactor
 }
 
@@ -82,8 +82,10 @@ private class DataSourceUpdater[TargetDB](dbConfig: DBConfig[TargetDB]) extends 
 
 object DbTransactorResource {
   def apply[Interpretation[_], TargetDB](
-      dbConfig:     DBConfig[TargetDB]
-  )(implicit async: Async[Interpretation],
-    cs:             ContextShift[Interpretation]): DbTransactorResource[Interpretation, TargetDB] =
+      dbConfig: DBConfig[TargetDB]
+  )(implicit
+      async: Async[Interpretation],
+      cs:    ContextShift[Interpretation]
+  ): DbTransactorResource[Interpretation, TargetDB] =
     new DbTransactorResource[Interpretation, TargetDB](dbConfig, new DataSourceUpdater[TargetDB](dbConfig))
 }

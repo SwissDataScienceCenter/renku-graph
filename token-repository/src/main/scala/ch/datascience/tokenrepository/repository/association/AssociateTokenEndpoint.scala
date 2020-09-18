@@ -56,9 +56,8 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[AccessToken]] = {
-    case NonFatal(exception) =>
-      ME.raiseError(BadRequestError(exception))
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[AccessToken]] = { case NonFatal(exception) =>
+    ME.raiseError(BadRequestError(exception))
   }
 
   private def httpResponse(projectId: Id): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
@@ -77,11 +76,13 @@ object IOAssociateTokenEndpoint {
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor:              DbTransactor[IO, ProjectsTokensDB],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[AssociateTokenEndpoint[IO]] =
+      transactor: DbTransactor[IO, ProjectsTokensDB],
+      logger:     Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[AssociateTokenEndpoint[IO]] =
     for {
       tokenAssociator <- IOTokenAssociator(transactor, logger)
     } yield new AssociateTokenEndpoint[IO](tokenAssociator, logger)

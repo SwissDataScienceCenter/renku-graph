@@ -84,11 +84,13 @@ class IOProjectInfoFinder(
 
 object IOProjectInfoFinder {
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[ProjectInfoFinder[IO]] =
+      gitLabThrottler: Throttler[IO, GitLab],
+      logger:          Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ProjectInfoFinder[IO]] =
     for {
       gitLabUrl <- GitLabUrl[IO]()
     } yield new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, logger)

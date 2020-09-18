@@ -22,7 +22,7 @@ import ch.datascience.tinytypes.Constraints
 
 trait PositiveInt extends Constraints[Int] {
   addConstraint(
-    check   = _ > 0,
+    check = _ > 0,
     message = _ => s"$typeName cannot be <= 0"
   )
 }

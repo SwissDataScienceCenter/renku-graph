@@ -18,7 +18,6 @@
 
 package ch.datascience.config.sentry
 
-
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -50,23 +49,23 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
 
     "return a SentryConfig if 'services.sentry.enabled' is 'true' and all " +
       "'services.sentry.url', 'services.sentry.service-name' and 'services.sentry.environment-name' are set" in {
-      forAll { sentryConfig: SentryConfig =>
-        val config = ConfigFactory.parseMap(
-          Map(
-            "services" -> Map(
-              "sentry" -> Map(
-                "enabled"          -> "true",
-                "url"              -> sentryConfig.baseUrl.value,
-                "service-name"     -> sentryConfig.serviceName.value,
-                "environment-name" -> sentryConfig.environmentName.value
+        forAll { sentryConfig: SentryConfig =>
+          val config = ConfigFactory.parseMap(
+            Map(
+              "services" -> Map(
+                "sentry" -> Map(
+                  "enabled"          -> "true",
+                  "url"              -> sentryConfig.baseUrl.value,
+                  "service-name"     -> sentryConfig.serviceName.value,
+                  "environment-name" -> sentryConfig.environmentName.value
+                ).asJava
               ).asJava
             ).asJava
-          ).asJava
-        )
+          )
 
-        SentryConfig[Try](config) shouldBe Success(Some(sentryConfig))
+          SentryConfig[Try](config) shouldBe Success(Some(sentryConfig))
+        }
       }
-    }
 
     "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.url' is invalid" in {
       val sentryConfig = sentryConfigs.generateOne

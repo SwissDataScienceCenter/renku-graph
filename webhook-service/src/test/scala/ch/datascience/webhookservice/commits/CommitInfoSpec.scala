@@ -62,7 +62,7 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
         "parent_ids":      ${commitInfo.parents.map(_.value).toArray}
       }""".as[CommitInfo] shouldBe Right(
         commitInfo.copy(
-          author    = Author.withName(authorUsername),
+          author = Author.withName(authorUsername),
           committer = Committer.withName(committerUsername)
         )
       )
@@ -83,7 +83,7 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
         "parent_ids":      ${commitInfo.parents.map(_.value).toArray}
       }""".as[CommitInfo] shouldBe Right(
         commitInfo.copy(
-          author    = Author.withEmail(authorEmail),
+          author = Author.withEmail(authorEmail),
           committer = Committer.withEmail(committerEmail)
         )
       )
@@ -104,7 +104,7 @@ class CommitInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shou
         "parent_ids":      ${commitInfo.parents.map(_.value).toArray}
       }""".as[CommitInfo] shouldBe Right(
         commitInfo.copy(
-          author    = Author.withName(authorUsername),
+          author = Author.withName(authorUsername),
           committer = Committer.withName(committerUsername)
         )
       )

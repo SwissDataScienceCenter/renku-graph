@@ -25,7 +25,7 @@ import ch.datascience.tinytypes.Constraints
 
 trait UUID extends Constraints[String] with NonBlank {
   addConstraint(
-    check   = value => Validated.catchOnly[IllegalArgumentException](fromString(value)).isValid,
+    check = value => Validated.catchOnly[IllegalArgumentException](fromString(value)).isValid,
     message = (value: String) => s"'$value' is not a valid UUID value for $typeName"
   )
 }

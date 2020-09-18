@@ -66,21 +66,21 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "define a GET /events?latest-per-project=true " +
       s"returning $NotFound if no latest-per-project parameter given" in new TestCase {
-      val response = routes call Request[IO](GET, uri"events")
+        val response = routes call Request[IO](GET, uri"events")
 
-      response.status            shouldBe NotFound
-      response.contentType       shouldBe Some(`Content-Type`(application.json))
-      response.body[InfoMessage] shouldBe InfoMessage("No 'latest-per-project' parameter")
-    }
+        response.status            shouldBe NotFound
+        response.contentType       shouldBe Some(`Content-Type`(application.json))
+        response.body[InfoMessage] shouldBe InfoMessage("No 'latest-per-project' parameter")
+      }
 
     "define a GET /events?latest-per-project=true " +
       s"returning $BadRequest if latest-per-project parameter has invalid value" in new TestCase {
-      val response = routes call Request[IO](GET, uri"events" withQueryParam ("latest-per-project", "xxx"))
+        val response = routes call Request[IO](GET, uri"events" withQueryParam ("latest-per-project", "xxx"))
 
-      response.status             shouldBe BadRequest
-      response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe ErrorMessage("'latest-per-project' parameter with invalid value")
-    }
+        response.status             shouldBe BadRequest
+        response.contentType        shouldBe Some(`Content-Type`(application.json))
+        response.body[ErrorMessage] shouldBe ErrorMessage("'latest-per-project' parameter with invalid value")
+      }
 
     "define a PATCH /events endpoint" in new TestCase {
       val request = Request[IO](PATCH, uri"events")
@@ -122,7 +122,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
         Request(GET, uri"metrics")
       )
 
-      response.status       shouldBe Ok
+      response.status     shouldBe Ok
       response.body[String] should include("server_response_duration_seconds")
     }
 
@@ -146,29 +146,29 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "define a GET /processing-status?project-id=:id endpoint " +
       s"returning $NotFound if no project-id parameter is given" in new TestCase {
-      val projectId = projectIds.generateOne
+        val projectId = projectIds.generateOne
 
-      val request = Request[IO](GET, uri"processing-status")
+        val request = Request[IO](GET, uri"processing-status")
 
-      val response = routes.call(request)
+        val response = routes.call(request)
 
-      response.status            shouldBe NotFound
-      response.contentType       shouldBe Some(`Content-Type`(application.json))
-      response.body[InfoMessage] shouldBe InfoMessage("No 'project-id' parameter")
-    }
+        response.status            shouldBe NotFound
+        response.contentType       shouldBe Some(`Content-Type`(application.json))
+        response.body[InfoMessage] shouldBe InfoMessage("No 'project-id' parameter")
+      }
 
     "define a GET /processing-status?project-id=:id endpoint " +
       s"returning $BadRequest if illegal project-id parameter value is given" in new TestCase {
-      val projectId = projectIds.generateOne
+        val projectId = projectIds.generateOne
 
-      val request = Request[IO](GET, uri"processing-status" withQueryParam ("project-id", "non int value"))
+        val request = Request[IO](GET, uri"processing-status" withQueryParam ("project-id", "non int value"))
 
-      val response = routes.call(request)
+        val response = routes.call(request)
 
-      response.status             shouldBe BadRequest
-      response.contentType        shouldBe Some(`Content-Type`(application.json))
-      response.body[ErrorMessage] shouldBe ErrorMessage("'project-id' parameter with invalid value")
-    }
+        response.status             shouldBe BadRequest
+        response.contentType        shouldBe Some(`Content-Type`(application.json))
+        response.body[ErrorMessage] shouldBe ErrorMessage("'project-id' parameter with invalid value")
+      }
 
     "define a POST /subscriptions endpoint" in new TestCase with TestCase2 {
       val request = Request[IO](POST, uri"subscriptions")
@@ -217,6 +217,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
   class TestStatusChangeEndpoint(updateCommandsRunner: StatusUpdatesRunner[IO],
                                  waitingEventsGauge:   LabeledGauge[IO, projects.Path],
                                  underProcessingGauge: LabeledGauge[IO, projects.Path],
-                                 logger:               Logger[IO])
-      extends StatusChangeEndpoint[IO](updateCommandsRunner, waitingEventsGauge, underProcessingGauge, logger)
+                                 logger:               Logger[IO]
+  ) extends StatusChangeEndpoint[IO](updateCommandsRunner, waitingEventsGauge, underProcessingGauge, logger)
 }

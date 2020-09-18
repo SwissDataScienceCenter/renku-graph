@@ -53,10 +53,9 @@ class DbInitializer[Interpretation[_]](
       .transact(transactor.get)
       .map(_ => ())
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)("Projects Tokens database initialization failure")
-      ME.raiseError(exception)
+  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)("Projects Tokens database initialization failure")
+    ME.raiseError(exception)
   }
 }
 
@@ -64,11 +63,13 @@ object IODbInitializer {
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor:              DbTransactor[IO, ProjectsTokensDB],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[DbInitializer[IO]] =
+      transactor: DbTransactor[IO, ProjectsTokensDB],
+      logger:     Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[DbInitializer[IO]] =
     for {
       pathAdder <- IOProjectPathAdder(transactor, logger)
     } yield new DbInitializer[IO](pathAdder, transactor, logger)

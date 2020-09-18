@@ -45,72 +45,73 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
       "increment waiting events gauge and decrement under processing gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
-      val projectPath = projectPaths.generateOne
-      storeEvent(
-        eventId,
-        EventStatus.Processing,
-        executionDates.generateOne,
-        eventDates.generateOne,
-        eventBodies.generateOne,
-        batchDate   = eventBatchDate,
-        projectPath = projectPath
-      )
-      storeEvent(
-        compoundEventIds.generateOne.copy(id = eventId.id),
-        EventStatus.Processing,
-        executionDates.generateOne,
-        eventDates.generateOne,
-        eventBodies.generateOne,
-        batchDate = eventBatchDate
-      )
-      storeEvent(
-        compoundEventIds.generateOne,
-        EventStatus.Processing,
-        executionDates.generateOne,
-        eventDates.generateOne,
-        eventBodies.generateOne,
-        batchDate = eventBatchDate
-      )
+        val projectPath = projectPaths.generateOne
+        storeEvent(
+          eventId,
+          EventStatus.Processing,
+          executionDates.generateOne,
+          eventDates.generateOne,
+          eventBodies.generateOne,
+          batchDate = eventBatchDate,
+          projectPath = projectPath
+        )
+        storeEvent(
+          compoundEventIds.generateOne.copy(id = eventId.id),
+          EventStatus.Processing,
+          executionDates.generateOne,
+          eventDates.generateOne,
+          eventBodies.generateOne,
+          batchDate = eventBatchDate
+        )
+        storeEvent(
+          compoundEventIds.generateOne,
+          EventStatus.Processing,
+          executionDates.generateOne,
+          eventDates.generateOne,
+          eventBodies.generateOne,
+          batchDate = eventBatchDate
+        )
 
-      findEvents(status = New) shouldBe List.empty
+        findEvents(status = New) shouldBe List.empty
 
-      (waitingEventsGauge.increment _).expects(projectPath).returning(IO.unit)
-      (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
+        (waitingEventsGauge.increment _).expects(projectPath).returning(IO.unit)
+        (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-      val command = ToNew[IO](eventId, waitingEventsGauge, underProcessingGauge, currentTime)
+        val command = ToNew[IO](eventId, waitingEventsGauge, underProcessingGauge, currentTime)
 
-      (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
+        (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-      findEvents(status = New) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
+        findEvents(status = New) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
 
-      histogram.verifyExecutionTimeMeasured(command.query.name)
-    }
+        histogram.verifyExecutionTimeMeasured(command.query.name)
+      }
 
     EventStatus.all.filterNot(_ == Processing) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
         s"and return ${UpdateResult.Conflict}" in new TestCase {
 
-        val executionDate = executionDates.generateOne
-        storeEvent(eventId,
-                   eventStatus,
-                   executionDate,
-                   eventDates.generateOne,
-                   eventBodies.generateOne,
-                   batchDate = eventBatchDate)
+          val executionDate = executionDates.generateOne
+          storeEvent(eventId,
+                     eventStatus,
+                     executionDate,
+                     eventDates.generateOne,
+                     eventBodies.generateOne,
+                     batchDate = eventBatchDate
+          )
 
-        findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
+          findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-        val command = ToNew[IO](eventId, waitingEventsGauge, underProcessingGauge, currentTime)
+          val command = ToNew[IO](eventId, waitingEventsGauge, underProcessingGauge, currentTime)
 
-        (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
-        val expectedEvents =
-          if (eventStatus != New) List.empty
-          else List((eventId, executionDate, eventBatchDate))
-        findEvents(status = New) shouldBe expectedEvents
+          val expectedEvents =
+            if (eventStatus != New) List.empty
+            else List((eventId, executionDate, eventBatchDate))
+          findEvents(status = New) shouldBe expectedEvents
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
-      }
+          histogram.verifyExecutionTimeMeasured(command.query.name)
+        }
     }
   }
 

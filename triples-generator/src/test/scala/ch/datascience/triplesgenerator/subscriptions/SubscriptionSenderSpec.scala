@@ -75,8 +75,8 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
   }
 
   private implicit lazy val payloadEncoder: Encoder[(SubscriberUrl, Set[String])] =
-    Encoder.instance[(SubscriberUrl, Set[String])] {
-      case (url, statuses) => json"""{
+    Encoder.instance[(SubscriberUrl, Set[String])] { case (url, statuses) =>
+      json"""{
         "subscriberUrl": ${url.value},
         "statuses": ${statuses.toList}
       }"""

@@ -73,18 +73,19 @@ class ReProvisioningImpl[Interpretation[_]](
       } yield ()
     } flatMap logSummary
 
-  private def logSummary: ((ElapsedTime, Unit)) => Interpretation[Unit] = {
-    case (elapsedTime, _) => logger.info(s"Clearing DB finished in ${elapsedTime}ms - re-processing all the events")
+  private def logSummary: ((ElapsedTime, Unit)) => Interpretation[Unit] = { case (elapsedTime, _) =>
+    logger.info(s"Clearing DB finished in ${elapsedTime}ms - re-processing all the events")
   }
 
   private def tryAgain(step: => Interpretation[Unit]): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) => {
-      for {
-        _ <- logger.error(exception)("Re-provisioning failure")
-        _ <- timer sleep sleepWhenBusy
-        _ <- step
-      } yield ()
-    } recoverWith tryAgain(step)
+    case NonFatal(exception) =>
+      {
+        for {
+          _ <- logger.error(exception)("Re-provisioning failure")
+          _ <- timer sleep sleepWhenBusy
+          _ <- step
+        } yield ()
+      } recoverWith tryAgain(step)
   }
 }
 
@@ -104,10 +105,12 @@ object IOReProvisioning {
       timeRecorder:         SparqlQueryTimeRecorder[IO],
       logger:               Logger[IO],
       configuration:        Config = ConfigFactory.load()
-  )(implicit ME:            MonadError[IO, Throwable],
-    executionContext:       ExecutionContext,
-    contextShift:           ContextShift[IO],
-    timer:                  Timer[IO]): IO[ReProvisioning[IO]] =
+  )(implicit
+      ME:               MonadError[IO, Throwable],
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ReProvisioning[IO]] =
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO](configuration)
       currentCliVersion     <- CliVersionFinder[IO](triplesGeneration)

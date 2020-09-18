@@ -33,14 +33,15 @@ private trait KGInfoFinder[Interpretation[_]] {
 }
 
 private class IOKGInfoFinder(
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext,
-  contextShift:              ContextShift[IO],
-  timer:                     Timer[IO],
-  ME:                        MonadError[IO, Throwable])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    rdfStoreConfig: RdfStoreConfig,
+    logger:         Logger[IO],
+    timeRecorder:   SparqlQueryTimeRecorder[IO]
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO],
+    ME:               MonadError[IO, Throwable]
+) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with KGInfoFinder[IO] {
 
   import eu.timepit.refined.auto._
@@ -84,12 +85,14 @@ private class IOKGInfoFinder(
 
 private object IOKGInfoFinder {
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      logger:                  Logger[IO],
-      rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO]()
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[KGInfoFinder[IO]] =
+      timeRecorder:   SparqlQueryTimeRecorder[IO],
+      logger:         Logger[IO],
+      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO]()
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[KGInfoFinder[IO]] =
     for {
       config <- rdfStoreConfig
     } yield new IOKGInfoFinder(config, logger, timeRecorder)

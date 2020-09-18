@@ -74,40 +74,40 @@ class LineageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
 
     s"return '${Node.SingleWordType.ProcessRun}' " +
       "if node contains the 'http://purl.org/wf4ever/wfprov#ProcessRun' type" in {
-      val node = entityNodes.generateOne.copy(
-        types = Set(
-          (prov / "Activity").toString,
-          (wfprov / "ProcessRun").toString
-        ).map(Node.Type.apply)
-      )
+        val node = entityNodes.generateOne.copy(
+          types = Set(
+            (prov / "Activity").toString,
+            (wfprov / "ProcessRun").toString
+          ).map(Node.Type.apply)
+        )
 
-      node.singleWordType shouldBe Right(Node.SingleWordType.ProcessRun)
-    }
+        node.singleWordType shouldBe Right(Node.SingleWordType.ProcessRun)
+      }
 
     s"return '${Node.SingleWordType.File}' " +
       "if node contains the 'http://www.w3.org/ns/prov#Entity' type but not 'http://www.w3.org/ns/prov#Collection'" in {
-      val node = entityNodes.generateOne.copy(
-        types = Set(
-          (prov / "Entity").toString,
-          (wfprov / "Artifact").toString
-        ).map(Node.Type.apply)
-      )
+        val node = entityNodes.generateOne.copy(
+          types = Set(
+            (prov / "Entity").toString,
+            (wfprov / "Artifact").toString
+          ).map(Node.Type.apply)
+        )
 
-      node.singleWordType shouldBe Right(Node.SingleWordType.File)
-    }
+        node.singleWordType shouldBe Right(Node.SingleWordType.File)
+      }
 
     s"return '${Node.SingleWordType.Directory}' " +
       "if node contains the 'http://www.w3.org/ns/prov#Entity' and 'http://www.w3.org/ns/prov#Collection' types" in {
-      val node = entityNodes.generateOne.copy(
-        types = Set(
-          (prov / "Entity").toString,
-          (wfprov / "Artifact").toString,
-          (prov / "Collection").toString
-        ).map(Node.Type.apply)
-      )
+        val node = entityNodes.generateOne.copy(
+          types = Set(
+            (prov / "Entity").toString,
+            (wfprov / "Artifact").toString,
+            (prov / "Collection").toString
+          ).map(Node.Type.apply)
+        )
 
-      node.singleWordType shouldBe Right(Node.SingleWordType.Directory)
-    }
+        node.singleWordType shouldBe Right(Node.SingleWordType.Directory)
+      }
 
     "return an Exception there's no match to the given types" in {
       val types = Set(
@@ -142,7 +142,7 @@ class LineageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
   }
 
   private lazy val edgesSets: Gen[Set[Edge]] = for {
-    edgesNumber <- positiveInts(max               = 20)
+    edgesNumber <- positiveInts(max = 20)
     edgesSet    <- setOf[Edge](edges, minElements = 1, maxElements = edgesNumber)
   } yield edgesSet
 

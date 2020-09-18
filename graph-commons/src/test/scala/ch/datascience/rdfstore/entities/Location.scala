@@ -34,6 +34,6 @@ object WorkflowFile {
   def cwl(fileName:  String Refined NonEmpty): WorkflowFile = new CwlFile(s".renku/workflow/$fileName")
   def yaml(fileName: String Refined NonEmpty): WorkflowFile = new YamlFile(s".renku/workflow/$fileName")
 
-  final class CwlFile(override val value:  String) extends AnyVal with WorkflowFile
+  final class CwlFile(override val value: String) extends AnyVal with WorkflowFile
   final class YamlFile(override val value: String) extends AnyVal with WorkflowFile
 }

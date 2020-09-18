@@ -109,9 +109,9 @@ class RdfStoreServer(
     for {
       _ <- IO(dataset.asDatasetGraph().clear())
       _ <- isDatasetEmpty flatMap {
-            case true  => IO.unit
-            case false => IO.raiseError(new Exception(s"Clearing $datasetName wasn't successful"))
-          }
+             case true  => IO.unit
+             case false => IO.raiseError(new Exception(s"Clearing $datasetName wasn't successful"))
+           }
     } yield ()
 
   def isDatasetEmpty: IO[Boolean] = IO {

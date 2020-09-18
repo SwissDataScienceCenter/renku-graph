@@ -39,8 +39,8 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private[triplescuration] trait UpdatesCreator[Interpretation[_]] {
-  def create(commit:             CommitEvent)(
-      implicit maybeAccessToken: Option[AccessToken]
+  def create(commit:    CommitEvent)(implicit
+      maybeAccessToken: Option[AccessToken]
   ): CurationUpdatesGroup[Interpretation]
 }
 
@@ -62,8 +62,8 @@ private[triplescuration] class UpdatesCreatorImpl(
         EitherT {
           gitLab
             .findProject(commit.project.path)
-            .flatMap { forkInfoUpdates }
-            .map { _.asRight[ProcessingRecoverableError] }
+            .flatMap(forkInfoUpdates)
+            .map(_.asRight[ProcessingRecoverableError])
             .recover(maybeToRecoverableError)
         }
     )

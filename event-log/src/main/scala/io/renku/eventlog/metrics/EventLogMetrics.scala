@@ -54,8 +54,8 @@ class EventLogMetrics(
     } yield ()
   } recoverWith logAndRetry(continueWith = updateStatuses())
 
-  private lazy val toStatusesGauge: ((EventStatus, Long)) => IO[Unit] = {
-    case (status, count) => statusesGauge set status -> count
+  private lazy val toStatusesGauge: ((EventStatus, Long)) => IO[Unit] = { case (status, count) =>
+    statusesGauge set status -> count
   }
 
   private def logAndRetry(continueWith: => IO[Unit]): PartialFunction[Throwable, IO[Unit]] = {
@@ -88,11 +88,12 @@ object IOEventLogMetrics {
   )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[EventLogMetrics] =
     for {
       statusesGauge <- Gauge[IO, EventStatus](name = "events_statuses_count",
-                                              help      = "Total Commit Events by status.",
-                                              labelName = "status")(metricsRegistry)
+                                              help = "Total Commit Events by status.",
+                                              labelName = "status"
+                       )(metricsRegistry)
       totalGauge <- Gauge(
-                     name = "events_count",
-                     help = "Total Commit Events."
-                   )(metricsRegistry)
+                      name = "events_count",
+                      help = "Total Commit Events."
+                    )(metricsRegistry)
     } yield new EventLogMetrics(statsFinder, logger, statusesGauge, totalGauge)
 }

@@ -67,52 +67,52 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
     "do nothing if the latest eventIds in the Event Log " +
       "matches the latest commits in GitLab for relevant projects" in new TestCase {
 
-      val latestProjectsCommitsList = nonEmptyList(latestProjectsCommits).generateOne.toList
-      givenFetchLogLatestEvents
-        .returning(context.pure(latestProjectsCommitsList))
+        val latestProjectsCommitsList = nonEmptyList(latestProjectsCommits).generateOne.toList
+        givenFetchLogLatestEvents
+          .returning(context.pure(latestProjectsCommitsList))
 
-      givenLatestCommitsAndLogEventsMatch(latestProjectsCommitsList: _*)
+        givenLatestCommitsAndLogEventsMatch(latestProjectsCommitsList: _*)
 
-      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
+        eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.logged(
-        Info(
-          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, ${latestProjectsCommitsList.size} skipped, 0 failed"
+        logger.logged(
+          Info(
+            s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, ${latestProjectsCommitsList.size} skipped, 0 failed"
+          )
         )
-      )
-    }
+      }
 
     "add missing events to the Event Log " +
       "for projects with the latest eventIds different than the latest commits in GitLab" in new TestCase {
 
-      val latestProjectsCommitsList @ commit1 +: commit2 +: commit3 +: Nil =
-        nonEmptyList(latestProjectsCommits, minElements = 3, maxElements = 3).generateOne.toList
-      givenFetchLogLatestEvents
-        .returning(context.pure(latestProjectsCommitsList))
+        val latestProjectsCommitsList @ commit1 +: commit2 +: commit3 +: Nil =
+          nonEmptyList(latestProjectsCommits, minElements = 3, maxElements = 3).generateOne.toList
+        givenFetchLogLatestEvents
+          .returning(context.pure(latestProjectsCommitsList))
 
-      givenLatestCommitsAndLogEventsMatch(commit1, commit3)
+        givenLatestCommitsAndLogEventsMatch(commit1, commit3)
 
-      val maybeAccessToken2 = Gen.option(accessTokens).generateOne
-      givenAccessToken(commit2.projectId, maybeAccessToken2)
-      val commitInfo2 = commitInfos.generateOne
-      givenFetchLatestCommit(commit2, maybeAccessToken2)
-        .returning(OptionT.some[IO](commitInfo2))
-      val projectInfo2 = projectInfos.generateOne.copy(id = commit2.projectId)
-      givenFindingProjectInfo(commit2, maybeAccessToken2)
-        .returning(context.pure(projectInfo2))
+        val maybeAccessToken2 = Gen.option(accessTokens).generateOne
+        givenAccessToken(commit2.projectId, maybeAccessToken2)
+        val commitInfo2 = commitInfos.generateOne
+        givenFetchLatestCommit(commit2, maybeAccessToken2)
+          .returning(OptionT.some[IO](commitInfo2))
+        val projectInfo2 = projectInfos.generateOne.copy(id = commit2.projectId)
+        givenFindingProjectInfo(commit2, maybeAccessToken2)
+          .returning(context.pure(projectInfo2))
 
-      givenStoring(
-        StartCommit(id = commitInfo2.id, project = Project(projectInfo2.id, projectInfo2.path))
-      ).returning(IO.unit)
+        givenStoring(
+          StartCommit(id = commitInfo2.id, project = Project(projectInfo2.id, projectInfo2.path))
+        ).returning(IO.unit)
 
-      eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
+        eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
-      logger.logged(
-        Info(
-          s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 1 updates, 2 skipped, 0 failed"
+        logger.logged(
+          Info(
+            s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 1 updates, 2 skipped, 0 failed"
+          )
         )
-      )
-    }
+      }
 
     "do nothing if the latest PushEvent does not exists" in new TestCase {
       val latestProjectsCommitsList @ commit1 +: commit2 +: Nil =

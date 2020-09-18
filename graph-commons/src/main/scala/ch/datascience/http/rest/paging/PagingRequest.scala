@@ -31,7 +31,8 @@ object PagingRequest {
   val default: PagingRequest = PagingRequest(Page.first, PerPage.default)
 
   def apply(maybePage:    Option[ValidatedNel[ParseFailure, Page]],
-            maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]]): ValidatedNel[ParseFailure, PagingRequest] =
+            maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]]
+  ): ValidatedNel[ParseFailure, PagingRequest] =
     (maybePage getOrElse Page.first.validNel, maybePerPage getOrElse PerPage.default.validNel)
       .mapN(PagingRequest.apply)
 

@@ -31,8 +31,8 @@ import scala.language.higherKinds
 
 object CurationGenerators {
 
-  implicit def curatedTriplesObjects[Interpretation[_]](
-      implicit ME: MonadError[Interpretation, Throwable]
+  implicit def curatedTriplesObjects[Interpretation[_]](implicit
+      ME: MonadError[Interpretation, Throwable]
   ): Gen[CuratedTriples[Interpretation]] =
     curatedTriplesObjects[Interpretation](
       nonEmptyList(curationUpdatesGroups[Interpretation]).map(_.toList)
@@ -53,8 +53,8 @@ object CurationGenerators {
       updates <- nonEmptyList(curationUpdatesGroups[Interpretation])
     } yield CuratedTriples(JsonLDTriples(List(triples.toJson)), updates.toList)
 
-  implicit def curationUpdatesGroups[Interpretation[_]](
-      implicit ME: MonadError[Interpretation, Throwable]
+  implicit def curationUpdatesGroups[Interpretation[_]](implicit
+      ME: MonadError[Interpretation, Throwable]
   ): Gen[CurationUpdatesGroup[Interpretation]] =
     for {
       name        <- nonBlankStrings(minLength = 5)

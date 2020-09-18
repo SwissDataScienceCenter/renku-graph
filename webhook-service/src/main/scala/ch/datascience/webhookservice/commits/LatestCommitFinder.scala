@@ -80,11 +80,13 @@ class IOLatestCommitFinder(
 
 object IOLatestCommitFinder {
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[LatestCommitFinder[IO]] =
+      gitLabThrottler: Throttler[IO, GitLab],
+      logger:          Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[LatestCommitFinder[IO]] =
     for {
       gitLabUrl <- GitLabUrl[IO]()
     } yield new IOLatestCommitFinder(gitLabUrl, gitLabThrottler, logger)

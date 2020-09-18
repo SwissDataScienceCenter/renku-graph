@@ -48,62 +48,62 @@ class IOCommitInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalS
     "fetch commit info from the configured url " +
       "and return CommitInfo if OK returned with valid body - case with Personal Access Token" in new TestCase {
 
-      val accessToken = personalAccessTokens.generateOne
+        val accessToken = personalAccessTokens.generateOne
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-          .withHeader("PRIVATE-TOKEN", equalTo(accessToken.value))
-          .willReturn(okJson(responseJson.toString()))
+        stubFor {
+          get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+            .withHeader("PRIVATE-TOKEN", equalTo(accessToken.value))
+            .willReturn(okJson(responseJson.toString()))
+        }
+
+        finder.findCommitInfo(projectId, commitId, Some(accessToken)).unsafeRunSync() shouldBe CommitInfo(
+          id = commitId,
+          message = commitMessage,
+          committedDate = committedDate,
+          author = author,
+          committer = committer,
+          parents = parents
+        )
       }
-
-      finder.findCommitInfo(projectId, commitId, Some(accessToken)).unsafeRunSync() shouldBe CommitInfo(
-        id            = commitId,
-        message       = commitMessage,
-        committedDate = committedDate,
-        author        = author,
-        committer     = committer,
-        parents       = parents
-      )
-    }
 
     "fetch commit info from the configured url " +
       "and return CommitInfo if OK returned with valid body - case with OAuth Access Token" in new TestCase {
 
-      val accessToken = oauthAccessTokens.generateOne
+        val accessToken = oauthAccessTokens.generateOne
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-          .withHeader("Authorization", equalTo(s"Bearer ${accessToken.value}"))
-          .willReturn(okJson(responseJson.toString()))
+        stubFor {
+          get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+            .withHeader("Authorization", equalTo(s"Bearer ${accessToken.value}"))
+            .willReturn(okJson(responseJson.toString()))
+        }
+
+        finder.findCommitInfo(projectId, commitId, Some(accessToken)).unsafeRunSync() shouldBe CommitInfo(
+          id = commitId,
+          message = commitMessage,
+          committedDate = committedDate,
+          author = author,
+          committer = committer,
+          parents = parents
+        )
       }
-
-      finder.findCommitInfo(projectId, commitId, Some(accessToken)).unsafeRunSync() shouldBe CommitInfo(
-        id            = commitId,
-        message       = commitMessage,
-        committedDate = committedDate,
-        author        = author,
-        committer     = committer,
-        parents       = parents
-      )
-    }
 
     "fetch commit info from the configured url " +
       "and return CommitInfo if OK returned with valid body - case with no access token" in new TestCase {
 
-      stubFor {
-        get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
-          .willReturn(okJson(responseJson.toString()))
-      }
+        stubFor {
+          get(s"/api/v4/projects/$projectId/repository/commits/$commitId")
+            .willReturn(okJson(responseJson.toString()))
+        }
 
-      finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync() shouldBe CommitInfo(
-        id            = commitId,
-        message       = commitMessage,
-        committedDate = committedDate,
-        author        = author,
-        committer     = committer,
-        parents       = parents
-      )
-    }
+        finder.findCommitInfo(projectId, commitId, maybeAccessToken = None).unsafeRunSync() shouldBe CommitInfo(
+          id = commitId,
+          message = commitMessage,
+          committedDate = committedDate,
+          author = author,
+          committer = committer,
+          parents = parents
+        )
+      }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
 

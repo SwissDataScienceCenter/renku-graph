@@ -116,7 +116,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
           RunPlan.process(
             WorkflowFile.yaml(workflowFile),
             Command("python"),
-            inputs  = List(),
+            inputs = List(),
             outputs = List()
           )
         )
@@ -148,8 +148,8 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         associationFactory = Association.workflow(
           agent.copy(cliVersion = cliVersions.generateOne),
           RunPlan.workflow(
-            inputs       = List(),
-            outputs      = List(),
+            inputs = List(),
+            outputs = List(),
             subprocesses = List()
           )
         ),

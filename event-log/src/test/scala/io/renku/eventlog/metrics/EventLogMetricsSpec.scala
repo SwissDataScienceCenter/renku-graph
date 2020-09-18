@@ -56,12 +56,11 @@ class EventLogMetricsSpec
         .returning(statuses.pure[IO])
         .atLeastOnce()
 
-      statuses foreach {
-        case (status, count) =>
-          (statusesGauge.set _)
-            .expects(status -> count.toDouble)
-            .returning(IO.unit)
-            .atLeastOnce()
+      statuses foreach { case (status, count) =>
+        (statusesGauge.set _)
+          .expects(status -> count.toDouble)
+          .returning(IO.unit)
+          .atLeastOnce()
       }
 
       (totalGauge.set _)
@@ -88,12 +87,11 @@ class EventLogMetricsSpec
         .returning(statuses.pure[IO])
         .atLeastOnce()
 
-      statuses foreach {
-        case (status, count) =>
-          (statusesGauge.set _)
-            .expects(status -> count.toDouble)
-            .returning(IO.unit)
-            .atLeastOnce()
+      statuses foreach { case (status, count) =>
+        (statusesGauge.set _)
+          .expects(status -> count.toDouble)
+          .returning(IO.unit)
+          .atLeastOnce()
       }
 
       (totalGauge.set _)
@@ -127,7 +125,7 @@ class EventLogMetricsSpec
       logger,
       statusesGauge,
       totalGauge,
-      interval         = 100 millis,
+      interval = 100 millis,
       statusesInterval = 500 millis
     )
   }

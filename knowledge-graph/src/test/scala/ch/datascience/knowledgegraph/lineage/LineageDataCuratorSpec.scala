@@ -65,7 +65,8 @@ class LineageDataCuratorSpec extends AnyWordSpec with ScalaCheckPropertyChecks w
         val mergedLineages =
           Lineage
             .from[Try](edges1 ++ edges2 ++ edges3 + additionalLineage3Edge,
-                       nodes1 ++ nodes2 ++ nodes3 + additionalLineage3Node)
+                       nodes1 ++ nodes2 ++ nodes3 + additionalLineage3Node
+            )
             .fold(throw _, identity)
 
         lineageDataCurator.curate(mergedLineages, location) shouldBe OptionT.liftF(

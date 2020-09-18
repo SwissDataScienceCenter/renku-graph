@@ -88,12 +88,11 @@ package object entities extends Schemas with EntitiesGenerators {
 
   implicit class PropertiesOps(x: List[(Property, JsonLD)]) {
     def merge(y: List[(Property, JsonLD)]): List[(Property, JsonLD)] =
-      y.foldLeft(x) {
-        case (originalList, (property, value)) =>
-          val index = originalList.indexWhere(_._1 == property)
+      y.foldLeft(x) { case (originalList, (property, value)) =>
+        val index = originalList.indexWhere(_._1 == property)
 
-          if (index > -1) originalList.updated(index, property -> value)
-          else originalList :+ (property -> value)
+        if (index > -1) originalList.updated(index, property -> value)
+        else originalList :+ (property -> value)
       }
   }
 

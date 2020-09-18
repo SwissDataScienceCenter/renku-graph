@@ -18,7 +18,6 @@
 
 package ch.datascience.graph.tokenrepository
 
-
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.httpUrls

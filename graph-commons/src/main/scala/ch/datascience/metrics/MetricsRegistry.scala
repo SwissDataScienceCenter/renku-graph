@@ -51,8 +51,8 @@ object MetricsRegistry {
       case _           => EnabledMetricsRegistry
     }
 
-  private val noneValue: PartialFunction[Throwable, IO[Option[Boolean]]] = {
-    case NonFatal(_) => IO.pure(Some(true))
+  private val noneValue: PartialFunction[Throwable, IO[Option[Boolean]]] = { case NonFatal(_) =>
+    IO.pure(Some(true))
   }
 
   object DisabledMetricsRegistry extends MetricsRegistry[IO] {

@@ -50,7 +50,8 @@ object Generators {
 
   def nonBlankStrings(minLength:      Int Refined Positive = 1,
                       maxLength:      Int Refined Positive = 10,
-                      charsGenerator: Gen[Char]            = alphaChar): Gen[NonBlank] = {
+                      charsGenerator: Gen[Char] = alphaChar
+  ): Gen[NonBlank] = {
     require(minLength.value <= maxLength.value)
 
     val lengths =
@@ -86,7 +87,8 @@ object Generators {
     } yield chars.mkString("")
 
   def nonEmptyStringsList(minElements: Int Refined Positive = 1,
-                          maxElements: Int Refined Positive = 5): Gen[List[String]] =
+                          maxElements: Int Refined Positive = 5
+  ): Gen[List[String]] =
     for {
       size  <- choose(minElements.value, maxElements.value)
       lines <- Gen.listOfN(size, nonEmptyStrings())
@@ -94,7 +96,8 @@ object Generators {
 
   def nonEmptyList[T](generator:   Gen[T],
                       minElements: Int Refined Positive = 1,
-                      maxElements: Int Refined Positive = 5): Gen[NonEmptyList[T]] =
+                      maxElements: Int Refined Positive = 5
+  ): Gen[NonEmptyList[T]] =
     for {
       size <- choose(minElements.value, maxElements.value)
       list <- Gen.listOfN(size, generator)
@@ -118,7 +121,8 @@ object Generators {
 
   def setOf[T](generator:   Gen[T],
                minElements: Int Refined NonNegative = 0,
-               maxElements: Int Refined Positive = 5): Gen[Set[T]] = {
+               maxElements: Int Refined Positive = 5
+  ): Gen[Set[T]] = {
     require(minElements.value <= maxElements.value)
 
     for {
@@ -150,10 +154,12 @@ object Generators {
                     maxSegments: Int = 10,
                     partsGenerator: Gen[String] = nonBlankStrings(
                       charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_')),
-                      minLength      = 3
-                    ).map(_.value)): Gen[String] = {
+                      minLength = 3
+                    ).map(_.value)
+  ): Gen[String] = {
     require(minSegments <= maxSegments,
-            s"Generate relative paths with minSegments=$minSegments and maxSegments=$maxSegments makes no sense")
+            s"Generate relative paths with minSegments=$minSegments and maxSegments=$maxSegments makes no sense"
+    )
 
     for {
       partsNumber <- Gen.choose(minSegments, maxSegments)
@@ -166,9 +172,9 @@ object Generators {
   def httpUrls(pathGenerator: Gen[String] = relativePaths(minSegments = 0, maxSegments = 2)): Gen[String] =
     for {
       protocol <- Arbitrary.arbBool.arbitrary map {
-                   case true  => "http"
-                   case false => "https"
-                 }
+                    case true  => "http"
+                    case false => "https"
+                  }
       port <- httpPorts
       host <- nonEmptyStrings()
       path <- pathGenerator
@@ -177,9 +183,9 @@ object Generators {
 
   val localHttpUrls: Gen[String] = for {
     protocol <- Arbitrary.arbBool.arbitrary map {
-                 case true  => "http"
-                 case false => "https"
-               }
+                  case true  => "http"
+                  case false => "https"
+                }
     port <- httpPorts
   } yield s"$protocol://localhost:$port"
 
@@ -240,7 +246,8 @@ object Generators {
       value <- oneOf(nonEmptyStrings(maxLength = 5),
                      Arbitrary.arbNumber.arbitrary,
                      Arbitrary.arbBool.arbitrary,
-                     Gen.nonEmptyListOf(nonEmptyStrings()))
+                     Gen.nonEmptyListOf(nonEmptyStrings())
+               )
     } yield key -> value
 
     val objects = for {
@@ -251,8 +258,8 @@ object Generators {
     implicit val mapEncoder: Encoder[Map[String, Any]] = Encoder.instance[Map[String, Any]] { map =>
       Json.obj(
         map.map {
-          case (key, value: String)  => key -> Json.fromString(value)
-          case (key, value: Number)  => key -> Json.fromBigDecimal(value.doubleValue())
+          case (key, value: String) => key -> Json.fromString(value)
+          case (key, value: Number) => key -> Json.fromBigDecimal(value.doubleValue())
           case (key, value: Boolean) => key -> Json.fromBoolean(value)
           case (key, value: List[_]) => key -> Json.arr(value.map(_.toString).map(Json.fromString): _*)
           case (_, value) =>
@@ -268,12 +275,12 @@ object Generators {
 
   implicit val tinyTypes: Gen[TinyType] = Gen.oneOf(
     nonBlankStrings() map (_.value) map (v => new StringTinyType { override def value = v }),
-    relativePaths() map (v => new RelativePathTinyType { override def value           = v }),
-    Arbitrary.arbInt.arbitrary map (v => new IntTinyType { override def value         = v }),
-    Arbitrary.arbLong.arbitrary map (v => new LongTinyType { override def value       = v }),
-    jsons map (v => new JsonTinyType { override def value                             = v }),
-    timestamps map (v => new InstantTinyType { override def value                     = v }),
-    localDates map (v => new LocalDateTinyType { override def value                   = v })
+    relativePaths() map (v => new RelativePathTinyType { override def value = v }),
+    Arbitrary.arbInt.arbitrary map (v => new IntTinyType { override def value = v }),
+    Arbitrary.arbLong.arbitrary map (v => new LongTinyType { override def value = v }),
+    jsons map (v => new JsonTinyType { override def value = v }),
+    timestamps map (v => new InstantTinyType { override def value = v }),
+    localDates map (v => new LocalDateTinyType { override def value = v })
   )
 
   object Implicits {
@@ -286,7 +293,8 @@ object Generators {
         generateNonEmptyList(minElements = ofSize, maxElements = ofSize).toList
 
       def generateNonEmptyList(minElements: Int Refined Positive = 1,
-                               maxElements: Int Refined Positive = 5): NonEmptyList[T] =
+                               maxElements: Int Refined Positive = 5
+      ): NonEmptyList[T] =
         generateExample(nonEmptyList(generator, minElements, maxElements))
 
       def generateOption: Option[T] = Gen.option(generator).sample getOrElse generateOption
@@ -310,7 +318,8 @@ object Generators {
       def toGeneratorOfNones:   Gen[Option[T]] = Gen.const(None)
       def toGeneratorOfOptions: Gen[Option[T]] = Gen.option(generator)
       def toGeneratorOfNonEmptyList(minElements: Int Refined Positive = 1,
-                                    maxElements: Int Refined Positive = 5): Gen[NonEmptyList[T]] =
+                                    maxElements: Int Refined Positive = 5
+      ): Gen[NonEmptyList[T]] =
         nonEmptyList(generator, minElements, maxElements)
 
       private def generateExample[O](generator: Gen[O]): O =

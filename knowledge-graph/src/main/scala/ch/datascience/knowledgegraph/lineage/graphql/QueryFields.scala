@@ -35,10 +35,10 @@ object QueryFields {
   def apply(): List[Field[QueryContext[IO], Unit]] =
     fields[QueryContext[IO], Unit](
       Field(
-        name        = "lineage",
-        fieldType   = OptionType(lineageType),
+        name = "lineage",
+        fieldType = OptionType(lineageType),
         description = Some("Returns a lineage for a project with the given path"),
-        arguments   = List(projectPathArgument, locationArgument),
+        arguments = List(projectPathArgument, locationArgument),
         resolve = context =>
           context.ctx.lineageFinder
             .find(context.args arg projectPathArgument, context.args arg locationArgument)
@@ -47,7 +47,7 @@ object QueryFields {
     )
 
   private val locationArgument = Argument(
-    name         = "filePath",
+    name = "filePath",
     argumentType = Location.toScalarType(name = "FilePath", description = "File path")
   )
 }

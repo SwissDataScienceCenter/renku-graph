@@ -46,32 +46,32 @@ class IOProjectHookCreatorSpec extends AnyWordSpec with MockFactory with Externa
     "send relevant Json payload and 'PRIVATE-TOKEN' header (when Personal Access Token is given) " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
 
-      val personalAccessToken = personalAccessTokens.generateOne
+        val personalAccessToken = personalAccessTokens.generateOne
 
-      stubFor {
-        post(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
-          .withRequestBody(equalToJson(toJson(projectHook)))
-          .willReturn(created())
+        stubFor {
+          post(s"/api/v4/projects/$projectId/hooks")
+            .withHeader("PRIVATE-TOKEN", equalTo(personalAccessToken.value))
+            .withRequestBody(equalToJson(toJson(projectHook)))
+            .willReturn(created())
+        }
+
+        hookCreator.create(projectHook, personalAccessToken).unsafeRunSync() shouldBe ((): Unit)
       }
-
-      hookCreator.create(projectHook, personalAccessToken).unsafeRunSync() shouldBe ((): Unit)
-    }
 
     "send relevant Json payload and 'Authorization' header (when OAuth Access Token is given) " +
       "and return Unit if the remote responds with CREATED" in new TestCase {
 
-      val oauthAccessToken = oauthAccessTokens.generateOne
+        val oauthAccessToken = oauthAccessTokens.generateOne
 
-      stubFor {
-        post(s"/api/v4/projects/$projectId/hooks")
-          .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
-          .withRequestBody(equalToJson(toJson(projectHook)))
-          .willReturn(created())
+        stubFor {
+          post(s"/api/v4/projects/$projectId/hooks")
+            .withHeader("Authorization", equalTo(s"Bearer ${oauthAccessToken.value}"))
+            .withRequestBody(equalToJson(toJson(projectHook)))
+            .willReturn(created())
+        }
+
+        hookCreator.create(projectHook, oauthAccessToken).unsafeRunSync() shouldBe ((): Unit)
       }
-
-      hookCreator.create(projectHook, oauthAccessToken).unsafeRunSync() shouldBe ((): Unit)
-    }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
 

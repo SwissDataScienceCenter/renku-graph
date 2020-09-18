@@ -76,9 +76,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
         projectsJsons should have size dataset.projects.size
         projectsJsons.foreach { json =>
           (json.hcursor.downField("path").as[Path], json._links)
-            .mapN {
-              case (path, links) =>
-                links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
+            .mapN { case (path, links) =>
+              links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
             }
             .getOrElse(fail("No 'path' or 'project-details' links on the 'isPartOf' elements"))
         }
@@ -170,7 +169,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                                               published,
                                               parts,
                                               projects,
-                                              keywords))
+                                              keywords
+        ))
       )
       .getOrElse(fail("Cannot decode payload as Dataset"))
 

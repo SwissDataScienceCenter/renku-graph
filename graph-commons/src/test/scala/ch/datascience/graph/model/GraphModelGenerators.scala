@@ -82,8 +82,8 @@ object GraphModelGenerators {
     } yield s"$firstChar${otherChars.toList.mkString("")}"
 
     relativePaths(
-      minSegments    = 2,
-      maxSegments    = 5,
+      minSegments = 2,
+      maxSegments = 5,
       partsGenerator = partsGenerator
     ) map Path.apply
   }

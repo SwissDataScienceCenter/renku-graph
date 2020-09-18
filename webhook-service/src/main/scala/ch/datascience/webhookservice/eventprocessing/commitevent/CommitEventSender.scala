@@ -50,11 +50,12 @@ class IOCommitEventSender(
     eventLogUrl:           EventLogUrl,
     commitEventSerializer: CommitEventSerializer[IO],
     logger:                Logger[IO]
-)(implicit ME:             MonadError[IO, Throwable],
-  executionContext:        ExecutionContext,
-  contextShift:            ContextShift[IO],
-  timer:                   Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
+)(implicit
+    ME:               MonadError[IO, Throwable],
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO]
+) extends IORestClient(Throttler.noThrottling, logger)
     with CommitEventSender[IO] {
 
   import cats.effect._
@@ -76,8 +77,8 @@ class IOCommitEventSender(
     } yield sendingResult
 
   private implicit lazy val entityEncoder: Encoder[(CommitEvent, EventBody)] =
-    Encoder.instance[(CommitEvent, EventBody)] {
-      case (event, body) => json"""{
+    Encoder.instance[(CommitEvent, EventBody)] { case (event, body) =>
+      json"""{
         "id":        ${event.id.value},
         "project": {
           "id":      ${event.project.id.value},
@@ -98,10 +99,12 @@ class IOCommitEventSender(
 object IOCommitEventSender {
 
   def apply(
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[CommitEventSender[IO]] =
+      logger: Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[CommitEventSender[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
     } yield new IOCommitEventSender(eventLogUrl, new CommitEventSerializer[IO], logger)

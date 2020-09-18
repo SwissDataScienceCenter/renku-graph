@@ -55,8 +55,8 @@ object Histogram {
       buckets:   Seq[Double]
   )(
       metricsRegistry: MetricsRegistry[Interpretation]
-  )(
-      implicit ME: MonadError[Interpretation, Throwable]
+  )(implicit
+      ME: MonadError[Interpretation, Throwable]
   ): Interpretation[LabeledHistogram[Interpretation, LabelValue]] = {
 
     val builder = LibHistogram

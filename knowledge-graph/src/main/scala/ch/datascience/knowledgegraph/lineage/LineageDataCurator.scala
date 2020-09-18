@@ -49,7 +49,8 @@ private class LineageDataCuratorImpl[Interpretation[_]]()(implicit ME: MonadErro
   @scala.annotation.tailrec
   private def findEdgesConnected(to:         Set[Location],
                                  edgesLeft:  Set[Edge],
-                                 foundEdges: Set[Edge] = Set.empty): Set[Edge] =
+                                 foundEdges: Set[Edge] = Set.empty
+  ): Set[Edge] =
     to.headOption match {
       case None => foundEdges
       case Some(nodeToCheck) =>
@@ -63,14 +64,13 @@ private class LineageDataCuratorImpl[Interpretation[_]]()(implicit ME: MonadErro
     }
 
   private def collectNodes(from: Set[Edge], lineage: Lineage) =
-    from.foldLeft(Set.empty[Node].pure[Interpretation]) {
-      case (allNodes, Edge(source, target)) =>
-        (lineage.getNode(source) -> lineage.getNode(target))
-          .mapN { case (sourceNode, targetNode) => allNodes.map(_ + sourceNode + targetNode) }
-          .getOrElse {
-            new IllegalStateException(s"There is no node for either source $source or target $target")
-              .raiseError[Interpretation, Set[Node]]
-          }
+    from.foldLeft(Set.empty[Node].pure[Interpretation]) { case (allNodes, Edge(source, target)) =>
+      (lineage.getNode(source) -> lineage.getNode(target))
+        .mapN { case (sourceNode, targetNode) => allNodes.map(_ + sourceNode + targetNode) }
+        .getOrElse {
+          new IllegalStateException(s"There is no node for either source $source or target $target")
+            .raiseError[Interpretation, Set[Node]]
+        }
     }
 
   private def edgeWith(location: Location): Edge => Boolean = {

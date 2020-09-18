@@ -68,11 +68,10 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 
   private def httpResult(
       path: projects.Path
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding '$path' project failed")
-      logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+    val errorMessage = ErrorMessage(s"Finding '$path' project failed")
+    logger.error(exception)(errorMessage.value)
+    InternalServerError(errorMessage)
   }
 
   private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[Interpretation], String] = {
@@ -172,11 +171,13 @@ class ProjectEndpoint[Interpretation[_]: Effect](
 object IOProjectEndpoint {
 
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[ProjectEndpoint[IO]] =
+      gitLabThrottler: Throttler[IO, GitLab],
+      timeRecorder:    SparqlQueryTimeRecorder[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ProjectEndpoint[IO]] =
     for {
       projectFinder         <- IOProjectFinder(gitLabThrottler, ApplicationLogger, timeRecorder)
       renkuResourceUrl      <- renku.ResourcesUrl[IO]()

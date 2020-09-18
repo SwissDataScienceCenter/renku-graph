@@ -130,7 +130,8 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
                                                             timeRecorder,
                                                             statusRefreshInterval,
                                                             cacheRefreshInterval,
-                                                            statusCacheCheckTimeRef)
+                                                            statusCacheCheckTimeRef
+    )
 
     def expectNotificationSent =
       (subscriber.notifyAvailability _)

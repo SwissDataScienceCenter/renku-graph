@@ -26,9 +26,9 @@ import scala.language.higherKinds
 
 sealed trait EventLogDB
 
-class EventLogDbConfigProvider[Interpretation[_]](
-    implicit ME: MonadError[Interpretation, Throwable]
+class EventLogDbConfigProvider[Interpretation[_]](implicit
+    ME: MonadError[Interpretation, Throwable]
 ) extends DBConfigProvider[Interpretation, EventLogDB](
       namespace = "event-log",
-      dbName    = "event_log"
+      dbName = "event_log"
     )

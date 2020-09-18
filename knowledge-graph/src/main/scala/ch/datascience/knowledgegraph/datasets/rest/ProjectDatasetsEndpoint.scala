@@ -61,11 +61,10 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
 
   private def httpResult(
       projectPath: projects.Path
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding $projectPath's datasets failed")
-      logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+    val errorMessage = ErrorMessage(s"Finding $projectPath's datasets failed")
+    logger.error(exception)(errorMessage.value)
+    InternalServerError(errorMessage)
   }
 
   private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[Interpretation], String] = {
@@ -73,34 +72,35 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
   }
 
   private implicit val sameAsOrDerivedEncoder: Encoder[SameAsOrDerived] = Encoder.instance[SameAsOrDerived] {
-    case Left(sameAs:       SameAs)      => json"""{"sameAs": ${sameAs.toString}}"""
+    case Left(sameAs: SameAs) => json"""{"sameAs": ${sameAs.toString}}"""
     case Right(derivedFrom: DerivedFrom) => json"""{"derivedFrom": ${derivedFrom.toString}}"""
   }
 
   private implicit val datasetEncoder: Encoder[(Identifier, Title, Name, SameAsOrDerived)] =
-    Encoder.instance[(Identifier, Title, Name, SameAsOrDerived)] {
-      case (id, title, name, sameAsOrDerived) =>
-        json"""{
+    Encoder.instance[(Identifier, Title, Name, SameAsOrDerived)] { case (id, title, name, sameAsOrDerived) =>
+      json"""{
           "identifier": ${id.toString},
           "title": ${title.toString},
           "name": ${name.toString}
         }"""
-          .deepMerge(sameAsOrDerived.asJson)
-          .deepMerge(
-            _links(
-              Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))
-            )
+        .deepMerge(sameAsOrDerived.asJson)
+        .deepMerge(
+          _links(
+            Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))
           )
+        )
     }
 }
 
 object IOProjectDatasetsEndpoint {
 
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[ProjectDatasetsEndpoint[IO]] =
+      timeRecorder: SparqlQueryTimeRecorder[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ProjectDatasetsEndpoint[IO]] =
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
       renkuBaseUrl          <- RenkuBaseUrl[IO]()

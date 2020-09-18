@@ -30,8 +30,10 @@ class RoutesMetrics[Interpretation[_]](metricsRegistry: MetricsRegistry[Interpre
 
   implicit class RoutesOps(routes: HttpRoutes[Interpretation]) {
 
-    def withMetrics(implicit F: Sync[Interpretation],
-                    clock:      Clock[Interpretation]): Resource[Interpretation, HttpRoutes[Interpretation]] =
+    def withMetrics(implicit
+        F:     Sync[Interpretation],
+        clock: Clock[Interpretation]
+    ): Resource[Interpretation, HttpRoutes[Interpretation]] =
       metricsRegistry.maybeCollectorRegistry match {
         case Some(collectorRegistry) =>
           Prometheus.metricsOps[Interpretation](collectorRegistry, "server").map { metrics =>

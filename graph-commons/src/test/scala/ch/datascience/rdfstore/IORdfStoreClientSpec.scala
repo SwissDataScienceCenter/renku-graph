@@ -105,7 +105,6 @@ class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with
 
   "send sparql query with paging request" should {
 
-
     import io.circe.literal._
 
     "do a single call to the store if not full page returned" in new QueryClientTestCase {
@@ -204,7 +203,8 @@ class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with
 
       val countQuery = SparqlQuery(name = "test count query",
                                    prefixes = Set.empty,
-                                   body     = """SELECT ?s ?p ?o WHERE { ?s ?p ?o} ORDER BY ASC(?o)""")
+                                   body = """SELECT ?s ?p ?o WHERE { ?s ?p ?o} ORDER BY ASC(?o)"""
+      )
       val totalResponseBody = json"""{
         "results": {
           "bindings": [
@@ -330,7 +330,8 @@ class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with
     val client = new TestRdfQueryClient(
       query = SparqlQuery(name = "find all triples",
                           prefixes = Set.empty,
-                          body     = """SELECT ?s ?p ?o WHERE { ?s ?p ?o } ORDER BY ASC(?s)"""),
+                          body = """SELECT ?s ?p ?o WHERE { ?s ?p ?o } ORDER BY ASC(?s)"""
+      ),
       rdfStoreConfig
     )
   }
@@ -360,14 +361,15 @@ class IORdfStoreClientSpec extends AnyWordSpec with ExternalServiceStubbing with
 
   private class TestRdfQueryClient(val query:      SparqlQuery,
                                    rdfStoreConfig: RdfStoreConfig,
-                                   logger:         Logger[IO] = TestLogger[IO]())
-      extends IORdfStoreClient(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)))
+                                   logger:         Logger[IO] = TestLogger[IO]()
+  ) extends IORdfStoreClient(rdfStoreConfig, logger, new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)))
       with Paging[IO, String] {
 
     def callRemote: IO[Json] = queryExpecting[Json](query)
 
     def callWith(pagingRequest:   PagingRequest,
-                 maybeCountQuery: Option[SparqlQuery] = None): IO[PagingResponse[String]] = {
+                 maybeCountQuery: Option[SparqlQuery] = None
+    ): IO[PagingResponse[String]] = {
       implicit val resultsFinder: PagedResultsFinder[IO, String] = pagedResultsFinder(query, maybeCountQuery)
       findPage(pagingRequest)
     }

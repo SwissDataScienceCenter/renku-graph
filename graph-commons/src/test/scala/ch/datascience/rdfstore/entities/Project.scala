@@ -25,7 +25,8 @@ final case class Project(path:               Path,
                          dateCreated:        DateCreated,
                          maybeCreator:       Option[Person],
                          maybeParentProject: Option[Project] = None,
-                         version:            SchemaVersion)
+                         version:            SchemaVersion
+)
 
 object Project {
 

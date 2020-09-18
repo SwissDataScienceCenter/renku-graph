@@ -49,25 +49,25 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
     "return OK when a valid access token is present in the header " +
       "and the hook exists for the project with the given id" in new TestCase {
 
-      val accessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Request[IO]))
-        .expects(*)
-        .returning(context.pure(accessToken))
+        val accessToken = accessTokens.generateOne
+        (accessTokenFinder
+          .findAccessToken(_: Request[IO]))
+          .expects(*)
+          .returning(context.pure(accessToken))
 
-      (hookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
-        .expects(projectId, Some(accessToken))
-        .returning(context.pure(HookExists))
+        (hookValidator
+          .validateHook(_: Id, _: Option[AccessToken]))
+          .expects(projectId, Some(accessToken))
+          .returning(context.pure(HookExists))
 
-      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
+        val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
 
-      val response = validateHook(projectId, request).unsafeRunSync()
+        val response = validateHook(projectId, request).unsafeRunSync()
 
-      response.status                 shouldBe Ok
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe json"""{"message": "Hook valid"}"""
-    }
+        response.status                 shouldBe Ok
+        response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
+        response.as[Json].unsafeRunSync shouldBe json"""{"message": "Hook valid"}"""
+      }
 
     "return NOT_FOUND the hook does not exist" in new TestCase {
 

@@ -72,7 +72,8 @@ object DBConfigProvider {
                                 user:           User,
                                 pass:           Pass,
                                 connectionPool: ConnectionPool,
-                                maxLifetime:    MaxLifetime)
+                                maxLifetime:    MaxLifetime
+  )
   object DBConfig {
     type Driver         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type Url            = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]

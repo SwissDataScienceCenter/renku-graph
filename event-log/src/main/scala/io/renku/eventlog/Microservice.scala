@@ -67,50 +67,51 @@ object Microservice extends IOMicroservice {
         eventLogMetrics      <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
         waitingEventsGauge   <- WaitingEventsGauge(metricsRegistry, statsFinder, ApplicationLogger)
         underProcessingGauge <- UnderProcessingGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        eventCreationEndpoint <- IOEventCreationEndpoint(transactor,
-                                                         waitingEventsGauge,
-                                                         queriesExecTimes,
-                                                         ApplicationLogger)
+        eventCreationEndpoint <-
+          IOEventCreationEndpoint(transactor, waitingEventsGauge, queriesExecTimes, ApplicationLogger)
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
                                                            waitingEventsGauge,
                                                            underProcessingGauge,
                                                            queriesExecTimes,
-                                                           ApplicationLogger)
+                                                           ApplicationLogger
+                                  )
         statusChangeEndpoint <- IOStatusChangeEndpoint(transactor,
                                                        waitingEventsGauge,
                                                        underProcessingGauge,
                                                        queriesExecTimes,
-                                                       ApplicationLogger)
+                                                       ApplicationLogger
+                                )
         subscriptions <- Subscriptions(ApplicationLogger)
         eventsDispatcher <- EventsDispatcher(transactor,
                                              subscriptions,
                                              waitingEventsGauge,
                                              underProcessingGauge,
                                              queriesExecTimes,
-                                             ApplicationLogger)
+                                             ApplicationLogger
+                            )
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptions, ApplicationLogger)
         microserviceRoutes = new MicroserviceRoutes[IO](
-          eventCreationEndpoint,
-          latestEventsEndpoint,
-          processingStatusEndpoint,
-          eventsPatchingEndpoint,
-          statusChangeEndpoint,
-          subscriptionsEndpoint,
-          new RoutesMetrics[IO](metricsRegistry)
-        ).routes
+                               eventCreationEndpoint,
+                               latestEventsEndpoint,
+                               processingStatusEndpoint,
+                               eventsPatchingEndpoint,
+                               statusChangeEndpoint,
+                               subscriptionsEndpoint,
+                               new RoutesMetrics[IO](metricsRegistry)
+                             ).routes
         exitcode <- microserviceRoutes.use { routes =>
-                     val httpServer = new HttpServer[IO](serverPort = 9005, routes)
+                      val httpServer = new HttpServer[IO](serverPort = 9005, routes)
 
-                     new MicroserviceRunner(
-                       sentryInitializer,
-                       eventLogMetrics,
-                       eventsDispatcher,
-                       httpServer,
-                       subProcessesCancelTokens
-                     ).run()
-                   }
+                      new MicroserviceRunner(
+                        sentryInitializer,
+                        eventLogMetrics,
+                        eventsDispatcher,
+                        httpServer,
+                        subProcessesCancelTokens
+                      ).run()
+                    }
       } yield exitcode
 
     }

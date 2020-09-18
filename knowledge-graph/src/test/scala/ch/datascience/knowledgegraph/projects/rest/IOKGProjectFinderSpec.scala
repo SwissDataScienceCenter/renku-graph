@@ -48,17 +48,18 @@ class IOKGProjectFinderSpec
         val maybeProjectCreator = project.created.maybeCreator
         loadToStore(
           fileCommit(commitId = commitIds.generateOne)(projectPath = projectPaths.generateOne,
-                                                       projectVersion = projectSchemaVersions.generateOne),
+                                                       projectVersion = projectSchemaVersions.generateOne
+          ),
           fileCommit(
-            commitId      = commitIds.generateOne,
+            commitId = commitIds.generateOne,
             committedDate = CommittedDate(project.created.date.value)
           )(
-            projectPath         = project.path,
-            projectName         = project.name,
-            projectDateCreated  = project.created.date,
+            projectPath = project.path,
+            projectName = project.name,
+            projectDateCreated = project.created.date,
             maybeProjectCreator = maybeProjectCreator.toMaybePerson,
-            maybeParent         = None,
-            projectVersion      = project.version
+            maybeParent = None,
+            projectVersion = project.version
           )
         )
 
@@ -72,18 +73,18 @@ class IOKGProjectFinderSpec
           fileCommit(
             commitId = commitIds.generateOne
           )(
-            projectPath         = project.path,
-            projectName         = project.name,
-            projectDateCreated  = project.created.date,
+            projectPath = project.path,
+            projectName = project.name,
+            projectDateCreated = project.created.date,
             maybeProjectCreator = project.created.maybeCreator.toMaybePerson,
             maybeParent = project.maybeParent.map { parent =>
               entities.Project(
                 parent.resourceId.toUnsafe[Path],
                 parent.name,
                 parent.created.date,
-                maybeCreator       = parent.created.maybeCreator.toMaybePerson,
+                maybeCreator = parent.created.maybeCreator.toMaybePerson,
                 maybeParentProject = None,
-                version            = projectSchemaVersions.generateOne
+                version = projectSchemaVersions.generateOne
               )
             },
             projectVersion = project.version

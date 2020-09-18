@@ -47,8 +47,8 @@ object Arguments {
       import cats.syntax.all._
 
       ScalarType[TT](
-        name         = name.value,
-        description  = Some(description.value),
+        name = name.value,
+        description = Some(description.value),
         coerceOutput = valueOutput,
         coerceUserInput = {
           case s: String => typeFactory.from(s) leftMap (_ => TinyTypeCoercionViolation(exceptionMessage))

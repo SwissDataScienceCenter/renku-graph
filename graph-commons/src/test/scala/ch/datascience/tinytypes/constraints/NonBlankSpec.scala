@@ -35,11 +35,15 @@ class NonBlankSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
     }
 
     "throw an IllegalArgumentException for empty String values" in {
-      intercept[IllegalArgumentException](NonBlankString("")).getMessage shouldBe "ch.datascience.tinytypes.constraints.NonBlankString cannot be blank"
+      intercept[IllegalArgumentException](
+        NonBlankString("")
+      ).getMessage shouldBe "ch.datascience.tinytypes.constraints.NonBlankString cannot be blank"
     }
 
     "throw an IllegalArgumentException for blank String values" in {
-      intercept[IllegalArgumentException](NonBlankString(" ")).getMessage shouldBe "ch.datascience.tinytypes.constraints.NonBlankString cannot be blank"
+      intercept[IllegalArgumentException](
+        NonBlankString(" ")
+      ).getMessage shouldBe "ch.datascience.tinytypes.constraints.NonBlankString cannot be blank"
     }
   }
 }

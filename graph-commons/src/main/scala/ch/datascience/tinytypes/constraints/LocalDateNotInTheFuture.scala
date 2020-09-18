@@ -26,7 +26,7 @@ trait LocalDateNotInTheFuture extends Constraints[LocalDate] {
   protected[this] def now: LocalDate = LocalDate.now()
 
   addConstraint(
-    check   = _.compareTo(now) <= 0,
+    check = _.compareTo(now) <= 0,
     message = (_: LocalDate) => s"$typeName cannot be in the future"
   )
 }

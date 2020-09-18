@@ -31,8 +31,8 @@ trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable w
   def eventId: CompoundEventId
   def status:  EventStatus
   def query:   SqlQuery[Int]
-  def updateGauges(updateResult: UpdateResult)(
-      implicit transactor:       DbTransactor[Interpretation, EventLogDB]
+  def updateGauges(updateResult: UpdateResult)(implicit
+      transactor:                DbTransactor[Interpretation, EventLogDB]
   ): Interpretation[Unit]
 
   def mapResult: Int => UpdateResult = {

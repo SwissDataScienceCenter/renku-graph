@@ -53,13 +53,13 @@ private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
     for {
       datasetInfos <- findDatasetsInfo(curatedTriples.triples).asRightT
       topmostInfos <- EitherT(
-                       datasetInfos
-                         .map(findTopmostData)
-                         .toList
-                         .sequence
-                         .map(_.asRight[ProcessingRecoverableError])
-                         .recover(maybeToRecoverableError)
-                     )
+                        datasetInfos
+                          .map(findTopmostData)
+                          .toList
+                          .sequence
+                          .map(_.asRight[ProcessingRecoverableError])
+                          .recover(maybeToRecoverableError)
+                      )
       updatedTriples = topmostInfos.foldLeft(curatedTriples)(mergeTopmostDataIntoTriples)
     } yield topmostInfos.foldLeft(updatedTriples)(descendantsUpdater.prepareUpdates[Interpretation])
 

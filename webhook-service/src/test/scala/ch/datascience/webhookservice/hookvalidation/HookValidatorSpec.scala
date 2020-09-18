@@ -559,9 +559,10 @@ class TryHookValidator(
     accessTokenRemover:    AccessTokenRemover[Try],
     logger:                Logger[Try]
 ) extends HookValidator[Try](projectHookUrl,
-                               projectInfoFinder,
-                               projectHookVerifier,
-                               accessTokenFinder,
-                               accessTokenAssociator,
-                               accessTokenRemover,
-                               logger)
+                             projectInfoFinder,
+                             projectHookVerifier,
+                             accessTokenFinder,
+                             accessTokenAssociator,
+                             accessTokenRemover,
+                             logger
+    )

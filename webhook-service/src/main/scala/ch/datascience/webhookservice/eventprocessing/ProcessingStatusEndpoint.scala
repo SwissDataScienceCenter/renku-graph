@@ -84,23 +84,22 @@ class ProcessingStatusEndpoint[Interpretation[_]: Effect](
     case _          => None
   }
 
-  private lazy val noAccessTokenToNone: PartialFunction[Throwable, Option[Unit]] = {
-    case NoAccessTokenException(_) => None
+  private lazy val noAccessTokenToNone: PartialFunction[Throwable, Option[Unit]] = { case NoAccessTokenException(_) =>
+    None
   }
 
   private def httpResponse(
       projectId: projects.Id
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"Finding progress status for project '$projectId' failed")
-      InternalServerError(ErrorMessage(exception))
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+    logger.error(exception)(s"Finding progress status for project '$projectId' failed")
+    InternalServerError(ErrorMessage(exception))
   }
 }
 
 private object ProcessingStatusEndpoint {
 
-  implicit val processingStatusEncoder: Encoder[ProcessingStatus] = {
-    case ProcessingStatus(done, total, progress) => json"""
+  implicit val processingStatusEncoder: Encoder[ProcessingStatus] = { case ProcessingStatus(done, total, progress) =>
+    json"""
       {
        "done": ${done.value},
        "total": ${total.value},
@@ -117,14 +116,16 @@ private object ProcessingStatusEndpoint {
 
 object IOProcessingStatusEndpoint {
   def apply(
-      projectHookUrl:          ProjectHookUrl,
-      gitLabThrottler:         Throttler[IO, GitLab],
-      executionTimeRecorder:   ExecutionTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    clock:                     Clock[IO],
-    timer:                     Timer[IO]): IO[ProcessingStatusEndpoint[IO]] =
+      projectHookUrl:        ProjectHookUrl,
+      gitLabThrottler:       Throttler[IO, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[IO],
+      logger:                Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      clock:            Clock[IO],
+      timer:            Timer[IO]
+  ): IO[ProcessingStatusEndpoint[IO]] =
     for {
       fetcher       <- IOProcessingStatusFetcher(logger)
       hookValidator <- IOHookValidator(projectHookUrl, gitLabThrottler)

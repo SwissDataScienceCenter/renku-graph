@@ -26,7 +26,7 @@ trait InstantNotInTheFuture extends Constraints[Instant] {
   protected[this] def now: Instant = Instant.now()
 
   addConstraint(
-    check   = _.compareTo(now) <= 0,
+    check = _.compareTo(now) <= 0,
     message = (_: Instant) => s"$typeName cannot be in the future"
   )
 }

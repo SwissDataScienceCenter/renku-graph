@@ -62,7 +62,8 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
                            createdDate:     CreatedDate = CreatedDate(Instant.now),
                            batchDate:       BatchDate = BatchDate(Instant.now),
                            projectPath:     Path = projectPaths.generateOne,
-                           maybeMessage:    Option[EventMessage] = None): Unit = execute {
+                           maybeMessage:    Option[EventMessage] = None
+  ): Unit = execute {
     maybeMessage match {
       case None =>
         sql"""|insert into

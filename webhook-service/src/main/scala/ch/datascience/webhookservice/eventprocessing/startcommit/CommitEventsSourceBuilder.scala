@@ -46,7 +46,8 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
 
   def buildEventsSource(startCommit:      StartCommit,
                         maybeAccessToken: Option[AccessToken],
-                        clock:            Clock): Interpretation[EventsFlowBuilder[Interpretation]] = ME.pure {
+                        clock:            Clock
+  ): Interpretation[EventsFlowBuilder[Interpretation]] = ME.pure {
     transform: Function1[CommitEvent, Interpretation[SendingResult]] =>
       new EventsFlow(startCommit, maybeAccessToken, transform, clock).run()
   }
@@ -54,13 +55,15 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
   private class EventsFlow(startCommit:      StartCommit,
                            maybeAccessToken: Option[AccessToken],
                            transform:        CommitEvent => Interpretation[SendingResult],
-                           clock:            Clock) {
+                           clock:            Clock
+  ) {
 
     def run(): Interpretation[List[SendingResult]] = findEventAndTransform(startCommit.id, List.empty)
 
     private def findEventAndTransform(commitId:         CommitId,
                                       transformResults: List[SendingResult],
-                                      batchDate:        BatchDate = BatchDate(clock)): Interpretation[List[SendingResult]] =
+                                      batchDate:        BatchDate = BatchDate(clock)
+    ): Interpretation[List[SendingResult]] =
       maybeCommitEvent(commitId, batchDate) flatMap {
         case None => transformResults.pure[Interpretation]
         case Some(commitEvent) =>
@@ -68,7 +71,7 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
             currentTransformResult <- transform(commitEvent)
             mergedResults          <- (transformResults :+ currentTransformResult).pure[Interpretation]
             parentsResults <- if (currentTransformResult == Existed) List.empty[SendingResult].pure[Interpretation]
-                             else transformParents(commitEvent, batchDate)
+                              else transformParents(commitEvent, batchDate)
           } yield mergedResults ++ parentsResults
       }
 
@@ -80,14 +83,14 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
       findCommitInfo(startCommit.project.id, commitId, maybeAccessToken) map toCommitEvent(batchDate)
 
     private def toCommitEvent(batchDate: BatchDate)(commitInfo: CommitInfo) = CommitEvent(
-      id            = commitInfo.id,
-      message       = commitInfo.message,
+      id = commitInfo.id,
+      message = commitInfo.message,
       committedDate = commitInfo.committedDate,
-      author        = commitInfo.author,
-      committer     = commitInfo.committer,
-      parents       = commitInfo.parents.filterNot(_ == DontCareCommitId),
-      project       = startCommit.project,
-      batchDate     = batchDate
+      author = commitInfo.author,
+      committer = commitInfo.committer,
+      parents = commitInfo.parents.filterNot(_ == DontCareCommitId),
+      project = startCommit.project,
+      batchDate = batchDate
     )
 
     private def transformParents(commitEvent: CommitEvent, batchDate: BatchDate) =
@@ -109,10 +112,12 @@ private object CommitEventsSourceBuilder {
 
 private object IOCommitEventsSourceBuilder {
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[CommitEventsSourceBuilder[IO]] =
+      gitLabThrottler: Throttler[IO, GitLab]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[CommitEventsSourceBuilder[IO]] =
     for {
       gitLabUrl <- GitLabUrl[IO]()
     } yield new CommitEventsSourceBuilder[IO](new IOCommitInfoFinder(gitLabUrl, gitLabThrottler, ApplicationLogger))

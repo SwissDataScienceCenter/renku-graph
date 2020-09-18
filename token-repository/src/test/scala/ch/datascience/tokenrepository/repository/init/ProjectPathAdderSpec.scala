@@ -140,7 +140,8 @@ class ProjectPathAdderSpec
     def assumePathExistsInGitLab(projectId:        Id,
                                  maybeProjectPath: Option[Path],
                                  encryptedToken:   EncryptedAccessToken,
-                                 token:            AccessToken) = {
+                                 token:            AccessToken
+    ) = {
       (accessTokenCrypto.decrypt _)
         .expects(encryptedToken)
         .returning(token.pure[IO])

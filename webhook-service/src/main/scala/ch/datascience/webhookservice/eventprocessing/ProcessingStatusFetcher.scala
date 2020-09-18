@@ -76,13 +76,14 @@ private object ProcessingStatusFetcher {
 }
 
 private class IOProcessingStatusFetcher(
-    eventLogUrl:    EventLogUrl,
-    logger:         Logger[IO]
-)(implicit ME:      MonadError[IO, Throwable],
-  executionContext: ExecutionContext,
-  contextShift:     ContextShift[IO],
-  timer:            Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
+    eventLogUrl: EventLogUrl,
+    logger:      Logger[IO]
+)(implicit
+    ME:               MonadError[IO, Throwable],
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO]
+) extends IORestClient(Throttler.noThrottling, logger)
     with ProcessingStatusFetcher[IO] {
 
   import IOProcessingStatusFetcher._
@@ -112,10 +113,12 @@ private object IOProcessingStatusFetcher {
   import io.circe.DecodingFailure
 
   def apply(
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[ProcessingStatusFetcher[IO]] =
+      logger: Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ProcessingStatusFetcher[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
     } yield new IOProcessingStatusFetcher(eventLogUrl, logger)

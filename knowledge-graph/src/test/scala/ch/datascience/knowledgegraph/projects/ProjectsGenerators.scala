@@ -44,17 +44,17 @@ object ProjectsGenerators {
     kgProject     <- kgProjects
     gitLabProject <- gitLabProjects
   } yield Project(
-    id               = gitLabProject.id,
-    path             = kgProject.path,
-    name             = kgProject.name,
+    id = gitLabProject.id,
+    path = kgProject.path,
+    name = kgProject.name,
     maybeDescription = gitLabProject.maybeDescription,
-    visibility       = gitLabProject.visibility,
+    visibility = gitLabProject.visibility,
     created = Creation(
-      date         = kgProject.created.date,
+      date = kgProject.created.date,
       maybeCreator = kgProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
     ),
     updatedAt = gitLabProject.updatedAt,
-    urls      = gitLabProject.urls,
+    urls = gitLabProject.urls,
     forking = Forking(
       gitLabProject.forksCount,
       kgProject.maybeParent.map { parent =>
@@ -62,15 +62,16 @@ object ProjectsGenerators {
           parent.resourceId.toUnsafe[Path],
           parent.name,
           Creation(parent.created.date,
-                   parent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name)))
+                   parent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
+          )
         )
       }
     ),
-    tags        = gitLabProject.tags,
-    starsCount  = gitLabProject.starsCount,
+    tags = gitLabProject.tags,
+    starsCount = gitLabProject.starsCount,
     permissions = gitLabProject.permissions,
-    statistics  = gitLabProject.statistics,
-    version     = kgProject.version
+    statistics = gitLabProject.statistics,
+    version = kgProject.version
   )
 
   implicit lazy val kgProjects: Gen[KGProject] = kgProjects(parents.toGeneratorOfOptions)
@@ -112,7 +113,8 @@ object ProjectsGenerators {
                         starsCount,
                         updatedAt,
                         permissions,
-                        statistics)
+                        statistics
+  )
 
   private implicit lazy val urlsObjects: Gen[Urls] = for {
     sshUrl         <- sshUrls

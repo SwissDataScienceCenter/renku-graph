@@ -49,13 +49,12 @@ private class EventsPatcherImpl(
     } yield ()
   } recoverWith loggedError(eventsPatch)
 
-  private def loggedError(patch: EventsPatch[IO]): PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) =>
-      val message = s"Patching all events with ${patch.name} failed"
-      logger.error(exception)(message)
-      ME.raiseError {
-        new Exception(message, exception)
-      }
+  private def loggedError(patch: EventsPatch[IO]): PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+    val message = s"Patching all events with ${patch.name} failed"
+    logger.error(exception)(message)
+    ME.raiseError {
+      new Exception(message, exception)
+    }
   }
 }
 

@@ -56,8 +56,8 @@ private class IOSubscriptionSender(
     } yield sendingResult
 
   private implicit lazy val entityEncoder: Encoder[(SubscriberUrl, Set[String])] =
-    Encoder.instance[(SubscriberUrl, Set[String])] {
-      case (url, statuses) => json"""{
+    Encoder.instance[(SubscriberUrl, Set[String])] { case (url, statuses) =>
+      json"""{
         "subscriberUrl": ${url.value},
         "statuses": ${statuses.toList}
       }"""
@@ -70,10 +70,12 @@ private class IOSubscriptionSender(
 
 private object IOSubscriptionSender {
   def apply(
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[SubscriptionSender[IO]] =
+      logger: Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[SubscriptionSender[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
     } yield new IOSubscriptionSender(eventLogUrl, logger)

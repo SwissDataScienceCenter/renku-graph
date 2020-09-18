@@ -23,7 +23,7 @@ import ch.datascience.tinytypes.Constraints
 trait NonNegativeInt extends Constraints[Int] {
 
   addConstraint(
-    check   = _ >= 0,
+    check = _ >= 0,
     message = _ => s"$typeName cannot be < 0"
   )
 }
@@ -31,7 +31,7 @@ trait NonNegativeInt extends Constraints[Int] {
 trait NonNegativeLong extends Constraints[Long] {
 
   addConstraint(
-    check   = _ >= 0L,
+    check = _ >= 0L,
     message = _ => s"$typeName cannot be < 0"
   )
 }

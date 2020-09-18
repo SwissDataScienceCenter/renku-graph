@@ -37,7 +37,8 @@ class Activity(val commitId:                 CommitId,
                val maybeInformedBy:          Option[Activity],
                val maybeInfluenced:          Option[Activity],
                val maybeInvalidation:        Option[Entity with Artifact],
-               val maybeGenerationFactories: List[Activity => Generation]) {
+               val maybeGenerationFactories: List[Activity => Generation]
+) {
   lazy val generations: List[Generation] = maybeGenerationFactories.map(_.apply(this))
 
   def entity(location: Location): Entity with Artifact =
@@ -65,7 +66,8 @@ object Activity {
             maybeInformedBy:          Option[Activity] = None,
             maybeInfluenced:          Option[Activity] = None,
             maybeInvalidation:        Option[Entity with Artifact] = None,
-            maybeGenerationFactories: List[Activity => Generation] = Nil): Activity =
+            maybeGenerationFactories: List[Activity => Generation] = Nil
+  ): Activity =
     new Activity(id,
                  committedDate,
                  committer,
@@ -75,22 +77,25 @@ object Activity {
                  maybeInformedBy,
                  maybeInfluenced,
                  maybeInvalidation,
-                 maybeGenerationFactories)
+                 maybeGenerationFactories
+    )
 
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
-                                           fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Activity] =
+  private[entities] implicit def converter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): PartialEntityConverter[Activity] =
     new PartialEntityConverter[Activity] {
       override def convert[T <: Activity]: T => Either[Exception, PartialEntity] =
         entity =>
           for {
             reverseInvalidation <- entity.maybeInvalidation match {
-                                    case Some(invalidation) =>
-                                      Reverse.of((prov / "wasInvalidatedBy") -> invalidation.asJsonLD)
-                                    case _ => Reverse.empty.asRight[Exception]
-                                  }
+                                     case Some(invalidation) =>
+                                       Reverse.of((prov / "wasInvalidatedBy") -> invalidation.asJsonLD)
+                                     case _ => Reverse.empty.asRight[Exception]
+                                   }
             reverseGeneration <- Reverse.of((prov / "activity") -> entity.generations.map(_.asJsonLD))
           } yield PartialEntity(
             EntityTypes of (prov / "Activity"),
@@ -119,11 +124,13 @@ object Activity {
       case a => throw new Exception(s"Cannot serialize ${a.getClass} Activity")
     }
 
-  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                               fusekiBaseUrl:         FusekiBaseUrl): EntityIdEncoder[Activity] =
+  implicit def entityIdEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): EntityIdEncoder[Activity] =
     EntityIdEncoder.instance {
-      case a: ActivityWorkflowRun => a.asEntityId
-      case a: Activity with ChildProcessRun => a.asEntityId
+      case a: ActivityWorkflowRun              => a.asEntityId
+      case a: Activity with ChildProcessRun    => a.asEntityId
       case a: Activity with WorkflowProcessRun => a.asEntityId
       case a: Activity with StandAloneProcessRun => a.asEntityId
       case a: Activity =>

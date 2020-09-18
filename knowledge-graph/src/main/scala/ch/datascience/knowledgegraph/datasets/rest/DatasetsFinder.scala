@@ -40,7 +40,8 @@ import scala.language.higherKinds
 private trait DatasetsFinder[Interpretation[_]] {
   def findDatasets(maybePhrase: Option[Phrase],
                    sort:        Sort.By,
-                   paging:      PagingRequest): Interpretation[PagingResponse[DatasetSearchResult]]
+                   paging:      PagingRequest
+  ): Interpretation[PagingResponse[DatasetSearchResult]]
 }
 
 private object DatasetsFinder {
@@ -76,7 +77,8 @@ private class IODatasetsFinder(
 
   override def findDatasets(maybePhrase:   Option[Phrase],
                             sort:          Sort.By,
-                            pagingRequest: PagingRequest): IO[PagingResponse[DatasetSearchResult]] = {
+                            pagingRequest: PagingRequest
+  ): IO[PagingResponse[DatasetSearchResult]] = {
     val phrase = maybePhrase getOrElse Phrase("*")
     implicit val resultsFinder: PagedResultsFinder[IO, DatasetSearchResult] = pagedResultsFinder(
       sparqlQuery(phrase, sort)
@@ -184,11 +186,11 @@ private object IODatasetsFinder {
       maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
       projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
       maybeDescription <- cursor
-                           .downField("maybeDescription")
-                           .downField("value")
-                           .as[Option[String]]
-                           .map(blankToNone)
-                           .flatMap(toOption[Description])
+                            .downField("maybeDescription")
+                            .downField("value")
+                            .as[Option[String]]
+                            .map(blankToNone)
+                            .flatMap(toOption[Description])
     } yield DatasetSearchResult(
       id,
       title,

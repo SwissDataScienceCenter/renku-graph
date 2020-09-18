@@ -26,7 +26,8 @@ import io.renku.jsonld._
 final case class PartialEntity(maybeId:      Option[EntityId],
                                maybeTypes:   Option[EntityTypes],
                                properties:   List[(Property, JsonLD)],
-                               maybeReverse: Option[Reverse])
+                               maybeReverse: Option[Reverse]
+)
 
 object PartialEntity {
 
@@ -40,20 +41,21 @@ object PartialEntity {
 
   def apply(types: EntityTypes, first: (Property, JsonLD), other: (Property, JsonLD)*): PartialEntity =
     PartialEntity(
-      maybeId      = None,
-      maybeTypes   = types.some,
-      properties   = (first +: other).toList,
+      maybeId = None,
+      maybeTypes = types.some,
+      properties = (first +: other).toList,
       maybeReverse = None
     )
 
   def apply(types:   EntityTypes,
             reverse: Reverse,
             first:   (Property, JsonLD),
-            other:   (Property, JsonLD)*): PartialEntity =
+            other:   (Property, JsonLD)*
+  ): PartialEntity =
     PartialEntity(
-      maybeId      = None,
-      maybeTypes   = types.some,
-      properties   = (first +: other).toList,
+      maybeId = None,
+      maybeTypes = types.some,
+      properties = (first +: other).toList,
       maybeReverse = Some(reverse)
     )
 
@@ -65,9 +67,9 @@ object PartialEntity {
 
   implicit val semigroup: Semigroup[PartialEntity] = (x: PartialEntity, y: PartialEntity) =>
     x.copy(
-      maybeId      = y.maybeId orElse x.maybeId,
-      maybeTypes   = y.maybeTypes.map(_.list) |+| x.maybeTypes.map(_.list) map EntityTypes.apply,
-      properties   = x.properties merge y.properties,
+      maybeId = y.maybeId orElse x.maybeId,
+      maybeTypes = y.maybeTypes.map(_.list) |+| x.maybeTypes.map(_.list) map EntityTypes.apply,
+      properties = x.properties merge y.properties,
       maybeReverse = x.maybeReverse |+| y.maybeReverse
     )
 

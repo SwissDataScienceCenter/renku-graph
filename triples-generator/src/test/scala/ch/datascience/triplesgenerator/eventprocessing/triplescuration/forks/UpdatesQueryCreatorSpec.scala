@@ -330,7 +330,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   private def removeDateCreated(projectId: ResourceId): Unit =
     runUpdate(
       SparqlQuery(
-        name     = "delete date created",
+        name = "delete date created",
         prefixes = Set("PREFIX schema: <http://schema.org/>"),
         s"""| DELETE { ${projectId.showAs[RdfResource]} schema:dateCreated ?dateCreated }
             | WHERE { ${projectId.showAs[RdfResource]} schema:dateCreated ?dateCreated }

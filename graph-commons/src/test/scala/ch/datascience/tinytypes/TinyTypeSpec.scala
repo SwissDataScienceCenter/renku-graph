@@ -175,12 +175,12 @@ private object TinyTypeTest extends TinyTypeFactory[TinyTypeTest](new TinyTypeTe
   }
 
   addConstraint(
-    check   = _ != invalidValue,
+    check = _ != invalidValue,
     message = _ => invalidValueMessage
   )
 
   addConstraint(
-    check   = !_.contains(invalidChar),
+    check = !_.contains(invalidChar),
     message = _ => invalidCharMessage
   )
 }
