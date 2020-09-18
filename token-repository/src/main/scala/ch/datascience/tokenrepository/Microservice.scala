@@ -52,20 +52,20 @@ object Microservice extends IOMicroservice {
         metricsRegistry        <- MetricsRegistry()
         deleteTokenEndpoint    <- IODeleteTokenEndpoint(transactor, ApplicationLogger)
         microserviceRoutes = new MicroserviceRoutes[IO](
-          fetchTokenEndpoint,
-          associateTokenEndpoint,
-          deleteTokenEndpoint,
-          new RoutesMetrics[IO](metricsRegistry)
-        ).routes
+                               fetchTokenEndpoint,
+                               associateTokenEndpoint,
+                               deleteTokenEndpoint,
+                               new RoutesMetrics[IO](metricsRegistry)
+                             ).routes
         exitcode <- microserviceRoutes.use { routes =>
-                     val httpServer = new HttpServer[IO](serverPort = 9003, routes)
+                      val httpServer = new HttpServer[IO](serverPort = 9003, routes)
 
-                     new MicroserviceRunner(
-                       sentryInitializer,
-                       dbInitializer,
-                       httpServer
-                     ) run args
-                   }
+                      new MicroserviceRunner(
+                        sentryInitializer,
+                        dbInitializer,
+                        httpServer
+                      ) run args
+                    }
       } yield exitcode
     }
 }

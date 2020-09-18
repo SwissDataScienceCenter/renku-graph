@@ -108,8 +108,8 @@ object RateLimit extends TypeName {
   )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[Long Refined Positive] =
     for {
       long <- ME
-               .fromTry(Try(rate.toLong))
-               .adaptError { case _ => new IllegalArgumentException(s"$typeName has to be positive") }
+                .fromTry(Try(rate.toLong))
+                .adaptError { case _ => new IllegalArgumentException(s"$typeName has to be positive") }
       positiveLong <- ME.fromEither(long.toPositiveLong(errorWhenNotPositive = s"$typeName has to be positive"))
     } yield positiveLong
 

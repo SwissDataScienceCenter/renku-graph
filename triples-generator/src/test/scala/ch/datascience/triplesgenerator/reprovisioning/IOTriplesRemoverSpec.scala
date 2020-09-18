@@ -37,13 +37,13 @@ class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should
     "remove all the triples from the storage except for CLI version" in new TestCase {
 
       val cliVersionJsonLD = JsonLD.entity(
-        id    = CliVersionJsonLD.id,
+        id = CliVersionJsonLD.id,
         types = EntityTypes.of(CliVersionJsonLD.objectType),
         CliVersionJsonLD.version -> JsonLD.fromString(cliVersions.generateOne.toString)
       )
 
       val reprovisioningJsonLD = JsonLD.entity(
-        id    = ReProvisioningJsonLD.id,
+        id = ReProvisioningJsonLD.id,
         types = EntityTypes.of(ReProvisioningJsonLD.objectType),
         ReProvisioningJsonLD.reProvisioningStatus -> JsonLD.fromBoolean(true)
       )
@@ -61,7 +61,8 @@ class IOTriplesRemoverSpec extends AnyWordSpec with InMemoryRdfStore with should
         .removeAllTriples()
         .unsafeRunSync() shouldBe ((): Unit)
 
-      val totalNumberOfTriples = cliVersionJsonLD.properties.size + 1 + reprovisioningJsonLD.properties.size + 1 // +1 for rdf:type
+      val totalNumberOfTriples =
+        cliVersionJsonLD.properties.size + 1 + reprovisioningJsonLD.properties.size + 1 // +1 for rdf:type
       rdfStoreSize shouldBe totalNumberOfTriples
     }
   }

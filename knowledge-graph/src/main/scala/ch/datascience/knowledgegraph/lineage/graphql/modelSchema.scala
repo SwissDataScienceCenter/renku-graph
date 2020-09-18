@@ -24,12 +24,12 @@ import sangria.schema._
 private object modelSchema {
 
   private implicit val nodeType: ObjectType[Unit, Node] = ObjectType(
-    name        = "node",
+    name = "node",
     description = "Lineage node",
     fields[Unit, Node](
-      Field("id", StringType, Some("Node identifier"), resolve     = _.value.location.toString),
+      Field("id", StringType, Some("Node identifier"), resolve = _.value.location.toString),
       Field("location", StringType, Some("Node location"), resolve = _.value.location.toString),
-      Field("label", StringType, Some("Node label"), resolve       = _.value.label.toString),
+      Field("label", StringType, Some("Node label"), resolve = _.value.label.toString),
       Field(
         "type",
         EnumType(
@@ -37,8 +37,8 @@ private object modelSchema {
           description = None,
           values = List(
             EnumValue(Node.SingleWordType.ProcessRun.name, value = Node.SingleWordType.ProcessRun),
-            EnumValue(Node.SingleWordType.Directory.name, value  = Node.SingleWordType.Directory),
-            EnumValue(Node.SingleWordType.File.name, value       = Node.SingleWordType.File)
+            EnumValue(Node.SingleWordType.Directory.name, value = Node.SingleWordType.Directory),
+            EnumValue(Node.SingleWordType.File.name, value = Node.SingleWordType.File)
           )
         ),
         Some("Node type"),
@@ -48,7 +48,7 @@ private object modelSchema {
   )
 
   private implicit val edgeType: ObjectType[Unit, Edge] = ObjectType(
-    name        = "edge",
+    name = "edge",
     description = "Lineage edge",
     fields = fields[Unit, Edge](
       Field("source", StringType, Some("Source node"), resolve = _.value.source.toString),
@@ -57,7 +57,7 @@ private object modelSchema {
   )
 
   val lineageType: ObjectType[Unit, Lineage] = ObjectType[Unit, Lineage](
-    name        = "lineage",
+    name = "lineage",
     description = "Lineage",
     fields = fields[Unit, Lineage](
       Field("nodes", ListType(nodeType), Some("Lineage nodes"), resolve = _.value.nodes.toList),

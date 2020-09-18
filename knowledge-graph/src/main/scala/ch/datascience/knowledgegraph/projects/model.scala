@@ -51,7 +51,8 @@ object model {
                            starsCount:       StarsCount,
                            permissions:      Permissions,
                            statistics:       Statistics,
-                           version:          SchemaVersion)
+                           version:          SchemaVersion
+  )
 
   object Project {
     final class Tag private (val value: String) extends AnyVal with StringTinyType
@@ -81,11 +82,11 @@ object model {
 
   object Permissions {
 
-    final case class ProjectPermissions(projectAccessLevel:         ProjectAccessLevel) extends Permissions
-    final case class GroupPermissions(groupAccessLevel:             GroupAccessLevel) extends Permissions
+    final case class ProjectPermissions(projectAccessLevel: ProjectAccessLevel) extends Permissions
+    final case class GroupPermissions(groupAccessLevel: GroupAccessLevel) extends Permissions
     final case class ProjectAndGroupPermissions(projectAccessLevel: ProjectAccessLevel,
-                                                groupAccessLevel:   GroupAccessLevel)
-        extends Permissions
+                                                groupAccessLevel:   GroupAccessLevel
+    ) extends Permissions
 
     def apply(accessLevel:        ProjectAccessLevel): Permissions = ProjectPermissions(accessLevel)
     def apply(accessLevel:        GroupAccessLevel): Permissions = GroupPermissions(accessLevel)
@@ -117,11 +118,11 @@ object model {
       sealed abstract class AbstractAccessLevel(val name: String Refined NonEmpty, val value: Int Refined Positive)
           extends AccessLevel
 
-      final case object Guest      extends AbstractAccessLevel(name = "Guest", value      = 10)
-      final case object Reporter   extends AbstractAccessLevel(name = "Reporter", value   = 20)
-      final case object Developer  extends AbstractAccessLevel(name = "Developer", value  = 30)
+      final case object Guest      extends AbstractAccessLevel(name = "Guest", value = 10)
+      final case object Reporter   extends AbstractAccessLevel(name = "Reporter", value = 20)
+      final case object Developer  extends AbstractAccessLevel(name = "Developer", value = 30)
       final case object Maintainer extends AbstractAccessLevel(name = "Maintainer", value = 40)
-      final case object Owner      extends AbstractAccessLevel(name = "Owner", value      = 50)
+      final case object Owner      extends AbstractAccessLevel(name = "Owner", value = 50)
 
       lazy val all: Set[AccessLevel] = Set(Guest, Reporter, Developer, Maintainer, Owner)
     }
@@ -131,7 +132,8 @@ object model {
                               storageSize:      StorageSize,
                               repositorySize:   RepositorySize,
                               lsfObjectsSize:   LsfObjectsSize,
-                              jobArtifactsSize: JobArtifactsSize)
+                              jobArtifactsSize: JobArtifactsSize
+  )
 
   object Statistics {
     final class CommitsCount private (val value: Long) extends AnyVal with LongTinyType
@@ -159,7 +161,7 @@ object model {
     final class SshUrl private (val value: String) extends AnyVal with StringTinyType
     implicit object SshUrl extends TinyTypeFactory[SshUrl](new SshUrl(_)) with NonBlank {
       addConstraint(
-        check   = _ matches "^git@.*\\.git$",
+        check = _ matches "^git@.*\\.git$",
         message = url => s"$url is not a valid repository ssh url"
       )
     }

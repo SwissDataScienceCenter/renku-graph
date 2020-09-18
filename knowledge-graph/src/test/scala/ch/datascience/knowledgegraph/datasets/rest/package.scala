@@ -65,14 +65,15 @@ package object rest {
     }
 
     def toJsonLD(
-        noSameAs:    Boolean       = false,
-        commitId:    CommitId      = commitIds.generateOne
-    )(topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs))
-        : JsonLD =
+        noSameAs: Boolean = false,
+        commitId: CommitId = commitIds.generateOne
+    )(
+        topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs)
+    ): JsonLD =
       toJsonLDsAndDatasets(
         firstDatasetDateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
-        noSameAs                = noSameAs,
-        commitId                = commitId
+        noSameAs = noSameAs,
+        commitId = commitId
       )(topmostSameAs) match {
         case (json, _) +: Nil => json
         case _                => throw new Exception("Not prepared to work datasets having multiple projects")
@@ -82,30 +83,31 @@ package object rest {
         firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
         noSameAs:                Boolean,
         commitId:                CommitId = commitIds.generateOne
-    )(topmostSameAs:             TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs))
-        : List[(JsonLD, Dataset)] =
+    )(
+        topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs)
+    ): List[(JsonLD, Dataset)] =
       dataSet.projects match {
         case firstProject +: otherProjects =>
           val firstTuple = nonModifiedDataSetCommit(
-            commitId      = commitId,
+            commitId = commitId,
             committedDate = CommittedDate(firstDatasetDateCreated.value),
-            committer     = Person(firstProject.created.agent.name, firstProject.created.agent.maybeEmail)
+            committer = Person(firstProject.created.agent.name, firstProject.created.agent.maybeEmail)
           )(
             projectPath = firstProject.path,
             projectName = firstProject.name
           )(
-            datasetIdentifier         = dataSet.id,
-            datasetTitle              = dataSet.title,
-            datasetName               = dataSet.name,
-            datasetUrl                = dataSet.url,
-            maybeDatasetSameAs        = if (noSameAs) None else dataSet.sameAs.some,
-            maybeDatasetDescription   = dataSet.maybeDescription,
+            datasetIdentifier = dataSet.id,
+            datasetTitle = dataSet.title,
+            datasetName = dataSet.name,
+            datasetUrl = dataSet.url,
+            maybeDatasetSameAs = if (noSameAs) None else dataSet.sameAs.some,
+            maybeDatasetDescription = dataSet.maybeDescription,
             maybeDatasetPublishedDate = dataSet.published.maybeDate,
-            datasetCreatedDate        = firstDatasetDateCreated,
-            datasetCreators           = dataSet.published.creators map toPerson,
-            datasetParts              = dataSet.parts.map(part => (part.name, part.atLocation)),
-            datasetKeywords           = dataSet.keywords,
-            overrideTopmostSameAs     = topmostSameAs.some
+            datasetCreatedDate = firstDatasetDateCreated,
+            datasetCreators = dataSet.published.creators map toPerson,
+            datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
+            datasetKeywords = dataSet.keywords,
+            overrideTopmostSameAs = topmostSameAs.some
           ) -> dataSet
 
           val sameAs =
@@ -120,20 +122,20 @@ package object rest {
               projectPath = project.path,
               projectName = project.name
             )(
-              datasetIdentifier         = dataSetId,
-              datasetTitle              = dataSet.title,
-              datasetName               = dataSet.name,
-              datasetUrl                = dataSet.url,
-              maybeDatasetSameAs        = sameAs.some,
-              maybeDatasetDescription   = dataSet.maybeDescription,
+              datasetIdentifier = dataSetId,
+              datasetTitle = dataSet.title,
+              datasetName = dataSet.name,
+              datasetUrl = dataSet.url,
+              maybeDatasetSameAs = sameAs.some,
+              maybeDatasetDescription = dataSet.maybeDescription,
               maybeDatasetPublishedDate = dataSet.published.maybeDate,
-              datasetCreatedDate        = projectDateCreated,
-              datasetCreators           = dataSet.published.creators map toPerson,
-              datasetParts              = dataSet.parts.map(part => (part.name, part.atLocation)),
-              datasetKeywords           = dataSet.keywords,
-              overrideTopmostSameAs     = topmostSameAs.some
+              datasetCreatedDate = projectDateCreated,
+              datasetCreators = dataSet.published.creators map toPerson,
+              datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords = dataSet.keywords,
+              overrideTopmostSameAs = topmostSameAs.some
             ) -> dataSet.copy(
-              id     = dataSetId,
+              id = dataSetId,
               sameAs = sameAs,
               projects = List(
                 project.copy(created = project.created.copy(date = DateCreatedInProject(projectDateCreated.value)))
@@ -197,8 +199,9 @@ package object rest {
     lazy val entityId: EntityId = DataSet.entityId(dataSet.id)
 
     def toJsonLD(firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
-                 commitId:                CommitId    = commitIds.generateOne,
-                 topmostDerivedFrom:      DerivedFrom = dataSet.derivedFrom): JsonLD =
+                 commitId:                CommitId = commitIds.generateOne,
+                 topmostDerivedFrom:      DerivedFrom = dataSet.derivedFrom
+    ): JsonLD =
       toJsonLDs(firstDatasetDateCreated, commitId, topmostDerivedFrom) match {
         case first +: Nil => first
         case _ =>
@@ -208,29 +211,30 @@ package object rest {
       }
 
     def toJsonLDs(firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
-                  commitId:                CommitId    = commitIds.generateOne,
-                  topmostDerivedFrom:      DerivedFrom = dataSet.derivedFrom): List[JsonLD] =
+                  commitId:                CommitId = commitIds.generateOne,
+                  topmostDerivedFrom:      DerivedFrom = dataSet.derivedFrom
+    ): List[JsonLD] =
       dataSet.projects match {
         case firstProject +: otherProjects =>
           val firstJsonLd = modifiedDataSetCommit(
-            commitId      = commitId,
+            commitId = commitId,
             committedDate = CommittedDate(firstDatasetDateCreated.value),
-            committer     = Person(firstProject.created.agent.name, firstProject.created.agent.maybeEmail)
+            committer = Person(firstProject.created.agent.name, firstProject.created.agent.maybeEmail)
           )(
             projectPath = firstProject.path,
             projectName = firstProject.name
           )(
-            datasetIdentifier          = dataSet.id,
-            datasetTitle               = dataSet.title,
-            datasetName                = dataSet.name,
-            datasetUrl                 = dataSet.url,
-            datasetDerivedFrom         = dataSet.derivedFrom,
-            maybeDatasetDescription    = dataSet.maybeDescription,
-            maybeDatasetPublishedDate  = dataSet.published.maybeDate,
-            datasetCreatedDate         = DateCreated(firstDatasetDateCreated.value),
-            datasetCreators            = dataSet.published.creators map toPerson,
-            datasetParts               = dataSet.parts.map(part => (part.name, part.atLocation)),
-            datasetKeywords            = dataSet.keywords,
+            datasetIdentifier = dataSet.id,
+            datasetTitle = dataSet.title,
+            datasetName = dataSet.name,
+            datasetUrl = dataSet.url,
+            datasetDerivedFrom = dataSet.derivedFrom,
+            maybeDatasetDescription = dataSet.maybeDescription,
+            maybeDatasetPublishedDate = dataSet.published.maybeDate,
+            datasetCreatedDate = DateCreated(firstDatasetDateCreated.value),
+            datasetCreators = dataSet.published.creators map toPerson,
+            datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
+            datasetKeywords = dataSet.keywords,
             overrideTopmostDerivedFrom = topmostDerivedFrom.some
           )
 
@@ -245,16 +249,16 @@ package object rest {
               projectPath = project.path,
               projectName = project.name
             )(
-              datasetTitle               = dataSet.title,
-              datasetName                = dataSet.name,
-              datasetUrl                 = dataSet.url,
-              datasetDerivedFrom         = dataSet.derivedFrom,
-              maybeDatasetDescription    = dataSet.maybeDescription,
-              maybeDatasetPublishedDate  = dataSet.published.maybeDate,
-              datasetCreatedDate         = DateCreated(projectDateCreated.value),
-              datasetCreators            = dataSet.published.creators map toPerson,
-              datasetParts               = dataSet.parts.map(part => (part.name, part.atLocation)),
-              datasetKeywords            = dataSet.keywords,
+              datasetTitle = dataSet.title,
+              datasetName = dataSet.name,
+              datasetUrl = dataSet.url,
+              datasetDerivedFrom = dataSet.derivedFrom,
+              maybeDatasetDescription = dataSet.maybeDescription,
+              maybeDatasetPublishedDate = dataSet.published.maybeDate,
+              datasetCreatedDate = DateCreated(projectDateCreated.value),
+              datasetCreators = dataSet.published.creators map toPerson,
+              datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
+              datasetKeywords = dataSet.keywords,
               overrideTopmostDerivedFrom = topmostDerivedFrom.some
             )
           }

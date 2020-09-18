@@ -50,62 +50,62 @@ class EventPersisterSpec
     "add a new event if there is no event with the given id for the given project " +
       "and there's no batch waiting or under processing" in new TestCase {
 
-      // storeNewEvent 1
-      (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
+        // storeNewEvent 1
+        (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
 
-      persister.storeNewEvent(event).unsafeRunSync shouldBe Created
+        persister.storeNewEvent(event).unsafeRunSync shouldBe Created
 
-      storedEvent(event.compoundEventId) shouldBe (
-        event.compoundEventId,
-        EventStatus.New,
-        CreatedDate(now),
-        ExecutionDate(now),
-        event.date,
-        event.body,
-        None
-      )
+        storedEvent(event.compoundEventId) shouldBe (
+          event.compoundEventId,
+          EventStatus.New,
+          CreatedDate(now),
+          ExecutionDate(now),
+          event.date,
+          event.body,
+          None
+        )
 
-      // storeNewEvent 2 - different event id and different project
-      val event2 = events.generateOne
-      (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+        // storeNewEvent 2 - different event id and different project
+        val event2 = events.generateOne
+        (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
 
-      val nowForEvent2 = Instant.now()
-      currentTime.expects().returning(nowForEvent2)
+        val nowForEvent2 = Instant.now()
+        currentTime.expects().returning(nowForEvent2)
 
-      persister.storeNewEvent(event2).unsafeRunSync shouldBe Created
+        persister.storeNewEvent(event2).unsafeRunSync shouldBe Created
 
-      val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
-      save2Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
-      save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event2.batchDate)
+        val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
+        save2Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
+        save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event2.batchDate)
 
-      queriesExecTimes.verifyExecutionTimeMeasured("new - check existence", "new - find batch", "new - create")
-    }
+        queriesExecTimes.verifyExecutionTimeMeasured("new - check existence", "new - find batch", "new - create")
+      }
 
     "add a new event if there is no event with the given id for the given project " +
       "and there's a batch for that project waiting and under processing" in new TestCase {
 
-      // storeNewEvent 1
-      (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
+        // storeNewEvent 1
+        (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
 
-      persister.storeNewEvent(event).unsafeRunSync shouldBe Created
+        persister.storeNewEvent(event).unsafeRunSync shouldBe Created
 
-      findEvents(status = New).head shouldBe (
-        event.compoundEventId, ExecutionDate(now), event.batchDate
-      )
+        findEvents(status = New).head shouldBe (
+          event.compoundEventId, ExecutionDate(now), event.batchDate
+        )
 
-      // storeNewEvent 2 - different event id and batch date but same project
-      val event2 = event.copy(id = eventIds.generateOne, batchDate = batchDates.generateOne)
-      (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+        // storeNewEvent 2 - different event id and batch date but same project
+        val event2 = event.copy(id = eventIds.generateOne, batchDate = batchDates.generateOne)
+        (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
 
-      val nowForEvent2 = Instant.now()
-      currentTime.expects().returning(nowForEvent2)
+        val nowForEvent2 = Instant.now()
+        currentTime.expects().returning(nowForEvent2)
 
-      persister.storeNewEvent(event2).unsafeRunSync shouldBe Created
+        persister.storeNewEvent(event2).unsafeRunSync shouldBe Created
 
-      val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
-      save2Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
-      save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event.batchDate)
-    }
+        val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
+        save2Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
+        save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event.batchDate)
+      }
 
     "add a new event if there is another event with the same id but for a different project" in new TestCase {
 

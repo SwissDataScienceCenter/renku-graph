@@ -56,9 +56,8 @@ class EventCreationEndpoint[Interpretation[_]: Effect](
     } yield response
   } recoverWith httpResponse
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[Event]] = {
-    case NonFatal(exception) =>
-      ME.raiseError(BadRequestError(exception))
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[Event]] = { case NonFatal(exception) =>
+    ME.raiseError(BadRequestError(exception))
   }
 
   private implicit class ResultOps(result: Result) {

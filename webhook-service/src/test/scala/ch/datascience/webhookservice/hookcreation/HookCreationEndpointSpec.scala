@@ -49,25 +49,25 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
     "return CREATED when a valid access token is present in the header " +
       "and webhook is successfully created for project with the given id in in GitLab" in new TestCase {
 
-      val accessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Request[IO]))
-        .expects(*)
-        .returning(context.pure(accessToken))
+        val accessToken = accessTokens.generateOne
+        (accessTokenFinder
+          .findAccessToken(_: Request[IO]))
+          .expects(*)
+          .returning(context.pure(accessToken))
 
-      (hookCreator
-        .createHook(_: Id, _: AccessToken))
-        .expects(projectId, accessToken)
-        .returning(IO.pure(HookCreated))
+        (hookCreator
+          .createHook(_: Id, _: AccessToken))
+          .expects(projectId, accessToken)
+          .returning(IO.pure(HookCreated))
 
-      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
+        val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
 
-      val response = createHook(projectId, request).unsafeRunSync
+        val response = createHook(projectId, request).unsafeRunSync
 
-      response.status                 shouldBe Created
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe json"""{"message": "Hook created"}"""
-    }
+        response.status                 shouldBe Created
+        response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
+        response.as[Json].unsafeRunSync shouldBe json"""{"message": "Hook created"}"""
+      }
 
     "return OK when hook was already created" in new TestCase {
 

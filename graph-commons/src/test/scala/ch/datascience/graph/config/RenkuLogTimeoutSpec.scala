@@ -18,7 +18,6 @@
 
 package ch.datascience.graph.config
 
-
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.CommonGraphGenerators.renkuLogTimeouts
 import ch.datascience.generators.Generators.Implicits._

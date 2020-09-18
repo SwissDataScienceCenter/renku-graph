@@ -54,12 +54,12 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
       case types if types contains (schema / "Dataset").toString =>
         json
           .getId[Interpretation, EntityId]
-          .semiflatMap { collectDatasetInfo(collected, json) }
+          .semiflatMap(collectDatasetInfo(collected, json))
           .fold(json)(_ => json)
       case types if types contains (schema / "URL").toString =>
         json
           .getId[Interpretation, EntityId]
-          .semiflatMap { collectSameAsInfo(collected, json) }
+          .semiflatMap(collectSameAsInfo(collected, json))
           .fold(json)(_ => json)
       case _ => json.pure[Interpretation]
     }
@@ -129,9 +129,9 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
       for {
         sameAsUrl <- maybeSameAsUrl
         matchingSameAs <- collectedInfos.flatMap {
-                           case CollectedSameAs(`sameAsUrl`, sameAs) => sameAs.some
-                           case _                                    => None
-                         }.headOption
+                            case CollectedSameAs(`sameAsUrl`, sameAs) => sameAs.some
+                            case _                                    => None
+                          }.headOption
       } yield matchingSameAs
   }
 

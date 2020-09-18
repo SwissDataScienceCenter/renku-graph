@@ -93,8 +93,8 @@ private class IOProjectPathAdder(
         case None =>
           Option.empty[(Id, EncryptedAccessToken)].pure[IO]
         case Some((id, token)) =>
-          ME.fromEither((Id from id, EncryptedAccessToken from token).mapN {
-            case (projectId, encryptedToken) => Option(projectId -> encryptedToken)
+          ME.fromEither((Id from id, EncryptedAccessToken from token).mapN { case (projectId, encryptedToken) =>
+            Option(projectId -> encryptedToken)
           })
       }
 
@@ -105,10 +105,9 @@ private class IOProjectPathAdder(
       _                <- addOrRemove(id, maybeProjectPath)
       _                <- addPathIfMissing()
     } yield ()
-  } recoverWith {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"Error while adding Project Path for projectId = $id")
-      addPathIfMissing()
+  } recoverWith { case NonFatal(exception) =>
+    logger.error(exception)(s"Error while adding Project Path for projectId = $id")
+    addPathIfMissing()
   }
 
   private def addOrRemove(id: Id, maybePath: Option[Path]): IO[Unit] =
@@ -127,10 +126,9 @@ private class IOProjectPathAdder(
       .transact(transactor.get)
       .map(_ => ())
 
-  private lazy val logging: PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)("'project_path' column adding failure")
-      ME.raiseError(exception)
+  private lazy val logging: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)("'project_path' column adding failure")
+    ME.raiseError(exception)
   }
 }
 
@@ -141,11 +139,13 @@ private object IOProjectPathAdder {
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor:              DbTransactor[IO, ProjectsTokensDB],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[ProjectPathAdder[IO]] =
+      transactor: DbTransactor[IO, ProjectsTokensDB],
+      logger:     Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ProjectPathAdder[IO]] =
     for {
       accessTokenCrypto <- AccessTokenCrypto[IO]()
       pathFinder        <- IOProjectPathFinder(logger)

@@ -39,20 +39,20 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
       "Sentry initialisation is fine and " +
       "Events Synchronization Scheduler and Http Server start up" in new TestCase {
 
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
+        (sentryInitializer.run _)
+          .expects()
+          .returning(IO.unit)
 
-      (eventsSynchronizationScheduler.run _)
-        .expects()
-        .returning(IO.unit)
+        (eventsSynchronizationScheduler.run _)
+          .expects()
+          .returning(IO.unit)
 
-      (httpServer.run _)
-        .expects()
-        .returning(context.pure(ExitCode.Success))
+        (httpServer.run _)
+          .expects()
+          .returning(context.pure(ExitCode.Success))
 
-      runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
-    }
+        runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
+      }
 
     "fail if Sentry initialization fails" in new TestCase {
 

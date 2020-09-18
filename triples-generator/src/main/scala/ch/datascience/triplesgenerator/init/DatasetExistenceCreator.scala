@@ -31,8 +31,8 @@ private trait DatasetExistenceCreator[Interpretation[_]] {
   def createDataset(): Interpretation[Unit]
 }
 
-private class IODatasetExistenceCreator(fusekiAdminConfig: FusekiAdminConfig, logger: Logger[IO])(
-    implicit executionContext:                             ExecutionContext,
+private class IODatasetExistenceCreator(fusekiAdminConfig: FusekiAdminConfig, logger: Logger[IO])(implicit
+    executionContext:                                      ExecutionContext,
     contextShift:                                          ContextShift[IO],
     timer:                                                 Timer[IO]
 ) extends IORestClient(Throttler.noThrottling, logger)
@@ -59,7 +59,7 @@ private class IODatasetExistenceCreator(fusekiAdminConfig: FusekiAdminConfig, lo
         )
       )
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
-    case (Ok, _, _) => IO.unit
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = { case (Ok, _, _) =>
+    IO.unit
   }
 }

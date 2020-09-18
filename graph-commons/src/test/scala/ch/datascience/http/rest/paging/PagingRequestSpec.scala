@@ -134,7 +134,9 @@ class PagingRequestSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
       val pageParsingError    = parseFailures.generateOne
       val perPageParsingError = parseFailures.generateOne
 
-      PagingRequest(Some(pageParsingError.invalidNel[Page]), Some(perPageParsingError.invalidNel[PerPage])) shouldBe Validated
+      PagingRequest(Some(pageParsingError.invalidNel[Page]),
+                    Some(perPageParsingError.invalidNel[PerPage])
+      ) shouldBe Validated
         .Invalid(NonEmptyList.of(pageParsingError, perPageParsingError))
     }
   }

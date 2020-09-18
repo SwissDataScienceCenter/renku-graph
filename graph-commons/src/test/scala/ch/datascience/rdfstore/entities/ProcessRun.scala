@@ -71,7 +71,8 @@ object ProcessRun {
                  workflowRun.maybeInformedBy,
                  workflowRun.maybeInfluenced,
                  maybeInvalidation,
-                 maybeGenerationFactories = Nil) with ChildProcessRun {
+                 maybeGenerationFactories = Nil
+    ) with ChildProcessRun {
       override val processRunAssociation: ChildRunPlanAssociation = associationFactory(workflowRun)(step)
       override val processRunUsages: List[Usage] = workflowRun.processRunAssociation.runPlan.runSubprocesses
         .get(step.value)
@@ -102,7 +103,8 @@ object ProcessRun {
                  maybeInformedBy,
                  maybeInfluenced,
                  maybeInvalidation,
-                 maybeGenerationFactories = Nil) with WorkflowProcessRun {
+                 maybeGenerationFactories = Nil
+    ) with WorkflowProcessRun {
       override val processRunAssociation: WorkflowRunPlanAssociation = association
       override val processRunUsages:      List[Usage]                = association.runPlan.asUsages(this)
     }
@@ -128,14 +130,15 @@ object ProcessRun {
                  maybeInformedBy,
                  maybeInfluenced,
                  maybeInvalidation,
-                 maybeGenerationFactories = Nil) with StandAloneProcessRun {
+                 maybeGenerationFactories = Nil
+    ) with StandAloneProcessRun {
       override val processRunAssociation: ProcessRunPlanAssociation = associationFactory(this)
       override val processRunUsages:      List[Usage]               = associationFactory(this).runPlan.asUsages(this)
     }
 
-  private[entities] implicit def childProcessRunConverter(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  private[entities] implicit def childProcessRunConverter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Activity with ChildProcessRun] =
     new PartialEntityConverter[Activity with ChildProcessRun] {
       override def convert[T <: Activity with ChildProcessRun]: T => Either[Exception, PartialEntity] =
@@ -153,9 +156,9 @@ object ProcessRun {
         entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.processRunStep).some
     }
 
-  private[entities] implicit def standAloneProcessRunConverter(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  private[entities] implicit def standAloneProcessRunConverter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Activity with StandAloneProcessRun] =
     new PartialEntityConverter[Activity with StandAloneProcessRun] {
       override def convert[T <: Activity with StandAloneProcessRun]: T => Either[Exception, PartialEntity] =
@@ -172,9 +175,9 @@ object ProcessRun {
         entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId).some
     }
 
-  private[entities] implicit def workflowProcessRunConverter(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  private[entities] implicit def workflowProcessRunConverter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Activity with WorkflowProcessRun] =
     new PartialEntityConverter[Activity with WorkflowProcessRun] {
       override def convert[T <: Activity with WorkflowProcessRun]: T => Either[Exception, PartialEntity] =
@@ -191,9 +194,9 @@ object ProcessRun {
         entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId).some
     }
 
-  implicit def childProcessRunEncoder(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  implicit def childProcessRunEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[Activity with ChildProcessRun] =
     JsonLDEncoder.instance { entity =>
       entity
@@ -202,9 +205,9 @@ object ProcessRun {
         .getOrFail
     }
 
-  implicit def standAloneProcessRunEncoder(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  implicit def standAloneProcessRunEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[Activity with StandAloneProcessRun] =
     JsonLDEncoder.instance { entity =>
       entity
@@ -213,9 +216,9 @@ object ProcessRun {
         .getOrFail
     }
 
-  implicit def workflowProcessRunEncoder(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  implicit def workflowProcessRunEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[Activity with WorkflowProcessRun] =
     JsonLDEncoder.instance { entity =>
       entity
@@ -224,8 +227,10 @@ object ProcessRun {
         .getOrFail
     }
 
-  implicit def childEntityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                                    fusekiBaseUrl:         FusekiBaseUrl): EntityIdEncoder[Activity with ChildProcessRun] =
+  implicit def childEntityIdEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): EntityIdEncoder[Activity with ChildProcessRun] =
     EntityIdEncoder.instance { entity =>
       entity
         .getEntityId[Activity with ChildProcessRun]
@@ -233,9 +238,9 @@ object ProcessRun {
         .getOrElse(throw new IllegalStateException(s"No EntityId found for $entity"))
     }
 
-  implicit def standAloneEntityIdEncoder(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  implicit def standAloneEntityIdEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): EntityIdEncoder[Activity with StandAloneProcessRun] =
     EntityIdEncoder.instance { entity =>
       entity
@@ -244,9 +249,9 @@ object ProcessRun {
         .getOrElse(throw new IllegalStateException(s"No EntityId found for $entity"))
     }
 
-  implicit def workflowEntityIdEncoder(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  implicit def workflowEntityIdEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): EntityIdEncoder[Activity with WorkflowProcessRun] =
     EntityIdEncoder.instance { entity =>
       entity

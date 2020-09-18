@@ -22,7 +22,6 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.security.InvalidKeyException
 import java.util.Base64
 
-
 import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -102,8 +101,6 @@ class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers {
   }
 
   private trait TestCase {
-
-
 
     private val secret = new String(Base64.getEncoder.encode("1234567890123456".getBytes("utf-8")), "utf-8")
     val hookTokenCrypto = new HookTokenCrypto[Try](

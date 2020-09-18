@@ -67,7 +67,8 @@ object WorkflowRun {
                  Some(informedBy),
                  maybeInfluenced,
                  maybeInvalidation,
-                 maybeGenerationFactories) with WorkflowProcessRun with WorkflowRun {
+                 maybeGenerationFactories
+    ) with WorkflowProcessRun with WorkflowRun {
       override val processRunAssociation: WorkflowRunPlanAssociation = associationFactory(project)(this)(workflowFile)
       override val processRunUsages:      List[Usage]                = processRunAssociation.runPlan.asUsages(this)
       val workflowRunFile:                WorkflowFile               = workflowFile
@@ -76,9 +77,9 @@ object WorkflowRun {
       }
     }
 
-  private[entities] implicit def converter(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  private[entities] implicit def converter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Activity with WorkflowRun] =
     new PartialEntityConverter[Activity with WorkflowRun] {
       override def convert[T <: Activity with WorkflowRun]: T => Either[Exception, PartialEntity] =
@@ -94,8 +95,10 @@ object WorkflowRun {
       override lazy val toEntityId: Activity with WorkflowRun => Option[EntityId] = _ => None
     }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[ActivityWorkflowRun] =
+  implicit def encoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): JsonLDEncoder[ActivityWorkflowRun] =
     JsonLDEncoder.instance { entity =>
       entity
         .asPartialJsonLD[Activity]
@@ -104,8 +107,10 @@ object WorkflowRun {
         .getOrFail
     }
 
-  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                               fusekiBaseUrl:         FusekiBaseUrl): EntityIdEncoder[ActivityWorkflowRun] =
+  implicit def entityIdEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): EntityIdEncoder[ActivityWorkflowRun] =
     EntityIdEncoder.instance { entity =>
       entity
         .getEntityId[Activity with WorkflowProcessRun]

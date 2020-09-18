@@ -78,7 +78,8 @@ class EventProcessingEndpoint[Interpretation[_]: Effect](
   private implicit class ResultOps(result: EventSchedulingResult) {
 
     def asHttpResponse(eventId:      CompoundEventId,
-                       commitEvents: NonEmptyList[CommitEvent]): Interpretation[Response[Interpretation]] =
+                       commitEvents: NonEmptyList[CommitEvent]
+    ): Interpretation[Response[Interpretation]] =
       result match {
         case EventSchedulingResult.Accepted =>
           logInfo(eventId, commitEvents.head.project.path)
@@ -132,16 +133,15 @@ object IOEventProcessingEndpoint {
       gitLabThrottler:      Throttler[IO, GitLab],
       timeRecorder:         SparqlQueryTimeRecorder[IO],
       logger:               Logger[IO]
-  )(implicit contextShift:  ContextShift[IO],
-    executionContext:       ExecutionContext,
-    timer:                  Timer[IO]): IO[EventProcessingEndpoint[IO]] =
+  )(implicit
+      contextShift:     ContextShift[IO],
+      executionContext: ExecutionContext,
+      timer:            Timer[IO]
+  ): IO[EventProcessingEndpoint[IO]] =
     for {
       triplesGenerator <- TriplesGenerator(triplesGeneration)
-      commitEventProcessor <- IOCommitEventProcessor(triplesGenerator,
-                                                     metricsRegistry,
-                                                     gitLabThrottler,
-                                                     timeRecorder,
-                                                     logger)
+      commitEventProcessor <-
+        IOCommitEventProcessor(triplesGenerator, metricsRegistry, gitLabThrottler, timeRecorder, logger)
       eventsProcessingRunner <- IOEventsProcessingRunner(commitEventProcessor, subscriber, logger)
       bodyDeserialiser = new EventBodyDeserialiser[IO]()
     } yield new EventProcessingEndpoint[IO](bodyDeserialiser, eventsProcessingRunner, reProvisioningStatus, logger)

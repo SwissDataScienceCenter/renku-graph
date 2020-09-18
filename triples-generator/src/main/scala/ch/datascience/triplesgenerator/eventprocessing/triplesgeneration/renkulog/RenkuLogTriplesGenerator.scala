@@ -64,8 +64,8 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
         .recoverWith(meaningfulError(maybeAccessToken))
     }
 
-  private def cloneCheckoutGenerate(commitEvent: CommitEvent)(repoDirectory: Path)(
-      implicit maybeAccessToken:                 Option[AccessToken]
+  private def cloneCheckoutGenerate(commitEvent: CommitEvent)(repoDirectory: Path)(implicit
+      maybeAccessToken:                          Option[AccessToken]
   ): IO[Either[ProcessingRecoverableError, GenerationResult]] = {
     for {
       _      <- prepareRepository(commitEvent, repoDirectory)
@@ -73,8 +73,8 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
     } yield result
   }.value
 
-  private def prepareRepository(commitEvent: CommitEvent, repoDirectory: Path)(
-      implicit maybeAccessToken:             Option[AccessToken]
+  private def prepareRepository(commitEvent: CommitEvent, repoDirectory: Path)(implicit
+      maybeAccessToken:                      Option[AccessToken]
   ): EitherT[IO, ProcessingRecoverableError, Unit] =
     for {
       repositoryUrl <- findRepositoryUrl(commitEvent.project.path, maybeAccessToken).toRight
@@ -83,14 +83,16 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
     } yield ()
 
   private def processEvent(commitEvent:   CommitEvent,
-                           repoDirectory: Path): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
+                           repoDirectory: Path
+  ): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
     (git findCommitMessage (commitEvent.commitId, repoDirectory)).toRight flatMap {
       case message if message contains "renku migrate" => rightT[IO, ProcessingRecoverableError](MigrationEvent)
       case _                                           => migrateAndLog(commitEvent, repoDirectory)
     }
 
   private def migrateAndLog(commitEvent:   CommitEvent,
-                            repoDirectory: Path): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
+                            repoDirectory: Path
+  ): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
     for {
       _       <- (renku migrate (commitEvent, repoDirectory)).toRight
       triples <- findTriples(commitEvent, repoDirectory)
@@ -111,7 +113,8 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
   }
 
   private def findTriples(commitEvent:         CommitEvent,
-                          repositoryDirectory: Path): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = {
+                          repositoryDirectory: Path
+  ): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = {
     import renku._
 
     commitEvent match {
@@ -139,10 +142,10 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
 
 private[eventprocessing] object RenkuLogTriplesGenerator {
 
-  def apply()(
-      implicit contextShift: ContextShift[IO],
-      executionContext:      ExecutionContext,
-      timer:                 Timer[IO]
+  def apply()(implicit
+      contextShift:     ContextShift[IO],
+      executionContext: ExecutionContext,
+      timer:            Timer[IO]
   ): IO[TriplesGenerator[IO]] =
     for {
       renkuLogTimeout <- RenkuLogTimeout[IO]()

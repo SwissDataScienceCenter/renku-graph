@@ -56,7 +56,7 @@ private class AccessTokenCrypto[Interpretation[_]](
   } recoverWith meaningfulError
 
   private lazy val serialize: AccessToken => String = {
-    case OAuthAccessToken(token)    => Json.obj("oauth"    -> Json.fromString(token)).noSpaces
+    case OAuthAccessToken(token)    => Json.obj("oauth" -> Json.fromString(token)).noSpaces
     case PersonalAccessToken(token) => Json.obj("personal" -> Json.fromString(token)).noSpaces
   }
 
@@ -70,7 +70,8 @@ private class AccessTokenCrypto[Interpretation[_]](
       maybeOauth    <- cursor.downField("oauth").as[Option[String]].flatMap(to(OAuthAccessToken.from))
       maybePersonal <- cursor.downField("personal").as[Option[String]].flatMap(to(PersonalAccessToken.from))
       token <- Either.fromOption(maybeOauth orElse maybePersonal,
-                                 ifNone = DecodingFailure("Access token cannot be deserialized", Nil))
+                                 ifNone = DecodingFailure("Access token cannot be deserialized", Nil)
+               )
     } yield token
   }
 
@@ -89,9 +90,8 @@ private class AccessTokenCrypto[Interpretation[_]](
       .flatMap(_.as[AccessToken])
   }
 
-  private lazy val meaningfulError: PartialFunction[Throwable, Interpretation[AccessToken]] = {
-    case NonFatal(cause) =>
-      ME.raiseError(new RuntimeException("AccessToken decryption failed", cause))
+  private lazy val meaningfulError: PartialFunction[Throwable, Interpretation[AccessToken]] = { case NonFatal(cause) =>
+    ME.raiseError(new RuntimeException("AccessToken decryption failed", cause))
   }
 }
 

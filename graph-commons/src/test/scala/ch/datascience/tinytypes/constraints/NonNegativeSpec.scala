@@ -35,7 +35,9 @@ class NonNegativeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
     }
 
     "throw an IllegalArgumentException for negative value" in {
-      intercept[IllegalArgumentException](TestNonNegativeInt(-1)).getMessage shouldBe "ch.datascience.tinytypes.constraints.TestNonNegativeInt cannot be < 0"
+      intercept[IllegalArgumentException](
+        TestNonNegativeInt(-1)
+      ).getMessage shouldBe "ch.datascience.tinytypes.constraints.TestNonNegativeInt cannot be < 0"
     }
   }
 
@@ -48,7 +50,9 @@ class NonNegativeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
     }
 
     "throw an IllegalArgumentException for negative value" in {
-      intercept[IllegalArgumentException](TestNonNegativeLong(-1)).getMessage shouldBe "ch.datascience.tinytypes.constraints.TestNonNegativeLong cannot be < 0"
+      intercept[IllegalArgumentException](
+        TestNonNegativeLong(-1)
+      ).getMessage shouldBe "ch.datascience.tinytypes.constraints.TestNonNegativeLong cannot be < 0"
     }
   }
 }

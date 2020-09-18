@@ -86,15 +86,17 @@ object Throttler {
 
   def apply[Interpretation[_], ThrottlingTarget](
       rateLimit: RateLimit[ThrottlingTarget]
-  )(implicit F:  Concurrent[Interpretation],
-    timer:       Timer[Interpretation]): Interpretation[Throttler[Interpretation, ThrottlingTarget]] =
+  )(implicit
+      F:     Concurrent[Interpretation],
+      timer: Timer[Interpretation]
+  ): Interpretation[Throttler[Interpretation, ThrottlingTarget]] =
     for {
       semaphore         <- Semaphore[Interpretation](1)
       workersStartTimes <- timer.clock.monotonic(NANOSECONDS) flatMap (now => Ref.of(List(now)))
     } yield new StandardThrottler[Interpretation, ThrottlingTarget](rateLimit, semaphore, workersStartTimes)
 
-  def noThrottling[Interpretation[_], ThrottlingTarget](
-      implicit ME: MonadError[Interpretation, Throwable]
+  def noThrottling[Interpretation[_], ThrottlingTarget](implicit
+      ME: MonadError[Interpretation, Throwable]
   ): Throttler[Interpretation, ThrottlingTarget] = new Throttler[Interpretation, ThrottlingTarget] {
     override def acquire: Interpretation[Unit] = ME.unit
     override def release: Interpretation[Unit] = ME.unit

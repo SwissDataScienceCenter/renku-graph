@@ -102,13 +102,15 @@ class StatusNewPatchSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
                  status:        EventStatus,
                  executionDate: Gen[ExecutionDate],
                  eventDate:     EventDate,
-                 maybeMessage:  Option[EventMessage] = None): Unit =
+                 maybeMessage:  Option[EventMessage] = None
+    ): Unit =
       storeEvent(commitEventId,
                  status,
                  executionDate.generateOne,
                  eventDate,
                  eventBodies.generateOne,
-                 projectPath  = projectPaths.generateOne,
-                 maybeMessage = maybeMessage)
+                 projectPath = projectPaths.generateOne,
+                 maybeMessage = maybeMessage
+      )
   }
 }

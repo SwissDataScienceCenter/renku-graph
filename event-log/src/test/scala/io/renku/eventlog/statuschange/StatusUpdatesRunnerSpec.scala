@@ -48,20 +48,20 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
       "map the result using command's result mapping rules " +
       "and update metrics gauges" in new TestCase {
 
-      store(eventId, projectPath, New)
+        store(eventId, projectPath, New)
 
-      (gauge.increment _).expects(projectPath).returning(IO.unit)
+        (gauge.increment _).expects(projectPath).returning(IO.unit)
 
-      val command = TestCommand(eventId, projectPath, gauge)
+        val command = TestCommand(eventId, projectPath, gauge)
 
-      runner.run(command).unsafeRunSync() shouldBe Updated
+        runner.run(command).unsafeRunSync() shouldBe Updated
 
-      findEvents(status = Processing).map(_._1) shouldBe List(eventId)
+        findEvents(status = Processing).map(_._1) shouldBe List(eventId)
 
-      logger.loggedOnly(Info(s"Event $eventId got ${command.status}"))
+        logger.loggedOnly(Info(s"Event $eventId got ${command.status}"))
 
-      histogram.verifyExecutionTimeMeasured(command.query.name)
-    }
+        histogram.verifyExecutionTimeMeasured(command.query.name)
+      }
   }
 
   private trait TestCase {
@@ -76,8 +76,8 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
   private case class TestCommand(eventId:     CompoundEventId,
                                  projectPath: projects.Path,
-                                 gauge:       LabeledGauge[IO, projects.Path])
-      extends ChangeStatusCommand[IO] {
+                                 gauge:       LabeledGauge[IO, projects.Path]
+  ) extends ChangeStatusCommand[IO] {
     import doobie.implicits._
 
     override val status: EventStatus = Processing
@@ -107,5 +107,6 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
                executionDates.generateOne,
                eventDates.generateOne,
                eventBodies.generateOne,
-               projectPath = projectPath)
+               projectPath = projectPath
+    )
 }

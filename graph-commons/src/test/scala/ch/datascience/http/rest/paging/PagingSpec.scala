@@ -37,65 +37,65 @@ class PagingSpec extends AnyWordSpec with should.Matchers {
     "call the findResults and return found items " +
       "if the first page requested and per page is greater than the number of found items" in {
 
-      val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
+        val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
 
-      val resultsFinder = new ResultsFinder(returning = context.pure(results))()
+        val resultsFinder = new ResultsFinder(returning = context.pure(results))()
 
-      val pagingRequest = PagingRequest(Page.first, PerPage(7))
+        val pagingRequest = PagingRequest(Page.first, PerPage(7))
 
-      val Success(response) = resultsFinder.find(pagingRequest)
+        val Success(response) = resultsFinder.find(pagingRequest)
 
-      response.results                  shouldBe results
-      response.pagingInfo.pagingRequest shouldBe pagingRequest
-      response.pagingInfo.total         shouldBe Total(6)
-    }
+        response.results                  shouldBe results
+        response.pagingInfo.pagingRequest shouldBe pagingRequest
+        response.pagingInfo.total         shouldBe Total(6)
+      }
 
     "call the findResults and find total number of results " +
       "if the combination of requested page and per page is equal to the number of found items" in {
 
-      val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
+        val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
 
-      val resultsFinder = new ResultsFinder(returning = context.pure(results))()
+        val resultsFinder = new ResultsFinder(returning = context.pure(results))()
 
-      val pagingRequest = PagingRequest(Page.first, PerPage(6))
+        val pagingRequest = PagingRequest(Page.first, PerPage(6))
 
-      val Success(response) = resultsFinder.find(pagingRequest)
+        val Success(response) = resultsFinder.find(pagingRequest)
 
-      response.results                  shouldBe results
-      response.pagingInfo.pagingRequest shouldBe pagingRequest
-      response.pagingInfo.total         shouldBe Total(results.size)
-    }
+        response.results                  shouldBe results
+        response.pagingInfo.pagingRequest shouldBe pagingRequest
+        response.pagingInfo.total         shouldBe Total(results.size)
+      }
 
     "call the findResults and find total number of results " +
       "if not the first page is requested and there are no results" in {
 
-      val total         = Total(5)
-      val resultsFinder = new ResultsFinder(returning = context.pure(Nil))(total)
+        val total         = Total(5)
+        val resultsFinder = new ResultsFinder(returning = context.pure(Nil))(total)
 
-      val pagingRequest = PagingRequest(Page(2), PerPage(6))
+        val pagingRequest = PagingRequest(Page(2), PerPage(6))
 
-      val Success(response) = resultsFinder.find(pagingRequest)
+        val Success(response) = resultsFinder.find(pagingRequest)
 
-      response.results                  shouldBe Nil
-      response.pagingInfo.pagingRequest shouldBe pagingRequest
-      response.pagingInfo.total         shouldBe total
-    }
+        response.results                  shouldBe Nil
+        response.pagingInfo.pagingRequest shouldBe pagingRequest
+        response.pagingInfo.total         shouldBe total
+      }
 
     "call the findResults and find total number of results " +
       "if the combination of requested page and per page is less than the number of found items" in {
 
-      val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
+        val results = nonEmptyList(positiveInts(), minElements = 6, maxElements = 6).generateOne.map(_.value).toList
 
-      val resultsFinder = new ResultsFinder(returning = context.pure(results))()
+        val resultsFinder = new ResultsFinder(returning = context.pure(results))()
 
-      val pagingRequest = PagingRequest(Page.first, PerPage(5))
+        val pagingRequest = PagingRequest(Page.first, PerPage(5))
 
-      val Success(response) = resultsFinder.find(pagingRequest)
+        val Success(response) = resultsFinder.find(pagingRequest)
 
-      response.results                  shouldBe results.take(PerPage(5).value)
-      response.pagingInfo.pagingRequest shouldBe pagingRequest
-      response.pagingInfo.total         shouldBe Total(results.size)
-    }
+        response.results                  shouldBe results.take(PerPage(5).value)
+        response.pagingInfo.pagingRequest shouldBe pagingRequest
+        response.pagingInfo.total         shouldBe Total(results.size)
+      }
   }
 
   private val context = MonadError[Try, Throwable]

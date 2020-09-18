@@ -70,10 +70,9 @@ class DbInitializer[Interpretation[_]](
       .transact(transactor.get)
       .map(_ => ())
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)("Event Log database initialization failure")
-      ME.raiseError(exception)
+  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)("Event Log database initialization failure")
+    ME.raiseError(exception)
   }
 }
 

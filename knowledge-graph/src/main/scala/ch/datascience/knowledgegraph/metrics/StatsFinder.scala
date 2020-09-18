@@ -34,14 +34,15 @@ trait StatsFinder[Interpretation[_]] {
 }
 
 class StatsFinderImpl(
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext,
-  contextShift:              ContextShift[IO],
-  timer:                     Timer[IO],
-  ME:                        MonadError[IO, Throwable])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    rdfStoreConfig: RdfStoreConfig,
+    logger:         Logger[IO],
+    timeRecorder:   SparqlQueryTimeRecorder[IO]
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO],
+    ME:               MonadError[IO, Throwable]
+) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with StatsFinder[IO] {
 
   import EntityCount._
@@ -90,13 +91,15 @@ private object EntityCount {
 
 object IOStatsFinder {
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      logger:                  Logger[IO],
-      rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO]()
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO],
-    ME:                        MonadError[IO, Throwable]): IO[StatsFinder[IO]] =
+      timeRecorder:   SparqlQueryTimeRecorder[IO],
+      logger:         Logger[IO],
+      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO]()
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO],
+      ME:               MonadError[IO, Throwable]
+  ): IO[StatsFinder[IO]] =
     for {
       config <- rdfStoreConfig
     } yield new StatsFinderImpl(config, logger, timeRecorder)

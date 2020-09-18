@@ -28,7 +28,7 @@ object QuerySchema {
       fields: List[Field[QueryContext[Interpretation], Unit]]*
   ): Schema[QueryContext[Interpretation], Unit] = Schema {
     ObjectType(
-      name   = "Query",
+      name = "Query",
       fields = fields.flatten.toList
     )
   }

@@ -35,12 +35,11 @@ private class DescendantsUpdater {
       curatedTriples: CuratedTriples[Interpretation],
       topmostData:    TopmostData
   )(implicit ME:      MonadError[Interpretation, Throwable]): CuratedTriples[Interpretation] = curatedTriples.copy(
-    updatesGroups =
-      curatedTriples.updatesGroups :+ CurationUpdatesGroup(
-        name = "Dataset descendants updates",
-        prepareSameAsUpdate(topmostData.datasetId, topmostData.sameAs),
-        prepareDerivedFromUpdate(topmostData.datasetId, topmostData.derivedFrom)
-      )
+    updatesGroups = curatedTriples.updatesGroups :+ CurationUpdatesGroup(
+      name = "Dataset descendants updates",
+      prepareSameAsUpdate(topmostData.datasetId, topmostData.sameAs),
+      prepareDerivedFromUpdate(topmostData.datasetId, topmostData.derivedFrom)
+    )
   )
 
   private def prepareSameAsUpdate(entityId: EntityId, topmostSameAs: TopmostSameAs) = SparqlQuery(

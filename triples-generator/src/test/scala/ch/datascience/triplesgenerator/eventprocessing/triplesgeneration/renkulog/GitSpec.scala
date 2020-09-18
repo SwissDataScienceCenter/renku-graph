@@ -50,7 +50,7 @@ class GitSpec extends AnyWordSpec with MockFactory with should.Matchers {
           val commandResultException = ShelloutException {
             CommandResult(
               exitCode = 1,
-              chunks   = Seq(Left(new Bytes(errorMessage.getBytes())))
+              chunks = Seq(Left(new Bytes(errorMessage.getBytes())))
             )
           }
           cloneCommand
@@ -70,7 +70,7 @@ class GitSpec extends AnyWordSpec with MockFactory with should.Matchers {
       val commandException = ShelloutException {
         CommandResult(
           exitCode = 1,
-          chunks   = Seq(Right(new Bytes(nonBlankStrings().generateOne.value.getBytes())))
+          chunks = Seq(Right(new Bytes(nonBlankStrings().generateOne.value.getBytes())))
         )
       }
       cloneCommand
@@ -89,7 +89,7 @@ class GitSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .throwing(ShelloutException {
           CommandResult(
             exitCode = 1,
-            chunks   = Nil
+            chunks = Nil
           )
         })
 

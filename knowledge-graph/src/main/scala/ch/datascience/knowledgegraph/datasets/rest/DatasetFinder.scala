@@ -61,9 +61,9 @@ private class IODatasetFinder(
     } yield maybeDetails map { details =>
       details.copy(
         published = details.published.copy(creators = creators),
-        parts     = parts,
-        projects  = projects,
-        keywords  = keywords
+        parts = parts,
+        projects = projects,
+        keywords = keywords
       )
     }
 
@@ -71,7 +71,8 @@ private class IODatasetFinder(
     def copy(published: DatasetPublishing,
              parts:     List[DatasetPart],
              projects:  List[DatasetProject],
-             keywords:  List[Keyword]): Dataset =
+             keywords:  List[Keyword]
+    ): Dataset =
       dataset match {
         case ds: NonModifiedDataset =>
           ds.copy(published = published, parts = parts, projects = projects, keywords = keywords)
@@ -84,13 +85,15 @@ private class IODatasetFinder(
 private object IODatasetFinder {
 
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
-      logger:                  Logger[IO] = ApplicationLogger
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[DatasetFinder[IO]] =
+      timeRecorder:   SparqlQueryTimeRecorder[IO],
+      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
+      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
+      logger:         Logger[IO] = ApplicationLogger
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[DatasetFinder[IO]] =
     for {
       config       <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl

@@ -37,7 +37,7 @@ import scala.language.postfixOps
 class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with should.Matchers {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout  = scaled(Span(3, Seconds)),
+    timeout = scaled(Span(3, Seconds)),
     interval = scaled(Span(150, Millis))
   )
 

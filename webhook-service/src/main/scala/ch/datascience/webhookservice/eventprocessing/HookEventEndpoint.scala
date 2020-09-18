@@ -68,9 +68,8 @@ class HookEventEndpoint[Interpretation[_]: Effect](
   private implicit lazy val startCommitEntityDecoder: EntityDecoder[Interpretation, StartCommit] =
     jsonOf[Interpretation, StartCommit]
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[StartCommit]] = {
-    case NonFatal(exception) =>
-      ME.raiseError(BadRequestError(exception))
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[StartCommit]] = { case NonFatal(exception) =>
+    ME.raiseError(BadRequestError(exception))
   }
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
@@ -82,9 +81,8 @@ class HookEventEndpoint[Interpretation[_]: Effect](
     }
   }
 
-  private lazy val unauthorizedException: PartialFunction[Throwable, Interpretation[HookToken]] = {
-    case NonFatal(_) =>
-      ME.raiseError(UnauthorizedException)
+  private lazy val unauthorizedException: PartialFunction[Throwable, Interpretation[HookToken]] = { case NonFatal(_) =>
+    ME.raiseError(UnauthorizedException)
   }
 
   private def validate(hookToken: HookToken, startCommit: StartCommit): Interpretation[Unit] = ME.fromEither {
@@ -122,14 +120,16 @@ private object HookEventEndpoint {
 
 object IOHookEventEndpoint {
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      hookTokenCrypto:         HookTokenCrypto[IO],
-      executionTimeRecorder:   ExecutionTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    clock:                     Clock[IO],
-    timer:                     Timer[IO]): IO[HookEventEndpoint[IO]] =
+      gitLabThrottler:       Throttler[IO, GitLab],
+      hookTokenCrypto:       HookTokenCrypto[IO],
+      executionTimeRecorder: ExecutionTimeRecorder[IO],
+      logger:                Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      clock:            Clock[IO],
+      timer:            Timer[IO]
+  ): IO[HookEventEndpoint[IO]] =
     for {
       commitToEventLog <- IOCommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
     } yield new HookEventEndpoint[IO](hookTokenCrypto, commitToEventLog)

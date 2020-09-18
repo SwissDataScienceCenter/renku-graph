@@ -18,7 +18,6 @@
 
 package ch.datascience.knowledgegraph.lineage
 
-
 import ch.datascience.generators.Generators._
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.rdfstore.entities.bundles._
@@ -58,11 +57,11 @@ object LineageGenerators {
   implicit val lineages: Gen[Lineage] = for {
     nodePairsSet <- nonEmptySet(nodePairs, 2)
   } yield {
-    val nodes = nodePairsSet.foldLeft(List.empty[Node]) {
-      case (acc, (source, target)) => acc :+ source :+ target
+    val nodes = nodePairsSet.foldLeft(List.empty[Node]) { case (acc, (source, target)) =>
+      acc :+ source :+ target
     }
-    val edges = (nodes zip nodes.tail).map {
-      case (left, right) => Edge(left.location, right.location)
+    val edges = (nodes zip nodes.tail).map { case (left, right) =>
+      Edge(left.location, right.location)
     }
     Lineage.from[Try](edges.toSet, nodes.toSet).fold(throw _, identity)
   }

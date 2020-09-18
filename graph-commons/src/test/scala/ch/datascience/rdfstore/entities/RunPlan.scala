@@ -84,7 +84,7 @@ object RunPlan {
       successCodes: List[SuccessCode] = Nil
   )(project:        Project)(activity: Activity)(workflowFile: WorkflowFile): Entity with WorkflowRunPlan =
     new Entity(activity.commitId, workflowFile, project, maybeInvalidationActivity = None, maybeGeneration = None)
-    with WorkflowRunPlan {
+      with WorkflowRunPlan {
       override val runArguments: List[Argument] = toParameters(arguments, this)
       override val runCommandInputs: List[CommandParameter with Input] =
         toParameters(inputs, offset = arguments.length, this)
@@ -106,7 +106,8 @@ object RunPlan {
                workflowFile,
                activity.project,
                maybeInvalidationActivity = None,
-               maybeGeneration           = None) with ProcessRunPlan {
+               maybeGeneration = None
+    ) with ProcessRunPlan {
       override val runCommand:   Command        = command
       override val runArguments: List[Argument] = toParameters(arguments, this)
       override val runCommandInputs: List[CommandParameter with Input] =
@@ -117,16 +118,18 @@ object RunPlan {
     }
 
   private def toParameters[T](factories: List[Position => Entity with RunPlan => T],
-                              runPlan:   Entity with RunPlan): List[T] =
-    factories.zipWithIndex.map {
-      case (factory, idx) => factory(Position(idx + 1))(runPlan)
+                              runPlan:   Entity with RunPlan
+  ): List[T] =
+    factories.zipWithIndex.map { case (factory, idx) =>
+      factory(Position(idx + 1))(runPlan)
     }
 
   private def toParameters[T](factories: List[Position => Entity with RunPlan => T],
                               offset:    Int,
-                              runPlan:   Entity with RunPlan): List[T] =
-    factories.zipWithIndex.map {
-      case (factory, idx) => factory(Position(idx + offset + 1))(runPlan)
+                              runPlan:   Entity with RunPlan
+  ): List[T] =
+    factories.zipWithIndex.map { case (factory, idx) =>
+      factory(Position(idx + offset + 1))(runPlan)
     }
 
   private def toOutputParameters(
@@ -136,7 +139,7 @@ object RunPlan {
   )(activity:    Activity): List[CommandParameter with Output] =
     factories.zipWithIndex.map {
       case (factory: PositionOutputFactory, idx) => factory(activity)(Position(idx + offset + 1))(runPlan)
-      case (factory: MappedOutputFactory, _)     => factory(activity)(runPlan)
+      case (factory: MappedOutputFactory, _) => factory(activity)(runPlan)
       case (factory: NoPositionOutputFactory, _) => factory(activity)(runPlan)
     }
 
@@ -150,16 +153,15 @@ object RunPlan {
         factory(activity)(Position(idx + offset + 1))(runPlan)
       case (factory: PositionInputFactory, idx) =>
         factory(Position(idx + offset + 1))(runPlan)
-      case (factory: MappedInputFactory, _)     => factory(runPlan)
+      case (factory: MappedInputFactory, _) => factory(runPlan)
       case (factory: NoPositionInputFactory, _) => factory(runPlan)
     }
 
-  private[entities] implicit def workflowRunPlanConverter(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  private[entities] implicit def workflowRunPlanConverter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Entity with WorkflowRunPlan] = new PartialEntityConverter[Entity with WorkflowRunPlan] {
     self =>
-
     override def convert[T <: Entity with WorkflowRunPlan]: T => Either[Exception, PartialEntity] = { implicit entity =>
       PartialEntity(
         EntityTypes of (prov / "Plan", renku / "Run"),
@@ -174,28 +176,27 @@ object RunPlan {
     override def toEntityId: Entity with WorkflowRunPlan => Option[EntityId] =
       entity => (EntityId of renkuBaseUrl / "runs" / entity.identifier).some
 
-    private implicit def subprocessEncoder(
-        implicit parentRunPlan: Entity with WorkflowRunPlan
+    private implicit def subprocessEncoder(implicit
+        parentRunPlan: Entity with WorkflowRunPlan
     ): JsonLDEncoder[(Entity with ProcessRunPlan, Int)] =
-      JsonLDEncoder.instance[(Entity with ProcessRunPlan, Int)] {
-        case (entity, idx) =>
-          JsonLD.entity(
-            id = parentRunPlan
-              .getEntityId(self)
-              .map(_ / "subprocess" / (idx + 1))
-              .getOrElse(
-                throw new IllegalStateException(s"No entityId for WorkflowRunPlan with ${parentRunPlan.identifier}")
-              ),
-            types = EntityTypes of renku / "OrderedSubprocess",
-            renku / "index"   -> idx.asJsonLD,
-            renku / "process" -> entity.asJsonLD
-          )
+      JsonLDEncoder.instance[(Entity with ProcessRunPlan, Int)] { case (entity, idx) =>
+        JsonLD.entity(
+          id = parentRunPlan
+            .getEntityId(self)
+            .map(_ / "subprocess" / (idx + 1))
+            .getOrElse(
+              throw new IllegalStateException(s"No entityId for WorkflowRunPlan with ${parentRunPlan.identifier}")
+            ),
+          types = EntityTypes of renku / "OrderedSubprocess",
+          renku / "index"   -> idx.asJsonLD,
+          renku / "process" -> entity.asJsonLD
+        )
       }
   }
 
-  private[entities] implicit def processRunPlanConverter(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  private[entities] implicit def processRunPlanConverter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Entity with ProcessRunPlan] =
     new PartialEntityConverter[Entity with ProcessRunPlan] {
       override def convert[T <: Entity with ProcessRunPlan]: T => Either[Exception, PartialEntity] = { entity =>
@@ -213,9 +214,9 @@ object RunPlan {
         entity => (EntityId of renkuBaseUrl / "runs" / entity.identifier).some
     }
 
-  private[entities] implicit def runPlanConverter(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  private[entities] implicit def runPlanConverter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Entity with RunPlan] = new PartialEntityConverter[Entity with RunPlan] {
     override def convert[T <: Entity with RunPlan]: T => Either[Exception, PartialEntity] = {
       case rp: Entity with WorkflowRunPlan =>
@@ -232,17 +233,17 @@ object RunPlan {
     }
   }
 
-  implicit def workflowRUnPlanEncoder(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  implicit def workflowRUnPlanEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[Entity with WorkflowRunPlan] =
     JsonLDEncoder.instance { entity =>
       entity.asPartialJsonLD[Entity] combine entity.asPartialJsonLD[Entity with WorkflowRunPlan] getOrFail
     }
 
-  implicit def processRunPlanEncoder(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  implicit def processRunPlanEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[Entity with ProcessRunPlan] =
     JsonLDEncoder.instance { entity =>
       entity.asPartialJsonLD[Entity] combine entity.asPartialJsonLD[Entity with ProcessRunPlan] getOrFail

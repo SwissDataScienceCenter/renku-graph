@@ -33,21 +33,22 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait EventStatusUpdater[Interpretation[_]] {
-  def markEventNew(eventId:                  CompoundEventId): Interpretation[Unit]
+  def markEventNew(eventId:                  CompoundEventId):           Interpretation[Unit]
   def markEventDone(eventId:                 CompoundEventId): Interpretation[Unit]
   def markEventFailedRecoverably(eventId:    CompoundEventId, exception: Throwable): Interpretation[Unit]
   def markEventFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): Interpretation[Unit]
-  def markEventSkipped(eventId:              CompoundEventId, message: String): Interpretation[Unit]
+  def markEventSkipped(eventId:              CompoundEventId, message:   String):    Interpretation[Unit]
 }
 
 private class IOEventStatusUpdater(
-    eventLogUrl:    EventLogUrl,
-    logger:         Logger[IO]
-)(implicit ME:      MonadError[IO, Throwable],
-  executionContext: ExecutionContext,
-  contextShift:     ContextShift[IO],
-  timer:            Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
+    eventLogUrl: EventLogUrl,
+    logger:      Logger[IO]
+)(implicit
+    ME:               MonadError[IO, Throwable],
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO]
+) extends IORestClient(Throttler.noThrottling, logger)
     with EventStatusUpdater[IO] {
 
   import cats.effect._
@@ -61,34 +62,34 @@ private class IOEventStatusUpdater(
 
   override def markEventNew(eventId: CompoundEventId): IO[Unit] = sendStatusChange(
     eventId,
-    payload         = json"""{"status": "NEW"}""",
+    payload = json"""{"status": "NEW"}""",
     responseMapping = okConflictAsSuccess
   )
 
   override def markEventDone(eventId: CompoundEventId): IO[Unit] = sendStatusChange(
     eventId,
-    payload         = json"""{"status": "TRIPLES_STORE"}""",
+    payload = json"""{"status": "TRIPLES_STORE"}""",
     responseMapping = okConflictAsSuccess
   )
 
   override def markEventFailedRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
     sendStatusChange(
       eventId,
-      payload         = json"""{"status": "RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+      payload = json"""{"status": "RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
       responseMapping = okConflictAsSuccess
     )
 
   override def markEventFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
     sendStatusChange(
       eventId,
-      payload         = json"""{"status": "NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+      payload = json"""{"status": "NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
       responseMapping = okConflictAsSuccess
     )
 
   def markEventSkipped(eventId: CompoundEventId, message: String): IO[Unit] =
     sendStatusChange(
       eventId,
-      payload         = json"""{"status": "SKIPPED", "message": $message}""",
+      payload = json"""{"status": "SKIPPED", "message": $message}""",
       responseMapping = okConflictAsSuccess
     )
 
@@ -121,10 +122,12 @@ private class IOEventStatusUpdater(
 
 private object IOEventStatusUpdater {
   def apply(
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[EventStatusUpdater[IO]] =
+      logger: Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[EventStatusUpdater[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
     } yield new IOEventStatusUpdater(eventLogUrl, logger)

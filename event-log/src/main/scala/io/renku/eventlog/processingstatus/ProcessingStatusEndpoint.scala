@@ -70,11 +70,10 @@ class ProcessingStatusEndpoint[Interpretation[_]](
 
   private def internalServerError(
       projectId: projects.Id
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding processing status for project $projectId failed")
-      logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+    val errorMessage = ErrorMessage(s"Finding processing status for project $projectId failed")
+    logger.error(exception)(errorMessage.value)
+    InternalServerError(errorMessage)
   }
 }
 

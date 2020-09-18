@@ -96,8 +96,8 @@ class HookValidator[Interpretation[_]](
 
   private def visibilityAndStoredToken(
       projectId: Id
-  ): PartialFunction[Throwable, Interpretation[(Visibility, Token)]] = {
-    case UnauthorizedException => findVisibilityAndStoredToken(projectId)
+  ): PartialFunction[Throwable, Interpretation[(Visibility, Token)]] = { case UnauthorizedException =>
+    findVisibilityAndStoredToken(projectId)
   }
 
   private def findVisibilityAndStoredToken(projectId: Id) = {
@@ -114,8 +114,8 @@ class HookValidator[Interpretation[_]](
 
   private def storedAccessTokenError(
       projectId: Id
-  ): PartialFunction[Throwable, Interpretation[(Visibility, Token)]] = {
-    case UnauthorizedException => ME.raiseError(new Exception(s"Stored access token for $projectId is invalid"))
+  ): PartialFunction[Throwable, Interpretation[(Visibility, Token)]] = { case UnauthorizedException =>
+    ME.raiseError(new Exception(s"Stored access token for $projectId is invalid"))
   }
 
   private def toValidationResult(projectHookPresent: Boolean, projectId: Id): Interpretation[HookValidationResult] =
@@ -135,7 +135,7 @@ class HookValidator[Interpretation[_]](
 
   private sealed abstract class Token(val value: AccessToken)
   private object Token {
-    case class GivenToken(override val value:  AccessToken) extends Token(value)
+    case class GivenToken(override val value: AccessToken) extends Token(value)
     case class StoredToken(override val value: AccessToken) extends Token(value)
   }
 }
@@ -153,11 +153,13 @@ object HookValidator {
 
 object IOHookValidator {
   def apply(
-      projectHookUrl:          ProjectHookUrl,
-      gitLabThrottler:         Throttler[IO, GitLab]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[HookValidator[IO]] =
+      projectHookUrl:  ProjectHookUrl,
+      gitLabThrottler: Throttler[IO, GitLab]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[HookValidator[IO]] =
     for {
       tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
       gitLabUrl          <- GitLabUrl[IO]()

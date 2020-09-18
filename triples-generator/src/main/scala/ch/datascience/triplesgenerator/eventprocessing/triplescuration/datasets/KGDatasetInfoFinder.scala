@@ -108,10 +108,10 @@ private class KGDatasetInfoFinderImpl(
 }
 
 private object IOKGDatasetInfoFinder {
-  def apply(logger:              Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(
-      implicit executionContext: ExecutionContext,
-      contextShift:              ContextShift[IO],
-      timer:                     Timer[IO]
+  def apply(logger:     Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
   ): IO[KGDatasetInfoFinderImpl] =
     for {
       rdfStoreConfig <- RdfStoreConfig[IO]()

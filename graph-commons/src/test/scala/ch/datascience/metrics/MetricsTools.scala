@@ -36,8 +36,8 @@ object MetricsTools {
       } yield resultTuple
 
     private val toResultTuple: Sample => List[(String, String, Double)] = sample =>
-      (sample.labelNames.asScala.toList, sample.labelValues.asScala.toList) mapN {
-        case (labelName, labelValue) => (labelName, labelValue, sample.value)
+      (sample.labelNames.asScala.toList, sample.labelValues.asScala.toList) mapN { case (labelName, labelValue) =>
+        (labelName, labelValue, sample.value)
       }
   }
 }

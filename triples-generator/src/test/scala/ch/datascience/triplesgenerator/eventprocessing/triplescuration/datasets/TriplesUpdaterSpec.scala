@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
-
 import ch.datascience.generators.CommonGraphGenerators.fusekiBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._

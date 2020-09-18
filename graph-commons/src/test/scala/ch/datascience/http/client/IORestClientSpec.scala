@@ -53,50 +53,50 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
     "succeed returning value calculated with the given response mapping rules " +
       "if the response matches the rules" in new TestCase {
 
-      stubFor {
-        get("/resource")
-          .willReturn(ok("1"))
+        stubFor {
+          get("/resource")
+            .willReturn(ok("1"))
+        }
+
+        verifyThrottling()
+
+        client.callRemote.unsafeRunSync() shouldBe 1
+
+        logger.loggedOnly(Warn(s"GET $hostUrl/resource finished${executionTimeRecorder.executionTimeInfo}"))
       }
-
-      verifyThrottling()
-
-      client.callRemote.unsafeRunSync() shouldBe 1
-
-      logger.loggedOnly(Warn(s"GET $hostUrl/resource finished${executionTimeRecorder.executionTimeInfo}"))
-    }
 
     "succeed returning value calculated with the given response mapping rules " +
       "and do not measure execution time if Time Recorder not given" in new TestCase {
 
-      stubFor {
-        get("/resource")
-          .willReturn(ok("1"))
+        stubFor {
+          get("/resource")
+            .willReturn(ok("1"))
+        }
+
+        verifyThrottling()
+
+        override val client = new TestRestClient(hostUrl, throttler, logger, maybeTimeRecorder = None)
+
+        client.callRemote.unsafeRunSync() shouldBe 1
+
+        logger.expectNoLogs()
       }
-
-      verifyThrottling()
-
-      override val client = new TestRestClient(hostUrl, throttler, logger, maybeTimeRecorder = None)
-
-      client.callRemote.unsafeRunSync() shouldBe 1
-
-      logger.expectNoLogs()
-    }
 
     "succeed returning value calculated with the given response mapping rules and " +
       "log execution time along with the given request name if Time Recorder present" in new TestCase {
 
-      stubFor {
-        get("/resource")
-          .willReturn(ok("1"))
+        stubFor {
+          get("/resource")
+            .willReturn(ok("1"))
+        }
+
+        verifyThrottling()
+
+        val requestName: String Refined NonEmpty = "some request"
+        client.callRemote(requestName).unsafeRunSync() shouldBe 1
+
+        logger.loggedOnly(Warn(s"$requestName finished${executionTimeRecorder.executionTimeInfo}"))
       }
-
-      verifyThrottling()
-
-      val requestName: String Refined NonEmpty = "some request"
-      client.callRemote(requestName).unsafeRunSync() shouldBe 1
-
-      logger.loggedOnly(Warn(s"$requestName finished${executionTimeRecorder.executionTimeInfo}"))
-    }
 
     "cause the given histogram to capture execution time - case with some given label" in new TestCase {
 
@@ -130,7 +130,7 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
       client.callRemote.unsafeRunSync() shouldBe 1
 
       val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
-      sample.value               should be >= 0d
+      sample.value                 should be >= 0d
       sample.labelNames.asScala  shouldBe empty
       sample.labelValues.asScala shouldBe empty
     }
@@ -240,8 +240,8 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
   private class TestRestClient(hostUrl:           ServiceUrl,
                                throttler:         Throttler[IO, Any],
                                logger:            Logger[IO],
-                               maybeTimeRecorder: Option[ExecutionTimeRecorder[IO]])
-      extends IORestClient(throttler, logger, maybeTimeRecorder, retryInterval = 1 millisecond, maxRetries = 2) {
+                               maybeTimeRecorder: Option[ExecutionTimeRecorder[IO]]
+  ) extends IORestClient(throttler, logger, maybeTimeRecorder, retryInterval = 1 millisecond, maxRetries = 2) {
 
     def callRemote: IO[Int] =
       for {

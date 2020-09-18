@@ -173,7 +173,8 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                     starsCount,
                     permissions,
                     statistics,
-                    version)
+                    version
+    )
 
   private implicit lazy val createdDecoder: Decoder[Creation] = cursor =>
     for {
@@ -215,11 +216,11 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       maybeProjectAccessLevel <- maybeAccessLevel("projectAccess").map(_.map(ProjectAccessLevel))
       maybeGroupAccessLevel   <- maybeAccessLevel("groupAccess").map(_.map(GroupAccessLevel))
       permissions <- (maybeProjectAccessLevel, maybeGroupAccessLevel) match {
-                      case (Some(project), Some(group)) => Right(Permissions(project, group))
-                      case (Some(project), None)        => Right(Permissions(project))
-                      case (None, Some(group))          => Right(Permissions(group))
-                      case _                            => Left(DecodingFailure("Neither projectAccess nor groupAccess", Nil))
-                    }
+                       case (Some(project), Some(group)) => Right(Permissions(project, group))
+                       case (Some(project), None)        => Right(Permissions(project))
+                       case (None, Some(group))          => Right(Permissions(group))
+                       case _                            => Left(DecodingFailure("Neither projectAccess nor groupAccess", Nil))
+                     }
     } yield permissions
   }
 
@@ -227,15 +228,14 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
     for {
       name <- cursor.downField("level").downField("name").as[String]
       accessLevel <- cursor
-                      .downField("level")
-                      .downField("value")
-                      .as[Int]
-                      .flatMap(AccessLevel.from)
-                      .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
-    } yield {
+                       .downField("level")
+                       .downField("value")
+                       .as[Int]
+                       .flatMap(AccessLevel.from)
+                       .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
+    } yield
       if (accessLevel.name.value == name) accessLevel
       else throw new Exception(s"$name does not match $accessLevel")
-    }
 
   private implicit lazy val statisticsDecoder: Decoder[Statistics] = cursor =>
     for {

@@ -37,16 +37,17 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
 abstract class IORdfStoreClient(
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO],
-    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
-)(implicit executionContext: ExecutionContext,
-  contextShift:              ContextShift[IO],
-  timer:                     Timer[IO],
-  ME:                        MonadError[IO, Throwable])
-    extends IORestClient(Throttler.noThrottling, logger, Some(timeRecorder.instance), retryInterval, maxRetries) {
+    rdfStoreConfig: RdfStoreConfig,
+    logger:         Logger[IO],
+    timeRecorder:   SparqlQueryTimeRecorder[IO],
+    retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO],
+    ME:               MonadError[IO, Throwable]
+) extends IORestClient(Throttler.noThrottling, logger, Some(timeRecorder.instance), retryInterval, maxRetries) {
 
   import IORdfStoreClient._
   import ch.datascience.http.client.UrlEncoder.urlEncode
@@ -87,14 +88,15 @@ abstract class IORdfStoreClient(
     request(POST, uri, rdfStoreConfig.authCredentials)
       .withEntity(toEntity(queryType, query))
       .putHeaders(`Content-Type`(`x-www-form-urlencoded`),
-                  Header(Accept.name.value, "application/sparql-results+json")),
+                  Header(Accept.name.value, "application/sparql-results+json")
+      ),
     name = query.name
   )
 
   private def toFullResponseMapper[ResultType](
       mapResponse: Response[IO] => IO[ResultType]
-  ): PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]] = {
-    case (Ok, _, response) => mapResponse(response)
+  ): PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]] = { case (Ok, _, response) =>
+    mapResponse(response)
   }
 
   private def responseMapperFor[ResultType](implicit decoder: Decoder[ResultType]): Response[IO] => IO[ResultType] =
@@ -136,9 +138,8 @@ abstract class IORdfStoreClient(
         _.downField("results").downField("bindings").as(decodeList(totals)).map(_.headOption)
       }
 
-      private implicit val recordsDecoder: Decoder[List[ResultType]] = {
+      private implicit val recordsDecoder: Decoder[List[ResultType]] =
         _.downField("results").downField("bindings").as(decodeList[ResultType])
-      }
     }
 }
 

@@ -109,11 +109,10 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
       val failure = RecoverableFailure(nonEmptyStrings().generateOne)
 
-      curatedTriples.updatesGroups.map(
-        updatesGroup =>
-          updatesGroup
-            .generateUpdates()
-            .expectExecuteQueries(failure.pure[Try])
+      curatedTriples.updatesGroups.map(updatesGroup =>
+        updatesGroup
+          .generateUpdates()
+          .expectExecuteQueries(failure.pure[Try])
       )
 
       uploader.upload(curatedTriples) shouldBe failure.pure[Try]

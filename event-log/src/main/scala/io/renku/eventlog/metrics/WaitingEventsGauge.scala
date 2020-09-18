@@ -34,12 +34,12 @@ object WaitingEventsGauge {
   ): IO[LabeledGauge[IO, projects.Path]] =
     for {
       gauge <- Gauge[IO, projects.Path](
-                name      = "events_waiting_count",
-                help      = "Number of waiting Events by project path.",
-                labelName = "project",
-                resetDataFetch =
-                  () => statsFinder.countEvents(Set(New, RecoverableFailure)).map(_.mapValues(_.toDouble))
-              )(metricsRegistry)
+                 name = "events_waiting_count",
+                 help = "Number of waiting Events by project path.",
+                 labelName = "project",
+                 resetDataFetch =
+                   () => statsFinder.countEvents(Set(New, RecoverableFailure)).map(_.mapValues(_.toDouble))
+               )(metricsRegistry)
       _ <- gauge.reset
     } yield gauge
 }

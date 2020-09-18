@@ -59,7 +59,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         Request(Method.GET, uri"metrics")
       )
 
-      response.status       shouldBe Ok
+      response.status     shouldBe Ok
       response.body[String] should include("server_response_duration_seconds")
     }
 

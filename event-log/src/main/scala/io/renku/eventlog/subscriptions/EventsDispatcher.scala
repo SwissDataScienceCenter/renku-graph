@@ -76,17 +76,18 @@ class EventsDispatcher(
   private def dispatch(id: CompoundEventId, body: EventBody): IO[Unit] =
     subscriptions.nextFree flatMap {
       case None => waitForSubscriptions(andThen = dispatch(id, body))
-      case Some(url) => {
-        for {
-          result <- sendEvent(url, id, body)
-          _      <- logStatement(result, url, id)
-          _ <- result match {
-                case Delivered    => IO.unit
-                case ServiceBusy  => markBusy(url) recover withNothing flatMap (_ => dispatch(id, body))
-                case Misdelivered => remove(url) recover withNothing flatMap (_ => dispatch(id, body))
-              }
-        } yield ()
-      } recoverWith markEventAsNonRecoverable(url, id)
+      case Some(url) =>
+        {
+          for {
+            result <- sendEvent(url, id, body)
+            _      <- logStatement(result, url, id)
+            _ <- result match {
+                   case Delivered    => IO.unit
+                   case ServiceBusy  => markBusy(url) recover withNothing flatMap (_ => dispatch(id, body))
+                   case Misdelivered => remove(url) recover withNothing flatMap (_ => dispatch(id, body))
+                 }
+          } yield ()
+        } recoverWith markEventAsNonRecoverable(url, id)
     }
 
   private def logStatement(result: SendingResult, url: SubscriberUrl, id: CompoundEventId): IO[Unit] = result match {
@@ -95,17 +96,18 @@ class EventsDispatcher(
     case result @ Misdelivered => logger.error(s"Event $id, url = $url -> $result")
   }
 
-  private lazy val withNothing: PartialFunction[Throwable, Unit] = {
-    case NonFatal(_) => ()
+  private lazy val withNothing: PartialFunction[Throwable, Unit] = { case NonFatal(_) =>
+    ()
   }
 
-  private def markEventAsNonRecoverable(url: SubscriberUrl, id: CompoundEventId): PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) =>
-      val markEventFailed = ToNonRecoverableFailure[IO](id, EventMessage(exception), underProcessingGauge)
-      for {
-        _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
-        _ <- logger.error(exception)(s"Event $id, url = $url -> ${markEventFailed.status}")
-      } yield ()
+  private def markEventAsNonRecoverable(url: SubscriberUrl,
+                                        id:  CompoundEventId
+  ): PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+    val markEventFailed = ToNonRecoverableFailure[IO](id, EventMessage(exception), underProcessingGauge)
+    for {
+      _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
+      _ <- logger.error(exception)(s"Event $id, url = $url -> ${markEventFailed.status}")
+    } yield ()
   }
 
   private def loggingError[O](message: String, retry: => IO[O]): PartialFunction[Throwable, IO[O]] = {
@@ -118,13 +120,14 @@ class EventsDispatcher(
   }
 
   private def retry(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
-    case NonFatal(exception) => {
-      for {
-        _      <- logger.error(exception)(s"Marking event as ${command.status} failed")
-        _      <- timer sleep onErrorSleep
-        result <- statusUpdatesRunner run command
-      } yield result
-    } recoverWith retry(command)
+    case NonFatal(exception) =>
+      {
+        for {
+          _      <- logger.error(exception)(s"Marking event as ${command.status} failed")
+          _      <- timer sleep onErrorSleep
+          result <- statusUpdatesRunner run command
+        } yield result
+      } recoverWith retry(command)
   }
 }
 
@@ -134,15 +137,17 @@ object EventsDispatcher {
   private val OnErrorSleep:        FiniteDuration = 1 seconds
 
   def apply(
-      transactor:              DbTransactor[IO, EventLogDB],
-      subscriptions:           Subscriptions[IO],
-      waitingEventsGauge:      LabeledGauge[IO, projects.Path],
-      underProcessingGauge:    LabeledGauge[IO, projects.Path],
-      queriesExecTimes:        LabeledHistogram[IO, SqlQuery.Name],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[EventsDispatcher] =
+      transactor:           DbTransactor[IO, EventLogDB],
+      subscriptions:        Subscriptions[IO],
+      waitingEventsGauge:   LabeledGauge[IO, projects.Path],
+      underProcessingGauge: LabeledGauge[IO, projects.Path],
+      queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
+      logger:               Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[EventsDispatcher] =
     for {
       eventsFinder        <- IOEventLogFetch(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
       eventsSender        <- IOEventsSender(logger)
@@ -154,6 +159,7 @@ object EventsDispatcher {
                                  underProcessingGauge,
                                  logger,
                                  noSubscriptionSleep = NoSubscriptionSleep,
-                                 noEventSleep        = NoEventSleep,
-                                 onErrorSleep        = OnErrorSleep)
+                                 noEventSleep = NoEventSleep,
+                                 onErrorSleep = OnErrorSleep
+    )
 }

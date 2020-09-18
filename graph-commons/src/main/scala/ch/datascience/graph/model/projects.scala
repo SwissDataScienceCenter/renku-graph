@@ -36,7 +36,7 @@ object projects {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
     private[projects] val regexValidator = "^([\\w.-]+)(\\/([\\w.-]+))+$"
     addConstraint(
-      check   = v => (v contains "/") && (allowedFirstChar contains v.head) && (v matches regexValidator),
+      check = v => (v contains "/") && (allowedFirstChar contains v.head) && (v matches regexValidator),
       message = (value: String) => s"'$value' is not a valid $typeName"
     )
   }

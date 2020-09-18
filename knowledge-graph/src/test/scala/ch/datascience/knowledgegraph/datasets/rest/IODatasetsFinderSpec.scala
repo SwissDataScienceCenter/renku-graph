@@ -59,301 +59,303 @@ class IODatasetsFinderSpec
     Option(Phrase("*")) +: Option.empty[Phrase] +: Nil foreach { maybePhrase =>
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of datasets that has neither sameAs nor are imported to and/or from other projects" in new TestCase {
-        val sameAs1DatasetsAndJsons = nonModifiedDatasets(
-          projects = datasetProjects.toGeneratorOfNonEmptyList(minElements = 2)
-        ).generateOne.toJsonLDsAndDatasets(noSameAs = true)()
-        val sameAs2DatasetsAndJsons = nonModifiedDatasets(
-          projects = datasetProjects.toGeneratorOfNonEmptyList(maxElements = 1)
-        ).generateOne.toJsonLDsAndDatasets(noSameAs = true)()
-        val sameAs3DatasetsAndJsons = nonModifiedDatasets(
-          projects = datasetProjects.toGeneratorOfNonEmptyList(minElements = 2)
-        ).generateOne.toJsonLDsAndDatasets(noSameAs = false)()
+          val sameAs1DatasetsAndJsons = nonModifiedDatasets(
+            projects = datasetProjects.toGeneratorOfNonEmptyList(minElements = 2)
+          ).generateOne.toJsonLDsAndDatasets(noSameAs = true)()
+          val sameAs2DatasetsAndJsons = nonModifiedDatasets(
+            projects = datasetProjects.toGeneratorOfNonEmptyList(maxElements = 1)
+          ).generateOne.toJsonLDsAndDatasets(noSameAs = true)()
+          val sameAs3DatasetsAndJsons = nonModifiedDatasets(
+            projects = datasetProjects.toGeneratorOfNonEmptyList(minElements = 2)
+          ).generateOne.toJsonLDsAndDatasets(noSameAs = false)()
 
-        loadToStore(
-          (sameAs1DatasetsAndJsons ++ sameAs2DatasetsAndJsons ++ sameAs3DatasetsAndJsons).jsonLDs: _*
-        )
+          loadToStore(
+            (sameAs1DatasetsAndJsons ++ sameAs2DatasetsAndJsons ++ sameAs3DatasetsAndJsons).jsonLDs: _*
+          )
 
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync()
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
 
-        val datasetsList =
-          List(
-            sameAs1DatasetsAndJsons.toDatasetSearchResult(matchIdFrom = result.results),
-            sameAs2DatasetsAndJsons.toDatasetSearchResult(matchIdFrom = result.results),
-            sameAs3DatasetsAndJsons.toDatasetSearchResult(matchIdFrom = result.results)
-          ).flatten.sortBy(_.title.value)
+          val datasetsList =
+            List(
+              sameAs1DatasetsAndJsons.toDatasetSearchResult(matchIdFrom = result.results),
+              sameAs2DatasetsAndJsons.toDatasetSearchResult(matchIdFrom = result.results),
+              sameAs3DatasetsAndJsons.toDatasetSearchResult(matchIdFrom = result.results)
+            ).flatten.sortBy(_.title.value)
 
-        result.results shouldBe datasetsList
+          result.results shouldBe datasetsList
 
-        result.pagingInfo.total shouldBe Total(datasetsList.size)
-      }
+          result.pagingInfo.total shouldBe Total(datasetsList.size)
+        }
 
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of non-modified datasets" in new TestCase {
 
-        val datasetsAndJsons = nonModifiedDatasets()
-          .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
-          .toList
-          .map(_.toJsonLDsAndDatasets(noSameAs = false)())
+          val datasetsAndJsons = nonModifiedDatasets()
+            .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
+            .toList
+            .map(_.toJsonLDsAndDatasets(noSameAs = false)())
 
-        loadToStore(datasetsAndJsons.flatMap(_.jsonLDs): _*)
+          loadToStore(datasetsAndJsons.flatMap(_.jsonLDs): _*)
 
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync()
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
 
-        result.results shouldBe datasetsAndJsons
-          .flatMap(_.toDatasetSearchResult(matchIdFrom = result.results))
-          .sortBy(_.title.value)
+          result.results shouldBe datasetsAndJsons
+            .flatMap(_.toDatasetSearchResult(matchIdFrom = result.results))
+            .sortBy(_.title.value)
 
-        result.pagingInfo.total shouldBe Total(datasetsAndJsons.size)
-      }
+          result.pagingInfo.total shouldBe Total(datasetsAndJsons.size)
+        }
 
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of shared sameAs" in new TestCase {
 
-        val sharedSameAs    = datasetSameAs.generateOne
-        val dataset1Project = datasetProjects.generateOne
-        val datasets1       = nonModifiedDatasets().generateOne.copy(sameAs = sharedSameAs, projects = List(dataset1Project))
-        val datasets2       = datasets1.copy(id = datasetIdentifiers.generateOne, projects = single.generateOne.toList)
+          val sharedSameAs    = datasetSameAs.generateOne
+          val dataset1Project = datasetProjects.generateOne
+          val datasets1 =
+            nonModifiedDatasets().generateOne.copy(sameAs = sharedSameAs, projects = List(dataset1Project))
+          val datasets2 = datasets1.copy(id = datasetIdentifiers.generateOne, projects = single.generateOne.toList)
 
-        loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()())
+          loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()())
 
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync()
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
 
-        result.results shouldBe List(datasets1, datasets2).toDatasetSearchResult(matchIdFrom = result.results).toList
+          result.results shouldBe List(datasets1, datasets2).toDatasetSearchResult(matchIdFrom = result.results).toList
 
-        result.pagingInfo.total shouldBe Total(1)
-      }
+          result.pagingInfo.total shouldBe Total(1)
+        }
 
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of shared sameAs with modification on some projects" in new TestCase {
 
-        val sharedSameAs = datasetSameAs.generateOne
-        val datasets1    = nonModifiedDatasets(projects = single).generateOne.copy(sameAs = sharedSameAs)
-        val datasets2    = datasets1.copy(id = datasetIdentifiers.generateOne, projects = single.generateOne.toList)
-        val datasets2Modification = modifiedDatasetsOnFirstProject(datasets2).generateOne
-          .copy(title = datasetTitles.generateOne)
+          val sharedSameAs = datasetSameAs.generateOne
+          val datasets1    = nonModifiedDatasets(projects = single).generateOne.copy(sameAs = sharedSameAs)
+          val datasets2    = datasets1.copy(id = datasetIdentifiers.generateOne, projects = single.generateOne.toList)
+          val datasets2Modification = modifiedDatasetsOnFirstProject(datasets2).generateOne
+            .copy(title = datasetTitles.generateOne)
 
-        loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()(), datasets2Modification.toJsonLD())
+          loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()(), datasets2Modification.toJsonLD())
 
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync()
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
 
-        result.results shouldBe List(List(datasets1), List(datasets2Modification))
-          .flatMap(_.toDatasetSearchResult(matchIdFrom = result.results))
-          .sortBy(_.title.value)
+          result.results shouldBe List(List(datasets1), List(datasets2Modification))
+            .flatMap(_.toDatasetSearchResult(matchIdFrom = result.results))
+            .sortBy(_.title.value)
 
-        result.pagingInfo.total shouldBe Total(2)
-      }
+          result.pagingInfo.total shouldBe Total(2)
+        }
 
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of shared sameAs and forks" in new TestCase {
 
-        val sharedSameAs    = datasetSameAs.generateOne
-        val dataset1Project = datasetProjects.generateOne
-        val datasets1       = nonModifiedDatasets().generateOne.copy(sameAs = sharedSameAs, projects = List(dataset1Project))
-        val datasets2 = datasets1.copy(
-          id       = datasetIdentifiers.generateOne,
-          projects = single.generateOne.toList.map(_ shiftDateAfter dataset1Project)
-        )
-        val datasets2Fork = datasets2.copy(
-          projects = single.generateOne.toList.map(_ shiftDateAfter dataset1Project)
-        )
+          val sharedSameAs    = datasetSameAs.generateOne
+          val dataset1Project = datasetProjects.generateOne
+          val datasets1 =
+            nonModifiedDatasets().generateOne.copy(sameAs = sharedSameAs, projects = List(dataset1Project))
+          val datasets2 = datasets1.copy(
+            id = datasetIdentifiers.generateOne,
+            projects = single.generateOne.toList.map(_ shiftDateAfter dataset1Project)
+          )
+          val datasets2Fork = datasets2.copy(
+            projects = single.generateOne.toList.map(_ shiftDateAfter dataset1Project)
+          )
 
-        loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()(), datasets2Fork.toJsonLD()())
+          loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()(), datasets2Fork.toJsonLD()())
 
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync()
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
 
-        result.results shouldBe List(datasets1, datasets2, datasets2Fork)
-          .toDatasetSearchResult(matchIdFrom = result.results)
-          .toList
+          result.results shouldBe List(datasets1, datasets2, datasets2Fork)
+            .toDatasetSearchResult(matchIdFrom = result.results)
+            .toList
 
-        result.pagingInfo.total shouldBe Total(1)
-      }
+          result.pagingInfo.total shouldBe Total(1)
+        }
 
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case of one level of modification" in new TestCase {
 
-        val originalDatasetsList = nonModifiedDatasets(projects = single)
-          .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
-          .toList
-        val modifiedDatasetsList = originalDatasetsList.map { ds =>
-          modifiedDatasetsOnFirstProject(ds, ds.entityId.asDerivedFrom.some).generateOne
-            .copy(name = datasetNames.generateOne)
+          val originalDatasetsList = nonModifiedDatasets(projects = single)
+            .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
+            .toList
+          val modifiedDatasetsList = originalDatasetsList.map { ds =>
+            modifiedDatasetsOnFirstProject(ds, ds.entityId.asDerivedFrom.some).generateOne
+              .copy(name = datasetNames.generateOne)
+          }
+
+          loadToStore(originalDatasetsList flatMap (_.toJsonLDsAndDatasets(noSameAs = false)().jsonLDs): _*)
+          loadToStore(modifiedDatasetsList map (_.toJsonLD()):                                           _*)
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
+
+          result.results shouldBe modifiedDatasetsList
+            .map(_.toDatasetSearchResult(projectsCount = 1))
+            .sortBy(_.title.value)
+
+          result.pagingInfo.total shouldBe Total(modifiedDatasetsList.size)
         }
-
-        loadToStore(originalDatasetsList flatMap (_.toJsonLDsAndDatasets(noSameAs = false)().jsonLDs): _*)
-        loadToStore(modifiedDatasetsList map (_.toJsonLD()): _*)
-
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync()
-
-        result.results shouldBe modifiedDatasetsList
-          .map(_.toDatasetSearchResult(projectsCount = 1))
-          .sortBy(_.title.value)
-
-        result.pagingInfo.total shouldBe Total(modifiedDatasetsList.size)
-      }
 
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case more than one level of modification" in new TestCase {
 
-        val original = nonModifiedDatasets(projects = single).generateOne
-        val modification1 = modifiedDatasetsOnFirstProject(original).generateOne
-          .copy(title = datasetTitles.generateOne)
-        val modification2 = modifiedDatasetsOnFirstProject(modification1).generateOne
-          .copy(title = datasetTitles.generateOne)
+          val original = nonModifiedDatasets(projects = single).generateOne
+          val modification1 = modifiedDatasetsOnFirstProject(original).generateOne
+            .copy(title = datasetTitles.generateOne)
+          val modification2 = modifiedDatasetsOnFirstProject(modification1).generateOne
+            .copy(title = datasetTitles.generateOne)
 
-        loadToStore(
-          original.toJsonLD()(),
-          modification1.toJsonLD(topmostDerivedFrom = original.entityId.asDerivedFrom),
-          modification2.toJsonLD(topmostDerivedFrom = original.entityId.asDerivedFrom)
-        )
+          loadToStore(
+            original.toJsonLD()(),
+            modification1.toJsonLD(topmostDerivedFrom = original.entityId.asDerivedFrom),
+            modification2.toJsonLD(topmostDerivedFrom = original.entityId.asDerivedFrom)
+          )
 
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync()
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
 
-        result.results          should contain only modification2.toDatasetSearchResult(projectsCount = 1)
-        result.pagingInfo.total shouldBe Total(1)
-      }
+          result.results            should contain only modification2.toDatasetSearchResult(projectsCount = 1)
+          result.pagingInfo.total shouldBe Total(1)
+        }
 
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case if there are modified and non-modified datasets" in new TestCase {
 
-        val dataset1 = nonModifiedDatasets(projects = single).generateOne
-        val dataset1Modification = modifiedDatasetsOnFirstProject(dataset1).generateOne
-          .copy(name = datasetNames.generateOne)
-        val nonModifiedDataset = nonModifiedDatasets(projects = single).generateOne
+          val dataset1 = nonModifiedDatasets(projects = single).generateOne
+          val dataset1Modification = modifiedDatasetsOnFirstProject(dataset1).generateOne
+            .copy(name = datasetNames.generateOne)
+          val nonModifiedDataset = nonModifiedDatasets(projects = single).generateOne
 
-        loadToStore(
-          dataset1.toJsonLD()(),
-          dataset1Modification.toJsonLD(topmostDerivedFrom = dataset1.entityId.asDerivedFrom),
-          nonModifiedDataset.toJsonLD()()
-        )
+          loadToStore(
+            dataset1.toJsonLD()(),
+            dataset1Modification.toJsonLD(topmostDerivedFrom = dataset1.entityId.asDerivedFrom),
+            nonModifiedDataset.toJsonLD()()
+          )
 
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync()
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
 
-        result.results shouldBe List(List(dataset1Modification), List(nonModifiedDataset))
-          .flatMap(_.toDatasetSearchResult(result.results))
-          .sortBy(_.title.value)
-        result.pagingInfo.total shouldBe Total(2)
-      }
+          result.results shouldBe List(List(dataset1Modification), List(nonModifiedDataset))
+            .flatMap(_.toDatasetSearchResult(result.results))
+            .sortBy(_.title.value)
+          result.pagingInfo.total shouldBe Total(2)
+        }
 
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case if datasets are modified on some projects but not all" in new TestCase {
 
-        val projects @ _ +: project2 +: Nil =
-          datasetProjects.generateNonEmptyList(minElements = 2, maxElements = 2).toList
-        val dataset = nonModifiedDatasets().generateOne.copy(projects = projects)
-        val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
-          .copy(title = datasetTitles.generateOne)
+          val projects @ _ +: project2 +: Nil =
+            datasetProjects.generateNonEmptyList(minElements = 2, maxElements = 2).toList
+          val dataset = nonModifiedDatasets().generateOne.copy(projects = projects)
+          val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
+            .copy(title = datasetTitles.generateOne)
 
-        val jsonsAndDatasets = dataset.toJsonLDsAndDatasets(noSameAs = false)()
-        loadToStore(
-          jsonsAndDatasets.jsonLDs :+
-            datasetModification.toJsonLD(topmostDerivedFrom = dataset.entityId.asDerivedFrom): _*
-        )
+          val jsonsAndDatasets = dataset.toJsonLDsAndDatasets(noSameAs = false)()
+          loadToStore(
+            jsonsAndDatasets.jsonLDs :+
+              datasetModification.toJsonLD(topmostDerivedFrom = dataset.entityId.asDerivedFrom): _*
+          )
 
-        val result = datasetsFinder
-          .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync()
+          val result = datasetsFinder
+            .findDatasets(None, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
 
-        result.results shouldBe List(
-          jsonsAndDatasets.dataset(havingOnly = project2).toDatasetSearchResult(projectsCount = 1),
-          datasetModification.toDatasetSearchResult(projectsCount = 1)
-        ).sortBy(_.title.value)
+          result.results shouldBe List(
+            jsonsAndDatasets.dataset(havingOnly = project2).toDatasetSearchResult(projectsCount = 1),
+            datasetModification.toDatasetSearchResult(projectsCount = 1)
+          ).sortBy(_.title.value)
 
-        result.pagingInfo.total shouldBe Total(2)
-      }
+          result.pagingInfo.total shouldBe Total(2)
+        }
 
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case with forks on renku created datasets" in new TestCase {
 
-        val dataset     = nonModifiedDatasets(projects = single).generateOne
-        val datasetFork = dataset.copy(projects = List(datasetProjects.generateOne))
+          val dataset     = nonModifiedDatasets(projects = single).generateOne
+          val datasetFork = dataset.copy(projects = List(datasetProjects.generateOne))
 
-        loadToStore(
-          dataset.toJsonLD(noSameAs     = true)(),
-          datasetFork.toJsonLD(noSameAs = true)()
-        )
+          loadToStore(
+            dataset.toJsonLD(noSameAs = true)(),
+            datasetFork.toJsonLD(noSameAs = true)()
+          )
 
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync()
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
 
-        result.results should contain theSameElementsAs List(dataset, datasetFork)
-          .toDatasetSearchResult(result.results)
-          .toList
+          result.results should contain theSameElementsAs List(dataset, datasetFork)
+            .toDatasetSearchResult(result.results)
+            .toList
 
-        result.pagingInfo.total shouldBe Total(1)
-      }
+          result.pagingInfo.total shouldBe Total(1)
+        }
 
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case with more than one level of modification and forks on the 1st level" in new TestCase {
 
-        val dataset     = nonModifiedDatasets(projects = single).generateOne
-        val datasetFork = dataset.copy(projects = List(datasetProjects.generateOne))
-        val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
-          .copy(title = datasetTitles.generateOne)
+          val dataset     = nonModifiedDatasets(projects = single).generateOne
+          val datasetFork = dataset.copy(projects = List(datasetProjects.generateOne))
+          val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
+            .copy(title = datasetTitles.generateOne)
 
-        loadToStore(
-          dataset.toJsonLD()(),
-          datasetFork.toJsonLD()(),
-          datasetModification.toJsonLD(topmostDerivedFrom = datasetFork.entityId.asDerivedFrom)
-        )
+          loadToStore(
+            dataset.toJsonLD()(),
+            datasetFork.toJsonLD()(),
+            datasetModification.toJsonLD(topmostDerivedFrom = datasetFork.entityId.asDerivedFrom)
+          )
 
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync()
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
 
-        result.results shouldBe List(
-          datasetFork.toDatasetSearchResult(projectsCount         = 1),
-          datasetModification.toDatasetSearchResult(projectsCount = 1)
-        ).sortBy(_.title.value)
+          result.results shouldBe List(
+            datasetFork.toDatasetSearchResult(projectsCount = 1),
+            datasetModification.toDatasetSearchResult(projectsCount = 1)
+          ).sortBy(_.title.value)
 
-        result.pagingInfo.total shouldBe Total(2)
-      }
+          result.pagingInfo.total shouldBe Total(2)
+        }
 
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case with more than one level of modification and forks on not the 1st level" in new TestCase {
 
-        val dataset = nonModifiedDatasets(projects = single).generateOne
-        val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
-          .copy(name = datasetNames.generateOne)
-        val forkProject             = datasetProjects.generateOne
-        val datasetModificationFork = datasetModification.copy(projects = List(forkProject))
-        val datasetModificationOnFork = modifiedDatasetsOnFirstProject(datasetModificationFork).generateOne
-          .copy(name = datasetNames.generateOne)
+          val dataset = nonModifiedDatasets(projects = single).generateOne
+          val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
+            .copy(name = datasetNames.generateOne)
+          val forkProject             = datasetProjects.generateOne
+          val datasetModificationFork = datasetModification.copy(projects = List(forkProject))
+          val datasetModificationOnFork = modifiedDatasetsOnFirstProject(datasetModificationFork).generateOne
+            .copy(name = datasetNames.generateOne)
 
-        loadToStore(
-          dataset.toJsonLD()(),
-          datasetModification.toJsonLD(topmostDerivedFrom       = dataset.entityId.asDerivedFrom),
-          datasetModificationFork.toJsonLD(topmostDerivedFrom   = dataset.entityId.asDerivedFrom),
-          datasetModificationOnFork.toJsonLD(topmostDerivedFrom = datasetModificationFork.entityId.asDerivedFrom)
-        )
+          loadToStore(
+            dataset.toJsonLD()(),
+            datasetModification.toJsonLD(topmostDerivedFrom = dataset.entityId.asDerivedFrom),
+            datasetModificationFork.toJsonLD(topmostDerivedFrom = dataset.entityId.asDerivedFrom),
+            datasetModificationOnFork.toJsonLD(topmostDerivedFrom = datasetModificationFork.entityId.asDerivedFrom)
+          )
 
-        val result = datasetsFinder
-          .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-          .unsafeRunSync()
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
 
-        result.results should contain theSameElementsAs List(
-          datasetModification.toDatasetSearchResult(projectsCount       = 1),
-          datasetModificationOnFork.toDatasetSearchResult(projectsCount = 1)
-        ).sortBy(_.title.value)
+          result.results should contain theSameElementsAs List(
+            datasetModification.toDatasetSearchResult(projectsCount = 1),
+            datasetModificationOnFork.toDatasetSearchResult(projectsCount = 1)
+          ).sortBy(_.title.value)
 
-        result.pagingInfo.total shouldBe Total(2)
-      }
+          result.pagingInfo.total shouldBe Total(2)
+        }
     }
   }
 
@@ -362,41 +364,42 @@ class IODatasetsFinderSpec
     "returns all datasets containing the phrase - " +
       "case with no shared SameAs and no modifications" in new TestCase {
 
-      val phrase = phrases.generateOne
-      val sameAs1DatasetsAndJsons = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, minElements = 2)
-      ).generateOne.makeNameContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
-      val sameAs2DatasetsAndJsons = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, maxElements = 1)
-      ).generateOne.makeDescContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
-      val sameAs3DatasetsAndJsons = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, maxElements = 1)
-      ).generateOne.makeCreatorNameContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
-      val sameAs4DatasetsAndJsons = nonModifiedDatasets(
-        projects = nonEmptyList(datasetProjects, maxElements = 1)
-      ).generateOne.makeTitleContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
+        val phrase = phrases.generateOne
+        val sameAs1DatasetsAndJsons = nonModifiedDatasets(
+          projects = nonEmptyList(datasetProjects, minElements = 2)
+        ).generateOne.makeNameContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
+        val sameAs2DatasetsAndJsons = nonModifiedDatasets(
+          projects = nonEmptyList(datasetProjects, maxElements = 1)
+        ).generateOne.makeDescContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
+        val sameAs3DatasetsAndJsons = nonModifiedDatasets(
+          projects = nonEmptyList(datasetProjects, maxElements = 1)
+        ).generateOne.makeCreatorNameContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
+        val sameAs4DatasetsAndJsons = nonModifiedDatasets(
+          projects = nonEmptyList(datasetProjects, maxElements = 1)
+        ).generateOne.makeTitleContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
 
-      loadToStore(
-        (sameAs1DatasetsAndJsons ++
-          sameAs2DatasetsAndJsons ++
-          sameAs3DatasetsAndJsons ++
-          sameAs4DatasetsAndJsons ++
-          nonModifiedDatasets().generateOne.toJsonLDsAndDatasets(noSameAs = true)()).jsonLDs: _*
-      )
+        loadToStore(
+          (sameAs1DatasetsAndJsons ++
+            sameAs2DatasetsAndJsons ++
+            sameAs3DatasetsAndJsons ++
+            sameAs4DatasetsAndJsons ++
+            nonModifiedDatasets().generateOne.toJsonLDsAndDatasets(noSameAs = true)()).jsonLDs: _*
+        )
 
-      val result = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
-        .unsafeRunSync()
+        val result = datasetsFinder
+          .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
 
-      result.results shouldBe List(sameAs1DatasetsAndJsons,
-                                   sameAs2DatasetsAndJsons,
-                                   sameAs3DatasetsAndJsons,
-                                   sameAs4DatasetsAndJsons)
-        .flatMap(_.toDatasetSearchResult(result.results))
-        .sortBy(_.title.value)
+        result.results shouldBe List(sameAs1DatasetsAndJsons,
+                                     sameAs2DatasetsAndJsons,
+                                     sameAs3DatasetsAndJsons,
+                                     sameAs4DatasetsAndJsons
+        )
+          .flatMap(_.toDatasetSearchResult(result.results))
+          .sortBy(_.title.value)
 
-      result.pagingInfo.total shouldBe Total(4)
-    }
+        result.pagingInfo.total shouldBe Total(4)
+      }
 
     "return no results if there is no matching dataset" in new TestCase {
 
@@ -631,7 +634,8 @@ class IODatasetsFinderSpec
         addPhrase(phrase,
                   nonModifiedDatasets().generateOne,
                   nonModifiedDatasets().generateOne,
-                  nonModifiedDatasets().generateOne)
+                  nonModifiedDatasets().generateOne
+        )
 
       val datasetsAndJsons = List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne)
         .map(_.toJsonLDsAndDatasets(noSameAs = false)())
@@ -661,7 +665,8 @@ class IODatasetsFinderSpec
         addPhrase(phrase,
                   nonModifiedDatasets().generateOne,
                   nonModifiedDatasets().generateOne,
-                  nonModifiedDatasets().generateOne)
+                  nonModifiedDatasets().generateOne
+        )
 
       val datasetsAndJsons = List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne)
         .map(_.toJsonLDsAndDatasets(noSameAs = false)())
@@ -749,21 +754,20 @@ class IODatasetsFinderSpec
 
     def toDatasetSearchResult(matchIdFrom: List[DatasetSearchResult]): Option[DatasetSearchResult] =
       tuples
-        .find {
-          case (_, dataset) => matchIdFrom.exists(_.id == dataset.id)
+        .find { case (_, dataset) =>
+          matchIdFrom.exists(_.id == dataset.id)
         }
-        .map {
-          case (_, dataset) => dataset.toDatasetSearchResult(projectsCount = tuples.size)
+        .map { case (_, dataset) =>
+          dataset.toDatasetSearchResult(projectsCount = tuples.size)
         }
 
     def dataset(havingOnly: DatasetProject): Dataset = {
       tuples
-        .find {
-          case (_, ds) =>
-            ds.projects match {
-              case first +: Nil => first.path == havingOnly.path
-              case _            => false
-            }
+        .find { case (_, ds) =>
+          ds.projects match {
+            case first +: Nil => first.path == havingOnly.path
+            case _            => false
+          }
         } getOrElse fail(s"Cannot find dataset for project ${havingOnly.path}")
     }._2
   }

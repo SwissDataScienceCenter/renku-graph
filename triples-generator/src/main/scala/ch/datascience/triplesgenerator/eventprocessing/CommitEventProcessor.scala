@@ -77,10 +77,10 @@ private class CommitEventProcessor[Interpretation[_]](
     } flatMap logSummary recoverWith logError(eventId, events.head.project.path)
 
   private def logError(eventId:     CompoundEventId,
-                       projectPath: projects.Path): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"Commit Event processing failure: $eventId, projectPath: $projectPath")
-      ME.unit
+                       projectPath: projects.Path
+  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)(s"Commit Event processing failure: $eventId, projectPath: $projectPath")
+    ME.unit
   }
 
   private def allToTriplesAndUpload(
@@ -125,21 +125,22 @@ private class CommitEventProcessor[Interpretation[_]](
     RecoverableError(commit, error)
   }
 
-  private def nonRecoverableFailure(commit: CommitEvent): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"${logMessageCommon(commit)} failed")
-      (NonRecoverableError(commit, exception): UploadingResult).pure[Interpretation]
+  private def nonRecoverableFailure(
+      commit: CommitEvent
+  ): PartialFunction[Throwable, Interpretation[UploadingResult]] = { case NonFatal(exception) =>
+    logger.error(exception)(s"${logMessageCommon(commit)} failed")
+    (NonRecoverableError(commit, exception): UploadingResult).pure[Interpretation]
   }
 
   private def updateEventLog(uploadingResults: NonEmptyList[UploadingResult]) = {
     for {
       _ <- if (uploadingResults.allUploaded)
-            markEventDone(uploadingResults.head.commit.compoundEventId)
-          else if (uploadingResults.haveSkipped)
-            markEventAsSkipped(uploadingResults.skipped)
-          else if (uploadingResults.haveRecoverableFailure)
-            markEventAsRecoverable(uploadingResults.recoverableError)
-          else markEventAsNonRecoverable(uploadingResults.nonRecoverableError)
+             markEventDone(uploadingResults.head.commit.compoundEventId)
+           else if (uploadingResults.haveSkipped)
+             markEventAsSkipped(uploadingResults.skipped)
+           else if (uploadingResults.haveRecoverableFailure)
+             markEventAsRecoverable(uploadingResults.recoverableError)
+           else markEventAsNonRecoverable(uploadingResults.nonRecoverableError)
     } yield uploadingResults
   } recoverWith logEventLogUpdateError(uploadingResults)
 
@@ -172,12 +173,11 @@ private class CommitEventProcessor[Interpretation[_]](
 
   private def logEventLogUpdateError(
       uploadingResults: NonEmptyList[UploadingResult]
-  ): PartialFunction[Throwable, Interpretation[NonEmptyList[UploadingResult]]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(
-        s"${logMessageCommon(uploadingResults.head.commit)} failed to mark as TriplesStore in the Event Log"
-      )
-      uploadingResults.pure[Interpretation]
+  ): PartialFunction[Throwable, Interpretation[NonEmptyList[UploadingResult]]] = { case NonFatal(exception) =>
+    logger.error(exception)(
+      s"${logMessageCommon(uploadingResults.head.commit)} failed to mark as TriplesStore in the Event Log"
+    )
+    uploadingResults.pure[Interpretation]
   }
 
   private def logSummary: ((ElapsedTime, NonEmptyList[UploadingResult])) => Interpretation[Unit] = {
@@ -216,9 +216,9 @@ private class CommitEventProcessor[Interpretation[_]](
     val cause: Throwable
   }
   private object UploadingResult {
-    case class Uploaded(commit:            CommitEvent) extends UploadingResult
-    case class Skipped(commit:             CommitEvent, message: String) extends UploadingResult
-    case class RecoverableError(commit:    CommitEvent, cause: Throwable) extends UploadingError
+    case class Uploaded(commit: CommitEvent) extends UploadingResult
+    case class Skipped(commit: CommitEvent, message: String) extends UploadingResult
+    case class RecoverableError(commit: CommitEvent, cause: Throwable) extends UploadingError
     case class NonRecoverableError(commit: CommitEvent, cause: Throwable) extends UploadingError
   }
 }
@@ -240,15 +240,17 @@ private object IOCommitEventProcessor {
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000)
 
   def apply(
-      triplesGenerator:    TriplesGenerator[IO],
-      metricsRegistry:     MetricsRegistry[IO],
-      gitLabThrottler:     Throttler[IO, GitLab],
-      timeRecorder:        SparqlQueryTimeRecorder[IO],
-      logger:              Logger[IO],
-      config:              Config = ConfigFactory.load()
-  )(implicit contextShift: ContextShift[IO],
-    executionContext:      ExecutionContext,
-    timer:                 Timer[IO]): IO[CommitEventProcessor[IO]] =
+      triplesGenerator: TriplesGenerator[IO],
+      metricsRegistry:  MetricsRegistry[IO],
+      gitLabThrottler:  Throttler[IO, GitLab],
+      timeRecorder:     SparqlQueryTimeRecorder[IO],
+      logger:           Logger[IO],
+      config:           Config = ConfigFactory.load()
+  )(implicit
+      contextShift:     ContextShift[IO],
+      executionContext: ExecutionContext,
+      timer:            Timer[IO]
+  ): IO[CommitEventProcessor[IO]] =
     for {
       uploader              <- IOUploader(logger, timeRecorder)
       accessTokenFinder     <- IOAccessTokenFinder(logger)

@@ -37,8 +37,8 @@ object TinyTypeDecoders {
     case nonBlank => RefType.applyRef[NonBlank](nonBlank).fold(e => { print(e); None }, Option.apply)
   }
 
-  def toOption[TT <: TinyType { type V = String }](
-      implicit tinyTypeFactory: From[TT]
+  def toOption[TT <: TinyType { type V = String }](implicit
+      tinyTypeFactory: From[TT]
   ): Option[NonBlank] => Either[DecodingFailure, Option[TT]] = {
     case Some(nonBlank) =>
       tinyTypeFactory

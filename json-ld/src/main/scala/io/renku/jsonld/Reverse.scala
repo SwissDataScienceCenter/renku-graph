@@ -66,8 +66,8 @@ object Reverse {
       case list =>
         Either
           .fromOption(
-            list collectFirst {
-              case `value which is neither Entity nor Array(Entity)`(exception) => exception
+            list collectFirst { case `value which is neither Entity nor Array(Entity)`(exception) =>
+              exception
             },
             ifNone = new Reverse(properties)
           )

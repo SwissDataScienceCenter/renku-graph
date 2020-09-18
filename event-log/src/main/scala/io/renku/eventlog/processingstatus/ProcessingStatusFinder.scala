@@ -65,7 +65,7 @@ class ProcessingStatusFinderImpl(
                   |  ) max_batch_date on log.batch_date = max_batch_date.batch_date
                   |where log.project_id = $projectId
                   |""".stripMargin.query[EventStatus].to[List],
-    name  = "processing status"
+    name = "processing status"
   )
 
   private def toProcessingStatus(statuses: List[EventStatus]) =
@@ -137,6 +137,8 @@ object ProcessingStatus {
     val progress =
       if (total.value == 0) 100d
       else BigDecimal((done.value.toDouble / total.value) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
-    applyRef[Progress](progress) getOrError [Interpretation] s"ProcessingStatus with 'progress' $progress makes no sense"
+    applyRef[Progress](
+      progress
+    ) getOrError [Interpretation] s"ProcessingStatus with 'progress' $progress makes no sense"
   }
 }

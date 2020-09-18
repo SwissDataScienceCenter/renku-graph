@@ -49,10 +49,9 @@ class SubscriberImpl(
       subscriberUrl <- findSubscriberUrl
       _             <- postToEventLog(subscriberUrl)
     } yield ()
-  } recoverWith {
-    case NonFatal(exception) =>
-      logger.error(exception)("Problem with notifying event-log")
-      exception.raiseError[IO, Unit]
+  } recoverWith { case NonFatal(exception) =>
+    logger.error(exception)("Problem with notifying event-log")
+    exception.raiseError[IO, Unit]
   }
 
   override def run: IO[Unit] =
@@ -71,13 +70,12 @@ class SubscriberImpl(
     } yield ()
   } recoverWith errorLoggedAndRetry("Finding subscriber URL failed")
 
-  private def errorLoggedAndRetry(message: String): PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) =>
-      for {
-        _ <- logger.error(exception)(message)
-        _ <- timer sleep initialDelay
-        _ <- subscribeForEvents(initOrError = true)
-      } yield ()
+  private def errorLoggedAndRetry(message: String): PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+    for {
+      _ <- logger.error(exception)(message)
+      _ <- timer sleep initialDelay
+      _ <- subscribeForEvents(initOrError = true)
+    } yield ()
   }
 }
 

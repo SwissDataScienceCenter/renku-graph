@@ -98,7 +98,7 @@ class IOEdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalS
       committer = persons.generateOne,
       project,
       agent,
-      comment                  = "committing 1 file",
+      comment = "committing 1 file",
       maybeGenerationFactories = List(Generation.factory(entityFactory = Entity.factory(creating)))
     )
 
@@ -115,7 +115,7 @@ class IOEdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalS
           RunPlan.process(
             WorkflowFile.yaml("renku-run.yaml"),
             Command("cat"),
-            inputs  = inputs,
+            inputs = inputs,
             outputs = outputs
           )
         ),

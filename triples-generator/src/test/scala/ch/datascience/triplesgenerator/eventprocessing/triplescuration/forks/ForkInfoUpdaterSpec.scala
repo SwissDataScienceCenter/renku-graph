@@ -56,8 +56,9 @@ class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Match
         .updateForkInfo(event, givenCuratedTriples)
         .value
         .unsafeRunSync() shouldBe Right(
-        CuratedTriples[IO](triples       = transformedTriples,
-                           updatesGroups = givenCuratedTriples.updatesGroups :+ updateGroup)
+        CuratedTriples[IO](triples = transformedTriples,
+                           updatesGroups = givenCuratedTriples.updatesGroups :+ updateGroup
+        )
       )
     }
 

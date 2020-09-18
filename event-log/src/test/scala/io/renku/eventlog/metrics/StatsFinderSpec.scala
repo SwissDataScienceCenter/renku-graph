@@ -74,14 +74,13 @@ class StatsFinderSpec
 
         stats.countEvents(Set(New, RecoverableFailure)).unsafeRunSync() shouldBe events
           .groupBy(_._1)
-          .map {
-            case (projectPath, sameProjectGroup) =>
-              projectPath -> sameProjectGroup.count {
-                case (_, _, status) => Set(New, RecoverableFailure) contains status
-              }
+          .map { case (projectPath, sameProjectGroup) =>
+            projectPath -> sameProjectGroup.count { case (_, _, status) =>
+              Set(New, RecoverableFailure) contains status
+            }
           }
-          .filter {
-            case (_, count) => count > 0
+          .filter { case (_, count) =>
+            count > 0
           }
 
         queriesExecTimes.verifyExecutionTimeMeasured("projects events count")
@@ -92,16 +91,15 @@ class StatsFinderSpec
   private val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
   private val stats            = new StatsFinderImpl(transactor, queriesExecTimes)
 
-  private def store: ((Path, EventId, EventStatus)) => Unit = {
-    case (projectPath, eventId, status) =>
-      storeEvent(
-        CompoundEventId(eventId, Id(Math.abs(projectPath.value.hashCode))),
-        status,
-        executionDates.generateOne,
-        eventDates.generateOne,
-        eventBodies.generateOne,
-        projectPath = projectPath
-      )
+  private def store: ((Path, EventId, EventStatus)) => Unit = { case (projectPath, eventId, status) =>
+    storeEvent(
+      CompoundEventId(eventId, Id(Math.abs(projectPath.value.hashCode))),
+      status,
+      executionDates.generateOne,
+      eventDates.generateOne,
+      eventBodies.generateOne,
+      projectPath = projectPath
+    )
   }
 
   private def store(status: EventStatus): Unit =
@@ -109,12 +107,13 @@ class StatsFinderSpec
                status,
                executionDates.generateOne,
                eventDates.generateOne,
-               eventBodies.generateOne)
+               eventBodies.generateOne
+    )
 
   private def generateEventsFor(projectPaths: List[Path]) =
     projectPaths flatMap { projectPath =>
-      nonEmptyList(eventIdsAndStatuses, maxElements = 20).generateOne.toList.map {
-        case (commitId, status) => (projectPath, commitId, status)
+      nonEmptyList(eventIdsAndStatuses, maxElements = 20).generateOne.toList.map { case (commitId, status) =>
+        (projectPath, commitId, status)
       }
     }
 

@@ -56,17 +56,17 @@ object CommitInfo {
       committerName  <- cursor.downField("committer_name").toMaybeName
       committerEmail <- cursor.downField("committer_email").toMaybeEmail
       author <- (authorName, authorEmail) match {
-                 case (Some(name), Some(email)) => Right(Author(name, email))
-                 case (Some(name), None)        => Right(Author.withName(name))
-                 case (None, Some(email))       => Right(Author.withEmail(email))
-                 case _                         => Left(DecodingFailure("Neither author name nor email", Nil))
-               }
+                  case (Some(name), Some(email)) => Right(Author(name, email))
+                  case (Some(name), None)        => Right(Author.withName(name))
+                  case (None, Some(email))       => Right(Author.withEmail(email))
+                  case _                         => Left(DecodingFailure("Neither author name nor email", Nil))
+                }
       committer <- (committerName, committerEmail) match {
-                    case (Some(name), Some(email)) => Right(Committer(name, email))
-                    case (Some(name), None)        => Right(Committer.withName(name))
-                    case (None, Some(email))       => Right(Committer.withEmail(email))
-                    case _                         => Left(DecodingFailure("Neither committer name nor email", Nil))
-                  }
+                     case (Some(name), Some(email)) => Right(Committer(name, email))
+                     case (Some(name), None)        => Right(Committer.withName(name))
+                     case (None, Some(email))       => Right(Committer.withEmail(email))
+                     case _                         => Left(DecodingFailure("Neither committer name nor email", Nil))
+                   }
     } yield CommitInfo(id, message, committedDate, author, committer, parents)
   }
 }

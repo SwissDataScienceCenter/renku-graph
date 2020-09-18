@@ -48,7 +48,9 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
       .flatMap(toHttpResult(projectIdentifier))
       .recoverWith(httpResult(projectIdentifier))
 
-  private def toHttpResult[ID](projectIdentifier: ID): Option[AccessToken] => Interpretation[Response[Interpretation]] = {
+  private def toHttpResult[ID](
+      projectIdentifier: ID
+  ): Option[AccessToken] => Interpretation[Response[Interpretation]] = {
     case Some(token) =>
       Ok(token.asJson)
     case None =>
@@ -57,11 +59,10 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
 
   private def httpResult[ID](
       projectIdentifier: ID
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding token for project: $projectIdentifier failed")
-      logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+    val errorMessage = ErrorMessage(s"Finding token for project: $projectIdentifier failed")
+    logger.error(exception)(errorMessage.value)
+    InternalServerError(errorMessage)
   }
 
   implicit val findById:   projects.Id => OptionT[Interpretation, AccessToken]   = tokenFinder.findToken

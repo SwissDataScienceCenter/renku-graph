@@ -36,21 +36,21 @@ class HistogramSpec extends AnyWordSpec with MockFactory with should.Matchers {
     "register the metrics in the Metrics Registry " +
       "and return an instance of the LabeledHistogram" in new TestCase {
 
-      (metricsRegistry
-        .register[LibHistogram, LibHistogram.Builder](_: LibHistogram.Builder)(_: MonadError[Try, Throwable]))
-        .expects(*, *)
-        .onCall { (builder: LibHistogram.Builder, _: MonadError[Try, Throwable]) =>
-          builder.create().pure[Try]
-        }
+        (metricsRegistry
+          .register[LibHistogram, LibHistogram.Builder](_: LibHistogram.Builder)(_: MonadError[Try, Throwable]))
+          .expects(*, *)
+          .onCall { (builder: LibHistogram.Builder, _: MonadError[Try, Throwable]) =>
+            builder.create().pure[Try]
+          }
 
-      val labelName = nonBlankStrings().generateOne
+        val labelName = nonBlankStrings().generateOne
 
-      val Success(histogram) = Histogram[Try, String](name, help, labelName, Seq(.1, 1))(metricsRegistry)
+        val Success(histogram) = Histogram[Try, String](name, help, labelName, Seq(.1, 1))(metricsRegistry)
 
-      histogram.isInstanceOf[LabeledHistogram[Try, String]] shouldBe true
-      histogram.name                                        shouldBe name.value
-      histogram.help                                        shouldBe help.value
-    }
+        histogram.isInstanceOf[LabeledHistogram[Try, String]] shouldBe true
+        histogram.name                                        shouldBe name.value
+        histogram.help                                        shouldBe help.value
+      }
   }
 
   private trait TestCase {

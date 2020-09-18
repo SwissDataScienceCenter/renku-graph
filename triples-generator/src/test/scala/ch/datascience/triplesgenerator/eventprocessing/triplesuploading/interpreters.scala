@@ -18,8 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
-
-
 import scala.util.Try
 
 abstract class TryUploader(triplesUploader: TriplesUploader[Try], updatesUploader: UpdatesUploader[Try])

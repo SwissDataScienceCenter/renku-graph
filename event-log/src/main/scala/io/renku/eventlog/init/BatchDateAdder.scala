@@ -62,9 +62,8 @@ private class BatchDateAdder[Interpretation[_]](
     } yield ()
   } recoverWith logging
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)("'batch_date' column adding failure")
-      ME.raiseError(exception)
+  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)("'batch_date' column adding failure")
+    ME.raiseError(exception)
   }
 }

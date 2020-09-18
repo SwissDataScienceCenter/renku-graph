@@ -68,7 +68,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
 
   private lazy val notUsedPort: Int => Boolean = { port =>
     Validated
-      .catchOnly[SocketException] { new ServerSocket(port).close() }
+      .catchOnly[SocketException](new ServerSocket(port).close())
       .isValid
   }
 
@@ -147,7 +147,8 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
             RDFDataMgr.read(model,
                             new ByteArrayInputStream(Json.arr(jsonLDs.map(_.toJson): _*).noSpaces.getBytes(UTF_8)),
                             null,
-                            Lang.JSONLD)
+                            Lang.JSONLD
+            )
             model
           }
         }
@@ -188,9 +189,9 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
       for {
         vars <- cursor.as[List[String]]
         values <- cursor
-                   .downField("results")
-                   .downField("bindings")
-                   .as[List[Map[String, String]]](decodeList(valuesDecoder(vars)))
+                    .downField("results")
+                    .downField("bindings")
+                    .as[List[Map[String, String]]](decodeList(valuesDecoder(vars)))
       } yield values
     }
 

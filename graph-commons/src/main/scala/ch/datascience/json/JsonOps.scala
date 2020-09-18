@@ -30,9 +30,7 @@ object JsonOps {
       propertyAndValue match {
         case (property, maybeValue) =>
           maybeValue
-            .fold(ifEmpty = json)(
-              value => json deepMerge obj(property -> value.asJson)
-            )
+            .fold(ifEmpty = json)(value => json deepMerge obj(property -> value.asJson))
       }
   }
 }

@@ -105,7 +105,8 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
 
   def addNewCreator(projectPath:       Path,
                     maybeCreatorEmail: Option[Email],
-                    maybeCreatorName:  Option[users.Name]): List[SparqlQuery] = {
+                    maybeCreatorName:  Option[users.Name]
+  ): List[SparqlQuery] = {
     val projectId = ResourceId(renkuBaseUrl, projectPath)
     maybeCreatorEmail match {
       case Some(creatorEmail) =>

@@ -68,11 +68,13 @@ class HookValidationEndpoint[Interpretation[_]: Effect](
 
 object IOHookValidationEndpoint {
   def apply(
-      projectHookUrl:          ProjectHookUrl,
-      gitLabThrottler:         Throttler[IO, GitLab]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[HookValidationEndpoint[IO]] =
+      projectHookUrl:  ProjectHookUrl,
+      gitLabThrottler: Throttler[IO, GitLab]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[HookValidationEndpoint[IO]] =
     for {
       hookValidator <- IOHookValidator(projectHookUrl, gitLabThrottler)
     } yield new HookValidationEndpoint[IO](

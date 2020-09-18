@@ -50,12 +50,11 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
         .returning(counts.pure[IO])
         .atLeastOnce()
 
-      counts foreach {
-        case (entityType, count) =>
-          (countsGauge.set _)
-            .expects(entityType -> count.toDouble)
-            .returning(IO.unit)
-            .atLeastOnce()
+      counts foreach { case (entityType, count) =>
+        (countsGauge.set _)
+          .expects(entityType -> count.toDouble)
+          .returning(IO.unit)
+          .atLeastOnce()
       }
 
       metrics.run.unsafeRunAsyncAndForget()
@@ -77,12 +76,11 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
         .returning(statuses.pure[IO])
         .atLeastOnce()
 
-      statuses foreach {
-        case (entity, count) =>
-          (countsGauge.set _)
-            .expects(entity -> count.toDouble)
-            .returning(IO.unit)
-            .atLeastOnce()
+      statuses foreach { case (entity, count) =>
+        (countsGauge.set _)
+          .expects(entity -> count.toDouble)
+          .returning(IO.unit)
+          .atLeastOnce()
       }
 
       metrics.run.start.unsafeRunAsyncAndForget()
@@ -109,7 +107,7 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
       statsFinder,
       logger,
       countsGauge,
-      initialDelay   = 100 millis,
+      initialDelay = 100 millis,
       countsInterval = 500 millis
     )
   }

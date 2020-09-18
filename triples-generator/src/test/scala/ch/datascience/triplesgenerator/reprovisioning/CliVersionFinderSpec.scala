@@ -47,15 +47,17 @@ class CliVersionFinderSpec extends AnyWordSpec with MockFactory with should.Matc
         ).asJava
       )
 
-      CliVersionFinder[Try](triplesGeneration  = RemoteTriplesGeneration,
+      CliVersionFinder[Try](triplesGeneration = RemoteTriplesGeneration,
                             renkuVersionFinder = cliVersions.generateOne.pure[Try],
-                            config             = config) shouldBe Success(cliVersion)
+                            config = config
+      ) shouldBe Success(cliVersion)
     }
 
     s"call 'renku --version' if TriplesGeneration is $RenkuLog" in {
-      CliVersionFinder[Try](triplesGeneration  = RenkuLog,
+      CliVersionFinder[Try](triplesGeneration = RenkuLog,
                             renkuVersionFinder = cliVersion.pure[Try],
-                            config             = ConfigFactory.empty()) shouldBe Success(cliVersion)
+                            config = ConfigFactory.empty()
+      ) shouldBe Success(cliVersion)
     }
   }
 }

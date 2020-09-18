@@ -151,15 +151,15 @@ class IOProjectHookVerifierSpec extends AnyWordSpec with MockFactory with Extern
     Json
       .arr(
         hook(
-          url       = projectHookUrls.generateOne,
+          url = projectHookUrls.generateOne,
           projectId = projectId
         ),
         hook(
-          url       = oneHookUrl,
+          url = oneHookUrl,
           projectId = projectId
         ),
         hook(
-          url       = projectHookUrls.generateOne,
+          url = projectHookUrls.generateOne,
           projectId = projectId
         )
       )

@@ -71,15 +71,17 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
 
 object IOHookCreationEndpoint {
   def apply(
-      projectHookUrl:          ProjectHookUrl,
-      gitLabThrottler:         Throttler[IO, GitLab],
-      hookTokenCrypto:         HookTokenCrypto[IO],
-      executionTimeRecorder:   ExecutionTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    clock:                     Clock[IO],
-    timer:                     Timer[IO]): IO[HookCreationEndpoint[IO]] =
+      projectHookUrl:        ProjectHookUrl,
+      gitLabThrottler:       Throttler[IO, GitLab],
+      hookTokenCrypto:       HookTokenCrypto[IO],
+      executionTimeRecorder: ExecutionTimeRecorder[IO],
+      logger:                Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      clock:            Clock[IO],
+      timer:            Timer[IO]
+  ): IO[HookCreationEndpoint[IO]] =
     for {
       hookCreator <- IOHookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
     } yield new HookCreationEndpoint[IO](hookCreator, new AccessTokenExtractor[IO])

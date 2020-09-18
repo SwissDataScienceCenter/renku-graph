@@ -51,21 +51,21 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
     "return OK with info about processing status of events of a project with the given id " +
       "if there are some events for that project in the Log" in new TestCase {
 
-      val processingStatus = processingStatuses.generateOne
-      (statusFinder.fetchStatus _)
-        .expects(projectId)
-        .returning(OptionT.some[IO](processingStatus))
+        val processingStatus = processingStatuses.generateOne
+        (statusFinder.fetchStatus _)
+          .expects(projectId)
+          .returning(OptionT.some[IO](processingStatus))
 
-      val request = Request(Method.GET, uri"events" / "projects" / projectId.toString / "status")
+        val request = Request(Method.GET, uri"events" / "projects" / projectId.toString / "status")
 
-      val response = findProcessingStatus(projectId).unsafeRunSync()
+        val response = findProcessingStatus(projectId).unsafeRunSync()
 
-      response.status                             shouldBe Ok
-      response.contentType                        shouldBe Some(`Content-Type`(application.json))
-      response.as[ProcessingStatus].unsafeRunSync shouldBe processingStatus
+        response.status                             shouldBe Ok
+        response.contentType                        shouldBe Some(`Content-Type`(application.json))
+        response.as[ProcessingStatus].unsafeRunSync shouldBe processingStatus
 
-      logger.expectNoLogs()
-    }
+        logger.expectNoLogs()
+      }
 
     "return NOT_FOUND if there are no events for a project with the given id" in new TestCase {
 

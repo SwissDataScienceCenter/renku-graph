@@ -64,7 +64,8 @@ object IOUpdateCommandsRunner {
 
   def apply(transactor:       DbTransactor[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-            logger:           Logger[IO]): IO[StatusUpdatesRunner[IO]] = IO {
+            logger:           Logger[IO]
+  ): IO[StatusUpdatesRunner[IO]] = IO {
     new StatusUpdatesRunnerImpl(transactor, queriesExecTimes, logger)
   }
 }

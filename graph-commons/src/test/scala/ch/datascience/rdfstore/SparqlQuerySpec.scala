@@ -77,9 +77,9 @@ class SparqlQuerySpec extends AnyWordSpec with should.Matchers {
 
     "successfully add the given paging request to the SparqlQuery if there's 'ORDER BY' clause in the body" in {
       val query = SparqlQuery(
-        name     = "test query",
+        name = "test query",
         prefixes = Set.empty,
-        body     = s"""|${sentences().generateOne.value}
+        body = s"""|${sentences().generateOne.value}
                    |ORDER BY ASC(?field)
                    |""".stripMargin
       )
@@ -88,14 +88,15 @@ class SparqlQuerySpec extends AnyWordSpec with should.Matchers {
       query.include[Try](pagingRequest) shouldBe SparqlQuery(name = "test query",
                                                              query.prefixes,
                                                              query.body,
-                                                             Some(pagingRequest)).pure[Try]
+                                                             Some(pagingRequest)
+      ).pure[Try]
     }
 
     "successfully add the given paging request to the SparqlQuery if there's 'order by' clause in the body" in {
       val query = SparqlQuery(
-        name     = "test query",
+        name = "test query",
         prefixes = Set.empty,
-        body     = s"""|${sentences().generateOne.value}
+        body = s"""|${sentences().generateOne.value}
                    |order by asc(?field)
                    |""".stripMargin
       )
@@ -104,7 +105,8 @@ class SparqlQuerySpec extends AnyWordSpec with should.Matchers {
       query.include[Try](pagingRequest) shouldBe SparqlQuery(name = "test query",
                                                              query.prefixes,
                                                              query.body,
-                                                             Some(pagingRequest)).pure[Try]
+                                                             Some(pagingRequest)
+      ).pure[Try]
     }
 
     "fail adding the given paging request if there's no ORDER BY clause in the body" in {

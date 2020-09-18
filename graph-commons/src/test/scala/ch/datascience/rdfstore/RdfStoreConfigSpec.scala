@@ -18,7 +18,6 @@
 
 package ch.datascience.rdfstore
 
-
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._

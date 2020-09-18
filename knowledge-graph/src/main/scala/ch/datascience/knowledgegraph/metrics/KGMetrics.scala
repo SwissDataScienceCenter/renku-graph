@@ -56,8 +56,8 @@ class IOKGMetrics(
     } yield ()
   } recoverWith logAndRetry(continueWith = updateCounts())
 
-  private lazy val toCountsGauge: ((KGEntityType, Long)) => IO[Unit] = {
-    case (status, count) => countsGauge set status -> count
+  private lazy val toCountsGauge: ((KGEntityType, Long)) => IO[Unit] = { case (status, count) =>
+    countsGauge set status -> count
   }
 
   private def logAndRetry(continueWith: => IO[Unit]): PartialFunction[Throwable, IO[Unit]] = {
@@ -86,9 +86,10 @@ object IOKGMetrics {
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[KGMetrics[IO]] =
     for {
-      entitiesCountGauge <- Gauge[IO, KGEntityType](name = "entities_count",
-                                                    help      = "Total object by type.",
-                                                    labelName = "entities")(metricsRegistry)
+      entitiesCountGauge <-
+        Gauge[IO, KGEntityType](name = "entities_count", help = "Total object by type.", labelName = "entities")(
+          metricsRegistry
+        )
 
     } yield new IOKGMetrics(statsFinder, logger, entitiesCountGauge)
 }

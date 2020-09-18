@@ -48,7 +48,9 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
 
     "do nothing if no project in Gitlab" in new TestCase {
 
-      given(gitLabProjects(projectPath = event.project.path, maybeParentPaths = emptyOptionOf[Path]).generateOne).doesNotExistsInGitLab
+      given(
+        gitLabProjects(projectPath = event.project.path, maybeParentPaths = emptyOptionOf[Path]).generateOne
+      ).doesNotExistsInGitLab
 
       updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
         List.empty[SparqlQuery]
@@ -58,99 +60,99 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
     "update the wasDerivedFrom triple, recreate dateCreated and update the project creator" +
       "if Gitlab project's creator has an email and the user exists in KG" in new TestCase {
 
-      val emailInGitLab = userEmails.generateOne
-      val gitLabProject = given {
-        gitLabProjects(event.project.path).generateOne.copy(
-          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+        val emailInGitLab = userEmails.generateOne
+        val gitLabProject = given {
+          gitLabProjects(event.project.path).generateOne.copy(
+            maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+          )
+        }.existsInGitLab
+
+        val newCreatorId = userResourceIds(Some(emailInGitLab)).generateOne
+        given(
+          creatorId = newCreatorId,
+          forEmail = emailInGitLab
+        ).existsInKG
+
+        val wasDerivedFromUpdates = (updatesQueryCreator
+          .updateWasDerivedFrom(_: Path, _: Option[Path]))
+          .expects(gitLabProject.path, gitLabProject.maybeParentPath)
+          .returningUpdates
+
+        val creatorUpdates = (updatesQueryCreator
+          .swapCreator(_: Path, _: users.ResourceId))
+          .expects(gitLabProject.path, newCreatorId)
+          .returningUpdates
+
+        val recreateDateCreated = (updatesQueryCreator
+          .recreateDateCreated(_: Path, _: DateCreated))
+          .expects(gitLabProject.path, gitLabProject.dateCreated)
+          .returningUpdates
+
+        updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
+          List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
         )
-      }.existsInGitLab
-
-      val newCreatorId = userResourceIds(Some(emailInGitLab)).generateOne
-      given(
-        creatorId = newCreatorId,
-        forEmail  = emailInGitLab
-      ).existsInKG
-
-      val wasDerivedFromUpdates = (updatesQueryCreator
-        .updateWasDerivedFrom(_: Path, _: Option[Path]))
-        .expects(gitLabProject.path, gitLabProject.maybeParentPath)
-        .returningUpdates
-
-      val creatorUpdates = (updatesQueryCreator
-        .swapCreator(_: Path, _: users.ResourceId))
-        .expects(gitLabProject.path, newCreatorId)
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: Path, _: DateCreated))
-        .expects(gitLabProject.path, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
-      )
-    }
+      }
 
     "update the wasDerivedFrom triple, recreate dateCreated and update the project creator" +
       "if Gitlab project's creator has an email and the user does not exist in KG" in new TestCase {
 
-      val emailInGitLab = userEmails.generateOne
-      val gitLabProject = given {
-        gitLabProjects(event.project.path).generateOne.copy(
-          maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+        val emailInGitLab = userEmails.generateOne
+        val gitLabProject = given {
+          gitLabProjects(event.project.path).generateOne.copy(
+            maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+          )
+        }.existsInGitLab
+
+        val wasDerivedFromUpdates = (updatesQueryCreator
+          .updateWasDerivedFrom(_: Path, _: Option[Path]))
+          .expects(gitLabProject.path, gitLabProject.maybeParentPath)
+          .returningUpdates
+
+        givenNoUser(forEmail = emailInGitLab).existsInKG
+
+        val creatorUpdates = (updatesQueryCreator
+          .addNewCreator(_: Path, _: Option[Email], _: Option[users.Name]))
+          .expects(gitLabProject.path, Some(emailInGitLab), gitLabProject.maybeCreator.flatMap(_.maybeName))
+          .returningUpdates
+
+        val recreateDateCreated = (updatesQueryCreator
+          .recreateDateCreated(_: Path, _: DateCreated))
+          .expects(gitLabProject.path, gitLabProject.dateCreated)
+          .returningUpdates
+
+        updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
+          List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
         )
-      }.existsInGitLab
-
-      val wasDerivedFromUpdates = (updatesQueryCreator
-        .updateWasDerivedFrom(_: Path, _: Option[Path]))
-        .expects(gitLabProject.path, gitLabProject.maybeParentPath)
-        .returningUpdates
-
-      givenNoUser(forEmail = emailInGitLab).existsInKG
-
-      val creatorUpdates = (updatesQueryCreator
-        .addNewCreator(_: Path, _: Option[Email], _: Option[users.Name]))
-        .expects(gitLabProject.path, Some(emailInGitLab), gitLabProject.maybeCreator.flatMap(_.maybeName))
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: Path, _: DateCreated))
-        .expects(gitLabProject.path, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
-      )
-    }
+      }
 
     "update the wasDerivedFrom triple, recreate dateCreated and update the project creator" +
       "if Gitlab project's creator does not have an email" in new TestCase {
 
-      val gitLabProject = given {
-        gitLabProjects(event.project.path).generateOne.copy(
-          maybeCreator = gitLabCreator(maybeEmail = None).generateSome
+        val gitLabProject = given {
+          gitLabProjects(event.project.path).generateOne.copy(
+            maybeCreator = gitLabCreator(maybeEmail = None).generateSome
+          )
+        }.existsInGitLab
+
+        val wasDerivedFromUpdates = (updatesQueryCreator
+          .updateWasDerivedFrom(_: Path, _: Option[Path]))
+          .expects(gitLabProject.path, gitLabProject.maybeParentPath)
+          .returningUpdates
+
+        val creatorUpdates = (updatesQueryCreator
+          .addNewCreator(_: Path, _: Option[Email], _: Option[users.Name]))
+          .expects(gitLabProject.path, None, gitLabProject.maybeCreator.flatMap(_.maybeName))
+          .returningUpdates
+
+        val recreateDateCreated = (updatesQueryCreator
+          .recreateDateCreated(_: Path, _: DateCreated))
+          .expects(gitLabProject.path, gitLabProject.dateCreated)
+          .returningUpdates
+
+        updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
+          List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
         )
-      }.existsInGitLab
-
-      val wasDerivedFromUpdates = (updatesQueryCreator
-        .updateWasDerivedFrom(_: Path, _: Option[Path]))
-        .expects(gitLabProject.path, gitLabProject.maybeParentPath)
-        .returningUpdates
-
-      val creatorUpdates = (updatesQueryCreator
-        .addNewCreator(_: Path, _: Option[Email], _: Option[users.Name]))
-        .expects(gitLabProject.path, None, gitLabProject.maybeCreator.flatMap(_.maybeName))
-        .returningUpdates
-
-      val recreateDateCreated = (updatesQueryCreator
-        .recreateDateCreated(_: Path, _: DateCreated))
-        .expects(gitLabProject.path, gitLabProject.dateCreated)
-        .returningUpdates
-
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-        List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
-      )
-    }
+      }
 
     Set(
       BadRequestException(nonBlankStrings().generateOne),
@@ -246,30 +248,27 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
         gitLabProject
       }
 
-      lazy val doesNotExistsInGitLab = {
+      lazy val doesNotExistsInGitLab =
         (gitLabInfoFinder
           .findProject(_: Path)(_: Option[AccessToken]))
           .expects(event.project.path, maybeAccessToken)
           .returning(Option.empty.pure[IO])
-      }
     }
 
     def given(creatorId: users.ResourceId, forEmail: Email) = new {
-      lazy val existsInKG = {
+      lazy val existsInKG =
         (kgInfoFinder
           .findCreatorId(_: Email))
           .expects(forEmail)
           .returning(creatorId.some.pure[IO])
-      }
     }
 
     def givenNoUser(forEmail: Email) = new {
-      lazy val existsInKG = {
+      lazy val existsInKG =
         (kgInfoFinder
           .findCreatorId(_: Email))
           .expects(forEmail)
           .returning(Option.empty.pure[IO])
-      }
     }
 
     implicit class CallHandlerOps(handler: CallHandler[List[SparqlQuery]]) {

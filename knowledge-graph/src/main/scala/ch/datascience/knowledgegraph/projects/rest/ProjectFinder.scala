@@ -61,35 +61,35 @@ class IOProjectFinder(
 
   private def merge(path: Path, kgProject: KGProject, gitLabProject: GitLabProject) =
     Project(
-      id               = gitLabProject.id,
-      path             = path,
-      name             = kgProject.name,
+      id = gitLabProject.id,
+      path = path,
+      name = kgProject.name,
       maybeDescription = gitLabProject.maybeDescription,
-      visibility       = gitLabProject.visibility,
+      visibility = gitLabProject.visibility,
       created = Creation(
-        date         = kgProject.created.date,
+        date = kgProject.created.date,
         maybeCreator = kgProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
       ),
-      updatedAt   = gitLabProject.updatedAt,
-      urls        = gitLabProject.urls,
-      forking     = Forking(gitLabProject.forksCount, kgProject.maybeParent.toParentProject),
-      tags        = gitLabProject.tags,
-      starsCount  = gitLabProject.starsCount,
+      updatedAt = gitLabProject.updatedAt,
+      urls = gitLabProject.urls,
+      forking = Forking(gitLabProject.forksCount, kgProject.maybeParent.toParentProject),
+      tags = gitLabProject.tags,
+      starsCount = gitLabProject.starsCount,
       permissions = gitLabProject.permissions,
-      statistics  = gitLabProject.statistics,
-      version     = kgProject.version
+      statistics = gitLabProject.statistics,
+      version = kgProject.version
     )
 
   private implicit class ParentOps(maybeParent: Option[Parent]) {
     lazy val toParentProject: Option[ParentProject] =
-      (maybeParent -> maybeParent.flatMap(_.resourceId.as[Try, Path].toOption)) mapN {
-        case (parent, path) =>
-          ParentProject(
-            path,
-            parent.name,
-            Creation(parent.created.date,
-                     parent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name)))
+      (maybeParent -> maybeParent.flatMap(_.resourceId.as[Try, Path].toOption)) mapN { case (parent, path) =>
+        ParentProject(
+          path,
+          parent.name,
+          Creation(parent.created.date,
+                   parent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
           )
+        )
       }
   }
 }
@@ -105,10 +105,12 @@ private object IOProjectFinder {
       logger:          Logger[IO],
       timeRecorder:    SparqlQueryTimeRecorder[IO],
       config:          Config = ConfigFactory.load()
-  )(implicit ME:       MonadError[IO, Throwable],
-    executionContext:  ExecutionContext,
-    contextShift:      ContextShift[IO],
-    timer:             Timer[IO]): IO[ProjectFinder[IO]] =
+  )(implicit
+      ME:               MonadError[IO, Throwable],
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ProjectFinder[IO]] =
     for {
       kgProjectFinder     <- IOKGProjectFinder(timeRecorder, logger = logger)
       gitLabProjectFinder <- IOGitLabProjectFinder(gitLabThrottler, logger)

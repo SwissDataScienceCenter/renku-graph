@@ -103,12 +103,14 @@ class ThrottlerSpec extends AnyWordSpec with should.Matchers {
 
     def processConcurrently[ThrottlingTarget](tasks:              Int,
                                               use:                Throttler[IO, ThrottlingTarget],
-                                              taskProcessingTime: Option[FiniteDuration] = None) =
+                                              taskProcessingTime: Option[FiniteDuration] = None
+    ) =
       ((1 to tasks) map (useThrottledResource(_, use, taskProcessingTime))).toList.parSequence
 
     private def useThrottledResource[Target](name:               Int,
                                              throttler:          Throttler[IO, Target],
-                                             taskProcessingTime: Option[FiniteDuration]): IO[Unit] =
+                                             taskProcessingTime: Option[FiniteDuration]
+    ): IO[Unit] =
       for {
         _          <- throttler.acquire
         greenLight <- clock.monotonic(MILLISECONDS)
@@ -122,8 +124,8 @@ class ThrottlerSpec extends AnyWordSpec with should.Matchers {
         .map(greenLight => greenLight - startTime)
         .toList
         .sorted
-        .foldLeft(List.empty[Long]) {
-          case (diffs, item) => diffs :+ item - diffs.sum
+        .foldLeft(List.empty[Long]) { case (diffs, item) =>
+          diffs :+ item - diffs.sum
         }
 
     def totalTasksProcessingTime(startTime: Long) =

@@ -122,7 +122,7 @@ class EventsHistoryLoaderSpec extends AnyWordSpec with MockFactory with should.M
   }
 
   private def startCommitFrom(commitInfo: CommitInfo, projectInfo: ProjectInfo) = StartCommit(
-    id      = commitInfo.id,
+    id = commitInfo.id,
     project = Project(projectInfo.id, projectInfo.path)
   )
 }

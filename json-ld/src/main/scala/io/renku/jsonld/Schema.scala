@@ -32,7 +32,7 @@ object Schema {
   def from(baseUrl: String): Schema = SlashSeparatorSchema(baseUrl)
   def from(baseUrl: String, separator: String): Schema = CustomSeparatorSchema(baseUrl, separator)
 
-  private[jsonld] final case class SlashSeparatorSchema(value:  String) extends Schema(value, separator = "/")
+  private[jsonld] final case class SlashSeparatorSchema(value: String) extends Schema(value, separator = "/")
   private[jsonld] final case class CustomSeparatorSchema(value: String, separator: String)
       extends Schema(value, separator)
 }

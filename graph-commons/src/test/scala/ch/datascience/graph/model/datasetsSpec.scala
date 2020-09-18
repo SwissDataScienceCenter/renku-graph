@@ -53,7 +53,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
     "allow to construct UrlSameAs using the from factory" in {
       forAll(httpUrls()) { url =>
         val Right(sameAs) = SameAs.from(url)
-        sameAs       should (be(a[SameAs]) and be(a[UrlSameAs]))
+        sameAs         should (be(a[SameAs]) and be(a[UrlSameAs]))
         sameAs.value shouldBe url
       }
     }
@@ -61,7 +61,7 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
     "allow to construct IdSameAs using the fromId factory" in {
       forAll(httpUrls()) { url =>
         val Right(sameAs) = SameAs.fromId(url)
-        sameAs       should (be(a[SameAs]) and be(a[IdSameAs]))
+        sameAs         should (be(a[SameAs]) and be(a[IdSameAs]))
         sameAs.value shouldBe url
       }
     }

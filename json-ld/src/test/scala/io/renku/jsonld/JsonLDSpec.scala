@@ -349,7 +349,8 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
          parentProperty: (Property, JsonLD),
          childId:        EntityId,
          childTypes:     EntityTypes,
-         childProperty:  (Property, JsonLD)) =>
+         childProperty:  (Property, JsonLD)
+        ) =>
           val reverseProperty: Property = properties.generateOne
           val child = JsonLD.entity(childId, childTypes, childProperty)
           JsonLD
@@ -377,7 +378,8 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
          parentProperty: (Property, JsonLD),
          childId:        EntityId,
          childTypes:     EntityTypes,
-         childProperty:  (Property, JsonLD)) =>
+         childProperty:  (Property, JsonLD)
+        ) =>
           val reverseProperty1: Property = properties.generateOne
           val reverseProperty2: Property = properties.generateOne
           val child = JsonLD.entity(childId, childTypes, childProperty)
@@ -385,7 +387,8 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
             .entity(parentId,
                     parentTypes,
                     Reverse.ofEntities(reverseProperty1 -> child, reverseProperty2 -> child),
-                    parentProperty)
+                    parentProperty
+            )
             .toJson shouldBe
             parse(s"""{
             "@id":                  ${parentId.asJson},

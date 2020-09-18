@@ -188,8 +188,8 @@ private class IONodesDetailsFinder(
       case Nil => None
       case (location, typ, label) +: tail =>
         Some {
-          tail.foldLeft(Node(location, label, Set(typ))) {
-            case (node, (`location`, t, `label`)) => node.copy(types = node.types + t)
+          tail.foldLeft(Node(location, label, Set(typ))) { case (node, (`location`, t, `label`)) =>
+            node.copy(types = node.types + t)
           }
         }
     }
@@ -214,13 +214,15 @@ private class IONodesDetailsFinder(
 private object IOLineageNodeDetailsFinder {
 
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[NodesDetailsFinder[IO]] =
+      timeRecorder:   SparqlQueryTimeRecorder[IO],
+      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
+      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
+      logger:         Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[NodesDetailsFinder[IO]] =
     for {
       config       <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl

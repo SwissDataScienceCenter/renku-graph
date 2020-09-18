@@ -59,20 +59,20 @@ class EventsProcessingRunnerSpec
     s"return $Busy when processing capacity is reached " +
       s"and $Accepted once some of the scheduled events are done" in new TestCase {
 
-      // draining processing capacity by scheduling max number of jobs
-      (1 to processesNumber).toList map { _ =>
-        processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync()
+        // draining processing capacity by scheduling max number of jobs
+        (1 to processesNumber).toList map { _ =>
+          processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync()
+        }
+
+        // any new job to get the Busy status
+        processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Busy
+
+        expectAvailabilityIsCommunicated
+
+        // once at least one process is done, new events should be accepted again
+        sleep(eventProcessingTime + 50)
+        processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
       }
-
-      // any new job to get the Busy status
-      processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Busy
-
-      expectAvailabilityIsCommunicated
-
-      // once at least one process is done, new events should be accepted again
-      sleep(eventProcessingTime + 50)
-      processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
-    }
 
     "release the processing resource on processing failure" in new TestCase {
 

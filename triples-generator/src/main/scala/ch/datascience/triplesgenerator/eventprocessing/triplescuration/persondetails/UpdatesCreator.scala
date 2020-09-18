@@ -41,13 +41,12 @@ private[triplescuration] class UpdatesCreator {
       updates(persons): _*
     )
 
-  private def updates: Person => List[SparqlQuery] = {
-    case Person(id, names, emails) =>
-      List(
-        namesUpdate(id, names),
-        emailsUpdate(id, emails),
-        labelsDelete(id)
-      ).flatten
+  private def updates: Person => List[SparqlQuery] = { case Person(id, names, emails) =>
+    List(
+      namesUpdate(id, names),
+      emailsUpdate(id, emails),
+      labelsDelete(id)
+    ).flatten
   }
 
   private def namesUpdate(id: ResourceId, names: NonEmptyList[Name]) = Some {
@@ -99,7 +98,8 @@ private[triplescuration] class UpdatesCreator {
 
   private def INSERT[TT <: TinyType { type V = String }](resource: String,
                                                          property: String,
-                                                         values:   List[TT]): Option[String] =
+                                                         values:   List[TT]
+  ): Option[String] =
     values match {
       case Nil => None
       case list =>

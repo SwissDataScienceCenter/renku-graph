@@ -22,7 +22,8 @@ import ch.datascience.rdfstore.entities.ProcessRun.ChildProcessRun
 
 final case class Generation(location:           Location,
                             activity:           Activity,
-                            maybeReverseEntity: Option[Entity with Artifact] = None)
+                            maybeReverseEntity: Option[Entity with Artifact] = None
+)
 
 object Generation {
 

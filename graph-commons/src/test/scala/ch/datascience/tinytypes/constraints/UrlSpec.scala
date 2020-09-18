@@ -38,7 +38,9 @@ class UrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matc
     }
 
     "throw an IllegalArgumentException for invalid urls" in {
-      intercept[IllegalArgumentException](UrlType("invalid url")).getMessage shouldBe "Cannot instantiate ch.datascience.tinytypes.constraints.UrlTypes.UrlType with 'invalid url'"
+      intercept[IllegalArgumentException](
+        UrlType("invalid url")
+      ).getMessage shouldBe "Cannot instantiate ch.datascience.tinytypes.constraints.UrlTypes.UrlType with 'invalid url'"
     }
   }
 
@@ -157,7 +159,9 @@ class UrlSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matc
 
     "add query parameter with optional value if the value is given" in {
       val url = (httpUrls() map UrlType.apply).generateOne
-      (url ? ("param1" -> "value 1") && ("param2" -> Some("value 2"))).toString shouldBe s"$url?param1=value+1&param2=value+2"
+      (url ? ("param1" -> "value 1") && ("param2" -> Some(
+        "value 2"
+      ))).toString shouldBe s"$url?param1=value+1&param2=value+2"
     }
 
     "do not add query parameter with absent value" in {

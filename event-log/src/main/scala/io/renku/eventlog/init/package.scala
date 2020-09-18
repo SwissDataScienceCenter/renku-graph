@@ -29,8 +29,10 @@ import scala.language.higherKinds
 package object init {
 
   def execute[Interpretation[_]](
-      sql:               Fragment
-  )(implicit transactor: DbTransactor[Interpretation, EventLogDB],
-    ME:                  Bracket[Interpretation, Throwable]): Interpretation[Unit] =
+      sql: Fragment
+  )(implicit
+      transactor: DbTransactor[Interpretation, EventLogDB],
+      ME:         Bracket[Interpretation, Throwable]
+  ): Interpretation[Unit] =
     sql.update.run.transact(transactor.get).map(_ => ())
 }

@@ -60,8 +60,8 @@ class EventsPatchingEndpointImpl(
     } yield result
   } recoverWith httpResponse
 
-  private lazy val badRequest: PartialFunction[Throwable, IO[EventsPatch[IO]]] = {
-    case NonFatal(exception) => IO.raiseError(BadRequestError(exception))
+  private lazy val badRequest: PartialFunction[Throwable, IO[EventsPatch[IO]]] = { case NonFatal(exception) =>
+    IO.raiseError(BadRequestError(exception))
   }
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)

@@ -58,9 +58,9 @@ private class IOEdgesFinder(
       for {
         edges <- queryExpecting[Set[EdgeData]](queryWithOffset)
         results <- edges match {
-                    case e if e.size < pageSize => (into ++: edges).pure[IO]
-                    case fullPage               => fetchPaginatedResult(into ++: fullPage, using, offset + pageSize)
-                  }
+                     case e if e.size < pageSize => (into ++: edges).pure[IO]
+                     case fullPage               => fetchPaginatedResult(into ++: fullPage, using, offset + pageSize)
+                   }
       } yield results
     }
     fetchPaginatedResult(Set.empty[EdgeData], using, offset = 0)
@@ -136,13 +136,15 @@ private class IOEdgesFinder(
 private object IOEdgesFinder {
 
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      rdfStoreConfig:          IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:            IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[EdgesFinder[IO]] =
+      timeRecorder:   SparqlQueryTimeRecorder[IO],
+      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
+      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
+      logger:         Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[EdgesFinder[IO]] =
     for {
       config       <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl

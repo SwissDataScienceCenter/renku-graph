@@ -50,7 +50,7 @@ import scala.language.postfixOps
 class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually with should.Matchers {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout  = scaled(Span(5, Seconds)),
+    timeout = scaled(Span(5, Seconds)),
     interval = scaled(Span(150, Millis))
   )
 
@@ -90,8 +90,8 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         isNextSubscriber(returning = true)
 
         findingEvent(returning = Some(event))
-        nextFree(returning     = url1.some)
-        sending(event, got     = Delivered, forUrl = url1)
+        nextFree(returning = url1.some)
+        sending(event, got = Delivered, forUrl = url1)
 
         givenNoMoreEvents()
       }
@@ -106,31 +106,31 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
     "mark subscriber busy and dispatch found event to some other subscriber " +
       s"if delivery to the first one resulted in $ServiceBusy" in new TestCase {
 
-      val event = events.generateOne
+        val event = events.generateOne
 
-      inSequence {
-        isNextSubscriber(returning = true)
+        inSequence {
+          isNextSubscriber(returning = true)
 
-        findingEvent(returning = Some(event))
+          findingEvent(returning = Some(event))
 
-        nextFree(returning = url1.some)
-        sending(event, got = ServiceBusy, forUrl = url1)
-        expectMarkedBusy(url1)
+          nextFree(returning = url1.some)
+          sending(event, got = ServiceBusy, forUrl = url1)
+          expectMarkedBusy(url1)
 
-        nextFree(returning = url2.some)
-        sending(event, got = Delivered, forUrl = url2)
+          nextFree(returning = url2.some)
+          sending(event, got = Delivered, forUrl = url2)
 
-        givenNoMoreEvents()
+          givenNoMoreEvents()
+        }
+
+        dispatcher.run.unsafeRunAsyncAndForget()
+
+        eventually {
+          logger.loggedOnly(
+            Info(s"Event ${event.compoundEventId}, url = $url2 -> $Delivered")
+          )
+        }
       }
-
-      dispatcher.run.unsafeRunAsyncAndForget()
-
-      eventually {
-        logger.loggedOnly(
-          Info(s"Event ${event.compoundEventId}, url = $url2 -> $Delivered")
-        )
-      }
-    }
 
     "do not pop a new event until the one already taken is not dispatched" in new TestCase {
 
@@ -186,8 +186,8 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         isNextSubscriber(returning = false)
 
         isNextSubscriber(returning = true)
-        nextFree(returning         = url1.some)
-        sending(event, got         = ServiceBusy, forUrl = url1)
+        nextFree(returning = url1.some)
+        sending(event, got = ServiceBusy, forUrl = url1)
         expectMarkedBusy(url1)
 
         nextFree(returning = None)
@@ -195,8 +195,8 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         isNextSubscriber(returning = false)
 
         isNextSubscriber(returning = true)
-        nextFree(returning         = url1.some)
-        sending(event, got         = Delivered, forUrl = url1)
+        nextFree(returning = url1.some)
+        sending(event, got = Delivered, forUrl = url1)
 
         givenNoMoreEvents()
       }
@@ -215,76 +215,76 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
     s"remove subscriber which returned $Misdelivered on event dispatching " +
       "and use another subscriber if exists" in new TestCase {
 
-      val event = events.generateOne
+        val event = events.generateOne
 
-      inSequence {
-        isNextSubscriber(returning = true)
+        inSequence {
+          isNextSubscriber(returning = true)
 
-        findingEvent(returning = Some(event))
+          findingEvent(returning = Some(event))
 
-        nextFree(returning = url1.some)
-        sending(event, got = Misdelivered, forUrl = url1)
-        expectRemoval(of   = url1)
+          nextFree(returning = url1.some)
+          sending(event, got = Misdelivered, forUrl = url1)
+          expectRemoval(of = url1)
 
-        nextFree(returning = url2.some)
-        sending(event, got = Delivered, forUrl = url2)
+          nextFree(returning = url2.some)
+          sending(event, got = Delivered, forUrl = url2)
 
-        givenNoMoreEvents()
+          givenNoMoreEvents()
+        }
+
+        dispatcher.run.unsafeRunAsyncAndForget()
+
+        eventually {
+          logger.loggedOnly(
+            Error(s"Event ${event.compoundEventId}, url = $url1 -> $Misdelivered"),
+            Info(s"Event ${event.compoundEventId}, url = $url2 -> $Delivered")
+          )
+        }
       }
-
-      dispatcher.run.unsafeRunAsyncAndForget()
-
-      eventually {
-        logger.loggedOnly(
-          Error(s"Event ${event.compoundEventId}, url = $url1 -> $Misdelivered"),
-          Info(s"Event ${event.compoundEventId}, url = $url2 -> $Delivered")
-        )
-      }
-    }
 
     s"mark event with $NonRecoverableFailure status when sending it failed " +
       "and continue processing next event" in new TestCase {
 
-      val failingEvent = events.generateOne
-      val exception    = exceptions.generateOne
-      val nextEvent    = events.generateOne
+        val failingEvent = events.generateOne
+        val exception    = exceptions.generateOne
+        val nextEvent    = events.generateOne
 
-      val capturedFailure = CaptureAll[ToNonRecoverableFailure[IO]]()
+        val capturedFailure = CaptureAll[ToNonRecoverableFailure[IO]]()
 
-      inSequence {
-        isNextSubscriber(returning = true)
+        inSequence {
+          isNextSubscriber(returning = true)
 
-        // failing event
-        findingEvent(returning = Some(failingEvent))
+          // failing event
+          findingEvent(returning = Some(failingEvent))
 
-        nextFree(returning = url1.some)
+          nextFree(returning = url1.some)
 
-        (eventsSender.sendEvent _)
-          .expects(url1, failingEvent.compoundEventId, failingEvent.body)
-          .returning(exception.raiseError[IO, SendingResult])
+          (eventsSender.sendEvent _)
+            .expects(url1, failingEvent.compoundEventId, failingEvent.body)
+            .returning(exception.raiseError[IO, SendingResult])
 
-        (statusUpdatesRunner.run _)
-          .expects(capture(capturedFailure))
-          .returning(Updated.pure[IO])
-        // next event
-        givenEvent(nextEvent, got = Delivered, forUrl = url2)
+          (statusUpdatesRunner.run _)
+            .expects(capture(capturedFailure))
+            .returning(Updated.pure[IO])
+          // next event
+          givenEvent(nextEvent, got = Delivered, forUrl = url2)
 
-        givenNoMoreEvents()
+          givenNoMoreEvents()
+        }
+
+        dispatcher.run.unsafeRunAsyncAndForget()
+
+        capturedFailure.value.eventId              shouldBe failingEvent.compoundEventId
+        capturedFailure.value.underProcessingGauge shouldBe underProcessingGauge
+        capturedFailure.value.maybeMessage         shouldBe EventMessage(exception)
+
+        eventually {
+          logger.loggedOnly(
+            Error(s"Event ${failingEvent.compoundEventId}, url = $url1 -> $NonRecoverableFailure", exception),
+            Info(s"Event ${nextEvent.compoundEventId}, url = $url2 -> $Delivered")
+          )
+        }
       }
-
-      dispatcher.run.unsafeRunAsyncAndForget()
-
-      capturedFailure.value.eventId              shouldBe failingEvent.compoundEventId
-      capturedFailure.value.underProcessingGauge shouldBe underProcessingGauge
-      capturedFailure.value.maybeMessage         shouldBe EventMessage(exception)
-
-      eventually {
-        logger.loggedOnly(
-          Error(s"Event ${failingEvent.compoundEventId}, url = $url1 -> $NonRecoverableFailure", exception),
-          Info(s"Event ${nextEvent.compoundEventId}, url = $url2 -> $Delivered")
-        )
-      }
-    }
 
     "do not fail the process if finding subscriptions fails" in new TestCase {
 
@@ -342,71 +342,71 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
     "do not fail the process but re-dispatch the event " +
       "if marking a subscription busy fails" in new TestCase {
 
-      val event     = events.generateOne
-      val exception = exceptions.generateOne
+        val event     = events.generateOne
+        val exception = exceptions.generateOne
 
-      inSequence {
-        isNextSubscriber(returning = true)
+        inSequence {
+          isNextSubscriber(returning = true)
 
-        findingEvent(returning = Some(event))
+          findingEvent(returning = Some(event))
 
-        nextFree(returning = url1.some)
+          nextFree(returning = url1.some)
 
-        sending(event, ServiceBusy, forUrl = url1)
+          sending(event, ServiceBusy, forUrl = url1)
 
-        (subscriptions.markBusy _)
-          .expects(url1)
-          .returning(exception.raiseError[IO, Unit])
+          (subscriptions.markBusy _)
+            .expects(url1)
+            .returning(exception.raiseError[IO, Unit])
 
-        nextFree(returning = url2.some)
-        sending(event, got = Delivered, forUrl = url2)
+          nextFree(returning = url2.some)
+          sending(event, got = Delivered, forUrl = url2)
 
-        givenNoMoreEvents()
+          givenNoMoreEvents()
+        }
+
+        dispatcher.run.unsafeRunAsyncAndForget()
+
+        eventually {
+          logger.loggedOnly(
+            Info(s"Event ${event.compoundEventId}, url = $url2 -> $Delivered")
+          )
+        }
       }
-
-      dispatcher.run.unsafeRunAsyncAndForget()
-
-      eventually {
-        logger.loggedOnly(
-          Info(s"Event ${event.compoundEventId}, url = $url2 -> $Delivered")
-        )
-      }
-    }
 
     "do not fail the process but re-dispatch the event " +
       "if removing a subscription fails" in new TestCase {
 
-      val event     = events.generateOne
-      val exception = exceptions.generateOne
+        val event     = events.generateOne
+        val exception = exceptions.generateOne
 
-      inSequence {
-        isNextSubscriber(returning = true)
+        inSequence {
+          isNextSubscriber(returning = true)
 
-        findingEvent(returning = Some(event))
+          findingEvent(returning = Some(event))
 
-        nextFree(returning = url1.some)
+          nextFree(returning = url1.some)
 
-        sending(event, Misdelivered, forUrl = url1)
+          sending(event, Misdelivered, forUrl = url1)
 
-        (subscriptions.remove _)
-          .expects(url1)
-          .returning(exception.raiseError[IO, Unit])
+          (subscriptions.remove _)
+            .expects(url1)
+            .returning(exception.raiseError[IO, Unit])
 
-        nextFree(returning = url2.some)
-        sending(event, got = Delivered, forUrl = url2)
+          nextFree(returning = url2.some)
+          sending(event, got = Delivered, forUrl = url2)
 
-        givenNoMoreEvents()
+          givenNoMoreEvents()
+        }
+
+        dispatcher.run.unsafeRunAsyncAndForget()
+
+        eventually {
+          logger.loggedOnly(
+            Error(s"Event ${event.compoundEventId}, url = $url1 -> $Misdelivered"),
+            Info(s"Event ${event.compoundEventId}, url = $url2 -> $Delivered")
+          )
+        }
       }
-
-      dispatcher.run.unsafeRunAsyncAndForget()
-
-      eventually {
-        logger.loggedOnly(
-          Error(s"Event ${event.compoundEventId}, url = $url1 -> $Misdelivered"),
-          Info(s"Event ${event.compoundEventId}, url = $url2 -> $Delivered")
-        )
-      }
-    }
 
     "do not fail the process but try to mark event as failed again if doing so fails" in new TestCase {
 
@@ -438,7 +438,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
         // next event
         findingEvent(returning = Some(nextEvent))
-        nextFree(returning     = url2.some)
+        nextFree(returning = url2.some)
         sending(nextEvent, got = Delivered, forUrl = url2)
 
         givenNoMoreEvents()
@@ -481,8 +481,8 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       underProcessingGauge,
       logger,
       noSubscriptionSleep = 500 millis,
-      noEventSleep        = 250 millis,
-      onErrorSleep        = 250 millis
+      noEventSleep = 250 millis,
+      onErrorSleep = 250 millis
     )
 
     def givenNoMoreEvents() =

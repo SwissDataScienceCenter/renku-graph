@@ -49,12 +49,12 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
           JsonLD
             .arr(
               fileCommit()(
-                projectPath         = project.path,
-                projectName         = project.name,
-                projectDateCreated  = project.dateCreated,
+                projectPath = project.path,
+                projectName = project.name,
+                projectDateCreated = project.dateCreated,
                 maybeProjectCreator = project.maybeCreator,
-                maybeParent         = project.maybeParentProject,
-                projectVersion      = project.version
+                maybeParent = project.maybeParentProject,
+                projectVersion = project.version
               ),
               project.asJsonLD
             )
@@ -81,13 +81,13 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
           TransformedProject(
             project,
             maybeCreatedDate = None,
-            maybeCreatorId   = None
+            maybeCreatorId = None
           ).some,
           project.maybeParentProject.map { parent =>
             TransformedProject(
               parent,
               maybeCreatedDate = None,
-              maybeCreatorId   = None
+              maybeCreatorId = None
             )
           }
         ).flatten
@@ -144,12 +144,14 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
                                 maybeDateCreated:   List[DateCreated],
                                 maybeCreator:       Option[users.ResourceId],
                                 maybeParentProject: Option[ResourceId],
-                                version:            List[SchemaVersion])
+                                version:            List[SchemaVersion]
+  )
 
   object TransformedProject {
     def apply(project:          Project,
               maybeCreatedDate: Option[DateCreated],
-              maybeCreatorId:   Option[EntityId]): TransformedProject =
+              maybeCreatorId:   Option[EntityId]
+    ): TransformedProject =
       TransformedProject(
         project.asJsonLD.entityId
           .map(id => ResourceId(id))

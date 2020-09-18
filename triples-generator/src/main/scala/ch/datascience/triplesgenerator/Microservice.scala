@@ -71,18 +71,20 @@ object Microservice extends IOMicroservice {
                                                            metricsRegistry,
                                                            gitLabThrottler,
                                                            sparqlTimeRecorder,
-                                                           ApplicationLogger)
-      microserviceRoutes = new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry)).routes
+                                                           ApplicationLogger
+                                 )
+      microserviceRoutes =
+        new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry)).routes
       exitcode <- microserviceRoutes.use { routes =>
-                   new MicroserviceRunner(
-                     sentryInitializer,
-                     fusekiDatasetInitializer,
-                     subscriber,
-                     reProvisioning,
-                     new HttpServer[IO](serverPort = ServicePort.value, routes),
-                     subProcessesCancelTokens
-                   ) run args
-                 }
+                    new MicroserviceRunner(
+                      sentryInitializer,
+                      fusekiDatasetInitializer,
+                      subscriber,
+                      reProvisioning,
+                      new HttpServer[IO](serverPort = ServicePort.value, routes),
+                      subProcessesCancelTokens
+                    ) run args
+                  }
 
     } yield exitcode
 }

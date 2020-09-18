@@ -52,42 +52,42 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
       s"and return $Created " +
       "if there's no such an event in the Log yet" in new TestCase {
 
-      val event = events.generateOne
-      (persister.storeNewEvent _)
-        .expects(event)
-        .returning(Result.Created.pure[IO])
+        val event = events.generateOne
+        (persister.storeNewEvent _)
+          .expects(event)
+          .returning(Result.Created.pure[IO])
 
-      val request = Request(Method.POST, uri"events").withEntity(event.asJson)
+        val request = Request(Method.POST, uri"events").withEntity(event.asJson)
 
-      val response = addEvent(request).unsafeRunSync()
+        val response = addEvent(request).unsafeRunSync()
 
-      response.status                        shouldBe Created
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event created")
+        response.status                        shouldBe Created
+        response.contentType                   shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event created")
 
-      logger.loggedOnly(Info(s"Event ${event.compoundEventId}, projectPath = ${event.project.path} added"))
-    }
+        logger.loggedOnly(Info(s"Event ${event.compoundEventId}, projectPath = ${event.project.path} added"))
+      }
 
     "decode an Event from the request, " +
       "create it in the Event Log " +
       s"and return $Ok " +
       "if such an event was already in the Log" in new TestCase {
 
-      val event = events.generateOne
-      (persister.storeNewEvent _)
-        .expects(event)
-        .returning(Result.Existed.pure[IO])
+        val event = events.generateOne
+        (persister.storeNewEvent _)
+          .expects(event)
+          .returning(Result.Existed.pure[IO])
 
-      val request = Request(Method.POST, uri"events").withEntity(event.asJson)
+        val request = Request(Method.POST, uri"events").withEntity(event.asJson)
 
-      val response = addEvent(request).unsafeRunSync()
+        val response = addEvent(request).unsafeRunSync()
 
-      response.status                        shouldBe Ok
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event existed")
+        response.status                        shouldBe Ok
+        response.contentType                   shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event existed")
 
-      logger.expectNoLogs()
-    }
+        logger.expectNoLogs()
+      }
 
     s"return $BadRequest if decoding Event from the request fails" in new TestCase {
 

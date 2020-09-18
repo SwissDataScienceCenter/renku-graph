@@ -82,25 +82,25 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
     "return OK the progress status with done = total = 0 if the webhook exists " +
       "but there are no events in the Event Log yet" in new TestCase {
 
-      (hookValidator
-        .validateHook(_: Id, _: Option[AccessToken]))
-        .expects(projectId, None)
-        .returning(context.pure(HookExists))
+        (hookValidator
+          .validateHook(_: Id, _: Option[AccessToken]))
+          .expects(projectId, None)
+          .returning(context.pure(HookExists))
 
-      (processingStatusFetcher
-        .fetchProcessingStatus(_: Id))
-        .expects(projectId)
-        .returning(OptionT.none[IO, ProcessingStatus])
+        (processingStatusFetcher
+          .fetchProcessingStatus(_: Id))
+          .expects(projectId)
+          .returning(OptionT.none[IO, ProcessingStatus])
 
-      val response = fetchProcessingStatus(projectId).unsafeRunSync()
+        val response = fetchProcessingStatus(projectId).unsafeRunSync()
 
-      response.status                 shouldBe Ok
-      response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe json"""{
+        response.status                 shouldBe Ok
+        response.contentType            shouldBe Some(`Content-Type`(application.json))
+        response.as[Json].unsafeRunSync shouldBe json"""{
         "done": ${0},
         "total": ${0}
       }"""
-    }
+      }
 
     "return NOT_FOUND if the webhook does not exist" in new TestCase {
 

@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.config
 
-
 import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import com.typesafe.config.ConfigFactory
 import org.scalatest.matchers.should

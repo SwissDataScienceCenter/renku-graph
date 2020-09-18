@@ -25,7 +25,8 @@ import ch.datascience.graph.model.users.Email
 final case class GitLabProject(path:            Path,
                                maybeParentPath: Option[Path],
                                maybeCreator:    Option[GitLabCreator],
-                               dateCreated:     DateCreated)
+                               dateCreated:     DateCreated
+)
 
 final case class GitLabCreator(maybeEmail: Option[Email], maybeName: Option[users.Name])
 

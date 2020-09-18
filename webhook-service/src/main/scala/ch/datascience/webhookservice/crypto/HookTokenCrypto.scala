@@ -73,9 +73,8 @@ class HookTokenCrypto[Interpretation[_]](
       .flatMap(_.as[HookToken])
   }
 
-  private lazy val meaningfulError: PartialFunction[Throwable, Interpretation[HookToken]] = {
-    case NonFatal(cause) =>
-      ME.raiseError(new RuntimeException("HookToken decryption failed", cause))
+  private lazy val meaningfulError: PartialFunction[Throwable, Interpretation[HookToken]] = { case NonFatal(cause) =>
+    ME.raiseError(new RuntimeException("HookToken decryption failed", cause))
   }
 }
 
