@@ -45,8 +45,52 @@ package object triplescuration {
     import io.circe.optics.JsonPath.root
     import io.circe.{Decoder, Encoder}
 
+    def findTypes: List[String] = {
+      val t  = root.`@type`.each.string.getAll(json)
+      val tt = root.`@type`.string.getOption(json).toList
+      t ++ tt
+    }
+
     def get[T](property: String)(implicit decode: Decoder[T], encode: Encoder[T]): Option[T] =
       root.selectDynamic(property).as[T].getOption(json)
+
+    def getValue[F[_], T](implicit decode: Decoder[T], ME: MonadError[F, Throwable]): OptionT[F, T] =
+      singleValueJson(ME).flatMap {
+        _.hcursor
+          .downField("@value")
+          .as[Option[T]]
+          .fold(
+            fail("No @value property found in Json"),
+            OptionT.fromOption[F](_)
+          )
+      }
+
+    def getId[F[_], T](implicit decode: Decoder[T], ME: MonadError[F, Throwable]): OptionT[F, T] =
+      singleValueJson(ME).flatMap {
+        _.hcursor
+          .downField("@id")
+          .as[Option[T]]
+          .fold(
+            fail("No @value property found in Json"),
+            OptionT.fromOption[F](_)
+          )
+      }
+
+    private def singleValueJson[F[_]](implicit ME: MonadError[F, Throwable]) =
+      if (json.isArray) toSingleValue(ME)(json.asArray.map(_.toList))
+      else OptionT.some[F](json)
+
+    private def fail[F[_], T](
+        message: String
+    )(exception: Throwable)(implicit ME: MonadError[F, Throwable]): OptionT[F, T] =
+      OptionT.liftF(new IllegalStateException(message, exception).raiseError[F, T])
+
+    private def toSingleValue[F[_], T](implicit ME: MonadError[F, Throwable]): Option[List[T]] => OptionT[F, T] = {
+      case Some(v +: Nil) => OptionT.some[F](v)
+      case Some(Nil)      => OptionT.none[F, T]
+      case None           => OptionT.none[F, T]
+      case _              => OptionT.liftF(new IllegalStateException(s"Multiple values found in Json").raiseError[F, T])
+    }
 
     def getValues[T](
         property:      String
