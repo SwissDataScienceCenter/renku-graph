@@ -215,7 +215,7 @@ private object Commands {
           "json-ld",
           "--strict",
           "--revision",
-          s"${commit.parentId}^..${commit.commitId}",
+          s"${commit.parentId}..${commit.commitId}",
           changedFiles
         )(destinationDirectory)
     }
