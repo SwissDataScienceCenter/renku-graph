@@ -200,7 +200,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       inSequence {
         givenEventLog(has = Some(event))
 
-        (subscriptions.runOnFreeSubscriber _)
+        (subscriptions.runOnSubscriber _)
           .expects(*)
           .returning(exception.raiseError[IO, Unit])
 
@@ -391,7 +391,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         .anyNumberOfTimes()
 
     def givenThereIs(freeSubscriber: SubscriberUrl) =
-      (subscriptions.runOnFreeSubscriber _).expects(*).onCall { f: (SubscriberUrl => IO[Unit]) =>
+      (subscriptions.runOnSubscriber _).expects(*).onCall { f: (SubscriberUrl => IO[Unit]) =>
         f(freeSubscriber)
       }
 

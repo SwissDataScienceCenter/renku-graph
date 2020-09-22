@@ -53,7 +53,7 @@ class EventsDispatcher(
   def run: IO[Unit] =
     for {
       _ <- popEvent flatMap { case (eventId, eventBody) =>
-             runOnFreeSubscriber(dispatch(eventId, eventBody)) recoverWith tryReDispatch(eventId, eventBody)
+             runOnSubscriber(dispatch(eventId, eventBody)) recoverWith tryReDispatch(eventId, eventBody)
            }
       _ <- run
     } yield ()
@@ -73,9 +73,9 @@ class EventsDispatcher(
       _ <- result match {
              case Delivered => IO.unit
              case ServiceBusy =>
-               markBusy(subscriber) recover withNothing flatMap (_ => runOnFreeSubscriber(dispatch(id, body)))
+               markBusy(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(id, body)))
              case Misdelivered =>
-               remove(subscriber) recover withNothing flatMap (_ => runOnFreeSubscriber(dispatch(id, body)))
+               remove(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(id, body)))
            }
     } yield ()
   } recoverWith markEventAsNonRecoverable(subscriber, id)
@@ -85,7 +85,7 @@ class EventsDispatcher(
       for {
         _ <- logger.error(exception)("Dispatching an event failed")
         _ <- timer sleep onErrorSleep
-        _ <- runOnFreeSubscriber(dispatch(eventId, eventBody))
+        _ <- runOnSubscriber(dispatch(eventId, eventBody))
       } yield ()
   }
 
