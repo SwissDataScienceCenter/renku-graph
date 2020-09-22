@@ -18,7 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
 import io.renku.jsonld.{EntityId, EntityTypes}
@@ -27,8 +27,10 @@ trait Artifact
 
 object Artifact {
 
-  private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
-                                           fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Artifact] =
+  private[entities] implicit def converter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): PartialEntityConverter[Artifact] =
     new PartialEntityConverter[Artifact] {
       override def convert[T <: Artifact]: T => Either[Exception, PartialEntity] =
         _ => PartialEntity(EntityTypes of wfprov / "Artifact").asRight

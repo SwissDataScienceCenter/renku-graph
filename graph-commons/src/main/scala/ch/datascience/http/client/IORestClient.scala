@@ -18,13 +18,11 @@
 
 package ch.datascience.http.client
 
-import java.net.ConnectException
-
-import IORestClient._
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.http.client.IORestClient._
 import ch.datascience.http.client.RestClientError.{BadRequestException, ConnectivityException, MappingException, UnexpectedResponseException}
 import ch.datascience.logging.ExecutionTimeRecorder
 import eu.timepit.refined.api.Refined
@@ -35,8 +33,8 @@ import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.Status.BadRequest
 import org.http4s._
-import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.client.blaze.BlazeClientBuilder
+import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.headers.Authorization
 
 import scala.concurrent.ExecutionContext
@@ -58,13 +56,13 @@ abstract class IORestClient[ThrottlingTarget](
   protected def request(method: Method, uri: Uri): Request[IO] =
     Request[IO](
       method = method,
-      uri    = uri
+      uri = uri
     )
 
   protected def request(method: Method, uri: Uri, accessToken: AccessToken): Request[IO] =
     Request[IO](
-      method  = method,
-      uri     = uri,
+      method = method,
+      uri = uri,
       headers = authHeader(accessToken)
     )
 
@@ -76,8 +74,8 @@ abstract class IORestClient[ThrottlingTarget](
 
   protected def request(method: Method, uri: Uri, basicAuth: BasicAuthCredentials): Request[IO] =
     Request[IO](
-      method  = method,
-      uri     = uri,
+      method = method,
+      uri = uri,
       headers = Headers.of(basicAuthHeader(basicAuth))
     )
 
@@ -113,14 +111,16 @@ abstract class IORestClient[ThrottlingTarget](
   private def callRemote[ResultType](httpClient:  Client[IO],
                                      request:     HttpRequest,
                                      mapResponse: ResponseMapping[ResultType],
-                                     attempt:     Int): IO[ResultType] =
+                                     attempt:     Int
+  ): IO[ResultType] =
     httpClient
       .run(request.request)
       .use(response => processResponse(request.request, mapResponse)(response))
       .recoverWith(connectionError(httpClient, request, mapResponse, attempt))
 
-  private def processResponse[ResultType](request:     Request[IO],
-                                          mapResponse: ResponseMapping[ResultType])(response: Response[IO]) =
+  private def processResponse[ResultType](request: Request[IO], mapResponse: ResponseMapping[ResultType])(
+      response:                                    Response[IO]
+  ) =
     (mapResponse orElse raiseBadRequest orElse raiseUnexpectedResponse)(response.status, request, response)
       .recoverWith(mappingError(request, response))
 
@@ -150,7 +150,8 @@ abstract class IORestClient[ThrottlingTarget](
   private def connectionError[T](httpClient:  Client[IO],
                                  request:     HttpRequest,
                                  mapResponse: ResponseMapping[T],
-                                 attempt:     Int): PartialFunction[Throwable, IO[T]] = {
+                                 attempt:     Int
+  ): PartialFunction[Throwable, IO[T]] = {
     case error: RestClientError => throttler.release flatMap (_ => error.raiseError[IO, T])
     case NonFatal(cause) =>
       cause match {
@@ -161,8 +162,8 @@ abstract class IORestClient[ThrottlingTarget](
             result <- callRemote(httpClient, request, mapResponse, attempt + 1)
           } yield result
         case other =>
-          throttler.release flatMap (
-              _ => ConnectivityException(LogMessage(request.request, other), other).raiseError[IO, T]
+          throttler.release flatMap (_ =>
+            ConnectivityException(LogMessage(request.request, other), other).raiseError[IO, T]
           )
       }
   }

@@ -178,12 +178,13 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
       extends BatchDateAdder[IO](transactor, logger)
 
   private def storeEvent(commitEventId: CompoundEventId = compoundEventIds.generateOne,
-                         eventStatus:   String          = eventStatuses.generateOne.value,
-                         executionDate: ExecutionDate   = executionDates.generateOne,
-                         eventDate:     EventDate       = eventDates.generateOne,
-                         eventBody:     EventBody       = eventBodies.generateOne,
-                         createdDate:   CreatedDate     = createdDates.generateOne,
-                         projectPath:   Path            = projectPaths.generateOne): Unit = execute {
+                         eventStatus:   String = eventStatuses.generateOne.value,
+                         executionDate: ExecutionDate = executionDates.generateOne,
+                         eventDate:     EventDate = eventDates.generateOne,
+                         eventBody:     EventBody = eventBodies.generateOne,
+                         createdDate:   CreatedDate = createdDates.generateOne,
+                         projectPath:   Path = projectPaths.generateOne
+  ): Unit = execute {
     sql"""|insert into 
           |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
           |values (${commitEventId.id.value}, ${commitEventId.projectId.value}, $eventStatus, ${createdDate.value}, ${executionDate.value}, ${eventDate.value}, ${eventBody.value})

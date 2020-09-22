@@ -21,6 +21,7 @@ package ch.datascience.tinytypes
 import java.time.{Instant, LocalDate}
 
 import cats.MonadError
+import cats.syntax.all._
 import ch.datascience.tinytypes.constraints.PathSegment
 import io.circe.Json
 
@@ -70,8 +71,6 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     with ValueTransformation[TT#V]
     with TypeName {
 
-  import cats.implicits._
-
   import scala.util.Try
 
   final def apply(value: TT#V): TT = from(value).fold(
@@ -100,9 +99,9 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
 
   implicit class TinyTypeConverters(tinyType: TT) {
 
-    def as[Interpretation[_], OUT](
-        implicit converter: TinyTypeConverter[TT, OUT],
-        ME:                 MonadError[Interpretation, Throwable]
+    def as[Interpretation[_], OUT](implicit
+        converter: TinyTypeConverter[TT, OUT],
+        ME:        MonadError[Interpretation, Throwable]
     ): Interpretation[OUT] = ME.fromEither(converter(tinyType))
 
     def toUnsafe[OUT](implicit convert: TT => Either[Exception, OUT]): OUT =

@@ -46,7 +46,7 @@ private class IOProjectPathFinder(
     with ProjectPathFinder[IO] {
 
   import cats.effect._
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
   import org.http4s.Method.GET
@@ -75,10 +75,12 @@ private class IOProjectPathFinder(
 object IOProjectPathFinder {
 
   def apply(
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[ProjectPathFinder[IO]] =
+      logger: Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ProjectPathFinder[IO]] =
     for {
       gitLabRateLimit <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler <- Throttler[IO, GitLab](gitLabRateLimit)

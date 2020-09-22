@@ -20,7 +20,7 @@ package io.renku.eventlog.statuschange
 
 import cats.MonadError
 import cats.effect.{ContextShift, Effect}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
@@ -48,7 +48,8 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
   import statusUpdatesRunner.run
 
   def changeStatus(eventId: CompoundEventId,
-                   request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+                   request: Request[Interpretation]
+  ): Interpretation[Response[Interpretation]] = {
     for {
       command      <- request.as[ChangeStatusCommand[Interpretation]](ME, findDecoder(eventId)) recoverWith badRequest
       updateResult <- run(command)
@@ -98,7 +99,8 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
         case Skipped =>
           ToSkipped[Interpretation](eventId,
                                     maybeMessage getOrElse (throw new Exception(s"$status status needs a message")),
-                                    underProcessingGauge)
+                                    underProcessingGauge
+          )
         case RecoverableFailure =>
           ToRecoverableFailure[Interpretation](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge)
         case NonRecoverableFailure =>

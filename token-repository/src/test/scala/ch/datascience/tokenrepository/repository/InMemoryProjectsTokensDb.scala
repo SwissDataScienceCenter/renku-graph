@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository.repository
 
 import cats.effect.{ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import ch.datascience.db.TestDbConfig.newDbConfig
 import doobie.free.connection.ConnectionIO

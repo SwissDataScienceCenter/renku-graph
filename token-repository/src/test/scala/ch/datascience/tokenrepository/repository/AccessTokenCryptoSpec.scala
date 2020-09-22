@@ -22,7 +22,6 @@ import java.nio.charset.StandardCharsets.UTF_8
 import java.security.InvalidKeyException
 import java.util.Base64
 
-import cats.implicits._
 import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -107,8 +106,6 @@ class AccessTokenCryptoSpec extends AnyWordSpec with should.Matchers {
   }
 
   private trait TestCase {
-
-    import cats.implicits._
 
     private val secret = new String(Base64.getEncoder.encode("1234567890123456".getBytes(UTF_8)), UTF_8)
     val hookTokenCrypto = new AccessTokenCrypto[Try](

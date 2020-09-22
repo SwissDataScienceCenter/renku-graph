@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
@@ -71,9 +71,8 @@ class LineageFinderImpl[Interpretation[_]](
   private implicit class EdgesOps(edgesAndLocations: Map[EntityId, (Set[Node.Location], Set[Node.Location])]) {
 
     lazy val toEdgesSet: Interpretation[Set[Edge]] = {
-      edgesAndLocations map {
-        case (runPlan, (sources, targets)) =>
-          (sources.map(Edge(_, runPlan.toLocation)) ++ targets.map(Edge(runPlan.toLocation, _))).pure[Interpretation]
+      edgesAndLocations map { case (runPlan, (sources, targets)) =>
+        (sources.map(Edge(_, runPlan.toLocation)) ++ targets.map(Edge(runPlan.toLocation, _))).pure[Interpretation]
       }
     }.toList.sequence.map(_.toSet.flatten)
 
@@ -85,22 +84,24 @@ class LineageFinderImpl[Interpretation[_]](
   }
 
   private def loggingError(projectPath: Path,
-                           location:    Location): PartialFunction[Throwable, Interpretation[Option[Lineage]]] = {
-    case NonFatal(ex) =>
-      val message = s"Finding lineage for '$projectPath' and '$location' failed"
-      logger.error(ex)(message)
-      new Exception(message, ex).raiseError[Interpretation, Option[Lineage]]
+                           location:    Location
+  ): PartialFunction[Throwable, Interpretation[Option[Lineage]]] = { case NonFatal(ex) =>
+    val message = s"Finding lineage for '$projectPath' and '$location' failed"
+    logger.error(ex)(message)
+    new Exception(message, ex).raiseError[Interpretation, Option[Lineage]]
   }
 }
 
 object IOLineageFinder {
 
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[LineageFinderImpl[IO]] =
+      timeRecorder: SparqlQueryTimeRecorder[IO],
+      logger:       Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[LineageFinderImpl[IO]] =
     for {
       lineageEdgesFinder        <- IOEdgesFinder(timeRecorder, logger = logger)
       lineageDataTrimmer        <- IOLineageDataTrimmer()

@@ -21,7 +21,7 @@ package io.renku.eventlog.init
 import java.time.Instant
 
 import cats.effect.Bracket
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import doobie.implicits._
 import doobie.implicits.javatime._
@@ -62,9 +62,8 @@ private class BatchDateAdder[Interpretation[_]](
     } yield ()
   } recoverWith logging
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)("'batch_date' column adding failure")
-      ME.raiseError(exception)
+  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)("'batch_date' column adding failure")
+    ME.raiseError(exception)
   }
 }

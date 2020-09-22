@@ -19,7 +19,7 @@
 package ch.datascience.http.rest.paging
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.renku
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Total
@@ -75,16 +75,16 @@ object PagingResponse {
         new IllegalArgumentException("Cannot update Paging Results as there's different number of results")
           .raiseError[Interpretation, PagingResponse[Result]]
 
-    def toHttpResponse[Interpretation[_]: Effect](
-        implicit renkuResourceUrl: renku.ResourceUrl,
-        encoder:                   Encoder[Result]
+    def toHttpResponse[Interpretation[_]: Effect](implicit
+        renkuResourceUrl: renku.ResourceUrl,
+        encoder:          Encoder[Result]
     ): Response[Interpretation] =
       Response(Status.Ok)
         .withEntity(response.results.asJson)
         .putHeaders(PagingHeaders.from(response).toSeq: _*)
 
-    private implicit def resultsEntityEncoder[Interpretation[_]: Effect](
-        implicit encoder: Encoder[Result]
+    private implicit def resultsEntityEncoder[Interpretation[_]: Effect](implicit
+        encoder: Encoder[Result]
     ): EntityEncoder[Interpretation, Json] = jsonEncoderOf[Interpretation, Json]
   }
 }

@@ -125,7 +125,8 @@ class syntaxSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
          parentField: String,
          childId:     EntityId,
          childTypes:  EntityTypes,
-         childField:  Int) =>
+         childField:  Int
+        ) =>
           implicit val childEncoder: JsonLDEncoder[Child] = JsonLDEncoder.instance { o =>
             JsonLD.entity(childId, childTypes, schema / "int" -> o.int.asJsonLD)
           }
@@ -133,7 +134,8 @@ class syntaxSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
             JsonLD.entity(parentId,
                           parentTypes,
                           schema / "string" -> o.string.asJsonLD,
-                          schema / "child"  -> o.child.asJsonLD)
+                          schema / "child"  -> o.child.asJsonLD
+            )
           }
 
           Parent(parentField, Child(childField)).asJsonLD shouldBe JsonLD.entity(
@@ -196,5 +198,5 @@ class syntaxSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
   private case class Object(string: String, int: Int)
   private case class Parent(string: String, child: Child)
-  private case class Child(int:     Int)
+  private case class Child(int: Int)
 }

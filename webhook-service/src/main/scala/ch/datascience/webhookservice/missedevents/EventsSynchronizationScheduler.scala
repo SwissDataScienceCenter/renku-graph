@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.missedevents
 
 import cats.MonadError
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.logging.ExecutionTimeRecorder
@@ -69,9 +69,11 @@ object IOEventsSynchronizationScheduler {
       gitLabThrottler:       Throttler[IO, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[IO],
       logger:                Logger[IO]
-  )(implicit timer:          Timer[IO],
-    contextShift:            ContextShift[IO],
-    executionContext:        ExecutionContext): IO[EventsSynchronizationScheduler[IO]] =
+  )(implicit
+      timer:            Timer[IO],
+      contextShift:     ContextShift[IO],
+      executionContext: ExecutionContext
+  ): IO[EventsSynchronizationScheduler[IO]] =
     for {
       missedEventsLoader <- IOMissedEventsLoader(gitLabThrottler, executionTimeRecorder, logger)
     } yield new EventsSynchronizationScheduler[IO](new SchedulerConfigProvider[IO](), missedEventsLoader)

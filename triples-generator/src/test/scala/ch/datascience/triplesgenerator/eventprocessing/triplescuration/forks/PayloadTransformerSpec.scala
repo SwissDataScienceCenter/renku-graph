@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.effect.{ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -44,7 +44,9 @@ class PayloadTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "do nothing if there's no project in GitLab" in new TestCase {
 
-      given(gitLabProjects(event.project.path, maybeParentPaths = emptyOptionOf[Path]).generateOne).doesNotExistsInGitLab
+      given(
+        gitLabProjects(event.project.path, maybeParentPaths = emptyOptionOf[Path]).generateOne
+      ).doesNotExistsInGitLab
 
       transformer.transform(event, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(givenCuratedTriples)
     }
@@ -120,12 +122,11 @@ class PayloadTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
         gitLabProject
       }
 
-      lazy val doesNotExistsInGitLab = {
+      lazy val doesNotExistsInGitLab =
         (gitLabInfoFinder
           .findProject(_: Path)(_: Option[AccessToken]))
           .expects(event.project.path, maybeAccessToken)
           .returning(Option.empty.pure[IO])
-      }
     }
   }
 }

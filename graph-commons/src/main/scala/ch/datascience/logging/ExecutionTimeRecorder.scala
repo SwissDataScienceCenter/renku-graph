@@ -20,7 +20,7 @@ package ch.datascience.logging
 
 import cats.MonadError
 import cats.effect.Clock
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.ConfigLoader.find
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.tinytypes.{LongTinyType, TinyTypeFactory}
@@ -69,10 +69,9 @@ class ExecutionTimeRecorder[Interpretation[_]](
 
   def logExecutionTimeWhen[BlockOut](
       condition: PartialFunction[BlockOut, String]
-  ): ((ElapsedTime, BlockOut)) => BlockOut = {
-    case (elapsedTime, blockOut) =>
-      logWarningIfAboveThreshold(elapsedTime, blockOut, condition)
-      blockOut
+  ): ((ElapsedTime, BlockOut)) => BlockOut = { case (elapsedTime, blockOut) =>
+    logWarningIfAboveThreshold(elapsedTime, blockOut, condition)
+    blockOut
   }
 
   def logExecutionTime[BlockOut](withMessage: => String): ((ElapsedTime, BlockOut)) => BlockOut = {
@@ -81,8 +80,8 @@ class ExecutionTimeRecorder[Interpretation[_]](
       blockOut
   }
 
-  private def forAnyOutReturn[BlockOut](message: String): PartialFunction[BlockOut, String] = {
-    case _ => message
+  private def forAnyOutReturn[BlockOut](message: String): PartialFunction[BlockOut, String] = { case _ =>
+    message
   }
 
   private def logWarningIfAboveThreshold[BlockOut](
@@ -100,8 +99,10 @@ object ExecutionTimeRecorder {
       logger:         Logger[Interpretation],
       config:         Config = ConfigFactory.load(),
       maybeHistogram: Option[Histogram] = None
-  )(implicit clock:   Clock[Interpretation],
-    ME:               MonadError[Interpretation, Throwable]): Interpretation[ExecutionTimeRecorder[Interpretation]] =
+  )(implicit
+      clock: Clock[Interpretation],
+      ME:    MonadError[Interpretation, Throwable]
+  ): Interpretation[ExecutionTimeRecorder[Interpretation]] =
     for {
       duration  <- find[Interpretation, FiniteDuration]("logging.elapsed-time-threshold", config)
       threshold <- ME.fromEither(ElapsedTime from duration.toMillis)
@@ -110,7 +111,7 @@ object ExecutionTimeRecorder {
   class ElapsedTime private (val value: Long) extends AnyVal with LongTinyType
   object ElapsedTime extends TinyTypeFactory[ElapsedTime](new ElapsedTime(_)) {
     addConstraint(
-      check   = _ >= 0,
+      check = _ >= 0,
       message = (_: Long) => s"$typeName cannot be < 0"
     )
   }

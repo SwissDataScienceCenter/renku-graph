@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.eventprocessing
 
 import cats.MonadError
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
@@ -46,7 +46,8 @@ import scala.util.control.NonFatal
 
 class HookEventEndpoint[Interpretation[_]: Effect](
     hookTokenCrypto:  HookTokenCrypto[Interpretation],
-    commitToEventLog: CommitToEventLog[Interpretation]
+    commitToEventLog: CommitToEventLog[Interpretation],
+    logger:           Logger[Interpretation]
 )(implicit ME:        MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
@@ -68,9 +69,8 @@ class HookEventEndpoint[Interpretation[_]: Effect](
   private implicit lazy val startCommitEntityDecoder: EntityDecoder[Interpretation, StartCommit] =
     jsonOf[Interpretation, StartCommit]
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[StartCommit]] = {
-    case NonFatal(exception) =>
-      ME.raiseError(BadRequestError(exception))
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[StartCommit]] = { case NonFatal(exception) =>
+    ME.raiseError(BadRequestError(exception))
   }
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
@@ -82,9 +82,8 @@ class HookEventEndpoint[Interpretation[_]: Effect](
     }
   }
 
-  private lazy val unauthorizedException: PartialFunction[Throwable, Interpretation[HookToken]] = {
-    case NonFatal(_) =>
-      ME.raiseError(UnauthorizedException)
+  private lazy val unauthorizedException: PartialFunction[Throwable, Interpretation[HookToken]] = { case NonFatal(_) =>
+    ME.raiseError(UnauthorizedException)
   }
 
   private def validate(hookToken: HookToken, startCommit: StartCommit): Interpretation[Unit] = ME.fromEither {
@@ -98,7 +97,10 @@ class HookEventEndpoint[Interpretation[_]: Effect](
       Response[Interpretation](Status.Unauthorized)
         .withEntity[ErrorMessage](ErrorMessage(ex))
         .pure[Interpretation]
-    case NonFatal(exception) => InternalServerError(ErrorMessage(exception))
+    case NonFatal(exception) =>
+      logger.error(exception)(exception.getMessage)
+      InternalServerError(ErrorMessage(exception))
+
   }
 }
 
@@ -122,15 +124,17 @@ private object HookEventEndpoint {
 
 object IOHookEventEndpoint {
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      hookTokenCrypto:         HookTokenCrypto[IO],
-      executionTimeRecorder:   ExecutionTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    clock:                     Clock[IO],
-    timer:                     Timer[IO]): IO[HookEventEndpoint[IO]] =
+      gitLabThrottler:       Throttler[IO, GitLab],
+      hookTokenCrypto:       HookTokenCrypto[IO],
+      executionTimeRecorder: ExecutionTimeRecorder[IO],
+      logger:                Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      clock:            Clock[IO],
+      timer:            Timer[IO]
+  ): IO[HookEventEndpoint[IO]] =
     for {
       commitToEventLog <- IOCommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
-    } yield new HookEventEndpoint[IO](hookTokenCrypto, commitToEventLog)
+    } yield new HookEventEndpoint[IO](hookTokenCrypto, commitToEventLog, logger)
 }

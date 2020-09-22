@@ -40,13 +40,14 @@ private object LatestEventsFetcher {
 }
 
 private class IOLatestEventsFetcher(
-    eventLogUrl:    EventLogUrl,
-    logger:         Logger[IO]
-)(implicit ME:      MonadError[IO, Throwable],
-  executionContext: ExecutionContext,
-  contextShift:     ContextShift[IO],
-  timer:            Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
+    eventLogUrl: EventLogUrl,
+    logger:      Logger[IO]
+)(implicit
+    ME:               MonadError[IO, Throwable],
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO]
+) extends IORestClient(Throttler.noThrottling, logger)
     with LatestEventsFetcher[IO] {
 
   import IOLatestEventsFetcher.latestCommitDecoder
@@ -72,10 +73,12 @@ private class IOLatestEventsFetcher(
 
 private object IOLatestEventsFetcher {
   def apply(
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[LatestEventsFetcher[IO]] =
+      logger: Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[LatestEventsFetcher[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
     } yield new IOLatestEventsFetcher(eventLogUrl, logger)

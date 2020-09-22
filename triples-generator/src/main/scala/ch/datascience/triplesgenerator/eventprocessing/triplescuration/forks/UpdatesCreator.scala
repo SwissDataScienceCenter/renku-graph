@@ -22,7 +22,7 @@ package forks
 import cats.MonadError
 import cats.data.{EitherT, OptionT}
 import cats.effect.{ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken
@@ -39,8 +39,8 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private[triplescuration] trait UpdatesCreator[Interpretation[_]] {
-  def create(commit:             CommitEvent)(
-      implicit maybeAccessToken: Option[AccessToken]
+  def create(commit:    CommitEvent)(implicit
+      maybeAccessToken: Option[AccessToken]
   ): CurationUpdatesGroup[Interpretation]
 }
 
@@ -62,8 +62,8 @@ private[triplescuration] class UpdatesCreatorImpl(
         EitherT {
           gitLab
             .findProject(commit.project.path)
-            .flatMap { forkInfoUpdates }
-            .map { _.asRight[ProcessingRecoverableError] }
+            .flatMap(forkInfoUpdates)
+            .map(_.asRight[ProcessingRecoverableError])
             .recover(maybeToRecoverableError)
         }
     )

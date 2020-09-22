@@ -46,8 +46,8 @@ object model {
                                       published:        DatasetPublishing,
                                       parts:            List[DatasetPart],
                                       projects:         List[DatasetProject],
-                                      keywords:         List[Keyword])
-      extends Dataset
+                                      keywords:         List[Keyword]
+  ) extends Dataset
 
   final case class ModifiedDataset(id:               Identifier,
                                    title:            Title,
@@ -58,15 +58,15 @@ object model {
                                    published:        DatasetPublishing,
                                    parts:            List[DatasetPart],
                                    projects:         List[DatasetProject],
-                                   keywords:         List[Keyword])
-      extends Dataset
+                                   keywords:         List[Keyword]
+  ) extends Dataset
 
   final case class DatasetPublishing(maybeDate: Option[PublishedDate], creators: Set[DatasetCreator])
-  final case class DatasetCreator(maybeEmail:   Option[Email], name:             UserName, maybeAffiliation: Option[Affiliation])
+  final case class DatasetCreator(maybeEmail: Option[Email], name: UserName, maybeAffiliation: Option[Affiliation])
 
   final case class DatasetPart(name: PartName, atLocation: PartLocation)
 
-  final case class DatasetProject(path:     Path, name:                  projects.Name, created: AddedToProject)
-  final case class AddedToProject(date:     DateCreatedInProject, agent: DatasetAgent)
-  final case class DatasetAgent(maybeEmail: Option[Email], name:         UserName)
+  final case class DatasetProject(path: Path, name: projects.Name, created: AddedToProject)
+  final case class AddedToProject(date: DateCreatedInProject, agent: DatasetAgent)
+  final case class DatasetAgent(maybeEmail: Option[Email], name: UserName)
 }

@@ -18,13 +18,13 @@
 
 package io.renku.jsonld
 
-import cats.implicits._
+import cats.syntax.all._
 import io.circe.DecodingFailure
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.JsonLDGenerators._
 import io.renku.jsonld.syntax._
-import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 class CursorSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {

@@ -34,8 +34,8 @@ import scala.language.higherKinds
 private[eventprocessing] trait TriplesGenerator[Interpretation[_]] {
   def generateTriples(
       commit: CommitEvent
-  )(
-      implicit maybeAccessToken: Option[AccessToken]
+  )(implicit
+      maybeAccessToken: Option[AccessToken]
   ): EitherT[Interpretation, ProcessingRecoverableError, GenerationResult]
 }
 
@@ -46,11 +46,13 @@ private[eventprocessing] object TriplesGenerator {
       with ProcessingRecoverableError
 
   def apply(
-      triplesGeneration:   TriplesGeneration,
-      config:              Config = ConfigFactory.load()
-  )(implicit contextShift: ContextShift[IO],
-    executionContext:      ExecutionContext,
-    timer:                 Timer[IO]): IO[TriplesGenerator[IO]] = triplesGeneration match {
+      triplesGeneration: TriplesGeneration,
+      config:            Config = ConfigFactory.load()
+  )(implicit
+      contextShift:     ContextShift[IO],
+      executionContext: ExecutionContext,
+      timer:            Timer[IO]
+  ): IO[TriplesGenerator[IO]] = triplesGeneration match {
     case RenkuLog                => RenkuLogTriplesGenerator()
     case RemoteTriplesGeneration => RemoteTriplesGenerator(config)
   }

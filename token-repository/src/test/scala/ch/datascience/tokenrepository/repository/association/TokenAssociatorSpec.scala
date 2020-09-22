@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository.repository.association
 
 import cats.MonadError
-import cats.implicits._
+
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._

@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.eventprocessing.startcommit
 
 import cats.effect.IO
-import cats.implicits._
+
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.commits.CommitInfoFinder
@@ -34,22 +34,14 @@ class TryCommitToEventLog(
     commitEventSender:     CommitEventSender[Try],
     logger:                Logger[Try],
     executionTimeRecorder: ExecutionTimeRecorder[Try]
-) extends CommitToEventLog[Try](accessTokenFinder,
-                                  commitEventsSource,
-                                  commitEventSender,
-                                  logger,
-                                  executionTimeRecorder)
+) extends CommitToEventLog[Try](accessTokenFinder, commitEventsSource, commitEventSender, logger, executionTimeRecorder)
 class IOCommitToEventLog(
     accessTokenFinder:     AccessTokenFinder[IO],
     commitEventsSource:    CommitEventsSourceBuilder[IO],
     commitEventSender:     CommitEventSender[IO],
     logger:                Logger[IO],
     executionTimeRecorder: ExecutionTimeRecorder[IO]
-) extends CommitToEventLog[IO](accessTokenFinder,
-                                 commitEventsSource,
-                                 commitEventSender,
-                                 logger,
-                                 executionTimeRecorder)
+) extends CommitToEventLog[IO](accessTokenFinder, commitEventsSource, commitEventSender, logger, executionTimeRecorder)
 
 private class TryCommitEventsSourceBuilder(
     commitInfoFinder: CommitInfoFinder[Try]

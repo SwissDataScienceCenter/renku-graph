@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.eventprocessing.startcommit
 import java.time.{Clock, Instant, ZoneId}
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -86,9 +86,10 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
         Info(
           successfulStoring(startCommit,
                             commitEvents = commitEvents.size,
-                            created      = sendingResults.count(_ == EventCreated),
-                            existed      = sendingResults.count(_ == EventExisted),
-                            failed       = 0)
+                            created = sendingResults.count(_ == EventCreated),
+                            existed = sendingResults.count(_ == EventExisted),
+                            failed = 0
+          )
         )
       )
     }
@@ -269,7 +270,8 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
                           commitEvents: Int,
                           created:      Int,
                           existed:      Int,
-                          failed:       Int): String =
+                          failed:       Int
+    ): String =
       s"Start Commit id: ${startCommit.id}, project: ${startCommit.project.id}: " +
         s"$commitEvents Commit Events generated: $created created, $existed existed, $failed failed in ${executionTimeRecorder.elapsedTime}ms"
 
@@ -304,14 +306,14 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
         committer     <- committers
         parentsIds    <- parentsIdsLists()
       } yield CommitEvent(
-        id            = commitId,
-        message       = message,
+        id = commitId,
+        message = message,
         committedDate = committedDate,
-        author        = author,
-        committer     = committer,
-        parents       = parentsIds,
-        project       = project,
-        batchDate     = batchDate
+        author = author,
+        committer = committer,
+        parents = parentsIds,
+        project = project,
+        batchDate = batchDate
       )
   }
 }

@@ -35,11 +35,15 @@ class PositiveIntSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
     }
 
     "throw an IllegalArgumentException for 0" in {
-      intercept[IllegalArgumentException](PositiveIntTest(0)).getMessage shouldBe "ch.datascience.tinytypes.constraints.PositiveIntTest cannot be <= 0"
+      intercept[IllegalArgumentException](
+        PositiveIntTest(0)
+      ).getMessage shouldBe "ch.datascience.tinytypes.constraints.PositiveIntTest cannot be <= 0"
     }
 
     "throw an IllegalArgumentException for negative value" in {
-      intercept[IllegalArgumentException](PositiveIntTest(-1)).getMessage shouldBe "ch.datascience.tinytypes.constraints.PositiveIntTest cannot be <= 0"
+      intercept[IllegalArgumentException](
+        PositiveIntTest(-1)
+      ).getMessage shouldBe "ch.datascience.tinytypes.constraints.PositiveIntTest cannot be <= 0"
     }
   }
 }

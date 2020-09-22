@@ -49,13 +49,76 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
     "be a UrlTinyType" in {
       datasetSameAs.generateOne shouldBe a[UrlTinyType]
     }
+
+    "allow to construct UrlSameAs using the from factory" in {
+      forAll(httpUrls()) { url =>
+        val Right(sameAs) = SameAs.from(url)
+        sameAs         should (be(a[SameAs]) and be(a[UrlSameAs]))
+        sameAs.value shouldBe url
+      }
+    }
+
+    "allow to construct IdSameAs using the fromId factory" in {
+      forAll(httpUrls()) { url =>
+        val Right(sameAs) = SameAs.fromId(url)
+        sameAs         should (be(a[SameAs]) and be(a[IdSameAs]))
+        sameAs.value shouldBe url
+      }
+    }
+  }
+
+  "SameAs.equals" should {
+
+    "return true for two SameAs having equal value regardless of the type" in {
+      forAll { sameAs: SameAs =>
+        SameAs.fromId(sameAs.value) shouldBe SameAs.from(sameAs.value)
+        SameAs.from(sameAs.value)   shouldBe SameAs.fromId(sameAs.value)
+      }
+    }
+  }
+
+  "SameAs.hashCode" should {
+
+    "return same values for two SameAs having equal value regardless of the type" in {
+      forAll { sameAs: SameAs =>
+        SameAs.fromId(sameAs.value).map(_.hashCode()) shouldBe SameAs.from(sameAs.value).map(_.hashCode())
+      }
+    }
+  }
+
+  "SameAs.fromId" should {
+
+    "return an instance of IdSameAs" in {
+      val sameAs = datasetSameAs.generateOne
+
+      val Right(instance) = SameAs.fromId(sameAs.value)
+
+      instance       shouldBe an[IdSameAs]
+      instance.value shouldBe sameAs.value
+    }
+  }
+
+  "SameAs.from" should {
+
+    "return an instance of UrlSameAs" in {
+      val sameAs = datasetSameAs.generateOne
+
+      val Right(instance) = SameAs.from(sameAs.value)
+
+      instance       shouldBe an[UrlSameAs]
+      instance.value shouldBe sameAs.value
+    }
   }
 
   "SameAs.apply(EntityId)" should {
 
     "return an instance of IdSameAs" in {
       val entityId = EntityId.of(httpUrls().generateOne)
-      SameAs(entityId).value shouldBe entityId.value
+
+      val instance = SameAs(entityId)
+
+      instance       shouldBe an[IdSameAs]
+      instance.value shouldBe entityId.value
     }
   }
 
@@ -63,13 +126,22 @@ class datasetsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should
 
     import SameAs._
 
-    "serialise SameAs to an object having url property linked to the SameAs's value" in {
-      val sameAs = datasetSameAs.generateOne
+    "serialise IdSameAs to an object having url property linked to the SameAs's value" in {
+      val sameAs = datasetIdSameAs.generateOne
 
       val json = sameAsJsonLdEncoder(sameAs).toJson
 
       json.hcursor.downField("@type").as[String]                                    shouldBe Right((schema / "URL").toString)
       json.hcursor.downField((schema / "url").toString).downField("@id").as[String] shouldBe Right(sameAs.toString)
+    }
+
+    "serialise UrlSameAs to an object having url property as the SameAs's value" in {
+      val sameAs = datasetUrlSameAs.generateOne
+
+      val json = sameAsJsonLdEncoder(sameAs).toJson
+
+      json.hcursor.downField("@type").as[String]                                       shouldBe Right((schema / "URL").toString)
+      json.hcursor.downField((schema / "url").toString).downField("@value").as[String] shouldBe Right(sameAs.toString)
     }
   }
 

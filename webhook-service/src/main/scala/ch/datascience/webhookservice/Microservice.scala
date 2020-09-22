@@ -21,6 +21,7 @@ package ch.datascience.webhookservice
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
+import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
@@ -59,48 +60,44 @@ object Microservice extends IOMicroservice {
       hookTokenCrypto       <- HookTokenCrypto[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
       metricsRegistry       <- MetricsRegistry()
-      hookEventEndpoint <- IOHookEventEndpoint(gitLabThrottler,
-                                               hookTokenCrypto,
-                                               executionTimeRecorder,
-                                               ApplicationLogger)
+      hookEventEndpoint <-
+        IOHookEventEndpoint(gitLabThrottler, hookTokenCrypto, executionTimeRecorder, ApplicationLogger)
       hookCreatorEndpoint <- IOHookCreationEndpoint(projectHookUrl,
                                                     gitLabThrottler,
                                                     hookTokenCrypto,
                                                     executionTimeRecorder,
-                                                    ApplicationLogger)
-      processingStatusEndpoint <- IOProcessingStatusEndpoint(projectHookUrl,
-                                                             gitLabThrottler,
-                                                             executionTimeRecorder,
-                                                             ApplicationLogger)
-      hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler)
-      eventsSynchronizationScheduler <- IOEventsSynchronizationScheduler(gitLabThrottler,
-                                                                         executionTimeRecorder,
-                                                                         ApplicationLogger)
+                                                    ApplicationLogger
+                             )
+      processingStatusEndpoint <-
+        IOProcessingStatusEndpoint(projectHookUrl, gitLabThrottler, executionTimeRecorder, ApplicationLogger)
+      hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler, ApplicationLogger)
+      eventsSynchronizationScheduler <-
+        IOEventsSynchronizationScheduler(gitLabThrottler, executionTimeRecorder, ApplicationLogger)
 
       microserviceRoutes = new MicroserviceRoutes[IO](
-        hookEventEndpoint,
-        hookCreatorEndpoint,
-        hookValidationEndpoint,
-        processingStatusEndpoint,
-        new RoutesMetrics[IO](metricsRegistry)
-      ).routes
+                             hookEventEndpoint,
+                             hookCreatorEndpoint,
+                             hookValidationEndpoint,
+                             processingStatusEndpoint,
+                             new RoutesMetrics[IO](metricsRegistry)
+                           ).routes
 
       exitcode <- microserviceRoutes.use { routes =>
-                   val httpServer = new HttpServer[IO](serverPort = 9001, routes)
+                    val httpServer = new HttpServer[IO](serverPort = 9001, routes)
 
-                   new MicroserviceRunner(
-                     sentryInitializer,
-                     eventsSynchronizationScheduler,
-                     httpServer
-                   ) run args
-                 }
+                    new MicroserviceRunner(
+                      sentryInitializer,
+                      eventsSynchronizationScheduler,
+                      httpServer
+                    ) run args
+                  }
     } yield exitcode
 }
 
 class MicroserviceRunner(sentryInitializer:              SentryInitializer[IO],
                          eventsSynchronizationScheduler: EventsSynchronizationScheduler[IO],
-                         httpServer:                     HttpServer[IO])(implicit contextShift: ContextShift[IO]) {
-  import cats.implicits._
+                         httpServer:                     HttpServer[IO]
+)(implicit contextShift:                                 ContextShift[IO]) {
 
   def run(args: List[String]): IO[ExitCode] =
     for {

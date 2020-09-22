@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.MonadError
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
@@ -76,9 +76,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
         projectsJsons should have size dataset.projects.size
         projectsJsons.foreach { json =>
           (json.hcursor.downField("path").as[Path], json._links)
-            .mapN {
-              case (path, links) =>
-                links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
+            .mapN { case (path, links) =>
+              links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
             }
             .getOrElse(fail("No 'path' or 'project-details' links on the 'isPartOf' elements"))
         }
@@ -161,7 +160,17 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
     } yield maybeSameAs
       .map(NonModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects, keywords))
       .orElse(
-        maybeDerivedFrom map (ModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects, keywords))
+        maybeDerivedFrom map (ModifiedDataset(id,
+                                              title,
+                                              name,
+                                              url,
+                                              _,
+                                              maybeDescription,
+                                              published,
+                                              parts,
+                                              projects,
+                                              keywords
+        ))
       )
       .getOrElse(fail("Cannot decode payload as Dataset"))
 

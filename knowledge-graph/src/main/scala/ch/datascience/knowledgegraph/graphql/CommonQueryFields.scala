@@ -30,8 +30,8 @@ object CommonQueryFields {
   val projectPathArgument = Argument(
     name = "projectPath",
     argumentType = Path.toScalarType(
-      name             = "ProjectPath",
-      description      = "Project's path in the GitLab.",
+      name = "ProjectPath",
+      description = "Project's path in the GitLab.",
       exceptionMessage = "ProjectPath value expected in format <namespace>/<project>"
     )
   )

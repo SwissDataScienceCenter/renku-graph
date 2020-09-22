@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
@@ -47,15 +47,17 @@ class CliVersionFinderSpec extends AnyWordSpec with MockFactory with should.Matc
         ).asJava
       )
 
-      CliVersionFinder[Try](triplesGeneration  = RemoteTriplesGeneration,
+      CliVersionFinder[Try](triplesGeneration = RemoteTriplesGeneration,
                             renkuVersionFinder = cliVersions.generateOne.pure[Try],
-                            config             = config) shouldBe Success(cliVersion)
+                            config = config
+      ) shouldBe Success(cliVersion)
     }
 
     s"call 'renku --version' if TriplesGeneration is $RenkuLog" in {
-      CliVersionFinder[Try](triplesGeneration  = RenkuLog,
+      CliVersionFinder[Try](triplesGeneration = RenkuLog,
                             renkuVersionFinder = cliVersion.pure[Try],
-                            config             = ConfigFactory.empty()) shouldBe Success(cliVersion)
+                            config = ConfigFactory.empty()
+      ) shouldBe Success(cliVersion)
     }
   }
 }

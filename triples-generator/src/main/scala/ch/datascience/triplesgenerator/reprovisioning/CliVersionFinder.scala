@@ -49,14 +49,14 @@ private object CliVersionFinder {
       find[Interpretation, CliVersion]("services.triples-generator.cli-version", config)
   }
 
-  private def findRenkuVersion[Interpretation[_]](
-      implicit ME: MonadError[Interpretation, Throwable]
+  private def findRenkuVersion[Interpretation[_]](implicit
+      ME: MonadError[Interpretation, Throwable]
   ): Interpretation[CliVersion] = {
     import ammonite.ops._
-    import cats.implicits._
+    import cats.syntax.all._
 
     for {
-      versionAsString <- ME.fromTry { Try(%%('renku, "--version")(pwd).out.string.trim) }
+      versionAsString <- ME.fromTry(Try(%%('renku, "--version")(pwd).out.string.trim))
       version         <- ME.fromEither(CliVersion.from(versionAsString))
     } yield version
   }

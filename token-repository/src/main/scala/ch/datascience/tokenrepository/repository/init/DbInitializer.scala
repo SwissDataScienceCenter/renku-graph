@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository.repository.init
 
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
@@ -53,10 +53,9 @@ class DbInitializer[Interpretation[_]](
       .transact(transactor.get)
       .map(_ => ())
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)("Projects Tokens database initialization failure")
-      ME.raiseError(exception)
+  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)("Projects Tokens database initialization failure")
+    ME.raiseError(exception)
   }
 }
 
@@ -64,11 +63,13 @@ object IODbInitializer {
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor:              DbTransactor[IO, ProjectsTokensDB],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[DbInitializer[IO]] =
+      transactor: DbTransactor[IO, ProjectsTokensDB],
+      logger:     Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[DbInitializer[IO]] =
     for {
       pathAdder <- IOProjectPathAdder(transactor, logger)
     } yield new DbInitializer[IO](pathAdder, transactor, logger)

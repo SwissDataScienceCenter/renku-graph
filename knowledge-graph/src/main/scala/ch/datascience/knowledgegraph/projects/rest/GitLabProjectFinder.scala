@@ -53,7 +53,8 @@ object GitLabProjectFinder {
                                  starsCount:       StarsCount,
                                  updatedAt:        DateUpdated,
                                  permissions:      Permissions,
-                                 statistics:       Statistics)
+                                 statistics:       Statistics
+  )
 }
 
 private class IOGitLabProjectFinder(
@@ -65,7 +66,7 @@ private class IOGitLabProjectFinder(
     with GitLabProjectFinder[IO] {
 
   import cats.effect._
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.http.client.UrlEncoder.urlEncode
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
@@ -126,11 +127,11 @@ private class IOGitLabProjectFinder(
         maybeProjectAccessLevel <- maybeAccessLevel("project_access").map(_.map(ProjectAccessLevel))
         maybeGroupAccessLevel   <- maybeAccessLevel("group_access").map(_.map(GroupAccessLevel))
         permissions <- (maybeProjectAccessLevel, maybeGroupAccessLevel) match {
-                        case (Some(project), Some(group)) => Right(Permissions(project, group))
-                        case (Some(project), None)        => Right(Permissions(project))
-                        case (None, Some(group))          => Right(Permissions(group))
-                        case _                            => Left(DecodingFailure("permissions has neither project_access nor group_access", Nil))
-                      }
+                         case (Some(project), Some(group)) => Right(Permissions(project, group))
+                         case (Some(project), None)        => Right(Permissions(project))
+                         case (None, Some(group))          => Right(Permissions(group))
+                         case _                            => Left(DecodingFailure("permissions has neither project_access nor group_access", Nil))
+                       }
       } yield permissions
     }
 
@@ -149,10 +150,10 @@ private class IOGitLabProjectFinder(
         statistics     <- cursor.downField("statistics").as[Statistics]
         permissions    <- cursor.downField("permissions").as[Permissions]
         maybeDescription <- cursor
-                             .downField("description")
-                             .as[Option[String]]
-                             .map(blankToNone)
-                             .flatMap(toOption[Description])
+                              .downField("description")
+                              .as[Option[String]]
+                              .map(blankToNone)
+                              .flatMap(toOption[Description])
       } yield GitLabProject(
         id,
         maybeDescription,
@@ -173,11 +174,13 @@ private class IOGitLabProjectFinder(
 object IOGitLabProjectFinder {
 
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[GitLabProjectFinder[IO]] =
+      gitLabThrottler: Throttler[IO, GitLab],
+      logger:          Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[GitLabProjectFinder[IO]] =
     for {
       gitLabUrl <- GitLabUrl[IO]()
     } yield new IOGitLabProjectFinder(gitLabUrl, gitLabThrottler, logger)

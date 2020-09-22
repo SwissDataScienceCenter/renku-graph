@@ -41,14 +41,16 @@ import scala.concurrent.ExecutionContext
 private[eventprocessing] object RemoteTriplesGenerator extends ConfigLoader[IO] {
 
   def apply(
-      configuration:           Config
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[TriplesGenerator[IO]] =
+      configuration: Config
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[TriplesGenerator[IO]] =
     for {
-      serviceUrl <- find[String]("services.triples-generator.url", configuration) flatMap (
-                       url => IO.fromEither(TriplesGenerationServiceUrl from url)
-                   )
+      serviceUrl <- find[String]("services.triples-generator.url", configuration) flatMap (url =>
+                      IO.fromEither(TriplesGenerationServiceUrl from url)
+                    )
     } yield new RemoteTriplesGenerator(serviceUrl, ApplicationLogger)
 }
 

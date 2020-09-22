@@ -19,6 +19,7 @@
 package ch.datascience.rdfstore
 
 import cats.MonadError
+import cats.syntax.all._
 import ch.datascience.config.ConfigLoader.stringTinyTypeReader
 import ch.datascience.http.client.{BasicAuthCredentials, BasicAuthPassword, BasicAuthUsername}
 import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
@@ -36,7 +37,6 @@ final case class RdfStoreConfig(
 
 object RdfStoreConfig {
 
-  import cats.implicits._
   import ch.datascience.config.ConfigLoader._
   import ch.datascience.http.client.BasicAuthConfigReaders._
 

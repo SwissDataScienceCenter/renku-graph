@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, TopmostSameAs}
@@ -50,25 +50,28 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
       val dataset5TopmostSameAs = datasetTopmostSameAs.generateOne
       val dataset5DerivedFrom   = datasetDerivedFroms.generateOne
       loadToStore(
-        nonModifiedDataSetCommit()()(datasetIdentifier          = dataset1Id,
-                                     overrideTopmostSameAs      = topmostData.sameAs.some,
-                                     overrideTopmostDerivedFrom = dataset1DerivedFrom.some),
-        nonModifiedDataSetCommit()()(datasetIdentifier          = dataset2Id,
-                                     overrideTopmostSameAs      = topmostData.sameAs.some,
-                                     overrideTopmostDerivedFrom = dataset2DerivedFrom.some),
+        nonModifiedDataSetCommit()()(datasetIdentifier = dataset1Id,
+                                     overrideTopmostSameAs = topmostData.sameAs.some,
+                                     overrideTopmostDerivedFrom = dataset1DerivedFrom.some
+        ),
+        nonModifiedDataSetCommit()()(datasetIdentifier = dataset2Id,
+                                     overrideTopmostSameAs = topmostData.sameAs.some,
+                                     overrideTopmostDerivedFrom = dataset2DerivedFrom.some
+        ),
         modifiedDataSetCommit()()(
-          datasetIdentifier          = dataset3Id,
-          overrideTopmostSameAs      = dataset3TopmostSameAs.some,
+          datasetIdentifier = dataset3Id,
+          overrideTopmostSameAs = dataset3TopmostSameAs.some,
           overrideTopmostDerivedFrom = DerivedFrom(topmostData.datasetId).some
         ),
         modifiedDataSetCommit()()(
-          datasetIdentifier          = dataset4Id,
-          overrideTopmostSameAs      = dataset4TopmostSameAs.some,
+          datasetIdentifier = dataset4Id,
+          overrideTopmostSameAs = dataset4TopmostSameAs.some,
           overrideTopmostDerivedFrom = DerivedFrom(topmostData.datasetId).some
         ),
-        modifiedDataSetCommit()()(datasetIdentifier          = dataset5Id,
-                                  overrideTopmostSameAs      = dataset5TopmostSameAs.some,
-                                  overrideTopmostDerivedFrom = dataset5DerivedFrom.some)
+        modifiedDataSetCommit()()(datasetIdentifier = dataset5Id,
+                                  overrideTopmostSameAs = dataset5TopmostSameAs.some,
+                                  overrideTopmostDerivedFrom = dataset5DerivedFrom.some
+        )
       )
 
       val updatedTriples = updater.prepareUpdates[IO](curatedTriples, topmostData)

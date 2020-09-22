@@ -116,7 +116,7 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
       rdfStoreConfig,
       TestLogger(),
       retryInterval = 100 millis,
-      maxRetries    = 1
+      maxRetries = 1
     )
   }
 }

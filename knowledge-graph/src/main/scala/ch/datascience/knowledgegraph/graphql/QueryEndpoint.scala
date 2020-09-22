@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.graphql
 
 import cats.MonadError
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.knowledgegraph.lineage
 import io.chrisdavenport.log4cats.Logger
@@ -61,8 +61,8 @@ class QueryEndpoint[Interpretation[_]: Effect](
     } yield response
   } recoverWith httpResponse
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[UserQuery]] = {
-    case NonFatal(exception) => ME.raiseError(BadRequestError(exception))
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[UserQuery]] = { case NonFatal(exception) =>
+    ME.raiseError(BadRequestError(exception))
   }
 
   private lazy val badRequestForInvalidQuery: PartialFunction[Throwable, Interpretation[Json]] = {
@@ -87,14 +87,14 @@ private object QueryEndpoint {
   implicit val queryDecoder: Decoder[UserQuery] = cursor =>
     for {
       query <- cursor
-                .downField("query")
-                .as[String]
-                .flatMap(rawQuery => Either.fromTry(QueryParser.parse(rawQuery)))
-                .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
+                 .downField("query")
+                 .as[String]
+                 .flatMap(rawQuery => Either.fromTry(QueryParser.parse(rawQuery)))
+                 .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
       variables <- cursor
-                    .downField("variables")
-                    .as[Option[Map[String, Any]]]
-                    .map(_.getOrElse(Map.empty))
+                     .downField("variables")
+                     .as[Option[Map[String, Any]]]
+                     .map(_.getOrElse(Map.empty))
     } yield UserQuery(query, variables)
 
   private implicit lazy val variablesValueDecoder: Decoder[Any] =
@@ -110,11 +110,13 @@ object IOQueryEndpoint {
   import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[QueryEndpoint[IO]] =
+      timeRecorder: SparqlQueryTimeRecorder[IO],
+      logger:       Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[QueryEndpoint[IO]] =
     for {
       queryContext <- IOQueryContext(timeRecorder, logger)
       querySchema = QuerySchema[IO](lineage.graphql.QueryFields())

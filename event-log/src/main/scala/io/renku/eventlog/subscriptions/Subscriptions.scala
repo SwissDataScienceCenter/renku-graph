@@ -23,7 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, Fiber, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -140,11 +140,13 @@ object Subscriptions {
   private val busySleep: FiniteDuration = 5 minutes
 
   def apply(
-      logger:              Logger[IO],
-      busySleep:           FiniteDuration = Subscriptions.busySleep
-  )(implicit contextShift: ContextShift[IO],
-    timer:                 Timer[IO],
-    executionContext:      ExecutionContext): IO[Subscriptions[IO]] =
+      logger:    Logger[IO],
+      busySleep: FiniteDuration = Subscriptions.busySleep
+  )(implicit
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO],
+      executionContext: ExecutionContext
+  ): IO[Subscriptions[IO]] =
     for {
       currentUrl <- Ref.of[IO, Option[SubscriberUrl]](None)
     } yield new SubscriptionsImpl(currentUrl, logger, busySleep)

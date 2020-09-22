@@ -27,7 +27,7 @@ import scala.util.Try
 
 trait Url extends Constraints[String] {
   addConstraint(
-    check   = url => Try(new URL(url)).isSuccess,
+    check = url => Try(new URL(url)).isSuccess,
     message = (url: String) => s"Cannot instantiate $typeName with '$url'"
   )
 }

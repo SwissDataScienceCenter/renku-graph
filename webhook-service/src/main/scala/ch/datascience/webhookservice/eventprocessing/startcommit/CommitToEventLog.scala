@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.eventprocessing.startcommit
 
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import cats.{Monad, MonadError}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
@@ -56,7 +56,8 @@ class CommitToEventLog[Interpretation[_]: Monad](
       for {
         maybeAccessToken   <- findAccessToken(startCommit.project.id)
         commitEventsSource <- buildEventsSource(startCommit, maybeAccessToken, clock)
-        sendingResults     <- commitEventsSource transformEventsWith sendEvent(startCommit) recoverWith eventFindingException
+        sendingResults <-
+          commitEventsSource transformEventsWith sendEvent(startCommit) recoverWith eventFindingException
       } yield sendingResults
     } flatMap logSummary(startCommit) recoverWith loggingError(startCommit)
 
@@ -66,10 +67,9 @@ class CommitToEventLog[Interpretation[_]: Monad](
         case EventCreated => Created
         case EventExisted => Existed
       }
-      .recover {
-        case NonFatal(exception) =>
-          logger.error(exception)(logMessageFor(startCommit, "storing in the event log failed", Some(commitEvent)))
-          Failed
+      .recover { case NonFatal(exception) =>
+        logger.error(exception)(logMessageFor(startCommit, "storing in the event log failed", Some(commitEvent)))
+        Failed
       }
 
   private lazy val eventFindingException: PartialFunction[Throwable, Interpretation[List[SendingResult]]] = {
@@ -116,13 +116,15 @@ class CommitToEventLog[Interpretation[_]: Monad](
 
 object IOCommitToEventLog {
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      executionTimeRecorder:   ExecutionTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    clock:                     Clock[IO],
-    timer:                     Timer[IO]): IO[CommitToEventLog[IO]] =
+      gitLabThrottler:       Throttler[IO, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[IO],
+      logger:                Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      clock:            Clock[IO],
+      timer:            Timer[IO]
+  ): IO[CommitToEventLog[IO]] =
     for {
       eventSender               <- IOCommitEventSender(logger)
       accessTokenFinder         <- IOAccessTokenFinder(logger)

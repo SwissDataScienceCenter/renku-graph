@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
 import cats.MonadError
 import cats.effect.{ContextShift, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup

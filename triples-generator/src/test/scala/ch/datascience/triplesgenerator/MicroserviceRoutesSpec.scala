@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator
 
 import cats.effect.{Clock, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessingEndpoint
@@ -61,7 +61,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
         Request(Method.GET, uri"metrics")
       )
 
-      response.status       shouldBe Ok
+      response.status     shouldBe Ok
       response.body[String] should include("server_response_duration_seconds")
     }
   }

@@ -47,63 +47,64 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
       "decrement under processing gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
-      storeEvent(
-        compoundEventIds.generateOne.copy(id = eventId.id),
-        EventStatus.Processing,
-        executionDates.generateOne,
-        eventDates.generateOne,
-        eventBodies.generateOne,
-        batchDate = eventBatchDate
-      )
-      val executionDate = executionDates.generateOne
-      val projectPath   = projectPaths.generateOne
-      storeEvent(
-        eventId,
-        EventStatus.Processing,
-        executionDate,
-        eventDates.generateOne,
-        eventBodies.generateOne,
-        batchDate   = eventBatchDate,
-        projectPath = projectPath
-      )
+        storeEvent(
+          compoundEventIds.generateOne.copy(id = eventId.id),
+          EventStatus.Processing,
+          executionDates.generateOne,
+          eventDates.generateOne,
+          eventBodies.generateOne,
+          batchDate = eventBatchDate
+        )
+        val executionDate = executionDates.generateOne
+        val projectPath   = projectPaths.generateOne
+        storeEvent(
+          eventId,
+          EventStatus.Processing,
+          executionDate,
+          eventDates.generateOne,
+          eventBodies.generateOne,
+          batchDate = eventBatchDate,
+          projectPath = projectPath
+        )
 
-      findEvent(eventId) shouldBe Some((executionDate, Processing, None))
+        findEvent(eventId) shouldBe Some((executionDate, Processing, None))
 
-      (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
+        (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-      val message = eventMessages.generateOne
-      val command = ToSkipped[IO](eventId, message, underProcessingGauge, currentTime)
+        val message = eventMessages.generateOne
+        val command = ToSkipped[IO](eventId, message, underProcessingGauge, currentTime)
 
-      (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
+        (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-      findEvent(eventId) shouldBe Some((ExecutionDate(now), Skipped, Some(message)))
+        findEvent(eventId) shouldBe Some((ExecutionDate(now), Skipped, Some(message)))
 
-      histogram.verifyExecutionTimeMeasured(command.query.name)
-    }
+        histogram.verifyExecutionTimeMeasured(command.query.name)
+      }
 
     EventStatus.all.filterNot(_ == Processing) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
         s"and return ${UpdateResult.Conflict}" in new TestCase {
 
-        val executionDate = executionDates.generateOne
-        storeEvent(eventId,
-                   eventStatus,
-                   executionDate,
-                   eventDates.generateOne,
-                   eventBodies.generateOne,
-                   batchDate = eventBatchDate)
+          val executionDate = executionDates.generateOne
+          storeEvent(eventId,
+                     eventStatus,
+                     executionDate,
+                     eventDates.generateOne,
+                     eventBodies.generateOne,
+                     batchDate = eventBatchDate
+          )
 
-        findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
-        val message = eventMessages.generateOne
-        val command = ToSkipped[IO](eventId, message, underProcessingGauge, currentTime)
+          val message = eventMessages.generateOne
+          val command = ToSkipped[IO](eventId, message, underProcessingGauge, currentTime)
 
-        (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
-        findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
-      }
+          histogram.verifyExecutionTimeMeasured(command.query.name)
+        }
     }
   }
 

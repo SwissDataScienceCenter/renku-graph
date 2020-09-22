@@ -41,28 +41,28 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
     "return Success ExitCode if " +
       "Sentry and RDF dataset initialisation are fine " +
       "and subscription, re-provisioning and the http server start up" in new TestCase {
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
+        (sentryInitializer.run _)
+          .expects()
+          .returning(IO.unit)
 
-      (datasetInitializer.run _)
-        .expects()
-        .returning(IO.unit)
+        (datasetInitializer.run _)
+          .expects()
+          .returning(IO.unit)
 
-      (subscriber.run _)
-        .expects()
-        .returning(IO.unit)
+        (subscriber.run _)
+          .expects()
+          .returning(IO.unit)
 
-      (reProvisioning.run _)
-        .expects()
-        .returning(IO.unit)
+        (reProvisioning.run _)
+          .expects()
+          .returning(IO.unit)
 
-      (httpServer.run _)
-        .expects()
-        .returning(IO.pure(ExitCode.Success))
+        (httpServer.run _)
+          .expects()
+          .returning(IO.pure(ExitCode.Success))
 
-      microserviceRunner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
-    }
+        microserviceRunner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
+      }
 
     "fail if Sentry initialization fails" in new TestCase {
       val exception = exceptions.generateOne

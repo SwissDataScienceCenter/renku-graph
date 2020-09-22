@@ -46,7 +46,7 @@ class EventsPatchingEndpointImpl(
     extends Http4sDsl[IO]
     with EventsPatchingEndpoint[IO] {
 
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.controllers.InfoMessage
   import ch.datascience.controllers.InfoMessage._
   import eventsPatcher._
@@ -60,8 +60,8 @@ class EventsPatchingEndpointImpl(
     } yield result
   } recoverWith httpResponse
 
-  private lazy val badRequest: PartialFunction[Throwable, IO[EventsPatch[IO]]] = {
-    case NonFatal(exception) => IO.raiseError(BadRequestError(exception))
+  private lazy val badRequest: PartialFunction[Throwable, IO[EventsPatch[IO]]] = { case NonFatal(exception) =>
+    IO.raiseError(BadRequestError(exception))
   }
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)

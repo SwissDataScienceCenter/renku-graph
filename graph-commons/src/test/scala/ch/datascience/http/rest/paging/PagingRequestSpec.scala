@@ -19,7 +19,7 @@
 package ch.datascience.http.rest.paging
 
 import cats.data.{NonEmptyList, Validated}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -134,7 +134,9 @@ class PagingRequestSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
       val pageParsingError    = parseFailures.generateOne
       val perPageParsingError = parseFailures.generateOne
 
-      PagingRequest(Some(pageParsingError.invalidNel[Page]), Some(perPageParsingError.invalidNel[PerPage])) shouldBe Validated
+      PagingRequest(Some(pageParsingError.invalidNel[Page]),
+                    Some(perPageParsingError.invalidNel[PerPage])
+      ) shouldBe Validated
         .Invalid(NonEmptyList.of(pageParsingError, perPageParsingError))
     }
   }

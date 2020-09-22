@@ -32,11 +32,13 @@ class QueryContext[Interpretation[_]](
 
 object IOQueryContext {
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[QueryContext[IO]] =
+      timeRecorder: SparqlQueryTimeRecorder[IO],
+      logger:       Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[QueryContext[IO]] =
     for {
       lineageFinder <- IOLineageFinder(timeRecorder, logger)
     } yield new QueryContext[IO](lineageFinder)

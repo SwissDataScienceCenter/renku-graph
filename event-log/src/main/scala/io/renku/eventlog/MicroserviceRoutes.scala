@@ -20,7 +20,7 @@ package io.renku.eventlog
 
 import cats.data.ValidatedNel
 import cats.effect.{Clock, ConcurrentEffect, ContextShift, Resource}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.graph.http.server.binders._
@@ -105,12 +105,13 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   private object ProjectIdParameter {
 
     private implicit val queryParameterDecoder: QueryParamDecoder[projects.Id] =
-      (value: QueryParameterValue) => {
-        for {
-          int <- Try(value.value.toInt).toEither
-          id  <- projects.Id.from(int)
-        } yield id
-      }.leftMap(_ => ParseFailure(s"'${`project-id`}' parameter with invalid value", "")).toValidatedNel
+      (value: QueryParameterValue) =>
+        {
+          for {
+            int <- Try(value.value.toInt).toEither
+            id  <- projects.Id.from(int)
+          } yield id
+        }.leftMap(_ => ParseFailure(s"'${`project-id`}' parameter with invalid value", "")).toValidatedNel
 
     object `project-id` extends OptionalValidatingQueryParamDecoderMatcher[projects.Id]("project-id") {
       val parameterName:     String = "project-id"

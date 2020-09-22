@@ -67,7 +67,8 @@ class IOProjectDatasetsFinderSpec
           (datasetModification2.id,
            datasetModification2.title,
            datasetModification2.name,
-           Right(datasetModification2.derivedFrom))
+           Right(datasetModification2.derivedFrom)
+          )
         )
       }
     }
@@ -93,7 +94,8 @@ class IOProjectDatasetsFinderSpec
           (dataset2Modification.id,
            dataset2Modification.title,
            dataset2Modification.name,
-           Right(dataset2Modification.derivedFrom))
+           Right(dataset2Modification.derivedFrom)
+          )
         )
       }
     }

@@ -58,10 +58,12 @@ private class IOEventsReScheduler(
 
 private object IOEventsReScheduler {
   def apply(
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[EventsReScheduler[IO]] =
+      logger: Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[EventsReScheduler[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
     } yield new IOEventsReScheduler(eventLogUrl, logger)

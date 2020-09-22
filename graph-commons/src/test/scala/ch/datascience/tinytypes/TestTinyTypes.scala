@@ -26,7 +26,7 @@ private object TestTinyTypes {
   implicit object StringTestType extends TinyTypeFactory[StringTestType](new StringTestType(_)) {
     val InvalidValue: String = "invalid value"
     addConstraint(
-      check   = _ != InvalidValue,
+      check = _ != InvalidValue,
       message = (_: String) => s"$typeName cannot be '$InvalidValue'"
     )
   }

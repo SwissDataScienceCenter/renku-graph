@@ -77,9 +77,9 @@ object Association {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit def childRunPlanAssociationEncoder(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  implicit def childRunPlanAssociationEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[ChildRunPlanAssociation] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.workflowStep / "association",
@@ -89,9 +89,9 @@ object Association {
     )
   }
 
-  implicit def workflowRunPlanAssociationEncoder(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  implicit def workflowRunPlanAssociationEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[WorkflowRunPlanAssociation] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / "association",
@@ -101,9 +101,9 @@ object Association {
     )
   }
 
-  implicit def processRunPlanAssociationEncoder(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  implicit def processRunPlanAssociationEncoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[ProcessRunPlanAssociation] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / "association",

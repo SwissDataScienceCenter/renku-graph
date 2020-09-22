@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs, TopmostSameAs}
 import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder
@@ -29,7 +29,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait KGDatasetInfoFinder[Interpretation[_]] {
-  def findTopmostSameAs(sameAs:           SameAs):      Interpretation[Option[TopmostSameAs]]
+  def findTopmostSameAs(idSameAs:         IdSameAs):    Interpretation[Option[TopmostSameAs]]
   def findTopmostDerivedFrom(derivedFrom: DerivedFrom): Interpretation[Option[DerivedFrom]]
 }
 
@@ -41,15 +41,15 @@ private class KGDatasetInfoFinderImpl(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with KGDatasetInfoFinder[IO] {
 
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eu.timepit.refined.auto._
 
-  override def findTopmostSameAs(sameAs: SameAs): IO[Option[TopmostSameAs]] =
+  override def findTopmostSameAs(sameAs: IdSameAs): IO[Option[TopmostSameAs]] =
     queryExpecting[Set[TopmostSameAs]](using = queryFindingSameAs(sameAs))
-      .flatMap(toOption[TopmostSameAs, SameAs](sameAs))
+      .flatMap(toOption[TopmostSameAs, IdSameAs](sameAs))
 
-  private def queryFindingSameAs(sameAs: SameAs) = SparqlQuery(
+  private def queryFindingSameAs(sameAs: IdSameAs) = SparqlQuery(
     name = "upload - ds topmostSameAs",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
@@ -108,10 +108,10 @@ private class KGDatasetInfoFinderImpl(
 }
 
 private object IOKGDatasetInfoFinder {
-  def apply(logger:              Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(
-      implicit executionContext: ExecutionContext,
-      contextShift:              ContextShift[IO],
-      timer:                     Timer[IO]
+  def apply(logger:     Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
   ): IO[KGDatasetInfoFinderImpl] =
     for {
       rdfStoreConfig <- RdfStoreConfig[IO]()

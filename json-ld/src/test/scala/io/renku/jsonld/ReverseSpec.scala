@@ -104,7 +104,7 @@ class ReverseSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
         (property1, entities, property2, values) =>
           val Left(exception) = Reverse.of(
             property1 -> JsonLD.arr(entities.toList: _*),
-            property2 -> JsonLD.arr(values.toList:   _*)
+            property2 -> JsonLD.arr(values.toList: _*)
           )
 
           exception            shouldBe an[IllegalArgumentException]
@@ -170,7 +170,7 @@ class ReverseSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
           val Left(exception) = Reverse.fromList(
             List(
               property1 -> JsonLD.arr(entities.toList: _*),
-              property2 -> JsonLD.arr(values.toList:   _*)
+              property2 -> JsonLD.arr(values.toList: _*)
             )
           )
 

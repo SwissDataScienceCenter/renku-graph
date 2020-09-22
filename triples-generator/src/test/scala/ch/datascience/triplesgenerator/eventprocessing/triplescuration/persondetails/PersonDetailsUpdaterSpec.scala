@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.personde
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -45,8 +45,8 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.mutable
-import scala.util.{Failure, Success, Try}
 import scala.language.higherKinds
+import scala.util.{Failure, Success, Try}
 
 class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
@@ -55,54 +55,54 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
     "remove name and email properties from all the Person entities found in the given Json " +
       "except those which id starts with '_' (blank nodes) " +
       "and create SPARQL updates for them" in new TestCase {
-      val projectCreatorName  = userNames.generateOne
-      val projectCreatorEmail = userEmails.generateOne
-      val committerName       = userNames.generateOne
-      val committerEmail      = userEmails.generateOne
-      val datasetCreatorsSet = nonEmptyList(entities.Person.persons, minElements = 5, maxElements = 10)
-        .retryUntil(atLeastOneWithoutEmail)
-        .generateOne
-        .toList
-        .toSet
-      val jsonTriples = JsonLDTriples {
-        nonModifiedDataSetCommit(
-          committer = entities.Person(committerName, committerEmail)
-        )(
-          projectPath         = projectPaths.generateOne,
-          maybeProjectCreator = entities.Person(projectCreatorName, projectCreatorEmail).some
-        )(
-          datasetCreators = datasetCreatorsSet
-        ).toJson
-      }
-
-      val allPersons = jsonTriples.collectAllPersons
-      allPersons.filter(blankIds)    should not be empty
-      allPersons.filterNot(blankIds) should not be empty
-
-      val allPersonsInPayload = datasetCreatorsSet +
-        entities.Person(projectCreatorName, projectCreatorEmail) +
-        entities.Person(committerName, committerEmail)
-
-      val expectedUpdatesGroups = allPersonsInPayload
-        .map(maybeUpdatedPerson)
-        .flatten
-        .map { person =>
-          val updatesGroup = curationUpdatesGroups[Try].generateOne
-          (updatesCreator
-            .prepareUpdates[Try](_: UpdatePerson)(_: MonadError[Try, Throwable]))
-            .expects(person, *)
-            .returning(updatesGroup)
-          updatesGroup
+        val projectCreatorName  = userNames.generateOne
+        val projectCreatorEmail = userEmails.generateOne
+        val committerName       = userNames.generateOne
+        val committerEmail      = userEmails.generateOne
+        val datasetCreatorsSet = nonEmptyList(entities.Person.persons, minElements = 5, maxElements = 10)
+          .retryUntil(atLeastOneWithoutEmail)
+          .generateOne
+          .toList
+          .toSet
+        val jsonTriples = JsonLDTriples {
+          nonModifiedDataSetCommit(
+            committer = entities.Person(committerName, committerEmail)
+          )(
+            projectPath = projectPaths.generateOne,
+            maybeProjectCreator = entities.Person(projectCreatorName, projectCreatorEmail).some
+          )(
+            datasetCreators = datasetCreatorsSet
+          ).toJson
         }
 
-      val Success(curatedTriples) = curator curate CuratedTriples(jsonTriples, updatesGroups = Nil)
+        val allPersons = jsonTriples.collectAllPersons
+        allPersons.filter(blankIds)    should not be empty
+        allPersons.filterNot(blankIds) should not be empty
 
-      val curatedPersons = curatedTriples.triples.collectAllPersons
-      curatedPersons.filter(blankIds)    shouldBe allPersons.filter(blankIds)
-      curatedPersons.filterNot(blankIds) shouldBe allPersons.filterNot(blankIds).map(noEmailAndName)
+        val allPersonsInPayload = datasetCreatorsSet +
+          entities.Person(projectCreatorName, projectCreatorEmail) +
+          entities.Person(committerName, committerEmail)
 
-      curatedTriples.updatesGroups shouldBe expectedUpdatesGroups.toList
-    }
+        val expectedUpdatesGroups = allPersonsInPayload
+          .map(maybeUpdatedPerson)
+          .flatten
+          .map { person =>
+            val updatesGroup = curationUpdatesGroups[Try].generateOne
+            (updatesCreator
+              .prepareUpdates[Try](_: UpdatePerson)(_: MonadError[Try, Throwable]))
+              .expects(person, *)
+              .returning(updatesGroup)
+            updatesGroup
+          }
+
+        val Success(curatedTriples) = curator curate CuratedTriples(jsonTriples, updatesGroups = Nil)
+
+        val curatedPersons = curatedTriples.triples.collectAllPersons
+        curatedPersons.filter(blankIds)    shouldBe allPersons.filter(blankIds)
+        curatedPersons.filterNot(blankIds) shouldBe allPersons.filterNot(blankIds).map(noEmailAndName)
+
+        curatedTriples.updatesGroups shouldBe expectedUpdatesGroups.toList
+      }
 
     "fail if there's a Person entity without a name" in new TestCase {
 
@@ -112,7 +112,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
 
       val result = curator curate CuratedTriples(noNamesJson, updatesGroups = Nil)
 
-      result                       shouldBe a[Failure[_]]
+      result                     shouldBe a[Failure[_]]
       result.failed.get.getMessage should include regex "No names for person with '(.*)' id found in generated JSON-LD".r
     }
   }
@@ -160,7 +160,8 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
   private case class Person(id:               ResourceId,
                             maybeName:        Option[Name],
                             maybeEmail:       Option[Email],
-                            maybeAffiliation: Option[Affiliation])
+                            maybeAffiliation: Option[Affiliation]
+  )
 
   private lazy val maybeUpdatedPerson: entities.Person => Option[UpdatePerson] = { person =>
     person.maybeEmail map { email =>

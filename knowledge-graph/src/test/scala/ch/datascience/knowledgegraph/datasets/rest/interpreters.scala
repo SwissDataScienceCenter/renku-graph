@@ -27,23 +27,23 @@ import io.chrisdavenport.log4cats.Logger
 class IOProjectEndpointStub(projectFinder:         ProjectFinder[IO],
                             renkuResourcesUrl:     renku.ResourcesUrl,
                             executionTimeRecorder: ExecutionTimeRecorder[IO],
-                            logger:                Logger[IO])
-    extends ProjectEndpoint[IO](projectFinder, renkuResourcesUrl, executionTimeRecorder, logger)
+                            logger:                Logger[IO]
+) extends ProjectEndpoint[IO](projectFinder, renkuResourcesUrl, executionTimeRecorder, logger)
 
 class IOProjectDatasetsEndpointStub(projectDatasetsFinder: ProjectDatasetsFinder[IO],
                                     renkuResourcesUrl:     renku.ResourcesUrl,
                                     executionTimeRecorder: ExecutionTimeRecorder[IO],
-                                    logger:                Logger[IO])
-    extends ProjectDatasetsEndpoint[IO](projectDatasetsFinder, renkuResourcesUrl, executionTimeRecorder, logger)
+                                    logger:                Logger[IO]
+) extends ProjectDatasetsEndpoint[IO](projectDatasetsFinder, renkuResourcesUrl, executionTimeRecorder, logger)
 
 class IODatasetEndpointStub(datasetFinder:         DatasetFinder[IO],
                             renkuResourcesUrl:     renku.ResourcesUrl,
                             executionTimeRecorder: ExecutionTimeRecorder[IO],
-                            logger:                Logger[IO])
-    extends DatasetEndpoint[IO](datasetFinder, renkuResourcesUrl, executionTimeRecorder, logger)
+                            logger:                Logger[IO]
+) extends DatasetEndpoint[IO](datasetFinder, renkuResourcesUrl, executionTimeRecorder, logger)
 
 class IODatasetsSearchEndpointStub(datasetsFinder:        DatasetsFinder[IO],
                                    renkuResourcesUrl:     renku.ResourcesUrl,
                                    executionTimeRecorder: ExecutionTimeRecorder[IO],
-                                   logger:                Logger[IO])
-    extends DatasetsSearchEndpoint[IO](datasetsFinder, renkuResourcesUrl, executionTimeRecorder, logger)
+                                   logger:                Logger[IO]
+) extends DatasetsSearchEndpoint[IO](datasetsFinder, renkuResourcesUrl, executionTimeRecorder, logger)

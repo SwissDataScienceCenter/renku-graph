@@ -19,10 +19,9 @@
 package ch.datascience.tokenrepository.repository.init
 
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
@@ -35,9 +34,9 @@ import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{IOAccessTokenCrypto, InMemoryProjectsTokensDbSpec}
 import doobie.implicits._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 class ProjectPathAdderSpec
     extends AnyWordSpec
@@ -141,7 +140,8 @@ class ProjectPathAdderSpec
     def assumePathExistsInGitLab(projectId:        Id,
                                  maybeProjectPath: Option[Path],
                                  encryptedToken:   EncryptedAccessToken,
-                                 token:            AccessToken) = {
+                                 token:            AccessToken
+    ) = {
       (accessTokenCrypto.decrypt _)
         .expects(encryptedToken)
         .returning(token.pure[IO])

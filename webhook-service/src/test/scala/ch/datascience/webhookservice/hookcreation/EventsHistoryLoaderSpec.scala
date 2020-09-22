@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
 import cats.data.OptionT
-import cats.implicits._
+
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -122,7 +122,7 @@ class EventsHistoryLoaderSpec extends AnyWordSpec with MockFactory with should.M
   }
 
   private def startCommitFrom(commitInfo: CommitInfo, projectInfo: ProjectInfo) = StartCommit(
-    id      = commitInfo.id,
+    id = commitInfo.id,
     project = Project(projectInfo.id, projectInfo.path)
   )
 }

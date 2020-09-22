@@ -29,10 +29,10 @@ private object ProcessingStatusGenerator {
 
   implicit val processingStatuses: Gen[ProcessingStatus] =
     for {
-      total <- positiveInts(max    = Integer.MAX_VALUE)
+      total <- positiveInts(max = Integer.MAX_VALUE)
       done  <- nonNegativeInts(max = total.value)
       progress = Refined.unsafeApply(
-        BigDecimal((done.value.toDouble / total.value) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
-      ): ProcessingStatus.Progress
+                   BigDecimal((done.value.toDouble / total.value) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
+                 ): ProcessingStatus.Progress
     } yield ProcessingStatus(done, total, progress)
 }

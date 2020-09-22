@@ -20,18 +20,18 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import java.time.Instant
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, userEmails}
 import ch.datascience.graph.model.projects.{DateCreated, ResourceId}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
 import ch.datascience.rdfstore.entities.{Person, Project}
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
+import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
-import eu.timepit.refined.auto._
 
 class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Matchers {
 
@@ -330,7 +330,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   private def removeDateCreated(projectId: ResourceId): Unit =
     runUpdate(
       SparqlQuery(
-        name     = "delete date created",
+        name = "delete date created",
         prefixes = Set("PREFIX schema: <http://schema.org/>"),
         s"""| DELETE { ${projectId.showAs[RdfResource]} schema:dateCreated ?dateCreated }
             | WHERE { ${projectId.showAs[RdfResource]} schema:dateCreated ?dateCreated }

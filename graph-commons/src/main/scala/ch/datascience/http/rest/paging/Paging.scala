@@ -19,7 +19,7 @@
 package ch.datascience.http.rest.paging
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.http.rest.paging.model.Total
 
 import scala.language.higherKinds
@@ -28,9 +28,9 @@ trait Paging[Interpretation[_], Result] {
 
   import Paging.PagedResultsFinder
 
-  def findPage(paging:        PagingRequest)(
-      implicit resultsFinder: PagedResultsFinder[Interpretation, Result],
-      ME:                     MonadError[Interpretation, Throwable]
+  def findPage(paging: PagingRequest)(implicit
+      resultsFinder:   PagedResultsFinder[Interpretation, Result],
+      ME:              MonadError[Interpretation, Throwable]
   ): Interpretation[PagingResponse[Result]] =
     for {
       results  <- resultsFinder.findResults(paging)
@@ -43,9 +43,9 @@ trait Paging[Interpretation[_], Result] {
   )(implicit resultsFinder: PagedResultsFinder[Interpretation, Result], ME: MonadError[Interpretation, Throwable]) =
     for {
       total <- if (results.nonEmpty && results.size < pagingRequest.perPage.value)
-                Total((pagingRequest.page.value - 1) * pagingRequest.perPage.value + results.size).pure[Interpretation]
-              else
-                resultsFinder.findTotal()
+                 Total((pagingRequest.page.value - 1) * pagingRequest.perPage.value + results.size).pure[Interpretation]
+               else
+                 resultsFinder.findTotal()
       response <- PagingResponse.from[Interpretation, Result](results, pagingRequest, total)
     } yield response
 }

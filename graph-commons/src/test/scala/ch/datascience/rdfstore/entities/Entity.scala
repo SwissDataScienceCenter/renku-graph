@@ -18,7 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.rdfstore.FusekiBaseUrl
@@ -33,7 +33,8 @@ class Entity(val commitId:                  CommitId,
              val location:                  Location,
              val project:                   Project,
              val maybeInvalidationActivity: Option[Activity],
-             val maybeGeneration:           Option[Generation])
+             val maybeGeneration:           Option[Generation]
+)
 
 object Entity {
 
@@ -42,14 +43,17 @@ object Entity {
                generation.location,
                generation.activity.project,
                maybeInvalidationActivity = None,
-               maybeGeneration           = Some(generation)) with Artifact
+               maybeGeneration = Some(generation)
+    ) with Artifact
 
   def factory(location: Location)(activity: Activity): Entity with Artifact =
     new Entity(activity.commitId, location, activity.project, maybeInvalidationActivity = None, maybeGeneration = None)
-    with Artifact
+      with Artifact
 
-  private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
-                                           fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[Entity] =
+  private[entities] implicit def converter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): PartialEntityConverter[Entity] =
     new PartialEntityConverter[Entity] {
       override def convert[T <: Entity]: T => Either[Exception, PartialEntity] =
         entity =>
@@ -66,8 +70,10 @@ object Entity {
         entity => (EntityId of fusekiBaseUrl / "blob" / entity.commitId / entity.location).some
     }
 
-  implicit def encoderWithArtifact(implicit renkuBaseUrl: RenkuBaseUrl,
-                                   fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[Entity with Artifact] =
+  implicit def encoderWithArtifact(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): JsonLDEncoder[Entity with Artifact] =
     JsonLDEncoder.instance {
       case e: EntityCollection     => e.asJsonLD
       case e: DataSetEntity        => e.asJsonLD
@@ -87,23 +93,26 @@ object Collection {
 
   def factory(location: Location, membersLocations: List[Location])(activity: Activity): EntityCollection =
     new Entity(
-      commitId                  = activity.commitId,
-      location                  = location,
-      project                   = activity.project,
+      commitId = activity.commitId,
+      location = location,
+      project = activity.project,
       maybeInvalidationActivity = None,
-      maybeGeneration           = None
+      maybeGeneration = None
     ) with Collection with Artifact {
       override val collectionMembers: List[Entity with Artifact] = membersLocations.map { memberLocation =>
         new Entity(activity.commitId,
                    memberLocation,
                    activity.project,
                    maybeInvalidationActivity = None,
-                   maybeGeneration           = None) with Artifact
+                   maybeGeneration = None
+        ) with Artifact
       }
     }
 
-  private implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl,
-                                 fusekiBaseUrl:         FusekiBaseUrl): PartialEntityConverter[EntityCollection] =
+  private implicit def converter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): PartialEntityConverter[EntityCollection] =
     new PartialEntityConverter[EntityCollection] {
       override def convert[T <: EntityCollection]: T => Either[Exception, PartialEntity] =
         entity =>
@@ -116,8 +125,10 @@ object Collection {
         entity => (EntityId of fusekiBaseUrl / "blob" / entity.commitId / entity.location).some
     }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[EntityCollection] =
+  implicit def encoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): JsonLDEncoder[EntityCollection] =
     JsonLDEncoder.instance { entity =>
       entity
         .asPartialJsonLD[Entity]

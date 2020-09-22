@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.config
 
-import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.triplesgenerator.generators.ServiceTypesGenerators._

@@ -46,7 +46,9 @@ class RelativePathSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     }
 
     "throw an IllegalArgumentException for empty String values" in {
-      intercept[IllegalArgumentException](RelativePathString("")).getMessage shouldBe "ch.datascience.tinytypes.constraints.RelativePathString cannot be blank"
+      intercept[IllegalArgumentException](
+        RelativePathString("")
+      ).getMessage shouldBe "ch.datascience.tinytypes.constraints.RelativePathString cannot be blank"
     }
   }
 

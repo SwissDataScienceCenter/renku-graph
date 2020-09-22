@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.eventprocessing.startcommit
 import java.time.{Clock, Instant, ZoneId}
 
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -49,164 +49,164 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
       "if found commit info has no parents " +
       "and the event get created in the Event Log" in new TestCase {
 
-      val commitInfo = commitInfos(startCommit.id, noParents).generateOne
-      givenFindingCommitInfoReturns(commitInfo)
+        val commitInfo = commitInfos(startCommit.id, noParents).generateOne
+        givenFindingCommitInfoReturns(commitInfo)
 
-      source.transformEventsWith(send(returning = startCommit.id -> Created)) shouldBe List(Created).pure[Try]
-    }
+        source.transformEventsWith(send(returning = startCommit.id -> Created)) shouldBe List(Created).pure[Try]
+      }
 
     "map a single commit event with the transform function " +
       "if found commit info has no parents " +
       "and the event already exists in the Event Log" in new TestCase {
 
-      val commitInfo = commitInfos(startCommit.id, noParents).generateOne
-      givenFindingCommitInfoReturns(commitInfo)
+        val commitInfo = commitInfos(startCommit.id, noParents).generateOne
+        givenFindingCommitInfoReturns(commitInfo)
 
-      source.transformEventsWith(send(returning = startCommit.id -> Existed)) shouldBe List(Existed).pure[Try]
-    }
+        source.transformEventsWith(send(returning = startCommit.id -> Existed)) shouldBe List(Existed).pure[Try]
+      }
 
     "map a single commit event with the transform function " +
       "if found commit info has some parents " +
       "but the event for the start event already exists in the Event Log" in new TestCase {
 
-      val commitInfo = commitInfos(startCommit.id, someParents).generateOne
-      givenFindingCommitInfoReturns(commitInfo)
+        val commitInfo = commitInfos(startCommit.id, someParents).generateOne
+        givenFindingCommitInfoReturns(commitInfo)
 
-      source.transformEventsWith(send(returning = startCommit.id -> Existed)) shouldBe List(Existed).pure[Try]
-    }
+        source.transformEventsWith(send(returning = startCommit.id -> Existed)) shouldBe List(Existed).pure[Try]
+      }
 
     "map commit events with the transform function " +
       "starting from the given start commit to the ancestor matching the latest event in the Event Log" in new TestCase {
 
-      val level1Info = commitInfos(startCommit.id, singleParent).generateOne
+        val level1Info = commitInfos(startCommit.id, singleParent).generateOne
 
-      val level2Infos = level1Info.parents map { parentId =>
-        commitInfos(parentId, singleParent).generateOne
+        val level2Infos = level1Info.parents map { parentId =>
+          commitInfos(parentId, singleParent).generateOne
+        }
+
+        val level3Infos = level2Infos.flatMap(_.parents) map { parentId =>
+          commitInfos(parentId, noParents).generateOne
+        }
+
+        givenFindingCommitInfoReturns(level1Info, level2Infos)
+
+        source.transformEventsWith(
+          send(returning = startCommit.id -> Created, level2Infos.head.id -> Existed)
+        ) shouldBe List(Created, Existed).pure[Try]
       }
-
-      val level3Infos = level2Infos.flatMap(_.parents) map { parentId =>
-        commitInfos(parentId, noParents).generateOne
-      }
-
-      givenFindingCommitInfoReturns(level1Info, level2Infos)
-
-      source.transformEventsWith(
-        send(returning = startCommit.id -> Created, level2Infos.head.id -> Existed)
-      ) shouldBe List(Created, Existed).pure[Try]
-    }
 
     "map commit events with the transform function " +
       "starting from the given start commit to the oldest ancestor " +
       "if there are no events in the Event Log" in new TestCase {
 
-      val level1Parent = commitIds.generateOne
-      val level1Info   = commitInfos(startCommit.id, level1Parent).generateOne
+        val level1Parent = commitIds.generateOne
+        val level1Info   = commitInfos(startCommit.id, level1Parent).generateOne
 
-      val level2Parent = commitIds.generateOne
-      val level2Infos = List(
-        commitInfos(level1Parent, level2Parent).generateOne
-      )
+        val level2Parent = commitIds.generateOne
+        val level2Infos = List(
+          commitInfos(level1Parent, level2Parent).generateOne
+        )
 
-      val level3Infos = List(
-        commitInfos(level2Parent, noParents).generateOne
-      )
+        val level3Infos = List(
+          commitInfos(level2Parent, noParents).generateOne
+        )
 
-      givenFindingCommitInfoReturns(level1Info, level2Infos, level3Infos)
+        givenFindingCommitInfoReturns(level1Info, level2Infos, level3Infos)
 
-      source.transformEventsWith(
-        send(returning = startCommit.id -> Created, level1Parent -> Created, level2Parent -> Created)
-      ) shouldBe List(Created, Created, Created).pure[Try]
-    }
+        source.transformEventsWith(
+          send(returning = startCommit.id -> Created, level1Parent -> Created, level2Parent -> Created)
+        ) shouldBe List(Created, Created, Created).pure[Try]
+      }
 
     "map commit events with the transform function " +
       "starting from the given start commit to the oldest ancestor and multiple parents, " +
       "skipping traversing history of commits already in the Event Log" in new TestCase {
 
-      val level1Parent1 = commitIds.generateOne
-      val level1Parent2 = commitIds.generateOne
-      val level1Info    = commitInfos(startCommit.id, level1Parent1, level1Parent2).generateOne
+        val level1Parent1 = commitIds.generateOne
+        val level1Parent2 = commitIds.generateOne
+        val level1Info    = commitInfos(startCommit.id, level1Parent1, level1Parent2).generateOne
 
-      val level2Parent = commitIds.generateOne
-      val level2Infos = List(
-        commitInfos(level1Parent1, someParents).generateOne,
-        commitInfos(level1Parent2, level2Parent).generateOne
-      )
-      val level3Info = commitInfos(level2Parent, noParents).generateOne
-
-      givenFindingCommitInfoReturns(level1Info, level2Infos, List(level3Info))
-
-      source.transformEventsWith(
-        send(
-          startCommit.id -> Created,
-          level1Parent1  -> Existed,
-          level1Parent2  -> Created,
-          level2Parent   -> Created
+        val level2Parent = commitIds.generateOne
+        val level2Infos = List(
+          commitInfos(level1Parent1, someParents).generateOne,
+          commitInfos(level1Parent2, level2Parent).generateOne
         )
-      ) shouldBe List(Created, Existed, Created, Created).pure[Try]
-    }
+        val level3Info = commitInfos(level2Parent, noParents).generateOne
+
+        givenFindingCommitInfoReturns(level1Info, level2Infos, List(level3Info))
+
+        source.transformEventsWith(
+          send(
+            startCommit.id -> Created,
+            level1Parent1  -> Existed,
+            level1Parent2  -> Created,
+            level2Parent   -> Created
+          )
+        ) shouldBe List(Created, Existed, Created, Created).pure[Try]
+      }
 
     "map commit events with the transform function " +
       "starting from given start commit to the oldest ancestor " +
       "skipping commits with the 'don't care' 0000000000000000000000000000000000000000 ref" in new TestCase {
 
-      val level1Parent1 = CommitId("0000000000000000000000000000000000000000")
-      val level1Parent2 = commitIds.generateOne
-      val level1Info    = commitInfos(startCommit.id, level1Parent1, level1Parent2).generateOne
-      val level2Info    = commitInfos(level1Parent2, noParents).generateOne
+        val level1Parent1 = CommitId("0000000000000000000000000000000000000000")
+        val level1Parent2 = commitIds.generateOne
+        val level1Info    = commitInfos(startCommit.id, level1Parent1, level1Parent2).generateOne
+        val level2Info    = commitInfos(level1Parent2, noParents).generateOne
 
-      givenFindingCommitInfoReturns(level1Info, level2Info)
+        givenFindingCommitInfoReturns(level1Info, level2Info)
 
-      source.transformEventsWith(
-        send(
-          startCommit.id -> Created,
-          level1Parent2  -> Created
-        )
-      ) shouldBe List(Created, Created).pure[Try]
-    }
+        source.transformEventsWith(
+          send(
+            startCommit.id -> Created,
+            level1Parent2  -> Created
+          )
+        ) shouldBe List(Created, Created).pure[Try]
+      }
 
     "fail mapping the events " +
       "if finding commit info fails" in new TestCase {
 
-      val level1Info = commitInfos(startCommit.id, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
-      val level2Infos @ level2Info1 +: level2Info2 +: Nil = level1Info.parents map { parentId =>
-        commitInfos(parentId, noParents).generateOne
+        val level1Info = commitInfos(startCommit.id, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
+        val level2Infos @ level2Info1 +: level2Info2 +: Nil = level1Info.parents map { parentId =>
+          commitInfos(parentId, noParents).generateOne
+        }
+
+        givenFindingCommitInfoReturns(level1Info, level2Info2)
+
+        val exception = exceptions.generateOne
+        (commitInfoFinder
+          .findCommitInfo(_: Id, _: CommitId, _: Option[AccessToken]))
+          .expects(startCommit.project.id, level2Info1.id, maybeAccessToken)
+          .returning(context.raiseError(exception))
+
+        source.transformEventsWith(
+          send(
+            startCommit.id -> Created,
+            level2Info2.id -> Created
+          )
+        ) shouldBe exception.raiseError[Try, List[SendingResult]]
       }
-
-      givenFindingCommitInfoReturns(level1Info, level2Info2)
-
-      val exception = exceptions.generateOne
-      (commitInfoFinder
-        .findCommitInfo(_: Id, _: CommitId, _: Option[AccessToken]))
-        .expects(startCommit.project.id, level2Info1.id, maybeAccessToken)
-        .returning(context.raiseError(exception))
-
-      source.transformEventsWith(
-        send(
-          startCommit.id -> Created,
-          level2Info2.id -> Created
-        )
-      ) shouldBe exception.raiseError[Try, List[SendingResult]]
-    }
 
     "fail mapping the events " +
       "if the transform function fails on one of the events" in new TestCase {
 
-      val level1Parent1 = commitIds.generateOne
-      val level1Parent2 = commitIds.generateOne
-      val level1Info    = commitInfos(startCommit.id, level1Parent1, level1Parent2).generateOne
+        val level1Parent1 = commitIds.generateOne
+        val level1Parent2 = commitIds.generateOne
+        val level1Info    = commitInfos(startCommit.id, level1Parent1, level1Parent2).generateOne
 
-      val level2Infos @ level2Info1 +: _ = List(
-        commitInfos(level1Parent1, noParents).generateOne,
-        commitInfos(level1Parent2, noParents).generateOne
-      )
-      givenFindingCommitInfoReturns(level1Info, level2Infos)
+        val level2Infos @ level2Info1 +: _ = List(
+          commitInfos(level1Parent1, noParents).generateOne,
+          commitInfos(level1Parent2, noParents).generateOne
+        )
+        givenFindingCommitInfoReturns(level1Info, level2Infos)
 
-      val exception = exceptions.generateOne
-      val failingSend: CommitEvent => Try[SendingResult] = event =>
-        if (event.id == level2Info1.id) exception.raiseError[Try, SendingResult]
-        else Created.pure[Try]
-      source.transformEventsWith(failingSend) shouldBe exception.raiseError[Try, List[SendingResult]]
-    }
+        val exception = exceptions.generateOne
+        val failingSend: CommitEvent => Try[SendingResult] = event =>
+          if (event.id == level2Info1.id) exception.raiseError[Try, SendingResult]
+          else Created.pure[Try]
+        source.transformEventsWith(failingSend) shouldBe exception.raiseError[Try, List[SendingResult]]
+      }
   }
 
   private trait TestCase {

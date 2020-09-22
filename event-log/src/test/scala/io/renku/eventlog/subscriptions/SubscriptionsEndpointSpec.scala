@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.controllers.InfoMessage.InfoMessage
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
@@ -49,21 +49,21 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
     s"return $Accepted when there are NEW and RECOVERABLE_FAILURE statuses in the payload " +
       "and subscriber URL was added to the pool" in new TestCase {
 
-      (subscriptions.add _)
-        .expects(subscriberUrl)
-        .returning(IO.unit)
+        (subscriptions.add _)
+          .expects(subscriberUrl)
+          .returning(IO.unit)
 
-      val request = Request(Method.POST, uri"subscriptions")
-        .withEntity((subscriberUrl -> Set(New, RecoverableFailure)).asJson)
+        val request = Request(Method.POST, uri"subscriptions")
+          .withEntity((subscriberUrl -> Set(New, RecoverableFailure)).asJson)
 
-      val response = addSubscription(request).unsafeRunSync()
+        val response = addSubscription(request).unsafeRunSync()
 
-      response.status                        shouldBe Accepted
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Subscription added")
+        response.status                        shouldBe Accepted
+        response.contentType                   shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Subscription added")
 
-      logger.expectNoLogs()
-    }
+        logger.expectNoLogs()
+      }
 
     s"return $BadRequest when subscriber URL cannot be decoded from the request" in new TestCase {
 
@@ -128,8 +128,8 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
   }
 
   private implicit lazy val payloadEncoder: Encoder[(SubscriberUrl, Set[EventStatus])] =
-    Encoder.instance[(SubscriberUrl, Set[EventStatus])] {
-      case (url, statuses) => json"""{
+    Encoder.instance[(SubscriberUrl, Set[EventStatus])] { case (url, statuses) =>
+      json"""{
         "subscriberUrl": ${url.value},
         "statuses": ${statuses.map(_.toString).toList}
       }"""

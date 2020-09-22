@@ -27,5 +27,5 @@ private class IOEventBodyDeserialiser extends EventBodyDeserialiser[IO]
 abstract class IOEventProcessingEndpoint(eventBodyDeserializer:  EventBodyDeserialiser[IO],
                                          eventsProcessingRunner: EventsProcessingRunner[IO],
                                          reProvisioningStatus:   ReProvisioningStatus[IO],
-                                         logger:                 Logger[IO])
-    extends EventProcessingEndpoint[IO](eventBodyDeserializer, eventsProcessingRunner, reProvisioningStatus, logger)
+                                         logger:                 Logger[IO]
+) extends EventProcessingEndpoint[IO](eventBodyDeserializer, eventsProcessingRunner, reProvisioningStatus, logger)

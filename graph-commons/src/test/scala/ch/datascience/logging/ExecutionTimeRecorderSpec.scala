@@ -20,7 +20,7 @@ package ch.datascience.logging
 
 import cats.MonadError
 import cats.effect.Clock
-import cats.implicits._
+
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
@@ -107,7 +107,7 @@ class ExecutionTimeRecorderSpec
       }
 
       val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
-      sample.value              should be >= blockExecutionTime.toDouble / 1000
+      sample.value                should be >= blockExecutionTime.toDouble / 1000
       sample.labelNames.asScala shouldBe empty
     }
 
@@ -126,9 +126,11 @@ class ExecutionTimeRecorderSpec
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
       executionTimeRecorder.measureExecutionTime[String]({
-        Thread sleep blockExecutionTime
-        block()
-      }, Some(label))
+                                                           Thread sleep blockExecutionTime
+                                                           block()
+                                                         },
+                                                         Some(label)
+      )
 
       val Some(sample) = histogram.collect().asScala.flatMap(_.samples.asScala).lastOption
       sample.value              should be >= blockExecutionTime.toDouble / 1000
@@ -150,10 +152,10 @@ class ExecutionTimeRecorderSpec
       block.expects().returning(context.pure(blockOut))
 
       val blockExecutionTime = positiveInts(max = 100).generateOne.value
-      executionTimeRecorder.measureExecutionTime[String]({
+      executionTimeRecorder.measureExecutionTime[String] {
         Thread sleep blockExecutionTime
         block()
-      })
+      }
 
       histogram.collect().asScala.flatMap(_.samples.asScala).lastOption shouldBe None
 
@@ -165,33 +167,33 @@ class ExecutionTimeRecorderSpec
 
     "log warning with the phrase returned from the given partial function if it gets applied " +
       "and the elapsed time is >= threshold" in new TestCase {
-      import executionTimeRecorder._
+        import executionTimeRecorder._
 
-      val elapsedTime           = elapsedTimes.retryUntil(_.value >= loggingThreshold.value).generateOne
-      val blockOut              = nonEmptyStrings().generateOne
-      val blockExecutionMessage = "block executed"
+        val elapsedTime           = elapsedTimes.retryUntil(_.value >= loggingThreshold.value).generateOne
+        val blockOut              = nonEmptyStrings().generateOne
+        val blockExecutionMessage = "block executed"
 
-      context.pure(elapsedTime -> blockOut) map logExecutionTimeWhen {
-        case _ => blockExecutionMessage
-      } shouldBe context.pure(blockOut)
+        context.pure(elapsedTime -> blockOut) map logExecutionTimeWhen { case _ =>
+          blockExecutionMessage
+        } shouldBe context.pure(blockOut)
 
-      logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
-    }
+        logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))
+      }
 
     "not log a message if the given partial function does get applied " +
       "but the elapsed time is < threshold" in new TestCase {
-      import executionTimeRecorder._
+        import executionTimeRecorder._
 
-      val elapsedTime           = ElapsedTime(loggingThreshold.value - 1)
-      val blockOut              = nonEmptyStrings().generateOne
-      val blockExecutionMessage = "block executed"
+        val elapsedTime           = ElapsedTime(loggingThreshold.value - 1)
+        val blockOut              = nonEmptyStrings().generateOne
+        val blockExecutionMessage = "block executed"
 
-      context.pure(elapsedTime -> blockOut) map logExecutionTimeWhen {
-        case _ => blockExecutionMessage
-      } shouldBe context.pure(blockOut)
+        context.pure(elapsedTime -> blockOut) map logExecutionTimeWhen { case _ =>
+          blockExecutionMessage
+        } shouldBe context.pure(blockOut)
 
-      logger.expectNoLogs()
-    }
+        logger.expectNoLogs()
+      }
 
     "not log a message if the given partial function does not get applied" in new TestCase {
       import executionTimeRecorder._
@@ -200,8 +202,8 @@ class ExecutionTimeRecorderSpec
       val blockOut              = nonEmptyStrings().generateOne
       val blockExecutionMessage = "block executed"
 
-      context.pure(elapsedTime -> blockOut) map logExecutionTimeWhen {
-        case "" => blockExecutionMessage
+      context.pure(elapsedTime -> blockOut) map logExecutionTimeWhen { case "" =>
+        blockExecutionMessage
       } shouldBe context.pure(blockOut)
 
       logger.expectNoLogs()
@@ -261,8 +263,8 @@ class ExecutionTimeRecorderSpec
         val blockOut              = nonEmptyStrings().generateOne
         val blockExecutionMessage = "block executed"
 
-        context.pure(elapsedTime -> blockOut) map executionTimeRecorder.logExecutionTimeWhen {
-          case _ => blockExecutionMessage
+        context.pure(elapsedTime -> blockOut) map executionTimeRecorder.logExecutionTimeWhen { case _ =>
+          blockExecutionMessage
         } shouldBe context.pure(blockOut)
 
         logger.loggedOnly(Warn(s"$blockExecutionMessage in ${elapsedTime}ms"))

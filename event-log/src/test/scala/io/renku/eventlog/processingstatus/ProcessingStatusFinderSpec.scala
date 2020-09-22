@@ -45,30 +45,30 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec
       s"where $TriplesStore, $Skipped and $NonRecoverableFailure events are counted as done " +
       "and all as total" in new TestCase {
 
-      storeEvents(projectIds.generateOne, batchDates.generateOne, nonEmptyList(eventStatuses).generateOne)
+        storeEvents(projectIds.generateOne, batchDates.generateOne, nonEmptyList(eventStatuses).generateOne)
 
-      val toBeProcessedEvents = nonEmptyList(
-        Gen.oneOf(New, Processing, RecoverableFailure),
-        minElements = 10,
-        maxElements = 20
-      ).generateOne
-      val doneEvents = nonEmptyList(
-        Gen.oneOf(TriplesStore, Skipped, NonRecoverableFailure),
-        minElements = 10,
-        maxElements = 20
-      ).generateOne
-      val batchDate = batchDates.generateOne
-      storeEvents(projectId, batchDate, toBeProcessedEvents ::: doneEvents)
+        val toBeProcessedEvents = nonEmptyList(
+          Gen.oneOf(New, Processing, RecoverableFailure),
+          minElements = 10,
+          maxElements = 20
+        ).generateOne
+        val doneEvents = nonEmptyList(
+          Gen.oneOf(TriplesStore, Skipped, NonRecoverableFailure),
+          minElements = 10,
+          maxElements = 20
+        ).generateOne
+        val batchDate = batchDates.generateOne
+        storeEvents(projectId, batchDate, toBeProcessedEvents ::: doneEvents)
 
-      val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
+        val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
 
-      val expectedTotal = doneEvents.size + toBeProcessedEvents.size
-      processingStatus.done.value           shouldBe doneEvents.size
-      processingStatus.total.value          shouldBe expectedTotal
-      processingStatus.progress.value.floor shouldBe ((doneEvents.size.toDouble / expectedTotal) * 100).floor
+        val expectedTotal = doneEvents.size + toBeProcessedEvents.size
+        processingStatus.done.value           shouldBe doneEvents.size
+        processingStatus.total.value          shouldBe expectedTotal
+        processingStatus.progress.value.floor shouldBe ((doneEvents.size.toDouble / expectedTotal) * 100).floor
 
-      queriesExecTimes.verifyExecutionTimeMeasured("processing status")
-    }
+        queriesExecTimes.verifyExecutionTimeMeasured("processing status")
+      }
 
     "return ProcessingStatus for the latest batch only" in new TestCase {
 
@@ -91,20 +91,20 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec
     "return ProcessingStatus with done=total=(events in the batch) " +
       "if all events from the latest batch are processed" in new TestCase {
 
-      val olderBatchDate     = batchDates.generateOne
-      val olderBatchStatuses = nonEmptyList(eventStatuses).generateOne
-      storeEvents(projectId, olderBatchDate, olderBatchStatuses)
+        val olderBatchDate     = batchDates.generateOne
+        val olderBatchStatuses = nonEmptyList(eventStatuses).generateOne
+        storeEvents(projectId, olderBatchDate, olderBatchStatuses)
 
-      val newerBatchDate     = BatchDate(olderBatchDate.value plus (1, MINUTES))
-      val newerBatchStatuses = nonEmptyList(Gen.oneOf(TriplesStore, Skipped, NonRecoverableFailure)).generateOne
-      storeEvents(projectId, newerBatchDate, newerBatchStatuses)
+        val newerBatchDate     = BatchDate(olderBatchDate.value plus (1, MINUTES))
+        val newerBatchStatuses = nonEmptyList(Gen.oneOf(TriplesStore, Skipped, NonRecoverableFailure)).generateOne
+        storeEvents(projectId, newerBatchDate, newerBatchStatuses)
 
-      val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
+        val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
 
-      processingStatus.total.value    shouldBe newerBatchStatuses.size
-      processingStatus.done.value     shouldBe newerBatchStatuses.size
-      processingStatus.progress.value shouldBe 100d
-    }
+        processingStatus.total.value    shouldBe newerBatchStatuses.size
+        processingStatus.done.value     shouldBe newerBatchStatuses.size
+        processingStatus.progress.value shouldBe 100d
+      }
 
     "return None if there are no events for the project id" in new TestCase {
       processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync() shouldBe None

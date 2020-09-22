@@ -52,65 +52,66 @@ class ToNonRecoverableFailureSpec
       "decrement waiting events and under processing gauges for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
-      storeEvent(
-        compoundEventIds.generateOne.copy(id = eventId.id),
-        EventStatus.Processing,
-        executionDates.generateOne,
-        eventDates.generateOne,
-        eventBodies.generateOne,
-        batchDate = eventBatchDate
-      )
-      val executionDate = executionDates.generateOne
-      val projectPath   = projectPaths.generateOne
-      storeEvent(
-        eventId,
-        EventStatus.Processing,
-        executionDate,
-        eventDates.generateOne,
-        eventBodies.generateOne,
-        batchDate   = eventBatchDate,
-        projectPath = projectPath
-      )
-
-      findEvent(eventId) shouldBe Some((executionDate, Processing, None))
-
-      (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
-
-      val maybeMessage = Gen.option(eventMessages).generateOne
-      val command =
-        ToNonRecoverableFailure[IO](eventId, maybeMessage, underProcessingGauge, currentTime)
-
-      (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
-
-      findEvent(eventId) shouldBe Some((ExecutionDate(now), NonRecoverableFailure, maybeMessage))
-
-      histogram.verifyExecutionTimeMeasured(command.query.name)
-    }
-
-    EventStatus.all.filterNot(_ == Processing) foreach { eventStatus =>
-      s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.Conflict}" in new TestCase {
-
+        storeEvent(
+          compoundEventIds.generateOne.copy(id = eventId.id),
+          EventStatus.Processing,
+          executionDates.generateOne,
+          eventDates.generateOne,
+          eventBodies.generateOne,
+          batchDate = eventBatchDate
+        )
         val executionDate = executionDates.generateOne
-        storeEvent(eventId,
-                   eventStatus,
-                   executionDate,
-                   eventDates.generateOne,
-                   eventBodies.generateOne,
-                   batchDate = eventBatchDate)
+        val projectPath   = projectPaths.generateOne
+        storeEvent(
+          eventId,
+          EventStatus.Processing,
+          executionDate,
+          eventDates.generateOne,
+          eventBodies.generateOne,
+          batchDate = eventBatchDate,
+          projectPath = projectPath
+        )
 
-        findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+        findEvent(eventId) shouldBe Some((executionDate, Processing, None))
+
+        (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
           ToNonRecoverableFailure[IO](eventId, maybeMessage, underProcessingGauge, currentTime)
 
-        (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+        (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+        findEvent(eventId) shouldBe Some((ExecutionDate(now), NonRecoverableFailure, maybeMessage))
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
+
+    EventStatus.all.filterNot(_ == Processing) foreach { eventStatus =>
+      s"do nothing when updating event with $eventStatus status " +
+        s"and return ${UpdateResult.Conflict}" in new TestCase {
+
+          val executionDate = executionDates.generateOne
+          storeEvent(eventId,
+                     eventStatus,
+                     executionDate,
+                     eventDates.generateOne,
+                     eventBodies.generateOne,
+                     batchDate = eventBatchDate
+          )
+
+          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+
+          val maybeMessage = Gen.option(eventMessages).generateOne
+          val command =
+            ToNonRecoverableFailure[IO](eventId, maybeMessage, underProcessingGauge, currentTime)
+
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+
+          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+
+          histogram.verifyExecutionTimeMeasured(command.query.name)
+        }
     }
   }
 

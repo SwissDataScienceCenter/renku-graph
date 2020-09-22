@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects.{DateCreated, Path, ResourceId}
 import ch.datascience.graph.model.users
@@ -105,7 +105,8 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
 
   def addNewCreator(projectPath:       Path,
                     maybeCreatorEmail: Option[Email],
-                    maybeCreatorName:  Option[users.Name]): List[SparqlQuery] = {
+                    maybeCreatorName:  Option[users.Name]
+  ): List[SparqlQuery] = {
     val projectId = ResourceId(renkuBaseUrl, projectPath)
     maybeCreatorEmail match {
       case Some(creatorEmail) =>

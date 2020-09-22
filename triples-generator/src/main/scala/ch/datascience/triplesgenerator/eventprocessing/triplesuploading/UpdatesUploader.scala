@@ -35,21 +35,22 @@ private trait UpdatesUploader[Interpretation[_]] {
 }
 
 private class IOUpdatesUploader(
-    rdfStoreConfig:          RdfStoreConfig,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO],
-    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
-)(implicit executionContext: ExecutionContext,
-  contextShift:              ContextShift[IO],
-  timer:                     Timer[IO],
-  ME:                        MonadError[IO, Throwable])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder, retryInterval, maxRetries)
+    rdfStoreConfig: RdfStoreConfig,
+    logger:         Logger[IO],
+    timeRecorder:   SparqlQueryTimeRecorder[IO],
+    retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO],
+    ME:               MonadError[IO, Throwable]
+) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder, retryInterval, maxRetries)
     with UpdatesUploader[IO] {
 
   import LogMessage._
   import TriplesUploadResult._
-  import cats.implicits._
+  import cats.syntax.all._
   import org.http4s.Status.{BadRequest, Ok}
   import org.http4s.{Request, Response, Status}
 
@@ -72,7 +73,7 @@ private class IOUpdatesUploader(
   private def toDeliveryFailure(status: Status)(message: String) =
     RecoverableFailure(s"Triples curation update failed: $status: $message")
 
-  private def deliveryFailure: PartialFunction[Throwable, IO[TriplesUploadResult]] = {
-    case NonFatal(exception) => ME.pure(RecoverableFailure(exception.getMessage))
+  private def deliveryFailure: PartialFunction[Throwable, IO[TriplesUploadResult]] = { case NonFatal(exception) =>
+    ME.pure(RecoverableFailure(exception.getMessage))
   }
 }

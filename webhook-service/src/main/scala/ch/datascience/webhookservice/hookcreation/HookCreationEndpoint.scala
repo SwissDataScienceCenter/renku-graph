@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.hookcreation
 
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.controllers.ErrorMessage._
@@ -42,7 +42,8 @@ import scala.util.control.NonFatal
 
 class HookCreationEndpoint[Interpretation[_]: Effect](
     hookCreator:       HookCreator[Interpretation],
-    accessTokenFinder: AccessTokenExtractor[Interpretation]
+    accessTokenFinder: AccessTokenExtractor[Interpretation],
+    logger:            Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
   import accessTokenFinder._
@@ -65,22 +66,26 @@ class HookCreationEndpoint[Interpretation[_]: Effect](
       Response[Interpretation](Status.Unauthorized)
         .withEntity[ErrorMessage](ErrorMessage(ex))
         .pure[Interpretation]
-    case NonFatal(exception) => InternalServerError(ErrorMessage(exception))
+    case NonFatal(exception) =>
+      logger.error(exception)(exception.getMessage)
+      InternalServerError(ErrorMessage(exception))
   }
 }
 
 object IOHookCreationEndpoint {
   def apply(
-      projectHookUrl:          ProjectHookUrl,
-      gitLabThrottler:         Throttler[IO, GitLab],
-      hookTokenCrypto:         HookTokenCrypto[IO],
-      executionTimeRecorder:   ExecutionTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    clock:                     Clock[IO],
-    timer:                     Timer[IO]): IO[HookCreationEndpoint[IO]] =
+      projectHookUrl:        ProjectHookUrl,
+      gitLabThrottler:       Throttler[IO, GitLab],
+      hookTokenCrypto:       HookTokenCrypto[IO],
+      executionTimeRecorder: ExecutionTimeRecorder[IO],
+      logger:                Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      clock:            Clock[IO],
+      timer:            Timer[IO]
+  ): IO[HookCreationEndpoint[IO]] =
     for {
       hookCreator <- IOHookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
-    } yield new HookCreationEndpoint[IO](hookCreator, new AccessTokenExtractor[IO])
+    } yield new HookCreationEndpoint[IO](hookCreator, new AccessTokenExtractor[IO], logger)
 }

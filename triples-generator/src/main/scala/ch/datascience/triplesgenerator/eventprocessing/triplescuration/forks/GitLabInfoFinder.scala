@@ -46,7 +46,7 @@ private class IOGitLabInfoFinder(
 
   import cats.data.OptionT
   import cats.effect._
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.http.client.UrlEncoder.urlEncode
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
@@ -62,14 +62,16 @@ private class IOGitLabInfoFinder(
       path:                    projects.Path
   )(implicit maybeAccessToken: Option[AccessToken]): IO[Option[GitLabProject]] = {
     for {
-      projectsUri               <- OptionT.liftF(validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(path.value)}"))
-      (project, maybeCreatorId) <- send(request(GET, projectsUri, maybeAccessToken))(mapTo[ProjectAndCreatorId]).toOptionT
-      maybeCreator              <- fetchCreator(maybeCreatorId, maybeAccessToken)
+      projectsUri <- OptionT.liftF(validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(path.value)}"))
+      (project, maybeCreatorId) <-
+        send(request(GET, projectsUri, maybeAccessToken))(mapTo[ProjectAndCreatorId]).toOptionT
+      maybeCreator <- fetchCreator(maybeCreatorId, maybeAccessToken)
     } yield project.copy(maybeCreator = maybeCreator)
   }.value
 
   private def fetchCreator(maybeCreatorId:   Option[Int],
-                           maybeAccessToken: Option[AccessToken]): OptionT[IO, Option[GitLabCreator]] =
+                           maybeAccessToken: Option[AccessToken]
+  ): OptionT[IO, Option[GitLabCreator]] =
     maybeCreatorId match {
       case None => OptionT.some[IO](Option.empty[GitLabCreator])
       case Some(creatorId) =>
@@ -81,8 +83,8 @@ private class IOGitLabInfoFinder(
         }
     }
 
-  private def mapTo[OUT](
-      implicit decoder: EntityDecoder[IO, OUT]
+  private def mapTo[OUT](implicit
+      decoder: EntityDecoder[IO, OUT]
   ): PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[OUT]]] = {
     case (Ok, _, response) => response.as[OUT].map(Option.apply)
     case (NotFound, _, _)  => None.pure[IO]
@@ -98,8 +100,8 @@ private class IOGitLabInfoFinder(
         dateCreated    <- cursor.downField("created_at").as[DateCreated]
         maybeCreatorId <- cursor.downField("creator_id").as[Option[Int]]
         maybeParentPath <- cursor
-                            .downField("forked_from_project")
-                            .as[Option[projects.Path]](decodeOption(parentPathDecoder))
+                             .downField("forked_from_project")
+                             .as[Option[projects.Path]](decodeOption(parentPathDecoder))
       } yield GitLabProject(path, maybeParentPath, maybeCreator = None, dateCreated) -> maybeCreatorId
 
     jsonOf[IO, ProjectAndCreatorId]
@@ -112,15 +114,15 @@ private class IOGitLabInfoFinder(
       for {
         maybeName <- cursor.downField("name").as[Option[users.Name]]
         maybeEmail <- cursor
-                       .downField("email")
-                       .as[Option[String]]
-                       .map(blankToNone)
-                       .flatMap(toOption[Email])
+                        .downField("email")
+                        .as[Option[String]]
+                        .map(blankToNone)
+                        .flatMap(toOption[Email])
         maybePublicEmail <- cursor
-                             .downField("public_email")
-                             .as[Option[String]]
-                             .map(blankToNone)
-                             .flatMap(toOption[Email])
+                              .downField("public_email")
+                              .as[Option[String]]
+                              .map(blankToNone)
+                              .flatMap(toOption[Email])
       } yield GitLabCreator(maybeEmail orElse maybePublicEmail, maybeName)
 
     jsonOf[IO, GitLabCreator]
@@ -134,11 +136,13 @@ private class IOGitLabInfoFinder(
 private object IOGitLabInfoFinder {
 
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[GitLabInfoFinder[IO]] =
+      gitLabThrottler: Throttler[IO, GitLab],
+      logger:          Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[GitLabInfoFinder[IO]] =
     for {
       gitLabUrl <- GitLabUrl[IO]()
     } yield new IOGitLabInfoFinder(gitLabUrl, gitLabThrottler, logger)

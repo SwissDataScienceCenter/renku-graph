@@ -18,7 +18,6 @@
 
 package ch.datascience.control
 
-import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.control.RateLimitUnit._
 import ch.datascience.generators.CommonGraphGenerators._

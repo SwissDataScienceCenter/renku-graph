@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -30,8 +30,8 @@ import io.circe.{Decoder, DecodingFailure, Error, HCursor, ParsingFailure}
 
 import scala.language.higherKinds
 
-private class EventBodyDeserialiser[Interpretation[_]](
-    implicit ME: MonadError[Interpretation, Throwable]
+private class EventBodyDeserialiser[Interpretation[_]](implicit
+    ME: MonadError[Interpretation, Throwable]
 ) {
 
   def toCommitEvents(eventBody: EventBody): Interpretation[NonEmptyList[CommitEvent]] = ME.fromEither {

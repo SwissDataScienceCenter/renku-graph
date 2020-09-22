@@ -23,7 +23,7 @@ import java.time.{Duration, Instant}
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.config.RenkuLogTimeout
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
@@ -74,8 +74,8 @@ private class EventFetcherImpl(
     for {
       maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue) map selectRandom
       maybeIdAndProjectAndBody <- maybeProject
-                                   .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
-                                   .getOrElse(Free.pure[ConnectionOp, Option[EventIdAndBody]](None))
+                                    .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
+                                    .getOrElse(Free.pure[ConnectionOp, Option[EventIdAndBody]](None))
       maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
     } yield maybeProject -> maybeBody
 
@@ -137,12 +137,11 @@ private class EventFetcherImpl(
   }
 
   private def maybeUpdateMetrics(maybeProject: Option[ProjectIdAndPath], maybeBody: Option[EventIdAndBody]) =
-    (maybeBody, maybeProject) mapN {
-      case (_, (_, projectPath)) =>
-        for {
-          _ <- waitingEventsGauge decrement projectPath
-          _ <- underProcessingGauge increment projectPath
-        } yield ()
+    (maybeBody, maybeProject) mapN { case (_, (_, projectPath)) =>
+      for {
+        _ <- waitingEventsGauge decrement projectPath
+        _ <- underProcessingGauge increment projectPath
+      } yield ()
     } getOrElse ME.unit
 }
 
@@ -158,5 +157,6 @@ private object IOEventLogFetch {
                                                     _,
                                                     waitingEventsGauge,
                                                     underProcessingGauge,
-                                                    queriesExecTimes))
+                                                    queriesExecTimes
+    ))
 }

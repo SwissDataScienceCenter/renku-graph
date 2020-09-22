@@ -98,7 +98,8 @@ object WebhookServiceGenerators {
 
   implicit def parentsIdsLists(minNumber: Int = 0, maxNumber: Int = 4): Gen[List[CommitId]] = {
     require(minNumber <= maxNumber,
-            s"minNumber = $minNumber is not <= maxNumber = $maxNumber for generating parents Ids list")
+            s"minNumber = $minNumber is not <= maxNumber = $maxNumber for generating parents Ids list"
+    )
 
     for {
       parentCommitsNumber <- choose(minNumber, maxNumber)

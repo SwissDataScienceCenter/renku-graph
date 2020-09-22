@@ -22,7 +22,7 @@ package datasets
 import cats.MonadError
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
@@ -53,13 +53,13 @@ private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
     for {
       datasetInfos <- findDatasetsInfo(curatedTriples.triples).asRightT
       topmostInfos <- EitherT(
-                       datasetInfos
-                         .map(findTopmostData)
-                         .toList
-                         .sequence
-                         .map(_.asRight[ProcessingRecoverableError])
-                         .recover(maybeToRecoverableError)
-                     )
+                        datasetInfos
+                          .map(findTopmostData)
+                          .toList
+                          .sequence
+                          .map(_.asRight[ProcessingRecoverableError])
+                          .recover(maybeToRecoverableError)
+                      )
       updatedTriples = topmostInfos.foldLeft(curatedTriples)(mergeTopmostDataIntoTriples)
     } yield topmostInfos.foldLeft(updatedTriples)(descendantsUpdater.prepareUpdates[Interpretation])
 

@@ -22,7 +22,7 @@ import ammonite.ops.{CommandResult, root}
 import cats.data.EitherT
 import cats.data.EitherT._
 import cats.effect.{ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -60,49 +60,49 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       "convert the stream to RDF model and " +
       "removes the temp directory" in new TestCase {
 
-      (file
-        .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        (file
+          .mkdir(_: Path))
+          .expects(repositoryDirectory)
+          .returning(IO.pure(repositoryDirectory))
 
-      (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
-        .expects(projectPath, maybeAccessToken)
-        .returning(IO.pure(gitRepositoryUrl))
+        (gitLabRepoUrlFinder
+          .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+          .expects(projectPath, maybeAccessToken)
+          .returning(IO.pure(gitRepositoryUrl))
 
-      (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
+        (git
+          .clone(_: ServiceUrl, _: Path, _: Path))
+          .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+          .returning(rightT[IO, GenerationRecoverableError](()))
 
-      (git
-        .checkout(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(IO.unit)
+        (git
+          .checkout(_: CommitId, _: Path))
+          .expects(commitId, repositoryDirectory)
+          .returning(IO.unit)
 
-      (git
-        .findCommitMessage(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(nonBlankStrings().generateOne.value.pure[IO])
+        (git
+          .findCommitMessage(_: CommitId, _: Path))
+          .expects(commitId, repositoryDirectory)
+          .returning(nonBlankStrings().generateOne.value.pure[IO])
 
-      (renku
-        .migrate(_: CommitEvent, _: Path))
-        .expects(commitWithoutParent, repositoryDirectory)
-        .returning(IO.unit)
+        (renku
+          .migrate(_: CommitEvent, _: Path))
+          .expects(commitWithoutParent, repositoryDirectory)
+          .returning(IO.unit)
 
-      (renku
-        .log(_: CommitEventWithoutParent, _: Path)(_: (CommitEventWithoutParent, Path) => CommandResult))
-        .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
-        .returning(rightT[IO, ProcessingRecoverableError](triples))
+        (renku
+          .log(_: CommitEventWithoutParent, _: Path)(_: (CommitEventWithoutParent, Path) => CommandResult))
+          .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
+          .returning(rightT[IO, ProcessingRecoverableError](triples))
 
-      (file
-        .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.unit)
-        .atLeastOnce()
+        (file
+          .deleteDirectory(_: Path))
+          .expects(repositoryDirectory)
+          .returning(IO.unit)
+          .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync() shouldBe Right(Triples(triples))
-    }
+        triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync() shouldBe Right(Triples(triples))
+      }
 
     "create a temp directory, " +
       "clone the repo into it, " +
@@ -113,50 +113,50 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       "convert the stream to RDF model and " +
       "removes the temp directory" in new TestCase {
 
-      (file
-        .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        (file
+          .mkdir(_: Path))
+          .expects(repositoryDirectory)
+          .returning(IO.pure(repositoryDirectory))
 
-      (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
-        .expects(projectPath, maybeAccessToken)
-        .returning(IO.pure(gitRepositoryUrl))
+        (gitLabRepoUrlFinder
+          .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+          .expects(projectPath, maybeAccessToken)
+          .returning(IO.pure(gitRepositoryUrl))
 
-      (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
+        (git
+          .clone(_: ServiceUrl, _: Path, _: Path))
+          .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+          .returning(rightT[IO, GenerationRecoverableError](()))
 
-      (git
-        .checkout(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(IO.unit)
+        (git
+          .checkout(_: CommitId, _: Path))
+          .expects(commitId, repositoryDirectory)
+          .returning(IO.unit)
 
-      (git
-        .findCommitMessage(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(nonBlankStrings().generateOne.value.pure[IO])
+        (git
+          .findCommitMessage(_: CommitId, _: Path))
+          .expects(commitId, repositoryDirectory)
+          .returning(nonBlankStrings().generateOne.value.pure[IO])
 
-      val commitWithParent = toCommitWithParent(commitWithoutParent)
-      (renku
-        .migrate(_: CommitEvent, _: Path))
-        .expects(commitWithParent, repositoryDirectory)
-        .returning(IO.unit)
+        val commitWithParent = toCommitWithParent(commitWithoutParent)
+        (renku
+          .migrate(_: CommitEvent, _: Path))
+          .expects(commitWithParent, repositoryDirectory)
+          .returning(IO.unit)
 
-      (renku
-        .log(_: CommitEventWithParent, _: Path)(_: (CommitEventWithParent, Path) => CommandResult))
-        .expects(commitWithParent, repositoryDirectory, renku.commitWithParentTriplesFinder)
-        .returning(rightT(triples))
+        (renku
+          .log(_: CommitEventWithParent, _: Path)(_: (CommitEventWithParent, Path) => CommandResult))
+          .expects(commitWithParent, repositoryDirectory, renku.commitWithParentTriplesFinder)
+          .returning(rightT(triples))
 
-      (file
-        .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.unit)
-        .atLeastOnce()
+        (file
+          .deleteDirectory(_: Path))
+          .expects(repositoryDirectory)
+          .returning(IO.unit)
+          .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithParent).value.unsafeRunSync() shouldBe Right(Triples(triples))
-    }
+        triplesGenerator.generateTriples(commitWithParent).value.unsafeRunSync() shouldBe Right(Triples(triples))
+      }
 
     s"return $GenerationRecoverableError if 'renku log' returns one" in new TestCase {
 
@@ -211,39 +211,39 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       "check out the commit, " +
       s"and returns the $MigrationEvent if it's a migration commit" in new TestCase {
 
-      (file
-        .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        (file
+          .mkdir(_: Path))
+          .expects(repositoryDirectory)
+          .returning(IO.pure(repositoryDirectory))
 
-      (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
-        .expects(projectPath, maybeAccessToken)
-        .returning(IO.pure(gitRepositoryUrl))
+        (gitLabRepoUrlFinder
+          .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
+          .expects(projectPath, maybeAccessToken)
+          .returning(IO.pure(gitRepositoryUrl))
 
-      (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
+        (git
+          .clone(_: ServiceUrl, _: Path, _: Path))
+          .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+          .returning(rightT[IO, GenerationRecoverableError](()))
 
-      (git
-        .checkout(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(IO.unit)
+        (git
+          .checkout(_: CommitId, _: Path))
+          .expects(commitId, repositoryDirectory)
+          .returning(IO.unit)
 
-      (git
-        .findCommitMessage(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(sentenceContaining("renku migrate").generateOne.value.pure[IO])
+        (git
+          .findCommitMessage(_: CommitId, _: Path))
+          .expects(commitId, repositoryDirectory)
+          .returning(sentenceContaining("renku migrate").generateOne.value.pure[IO])
 
-      (file
-        .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.unit)
-        .atLeastOnce()
+        (file
+          .deleteDirectory(_: Path))
+          .expects(repositoryDirectory)
+          .returning(IO.unit)
+          .atLeastOnce()
 
-      triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync() shouldBe Right(MigrationEvent)
-    }
+        triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync() shouldBe Right(MigrationEvent)
+      }
 
     s"return $GenerationRecoverableError if cloning the repo returns such error" in new TestCase {
 
@@ -349,7 +349,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       actual.getMessage should startWith("Triples generation failed: ")
       actual.getMessage should not include accessToken.value
       actual.getMessage should include(accessToken.toString)
-      actual.getCause   shouldBe null
+      actual.getCause shouldBe null
     }
 
     "fail if checking out the sha fails" in new TestCase {

@@ -18,7 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets._
 import ch.datascience.rdfstore.FusekiBaseUrl
@@ -78,12 +78,14 @@ object DataSet {
                          partsFactories:             List[Activity => DataSetPartArtifact],
                          keywords:                   List[Keyword] = Nil,
                          overrideTopmostSameAs:      Option[TopmostSameAs] = None,
-                         overrideTopmostDerivedFrom: Option[DerivedFrom] = None)(activity: Activity): DataSetEntity =
+                         overrideTopmostDerivedFrom: Option[DerivedFrom] = None
+  )(activity:                                        Activity): DataSetEntity =
     new Entity(activity.commitId,
                Location(".renku") / "datasets" / id,
                activity.project,
                maybeInvalidationActivity = None,
-               maybeGeneration           = None) with DataSet with Artifact {
+               maybeGeneration = None
+    ) with DataSet with Artifact {
       override val datasetId:                         Identifier                = id
       override val datasetTitle:                      Title                     = title
       override val datasetName:                       Name                      = name
@@ -112,12 +114,14 @@ object DataSet {
                       partsFactories:             List[Activity => DataSetPartArtifact],
                       keywords:                   List[Keyword] = Nil,
                       overrideTopmostSameAs:      Option[TopmostSameAs] = None,
-                      overrideTopmostDerivedFrom: Option[DerivedFrom] = None)(activity: Activity): DataSetEntity =
+                      overrideTopmostDerivedFrom: Option[DerivedFrom] = None
+  )(activity:                                     Activity): DataSetEntity =
     new Entity(activity.commitId,
                Location(".renku") / "datasets" / id,
                activity.project,
                maybeInvalidationActivity = None,
-               maybeGeneration           = None) with DataSet with Artifact {
+               maybeGeneration = None
+    ) with DataSet with Artifact {
       override val datasetId:                         Identifier                = id
       override val datasetTitle:                      Title                     = title
       override val datasetName:                       Name                      = name
@@ -137,9 +141,9 @@ object DataSet {
   def entityId(identifier: Identifier)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId =
     EntityId of (renkuBaseUrl / "datasets" / identifier)
 
-  private implicit def converter(
-      implicit renkuBaseUrl: RenkuBaseUrl,
-      fusekiBaseUrl:         FusekiBaseUrl
+  private implicit def converter(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[DataSetEntity] =
     new PartialEntityConverter[DataSetEntity] {
       override def convert[T <: DataSetEntity]: T => Either[Exception, PartialEntity] = { entity =>
@@ -168,8 +172,10 @@ object DataSet {
       override def toEntityId: DataSetEntity => Option[EntityId] = entity => entityId(entity.datasetId).some
     }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl,
-                       fusekiBaseUrl:         FusekiBaseUrl): JsonLDEncoder[DataSetEntity] =
+  implicit def encoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): JsonLDEncoder[DataSetEntity] =
     JsonLDEncoder.instance { entity =>
       entity
         .asPartialJsonLD[Artifact]

@@ -63,7 +63,7 @@ trait TypesSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMet
     case (eventId, projectId) => CompoundEventId(eventId, projectId)
   }
 
-  implicit val projectRead: Read[EventProject] = Read[(projects.Id, projects.Path)].map {
-    case (id, path) => EventProject(id, path)
+  implicit val projectRead: Read[EventProject] = Read[(projects.Id, projects.Path)].map { case (id, path) =>
+    EventProject(id, path)
   }
 }

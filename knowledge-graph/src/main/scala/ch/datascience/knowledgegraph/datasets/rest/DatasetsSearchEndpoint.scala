@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.MonadError
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config._
 import ch.datascience.config.renku.ResourceUrl
 import ch.datascience.controllers.ErrorMessage
@@ -62,7 +62,8 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
 
   def searchForDatasets(maybePhrase: Option[Phrase],
                         sort:        Sort.By,
-                        paging:      PagingRequest): Interpretation[Response[Interpretation]] =
+                        paging:      PagingRequest
+  ): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
       implicit val datasetsUrl: renku.ResourceUrl = requestedUrl(maybePhrase, sort, paging)
 
@@ -77,15 +78,14 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
 
   private def httpResult(
       maybePhrase: Option[Phrase]
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(
-        maybePhrase
-          .map(phrase => s"Finding datasets matching '$phrase' failed")
-          .getOrElse("Finding all datasets failed")
-      )
-      logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+    val errorMessage = ErrorMessage(
+      maybePhrase
+        .map(phrase => s"Finding datasets matching '$phrase' failed")
+        .getOrElse("Finding all datasets failed")
+    )
+    logger.error(exception)(errorMessage.value)
+    InternalServerError(errorMessage)
   }
 
   private def finishedSuccessfully(maybePhrase: Option[Phrase]): PartialFunction[Response[Interpretation], String] = {
@@ -105,7 +105,7 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
         "published": $published,
         "projectsCount": $projectsCount
       }"""
-        .addIfDefined("description"           -> maybeDescription)
+        .addIfDefined("description" -> maybeDescription)
         .deepMerge(_links(Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))))
   }
 
@@ -158,10 +158,12 @@ object DatasetsSearchEndpoint {
 object IODatasetsSearchEndpoint {
 
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[DatasetsSearchEndpoint[IO]] =
+      timeRecorder: SparqlQueryTimeRecorder[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[DatasetsSearchEndpoint[IO]] =
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
@@ -171,7 +173,8 @@ object IODatasetsSearchEndpoint {
       new IODatasetsFinder(rdfStoreConfig,
                            new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger, timeRecorder),
                            ApplicationLogger,
-                           timeRecorder),
+                           timeRecorder
+      ),
       renkuResourceUrl,
       executionTimeRecorder,
       ApplicationLogger

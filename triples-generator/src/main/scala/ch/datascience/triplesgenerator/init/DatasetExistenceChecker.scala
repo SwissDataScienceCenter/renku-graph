@@ -31,8 +31,8 @@ private trait DatasetExistenceChecker[Interpretation[_]] {
   def doesDatasetExists(): Interpretation[Boolean]
 }
 
-private class IODatasetExistenceChecker(fusekiAdminConfig: FusekiAdminConfig, logger: Logger[IO])(
-    implicit executionContext:                             ExecutionContext,
+private class IODatasetExistenceChecker(fusekiAdminConfig: FusekiAdminConfig, logger: Logger[IO])(implicit
+    executionContext:                                      ExecutionContext,
     contextShift:                                          ContextShift[IO],
     timer:                                                 Timer[IO]
 ) extends IORestClient(Throttler.noThrottling, logger)

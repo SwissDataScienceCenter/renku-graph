@@ -21,7 +21,7 @@ package persondetails
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.JsonLDTriples
 import io.circe.Json
@@ -39,10 +39,9 @@ private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
   import updatesCreator._
 
   def curate(curatedTriples: CuratedTriples[Interpretation]): Interpretation[CuratedTriples[Interpretation]] =
-    removePersonsAttributes(curatedTriples.triples) map {
-      case (updatedTriples, persons) =>
-        val newUpdatesGroups = persons map prepareUpdates[Interpretation]
-        CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
+    removePersonsAttributes(curatedTriples.triples) map { case (updatedTriples, persons) =>
+      val newUpdatesGroups = persons map prepareUpdates[Interpretation]
+      CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
     }
 
   private object removePersonsAttributes extends (JsonLDTriples => Interpretation[(JsonLDTriples, Set[Person])]) {
@@ -112,8 +111,8 @@ private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
 
 private[triplescuration] object PersonDetailsUpdater {
 
-  def apply[Interpretation[_]]()(
-      implicit ME: MonadError[Interpretation, Throwable]
+  def apply[Interpretation[_]]()(implicit
+      ME: MonadError[Interpretation, Throwable]
   ): PersonDetailsUpdater[Interpretation] = new PersonDetailsUpdater[Interpretation](new UpdatesCreator)
 
   final case class Person(id: ResourceId, names: NonEmptyList[Name], emails: Set[Email])

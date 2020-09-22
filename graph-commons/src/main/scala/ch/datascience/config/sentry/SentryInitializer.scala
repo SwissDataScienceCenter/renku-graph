@@ -19,6 +19,7 @@
 package ch.datascience.config.sentry
 
 import cats.MonadError
+import cats.syntax.all._
 import ch.datascience.config.sentry.SentryConfig.SentryBaseUrl
 
 import scala.language.higherKinds
@@ -35,19 +36,17 @@ class SentryInitializer[Interpretation[_]](
       case _         => ME.unit
     }
 
-  private lazy val toDsn: SentryConfig => SentryBaseUrl = {
-    case SentryConfig(baseUrl, environmentName, serviceName) =>
-      baseUrl ? ("stacktrace.app.packages" -> "") & ("servername" -> serviceName) & ("environment" -> environmentName)
+  private lazy val toDsn: SentryConfig => SentryBaseUrl = { case SentryConfig(baseUrl, environmentName, serviceName) =>
+    baseUrl ? ("stacktrace.app.packages" -> "") & ("servername" -> serviceName) & ("environment" -> environmentName)
   }
 }
 
 object SentryInitializer {
   import cats.MonadError
-  import cats.implicits._
   import io.sentry.Sentry
 
-  def apply[Interpretation[_]]()(
-      implicit ME: MonadError[Interpretation, Throwable]
+  def apply[Interpretation[_]]()(implicit
+      ME: MonadError[Interpretation, Throwable]
   ): Interpretation[SentryInitializer[Interpretation]] =
     for {
       maybeSentryConfig <- SentryConfig[Interpretation]()

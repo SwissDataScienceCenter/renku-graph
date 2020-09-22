@@ -20,24 +20,23 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import java.lang.Thread.sleep
 
-import EventProcessingGenerators._
 import cats.data.NonEmptyList
 import cats.effect._
-import cats.effect.concurrent.Semaphore
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult.{Accepted, Busy}
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
@@ -60,20 +59,20 @@ class EventsProcessingRunnerSpec
     s"return $Busy when processing capacity is reached " +
       s"and $Accepted once some of the scheduled events are done" in new TestCase {
 
-      // draining processing capacity by scheduling max number of jobs
-      (1 to processesNumber).toList map { _ =>
-        processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync()
+        // draining processing capacity by scheduling max number of jobs
+        (1 to processesNumber).toList map { _ =>
+          processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync()
+        }
+
+        // any new job to get the Busy status
+        processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Busy
+
+        expectAvailabilityIsCommunicated
+
+        // once at least one process is done, new events should be accepted again
+        sleep(eventProcessingTime + 50)
+        processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
       }
-
-      // any new job to get the Busy status
-      processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Busy
-
-      expectAvailabilityIsCommunicated
-
-      // once at least one process is done, new events should be accepted again
-      sleep(eventProcessingTime + 50)
-      processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
-    }
 
     "release the processing resource on processing failure" in new TestCase {
 

@@ -33,7 +33,7 @@ class ProcessingStatusEndpoint[Interpretation[_]](
 )(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.controllers.ErrorMessage._
   import ch.datascience.controllers.{ErrorMessage, InfoMessage}
   import ch.datascience.graph.model.projects
@@ -70,11 +70,10 @@ class ProcessingStatusEndpoint[Interpretation[_]](
 
   private def internalServerError(
       projectId: projects.Id
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding processing status for project $projectId failed")
-      logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+    val errorMessage = ErrorMessage(s"Finding processing status for project $projectId failed")
+    logger.error(exception)(errorMessage.value)
+    InternalServerError(errorMessage)
   }
 }
 

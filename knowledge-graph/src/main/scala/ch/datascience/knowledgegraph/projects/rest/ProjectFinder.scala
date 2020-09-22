@@ -19,14 +19,14 @@
 package ch.datascience.knowledgegraph.projects.rest
 
 import cats.MonadError
-import cats.implicits._
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
-import IOAccessTokenFinder._
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
+import cats.syntax.all._
 import ch.datascience.config.GitLab
+import ch.datascience.control.Throttler
+import ch.datascience.graph.model.projects.Path
+import ch.datascience.graph.tokenrepository.IOAccessTokenFinder._
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.{KGProject, Parent}
@@ -61,35 +61,35 @@ class IOProjectFinder(
 
   private def merge(path: Path, kgProject: KGProject, gitLabProject: GitLabProject) =
     Project(
-      id               = gitLabProject.id,
-      path             = path,
-      name             = kgProject.name,
+      id = gitLabProject.id,
+      path = path,
+      name = kgProject.name,
       maybeDescription = gitLabProject.maybeDescription,
-      visibility       = gitLabProject.visibility,
+      visibility = gitLabProject.visibility,
       created = Creation(
-        date         = kgProject.created.date,
+        date = kgProject.created.date,
         maybeCreator = kgProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
       ),
-      updatedAt   = gitLabProject.updatedAt,
-      urls        = gitLabProject.urls,
-      forking     = Forking(gitLabProject.forksCount, kgProject.maybeParent.toParentProject),
-      tags        = gitLabProject.tags,
-      starsCount  = gitLabProject.starsCount,
+      updatedAt = gitLabProject.updatedAt,
+      urls = gitLabProject.urls,
+      forking = Forking(gitLabProject.forksCount, kgProject.maybeParent.toParentProject),
+      tags = gitLabProject.tags,
+      starsCount = gitLabProject.starsCount,
       permissions = gitLabProject.permissions,
-      statistics  = gitLabProject.statistics,
-      version     = kgProject.version
+      statistics = gitLabProject.statistics,
+      version = kgProject.version
     )
 
   private implicit class ParentOps(maybeParent: Option[Parent]) {
     lazy val toParentProject: Option[ParentProject] =
-      (maybeParent -> maybeParent.flatMap(_.resourceId.as[Try, Path].toOption)) mapN {
-        case (parent, path) =>
-          ParentProject(
-            path,
-            parent.name,
-            Creation(parent.created.date,
-                     parent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name)))
+      (maybeParent -> maybeParent.flatMap(_.resourceId.as[Try, Path].toOption)) mapN { case (parent, path) =>
+        ParentProject(
+          path,
+          parent.name,
+          Creation(parent.created.date,
+                   parent.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
           )
+        )
       }
   }
 }
@@ -105,10 +105,12 @@ private object IOProjectFinder {
       logger:          Logger[IO],
       timeRecorder:    SparqlQueryTimeRecorder[IO],
       config:          Config = ConfigFactory.load()
-  )(implicit ME:       MonadError[IO, Throwable],
-    executionContext:  ExecutionContext,
-    contextShift:      ContextShift[IO],
-    timer:             Timer[IO]): IO[ProjectFinder[IO]] =
+  )(implicit
+      ME:               MonadError[IO, Throwable],
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ProjectFinder[IO]] =
     for {
       kgProjectFinder     <- IOKGProjectFinder(timeRecorder, logger = logger)
       gitLabProjectFinder <- IOGitLabProjectFinder(gitLabThrottler, logger)

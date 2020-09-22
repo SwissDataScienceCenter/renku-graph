@@ -45,24 +45,24 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
       "if Sentry, Events Dispatcher and metrics initialisation are fine " +
       "and http server starts up" in new TestCase {
 
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
+        (sentryInitializer.run _)
+          .expects()
+          .returning(IO.unit)
 
-      (metrics.run _)
-        .expects()
-        .returning(IO.unit)
+        (metrics.run _)
+          .expects()
+          .returning(IO.unit)
 
-      (eventsDispatcher.run _)
-        .expects()
-        .returning(IO.unit)
+        (eventsDispatcher.run _)
+          .expects()
+          .returning(IO.unit)
 
-      (httpServer.run _)
-        .expects()
-        .returning(context.pure(ExitCode.Success))
+        (httpServer.run _)
+          .expects()
+          .returning(context.pure(ExitCode.Success))
 
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
-    }
+        runner.run().unsafeRunSync() shouldBe ExitCode.Success
+      }
 
     "fail if Sentry initialisation fails" in new TestCase {
 
@@ -157,7 +157,8 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
                                         metrics,
                                         eventsDispatcher,
                                         httpServer,
-                                        new ConcurrentHashMap[CancelToken[IO], Unit]())
+                                        new ConcurrentHashMap[CancelToken[IO], Unit]()
+    )
 
     class TestEventLogMetrics(
         statsFinder:      StatsFinder[IO],

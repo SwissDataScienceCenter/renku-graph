@@ -19,6 +19,7 @@
 package ch.datascience.config
 
 import cats.MonadError
+import cats.syntax.all._
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.Config
 import pureconfig._
@@ -50,17 +51,15 @@ object ConfigLoader {
       loadedConfig: ConfigReaderFailures Either T
   )(implicit ME:    MonadError[Interpretation, Throwable]): Interpretation[T] =
     ME.fromEither[T] {
-      import cats.implicits._
+
       loadedConfig leftMap (new ConfigLoadingException(_))
     }
 
-  implicit def stringTinyTypeReader[TT <: StringTinyType](implicit ttApply: TinyTypeFactory[TT]): ConfigReader[TT] = {
-    import cats.implicits._
+  implicit def stringTinyTypeReader[TT <: StringTinyType](implicit ttApply: TinyTypeFactory[TT]): ConfigReader[TT] =
     ConfigReader
       .fromString[TT] { value =>
         ttApply
           .from(value)
           .leftMap(exception => CannotConvert(value, ttApply.getClass.toString, exception.getMessage))
       }
-  }
 }

@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.{Bracket, ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -70,10 +70,9 @@ class DbInitializer[Interpretation[_]](
       .transact(transactor.get)
       .map(_ => ())
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)("Event Log database initialization failure")
-      ME.raiseError(exception)
+  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)("Event Log database initialization failure")
+    ME.raiseError(exception)
   }
 }
 

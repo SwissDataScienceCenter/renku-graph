@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository.repository.deletion
 
 import cats.MonadError
 import cats.effect.{ContextShift, Effect, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.db.DbTransactor

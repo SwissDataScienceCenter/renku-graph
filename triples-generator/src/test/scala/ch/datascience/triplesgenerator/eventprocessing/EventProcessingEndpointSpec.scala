@@ -18,11 +18,9 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
-import EventProcessingGenerators._
-import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.Generators.Implicits._
@@ -32,6 +30,7 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult.Busy
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
@@ -41,8 +40,8 @@ import io.circe.{Encoder, Json}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
-import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
+import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -55,55 +54,55 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
       "schedule triples generation " +
       s"and return $Accepted if event processor accepted the event" in new TestCase {
 
-      givenReProvisioningStatusSet(false)
+        givenReProvisioningStatusSet(false)
 
-      val commitEvents = eventBody.toCommitEvents
-      (eventBodyDeserializer.toCommitEvents _)
-        .expects(eventBody)
-        .returning(commitEvents.pure[IO])
+        val commitEvents = eventBody.toCommitEvents
+        (eventBodyDeserializer.toCommitEvents _)
+          .expects(eventBody)
+          .returning(commitEvents.pure[IO])
 
-      (processingRunner.scheduleForProcessing _)
-        .expects(eventId, commitEvents)
-        .returning(EventSchedulingResult.Accepted.pure[IO])
+        (processingRunner.scheduleForProcessing _)
+          .expects(eventId, commitEvents)
+          .returning(EventSchedulingResult.Accepted.pure[IO])
 
-      val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
+        val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
 
-      val response = processEvent(request).unsafeRunSync()
+        val response = processEvent(request).unsafeRunSync()
 
-      response.status                        shouldBe Accepted
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event accepted for processing")
+        response.status                        shouldBe Accepted
+        response.contentType                   shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event accepted for processing")
 
-      logger.loggedOnly(
-        Info(s"Event $eventId, projectPath = ${commitEvents.head.project.path} -> ${EventSchedulingResult.Accepted}")
-      )
-    }
+        logger.loggedOnly(
+          Info(s"Event $eventId, projectPath = ${commitEvents.head.project.path} -> ${EventSchedulingResult.Accepted}")
+        )
+      }
 
     "decode an event from the request, " +
       "schedule triples generation " +
       s"and return $TooManyRequests if event processor returned $Busy" in new TestCase {
 
-      givenReProvisioningStatusSet(false)
+        givenReProvisioningStatusSet(false)
 
-      val commitEvents = eventBody.toCommitEvents
-      (eventBodyDeserializer.toCommitEvents _)
-        .expects(eventBody)
-        .returning(commitEvents.pure[IO])
+        val commitEvents = eventBody.toCommitEvents
+        (eventBodyDeserializer.toCommitEvents _)
+          .expects(eventBody)
+          .returning(commitEvents.pure[IO])
 
-      (processingRunner.scheduleForProcessing _)
-        .expects(eventId, commitEvents)
-        .returning(EventSchedulingResult.Busy.pure[IO])
+        (processingRunner.scheduleForProcessing _)
+          .expects(eventId, commitEvents)
+          .returning(EventSchedulingResult.Busy.pure[IO])
 
-      val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
+        val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
 
-      val response = processEvent(request).unsafeRunSync()
+        val response = processEvent(request).unsafeRunSync()
 
-      response.status                        shouldBe TooManyRequests
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Too many events under processing")
+        response.status                        shouldBe TooManyRequests
+        response.contentType                   shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Too many events under processing")
 
-      logger.expectNoLogs()
-    }
+        logger.expectNoLogs()
+      }
 
     s"return $ServiceUnavailable if re-provisioning flag set to true" in new TestCase {
 
@@ -194,7 +193,8 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
     val processEvent = new EventProcessingEndpoint[IO](eventBodyDeserializer,
                                                        processingRunner,
                                                        reProvisioningStatus,
-                                                       logger).processEvent _
+                                                       logger
+    ).processEvent _
 
     def givenReProvisioningStatusSet(flag: Boolean) =
       (reProvisioningStatus.isReProvisioning _)
@@ -203,8 +203,8 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
   }
 
   private implicit lazy val eventEncoder: Encoder[(CompoundEventId, EventBody)] =
-    Encoder.instance[(CompoundEventId, EventBody)] {
-      case (eventId, body) => json"""{
+    Encoder.instance[(CompoundEventId, EventBody)] { case (eventId, body) =>
+      json"""{
         "id":      ${eventId.id.value},
         "project": {
           "id" :   ${eventId.projectId.value}

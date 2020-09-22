@@ -18,15 +18,16 @@
 
 package ch.datascience.webhookservice.eventprocessing.commitevent
 
-import CommitEventSender.EventSendingResult
-import CommitEventSender.EventSendingResult.{EventCreated, EventExisted}
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.EventBody
 import ch.datascience.http.client.IORestClient
 import ch.datascience.webhookservice.eventprocessing.CommitEvent
+import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender.EventSendingResult
+import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender.EventSendingResult.{EventCreated, EventExisted}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
 
@@ -49,15 +50,15 @@ class IOCommitEventSender(
     eventLogUrl:           EventLogUrl,
     commitEventSerializer: CommitEventSerializer[IO],
     logger:                Logger[IO]
-)(implicit ME:             MonadError[IO, Throwable],
-  executionContext:        ExecutionContext,
-  contextShift:            ContextShift[IO],
-  timer:                   Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
+)(implicit
+    ME:               MonadError[IO, Throwable],
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO]
+) extends IORestClient(Throttler.noThrottling, logger)
     with CommitEventSender[IO] {
 
   import cats.effect._
-  import cats.implicits._
   import commitEventSerializer._
   import io.circe.Encoder
   import io.circe.literal._
@@ -76,8 +77,8 @@ class IOCommitEventSender(
     } yield sendingResult
 
   private implicit lazy val entityEncoder: Encoder[(CommitEvent, EventBody)] =
-    Encoder.instance[(CommitEvent, EventBody)] {
-      case (event, body) => json"""{
+    Encoder.instance[(CommitEvent, EventBody)] { case (event, body) =>
+      json"""{
         "id":        ${event.id.value},
         "project": {
           "id":      ${event.project.id.value},
@@ -98,10 +99,12 @@ class IOCommitEventSender(
 object IOCommitEventSender {
 
   def apply(
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[CommitEventSender[IO]] =
+      logger: Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[CommitEventSender[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
     } yield new IOCommitEventSender(eventLogUrl, new CommitEventSerializer[IO], logger)

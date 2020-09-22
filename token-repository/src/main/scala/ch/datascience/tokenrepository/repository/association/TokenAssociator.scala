@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository.repository.association
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
@@ -57,11 +57,13 @@ private class TokenAssociator[Interpretiation[_]](
 
 private object IOTokenAssociator {
   def apply(
-      transactor:              DbTransactor[IO, ProjectsTokensDB],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[TokenAssociator[IO]] =
+      transactor: DbTransactor[IO, ProjectsTokensDB],
+      logger:     Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[TokenAssociator[IO]] =
     for {
       pathFinder        <- IOProjectPathFinder(logger)
       accessTokenCrypto <- AccessTokenCrypto[IO]()

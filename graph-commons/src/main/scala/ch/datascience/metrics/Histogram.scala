@@ -19,11 +19,10 @@
 package ch.datascience.metrics
 
 import cats.MonadError
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Histogram => LibHistogram}
-
-import cats.implicits._
 
 import scala.collection.JavaConverters._
 import scala.language.higherKinds
@@ -56,8 +55,8 @@ object Histogram {
       buckets:   Seq[Double]
   )(
       metricsRegistry: MetricsRegistry[Interpretation]
-  )(
-      implicit ME: MonadError[Interpretation, Throwable]
+  )(implicit
+      ME: MonadError[Interpretation, Throwable]
   ): Interpretation[LabeledHistogram[Interpretation, LabelValue]] = {
 
     val builder = LibHistogram

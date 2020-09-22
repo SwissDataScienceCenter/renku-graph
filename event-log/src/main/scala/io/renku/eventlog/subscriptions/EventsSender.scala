@@ -46,18 +46,19 @@ private object EventsSender {
 }
 
 private class IOEventsSender(
-    logger:         Logger[IO],
-    retryInterval:  FiniteDuration = SleepAfterConnectionIssue
-)(implicit ME:      MonadError[IO, Throwable],
-  executionContext: ExecutionContext,
-  contextShift:     ContextShift[IO],
-  timer:            Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger, retryInterval = retryInterval)
+    logger:        Logger[IO],
+    retryInterval: FiniteDuration = SleepAfterConnectionIssue
+)(implicit
+    ME:               MonadError[IO, Throwable],
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO]
+) extends IORestClient(Throttler.noThrottling, logger, retryInterval = retryInterval)
     with EventsSender[IO] {
 
   import SendingResult._
   import cats.effect._
-  import cats.implicits._
+  import cats.syntax.all._
   import io.circe.Encoder
   import io.circe.literal._
   import io.circe.syntax._
@@ -74,8 +75,8 @@ private class IOEventsSender(
   } recoverWith connectivityException(to = Misdelivered)
 
   private implicit lazy val entityEncoder: Encoder[(CompoundEventId, EventBody)] =
-    Encoder.instance[(CompoundEventId, EventBody)] {
-      case (id, body) => json"""{
+    Encoder.instance[(CompoundEventId, EventBody)] { case (id, body) =>
+      json"""{
         "id":      ${id.id.value},
         "project": {
           "id":    ${id.projectId.value}
@@ -99,10 +100,12 @@ private class IOEventsSender(
 
 private object IOEventsSender {
   def apply(
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[EventsSender[IO]] = IO {
+      logger: Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[EventsSender[IO]] = IO {
     new IOEventsSender(logger)
   }
 }

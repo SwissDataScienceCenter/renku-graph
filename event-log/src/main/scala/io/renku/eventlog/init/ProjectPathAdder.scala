@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.Bracket
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -93,16 +93,14 @@ private class ProjectPathAdder[Interpretation[_]](
       .sequence
       .map(_ => ())
 
-  private def toSqlUpdate: ((Id, Path)) => Interpretation[Unit] = {
-    case (projectId, projectPath) =>
-      sql"update event_log set project_path = ${projectPath.value} where project_id = ${projectId.value}".update.run
-        .transact(transactor.get)
-        .map(_ => ())
+  private def toSqlUpdate: ((Id, Path)) => Interpretation[Unit] = { case (projectId, projectPath) =>
+    sql"update event_log set project_path = ${projectPath.value} where project_id = ${projectId.value}".update.run
+      .transact(transactor.get)
+      .map(_ => ())
   }
 
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)("'project_path' column adding failure")
-      ME.raiseError(exception)
+  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)("'project_path' column adding failure")
+    ME.raiseError(exception)
   }
 }

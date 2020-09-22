@@ -46,7 +46,8 @@ private object Commands {
     import java.net.URL
 
     def findRepositoryUrl(projectPath:      projects.Path,
-                          maybeAccessToken: Option[AccessToken]): Interpretation[ServiceUrl] =
+                          maybeAccessToken: Option[AccessToken]
+    ): Interpretation[ServiceUrl] =
       merge(gitLabUrl, findUrlTokenPart(maybeAccessToken), projectPath)
 
     private lazy val findUrlTokenPart: Option[AccessToken] => String = {
@@ -57,7 +58,8 @@ private object Commands {
 
     private def merge(gitLabUrl:    GitLabUrl,
                       urlTokenPart: String,
-                      projectPath:  projects.Path): Interpretation[ServiceUrl] = ME.fromEither {
+                      projectPath:  projects.Path
+    ): Interpretation[ServiceUrl] = ME.fromEither {
       ServiceUrl.from {
         val url              = gitLabUrl.value
         val protocol         = new URL(url).getProtocol
@@ -87,7 +89,7 @@ private object Commands {
         %%('git, 'clone, url.toString, destinationDir.toString)(workDir)
   ) {
     import cats.data.EitherT
-    import cats.implicits._
+    import cats.syntax.all._
     import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
     def checkout(commitId: CommitId, repositoryDirectory: Path): IO[Unit] =
@@ -127,27 +129,28 @@ private object Commands {
   }
 
   class Renku(
-      timeout:             RenkuLogTimeout
-  )(implicit contextShift: ContextShift[IO],
-    timer:                 Timer[IO],
-    ME:                    MonadError[IO, Throwable],
-    executionContext:      ExecutionContext) {
+      timeout: RenkuLogTimeout
+  )(implicit
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO],
+      ME:               MonadError[IO, Throwable],
+      executionContext: ExecutionContext
+  ) {
 
-    import cats.implicits._
+    import cats.syntax.all._
 
     import scala.util.Try
 
     def migrate(commitEvent: CommitEvent, destinationDirectory: Path): IO[Unit] =
       IO(%%('renku, 'migrate)(destinationDirectory))
         .flatMap(_ => IO.unit)
-        .recoverWith {
-          case NonFatal(exception) =>
-            IO.raiseError {
-              new Exception(
-                s"'renku migrate' failed for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id}",
-                exception
-              )
-            }
+        .recoverWith { case NonFatal(exception) =>
+          IO.raiseError {
+            new Exception(
+              s"'renku migrate' failed for commit: ${commitEvent.commitId}, project: ${commitEvent.project.id}",
+              exception
+            )
+          }
         }
 
     def log[T <: CommitEvent](
@@ -156,13 +159,12 @@ private object Commands {
     )(implicit generateTriples: (T, Path) => CommandResult): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
       EitherT {
         IO.race(
-            call(generateTriples(commit, destinationDirectory)),
-            timer sleep timeout.value
-          )
-          .flatMap {
-            case Left(result) => IO.pure(result)
-            case Right(_)     => timeoutExceededError(commit)
-          }
+          call(generateTriples(commit, destinationDirectory)),
+          timer sleep timeout.value
+        ).flatMap {
+          case Left(result) => IO.pure(result)
+          case Right(_)     => timeoutExceededError(commit)
+        }
       }
 
     private def timeoutExceededError(commitEvent: CommitEvent): IO[Either[ProcessingRecoverableError, JsonLDTriples]] =

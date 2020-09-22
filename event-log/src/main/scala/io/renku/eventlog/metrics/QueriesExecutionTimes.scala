@@ -27,9 +27,9 @@ object QueriesExecutionTimes {
 
   def apply(metricsRegistry: MetricsRegistry[IO]): IO[LabeledHistogram[IO, SqlQuery.Name]] =
     Histogram[IO, SqlQuery.Name](
-      name      = "event_log_queries_execution_times",
-      help      = "Event Log queries execution times",
+      name = "event_log_queries_execution_times",
+      help = "Event Log queries execution times",
       labelName = "query_id",
-      buckets   = Seq(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 25, 50)
+      buckets = Seq(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 25, 50)
     )(metricsRegistry)
 }

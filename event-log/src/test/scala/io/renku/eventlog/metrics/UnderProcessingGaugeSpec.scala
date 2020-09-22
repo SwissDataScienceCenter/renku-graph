@@ -20,7 +20,7 @@ package io.renku.eventlog.metrics
 
 import cats.MonadError
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, nonEmptySet, nonNegativeLongs}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -46,30 +46,30 @@ class UnderProcessingGaugeSpec extends AnyWordSpec with MockFactory with should.
     "create a events_processing_count named gauge " +
       "and provision it with values from the Event Log" in new TestCase {
 
-      (metricsRegistry
-        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
-        .expects(*, *)
-        .onCall { (builder: LibGauge.Builder, _: MonadError[IO, Throwable]) =>
-          val actual = builder.create()
-          actual.describe().asScala.head.name shouldBe underlying.describe().asScala.head.name
-          actual.describe().asScala.head.help shouldBe underlying.describe().asScala.head.help
+        (metricsRegistry
+          .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
+          .expects(*, *)
+          .onCall { (builder: LibGauge.Builder, _: MonadError[IO, Throwable]) =>
+            val actual = builder.create()
+            actual.describe().asScala.head.name shouldBe underlying.describe().asScala.head.name
+            actual.describe().asScala.head.help shouldBe underlying.describe().asScala.head.help
 
-          underlying.pure[IO]
+            underlying.pure[IO]
+          }
+
+        val processingEvents = processingEventsGen.generateOne
+        (statsFinder.countEvents _)
+          .expects(Set(Processing: EventStatus))
+          .returning(processingEvents.pure[IO])
+
+        val gauge = UnderProcessingGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
+
+        gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
+
+        underlying.collectAllSamples should contain theSameElementsAs processingEvents.map { case (project, count) =>
+          ("project", project.value, count.toDouble)
         }
-
-      val processingEvents = processingEventsGen.generateOne
-      (statsFinder.countEvents _)
-        .expects(Set(Processing: EventStatus))
-        .returning(processingEvents.pure[IO])
-
-      val gauge = UnderProcessingGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
-
-      gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
-
-      underlying.collectAllSamples should contain theSameElementsAs processingEvents.map {
-        case (project, count) => ("project", project.value, count.toDouble)
       }
-    }
 
     "fail if finding values for initial provisioning fails" in new TestCase {
 

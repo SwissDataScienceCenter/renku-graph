@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.hookcreation
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken
@@ -56,7 +56,7 @@ private class EventsHistoryLoader[Interpretation[_]](
     .recoverWith(loggingError(projectInfo))
 
   private def startCommitFrom(latestCommit: CommitInfo, projectInfo: ProjectInfo) = StartCommit(
-    id      = latestCommit.id,
+    id = latestCommit.id,
     project = Project(projectInfo.id, projectInfo.path)
   )
 
@@ -69,13 +69,15 @@ private class EventsHistoryLoader[Interpretation[_]](
 
 private object IOEventsHistoryLoader {
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      executionTimeRecorder:   ExecutionTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    clock:                     Clock[IO],
-    timer:                     Timer[IO]): IO[EventsHistoryLoader[IO]] =
+      gitLabThrottler:       Throttler[IO, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[IO],
+      logger:                Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      clock:            Clock[IO],
+      timer:            Timer[IO]
+  ): IO[EventsHistoryLoader[IO]] =
     for {
       commitToEventLog   <- IOCommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
       latestCommitFinder <- IOLatestCommitFinder(gitLabThrottler, logger)

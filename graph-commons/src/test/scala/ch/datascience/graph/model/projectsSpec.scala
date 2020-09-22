@@ -18,12 +18,12 @@
 
 package ch.datascience.graph.model
 
-import GraphModelGenerators._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects._
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.tinytypes.constraints.{RelativePath, Url}

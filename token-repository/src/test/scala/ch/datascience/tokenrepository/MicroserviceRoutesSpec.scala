@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository
 
 import cats.data.OptionT
 import cats.effect.{Clock, IO}
-import cats.implicits._
+
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects
@@ -59,7 +59,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         Request(Method.GET, uri"metrics")
       )
 
-      response.status       shouldBe Ok
+      response.status     shouldBe Ok
       response.body[String] should include("server_response_duration_seconds")
     }
 

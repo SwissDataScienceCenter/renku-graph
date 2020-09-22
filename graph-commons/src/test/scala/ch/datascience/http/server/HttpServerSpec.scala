@@ -70,8 +70,8 @@ class HttpServerSpec extends AnyWordSpec with Http4sDsl[IO] with should.Matchers
 
   val port            = httpPorts.generateOne
   private val baseUri = Uri.unsafeFromString(s"http://localhost:$port")
-  private val routes = HttpRoutes.of[IO] {
-    case GET -> Root / "resource" => Ok("response")
+  private val routes = HttpRoutes.of[IO] { case GET -> Root / "resource" =>
+    Ok("response")
   }
   new HttpServer[IO](port.value, routes).run.unsafeRunAsyncAndForget()
 }

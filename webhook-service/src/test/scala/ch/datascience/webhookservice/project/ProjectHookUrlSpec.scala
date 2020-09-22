@@ -18,7 +18,6 @@
 
 package ch.datascience.webhookservice.project
 
-import cats.implicits._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import com.typesafe.config.ConfigFactory
@@ -35,21 +34,21 @@ class ProjectHookUrlSpec extends AnyWordSpec with MockFactory with should.Matche
 
     "return project hook url composed of selfUrl and /webhooks/events " +
       "if selfUrl can be obtained" in {
-      val selfUrl = selfUrls.generateOne
-      val config = ConfigFactory.parseMap(
-        Map(
-          "services" -> Map(
-            "self" -> Map(
-              "url" -> selfUrl.toString()
+        val selfUrl = selfUrls.generateOne
+        val config = ConfigFactory.parseMap(
+          Map(
+            "services" -> Map(
+              "self" -> Map(
+                "url" -> selfUrl.toString()
+              ).asJava
             ).asJava
           ).asJava
-        ).asJava
-      )
+        )
 
-      ProjectHookUrl.fromConfig[Try](config).map(_.value) shouldBe Success(
-        s"$selfUrl/webhooks/events"
-      )
-    }
+        ProjectHookUrl.fromConfig[Try](config).map(_.value) shouldBe Success(
+          s"$selfUrl/webhooks/events"
+        )
+      }
 
     "fail if finding selfUrl fails" in {
       ProjectHookUrl.fromConfig[Try](ConfigFactory.empty()) shouldBe a[Failure[_]]

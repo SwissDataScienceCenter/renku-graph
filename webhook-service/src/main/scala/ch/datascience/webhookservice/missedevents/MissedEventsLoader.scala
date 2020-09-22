@@ -19,7 +19,7 @@
 package ch.datascience.webhookservice.missedevents
 
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
@@ -67,18 +67,17 @@ private class IOMissedEventsLoader(
       for {
         latestLogEvents <- fetchLatestEvents
         updateSummary <- if (latestLogEvents.isEmpty) IO.pure(UpdateSummary())
-                        else (latestLogEvents map loadEvents).sequence map toUpdateSummary
+                         else (latestLogEvents map loadEvents).sequence map toUpdateSummary
       } yield updateSummary
     } flatMap logSummary recoverWith loggingError
 
-  private lazy val logSummary: ((ElapsedTime, UpdateSummary)) => IO[Unit] = {
-    case (elapsedTime, updateSummary) =>
-      logger.info(
-        s"Synchronized Commits with GitLab in ${elapsedTime}ms: " +
-          s"${updateSummary(Updated)} updates, " +
-          s"${updateSummary(Skipped)} skipped, " +
-          s"${updateSummary(Failed)} failed"
-      )
+  private lazy val logSummary: ((ElapsedTime, UpdateSummary)) => IO[Unit] = { case (elapsedTime, updateSummary) =>
+    logger.info(
+      s"Synchronized Commits with GitLab in ${elapsedTime}ms: " +
+        s"${updateSummary(Updated)} updates, " +
+        s"${updateSummary(Skipped)} skipped, " +
+        s"${updateSummary(Failed)} failed"
+    )
   }
 
   private def loadEvents(latestProjectCommit: LatestProjectCommit): IO[UpdateResult] = {
@@ -91,7 +90,8 @@ private class IOMissedEventsLoader(
 
   private def addEventsIfMissing(latestProjectCommit: LatestProjectCommit,
                                  maybeLatestCommit:   Option[CommitInfo],
-                                 maybeAccessToken:    Option[AccessToken]) =
+                                 maybeAccessToken:    Option[AccessToken]
+  ) =
     maybeLatestCommit match {
       case None                                                              => IO.pure(Skipped)
       case Some(commitInfo) if commitInfo.id == latestProjectCommit.commitId => IO.pure(Skipped)
@@ -105,7 +105,7 @@ private class IOMissedEventsLoader(
 
   private def startCommitFrom(commitInfo: CommitInfo, projectInfo: ProjectInfo) = IO.pure {
     StartCommit(
-      id      = commitInfo.id,
+      id = commitInfo.id,
       project = Project(projectInfo.id, projectInfo.path)
     )
   }
@@ -116,10 +116,9 @@ private class IOMissedEventsLoader(
       IO.pure(Failed)
   }
 
-  private lazy val loggingError: PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)("Synchronizing Commits with GitLab failed")
-      IO.raiseError(exception)
+  private lazy val loggingError: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)("Synchronizing Commits with GitLab failed")
+    IO.raiseError(exception)
   }
 
   private sealed trait UpdateResult extends Product with Serializable
@@ -143,9 +142,11 @@ private object IOMissedEventsLoader {
       gitLabThrottler:       Throttler[IO, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[IO],
       logger:                Logger[IO]
-  )(implicit timer:          Timer[IO],
-    contextShift:            ContextShift[IO],
-    executionContext:        ExecutionContext): IO[MissedEventsLoader[IO]] =
+  )(implicit
+      timer:            Timer[IO],
+      contextShift:     ContextShift[IO],
+      executionContext: ExecutionContext
+  ): IO[MissedEventsLoader[IO]] =
     for {
       tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
       gitLabUrl          <- GitLabUrl[IO]()

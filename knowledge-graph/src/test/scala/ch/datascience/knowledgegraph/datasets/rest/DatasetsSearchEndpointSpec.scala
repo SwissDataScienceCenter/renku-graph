@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.MonadError
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.renku
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
@@ -68,8 +68,8 @@ class DatasetsSearchEndpointSpec
 
         val response = searchForDatasets(maybePhrase, sort, pagingRequest).unsafeRunSync()
 
-        response.status         shouldBe Ok
-        response.contentType    shouldBe Some(`Content-Type`(application.json))
+        response.status       shouldBe Ok
+        response.contentType  shouldBe Some(`Content-Type`(application.json))
         response.headers.toList should contain allElementsOf PagingHeaders.from(pagingResponse)
         response
           .as[List[Json]]
@@ -93,7 +93,7 @@ class DatasetsSearchEndpointSpec
       response.status                       shouldBe Ok
       response.contentType                  shouldBe Some(`Content-Type`(application.json))
       response.as[List[Json]].unsafeRunSync shouldBe empty
-      response.headers.toList               should contain allElementsOf PagingHeaders.from(pagingResponse)
+      response.headers.toList                 should contain allElementsOf PagingHeaders.from(pagingResponse)
 
       logger.loggedOnly(warn(maybePhrase))
     }

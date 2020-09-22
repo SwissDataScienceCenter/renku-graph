@@ -21,7 +21,7 @@ package ch.datascience.webhookservice.hookcreation
 import cats.MonadError
 import cats.data.EitherT
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects.Id
@@ -51,9 +51,11 @@ private class HookCreator[Interpretation[_]](
     accessTokenAssociator: AccessTokenAssociator[Interpretation],
     eventsHistoryLoader:   EventsHistoryLoader[Interpretation],
     logger:                Logger[Interpretation]
-)(implicit ME:             MonadError[Interpretation, Throwable],
-  contextShift:            ContextShift[Interpretation],
-  concurrent:              Concurrent[Interpretation]) {
+)(implicit
+    ME:           MonadError[Interpretation, Throwable],
+    contextShift: ContextShift[Interpretation],
+    concurrent:   Concurrent[Interpretation]
+) {
 
   import HookCreator.CreationResult._
   import accessTokenAssociator._
@@ -79,8 +81,8 @@ private class HookCreator[Interpretation[_]](
       projectId:      Id,
       projectHookUrl: ProjectHookUrl
   ): EitherT[Interpretation, HookAlreadyCreated, Unit] = EitherT.cond[Interpretation](
-    test  = hookValidation == HookMissing,
-    left  = HookAlreadyCreated(projectId, projectHookUrl),
+    test = hookValidation == HookMissing,
+    left = HookAlreadyCreated(projectId, projectHookUrl),
     right = ()
   )
 
@@ -110,15 +112,17 @@ private object HookCreator {
 
 private object IOHookCreator {
   def apply(
-      projectHookUrl:          ProjectHookUrl,
-      gitLabThrottler:         Throttler[IO, GitLab],
-      hookTokenCrypto:         HookTokenCrypto[IO],
-      executionTimeRecorder:   ExecutionTimeRecorder[IO],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    clock:                     Clock[IO],
-    timer:                     Timer[IO]): IO[HookCreator[IO]] =
+      projectHookUrl:        ProjectHookUrl,
+      gitLabThrottler:       Throttler[IO, GitLab],
+      hookTokenCrypto:       HookTokenCrypto[IO],
+      executionTimeRecorder: ExecutionTimeRecorder[IO],
+      logger:                Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      clock:            Clock[IO],
+      timer:            Timer[IO]
+  ): IO[HookCreator[IO]] =
     for {
       eventsHistoryLoader <- IOEventsHistoryLoader(gitLabThrottler, executionTimeRecorder, logger)
       hookValidator       <- IOHookValidator(projectHookUrl, gitLabThrottler)

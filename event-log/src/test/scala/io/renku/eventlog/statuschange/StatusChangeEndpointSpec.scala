@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange
 
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
@@ -42,12 +42,12 @@ import io.renku.eventlog.statuschange.commands._
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
-import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
+import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import org.scalatest.prop.TableDrivenPropertyChecks
+import org.scalatest.wordspec.AnyWordSpec
 
 class StatusChangeEndpointSpec
     extends AnyWordSpec
@@ -65,86 +65,88 @@ class StatusChangeEndpointSpec
       RecoverableFailure -> ToRecoverableFailure[IO](compoundEventIds.generateOne,
                                                      eventMessages.generateOption,
                                                      waitingEventsGauge,
-                                                     underProcessingGauge),
+                                                     underProcessingGauge
+      ),
       NonRecoverableFailure -> ToNonRecoverableFailure[IO](compoundEventIds.generateOne,
                                                            eventMessages.generateOption,
-                                                           underProcessingGauge)
+                                                           underProcessingGauge
+      )
     )
     forAll(scenarios) { (status, command) =>
       "decode payload from the body, " +
         "perform status update " +
         s"and return $Ok if all went fine - $status status case" in new TestCase {
 
-        command.status shouldBe status
+          command.status shouldBe status
 
-        val eventId = command.eventId
+          val eventId = command.eventId
 
-        (commandsRunner.run _)
-          .expects(command)
-          .returning(Updated.pure[IO])
+          (commandsRunner.run _)
+            .expects(command)
+            .returning(Updated.pure[IO])
 
-        val request = Request(
-          Method.PATCH,
-          uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-        ).withEntity(command.asJson)
+          val request = Request(
+            Method.PATCH,
+            uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+          ).withEntity(command.asJson)
 
-        val response = changeStatus(eventId, request).unsafeRunSync()
+          val response = changeStatus(eventId, request).unsafeRunSync()
 
-        response.status                        shouldBe Ok
-        response.contentType                   shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event status updated")
+          response.status                        shouldBe Ok
+          response.contentType                   shouldBe Some(`Content-Type`(application.json))
+          response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event status updated")
 
-        logger.expectNoLogs()
-      }
+          logger.expectNoLogs()
+        }
 
       "decode payload from the body, " +
         "perform status update " +
         s"and return $Conflict if no event gets updated - $status status case" in new TestCase {
 
-        val eventId = command.eventId
+          val eventId = command.eventId
 
-        (commandsRunner.run _)
-          .expects(command)
-          .returning(UpdateResult.Conflict.pure[IO])
+          (commandsRunner.run _)
+            .expects(command)
+            .returning(UpdateResult.Conflict.pure[IO])
 
-        val request = Request(
-          Method.PATCH,
-          uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-        ).withEntity(command.asJson)
+          val request = Request(
+            Method.PATCH,
+            uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+          ).withEntity(command.asJson)
 
-        val response = changeStatus(eventId, request).unsafeRunSync()
+          val response = changeStatus(eventId, request).unsafeRunSync()
 
-        response.status                        shouldBe Conflict
-        response.contentType                   shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event status cannot be updated")
+          response.status                        shouldBe Conflict
+          response.contentType                   shouldBe Some(`Content-Type`(application.json))
+          response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event status cannot be updated")
 
-        logger.expectNoLogs()
-      }
+          logger.expectNoLogs()
+        }
 
       "decode payload from the body, " +
         "perform status update " +
         s"and return $InternalServerError if there was an error during update - $status status case" in new TestCase {
 
-        val eventId = command.eventId
+          val eventId = command.eventId
 
-        val errorMessage = nonBlankStrings().generateOne
-        (commandsRunner.run _)
-          .expects(command)
-          .returning(UpdateResult.Failure(errorMessage).pure[IO])
+          val errorMessage = nonBlankStrings().generateOne
+          (commandsRunner.run _)
+            .expects(command)
+            .returning(UpdateResult.Failure(errorMessage).pure[IO])
 
-        val request = Request(
-          Method.PATCH,
-          uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-        ).withEntity(command.asJson)
+          val request = Request(
+            Method.PATCH,
+            uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+          ).withEntity(command.asJson)
 
-        val response = changeStatus(eventId, request).unsafeRunSync()
+          val response = changeStatus(eventId, request).unsafeRunSync()
 
-        response.status                        shouldBe InternalServerError
-        response.contentType                   shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync shouldBe ErrorMessage(errorMessage.value)
+          response.status                        shouldBe InternalServerError
+          response.contentType                   shouldBe Some(`Content-Type`(application.json))
+          response.as[InfoMessage].unsafeRunSync shouldBe ErrorMessage(errorMessage.value)
 
-        logger.loggedOnly(Error(errorMessage.value))
-      }
+          logger.loggedOnly(Error(errorMessage.value))
+        }
     }
 
     s"return $BadRequest if decoding payload fails" in new TestCase {

@@ -23,7 +23,7 @@ import cats.MonadError
 import cats.data.EitherT.{leftT, rightT}
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -124,29 +124,29 @@ class CommitEventProcessorSpec
     "succeed if events are successfully turned into triples and all stored in Jena " +
       "even if some of them failed in different stages" in new TestCase {
 
-      val commitEvents                         = commitsLists(size = Gen.const(3)).generateOne
-      val commit1 +: commit2 +: commit3 +: Nil = commitEvents.toList
+        val commitEvents                         = commitsLists(size = Gen.const(3)).generateOne
+        val commit1 +: commit2 +: commit3 +: Nil = commitEvents.toList
 
-      givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
-        .returning(context.pure(maybeAccessToken))
+        givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+          .returning(context.pure(maybeAccessToken))
 
-      val successfulCommitsAndTriples = generateTriples(forCommits = NonEmptyList.of(commit1, commit3))
+        val successfulCommitsAndTriples = generateTriples(forCommits = NonEmptyList.of(commit1, commit3))
 
-      successfulCommitsAndTriples.toList foreach successfulTriplesGenerationAndUpload
+        successfulCommitsAndTriples.toList foreach successfulTriplesGenerationAndUpload
 
-      val exception2 = exceptions.generateOne
-      (triplesFinder
-        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
-        .expects(commit2, maybeAccessToken)
-        .returning(EitherT.liftF[Try, ProcessingRecoverableError, GenerationResult](context.raiseError(exception2)))
+        val exception2 = exceptions.generateOne
+        (triplesFinder
+          .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
+          .expects(commit2, maybeAccessToken)
+          .returning(EitherT.liftF[Try, ProcessingRecoverableError, GenerationResult](context.raiseError(exception2)))
 
-      expectEventMarkedAsNonRecoverableFailure(commit2.compoundEventId, exception2)
+        expectEventMarkedAsNonRecoverableFailure(commit2.compoundEventId, exception2)
 
-      eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+        eventProcessor.process(eventId, commitEvents) shouldBe context.unit
 
-      logError(commit2, exception2)
-      logSummary(commitEvents, uploaded = successfulCommitsAndTriples.size, failed = 1)
-    }
+        logError(commit2, exception2)
+        logSummary(commitEvents, uploaded = successfulCommitsAndTriples.size, failed = 1)
+      }
 
     "succeed and mark event with NonRecoverableFailure if finding triples fails" in new TestCase {
 
@@ -251,48 +251,6 @@ class CommitEventProcessorSpec
     "succeed and mark event with RecoverableFailure " +
       s"if uploading triples to the dataset fails with $RecoverableFailure for at least one event" in new TestCase {
 
-      val commitEvents              = commitsLists(size = Gen.const(2)).generateOne
-      val commit1 +: commit2 +: Nil = commitEvents.toList
-
-      givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
-        .returning(context.pure(maybeAccessToken))
-
-      val rawTriples = jsonLDTriples.generateOne
-      (triplesFinder
-        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
-        .expects(commit1, maybeAccessToken)
-        .returning(rightT[Try, ProcessingRecoverableError](Triples(rawTriples)))
-
-      val curatedTriples = curatedTriplesObjects[Try].generateOne
-      (triplesCurator
-        .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
-        .expects(commit1, rawTriples, maybeAccessToken)
-        .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
-
-      val uploadingError = nonEmptyStrings().map(RecoverableFailure.apply).generateOne
-      (uploader
-        .upload(_: CuratedTriples[Try]))
-        .expects(curatedTriples)
-        .returning(context.pure(uploadingError))
-
-      val exception2 = exceptions.generateOne
-      (triplesFinder
-        .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
-        .expects(commit2, maybeAccessToken)
-        .returning(EitherT.liftF[Try, ProcessingRecoverableError, GenerationResult](context.raiseError(exception2)))
-
-      expectEventMarkedAsRecoverableFailure(commit1.compoundEventId, uploadingError)
-
-      eventProcessor.process(eventId, commitEvents) shouldBe context.unit
-
-      logError(commitEvents.head, uploadingError.message)
-      logSummary(commitEvents, failed = 2)
-    }
-
-    "succeed and mark event with NonRecoverableFailure " +
-      s"if uploading triples to the store fails with either $InvalidTriplesFailure or $InvalidUpdatesFailure for at least one event" in new TestCase {
-
-      (InvalidTriplesFailure("error") +: InvalidUpdatesFailure("error") +: Nil) foreach { failure =>
         val commitEvents              = commitsLists(size = Gen.const(2)).generateOne
         val commit1 +: commit2 +: Nil = commitEvents.toList
 
@@ -311,10 +269,11 @@ class CommitEventProcessorSpec
           .expects(commit1, rawTriples, maybeAccessToken)
           .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
 
+        val uploadingError = nonEmptyStrings().map(RecoverableFailure.apply).generateOne
         (uploader
           .upload(_: CuratedTriples[Try]))
           .expects(curatedTriples)
-          .returning(context.pure(failure))
+          .returning(context.pure(uploadingError))
 
         val exception2 = exceptions.generateOne
         (triplesFinder
@@ -322,15 +281,56 @@ class CommitEventProcessorSpec
           .expects(commit2, maybeAccessToken)
           .returning(EitherT.liftF[Try, ProcessingRecoverableError, GenerationResult](context.raiseError(exception2)))
 
-        expectEventMarkedAsNonRecoverableFailure(commit1.compoundEventId, failure)
+        expectEventMarkedAsRecoverableFailure(commit1.compoundEventId, uploadingError)
 
         eventProcessor.process(eventId, commitEvents) shouldBe context.unit
 
-        logError(commitEvents.head, failure.getMessage)
+        logError(commitEvents.head, uploadingError.message)
         logSummary(commitEvents, failed = 2)
-        logger.reset()
       }
-    }
+
+    "succeed and mark event with NonRecoverableFailure " +
+      s"if uploading triples to the store fails with either $InvalidTriplesFailure or $InvalidUpdatesFailure for at least one event" in new TestCase {
+
+        (InvalidTriplesFailure("error") +: InvalidUpdatesFailure("error") +: Nil) foreach { failure =>
+          val commitEvents              = commitsLists(size = Gen.const(2)).generateOne
+          val commit1 +: commit2 +: Nil = commitEvents.toList
+
+          givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+            .returning(context.pure(maybeAccessToken))
+
+          val rawTriples = jsonLDTriples.generateOne
+          (triplesFinder
+            .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
+            .expects(commit1, maybeAccessToken)
+            .returning(rightT[Try, ProcessingRecoverableError](Triples(rawTriples)))
+
+          val curatedTriples = curatedTriplesObjects[Try].generateOne
+          (triplesCurator
+            .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
+            .expects(commit1, rawTriples, maybeAccessToken)
+            .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
+
+          (uploader
+            .upload(_: CuratedTriples[Try]))
+            .expects(curatedTriples)
+            .returning(context.pure(failure))
+
+          val exception2 = exceptions.generateOne
+          (triplesFinder
+            .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
+            .expects(commit2, maybeAccessToken)
+            .returning(EitherT.liftF[Try, ProcessingRecoverableError, GenerationResult](context.raiseError(exception2)))
+
+          expectEventMarkedAsNonRecoverableFailure(commit1.compoundEventId, failure)
+
+          eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+
+          logError(commitEvents.head, failure.getMessage)
+          logSummary(commitEvents, failed = 2)
+          logger.reset()
+        }
+      }
 
     "succeed and log an error if marking event as TriplesStore fails" in new TestCase {
 
@@ -371,7 +371,7 @@ class CommitEventProcessorSpec
 
       logger.loggedOnly(
         Error(
-          message          = s"Commit Event processing failure: $eventId, projectPath: ${commitEvents.head.project.path}",
+          message = s"Commit Event processing failure: $eventId, projectPath: ${commitEvents.head.project.path}",
           throwableMatcher = NotRefEqual(new Exception("processing failure -> Event rolled back", exception))
         )
       )
@@ -489,7 +489,8 @@ class CommitEventProcessorSpec
     def logSummary(commits:  NonEmptyList[CommitEvent],
                    uploaded: Int = 0,
                    skipped:  Int = 0,
-                   failed:   Int = 0): Assertion =
+                   failed:   Int = 0
+    ): Assertion =
       logger.logged(
         Info(
           s"${commonLogMessage(commits.head)} processed in ${executionTimeRecorder.elapsedTime}ms: " +

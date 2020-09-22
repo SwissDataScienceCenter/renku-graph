@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore._
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
@@ -57,7 +58,6 @@ private class ReProvisioningStatusImpl(
     with ReProvisioningStatus[IO] {
 
   import ReProvisioningJsonLD._
-  import cats.implicits._
 
   private val runningStatusCheckStarted = new AtomicBoolean(false)
 
@@ -96,9 +96,10 @@ private class ReProvisioningStatusImpl(
     for {
       isCacheExpired <- isCacheExpired
       flag <- if (isCacheExpired) fetchStatus flatMap {
-               case Some(Running) => triggerPeriodicStatusCheck() map (_ => true)
-               case _             => updateCacheCheckTime() map (_ => false)
-             } else false.pure[IO]
+                case Some(Running) => triggerPeriodicStatusCheck() map (_ => true)
+                case _             => updateCacheCheckTime() map (_ => false)
+              }
+              else false.pure[IO]
     } yield flag
 
   private def isCacheExpired: IO[Boolean] =
@@ -124,11 +125,11 @@ private class ReProvisioningStatusImpl(
     for {
       _ <- timer sleep statusRefreshInterval
       _ <- fetchStatus.flatMap {
-            case Some(Running) => periodicStatusCheck
-            case _ =>
-              runningStatusCheckStarted set false
-              subscriber.notifyAvailability
-          }
+             case Some(Running) => periodicStatusCheck
+             case _ =>
+               runningStatusCheckStarted set false
+               subscriber.notifyAvailability
+           }
     } yield ()
 
   private def fetchStatus: IO[Option[Status]] =
@@ -164,13 +165,15 @@ object ReProvisioningStatus {
   private val StatusRefreshInterval: FiniteDuration = 15 seconds
 
   def apply(
-      subscriber:              Subscriber[IO],
-      logger:                  Logger[IO],
-      timeRecorder:            SparqlQueryTimeRecorder[IO],
-      configuration:           Config = ConfigFactory.load()
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[ReProvisioningStatus[IO]] =
+      subscriber:    Subscriber[IO],
+      logger:        Logger[IO],
+      timeRecorder:  SparqlQueryTimeRecorder[IO],
+      configuration: Config = ConfigFactory.load()
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ReProvisioningStatus[IO]] =
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO](configuration)
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
@@ -182,7 +185,8 @@ object ReProvisioningStatus {
                                          timeRecorder,
                                          StatusRefreshInterval,
                                          CacheRefreshInterval,
-                                         lastCacheCheckTimeRef)
+                                         lastCacheCheckTimeRef
+    )
 }
 
 private case object ReProvisioningJsonLD {

@@ -23,7 +23,8 @@ import ch.datascience.rdfstore.entities.CommandParameter.{EntityCommandParameter
 
 final class Usage private (val activity:     Activity,
                            val commandInput: EntityCommandParameter with Input,
-                           val maybeStep:    Option[Step])
+                           val maybeStep:    Option[Step]
+)
 
 object Usage {
 

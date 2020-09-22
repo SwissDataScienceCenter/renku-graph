@@ -20,7 +20,7 @@ package ch.datascience.webhookservice.hookvalidation
 
 import ProjectHookVerifier.HookIdentifier
 import cats.MonadError
-import cats.implicits._
+
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
@@ -559,9 +559,10 @@ class TryHookValidator(
     accessTokenRemover:    AccessTokenRemover[Try],
     logger:                Logger[Try]
 ) extends HookValidator[Try](projectHookUrl,
-                               projectInfoFinder,
-                               projectHookVerifier,
-                               accessTokenFinder,
-                               accessTokenAssociator,
-                               accessTokenRemover,
-                               logger)
+                             projectInfoFinder,
+                             projectHookVerifier,
+                             accessTokenFinder,
+                             accessTokenAssociator,
+                             accessTokenRemover,
+                             logger
+    )

@@ -144,7 +144,7 @@ abstract class ServiceClient(implicit executionContext: ExecutionContext,
 
   import ServiceClient.ServiceReadiness
   import ServiceClient.ServiceReadiness._
-  import cats.implicits._
+  import cats.syntax.all._
   import org.http4s.circe.jsonEncoderOf
   import org.http4s.{EntityEncoder, Method, Request, Response, Status}
   protected implicit val jsonEntityEncoder: EntityEncoder[IO, Json] = jsonEncoderOf[IO, Json]

@@ -18,14 +18,14 @@
 
 package ch.datascience.knowledgegraph.lineage
 
-import LineageGenerators._
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.knowledgegraph.lineage.LineageGenerators._
 import ch.datascience.knowledgegraph.lineage.model.Node
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
@@ -60,8 +60,8 @@ class NodesDetailsFinderSpec
       val inputActivity = activity(creating = input)
       val output        = locations.generateOne
       val processRunActivity = processRun(
-        inputs           = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs          = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
+        inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
+        outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
         previousActivity = inputActivity
       )
 
@@ -88,8 +88,8 @@ class NodesDetailsFinderSpec
       val inputActivity = activity(creating = input)
       val output        = locations.generateOne
       val processRunActivity = processRun(
-        inputs           = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs          = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
+        inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
+        outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
         previousActivity = inputActivity
       )
 
@@ -118,13 +118,13 @@ class NodesDetailsFinderSpec
       val inputActivity = activity(creating = input)
       val output        = locations.generateOne
       val processRun1Activity = processRun(
-        inputs           = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs          = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
+        inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
+        outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
         previousActivity = inputActivity
       )
       val processRun2Activity = processRun(
-        inputs           = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs          = List.empty,
+        inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
+        outputs = List.empty,
         previousActivity = processRun1Activity
       )
 
@@ -134,9 +134,10 @@ class NodesDetailsFinderSpec
       val process2ActivityNode = NodeDef(processRun2Activity).toNode
 
       nodeDetailsFinder
-        .findDetails(Set(EntityId.of(process1ActivityNode.location.toString),
-                         EntityId.of(process2ActivityNode.location.toString)),
-                     projectPath)
+        .findDetails(
+          Set(EntityId.of(process1ActivityNode.location.toString), EntityId.of(process2ActivityNode.location.toString)),
+          projectPath
+        )
         .unsafeRunSync() shouldBe Set(process1ActivityNode, process2ActivityNode)
     }
 
@@ -144,8 +145,8 @@ class NodesDetailsFinderSpec
       val input         = locations.generateOne
       val inputActivity = activity(creating = input)
       val processRunActivity = processRun(
-        inputs           = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs          = List(Output.withoutPositionFactory(activity => Entity(Generation(locations.generateOne, activity)))),
+        inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
+        outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(locations.generateOne, activity)))),
         previousActivity = inputActivity
       )
 
@@ -162,7 +163,7 @@ class NodesDetailsFinderSpec
       val processRunActivity = processRun(
         inputs = List(Input.streamFrom(inputActivity.entity(input))),
         outputs = List(
-          Output.streamFactory(activity => Entity(Generation(output, activity)), to    = StdOut),
+          Output.streamFactory(activity => Entity(Generation(output, activity)), to = StdOut),
           Output.streamFactory(activity => Entity(Generation(errOutput, activity)), to = StdErr)
         ),
         previousActivity = inputActivity
@@ -188,8 +189,8 @@ class NodesDetailsFinderSpec
       val inputActivity = activity(creating = input)
       val output        = locations.generateOne
       val processRunActivity = processRun(
-        inputs           = List(Input.withoutPositionFrom(inputActivity.entity(input))),
-        outputs          = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
+        inputs = List(Input.withoutPositionFrom(inputActivity.entity(input))),
+        outputs = List(Output.withoutPositionFactory(activity => Entity(Generation(output, activity)))),
         previousActivity = inputActivity
       )
 
@@ -200,7 +201,8 @@ class NodesDetailsFinderSpec
       val exception = intercept[Exception] {
         nodeDetailsFinder
           .findDetails(Set(EntityId.of(NodeDef(processRunActivity).toNode.location.toString), missingRunPlan),
-                       projectPath)
+                       projectPath
+          )
           .unsafeRunSync()
       }
 
@@ -229,7 +231,7 @@ class NodesDetailsFinderSpec
       committer = persons.generateOne,
       project,
       agent,
-      comment                  = "committing 1 file",
+      comment = "committing 1 file",
       maybeGenerationFactories = List(Generation.factory(entityFactory = Entity.factory(creating)))
     )
 
@@ -246,7 +248,7 @@ class NodesDetailsFinderSpec
           RunPlan.process(
             WorkflowFile.yaml("renku-run.yaml"),
             Command("cat"),
-            inputs  = inputs,
+            inputs = inputs,
             outputs = outputs
           )
         ),

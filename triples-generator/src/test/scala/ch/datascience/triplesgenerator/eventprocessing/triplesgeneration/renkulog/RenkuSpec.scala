@@ -44,7 +44,7 @@ class RenkuSpec extends AnyWordSpec with should.Matchers {
       val commandBody = jsonLDTriples.generateOne
       val commandResult = CommandResult(
         exitCode = 0,
-        chunks   = Seq(Left(new Bytes(commandBody.value.noSpaces.getBytes())))
+        chunks = Seq(Left(new Bytes(commandBody.value.noSpaces.getBytes())))
       )
 
       val Right(triples) = renku().log(event, path)(triplesGeneration(returning = commandResult)).value.unsafeRunSync()

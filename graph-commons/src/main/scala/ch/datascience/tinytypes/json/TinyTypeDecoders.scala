@@ -21,7 +21,7 @@ package ch.datascience.tinytypes.json
 import java.time.ZoneOffset.UTC
 import java.time.{Instant, LocalDate, OffsetDateTime}
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.tinytypes._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.collection.NonEmpty
@@ -37,8 +37,8 @@ object TinyTypeDecoders {
     case nonBlank => RefType.applyRef[NonBlank](nonBlank).fold(e => { print(e); None }, Option.apply)
   }
 
-  def toOption[TT <: TinyType { type V = String }](
-      implicit tinyTypeFactory: From[TT]
+  def toOption[TT <: TinyType { type V = String }](implicit
+      tinyTypeFactory: From[TT]
   ): Option[NonBlank] => Either[DecodingFailure, Option[TT]] = {
     case Some(nonBlank) =>
       tinyTypeFactory

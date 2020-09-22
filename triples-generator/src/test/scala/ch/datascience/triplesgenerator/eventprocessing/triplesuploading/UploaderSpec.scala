@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
 import cats.data.EitherT
 import cats.data.EitherT.right
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.rdfstore.SparqlQuery
@@ -109,11 +109,10 @@ class UploaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
       val failure = RecoverableFailure(nonEmptyStrings().generateOne)
 
-      curatedTriples.updatesGroups.map(
-        updatesGroup =>
-          updatesGroup
-            .generateUpdates()
-            .expectExecuteQueries(failure.pure[Try])
+      curatedTriples.updatesGroups.map(updatesGroup =>
+        updatesGroup
+          .generateUpdates()
+          .expectExecuteQueries(failure.pure[Try])
       )
 
       uploader.upload(curatedTriples) shouldBe failure.pure[Try]

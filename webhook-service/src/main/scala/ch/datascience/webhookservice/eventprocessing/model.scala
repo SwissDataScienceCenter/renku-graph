@@ -60,7 +60,7 @@ import Person._
 
 sealed trait Author extends Person
 object Author {
-  final case class FullAuthor(name:     users.Name, email: Email) extends Author with WithEmail
+  final case class FullAuthor(name: users.Name, email: Email) extends Author with WithEmail
   final case class AuthorWithName(name: users.Name) extends Author
 
   def apply(username:    users.Name, email: Email): Author = FullAuthor(username, email)
@@ -70,7 +70,7 @@ object Author {
 
 sealed trait Committer extends Person
 object Committer {
-  final case class FullCommitter(name:     users.Name, email: Email) extends Committer with WithEmail
+  final case class FullCommitter(name: users.Name, email: Email) extends Committer with WithEmail
   final case class CommitterWithName(name: users.Name) extends Committer
 
   def apply(username:    users.Name, email: Email): Committer = FullCommitter(username, email)

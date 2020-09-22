@@ -29,7 +29,8 @@ import eu.timepit.refined.collection.NonEmpty
 import scala.language.higherKinds
 
 final case class CuratedTriples[Interpretation[_]](triples:       JsonLDTriples,
-                                                   updatesGroups: List[CurationUpdatesGroup[Interpretation]])
+                                                   updatesGroups: List[CurationUpdatesGroup[Interpretation]]
+)
 
 object CuratedTriples {
   private[eventprocessing] type GeneratedQueries[Interpretation[_]] =

@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.MonadError
 import cats.data.NonEmptyList
-import cats.implicits._
+
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -106,7 +106,8 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
 
   private implicit def parentsIdsLists(minNumber: Int = 0, maxNumber: Int = 4): Gen[List[CommitId]] = {
     require(minNumber <= maxNumber,
-            s"minNumber = $minNumber is not <= maxNumber = $maxNumber for generating parents Ids list")
+            s"minNumber = $minNumber is not <= maxNumber = $maxNumber for generating parents Ids list"
+    )
     for {
       parentCommitsNumber <- choose(minNumber, maxNumber)
       parents             <- Gen.listOfN(parentCommitsNumber, commitIds)

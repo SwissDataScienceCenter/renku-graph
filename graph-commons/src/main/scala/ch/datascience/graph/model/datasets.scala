@@ -56,16 +56,46 @@ object datasets {
       EntityId.of(derivedFrom.value).asJsonLD
   }
 
-  final class SameAs private (val value: String) extends AnyVal with UrlTinyType
-  implicit object SameAs extends TinyTypeFactory[SameAs](new SameAs(_)) with constraints.Url {
+  sealed trait SameAs extends Any with UrlTinyType {
 
-    def apply(datasetEntityId: EntityId): SameAs = SameAs(datasetEntityId.toString)
+    override def equals(obj: Any): Boolean =
+      Option(obj).exists {
+        case v: SameAs => v.value == value
+        case _ => false
+      }
 
-    implicit val sameAsJsonLdEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance { sameAs =>
+    override def hashCode(): Int = value.hashCode
+  }
+  final class IdSameAs private[datasets] (val value: String) extends SameAs
+  final class UrlSameAs private[datasets] (val value: String) extends SameAs
+  implicit object SameAs extends TinyTypeFactory[SameAs](new UrlSameAs(_)) with constraints.Url {
+
+    final def fromId(value: String): Either[IllegalArgumentException, IdSameAs] =
+      from(value) map (sameAs => new IdSameAs(sameAs.value))
+
+    final def fromUrl(value: String): Either[IllegalArgumentException, UrlSameAs] =
+      from(value) map (sameAs => new UrlSameAs(sameAs.value))
+
+    def apply(datasetEntityId: EntityId): IdSameAs = new IdSameAs(datasetEntityId.toString)
+
+    implicit val sameAsJsonLdEncoder: JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
+      case v: IdSameAs  => idSameAsJsonLdEncoder(v)
+      case v: UrlSameAs => urlSameAsJsonLdEncoder(v)
+    }
+
+    private lazy val idSameAsJsonLdEncoder: JsonLDEncoder[IdSameAs] = JsonLDEncoder.instance { sameAs =>
       JsonLD.entity(
         EntityId of s"_:${UUID.randomUUID()}",
         EntityTypes of (schema / "URL"),
         schema / "url" -> EntityId.of(sameAs.value).asJsonLD
+      )
+    }
+
+    private lazy val urlSameAsJsonLdEncoder: JsonLDEncoder[UrlSameAs] = JsonLDEncoder.instance { sameAs =>
+      JsonLD.entity(
+        EntityId of s"_:${UUID.randomUUID()}",
+        EntityTypes of (schema / "URL"),
+        schema / "url" -> sameAs.value.asJsonLD
       )
     }
   }

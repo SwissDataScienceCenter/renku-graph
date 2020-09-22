@@ -35,7 +35,7 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
 
   import EventStatus.{New, RecoverableFailure}
   import SubscriptionsEndpoint._
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.controllers.InfoMessage._
   import ch.datascience.controllers.{ErrorMessage, InfoMessage}
   import org.http4s.circe._
@@ -58,7 +58,8 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
   private def badRequestIf(statuses: Set[EventStatus], not: EventStatus*): Interpretation[Unit] =
     if (statuses != not.toSet) ME.raiseError {
       BadRequestError(s"Subscriptions to $New and $RecoverableFailure status supported only")
-    } else ME.unit
+    }
+    else ME.unit
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case exception: BadRequestError =>

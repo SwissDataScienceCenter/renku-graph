@@ -22,13 +22,13 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -48,23 +48,23 @@ class EventsSynchronizationSchedulerSpec
       "with initial delay read from config and " +
       "continues endlessly with interval periods" in new TestCase {
 
-      (timer
-        .sleep(_: FiniteDuration))
-        .expects(5 minutes)
-        .returning(context.unit)
+        (timer
+          .sleep(_: FiniteDuration))
+          .expects(5 minutes)
+          .returning(context.unit)
 
-      (timer
-        .sleep(_: FiniteDuration))
-        .expects(1 hour)
-        .returning(context.unit)
-        .atLeastOnce()
+        (timer
+          .sleep(_: FiniteDuration))
+          .expects(1 hour)
+          .returning(context.unit)
+          .atLeastOnce()
 
-      IO.suspend(scheduler.run.pure[IO]).start.unsafeRunAsyncAndForget()
+        IO.suspend(scheduler.run.pure[IO]).start.unsafeRunAsyncAndForget()
 
-      eventually {
-        eventsLoader.callCounter.get() should be > 5
+        eventually {
+          eventsLoader.callCounter.get() should be > 5
+        }
       }
-    }
   }
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)

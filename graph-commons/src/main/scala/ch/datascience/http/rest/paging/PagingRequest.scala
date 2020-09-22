@@ -18,20 +18,21 @@
 
 package ch.datascience.http.rest.paging
 
-import model._
+import cats.syntax.all._
+import ch.datascience.http.rest.paging.model._
 
 final case class PagingRequest(page: Page, perPage: PerPage)
 
 object PagingRequest {
   import cats.data._
-  import cats.implicits._
   import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
   import org.http4s.{ParseFailure, QueryParamDecoder}
 
   val default: PagingRequest = PagingRequest(Page.first, PerPage.default)
 
   def apply(maybePage:    Option[ValidatedNel[ParseFailure, Page]],
-            maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]]): ValidatedNel[ParseFailure, PagingRequest] =
+            maybePerPage: Option[ValidatedNel[ParseFailure, PerPage]]
+  ): ValidatedNel[ParseFailure, PagingRequest] =
     (maybePage getOrElse Page.first.validNel, maybePerPage getOrElse PerPage.default.validNel)
       .mapN(PagingRequest.apply)
 

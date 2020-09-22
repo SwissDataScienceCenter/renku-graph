@@ -35,7 +35,7 @@ object DatasetsGenerators {
   implicit val datasets: Gen[NonModifiedDataset] = nonModifiedDatasets()
 
   def nonModifiedDatasets(
-      sameAs:   Gen[SameAs]                       = datasetSameAs,
+      sameAs:   Gen[SameAs] = datasetSameAs,
       projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
   ): Gen[NonModifiedDataset] =
     for {
@@ -58,10 +58,11 @@ object DatasetsGenerators {
                                published,
                                part,
                                projects.toList,
-                               keywords)
+                               keywords
+    )
 
-  def modifiedDatasetsOnFirstProject(dataset: Dataset, derivedFromOverride: Option[DerivedFrom] = None)(
-      implicit renkuBaseUrl:                  RenkuBaseUrl
+  def modifiedDatasetsOnFirstProject(dataset: Dataset, derivedFromOverride: Option[DerivedFrom] = None)(implicit
+      renkuBaseUrl:                           RenkuBaseUrl
   ): Gen[ModifiedDataset] =
     for {
       id        <- datasetIdentifiers

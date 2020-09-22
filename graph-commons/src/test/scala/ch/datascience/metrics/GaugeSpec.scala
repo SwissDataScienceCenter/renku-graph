@@ -18,11 +18,11 @@
 
 package ch.datascience.metrics
 
-import MetricsTools._
 import cats.MonadError
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.metrics.MetricsTools._
 import io.prometheus.client.{Gauge => LibGauge}
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
@@ -100,8 +100,8 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       gauge.reset shouldBe ME.unit
 
-      underlying.collectAllSamples should contain theSameElementsAs waitingEvents.map {
-        case (labelValue, value) => (label, labelValue.value, value)
+      underlying.collectAllSamples should contain theSameElementsAs waitingEvents.map { case (labelValue, value) =>
+        (label, labelValue.value, value)
       }
     }
   }
@@ -187,19 +187,19 @@ class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
     "register the metrics in the Metrics Registry " +
       "and return an instance of the SingleValueGauge" in new TestCase {
 
-      (metricsRegistry
-        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[Try, Throwable]))
-        .expects(*, *)
-        .onCall { (builder: LibGauge.Builder, _: MonadError[Try, Throwable]) =>
-          builder.create().pure[Try]
-        }
+        (metricsRegistry
+          .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[Try, Throwable]))
+          .expects(*, *)
+          .onCall { (builder: LibGauge.Builder, _: MonadError[Try, Throwable]) =>
+            builder.create().pure[Try]
+          }
 
-      val Success(gauge) = Gauge[Try](name, help)(metricsRegistry)
+        val Success(gauge) = Gauge[Try](name, help)(metricsRegistry)
 
-      gauge.isInstanceOf[SingleValueGauge[Try]] shouldBe true
-      gauge.name                                shouldBe name.value
-      gauge.help                                shouldBe help.value
-    }
+        gauge.isInstanceOf[SingleValueGauge[Try]] shouldBe true
+        gauge.name                                shouldBe name.value
+        gauge.help                                shouldBe help.value
+      }
   }
 
   "apply with a label name" should {
@@ -207,21 +207,21 @@ class GaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
     "register the metrics in the Metrics Registry " +
       "and return an instance of the LabeledGauge" in new TestCase {
 
-      (metricsRegistry
-        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[Try, Throwable]))
-        .expects(*, *)
-        .onCall { (builder: LibGauge.Builder, _: MonadError[Try, Throwable]) =>
-          builder.create().pure[Try]
-        }
+        (metricsRegistry
+          .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[Try, Throwable]))
+          .expects(*, *)
+          .onCall { (builder: LibGauge.Builder, _: MonadError[Try, Throwable]) =>
+            builder.create().pure[Try]
+          }
 
-      val labelName = nonBlankStrings().generateOne
+        val labelName = nonBlankStrings().generateOne
 
-      val Success(gauge) = Gauge[Try, String](name, help, labelName)(metricsRegistry)
+        val Success(gauge) = Gauge[Try, String](name, help, labelName)(metricsRegistry)
 
-      gauge.isInstanceOf[LabeledGauge[Try, String]] shouldBe true
-      gauge.name                                    shouldBe name.value
-      gauge.help                                    shouldBe help.value
-    }
+        gauge.isInstanceOf[LabeledGauge[Try, String]] shouldBe true
+        gauge.name                                    shouldBe name.value
+        gauge.help                                    shouldBe help.value
+      }
   }
 
   private trait TestCase {

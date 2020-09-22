@@ -44,11 +44,11 @@ object Arguments {
         exceptionMessage: NonBlank
     ): ScalarType[TT] = {
 
-      import cats.implicits._
+      import cats.syntax.all._
 
       ScalarType[TT](
-        name         = name.value,
-        description  = Some(description.value),
+        name = name.value,
+        description = Some(description.value),
         coerceOutput = valueOutput,
         coerceUserInput = {
           case s: String => typeFactory.from(s) leftMap (_ => TinyTypeCoercionViolation(exceptionMessage))

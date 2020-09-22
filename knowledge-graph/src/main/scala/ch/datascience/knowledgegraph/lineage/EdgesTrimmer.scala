@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.lineage
 
 import cats.MonadError
 import cats.effect.IO
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.knowledgegraph.lineage.IOLineageDataTrimmer.EntityIdOps
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import ch.datascience.knowledgegraph.lineage.model.{EdgeMap, Node}
@@ -41,7 +41,6 @@ private class EdgesTrimmerImpl[Interpretation[_]]()(implicit ME: MonadError[Inte
     extends EdgesTrimmer[Interpretation] {
 
   /**
-    *
     * @param edges Edges from the whole project
     * @param location location of file the user selected in the UI
     * @return Trimmed graph with only nodes connected to the location

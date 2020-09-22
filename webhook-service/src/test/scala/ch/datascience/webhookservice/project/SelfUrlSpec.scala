@@ -18,7 +18,6 @@
 
 package ch.datascience.webhookservice.project
 
-import cats.implicits._
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._

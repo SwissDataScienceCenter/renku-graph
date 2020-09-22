@@ -21,7 +21,7 @@ package io.renku.eventlog.processingstatus
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.metrics.LabeledHistogram
@@ -65,7 +65,7 @@ class ProcessingStatusFinderImpl(
                   |  ) max_batch_date on log.batch_date = max_batch_date.batch_date
                   |where log.project_id = $projectId
                   |""".stripMargin.query[EventStatus].to[List],
-    name  = "processing status"
+    name = "processing status"
   )
 
   private def toProcessingStatus(statuses: List[EventStatus]) =
@@ -88,7 +88,7 @@ object IOProcessingStatusFinder {
   }
 }
 
-import ProcessingStatus._
+import io.renku.eventlog.processingstatus.ProcessingStatus._
 
 final case class ProcessingStatus private (
     done:     Done,
@@ -137,6 +137,8 @@ object ProcessingStatus {
     val progress =
       if (total.value == 0) 100d
       else BigDecimal((done.value.toDouble / total.value) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
-    applyRef[Progress](progress) getOrError [Interpretation] s"ProcessingStatus with 'progress' $progress makes no sense"
+    applyRef[Progress](
+      progress
+    ) getOrError [Interpretation] s"ProcessingStatus with 'progress' $progress makes no sense"
   }
 }

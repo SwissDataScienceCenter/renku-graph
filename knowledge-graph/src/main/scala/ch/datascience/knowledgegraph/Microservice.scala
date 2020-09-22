@@ -64,17 +64,17 @@ object Microservice extends IOMicroservice {
       statsFinder             <- IOStatsFinder(sparqlTimeRecorder, ApplicationLogger)
       kgMetrics               <- IOKGMetrics(statsFinder, metricsRegistry, ApplicationLogger)
       microServiceResource = new MicroserviceRoutes[IO](
-        queryEndpoint,
-        projectEndpoint,
-        projectDatasetsEndpoint,
-        datasetEndpoint,
-        datasetsSearchEndpoint,
-        new RoutesMetrics[IO](metricsRegistry)
-      ).routes
+                               queryEndpoint,
+                               projectEndpoint,
+                               projectDatasetsEndpoint,
+                               datasetEndpoint,
+                               datasetsSearchEndpoint,
+                               new RoutesMetrics[IO](metricsRegistry)
+                             ).routes
       exicode <- microServiceResource.use { routes =>
-                  val httpServer = new HttpServer[IO](serverPort = 9004, routes)
-                  new MicroserviceRunner(sentryInitializer, httpServer, kgMetrics).run(args)
-                }
+                   val httpServer = new HttpServer[IO](serverPort = 9004, routes)
+                   new MicroserviceRunner(sentryInitializer, httpServer, kgMetrics).run(args)
+                 }
 
     } yield exicode
 

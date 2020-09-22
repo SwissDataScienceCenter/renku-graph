@@ -19,7 +19,7 @@
 package io.renku.eventlog.eventspatching
 
 import cats.effect.{Bracket, IO}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
@@ -49,13 +49,12 @@ private class EventsPatcherImpl(
     } yield ()
   } recoverWith loggedError(eventsPatch)
 
-  private def loggedError(patch: EventsPatch[IO]): PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) =>
-      val message = s"Patching all events with ${patch.name} failed"
-      logger.error(exception)(message)
-      ME.raiseError {
-        new Exception(message, exception)
-      }
+  private def loggedError(patch: EventsPatch[IO]): PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+    val message = s"Patching all events with ${patch.name} failed"
+    logger.error(exception)(message)
+    ME.raiseError {
+      new Exception(message, exception)
+    }
   }
 }
 

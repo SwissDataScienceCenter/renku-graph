@@ -21,7 +21,7 @@ package ch.datascience.rdfstore
 import java.net.BindException
 
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -109,9 +109,9 @@ class RdfStoreServer(
     for {
       _ <- IO(dataset.asDatasetGraph().clear())
       _ <- isDatasetEmpty flatMap {
-            case true  => IO.unit
-            case false => IO.raiseError(new Exception(s"Clearing $datasetName wasn't successful"))
-          }
+             case true  => IO.unit
+             case false => IO.raiseError(new Exception(s"Clearing $datasetName wasn't successful"))
+           }
     } yield ()
 
   def isDatasetEmpty: IO[Boolean] = IO {

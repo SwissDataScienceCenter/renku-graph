@@ -18,7 +18,7 @@
 
 package ch.datascience.metrics
 
-import cats.implicits._
+import cats.syntax.all._
 import io.prometheus.client.Collector
 import io.prometheus.client.Collector.MetricFamilySamples.Sample
 
@@ -36,8 +36,8 @@ object MetricsTools {
       } yield resultTuple
 
     private val toResultTuple: Sample => List[(String, String, Double)] = sample =>
-      (sample.labelNames.asScala.toList, sample.labelValues.asScala.toList) mapN {
-        case (labelName, labelValue) => (labelName, labelValue, sample.value)
+      (sample.labelNames.asScala.toList, sample.labelValues.asScala.toList) mapN { case (labelName, labelValue) =>
+        (labelName, labelValue, sample.value)
       }
   }
 }

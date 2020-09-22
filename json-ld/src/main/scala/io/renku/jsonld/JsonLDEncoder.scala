@@ -44,8 +44,10 @@ object JsonLDEncoder {
   final implicit def encodeList[A](implicit itemEncoder: JsonLDEncoder[A]): JsonLDEncoder[List[A]] =
     (seq: List[A]) => JsonLD.arr(seq map (itemEncoder(_)): _*)
 
-  final implicit def encodeSet[A](implicit itemEncoder: JsonLDEncoder[A],
-                                  ordering:             Ordering[A]): JsonLDEncoder[Set[A]] =
+  final implicit def encodeSet[A](implicit
+      itemEncoder: JsonLDEncoder[A],
+      ordering:    Ordering[A]
+  ): JsonLDEncoder[Set[A]] =
     (seq: Set[A]) => JsonLD.arr(seq.toList.sorted map (itemEncoder(_)): _*)
 
   final implicit val encodeString:    JsonLDEncoder[String]    = (a: String) => JsonLD.fromString(a)

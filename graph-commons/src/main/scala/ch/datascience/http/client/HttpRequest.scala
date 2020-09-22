@@ -33,5 +33,5 @@ object HttpRequest {
   def apply(request: Request[IO], name: String Refined NonEmpty): NamedRequest = NamedRequest(request, name)
 
   final case class UnnamedRequest(request: Request[IO]) extends HttpRequest
-  final case class NamedRequest(request:   Request[IO], name: String Refined NonEmpty) extends HttpRequest
+  final case class NamedRequest(request: Request[IO], name: String Refined NonEmpty) extends HttpRequest
 }

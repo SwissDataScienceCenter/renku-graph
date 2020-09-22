@@ -18,10 +18,11 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.{fusekiBaseUrls, jsonLDTriples}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.datasets.{IdSameAs, UrlSameAs}
 import ch.datascience.rdfstore.entities.DataSet
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples}
@@ -50,15 +51,32 @@ class DataSetInfoFinderSpec extends AnyWordSpec with should.Matchers {
       infoFinder.findDatasetsInfo(triples) shouldBe Success(Set((entityId, None, None)))
     }
 
-    "return the DataSetInfo with SameAs and no derivedFrom as reflected in json" in new TestCase {
+    "return the DataSetInfo with UrlSameAs and no derivedFrom as reflected in json" in new TestCase {
       val identifier = datasetIdentifiers.generateOne
       val entityId   = DataSet.entityId(identifier)(renkuBaseUrl)
-      val sameAs     = datasetSameAs.generateSome
+      val sameAs     = datasetUrlSameAs.generateSome
       val triples = JsonLDTriples {
         nonModifiedDataSetCommit()()(datasetIdentifier = identifier, maybeDatasetSameAs = sameAs).toJson
       }
 
-      infoFinder.findDatasetsInfo(triples) shouldBe Success(Set((entityId, sameAs, None)))
+      val Success(datasetInfos) = infoFinder.findDatasetsInfo(triples)
+
+      datasetInfos             shouldBe Set((entityId, sameAs, None))
+      datasetInfos.head._2.get shouldBe an[UrlSameAs]
+    }
+
+    "return the DataSetInfo with IdSameAs and no derivedFrom as reflected in json" in new TestCase {
+      val identifier = datasetIdentifiers.generateOne
+      val entityId   = DataSet.entityId(identifier)(renkuBaseUrl)
+      val sameAs     = datasetIdSameAs.generateSome
+      val triples = JsonLDTriples {
+        nonModifiedDataSetCommit()()(datasetIdentifier = identifier, maybeDatasetSameAs = sameAs).toJson
+      }
+
+      val Success(datasetInfos) = infoFinder.findDatasetsInfo(triples)
+
+      datasetInfos             shouldBe Set((entityId, sameAs, None))
+      datasetInfos.head._2.get shouldBe an[IdSameAs]
     }
 
     "return the DataSetInfo with derivedFrom and no sameAs as reflected in json" in new TestCase {

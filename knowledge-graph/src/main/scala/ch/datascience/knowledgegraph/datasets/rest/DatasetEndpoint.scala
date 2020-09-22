@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect._
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.renku
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
@@ -67,11 +67,10 @@ class DatasetEndpoint[Interpretation[_]: Effect](
 
   private def httpResult(
       identifier: Identifier
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding dataset with '$identifier' id failed")
-      logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+    val errorMessage = ErrorMessage(s"Finding dataset with '$identifier' id failed")
+    logger.error(exception)(errorMessage.value)
+    InternalServerError(errorMessage)
   }
 
   private def finishedSuccessfully(identifier: Identifier): PartialFunction[Response[Interpretation], String] = {
@@ -145,10 +144,12 @@ class DatasetEndpoint[Interpretation[_]: Effect](
 object IODatasetEndpoint {
 
   def apply(
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[DatasetEndpoint[IO]] =
+      timeRecorder: SparqlQueryTimeRecorder[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[DatasetEndpoint[IO]] =
     for {
       datasetFinder         <- IODatasetFinder(timeRecorder, logger = ApplicationLogger)
       renkuResourceUrl      <- renku.ResourcesUrl[IO]()

@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.processingstatus
 
-import cats.implicits._
 import ch.datascience.generators.Generators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -45,33 +44,30 @@ class ProcessingStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
           total <- positiveInts(max = Integer.MAX_VALUE)
           done  <- positiveInts(max = total.value)
         } yield done.value -> total.value
-      } {
-        case (done, total) =>
-          val Success(processingStatus) = ProcessingStatus.from[Try](done, total)
+      } { case (done, total) =>
+        val Success(processingStatus) = ProcessingStatus.from[Try](done, total)
 
-          processingStatus.done.value  shouldBe done
-          processingStatus.total.value shouldBe total
+        processingStatus.done.value  shouldBe done
+        processingStatus.total.value shouldBe total
 
-          val expectedProgress = BigDecimal((done.toDouble / total) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
-          processingStatus.progress.value shouldBe expectedProgress
+        val expectedProgress = BigDecimal((done.toDouble / total) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
+        processingStatus.progress.value shouldBe expectedProgress
       }
     }
 
     "fail if done negative" in {
-      forAll(negativeInts(min = Integer.MIN_VALUE), nonNegativeInts(max = Integer.MAX_VALUE)) {
-        case (done, total) =>
-          val Failure(exception) = ProcessingStatus.from[Try](done, total.value)
-          exception            shouldBe an[IllegalArgumentException]
-          exception.getMessage shouldBe "ProcessingStatus's 'done' cannot be negative"
+      forAll(negativeInts(min = Integer.MIN_VALUE), nonNegativeInts(max = Integer.MAX_VALUE)) { case (done, total) =>
+        val Failure(exception) = ProcessingStatus.from[Try](done, total.value)
+        exception            shouldBe an[IllegalArgumentException]
+        exception.getMessage shouldBe "ProcessingStatus's 'done' cannot be negative"
       }
     }
 
     "fail if total negative" in {
-      forAll(nonNegativeInts(max = Integer.MAX_VALUE), negativeInts(min = Integer.MIN_VALUE)) {
-        case (done, total) =>
-          val Failure(exception) = ProcessingStatus.from[Try](done.value, total)
-          exception            shouldBe an[IllegalArgumentException]
-          exception.getMessage shouldBe "ProcessingStatus's 'total' cannot be negative"
+      forAll(nonNegativeInts(max = Integer.MAX_VALUE), negativeInts(min = Integer.MIN_VALUE)) { case (done, total) =>
+        val Failure(exception) = ProcessingStatus.from[Try](done.value, total)
+        exception            shouldBe an[IllegalArgumentException]
+        exception.getMessage shouldBe "ProcessingStatus's 'total' cannot be negative"
       }
     }
 
@@ -81,11 +77,10 @@ class ProcessingStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
           done  <- positiveInts(max = Integer.MAX_VALUE)
           total <- positiveInts(max = done.value - 1)
         } yield done.value -> total.value
-      } {
-        case (done, total) =>
-          val Failure(exception) = ProcessingStatus.from[Try](done, total)
-          exception            shouldBe an[IllegalArgumentException]
-          exception.getMessage shouldBe "ProcessingStatus with 'done' > 'total' makes no sense"
+      } { case (done, total) =>
+        val Failure(exception) = ProcessingStatus.from[Try](done, total)
+        exception            shouldBe an[IllegalArgumentException]
+        exception.getMessage shouldBe "ProcessingStatus with 'done' > 'total' makes no sense"
       }
     }
   }

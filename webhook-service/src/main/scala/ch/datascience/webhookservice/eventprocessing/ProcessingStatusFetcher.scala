@@ -18,15 +18,15 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
-import ProcessingStatusFetcher.ProcessingStatus
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.IORestClient
+import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.{NonNegative, Positive}
 import io.chrisdavenport.log4cats.Logger
@@ -76,19 +76,19 @@ private object ProcessingStatusFetcher {
 }
 
 private class IOProcessingStatusFetcher(
-    eventLogUrl:    EventLogUrl,
-    logger:         Logger[IO]
-)(implicit ME:      MonadError[IO, Throwable],
-  executionContext: ExecutionContext,
-  contextShift:     ContextShift[IO],
-  timer:            Timer[IO])
-    extends IORestClient(Throttler.noThrottling, logger)
+    eventLogUrl: EventLogUrl,
+    logger:      Logger[IO]
+)(implicit
+    ME:               MonadError[IO, Throwable],
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO]
+) extends IORestClient(Throttler.noThrottling, logger)
     with ProcessingStatusFetcher[IO] {
 
   import IOProcessingStatusFetcher._
   import ProcessingStatusFetcher._
   import cats.effect._
-  import cats.implicits._
   import org.http4s.Method.GET
   import org.http4s._
   import org.http4s.circe.jsonOf
@@ -113,10 +113,12 @@ private object IOProcessingStatusFetcher {
   import io.circe.DecodingFailure
 
   def apply(
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext,
-    contextShift:              ContextShift[IO],
-    timer:                     Timer[IO]): IO[ProcessingStatusFetcher[IO]] =
+      logger: Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ProcessingStatusFetcher[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
     } yield new IOProcessingStatusFetcher(eventLogUrl, logger)

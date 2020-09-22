@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes.constraints
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.tinytypes.{RelativePathTinyType, TinyTypeFactory}
 

@@ -22,7 +22,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO._
 import cats.effect._
 import cats.effect.concurrent.Semaphore
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult
@@ -38,7 +38,8 @@ import scala.util.control.NonFatal
 
 private trait EventsProcessingRunner[Interpretation[_]] {
   def scheduleForProcessing(eventId: CompoundEventId,
-                            events:  NonEmptyList[CommitEvent]): Interpretation[EventSchedulingResult]
+                            events:  NonEmptyList[CommitEvent]
+  ): Interpretation[EventSchedulingResult]
 }
 
 object EventsProcessingRunner {
@@ -61,15 +62,17 @@ private class IOEventsProcessingRunner private (
     extends EventsProcessingRunner[IO] {
 
   override def scheduleForProcessing(eventId: CompoundEventId,
-                                     events:  NonEmptyList[CommitEvent]): IO[EventSchedulingResult] =
+                                     events:  NonEmptyList[CommitEvent]
+  ): IO[EventSchedulingResult] =
     semaphore.available flatMap {
       case 0 => Busy.pure[IO]
-      case _ => {
-        for {
-          _ <- semaphore.acquire
-          _ <- process(eventId, events).start
-        } yield Accepted: EventSchedulingResult
-      } recoverWith releasingSemaphore
+      case _ =>
+        {
+          for {
+            _ <- semaphore.acquire
+            _ <- process(eventId, events).start
+          } yield Accepted: EventSchedulingResult
+        } recoverWith releasingSemaphore
     }
 
   private def process(eventId: CompoundEventId, events: NonEmptyList[CommitEvent]) = {
@@ -77,23 +80,21 @@ private class IOEventsProcessingRunner private (
       _ <- eventProcessor.process(eventId, events)
       _ <- releaseAndNotify()
     } yield ()
-  } recoverWith {
-    case NonFatal(exception) =>
-      for {
-        _ <- releaseAndNotify()
-        _ <- logger.error(exception)(s"Processing event $eventId failed")
-      } yield ()
+  } recoverWith { case NonFatal(exception) =>
+    for {
+      _ <- releaseAndNotify()
+      _ <- logger.error(exception)(s"Processing event $eventId failed")
+    } yield ()
   }
 
-  private def releasingSemaphore[O]: PartialFunction[Throwable, IO[O]] = {
-    case NonFatal(exception) =>
-      semaphore.available flatMap {
-        case available if available == generationProcesses.value => exception.raiseError[IO, O]
-        case _ =>
-          semaphore.release flatMap { _ =>
-            exception.raiseError[IO, O]
-          }
-      }
+  private def releasingSemaphore[O]: PartialFunction[Throwable, IO[O]] = { case NonFatal(exception) =>
+    semaphore.available flatMap {
+      case available if available == generationProcesses.value => exception.raiseError[IO, O]
+      case _ =>
+        semaphore.release flatMap { _ =>
+          exception.raiseError[IO, O]
+        }
+    }
   }
 
   private def releaseAndNotify(): IO[Unit] =

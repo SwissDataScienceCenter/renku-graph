@@ -40,10 +40,12 @@ import scala.language.higherKinds
 private trait DatasetsFinder[Interpretation[_]] {
   def findDatasets(maybePhrase: Option[Phrase],
                    sort:        Sort.By,
-                   paging:      PagingRequest): Interpretation[PagingResponse[DatasetSearchResult]]
+                   paging:      PagingRequest
+  ): Interpretation[PagingResponse[DatasetSearchResult]]
 }
 
 private object DatasetsFinder {
+
   final case class DatasetSearchResult(
       id:               Identifier,
       title:            Title,
@@ -54,7 +56,9 @@ private object DatasetsFinder {
   )
 
   final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
+
   implicit object ProjectsCount extends TinyTypeFactory[ProjectsCount](new ProjectsCount(_)) with NonNegativeInt
+
 }
 
 private class IODatasetsFinder(
@@ -68,12 +72,13 @@ private class IODatasetsFinder(
     with Paging[IO, DatasetSearchResult] {
 
   import IODatasetsFinder._
-  import cats.implicits._
+  import cats.syntax.all._
   import creatorsFinder._
 
   override def findDatasets(maybePhrase:   Option[Phrase],
                             sort:          Sort.By,
-                            pagingRequest: PagingRequest): IO[PagingResponse[DatasetSearchResult]] = {
+                            pagingRequest: PagingRequest
+  ): IO[PagingResponse[DatasetSearchResult]] = {
     val phrase = maybePhrase getOrElse Phrase("*")
     implicit val resultsFinder: PagedResultsFinder[IO, DatasetSearchResult] = pagedResultsFinder(
       sparqlQuery(phrase, sort)
@@ -181,11 +186,11 @@ private object IODatasetsFinder {
       maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
       projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
       maybeDescription <- cursor
-                           .downField("maybeDescription")
-                           .downField("value")
-                           .as[Option[String]]
-                           .map(blankToNone)
-                           .flatMap(toOption[Description])
+                            .downField("maybeDescription")
+                            .downField("value")
+                            .as[Option[String]]
+                            .map(blankToNone)
+                            .flatMap(toOption[Description])
     } yield DatasetSearchResult(
       id,
       title,

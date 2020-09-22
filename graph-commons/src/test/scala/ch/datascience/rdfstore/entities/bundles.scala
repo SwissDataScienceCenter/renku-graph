@@ -18,7 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}
@@ -54,14 +54,15 @@ object bundles extends Schemas {
             projectNames.generateOne,
             projectCreatedDates.generateOne,
             projectCreators.generateOption,
-            version = projectSchemaVersions.generateOne)
+            version = projectSchemaVersions.generateOne
+    )
 
   def fileCommit(
-      location:      Location      = locations.generateOne,
-      commitId:      CommitId      = commitIds.generateOne,
+      location:      Location = locations.generateOne,
+      commitId:      CommitId = commitIds.generateOne,
       committedDate: CommittedDate = committedDates.generateOne,
-      committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
-      cliVersion:    CliVersion    = cliVersions.generateOne
+      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion:    CliVersion = cliVersions.generateOne
   )(
       projectPath:         Path = projectPaths.generateOne,
       projectName:         projects.Name = projectNames.generateOne,
@@ -88,17 +89,17 @@ object bundles extends Schemas {
     Gen.oneOf(nonModifiedDataSetActivity()()(), modifiedDataSetActivity()()()).generateOne
 
   def nonModifiedDataSetCommit(
-      commitId:      CommitId      = commitIds.generateOne,
+      commitId:      CommitId = commitIds.generateOne,
       committedDate: CommittedDate = committedDates.generateOne,
-      committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
-      cliVersion:    CliVersion    = cliVersions.generateOne
+      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion:    CliVersion = cliVersions.generateOne
   )(
-      projectPath:         Path                 = projectPaths.generateOne,
-      projectName:         projects.Name        = projectNames.generateOne,
+      projectPath:         Path = projectPaths.generateOne,
+      projectName:         projects.Name = projectNames.generateOne,
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
-      maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
-      maybeParent:         Option[Project]      = None,
-      projectVersion:      SchemaVersion        = projectSchemaVersions.generateOne
+      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
+      maybeParent:         Option[Project] = None,
+      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
   )(
       datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
       datasetTitle:               Title = datasetTitles.generateOne,
@@ -136,31 +137,31 @@ object bundles extends Schemas {
     ).asJsonLD
 
   def nonModifiedDataSetActivity(
-      commitId:      CommitId      = commitIds.generateOne,
+      commitId:      CommitId = commitIds.generateOne,
       committedDate: CommittedDate = committedDates.generateOne,
-      committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
-      cliVersion:    CliVersion    = cliVersions.generateOne
+      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion:    CliVersion = cliVersions.generateOne
   )(
-      projectPath:         Path                 = projectPaths.generateOne,
-      projectName:         projects.Name        = projectNames.generateOne,
+      projectPath:         Path = projectPaths.generateOne,
+      projectName:         projects.Name = projectNames.generateOne,
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
-      maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
-      maybeParent:         Option[Project]      = None,
-      projectVersion:      SchemaVersion        = projectSchemaVersions.generateOne
+      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
+      maybeParent:         Option[Project] = None,
+      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
   )(
-      datasetIdentifier:          Identifier                     = datasetIdentifiers.generateOne,
-      datasetTitle:               Title                          = datasetTitles.generateOne,
-      datasetName:                Name                           = datasetNames.generateOne,
-      datasetUrl:                 Url                            = datasetUrls.generateOne,
-      maybeDatasetSameAs:         Option[SameAs]                 = Gen.option(datasetSameAs).generateOne,
-      maybeDatasetDescription:    Option[Description]            = Gen.option(datasetDescriptions).generateOne,
-      maybeDatasetPublishedDate:  Option[PublishedDate]          = Gen.option(datasetPublishedDates).generateOne,
-      datasetCreatedDate:         datasets.DateCreated           = datasets.DateCreated(committedDate.value),
-      datasetCreators:            Set[Person]                    = setOf(persons).generateOne,
+      datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
+      datasetTitle:               Title = datasetTitles.generateOne,
+      datasetName:                Name = datasetNames.generateOne,
+      datasetUrl:                 Url = datasetUrls.generateOne,
+      maybeDatasetSameAs:         Option[SameAs] = Gen.option(datasetSameAs).generateOne,
+      maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
+      maybeDatasetPublishedDate:  Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
+      datasetCreatedDate:         datasets.DateCreated = datasets.DateCreated(committedDate.value),
+      datasetCreators:            Set[Person] = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
-      datasetKeywords:            List[Keyword]                  = listOf(GraphModelGenerators.datasetKeywords).generateOne,
-      overrideTopmostSameAs:      Option[TopmostSameAs]          = None,
-      overrideTopmostDerivedFrom: Option[DerivedFrom]            = None
+      datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
+      overrideTopmostSameAs:      Option[TopmostSameAs] = None,
+      overrideTopmostDerivedFrom: Option[DerivedFrom] = None
   ): Activity = Activity(
     commitId,
     committedDate,
@@ -179,11 +180,11 @@ object bundles extends Schemas {
           maybeDatasetPublishedDate,
           datasetCreatedDate,
           datasetCreators,
-          datasetParts.map {
-            case (name, location) => DataSetPart.factory(name, location, None)(_)
+          datasetParts.map { case (name, location) =>
+            DataSetPart.factory(name, location, None)(_)
           },
           datasetKeywords,
-          overrideTopmostSameAs      = overrideTopmostSameAs,
+          overrideTopmostSameAs = overrideTopmostSameAs,
           overrideTopmostDerivedFrom = overrideTopmostDerivedFrom
         )
       )
@@ -191,17 +192,17 @@ object bundles extends Schemas {
   )
 
   def modifiedDataSetCommit(
-      commitId:      CommitId      = commitIds.generateOne,
+      commitId:      CommitId = commitIds.generateOne,
       committedDate: CommittedDate = committedDates.generateOne,
-      committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
-      cliVersion:    CliVersion    = cliVersions.generateOne
+      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion:    CliVersion = cliVersions.generateOne
   )(
-      projectPath:         Path                 = projectPaths.generateOne,
-      projectName:         projects.Name        = projectNames.generateOne,
+      projectPath:         Path = projectPaths.generateOne,
+      projectName:         projects.Name = projectNames.generateOne,
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
-      maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
-      maybeParent:         Option[Project]      = None,
-      projectVersion:      SchemaVersion        = projectSchemaVersions.generateOne
+      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
+      maybeParent:         Option[Project] = None,
+      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
   )(
       datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
       datasetTitle:               Title = datasetTitles.generateOne,
@@ -239,31 +240,31 @@ object bundles extends Schemas {
     ).asJsonLD
 
   def modifiedDataSetActivity(
-      commitId:      CommitId      = commitIds.generateOne,
+      commitId:      CommitId = commitIds.generateOne,
       committedDate: CommittedDate = committedDates.generateOne,
-      committer:     Person        = Person(userNames.generateOne, userEmails.generateOne),
-      cliVersion:    CliVersion    = cliVersions.generateOne
+      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion:    CliVersion = cliVersions.generateOne
   )(
-      projectPath:         Path                 = projectPaths.generateOne,
-      projectName:         projects.Name        = projectNames.generateOne,
+      projectPath:         Path = projectPaths.generateOne,
+      projectName:         projects.Name = projectNames.generateOne,
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
-      maybeProjectCreator: Option[Person]       = projectCreators.generateOption,
-      maybeParent:         Option[Project]      = None,
-      projectVersion:      SchemaVersion        = projectSchemaVersions.generateOne
+      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
+      maybeParent:         Option[Project] = None,
+      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
   )(
-      datasetIdentifier:          Identifier                     = datasetIdentifiers.generateOne,
-      datasetTitle:               Title                          = datasetTitles.generateOne,
-      datasetName:                Name                           = datasetNames.generateOne,
-      datasetUrl:                 Url                            = datasetUrls.generateOne,
-      datasetDerivedFrom:         DerivedFrom                    = datasetDerivedFroms.generateOne,
-      maybeDatasetDescription:    Option[Description]            = Gen.option(datasetDescriptions).generateOne,
-      maybeDatasetPublishedDate:  Option[PublishedDate]          = Gen.option(datasetPublishedDates).generateOne,
-      datasetCreatedDate:         datasets.DateCreated           = datasets.DateCreated(committedDate.value),
-      datasetCreators:            Set[Person]                    = setOf(persons).generateOne,
+      datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
+      datasetTitle:               Title = datasetTitles.generateOne,
+      datasetName:                Name = datasetNames.generateOne,
+      datasetUrl:                 Url = datasetUrls.generateOne,
+      datasetDerivedFrom:         DerivedFrom = datasetDerivedFroms.generateOne,
+      maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
+      maybeDatasetPublishedDate:  Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
+      datasetCreatedDate:         datasets.DateCreated = datasets.DateCreated(committedDate.value),
+      datasetCreators:            Set[Person] = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
-      datasetKeywords:            List[Keyword]                  = listOf(GraphModelGenerators.datasetKeywords).generateOne,
-      overrideTopmostSameAs:      Option[TopmostSameAs]          = None,
-      overrideTopmostDerivedFrom: Option[DerivedFrom]            = None
+      datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
+      overrideTopmostSameAs:      Option[TopmostSameAs] = None,
+      overrideTopmostDerivedFrom: Option[DerivedFrom] = None
   ): Activity = Activity(
     commitId,
     committedDate,
@@ -282,11 +283,11 @@ object bundles extends Schemas {
           maybeDatasetPublishedDate,
           datasetCreatedDate,
           datasetCreators,
-          datasetParts.map {
-            case (name, location) => DataSetPart.factory(name, location, None)(_)
+          datasetParts.map { case (name, location) =>
+            DataSetPart.factory(name, location, None)(_)
           },
           datasetKeywords,
-          overrideTopmostSameAs      = overrideTopmostSameAs,
+          overrideTopmostSameAs = overrideTopmostSameAs,
           overrideTopmostDerivedFrom = overrideTopmostDerivedFrom
         )
       )
@@ -318,7 +319,8 @@ object bundles extends Schemas {
                             projectNames.generateOne,
                             projectCreatedDates.generateOne,
                             projectCreators.generateOption,
-                            version = projectSchemaVersions.generateOne)
+                            version = projectSchemaVersions.generateOne
+      )
       val agent           = Agent(cliVersion)
       val dataSetId       = datasets.Identifier("d67a1653-0b6e-463b-89a0-afe72a53c8bb")
       val dataSetCreators = nonEmptySet(persons).generateOne
@@ -335,12 +337,12 @@ object bundles extends Schemas {
       def dataSetGenerationFactory(partsFactories: List[Activity => DataSetPartArtifact]) =
         Generation.factory(
           entityFactory = DataSet.nonModifiedFactory(
-            id             = dataSetId,
-            title          = datasets.Title("zhbikes"),
-            name           = datasets.Name("zhbikes"),
-            url            = datasetUrls.generateOne,
-            createdDate    = datasetCreatedDates.generateOne,
-            creators       = dataSetCreators,
+            id = dataSetId,
+            title = datasets.Title("zhbikes"),
+            name = datasets.Name("zhbikes"),
+            url = datasetUrls.generateOne,
+            createdDate = datasetCreatedDates.generateOne,
+            creators = dataSetCreators,
             partsFactories = partsFactories
           )
         )
@@ -351,7 +353,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment                  = "renku dataset create zhbikes",
+        comment = "renku dataset create zhbikes",
         maybeGenerationFactories = List(dataSetGenerationFactory(partsFactories = Nil))
       )
 
@@ -361,7 +363,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment         = "renku dataset: committing 1 newly added files",
+        comment = "renku dataset: committing 1 newly added files",
         maybeInformedBy = Some(commit2DataSetCreation),
         maybeGenerationFactories = List(
           Generation.factory(
@@ -396,7 +398,7 @@ object bundles extends Schemas {
         committer = persons.generateOne,
         project,
         agent,
-        comment         = "packages installed",
+        comment = "packages installed",
         maybeInformedBy = commit4Activity.some,
         maybeGenerationFactories = List(
           Generation.factory(Entity.factory(Location("requirements.txt")))
@@ -409,7 +411,7 @@ object bundles extends Schemas {
         committer = persons.generateOne,
         project,
         agent,
-        comment         = "added notebook",
+        comment = "added notebook",
         maybeInformedBy = commit5Activity.some,
         maybeGenerationFactories = List(
           Generation.factory(Entity.factory(Location("notebooks/zhbikes-notebook.ipynb")))
@@ -422,7 +424,7 @@ object bundles extends Schemas {
         committer = persons.generateOne,
         project,
         agent,
-        comment         = "added refactored scripts",
+        comment = "added refactored scripts",
         maybeInformedBy = Some(commit6Activity),
         maybeGenerationFactories = List(
           Generation.factory(entityFactory = Entity.factory(plotData)),
@@ -436,7 +438,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment         = "1st-renku-run.cwl generation",
+        comment = "1st-renku-run.cwl generation",
         maybeInformedBy = Some(commit7Activity),
         maybeGenerationFactories = List(
           Generation.factory(Entity.factory(WorkflowFile.cwl("1st-renku-run.cwl")))
@@ -450,7 +452,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment         = s"renku run: committing 1 newly added files",
+        comment = s"renku run: committing 1 newly added files",
         maybeInformedBy = Some(commit7Activity),
         associationFactory = Association.process(
           agent.copy(cliVersion = cliVersions.generateOne),
@@ -473,7 +475,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment         = "2nd-renku-run.cwl generation",
+        comment = "2nd-renku-run.cwl generation",
         maybeInformedBy = Some(commit7Activity),
         maybeGenerationFactories = List(
           Generation.factory(Entity.factory(WorkflowFile.cwl("2nd-renku-run.cwl")))
@@ -487,7 +489,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment         = s"renku run: committing 1 newly added files",
+        comment = s"renku run: committing 1 newly added files",
         maybeInformedBy = Some(commit8ProcessRun),
         associationFactory = Association.process(
           agent.copy(cliVersion = cliVersions.generateOne),
@@ -495,7 +497,8 @@ object bundles extends Schemas {
             WorkflowFile.yaml("2nd-renku-run.yaml"),
             Command("python"),
             inputs = List(Input.from(commit7Activity.entity(plotData)),
-                          Input.from(commit8ProcessRun.processRunAssociation.runPlan.output(bikesParquet))),
+                          Input.from(commit8ProcessRun.processRunAssociation.runPlan.output(bikesParquet))
+            ),
             outputs = List(
               Output.factory(activity => Entity(Generation(cumulativePng, activity))),
               Output.factory(commit9GridPlotEntityFactory)
@@ -511,7 +514,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment         = "renku dataset: committing 1 newly added files",
+        comment = "renku dataset: committing 1 newly added files",
         maybeInformedBy = Some(commit9ProcessRun),
         maybeGenerationFactories = List(
           Generation.factory(Collection.factory(dataSetFolder, List(velo2019Location, velo2018Location)))
@@ -524,7 +527,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment         = "renku dataset add zhbikes velo.csv",
+        comment = "renku dataset add zhbikes velo.csv",
         maybeInformedBy = Some(commit10Activity),
         maybeGenerationFactories = List(
           dataSetGenerationFactory(
@@ -545,7 +548,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment         = "renku-update.cwl generation",
+        comment = "renku-update.cwl generation",
         maybeInformedBy = Some(commit11Activity),
         maybeGenerationFactories = List(
           Generation.factory(Entity.factory(WorkflowFile.cwl("renku-update.cwl")))
@@ -558,7 +561,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment         = "renku-migrate-step0.cwl generation",
+        comment = "renku-migrate-step0.cwl generation",
         maybeInformedBy = Some(commit11Activity),
         maybeGenerationFactories = List(
           Generation.factory(Entity.factory(WorkflowFile.cwl("renku-migrate-step0.cwl")))
@@ -571,7 +574,7 @@ object bundles extends Schemas {
         persons.generateOne,
         project,
         agent,
-        comment         = "renku-migrate-step1.cwl generation",
+        comment = "renku-migrate-step1.cwl generation",
         maybeInformedBy = Some(commit11Activity),
         maybeGenerationFactories = List(
           Generation.factory(Entity.factory(WorkflowFile.cwl("renku-migrate-step1.cwl")))
@@ -594,14 +597,14 @@ object bundles extends Schemas {
           agent.copy(cliVersion = cliVersions.generateOne),
           RunPlan.workflow(
             inputs = List(
-              Input.from(commit7Activity.entity(cleanData), usedIn      = Step.one),
+              Input.from(commit7Activity.entity(cleanData), usedIn = Step.one),
               Input.from(commit10Activity.entity(dataSetFolder), usedIn = Step.one),
-              Input.from(commit7Activity.entity(plotData), usedIn       = Step.two)
+              Input.from(commit7Activity.entity(plotData), usedIn = Step.two)
             ),
             outputs = List(
-              Output.factory(commit12ParquetEntityFactory, producedBy       = Step.one),
+              Output.factory(commit12ParquetEntityFactory, producedBy = Step.one),
               Output.factory(commit12CumulativePngEntityFactory, producedBy = Step.two),
-              Output.factory(commit12GridPlotPngEntityFactory, producedBy   = Step.two)
+              Output.factory(commit12GridPlotPngEntityFactory, producedBy = Step.two)
             ),
             subprocesses = List(
               commit8ProcessRun.processRunAssociation.runPlan,
@@ -716,8 +719,8 @@ object bundles extends Schemas {
 
       private def asString(parameter: CommandParameter): String = parameter match {
         case param: Mapping =>
-          param.maybePrefix.fold(s"${asSign(param)} ${param.value}")(
-            prefix => s"$prefix ${asSign(param)} ${param.value}"
+          param.maybePrefix.fold(s"${asSign(param)} ${param.value}")(prefix =>
+            s"$prefix ${asSign(param)} ${param.value}"
           )
         case param => param.maybePrefix.fold(param.value.toString)(prefix => s"$prefix${param.value}")
       }

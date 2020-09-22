@@ -37,7 +37,7 @@ trait MetricsRegistry[Interpretation[_]] {
 object MetricsRegistry {
 
   import cats.effect.IO
-  import cats.implicits._
+  import cats.syntax.all._
   import ch.datascience.config.ConfigLoader.find
   import com.typesafe.config.{Config, ConfigFactory}
 
@@ -51,8 +51,8 @@ object MetricsRegistry {
       case _           => EnabledMetricsRegistry
     }
 
-  private val noneValue: PartialFunction[Throwable, IO[Option[Boolean]]] = {
-    case NonFatal(_) => IO.pure(Some(true))
+  private val noneValue: PartialFunction[Throwable, IO[Option[Boolean]]] = { case NonFatal(_) =>
+    IO.pure(Some(true))
   }
 
   object DisabledMetricsRegistry extends MetricsRegistry[IO] {

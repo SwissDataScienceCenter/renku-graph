@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.init
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.triplesgenerator.config.FusekiAdminConfig
 import io.chrisdavenport.log4cats.Logger
@@ -54,18 +54,17 @@ class FusekiDatasetInitializer[Interpretation[_]](
         logger.info(s"'$datasetName' dataset created in Jena")
       }
 
-  private def loggingError[T]: PartialFunction[Throwable, Interpretation[T]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"'$datasetName' dataset initialization in Jena failed")
-      ME.raiseError(exception)
+  private def loggingError[T]: PartialFunction[Throwable, Interpretation[T]] = { case NonFatal(exception) =>
+    logger.error(exception)(s"'$datasetName' dataset initialization in Jena failed")
+    ME.raiseError(exception)
   }
 }
 
 object IOFusekiDatasetInitializer {
-  def apply()(
-      implicit executionContext: ExecutionContext,
-      contextShift:              ContextShift[IO],
-      timer:                     Timer[IO]
+  def apply()(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
   ): IO[FusekiDatasetInitializer[IO]] =
     for {
       fusekiAdminConfig <- FusekiAdminConfig[IO]()

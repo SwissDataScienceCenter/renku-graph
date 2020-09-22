@@ -18,10 +18,9 @@
 
 package io.renku.eventlog.creation
 
-import EventPersister.Result
 import cats.MonadError
 import cats.effect.Effect
-import cats.implicits._
+import cats.syntax.all._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.{DbTransactor, SqlQuery}
@@ -31,6 +30,7 @@ import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog._
+import io.renku.eventlog.creation.EventPersister.Result
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
 
@@ -56,9 +56,8 @@ class EventCreationEndpoint[Interpretation[_]: Effect](
     } yield response
   } recoverWith httpResponse
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[Event]] = {
-    case NonFatal(exception) =>
-      ME.raiseError(BadRequestError(exception))
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[Event]] = { case NonFatal(exception) =>
+    ME.raiseError(BadRequestError(exception))
   }
 
   private implicit class ResultOps(result: Result) {
