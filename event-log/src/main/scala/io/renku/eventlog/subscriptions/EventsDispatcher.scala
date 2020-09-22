@@ -42,7 +42,6 @@ class EventsDispatcher(
     eventsSender:         EventsSender[IO],
     underProcessingGauge: LabeledGauge[IO, projects.Path],
     logger:               Logger[IO],
-    noSubscriptionSleep:  FiniteDuration,
     noEventSleep:         FiniteDuration,
     onErrorSleep:         FiniteDuration
 )(implicit timer:         Timer[IO]) {
@@ -53,70 +52,42 @@ class EventsDispatcher(
 
   def run: IO[Unit] =
     for {
-      _ <- popEventN flatMap {
-            case (eventId, eventBody) => runOnFreeSubscriber(dispatchN(eventId, eventBody))
-          }
+      _ <- popEvent flatMap { case (eventId, eventBody) =>
+             runOnFreeSubscriber(dispatch(eventId, eventBody)) recoverWith tryReDispatch(eventId, eventBody)
+           }
       _ <- run
     } yield ()
 
-  private def popEventN: IO[(CompoundEventId, EventBody)] =
+  private def popEvent: IO[(CompoundEventId, EventBody)] =
     eventsFinder.popEvent
-      .recoverWith(loggingError("Finding events to process failed", retry = eventsFinder.popEvent))
+      .recoverWith(loggingError("Finding events to dispatch failed", retry = eventsFinder.popEvent))
       .flatMap {
-        case None            => (timer sleep noEventSleep) flatMap (_ => popEventN)
+        case None            => (timer sleep noEventSleep) flatMap (_ => popEvent)
         case Some(idAndBody) => idAndBody.pure[IO]
       }
 
-  private def dispatchN(id: CompoundEventId, body: EventBody)(subscriber: SubscriberUrl): IO[Unit] = {
+  private def dispatch(id: CompoundEventId, body: EventBody)(subscriber: SubscriberUrl): IO[Unit] = {
     for {
       result <- sendEvent(subscriber, id, body)
       _      <- logStatement(result, subscriber, id)
       _ <- result match {
-            case Delivered    => IO.unit
-            case ServiceBusy  => markBusy(subscriber) recover withNothing flatMap (_ => dispatch(id, body))
-            case Misdelivered => remove(subscriber) recover withNothing flatMap (_ => dispatch(id, body))
-          }
+             case Delivered => IO.unit
+             case ServiceBusy =>
+               markBusy(subscriber) recover withNothing flatMap (_ => runOnFreeSubscriber(dispatch(id, body)))
+             case Misdelivered =>
+               remove(subscriber) recover withNothing flatMap (_ => runOnFreeSubscriber(dispatch(id, body)))
+           }
     } yield ()
   } recoverWith markEventAsNonRecoverable(subscriber, id)
 
-  def oldrun: IO[Unit] = waitForSubscriptions(andThen = popEvent)
-
-  private def waitForSubscriptions(andThen: => IO[Unit]): IO[Unit] = {
-    subscriptions.isNext flatMap {
-      case true => andThen
-      case false =>
-        for {
-          _ <- logger.info("Waiting for subscribers")
-          _ <- timer sleep noSubscriptionSleep
-          _ <- waitForSubscriptions(andThen)
-        } yield ()
-    }
-  } recoverWith loggingError("Finding subscribers failed", retry = waitForSubscriptions(andThen))
-
-  private def popEvent: IO[Unit] =
-    eventsFinder.popEvent
-      .recoverWith(loggingError("Finding events to process failed", retry = eventsFinder.popEvent))
-      .flatMap {
-        case None             => (timer sleep noEventSleep) flatMap (_ => popEvent)
-        case Some((id, body)) => dispatch(id, body) flatMap (_ => popEvent)
-      }
-
-  private def dispatch(id: CompoundEventId, body: EventBody): IO[Unit] =
-    subscriptions.nextFree flatMap {
-      case None => waitForSubscriptions(andThen = dispatch(id, body))
-      case Some(url) =>
-        {
-          for {
-            result <- sendEvent(url, id, body)
-            _      <- logStatement(result, url, id)
-            _ <- result match {
-                   case Delivered    => IO.unit
-                   case ServiceBusy  => markBusy(url) recover withNothing flatMap (_ => dispatch(id, body))
-                   case Misdelivered => remove(url) recover withNothing flatMap (_ => dispatch(id, body))
-                 }
-          } yield ()
-        } recoverWith markEventAsNonRecoverable(url, id)
-    }
+  private def tryReDispatch(eventId: CompoundEventId, eventBody: EventBody): PartialFunction[Throwable, IO[Unit]] = {
+    case NonFatal(exception) =>
+      for {
+        _ <- logger.error(exception)("Dispatching an event failed")
+        _ <- timer sleep onErrorSleep
+        _ <- runOnFreeSubscriber(dispatch(eventId, eventBody))
+      } yield ()
+  }
 
   private def logStatement(result: SendingResult, url: SubscriberUrl, id: CompoundEventId): IO[Unit] = result match {
     case result @ Delivered    => logger.info(s"Event $id, url = $url -> $result")
@@ -124,12 +95,11 @@ class EventsDispatcher(
     case result @ Misdelivered => logger.error(s"Event $id, url = $url -> $result")
   }
 
-  private lazy val withNothing: PartialFunction[Throwable, Unit] = { case NonFatal(_) =>
-    ()
-  }
+  private lazy val withNothing: PartialFunction[Throwable, Unit] = { case NonFatal(_) => () }
 
-  private def markEventAsNonRecoverable(url: SubscriberUrl,
-                                        id:  CompoundEventId
+  private def markEventAsNonRecoverable(
+      url: SubscriberUrl,
+      id:  CompoundEventId
   ): PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
     val markEventFailed = ToNonRecoverableFailure[IO](id, EventMessage(exception), underProcessingGauge)
     for {
@@ -138,10 +108,10 @@ class EventsDispatcher(
     } yield ()
   }
 
-  private def loggingError[O](message: String, retry: => IO[O]): PartialFunction[Throwable, IO[O]] = {
+  private def loggingError[O](errorMessage: String, retry: => IO[O]): PartialFunction[Throwable, IO[O]] = {
     case NonFatal(exception) =>
       for {
-        _      <- logger.error(exception)(message)
+        _      <- logger.error(exception)(errorMessage)
         _      <- timer sleep onErrorSleep
         result <- retry
       } yield result
@@ -160,9 +130,8 @@ class EventsDispatcher(
 }
 
 object EventsDispatcher {
-  private val NoSubscriptionSleep: FiniteDuration = 2 seconds
-  private val NoEventSleep:        FiniteDuration = 1 seconds
-  private val OnErrorSleep:        FiniteDuration = 1 seconds
+  private val NoEventSleep: FiniteDuration = 1 seconds
+  private val OnErrorSleep: FiniteDuration = 1 seconds
 
   def apply(
       transactor:           DbTransactor[IO, EventLogDB],
@@ -186,7 +155,6 @@ object EventsDispatcher {
                                  eventsSender,
                                  underProcessingGauge,
                                  logger,
-                                 noSubscriptionSleep = NoSubscriptionSleep,
                                  noEventSleep = NoEventSleep,
                                  onErrorSleep = OnErrorSleep
     )
