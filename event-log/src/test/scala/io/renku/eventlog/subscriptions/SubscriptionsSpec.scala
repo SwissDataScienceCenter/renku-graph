@@ -29,6 +29,7 @@ import ch.datascience.interpreters.TestLogger
 import eu.timepit.refined.auto._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
+import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -36,6 +37,11 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class SubscriptionsSpec extends AnyWordSpec with should.Matchers with Eventually {
+
+  implicit override val patienceConfig: PatienceConfig = PatienceConfig(
+    timeout = scaled(Span(3, Seconds)),
+    interval = scaled(Span(150, Millis))
+  )
 
   "add" should {
 
@@ -82,7 +88,7 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers with Eventually
       val anotherSubscriberUrl = subscriberUrls.generateOne
       subscriptions.add(anotherSubscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
-      val functionIds = nonEmptyStrings().generateNonEmptyList(minElements = 5).toList
+      val functionIds = nonEmptyStrings().generateNonEmptyList(minElements = 30, maxElements = 50).toList
       functionIds
         .map(id => subscriptions.runOnSubscriber(function(id)))
         .sequence
