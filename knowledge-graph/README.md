@@ -129,7 +129,8 @@ Response body example:
   "title" : "dataset title",
   "name" : "dataset alternate name",
   "url" : "http://host/url1",  // optional property
-   "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
+  "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
+  "derivedFrom" : "http://host/url1",             // optional property when no "sameAs" exists
   "description" : "vbnqyyjmbiBQpubavGpxlconuqj",  // optional property
   "published" : {
     "datePublished" : "2012-10-14T03:02:25.639Z", // optional property
