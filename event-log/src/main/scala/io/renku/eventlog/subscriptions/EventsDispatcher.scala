@@ -50,17 +50,18 @@ class EventsDispatcher(
   import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
   import subscriptions._
 
-  def run: IO[Unit] =
+  def run(): IO[Unit] =
     for {
       _ <- popEvent flatMap { case (eventId, eventBody) =>
              runOnSubscriber(dispatch(eventId, eventBody)) recoverWith tryReDispatch(eventId, eventBody)
            }
-      _ <- run
+      _ <- run()
     } yield ()
 
   private def popEvent: IO[(CompoundEventId, EventBody)] =
-    eventsFinder.popEvent
-      .recoverWith(loggingError("Finding events to dispatch failed", retry = eventsFinder.popEvent))
+    eventsFinder
+      .popEvent()
+      .recoverWith(loggingError("Finding events to dispatch failed", retry = eventsFinder.popEvent()))
       .flatMap {
         case None            => (timer sleep noEventSleep) flatMap (_ => popEvent)
         case Some(idAndBody) => idAndBody.pure[IO]

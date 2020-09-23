@@ -1,7 +1,7 @@
 // format: off
 organization := "ch.datascience"
 name := "renku-graph"
-scalaVersion := "2.12.11"
+scalaVersion := "2.13.3"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
@@ -132,7 +132,7 @@ lazy val acceptanceTests = Project(
 
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
-  scalaVersion := "2.12.11",
+  scalaVersion := "2.13.3",
 
   skip in publish := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
@@ -142,7 +142,6 @@ lazy val commonSettings = Seq(
 
   addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.0" cross CrossVersion.full),
 
-  scalacOptions += "-Ypartial-unification",
   scalacOptions += "-feature",
   scalacOptions += "-unchecked",
   scalacOptions += "-deprecation",
@@ -177,21 +176,24 @@ import sbtrelease.ReleasePlugin.autoImport.ReleaseKeys._
 import sbtrelease.ReleasePlugin.autoImport._
 import sbtrelease.{Vcs, Versions}
 
-releaseTagComment := {
-  Vcs.detect(root.base).map { implicit vcs =>
-    collectCommitsMessages() match {
-      case Nil => s"Releasing ${(version in ThisBuild).value}"
-      case messages =>
-        s"Release Notes for ${(version in ThisBuild).value}\n${messages.map(m => s"* $m").mkString("\n")}"
+releaseTagComment :=
+  Vcs
+    .detect(root.base)
+    .map { implicit vcs =>
+      collectCommitsMessages() match {
+        case Nil => s"Releasing ${(version in ThisBuild).value}"
+        case messages =>
+          s"Release Notes for ${(version in ThisBuild).value}\n${messages.map(m => s"* $m").mkString("\n")}"
+      }
     }
-  }
-}.getOrElse {
-  sys.error("Release Tag comment cannot be calculated")
-}
+    .getOrElse {
+      sys.error("Release Tag comment cannot be calculated")
+    }
 
 @scala.annotation.tailrec
-def collectCommitsMessages(commitsCounter: Int          = 1,
-                           messages:       List[String] = List.empty)(implicit vcs: Vcs): List[String] =
+def collectCommitsMessages(commitsCounter: Int = 1, messages: List[String] = List.empty)(implicit
+    vcs:                                   Vcs
+): List[String] =
   vcs.cmd("log", "--format=%s", "-1", s"HEAD~$commitsCounter").!!.trim match {
     case message if message startsWith "Setting version" => messages
     case message                                         => collectCommitsMessages(commitsCounter + 1, messages :+ message)

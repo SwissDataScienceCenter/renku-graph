@@ -25,7 +25,7 @@ import ch.datascience.interpreters.TestLogger.LogMessage._
 import io.chrisdavenport.log4cats.Logger
 import org.scalatest.Assertion
 import org.scalatest.matchers.should
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 import scala.language.higherKinds
 
@@ -50,7 +50,7 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] with s
     loggedOnly(List.fill(times)(expected))
 
   def loggedOnly(expected: List[LogEntry]): Assertion =
-    invocations.asScala.to[List] should contain theSameElementsAs expected
+    invocations.asScala.toList should contain theSameElementsAs expected
 
   def expectNoLogs(): Unit =
     if (!invocations.isEmpty) fail(s"No logs expected but got $invocationsPrettyPrint")

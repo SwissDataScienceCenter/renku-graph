@@ -53,7 +53,7 @@ class ProjectPathAdderSpec
       addProjectPath()
       checkColumnExists shouldBe true
 
-      projectPathAdder.run.unsafeRunSync() shouldBe ((): Unit)
+      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
 
       checkColumnExists shouldBe true
 
@@ -81,7 +81,7 @@ class ProjectPathAdderSpec
       insert(project2Id, project2TokenEncrypted)
       assumePathExistsInGitLab(project2Id, Some(project2Path), project2TokenEncrypted, project2Token)
 
-      projectPathAdder.run.unsafeRunSync() shouldBe ((): Unit)
+      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
 
       eventually {
         findToken(project1Path) shouldBe Some(project1TokenEncrypted.value)
@@ -116,7 +116,7 @@ class ProjectPathAdderSpec
       insert(project2Id, project2TokenEncrypted)
       assumePathExistsInGitLab(project2Id, Some(project2Path), project2TokenEncrypted, project2Token)
 
-      projectPathAdder.run.unsafeRunSync() shouldBe ((): Unit)
+      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
 
       eventually {
         findToken(project2Path) shouldBe Some(project2TokenEncrypted.value)

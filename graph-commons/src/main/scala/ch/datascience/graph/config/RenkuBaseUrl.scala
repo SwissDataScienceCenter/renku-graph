@@ -24,8 +24,6 @@ import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.tinytypes.constraints.{Url, UrlOps}
 import ch.datascience.tinytypes.{Renderer, StringTinyType, TinyTypeFactory}
 
-import scala.language.{higherKinds, implicitConversions}
-
 class RenkuBaseUrl private (val value: String) extends AnyVal with StringTinyType
 object RenkuBaseUrl extends TinyTypeFactory[RenkuBaseUrl](new RenkuBaseUrl(_)) with Url with UrlOps[RenkuBaseUrl] {
   import ConfigLoader._

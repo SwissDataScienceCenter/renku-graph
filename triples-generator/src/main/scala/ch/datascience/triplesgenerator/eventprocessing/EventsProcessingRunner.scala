@@ -100,7 +100,7 @@ private class IOEventsProcessingRunner private (
   private def releaseAndNotify(): IO[Unit] =
     for {
       _ <- semaphore.release
-      _ <- subscriber.notifyAvailability.start
+      _ <- subscriber.notifyAvailability().start
     } yield ()
 }
 

@@ -32,7 +32,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait LatestEventsFetcher[Interpretation[_]] {
-  def fetchLatestEvents: Interpretation[List[LatestProjectCommit]]
+  def fetchLatestEvents(): Interpretation[List[LatestProjectCommit]]
 }
 
 private object LatestEventsFetcher {
@@ -57,7 +57,7 @@ private class IOLatestEventsFetcher(
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  override def fetchLatestEvents: IO[List[LatestProjectCommit]] =
+  override def fetchLatestEvents(): IO[List[LatestProjectCommit]] =
     for {
       uri          <- validateUri(s"$eventLogUrl/events") map (_.withQueryParam("latest-per-project", "true"))
       latestEvents <- send(request(GET, uri))(mapResponse)

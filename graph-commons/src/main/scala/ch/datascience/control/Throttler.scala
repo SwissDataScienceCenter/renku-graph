@@ -26,7 +26,6 @@ import cats.effect.{Concurrent, Timer}
 import cats.syntax.all._
 
 import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
 
 trait Throttler[Interpretation[_], ThrottlingTarget] {
   def acquire: Interpretation[Unit]

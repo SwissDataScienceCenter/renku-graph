@@ -41,7 +41,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -228,8 +228,8 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
     val client                = new TestRestClient(hostUrl, throttler, logger, Some(executionTimeRecorder))
 
     def verifyThrottling() = inSequence {
-      (throttler.acquire _).expects().returning(IO.unit)
-      (throttler.release _).expects().returning(IO.unit)
+      (() => throttler.acquire).expects().returning(IO.unit)
+      (() => throttler.release).expects().returning(IO.unit)
     }
   }
 

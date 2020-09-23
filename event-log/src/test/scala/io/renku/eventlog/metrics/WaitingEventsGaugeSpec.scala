@@ -36,7 +36,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 class WaitingEventsGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
 

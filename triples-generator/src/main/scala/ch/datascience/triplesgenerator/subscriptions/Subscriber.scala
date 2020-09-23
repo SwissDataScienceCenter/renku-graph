@@ -27,8 +27,9 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 trait Subscriber[Interpretation[_]] {
-  def notifyAvailability: Interpretation[Unit]
-  def run:                Interpretation[Unit]
+  def notifyAvailability(): Interpretation[Unit]
+
+  def run(): Interpretation[Unit]
 }
 
 class SubscriberImpl(
@@ -44,9 +45,9 @@ class SubscriberImpl(
   import subscriptionSender._
   import subscriptionUrlFinder._
 
-  override def notifyAvailability: IO[Unit] = {
+  override def notifyAvailability(): IO[Unit] = {
     for {
-      subscriberUrl <- findSubscriberUrl
+      subscriberUrl <- findSubscriberUrl()
       _             <- postToEventLog(subscriberUrl)
     } yield ()
   } recoverWith { case NonFatal(exception) =>
@@ -54,7 +55,7 @@ class SubscriberImpl(
     exception.raiseError[IO, Unit]
   }
 
-  override def run: IO[Unit] =
+  override def run(): IO[Unit] =
     for {
       _ <- timer sleep initialDelay
       _ <- subscribeForEvents(initOrError = true)
@@ -62,7 +63,7 @@ class SubscriberImpl(
 
   private def subscribeForEvents(initOrError: Boolean): IO[Unit] = {
     for {
-      subscriberUrl <- findSubscriberUrl
+      subscriberUrl <- findSubscriberUrl()
       _             <- postToEventLog(subscriberUrl) recoverWith errorLoggedAndRetry("Subscribing for events failed")
       _             <- if (initOrError) logger.info(s"Subscribed for events with $subscriberUrl") else IO.unit
       _             <- timer sleep renewDelay

@@ -43,7 +43,7 @@ class FusekiDatasetInitializerSpec extends AnyWordSpec with MockFactory with sho
         .expects()
         .returning(context.pure(true))
 
-      datasetVerifier.run shouldBe context.unit
+      datasetVerifier.run() shouldBe context.unit
 
       logger.loggedOnly(Info(s"'${fusekiConfig.datasetName}' dataset exists in Jena; No action needed."))
     }
@@ -58,7 +58,7 @@ class FusekiDatasetInitializerSpec extends AnyWordSpec with MockFactory with sho
         .expects()
         .returning(context.unit)
 
-      datasetVerifier.run shouldBe context.unit
+      datasetVerifier.run() shouldBe context.unit
 
       logger.loggedOnly(Info(s"'${fusekiConfig.datasetName}' dataset created in Jena"))
     }
@@ -70,7 +70,7 @@ class FusekiDatasetInitializerSpec extends AnyWordSpec with MockFactory with sho
         .expects()
         .returning(context.raiseError(exception))
 
-      datasetVerifier.run shouldBe context.raiseError(exception)
+      datasetVerifier.run() shouldBe context.raiseError(exception)
 
       logger.loggedOnly(Error(s"'${fusekiConfig.datasetName}' dataset initialization in Jena failed", exception))
     }
@@ -86,7 +86,7 @@ class FusekiDatasetInitializerSpec extends AnyWordSpec with MockFactory with sho
         .expects()
         .returning(context.raiseError(exception))
 
-      datasetVerifier.run shouldBe context.raiseError(exception)
+      datasetVerifier.run() shouldBe context.raiseError(exception)
 
       logger.loggedOnly(Error(s"'${fusekiConfig.datasetName}' dataset initialization in Jena failed", exception))
     }

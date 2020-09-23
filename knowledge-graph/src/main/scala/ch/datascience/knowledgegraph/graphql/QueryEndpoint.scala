@@ -47,7 +47,7 @@ class QueryEndpoint[Interpretation[_]: Effect](
   import QueryEndpoint._
   import org.http4s.circe._
 
-  def schema: Interpretation[Response[Interpretation]] =
+  def schema(): Interpretation[Response[Interpretation]] =
     for {
       schema <- ME.fromTry(Try(renderSchema(querySchema)))
       result <- Ok(schema)

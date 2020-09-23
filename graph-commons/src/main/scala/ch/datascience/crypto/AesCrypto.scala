@@ -30,7 +30,6 @@ import javax.crypto.Cipher
 import javax.crypto.Cipher.{DECRYPT_MODE, ENCRYPT_MODE}
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
 
-import scala.language.higherKinds
 import scala.util.Try
 
 abstract class AesCrypto[Interpretation[_], NONENCRYPTED, ENCRYPTED](

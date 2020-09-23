@@ -60,9 +60,9 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
         val response = findProcessingStatus(projectId).unsafeRunSync()
 
-        response.status                             shouldBe Ok
-        response.contentType                        shouldBe Some(`Content-Type`(application.json))
-        response.as[ProcessingStatus].unsafeRunSync shouldBe processingStatus
+        response.status                               shouldBe Ok
+        response.contentType                          shouldBe Some(`Content-Type`(application.json))
+        response.as[ProcessingStatus].unsafeRunSync() shouldBe processingStatus
 
         logger.expectNoLogs()
       }
@@ -78,9 +78,9 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
       val response = findProcessingStatus(projectId).unsafeRunSync()
 
-      response.status                        shouldBe NotFound
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("No processing status found")
+      response.status                          shouldBe NotFound
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("No processing status found")
 
       logger.expectNoLogs()
     }
@@ -97,9 +97,9 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
       val response = findProcessingStatus(projectId).unsafeRunSync()
 
       val expectedMessage = s"Finding processing status for project $projectId failed"
-      response.status                         shouldBe InternalServerError
-      response.contentType                    shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage(expectedMessage)
+      response.status                           shouldBe InternalServerError
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(expectedMessage)
 
       logger.loggedOnly(Error(expectedMessage, exception))
     }

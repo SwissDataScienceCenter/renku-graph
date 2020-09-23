@@ -30,7 +30,6 @@ import eu.timepit.refined.pureconfig._
 import eu.timepit.refined.string.MatchesRegex
 
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 
 class DBConfigProvider[Interpretation[_], TargetDB](
     namespace: String,

@@ -95,7 +95,7 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec
         val olderBatchStatuses = nonEmptyList(eventStatuses).generateOne
         storeEvents(projectId, olderBatchDate, olderBatchStatuses)
 
-        val newerBatchDate     = BatchDate(olderBatchDate.value plus (1, MINUTES))
+        val newerBatchDate     = BatchDate(olderBatchDate.value.plus(1, MINUTES))
         val newerBatchStatuses = nonEmptyList(Gen.oneOf(TriplesStore, Skipped, NonRecoverableFailure)).generateOne
         storeEvents(projectId, newerBatchDate, newerBatchStatuses)
 

@@ -74,7 +74,7 @@ private class HookCreator[Interpretation[_]](
       _                   <- right(associate(projectId, accessToken))
       _                   <- right(contextShift.shift *> concurrent.start(eventsHistoryLoader.loadAllEvents(projectInfo, accessToken)))
     } yield ()
-  } fold [CreationResult] (_ => HookExisted, _ => HookCreated) recoverWith loggingError(projectId)
+  }.fold[CreationResult](_ => HookExisted, _ => HookCreated) recoverWith loggingError(projectId)
 
   private def leftIfProjectHookExists(
       hookValidation: HookValidationResult,

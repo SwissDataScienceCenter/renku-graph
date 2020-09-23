@@ -66,13 +66,13 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
         val response = getDataset(dataset.id).unsafeRunSync()
 
-        response.status                    shouldBe Ok
-        response.contentType               shouldBe Some(`Content-Type`(MediaType.application.json))
-        response.as[Dataset].unsafeRunSync shouldBe dataset
-        response.as[Json].unsafeRunSync._links shouldBe Right(
+        response.status                      shouldBe Ok
+        response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
+        response.as[Dataset].unsafeRunSync() shouldBe dataset
+        response.as[Json].unsafeRunSync()._links shouldBe Right(
           Links.of(Self -> Href(renkuResourcesUrl / "datasets" / dataset.id))
         )
-        val Right(projectsJsons) = response.as[Json].unsafeRunSync.hcursor.downField("isPartOf").as[List[Json]]
+        val Right(projectsJsons) = response.as[Json].unsafeRunSync().hcursor.downField("isPartOf").as[List[Json]]
         projectsJsons should have size dataset.projects.size
         projectsJsons.foreach { json =>
           (json.hcursor.downField("path").as[Path], json._links)
@@ -101,7 +101,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
 
-      response.as[Json].unsafeRunSync shouldBe InfoMessage(s"No dataset with '$identifier' id found").asJson
+      response.as[Json].unsafeRunSync() shouldBe InfoMessage(s"No dataset with '$identifier' id found").asJson
 
       logger.loggedOnly(Warn(s"Finding '$identifier' dataset finished${executionTimeRecorder.executionTimeInfo}"))
     }
@@ -121,7 +121,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
 
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(s"Finding dataset with '$identifier' id failed").asJson
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(s"Finding dataset with '$identifier' id failed").asJson
 
       logger.loggedOnly(Error(s"Finding dataset with '$identifier' id failed", exception))
     }

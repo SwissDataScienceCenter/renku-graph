@@ -34,7 +34,7 @@ import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
 trait ReProvisioning[Interpretation[_]] {
-  def run: Interpretation[Unit]
+  def run(): Interpretation[Unit]
 }
 
 class ReProvisioningImpl[Interpretation[_]](
@@ -55,11 +55,11 @@ class ReProvisioningImpl[Interpretation[_]](
   import triplesVersionCreator._
   import triplesVersionFinder._
 
-  override def run: Interpretation[Unit] =
-    triplesUpToDate.flatMap {
+  override def run(): Interpretation[Unit] =
+    triplesUpToDate().flatMap {
       case false => triggerReProvisioning
       case true  => logger.info("All projects' triples up to date")
-    } recoverWith tryAgain(run)
+    } recoverWith tryAgain(run())
 
   private def triggerReProvisioning =
     measureExecutionTime {
@@ -68,7 +68,7 @@ class ReProvisioningImpl[Interpretation[_]](
         _ <- reProvisioningStatus.setRunning()
         _ <- updateCliVersion()
         _ <- removeAllTriples() recoverWith tryAgain(removeAllTriples())
-        _ <- triggerEventsReScheduling recoverWith tryAgain(triggerEventsReScheduling)
+        _ <- triggerEventsReScheduling() recoverWith tryAgain(triggerEventsReScheduling())
         _ <- reProvisioningStatus.clear() recoverWith tryAgain(reProvisioningStatus.clear())
       } yield ()
     } flatMap logSummary

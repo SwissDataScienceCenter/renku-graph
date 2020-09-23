@@ -87,7 +87,7 @@ object ProjectsGenerators {
       maybeParent = maybeParent.map { parent =>
         parent.copy(
           created = parent.created.copy(
-            date = DateCreated(created.date.value plus (2, DAYS))
+            date = DateCreated(created.date.value.plus(2, DAYS))
           )
         )
       }

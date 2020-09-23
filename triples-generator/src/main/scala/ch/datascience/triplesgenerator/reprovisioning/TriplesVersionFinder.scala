@@ -27,7 +27,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait TriplesVersionFinder[Interpretation[_]] {
-  def triplesUpToDate: Interpretation[Boolean]
+  def triplesUpToDate(): Interpretation[Boolean]
 }
 
 private class IOTriplesVersionFinder(
@@ -43,7 +43,7 @@ private class IOTriplesVersionFinder(
   import io.circe.Decoder
   import io.circe.Decoder._
 
-  override def triplesUpToDate: IO[Boolean] = findCliVersion map {
+  override def triplesUpToDate(): IO[Boolean] = findCliVersion map {
     case Nil      => false
     case versions => versions forall (_.endsWith(currentCliVersion.toString))
   }

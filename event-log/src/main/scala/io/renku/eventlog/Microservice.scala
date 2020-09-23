@@ -60,7 +60,7 @@ object Microservice extends IOMicroservice {
     transactorResource.use { transactor =>
       for {
         _                    <- new IODbInitializer(transactor, ApplicationLogger).run
-        sentryInitializer    <- SentryInitializer[IO]
+        sentryInitializer    <- SentryInitializer[IO]()
         metricsRegistry      <- MetricsRegistry()
         queriesExecTimes     <- QueriesExecutionTimes(metricsRegistry)
         statsFinder          <- IOStatsFinder(transactor, queriesExecTimes)
@@ -128,10 +128,10 @@ private class MicroserviceRunner(
 
   def run(): IO[ExitCode] =
     for {
-      _      <- sentryInitializer.run
-      _      <- metrics.run.start map gatherCancelToken
-      _      <- eventsDispatcher.run.start map gatherCancelToken
-      result <- httpServer.run
+      _      <- sentryInitializer.run()
+      _      <- metrics.run().start map gatherCancelToken
+      _      <- eventsDispatcher.run().start map gatherCancelToken
+      result <- httpServer.run()
     } yield result
 
   private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {

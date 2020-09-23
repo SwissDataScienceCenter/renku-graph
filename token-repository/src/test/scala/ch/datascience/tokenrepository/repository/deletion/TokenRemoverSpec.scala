@@ -30,7 +30,7 @@ class TokenRemoverSpec extends AnyWordSpec with InMemoryProjectsTokensDbSpec wit
   "delete" should {
 
     "succeed if token does not exist" in new TestCase {
-      remover.delete(projectId).unsafeRunSync shouldBe ((): Unit)
+      remover.delete(projectId).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "succeed if token exists" in new TestCase {
@@ -39,7 +39,7 @@ class TokenRemoverSpec extends AnyWordSpec with InMemoryProjectsTokensDbSpec wit
       insert(projectId, projectPath, encryptedToken)
       findToken(projectId) shouldBe Some(encryptedToken.value)
 
-      remover.delete(projectId).unsafeRunSync shouldBe ((): Unit)
+      remover.delete(projectId).unsafeRunSync() shouldBe ((): Unit)
 
       findToken(projectId) shouldBe None
     }
