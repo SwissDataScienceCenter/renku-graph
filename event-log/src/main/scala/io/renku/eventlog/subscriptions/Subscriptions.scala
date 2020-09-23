@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
-import cats.effect.concurrent.Ref
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{ContextShift, Fiber, IO, Timer}
 import cats.syntax.all._
 import io.chrisdavenport.log4cats.Logger
@@ -29,32 +29,36 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
+import scala.util.Random
 
 trait Subscriptions[Interpretation[_]] {
-  def add(subscriberUrl: SubscriberUrl): Interpretation[Unit]
-  def nextFree: Interpretation[Option[SubscriberUrl]]
-  def isNext:   Interpretation[Boolean]
-  def getAll:   Interpretation[List[SubscriberUrl]]
-  def remove(subscriberUrl:   SubscriberUrl): Interpretation[Unit]
-  def markBusy(subscriberUrl: SubscriberUrl): Interpretation[Unit]
+  def add(subscriberUrl:      SubscriberUrl):                         Interpretation[Unit]
+  def remove(subscriberUrl:   SubscriberUrl):                         Interpretation[Unit]
+  def markBusy(subscriberUrl: SubscriberUrl):                         Interpretation[Unit]
+  def runOnSubscriber(f:      SubscriberUrl => Interpretation[Unit]): Interpretation[Unit]
 }
 
 class SubscriptionsImpl private[subscriptions] (
-    currentUrl:          Ref[IO, Option[SubscriberUrl]],
-    logger:              Logger[IO],
-    busySleep:           FiniteDuration
-)(implicit contextShift: ContextShift[IO], timer: Timer[IO], executionContext: ExecutionContext)
+    executionHookContainer: Ref[IO, Option[Deferred[IO, Unit]]],
+    logger:                 Logger[IO],
+    busySleep:              FiniteDuration
+)(implicit contextShift:    ContextShift[IO], timer: Timer[IO], executionContext: ExecutionContext)
     extends Subscriptions[IO] {
 
   import scala.collection.JavaConverters._
 
-  private val subscriptionsPool = new ConcurrentHashMap[SubscriberUrl, Unit]()
-  private val onHoldPool        = new ConcurrentHashMap[SubscriberUrl, AddWithDelay]()
+  private val subscriptionsPool  = new ConcurrentHashMap[SubscriberUrl, Unit]()
+  private val busySubscriberPool = new ConcurrentHashMap[SubscriberUrl, AddWithDelay]()
 
   override def add(subscriberUrl: SubscriberUrl): IO[Unit] =
     addAndLog(subscriberUrl, logMessage = s"$subscriberUrl added")
 
-  private def addAndLog(subscriberUrl: SubscriberUrl, logMessage: String): IO[Unit] = IO {
+  private def addAndLog(subscriberUrl: SubscriberUrl, logMessage: String): IO[Unit] = for {
+    _ <- addToThePool(subscriberUrl, logMessage)
+    _ <- releaseHook()
+  } yield ()
+
+  private def addToThePool(subscriberUrl: SubscriberUrl, logMessage: String) = IO {
     val added = Option {
       subscriptionsPool.putIfAbsent(subscriberUrl, ())
     }.isEmpty
@@ -62,60 +66,35 @@ class SubscriptionsImpl private[subscriptions] (
     ()
   }
 
-  override def nextFree: IO[Option[SubscriberUrl]] = {
-
-    def replaceCurrentUrl(maybeUrl: Option[SubscriberUrl]) = currentUrl.set(maybeUrl) map (_ => maybeUrl)
-
-    getAll.flatMap {
-      case Nil => currentUrl.getAndSet(Option.empty[SubscriberUrl])
-      case urls =>
-        currentUrl.get flatMap {
-          case None => currentUrl.set(urls.headOption) map (_ => urls.headOption)
-          case Some(url) =>
-            urls.indexOf(url) match {
-              case -1                          => replaceCurrentUrl(urls.headOption)
-              case idx if idx < urls.size - 1  => replaceCurrentUrl(Some(urls(idx + 1)))
-              case idx if idx == urls.size - 1 => replaceCurrentUrl(urls.headOption)
-            }
-        }
-    }
-  }
-
-  override def isNext: IO[Boolean] = (!subscriptionsPool.isEmpty).pure[IO]
-
-  override def getAll: IO[List[SubscriberUrl]] = IO {
-    subscriptionsPool.keys().asScala.toList
-  }
+  private def releaseHook() = for {
+    maybeExecutionHook <- executionHookContainer.getAndSet(None)
+    _ <- maybeExecutionHook match {
+           case Some(executionHook) => executionHook.complete(())
+           case _                   => IO.unit
+         }
+  } yield ()
 
   override def remove(subscriberUrl: SubscriberUrl): IO[Unit] =
     removeAndLog(subscriberUrl, logMessage = s"$subscriberUrl gone - removing") map (_ => ())
 
-  private def removeAndLog(subscriberUrl: SubscriberUrl, logMessage: String): IO[Boolean] =
-    for {
-      removed <- IO(Option(subscriptionsPool remove subscriberUrl).isDefined)
-      _       <- clearCurrentUrl(subscriberUrl)
-      _       <- if (removed) logger.info(logMessage) else IO.unit
-    } yield removed
-
   override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
       removed <- removeAndLog(subscriberUrl, logMessage = s"$subscriberUrl busy - putting on hold")
-      _       <- clearCurrentUrl(subscriberUrl)
       _       <- if (removed) waitAndBringBack(subscriberUrl) else IO.unit
     } yield ()
 
-  private def clearCurrentUrl(ifSetTo: SubscriberUrl): IO[Unit] =
-    currentUrl.get flatMap {
-      case Some(`ifSetTo`) => currentUrl.set(None)
-      case _               => IO.unit
-    }
+  private def removeAndLog(subscriberUrl: SubscriberUrl, logMessage: String): IO[Boolean] =
+    for {
+      removed <- IO(Option(subscriptionsPool remove subscriberUrl).isDefined)
+      _       <- if (removed) logger.info(logMessage) else IO.unit
+    } yield removed
 
   private def waitAndBringBack(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
-      _ <- Option(onHoldPool.get(subscriberUrl)).fold(IO.unit)(_.cancel)
+      _ <- Option(busySubscriberPool.get(subscriberUrl)).fold(IO.unit)(_.cancel)
       addWithDelay = AddWithDelay(subscriberUrl)
       _ <- addWithDelay.start
-      _ = onHoldPool.put(subscriberUrl, addWithDelay)
+      _ = busySubscriberPool.put(subscriberUrl, addWithDelay)
     } yield ()
 
   private case class AddWithDelay(subscriberUrl: SubscriberUrl) {
@@ -130,6 +109,25 @@ class SubscriptionsImpl private[subscriptions] (
 
     def cancel: IO[Unit] = IO(active.set(false))
   }
+
+  override def runOnSubscriber(f: SubscriberUrl => IO[Unit]): IO[Unit] =
+    maybeRandomSubscriber match {
+      case Some(url) => f(url)
+      case None =>
+        for {
+          executionHook <- Deferred[IO, Unit]
+          _             <- executionHookContainer set executionHook.some
+          _ <- logger.info(
+                 s"All ${busySubscriberPool.size()} subscribers are busy; waiting for one to become available"
+               )
+          _ <- executionHook.get
+          _ <- runOnSubscriber(f)
+        } yield ()
+    }
+
+  private def maybeRandomSubscriber = Random.shuffle {
+    subscriptionsPool.keySet().asScala.toList
+  }.headOption
 }
 
 object Subscriptions {
@@ -146,6 +144,6 @@ object Subscriptions {
       executionContext: ExecutionContext
   ): IO[Subscriptions[IO]] =
     for {
-      currentUrl <- Ref.of[IO, Option[SubscriberUrl]](None)
-    } yield new SubscriptionsImpl(currentUrl, logger, busySleep)
+      executionHookContainer <- Ref.of[IO, Option[Deferred[IO, Unit]]](None)
+    } yield new SubscriptionsImpl(executionHookContainer, logger, busySleep)
 }
