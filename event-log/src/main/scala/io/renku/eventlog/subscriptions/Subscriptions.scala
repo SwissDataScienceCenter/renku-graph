@@ -117,9 +117,11 @@ class SubscriptionsImpl private[subscriptions] (
         for {
           executionHook <- Deferred[IO, Unit]
           _             <- executionHookContainer set executionHook.some
-          _             <- logger.info(s"${busySubscriberPool.size()} busy subscribers; waiting for one to become available")
-          _             <- executionHook.get
-          _             <- runOnSubscriber(f)
+          _ <- logger.info(
+                 s"All ${busySubscriberPool.size()} subscribers are busy; waiting for one to become available"
+               )
+          _ <- executionHook.get
+          _ <- runOnSubscriber(f)
         } yield ()
     }
 
