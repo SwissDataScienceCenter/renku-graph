@@ -112,11 +112,11 @@ class ThrottlerSpec extends AnyWordSpec with should.Matchers {
                                              taskProcessingTime: Option[FiniteDuration]
     ): IO[Unit] =
       for {
-        _          <- throttler.acquire
+        _          <- throttler.acquire()
         greenLight <- clock.monotonic(MILLISECONDS)
         _          <- context.pure(register.put(name.toString, greenLight))
         _          <- taskProcessingTime.map(timer.sleep) getOrElse IO.unit
-        _          <- throttler.release
+        _          <- throttler.release()
       } yield ()
 
     def tasksStartDelays(startTime: Long) =

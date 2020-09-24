@@ -28,8 +28,9 @@ import cats.syntax.all._
 import scala.concurrent.duration._
 
 trait Throttler[Interpretation[_], ThrottlingTarget] {
-  def acquire: Interpretation[Unit]
-  def release: Interpretation[Unit]
+  def acquire(): Interpretation[Unit]
+
+  def release(): Interpretation[Unit]
 }
 
 final class StandardThrottler[Interpretation[_], ThrottlingTarget] private[control] (
@@ -44,7 +45,7 @@ final class StandardThrottler[Interpretation[_], ThrottlingTarget] private[contr
 
   import timer.clock
 
-  override def acquire: Interpretation[Unit] =
+  override def acquire(): Interpretation[Unit] =
     for {
       _          <- semaphore.acquire
       startTimes <- workersStartTimes.get
@@ -61,7 +62,7 @@ final class StandardThrottler[Interpretation[_], ThrottlingTarget] private[contr
       for {
         _ <- semaphore.release
         _ <- timer sleep NextAttemptSleep
-        _ <- acquire
+        _ <- acquire()
       } yield ()
 
   private def notTooEarly(startTimes: List[Long], now: Long): Boolean = {
@@ -73,7 +74,7 @@ final class StandardThrottler[Interpretation[_], ThrottlingTarget] private[contr
     durations.forall(_ >= MinTimeGap)
   }
 
-  override def release: Interpretation[Unit] =
+  override def release(): Interpretation[Unit] =
     for {
       _ <- semaphore.acquire
       _ <- workersStartTimes.modify(old => old.tail -> old)
@@ -97,7 +98,8 @@ object Throttler {
   def noThrottling[Interpretation[_], ThrottlingTarget](implicit
       ME: MonadError[Interpretation, Throwable]
   ): Throttler[Interpretation, ThrottlingTarget] = new Throttler[Interpretation, ThrottlingTarget] {
-    override def acquire: Interpretation[Unit] = ME.unit
-    override def release: Interpretation[Unit] = ME.unit
+    override def acquire(): Interpretation[Unit] = ME.unit
+
+    override def release(): Interpretation[Unit] = ME.unit
   }
 }
