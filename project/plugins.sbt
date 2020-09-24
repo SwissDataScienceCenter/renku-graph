@@ -23,5 +23,3 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.7.5")
 addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.5.0")
 
 addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.12")
-
-addSbtPlugin("ch.epfl.scala" % "sbt-scalafix" % "0.9.21")
