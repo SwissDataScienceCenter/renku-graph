@@ -33,8 +33,6 @@ import io.renku.eventlog.EventStatus.{Processing, RecoverableFailure}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage, EventStatus}
 
-import scala.language.higherKinds
-
 final case class ToRecoverableFailure[Interpretation[_]](
     eventId:              CompoundEventId,
     maybeMessage:         Option[EventMessage],
@@ -48,7 +46,7 @@ final case class ToRecoverableFailure[Interpretation[_]](
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|update event_log
-          |set status = $status, execution_date = ${now() plus (10, MINUTES)}, message = $maybeMessage
+          |set status = $status, execution_date = ${now().plus(10, MINUTES)}, message = $maybeMessage
           |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${Processing: EventStatus}
           |""".stripMargin.update.run,
     name = "processing->recoverable_fail"

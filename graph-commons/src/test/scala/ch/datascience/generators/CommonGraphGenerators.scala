@@ -138,7 +138,7 @@ object CommonGraphGenerators {
 
   def sortBys[T <: SortBy](sortBy: T): Gen[T#By] =
     for {
-      property  <- Gen.oneOf(sortBy.properties.to[List])
+      property  <- Gen.oneOf(sortBy.properties.toList)
       direction <- Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc)
     } yield sortBy.By(property, direction)
 

@@ -53,7 +53,7 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .expects(subscriberUrl)
         .returning(IO.unit)
 
-      subscriber.notifyAvailability.unsafeRunSync() shouldBe ((): Unit)
+      subscriber.notifyAvailability().unsafeRunSync() shouldBe ((): Unit)
     }
 
     "fail if finding the subscriber url fails" in new TestCase {
@@ -63,7 +63,7 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .returning(exception.raiseError[IO, SubscriberUrl])
 
       intercept[Exception] {
-        subscriber.notifyAvailability.unsafeRunSync()
+        subscriber.notifyAvailability().unsafeRunSync()
       } shouldBe exception
     }
 
@@ -79,7 +79,7 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
-        subscriber.notifyAvailability.unsafeRunSync()
+        subscriber.notifyAvailability().unsafeRunSync()
       } shouldBe exception
     }
   }
@@ -99,7 +99,7 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .returning(IO.unit)
         .atLeastOnce()
 
-      subscriber.run.unsafeRunAsyncAndForget()
+      subscriber.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -126,7 +126,7 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .returning(IO.unit)
         .atLeastOnce()
 
-      subscriber.run.unsafeRunAsyncAndForget()
+      subscriber.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -153,7 +153,7 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .returning(IO.unit)
         .atLeastOnce()
 
-      subscriber.run.unsafeRunAsyncAndForget()
+      subscriber.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(

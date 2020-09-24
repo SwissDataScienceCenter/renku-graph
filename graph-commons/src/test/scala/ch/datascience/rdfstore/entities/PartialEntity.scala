@@ -75,7 +75,7 @@ object PartialEntity {
 
   implicit class PartialEntityOps(partialEntity: Either[Exception, PartialEntity]) {
 
-    lazy val getOrFail: JsonLD = partialEntity flatMap toJsonLD fold (throw _, identity)
+    lazy val getOrFail: JsonLD = partialEntity.flatMap(toJsonLD).fold(throw _, identity)
 
     private def toJsonLD(partialEntity: PartialEntity): Either[Exception, JsonLD] =
       for {

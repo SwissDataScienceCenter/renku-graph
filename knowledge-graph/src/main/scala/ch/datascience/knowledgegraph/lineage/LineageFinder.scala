@@ -76,7 +76,8 @@ class LineageFinderImpl[Interpretation[_]](
       }
     }.toList.sequence.map(_.toSet.flatten)
 
-    lazy val toLocationsSet: Set[Location] = edgesAndLocations.mapValues { case (s, t) => s ++ t }.values.toSet.flatten
+    lazy val toLocationsSet: Set[Location] =
+      edgesAndLocations.view.mapValues { case (s, t) => s ++ t }.values.toSet.flatten
   }
 
   private implicit class EntityIdOps(entityId: EntityId) {

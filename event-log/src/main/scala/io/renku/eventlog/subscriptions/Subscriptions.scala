@@ -28,7 +28,7 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
+import scala.language.postfixOps
 import scala.util.Random
 
 trait Subscriptions[Interpretation[_]] {
@@ -45,7 +45,7 @@ class SubscriptionsImpl private[subscriptions] (
 )(implicit contextShift:    ContextShift[IO], timer: Timer[IO], executionContext: ExecutionContext)
     extends Subscriptions[IO] {
 
-  import scala.collection.JavaConverters._
+  import scala.jdk.CollectionConverters._
 
   private val subscriptionsPool  = new ConcurrentHashMap[SubscriberUrl, Unit]()
   private val busySubscriberPool = new ConcurrentHashMap[SubscriberUrl, AddWithDelay]()

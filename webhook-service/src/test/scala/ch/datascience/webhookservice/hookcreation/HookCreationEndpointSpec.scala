@@ -64,11 +64,11 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
         val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
 
-        val response = createHook(projectId, request).unsafeRunSync
+        val response = createHook(projectId, request).unsafeRunSync()
 
-        response.status                 shouldBe Created
-        response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-        response.as[Json].unsafeRunSync shouldBe json"""{"message": "Hook created"}"""
+        response.status                   shouldBe Created
+        response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+        response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook created"}"""
       }
 
     "return OK when hook was already created" in new TestCase {
@@ -88,9 +88,9 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
       val response = createHook(projectId, request).unsafeRunSync()
 
-      response.status                 shouldBe Ok
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe json"""{"message": "Hook already existed"}"""
+      response.status                   shouldBe Ok
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook already existed"}"""
     }
 
     "return UNAUTHORIZED when finding an access token in the headers fails with UnauthorizedException" in new TestCase {
@@ -104,9 +104,9 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
       val response = createHook(projectId, request).unsafeRunSync()
 
-      response.status                 shouldBe Unauthorized
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException).asJson
+      response.status                   shouldBe Unauthorized
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(UnauthorizedException).asJson
     }
 
     "return INTERNAL_SERVER_ERROR when there was an error during hook creation and log the error" in new TestCase {
@@ -128,9 +128,9 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
       val response = createHook(projectId, request).unsafeRunSync()
 
-      response.status                 shouldBe InternalServerError
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe errorMessage.asJson
+      response.status                   shouldBe InternalServerError
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe errorMessage.asJson
 
       logger.loggedOnly(
         Error(exception.getMessage, exception)
@@ -154,9 +154,9 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
       val response = createHook(projectId, request).unsafeRunSync()
 
-      response.status                 shouldBe Unauthorized
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException).asJson
+      response.status                   shouldBe Unauthorized
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(UnauthorizedException).asJson
     }
   }
 

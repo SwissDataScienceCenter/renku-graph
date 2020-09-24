@@ -48,7 +48,7 @@ class StatsFinderSpec
 
         statuses foreach store
 
-        stats.statuses.unsafeRunSync() shouldBe Map(
+        stats.statuses().unsafeRunSync() shouldBe Map(
           New                   -> statuses.count(_ == New),
           Processing            -> statuses.count(_ == Processing),
           TriplesStore          -> statuses.count(_ == TriplesStore),

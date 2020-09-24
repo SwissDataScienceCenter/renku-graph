@@ -40,7 +40,7 @@ import scala.language.higherKinds
 import scala.util.Random
 
 private trait EventFetcher[Interpretation[_]] {
-  def popEvent: Interpretation[Option[(CompoundEventId, EventBody)]]
+  def popEvent(): Interpretation[Option[(CompoundEventId, EventBody)]]
 }
 
 private class EventFetcherImpl(
@@ -63,7 +63,7 @@ private class EventFetcherImpl(
   private type EventIdAndBody   = (CompoundEventId, EventBody)
   private type ProjectIdAndPath = (projects.Id, projects.Path)
 
-  override def popEvent: IO[Option[EventIdAndBody]] =
+  override def popEvent(): IO[Option[EventIdAndBody]] =
     for {
       maybeProjectEventIdAndBody <- findEventAndUpdateForProcessing() transact transactor.get
       (maybeProject, maybeEventIdAndBody) = maybeProjectEventIdAndBody

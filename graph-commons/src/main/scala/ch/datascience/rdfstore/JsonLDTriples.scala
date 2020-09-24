@@ -21,8 +21,6 @@ package ch.datascience.rdfstore
 import ch.datascience.tinytypes.{JsonTinyType, TinyTypeFactory}
 import io.circe.Json
 
-import scala.language.higherKinds
-
 final class JsonLDTriples private (val value: Json) extends AnyVal with JsonTinyType
 
 object JsonLDTriples extends TinyTypeFactory[JsonLDTriples](new JsonLDTriples(_)) {

@@ -38,7 +38,7 @@ private class BatchDateAdder[Interpretation[_]](
 
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
-  def run: Interpretation[Unit] =
+  def run(): Interpretation[Unit] =
     checkColumnExists flatMap {
       case true  => logger.info("'batch_date' column exists")
       case false => addColumn()

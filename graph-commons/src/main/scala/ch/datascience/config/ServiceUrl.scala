@@ -22,8 +22,6 @@ import ch.datascience.tinytypes.constraints.{Url, UrlOps}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import pureconfig.ConfigReader
 
-import scala.language.implicitConversions
-
 class ServiceUrl private (val value: String) extends AnyVal with StringTinyType
 
 object ServiceUrl extends TinyTypeFactory[ServiceUrl](new ServiceUrl(_)) with Url with UrlOps[ServiceUrl] {

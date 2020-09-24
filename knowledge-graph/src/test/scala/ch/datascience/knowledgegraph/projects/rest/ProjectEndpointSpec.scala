@@ -71,8 +71,8 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
         response.status      shouldBe Ok
         response.contentType shouldBe Some(`Content-Type`(application.json))
 
-        response.as[Project].unsafeRunSync shouldBe project
-        response.as[Json].unsafeRunSync._links shouldBe Right(
+        response.as[Project].unsafeRunSync() shouldBe project
+        response.as[Json].unsafeRunSync()._links shouldBe Right(
           Links.of(
             Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path),
             Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets")
@@ -100,7 +100,7 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(application.json))
 
-      response.as[Json].unsafeRunSync shouldBe InfoMessage(s"No '$path' project found").asJson
+      response.as[Json].unsafeRunSync() shouldBe InfoMessage(s"No '$path' project found").asJson
 
       logger.loggedOnly(
         Warn(s"Finding '$path' details finished${executionTimeRecorder.executionTimeInfo}")
@@ -121,7 +121,7 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(application.json))
 
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(s"Finding '$path' project failed").asJson
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(s"Finding '$path' project failed").asJson
 
       logger.loggedOnly(Error(s"Finding '$path' project failed", exception))
     }

@@ -77,7 +77,7 @@ class SortBySpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
       Map("sort" -> Seq(s"invalid:$Desc")) match {
         case TestSort.sort(actual) =>
           actual shouldBe Some(Validated.invalidNel {
-            ParseFailure(TestSort.Property.from("invalid").left.get.getMessage, "")
+            ParseFailure(TestSort.Property.from("invalid").swap.getOrElse(throw new Exception("ERROR!")).getMessage, "")
           })
       }
     }

@@ -38,7 +38,7 @@ class EventLogMetrics(
     statusesInterval: FiniteDuration = EventLogMetrics.statusesInterval
 )(implicit ME:        MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO]) {
 
-  def run: IO[Unit] =
+  def run(): IO[Unit] =
     for {
       _ <- timer sleep interval
       _ <- updateStatuses()
@@ -46,16 +46,16 @@ class EventLogMetrics(
 
   private def updateStatuses(): IO[Unit] = {
     for {
-      statuses <- statsFinder.statuses
+      statuses <- statsFinder.statuses()
       _        <- (statuses map toStatusesGauge).toList.sequence
-      _        <- totalGauge set statuses.values.sum
+      _        <- totalGauge set statuses.values.sum.toDouble
       _        <- timer sleep statusesInterval
       _        <- updateStatuses()
     } yield ()
   } recoverWith logAndRetry(continueWith = updateStatuses())
 
   private lazy val toStatusesGauge: ((EventStatus, Long)) => IO[Unit] = { case (status, count) =>
-    statusesGauge set status -> count
+    statusesGauge set status -> count.toDouble
   }
 
   private def logAndRetry(continueWith: => IO[Unit]): PartialFunction[Throwable, IO[Unit]] = {

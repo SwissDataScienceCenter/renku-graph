@@ -64,7 +64,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
       }
 
-      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Info("The triples are not up to date - re-provisioning is clearing DB"),
@@ -77,7 +77,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         .expects()
         .returning(true.pure[IO])
 
-      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("All projects' triples up to date"))
     }
@@ -95,7 +95,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(true.pure[IO])
       }
 
-      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Error("Re-provisioning failure", exception),
@@ -140,7 +140,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
       }
 
-      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Info("The triples are not up to date - re-provisioning is clearing DB"),
@@ -191,7 +191,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
       }
 
-      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Info("The triples are not up to date - re-provisioning is clearing DB"),
@@ -234,7 +234,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
       }
 
-      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Info("The triples are not up to date - re-provisioning is clearing DB"),
@@ -281,7 +281,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
       }
 
-      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Info("The triples are not up to date - re-provisioning is clearing DB"),
@@ -324,7 +324,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
       }
 
-      reProvisioning.run.unsafeRunSync() shouldBe ((): Unit)
+      reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Info("The triples are not up to date - re-provisioning is clearing DB"),

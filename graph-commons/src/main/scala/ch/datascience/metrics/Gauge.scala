@@ -24,8 +24,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Gauge => LibGauge}
 
-import scala.collection.JavaConverters._
-import scala.language.higherKinds
+import scala.jdk.CollectionConverters._
 
 trait Gauge[Interpretation[_]] {
   protected def gauge: LibGauge
@@ -42,8 +41,10 @@ trait SingleValueGauge[Interpretation[_]] extends Gauge[Interpretation] {
 trait LabeledGauge[Interpretation[_], LabelValue] extends Gauge[Interpretation] {
   def set(labelValue:       (LabelValue, Double)): Interpretation[Unit]
   def increment(labelValue: LabelValue):           Interpretation[Unit]
-  def decrement(labelValue: LabelValue):           Interpretation[Unit]
-  def reset: Interpretation[Unit]
+
+  def decrement(labelValue: LabelValue): Interpretation[Unit]
+
+  def reset(): Interpretation[Unit]
 }
 
 class SingleValueGaugeImpl[Interpretation[_]] private[metrics] (
@@ -77,7 +78,7 @@ class LabeledGaugeImpl[Interpretation[_], LabelValue] private[metrics] (
     else ()
   }
 
-  def reset: Interpretation[Unit] =
+  def reset(): Interpretation[Unit] =
     for {
       newValues <- resetDataFetch()
       _         <- ME.catchNonFatal(gauge.clear())

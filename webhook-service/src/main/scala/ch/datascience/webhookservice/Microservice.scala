@@ -38,7 +38,6 @@ import ch.datascience.webhookservice.project.ProjectHookUrl
 import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 object Microservice extends IOMicroservice {
 
@@ -53,7 +52,7 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      sentryInitializer     <- SentryInitializer[IO]
+      sentryInitializer     <- SentryInitializer[IO]()
       projectHookUrl        <- ProjectHookUrl.fromConfig[IO]()
       gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
@@ -101,7 +100,7 @@ class MicroserviceRunner(sentryInitializer:              SentryInitializer[IO],
 
   def run(args: List[String]): IO[ExitCode] =
     for {
-      _ <- sentryInitializer.run
-      _ <- List(httpServer.run.start, eventsSynchronizationScheduler.run).sequence
+      _ <- sentryInitializer.run()
+      _ <- List(httpServer.run().start, eventsSynchronizationScheduler.run()).sequence
     } yield ExitCode.Success
 }

@@ -20,9 +20,9 @@ package ch.datascience.microservices
 
 import java.util.concurrent.ConcurrentHashMap
 
-import cats.effect.{CancelToken, IO, IOApp, Resource}
+import cats.effect.{CancelToken, IO, IOApp}
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 trait IOMicroservice extends IOApp {
 

@@ -48,8 +48,8 @@ class DbInitializer[Interpretation[_]](
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)")
       _ <- execute(sql"UPDATE event_log set status=${RecoverableFailure.value} where status='TRIPLES_STORE_FAILURE'")
       _ <- logger.info("Event Log database initialization success")
-      _ <- projectPathAdder.run
-      _ <- batchDateAdder.run
+      _ <- projectPathAdder.run()
+      _ <- batchDateAdder.run()
     } yield ()
   } recoverWith logging
 

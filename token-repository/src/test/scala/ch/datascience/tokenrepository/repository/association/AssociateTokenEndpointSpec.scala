@@ -55,8 +55,8 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
       val response = associateToken(projectId, request).unsafeRunSync()
 
-      response.status                              shouldBe Status.NoContent
-      response.body.compile.toVector.unsafeRunSync shouldBe empty
+      response.status                                shouldBe Status.NoContent
+      response.body.compile.toVector.unsafeRunSync() shouldBe empty
 
       logger.expectNoLogs()
     }
@@ -75,8 +75,8 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
       val response = associateToken(projectId, request).unsafeRunSync()
 
-      response.status                              shouldBe Status.NoContent
-      response.body.compile.toVector.unsafeRunSync shouldBe empty
+      response.status                                shouldBe Status.NoContent
+      response.body.compile.toVector.unsafeRunSync() shouldBe empty
 
       logger.expectNoLogs()
     }
@@ -87,9 +87,11 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
       val response = associateToken(projectId, request).unsafeRunSync()
 
-      response.status                 shouldBe Status.BadRequest
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe json"""{"message": "Malformed message body: Invalid JSON: empty body"}"""
+      response.status      shouldBe Status.BadRequest
+      response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
+      response
+        .as[Json]
+        .unsafeRunSync() shouldBe json"""{"message": "Malformed message body: Invalid JSON: empty body"}"""
 
       logger.expectNoLogs()
     }
@@ -112,7 +114,7 @@ class AssociateTokenEndpointSpec extends AnyWordSpec with MockFactory with shoul
       response.status      shouldBe Status.InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
       val expectedMessage = s"Associating token with projectId: $projectId failed"
-      response.as[Json].unsafeRunSync shouldBe json"""{"message": $expectedMessage}"""
+      response.as[Json].unsafeRunSync() shouldBe json"""{"message": $expectedMessage}"""
 
       logger.loggedOnly(Error(expectedMessage, exception))
     }

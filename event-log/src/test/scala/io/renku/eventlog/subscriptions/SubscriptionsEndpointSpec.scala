@@ -58,9 +58,9 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
 
         val response = addSubscription(request).unsafeRunSync()
 
-        response.status                        shouldBe Accepted
-        response.contentType                   shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Subscription added")
+        response.status                          shouldBe Accepted
+        response.contentType                     shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Subscription added")
 
         logger.expectNoLogs()
       }
@@ -75,7 +75,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
 
       response.status      shouldBe BadRequest
       response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage(
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
         s"Invalid message body: Could not decode JSON: $payload"
       )
 
@@ -91,7 +91,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
 
       response.status      shouldBe BadRequest
       response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage(
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
         s"Subscriptions to $New and $RecoverableFailure status supported only"
       )
 
@@ -111,9 +111,9 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
       val response = addSubscription(request).unsafeRunSync()
 
       val expectedMessage = "Adding subscriber URL failed"
-      response.status                         shouldBe InternalServerError
-      response.contentType                    shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage(expectedMessage)
+      response.status                           shouldBe InternalServerError
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(expectedMessage)
 
       logger.loggedOnly(Error(expectedMessage, exception))
     }

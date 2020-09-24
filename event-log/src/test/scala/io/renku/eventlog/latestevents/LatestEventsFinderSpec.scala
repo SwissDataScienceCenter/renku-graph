@@ -36,7 +36,7 @@ class LatestEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
   "findAllLatestEvents" should {
 
     "return an empty list if there are no events in the db" in new TestCase {
-      latestEventsFinder.findAllLatestEvents.unsafeRunSync() shouldBe List.empty
+      latestEventsFinder.findAllLatestEvents().unsafeRunSync() shouldBe List.empty
     }
 
     "return (projectId, eventBody) tuples with the youngest eventId (event_date wise) " +
@@ -46,7 +46,7 @@ class LatestEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           compoundEventIds.generateOne.copy(projectId = project1.id),
           eventStatuses.generateOne,
           executionDates.generateOne,
-          EventDate(now minus (20, DAYS)),
+          EventDate(now.minus(20, DAYS)),
           eventBodies.generateOne,
           projectPath = project1.path
         )
@@ -57,7 +57,7 @@ class LatestEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           youngestEventIdProject1,
           eventStatuses.generateOne,
           executionDates.generateOne,
-          EventDate(now minus (3, DAYS)),
+          EventDate(now.minus(3, DAYS)),
           youngestEventBodyProject1,
           projectPath = project1.path
         )
@@ -69,12 +69,12 @@ class LatestEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           eventIdProject2,
           eventStatuses.generateOne,
           executionDates.generateOne,
-          EventDate(now minus (2, DAYS)),
+          EventDate(now.minus(2, DAYS)),
           eventBodyProject2,
           projectPath = project2.path
         )
 
-        latestEventsFinder.findAllLatestEvents.unsafeRunSync() shouldBe List(
+        latestEventsFinder.findAllLatestEvents().unsafeRunSync() shouldBe List(
           (youngestEventIdProject1.id, project1, youngestEventBodyProject1),
           (eventIdProject2.id, project2, eventBodyProject2)
         )

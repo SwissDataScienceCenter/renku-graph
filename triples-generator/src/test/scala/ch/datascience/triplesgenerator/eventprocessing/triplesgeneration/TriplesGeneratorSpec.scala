@@ -28,7 +28,7 @@ import io.chrisdavenport.log4cats.Logger
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
 
 class TriplesGeneratorSpec extends AnyWordSpec with should.Matchers {

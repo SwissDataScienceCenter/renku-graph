@@ -23,7 +23,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.{Success, Try}
 
 class TriplesGenerationSpec extends AnyWordSpec with should.Matchers {

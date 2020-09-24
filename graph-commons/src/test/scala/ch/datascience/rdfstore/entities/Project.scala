@@ -33,11 +33,12 @@ object Project {
   import ch.datascience.graph.config.RenkuBaseUrl
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
+  import JsonLDEncoder._
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Project] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       EntityId of ResourceId(renkuBaseUrl, entity.path),
-      EntityTypes of (prov / "Location", schema / "Project"),
+      EntityTypes.of(prov / "Location", schema / "Project"),
       schema / "name"          -> entity.name.asJsonLD,
       schema / "dateCreated"   -> entity.dateCreated.asJsonLD,
       schema / "creator"       -> entity.maybeCreator.asJsonLD,

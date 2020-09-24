@@ -75,7 +75,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenNoMoreEvents()
       }
 
-      dispatcher.run.unsafeRunAsyncAndForget()
+      dispatcher.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -104,7 +104,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
           givenNoMoreEvents()
         }
 
-        dispatcher.run.unsafeRunAsyncAndForget()
+        dispatcher.run().unsafeRunAsyncAndForget()
 
         eventually {
           logger.loggedOnly(
@@ -137,7 +137,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
           givenNoMoreEvents()
         }
 
-        dispatcher.run.unsafeRunAsyncAndForget()
+        dispatcher.run().unsafeRunAsyncAndForget()
 
         eventually {
           logger.loggedOnly(
@@ -177,7 +177,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
           givenNoMoreEvents()
         }
 
-        dispatcher.run.unsafeRunAsyncAndForget()
+        dispatcher.run().unsafeRunAsyncAndForget()
 
         nonRecoverableStatusUpdate.value.eventId              shouldBe failingEvent.compoundEventId
         nonRecoverableStatusUpdate.value.underProcessingGauge shouldBe underProcessingGauge
@@ -210,7 +210,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenNoMoreEvents()
       }
 
-      dispatcher.run.unsafeRunAsyncAndForget()
+      dispatcher.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -239,7 +239,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenNoMoreEvents()
       }
 
-      dispatcher.run.unsafeRunAsyncAndForget()
+      dispatcher.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -271,7 +271,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenNoMoreEvents()
       }
 
-      dispatcher.run.unsafeRunAsyncAndForget()
+      dispatcher.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -303,7 +303,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenNoMoreEvents()
       }
 
-      dispatcher.run.unsafeRunAsyncAndForget()
+      dispatcher.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -347,7 +347,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenNoMoreEvents()
       }
 
-      dispatcher.run.unsafeRunAsyncAndForget()
+      dispatcher.run().unsafeRunAsyncAndForget()
 
       nonRecoverableStatusUpdate.value.eventId              shouldBe failingEvent.compoundEventId
       nonRecoverableStatusUpdate.value.underProcessingGauge shouldBe underProcessingGauge

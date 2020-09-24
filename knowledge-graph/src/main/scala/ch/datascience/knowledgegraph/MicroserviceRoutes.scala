@@ -61,9 +61,9 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   lazy val routes = HttpRoutes.of[F] {
     case           GET  -> Root / "ping"                                                                                                      => Ok("pong")
     case           GET  -> Root / "knowledge-graph" / "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) => searchForDatasets(maybePhrase, maybeSortBy,page, perPage)
-    case           GET  -> Root / "knowledge-graph" / "datasets" / DatasetId(id)                                                              => getDataset(id)
-    case           GET  -> Root / "knowledge-graph" / "graphql"                                                                               => schema
-    case request @ POST -> Root / "knowledge-graph" / "graphql"                                                                               => handleQuery(request)
+    case GET -> Root / "knowledge-graph" / "datasets" / DatasetId(id) => getDataset(id)
+    case GET -> Root / "knowledge-graph" / "graphql" => schema()
+    case request@POST -> Root / "knowledge-graph" / "graphql" => handleQuery(request)
     case           GET  ->        "knowledge-graph" /: "projects" /: path                                                                     => routeToProjectsEndpoints(path)
   }.withMetrics
   // format: on

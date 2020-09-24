@@ -97,7 +97,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
       maybeTrue.fold(
         errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),
         value =>
-          if (value) findLatestEvents
+          if (value) findLatestEvents()
           else BadRequest(ErrorMessage(s"'${`latest-per-project`}' parameter with invalid value"))
       )
   }

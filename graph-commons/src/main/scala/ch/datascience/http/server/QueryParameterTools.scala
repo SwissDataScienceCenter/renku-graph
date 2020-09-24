@@ -27,8 +27,6 @@ import io.circe.syntax._
 import org.http4s.circe._
 import org.http4s.{ParseFailure, Response, Status}
 
-import scala.language.higherKinds
-
 object QueryParameterTools {
 
   def toBadRequest[F[_]: ConcurrentEffect]()(

@@ -22,7 +22,7 @@ import cats.syntax.all._
 import io.prometheus.client.Collector
 import io.prometheus.client.Collector.MetricFamilySamples.Sample
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object MetricsTools {
 

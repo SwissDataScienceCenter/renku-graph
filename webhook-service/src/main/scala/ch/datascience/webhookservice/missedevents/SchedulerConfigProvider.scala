@@ -30,9 +30,9 @@ private class SchedulerConfigProvider[Interpretation[_]](
 )(implicit ME:     MonadError[Interpretation, Throwable])
     extends ConfigLoader[Interpretation] {
 
-  def getInitialDelay: Interpretation[FiniteDuration] =
+  def getInitialDelay(): Interpretation[FiniteDuration] =
     find[FiniteDuration]("events-synchronization.initial-delay", configuration)
 
-  def getInterval: Interpretation[FiniteDuration] =
+  def getInterval(): Interpretation[FiniteDuration] =
     find[FiniteDuration]("events-synchronization.interval", configuration)
 }

@@ -92,9 +92,9 @@ class StatusChangeEndpointSpec
 
           val response = changeStatus(eventId, request).unsafeRunSync()
 
-          response.status                        shouldBe Ok
-          response.contentType                   shouldBe Some(`Content-Type`(application.json))
-          response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event status updated")
+          response.status                          shouldBe Ok
+          response.contentType                     shouldBe Some(`Content-Type`(application.json))
+          response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event status updated")
 
           logger.expectNoLogs()
         }
@@ -116,9 +116,9 @@ class StatusChangeEndpointSpec
 
           val response = changeStatus(eventId, request).unsafeRunSync()
 
-          response.status                        shouldBe Conflict
-          response.contentType                   shouldBe Some(`Content-Type`(application.json))
-          response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event status cannot be updated")
+          response.status                          shouldBe Conflict
+          response.contentType                     shouldBe Some(`Content-Type`(application.json))
+          response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event status cannot be updated")
 
           logger.expectNoLogs()
         }
@@ -141,9 +141,9 @@ class StatusChangeEndpointSpec
 
           val response = changeStatus(eventId, request).unsafeRunSync()
 
-          response.status                        shouldBe InternalServerError
-          response.contentType                   shouldBe Some(`Content-Type`(application.json))
-          response.as[InfoMessage].unsafeRunSync shouldBe ErrorMessage(errorMessage.value)
+          response.status                          shouldBe InternalServerError
+          response.contentType                     shouldBe Some(`Content-Type`(application.json))
+          response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage.value)
 
           logger.loggedOnly(Error(errorMessage.value))
         }
@@ -163,7 +163,7 @@ class StatusChangeEndpointSpec
 
       response.status      shouldBe BadRequest
       response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe ErrorMessage(
+      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage(
         s"Invalid message body: Could not decode JSON: $payload"
       )
 
@@ -182,9 +182,9 @@ class StatusChangeEndpointSpec
 
       val response = changeStatus(eventId, request).unsafeRunSync()
 
-      response.status                         shouldBe BadRequest
-      response.contentType                    shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage("SKIPPED status needs a message")
+      response.status                           shouldBe BadRequest
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("SKIPPED status needs a message")
 
       logger.expectNoLogs()
     }
@@ -201,9 +201,9 @@ class StatusChangeEndpointSpec
 
       val response = changeStatus(eventId, request).unsafeRunSync()
 
-      response.status                         shouldBe BadRequest
-      response.contentType                    shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage("Transition to 'PROCESSING' status unsupported")
+      response.status                           shouldBe BadRequest
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Transition to 'PROCESSING' status unsupported")
 
       logger.expectNoLogs()
     }
@@ -225,9 +225,9 @@ class StatusChangeEndpointSpec
 
       val response = changeStatus(eventId, request).unsafeRunSync()
 
-      response.status                 shouldBe InternalServerError
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage("Event status update failed").asJson
+      response.status                   shouldBe InternalServerError
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Event status update failed").asJson
 
       logger.loggedOnly(Error("Event status update failed", exception))
     }
@@ -268,8 +268,11 @@ class StatusChangeEndpointSpec
   private class GaugeStub extends LabeledGauge[IO, projects.Path] {
     override def set(labelValue:       (projects.Path, Double)) = IO.unit
     override def increment(labelValue: projects.Path)           = IO.unit
-    override def decrement(labelValue: projects.Path)           = IO.unit
-    override def reset           = IO.unit
+
+    override def decrement(labelValue: projects.Path) = IO.unit
+
+    override def reset() = IO.unit
+
     protected override def gauge = Gauge.build("name", "help").create()
   }
 }

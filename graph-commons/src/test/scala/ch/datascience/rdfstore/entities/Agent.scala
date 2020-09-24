@@ -31,7 +31,7 @@ object Agent {
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Agent] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       EntityId of s"https://github.com/swissdatasciencecenter/renku-python/tree/v${entity.cliVersion}",
-      EntityTypes of (
+      EntityTypes.of(
         prov / "SoftwareAgent",
         wfprov / "WorkflowEngine"
       ),
