@@ -228,8 +228,8 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
     val client                = new TestRestClient(hostUrl, throttler, logger, Some(executionTimeRecorder))
 
     def verifyThrottling() = inSequence {
-      (() => throttler.acquire).expects().returning(IO.unit)
-      (() => throttler.release).expects().returning(IO.unit)
+      (throttler.acquire _).expects().returning(IO.unit)
+      (throttler.release _).expects().returning(IO.unit)
     }
   }
 
