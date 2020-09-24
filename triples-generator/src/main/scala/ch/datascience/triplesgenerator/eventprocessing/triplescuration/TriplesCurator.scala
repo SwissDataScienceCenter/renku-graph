@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 import cats.MonadError
 import cats.data.EitherT
 import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.{DataSetInfoEnricher, IODataSetInfoEnricher}
@@ -36,7 +36,7 @@ trait TriplesCurator[Interpretation[_]] {
   def curate(
       commit:                  CommitEvent,
       triples:                 JsonLDTriples
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
+  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation, SparqlQuery]
 }
 
 private[eventprocessing] class TriplesCuratorImpl[Interpretation[_]](
@@ -51,15 +51,16 @@ private[eventprocessing] class TriplesCuratorImpl[Interpretation[_]](
   override def curate(
       commit:                  CommitEvent,
       triples:                 JsonLDTriples
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] =
+  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation, SparqlQuery] =
     for {
-      triplesWithPersonDetails    <- personDetailsUpdater.curate(CuratedTriples(triples, updatesGroups = Nil)).toRight
+      triplesWithPersonDetails <-
+        personDetailsUpdater.curate(CuratedTriples[Interpretation, SparqlQuery](triples, updatesGroups = Nil)).toRight
       triplesWithForkInfo         <- updateForkInfo(commit, triplesWithPersonDetails)
       triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithForkInfo)
     } yield triplesWithEnrichedDatasets
 
-  private implicit class InterpretationOps(out: Interpretation[CuratedTriples[Interpretation]]) {
-    lazy val toRight: CurationResults[Interpretation] = EitherT.right[ProcessingRecoverableError](out)
+  private implicit class InterpretationOps(out: Interpretation[CuratedTriples[Interpretation, SparqlQuery]]) {
+    lazy val toRight: CurationResults[Interpretation, SparqlQuery] = EitherT.right[ProcessingRecoverableError](out)
   }
 }
 

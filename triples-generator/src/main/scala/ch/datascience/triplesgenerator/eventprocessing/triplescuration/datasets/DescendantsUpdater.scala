@@ -32,15 +32,16 @@ import scala.language.higherKinds
 private class DescendantsUpdater {
 
   def prepareUpdates[Interpretation[_]](
-      curatedTriples: CuratedTriples[Interpretation],
+      curatedTriples: CuratedTriples[Interpretation, SparqlQuery],
       topmostData:    TopmostData
-  )(implicit ME:      MonadError[Interpretation, Throwable]): CuratedTriples[Interpretation] = curatedTriples.copy(
-    updatesGroups = curatedTriples.updatesGroups :+ CurationUpdatesGroup(
-      name = "Dataset descendants updates",
-      prepareSameAsUpdate(topmostData.datasetId, topmostData.sameAs),
-      prepareDerivedFromUpdate(topmostData.datasetId, topmostData.derivedFrom)
+  )(implicit ME:      MonadError[Interpretation, Throwable]): CuratedTriples[Interpretation, SparqlQuery] =
+    curatedTriples.copy(
+      updatesGroups = curatedTriples.updatesGroups :+ CurationUpdatesGroup[Interpretation, SparqlQuery](
+        name = "Dataset descendants updates",
+        prepareSameAsUpdate(topmostData.datasetId, topmostData.sameAs),
+        prepareDerivedFromUpdate(topmostData.datasetId, topmostData.derivedFrom)
+      )
     )
-  )
 
   private def prepareSameAsUpdate(entityId: EntityId, topmostSameAs: TopmostSameAs) = SparqlQuery(
     name = "upload - topmostSameAs update",

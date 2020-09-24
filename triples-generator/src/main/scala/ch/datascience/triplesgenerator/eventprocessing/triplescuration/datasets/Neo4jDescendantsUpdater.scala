@@ -1,0 +1,60 @@
+/*
+ * Copyright 2020 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
+
+import cats.MonadError
+import ch.datascience.graph.model.datasets.{DerivedFrom, TopmostSameAs}
+import ch.datascience.rdfstore.{CypherQuery, GraphQuery, SparqlQuery}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
+import io.renku.jsonld.EntityId
+import eu.timepit.refined.auto._
+
+import scala.language.higherKinds
+
+private class Neo4jDescendantsUpdater {
+
+  def prepareUpdates[Interpretation[_]](
+      curatedTriples: CuratedTriples[Interpretation, CypherQuery],
+      topmostData:    TopmostData
+  )(implicit ME:      MonadError[Interpretation, Throwable]): CuratedTriples[Interpretation, CypherQuery] =
+    curatedTriples.copy(
+      updatesGroups = curatedTriples.updatesGroups :+ CurationUpdatesGroup[Interpretation, CypherQuery](
+        name = "Dataset descendants updates",
+        prepareSameAsUpdate(topmostData.datasetId, topmostData.sameAs),
+        prepareDerivedFromUpdate(topmostData.datasetId, topmostData.derivedFrom)
+      )
+    )
+
+  private def prepareSameAsUpdate(entityId: EntityId, topmostSameAs: TopmostSameAs) = CypherQuery(
+    name = "neo4j - upload - topmostSameAs update",
+    s"""MATCH (n: sch__Dataset { renku__topmostSameAs: '$entityId' })
+       |SET n.renku__topmostSameAs = toString($topmostSameAs)
+       |RETURN n""".stripMargin
+  )
+
+  private def prepareDerivedFromUpdate(entityId: EntityId, topmostDerivedFrom: DerivedFrom) = CypherQuery(
+    name = "neo4j - upload - topmostDerivedFrom update",
+    s"""MATCH (n: sch__Dataset { renku__topmostDerivedFrom: '$entityId' })
+       |SET n.renku__topmostDerivedFrom = toString($topmostDerivedFrom)
+       |RETURN n""".stripMargin
+  )
+
+}

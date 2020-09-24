@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 import cats.MonadError
 import cats.effect.{ContextShift, Timer}
 import cats.syntax.all._
-import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.{CypherQuery, GraphQuery, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import io.chrisdavenport.log4cats.Logger
@@ -31,20 +31,32 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class Uploader[Interpretation[_]](
-    triplesUploader: TriplesUploader[Interpretation],
-    updatesUploader: UpdatesUploader[Interpretation]
-)(implicit ME:       MonadError[Interpretation, Throwable]) {
+    graphUploader:        GraphUploader[Interpretation],
+    triplesUploader:      TriplesUploader[Interpretation],
+    updatesUploader:      UpdatesUploader[Interpretation],
+    graphUpdatesUploader: GraphUpdatesUploader[Interpretation]
+)(implicit ME:            MonadError[Interpretation, Throwable]) {
 
   import TriplesUploadResult._
 
-  def upload(curatedTriples: CuratedTriples[Interpretation]): Interpretation[TriplesUploadResult] =
+  def upload(curatedTriples:      CuratedTriples[Interpretation, SparqlQuery],
+             graphCuratedTriples: CuratedTriples[Interpretation, CypherQuery]
+  ): Interpretation[TriplesUploadResult] =
     for {
-      triplesUploadingResult    <- triplesUploader upload curatedTriples.triples
-      maybeUpdatesSendingResult <- prepareAndRun(curatedTriples.updatesGroups, when = triplesUploadingResult.failure)
+      triplesUploadingResult <- triplesUploader upload curatedTriples.triples
+      _                      <- graphUploader upload graphCuratedTriples.triples
+      maybeUpdatesSendingResult <- prepareAndRun(
+                                     curatedTriples.updatesGroups,
+                                     when = triplesUploadingResult.failure
+                                   )
+      _ <- prepareAndRunNeo4j(
+             graphCuratedTriples.updatesGroups,
+             when = triplesUploadingResult.failure
+           )
     } yield merge(triplesUploadingResult, maybeUpdatesSendingResult)
 
   private def prepareAndRun(
-      updatesGroups: List[CurationUpdatesGroup[Interpretation]],
+      updatesGroups: List[CurationUpdatesGroup[Interpretation, SparqlQuery]],
       when:          Boolean
   ): Interpretation[Option[TriplesUploadResult]] =
     if (when) Option.empty[TriplesUploadResult].pure[Interpretation]
@@ -54,8 +66,19 @@ class Uploader[Interpretation[_]](
         .flatSequence
         .map(mergeResults) map Option.apply
 
+  private def prepareAndRunNeo4j(
+      updatesGroups: List[CurationUpdatesGroup[Interpretation, CypherQuery]],
+      when:          Boolean
+  ): Interpretation[Option[TriplesUploadResult]] =
+    if (when) Option.empty[TriplesUploadResult].pure[Interpretation]
+    else
+      updatesGroups
+        .map(createUpdatesAndSendNeo4j)
+        .flatSequence
+        .map(mergeResults) map Option.apply
+
   private def createUpdatesAndSend(
-      updatesGroup: CurationUpdatesGroup[Interpretation]
+      updatesGroup: CurationUpdatesGroup[Interpretation, SparqlQuery]
   ): Interpretation[List[TriplesUploadResult]] =
     updatesGroup
       .generateUpdates()
@@ -63,6 +86,17 @@ class Uploader[Interpretation[_]](
         recoverableError =>
           List(RecoverableFailure(recoverableError.getMessage): TriplesUploadResult).pure[Interpretation],
         queries => (queries map updatesUploader.send).sequence
+      ) recoverWith invalidUpdatesFailure
+
+  private def createUpdatesAndSendNeo4j(
+      updatesGroup: CurationUpdatesGroup[Interpretation, CypherQuery]
+  ): Interpretation[List[TriplesUploadResult]] =
+    updatesGroup
+      .generateUpdates()
+      .foldF(
+        recoverableError =>
+          List(RecoverableFailure(recoverableError.getMessage): TriplesUploadResult).pure[Interpretation],
+        queries => (queries map graphUpdatesUploader.send).sequence
       ) recoverWith invalidUpdatesFailure
 
   private lazy val invalidUpdatesFailure: PartialFunction[Throwable, Interpretation[List[TriplesUploadResult]]] = {
@@ -101,8 +135,10 @@ private[eventprocessing] object IOUploader {
     for {
       rdfStoreConfig <- RdfStoreConfig[IO]()
     } yield new Uploader[IO](
+      new IOGraphUploader(logger),
       new IOTriplesUploader(rdfStoreConfig, logger),
-      new IOUpdatesUploader(rdfStoreConfig, logger, timeRecorder)
+      new IOUpdatesUploader(rdfStoreConfig, logger, timeRecorder),
+      new IOGraphUpdatesUploader(logger)
     )
 }
 

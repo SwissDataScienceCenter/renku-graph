@@ -16,44 +16,44 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration
-package datasets
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
 import cats.MonadError
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
-import ch.datascience.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.{CypherQuery, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{CuratedTriples, CurationResults}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
-private[triplescuration] trait DataSetInfoEnricher[Interpretation[_]] {
+private[triplescuration] trait Neo4jDatasetInfoEnricher[Interpretation[_]] {
   def enrichDataSetInfo(
-      curatedTriples: CuratedTriples[Interpretation, SparqlQuery]
-  ): CurationResults[Interpretation, SparqlQuery]
+      curatedTriples: CuratedTriples[Interpretation, CypherQuery]
+  ): CurationResults[Interpretation, CypherQuery]
 }
 
-private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
+private[triplescuration] class Neo4jDatasetInfoEnricherImpl[Interpretation[_]](
     dataSetInfoFinder:  DataSetInfoFinder[Interpretation],
     triplesUpdater:     TriplesUpdater,
     topmostDataFinder:  TopmostDataFinder[Interpretation],
-    descendantsUpdater: DescendantsUpdater
+    descendantsUpdater: Neo4jDescendantsUpdater
 )(implicit ME:          MonadError[Interpretation, Throwable])
-    extends DataSetInfoEnricher[Interpretation] {
+    extends Neo4jDatasetInfoEnricher[Interpretation] {
 
   import dataSetInfoFinder._
   import topmostDataFinder._
   import triplesUpdater._
 
   def enrichDataSetInfo(
-      curatedTriples: CuratedTriples[Interpretation, SparqlQuery]
-  ): CurationResults[Interpretation, SparqlQuery] =
+      curatedTriples: CuratedTriples[Interpretation, CypherQuery]
+  ): CurationResults[Interpretation, CypherQuery] =
     for {
       datasetInfos <- findDatasetsInfo(curatedTriples.triples).asRightT
       topmostInfos <- EitherT(
@@ -85,19 +85,23 @@ private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
   }
 }
 
-private[triplescuration] object IODataSetInfoEnricher {
+private[triplescuration] object IONeo4jDatasetInfoEnricher {
   import cats.effect.Timer
 
   def apply(
-      logger:                  Logger[IO],
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[DataSetInfoEnricher[IO]] =
+      logger:       Logger[IO],
+      timeRecorder: SparqlQueryTimeRecorder[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      cs:               ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[Neo4jDatasetInfoEnricher[IO]] =
     for {
       topmostDataFinder <- IOTopmostDataFinder(logger, timeRecorder)
-    } yield new DataSetInfoEnricherImpl[IO](
+    } yield new Neo4jDatasetInfoEnricherImpl[IO](
       new DataSetInfoFinderImpl[IO](),
       new TriplesUpdater(),
       topmostDataFinder,
-      new DescendantsUpdater()
+      new Neo4jDescendantsUpdater()
     )
 }

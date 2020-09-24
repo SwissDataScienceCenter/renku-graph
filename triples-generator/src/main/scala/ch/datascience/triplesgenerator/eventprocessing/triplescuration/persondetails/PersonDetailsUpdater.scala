@@ -23,7 +23,7 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
-import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
 import io.circe.Json
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath._
@@ -38,7 +38,9 @@ private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
   import PersonDetailsUpdater._
   import updatesCreator._
 
-  def curate(curatedTriples: CuratedTriples[Interpretation]): Interpretation[CuratedTriples[Interpretation]] =
+  def curate(
+      curatedTriples: CuratedTriples[Interpretation, SparqlQuery]
+  ): Interpretation[CuratedTriples[Interpretation, SparqlQuery]] =
     removePersonsAttributes(curatedTriples.triples) map { case (updatedTriples, persons) =>
       val newUpdatesGroups = persons map prepareUpdates[Interpretation]
       CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)

@@ -41,7 +41,7 @@ import scala.language.higherKinds
 private[triplescuration] trait UpdatesCreator[Interpretation[_]] {
   def create(commit:    CommitEvent)(implicit
       maybeAccessToken: Option[AccessToken]
-  ): CurationUpdatesGroup[Interpretation]
+  ): CurationUpdatesGroup[Interpretation, SparqlQuery]
 }
 
 private[triplescuration] class UpdatesCreatorImpl(
@@ -55,8 +55,8 @@ private[triplescuration] class UpdatesCreatorImpl(
 
   override def create(
       commit:                  CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationUpdatesGroup[IO] =
-    CurationUpdatesGroup[IO](
+  )(implicit maybeAccessToken: Option[AccessToken]): CurationUpdatesGroup[IO, SparqlQuery] =
+    CurationUpdatesGroup[IO, SparqlQuery](
       "Fork info updates",
       () =>
         EitherT {

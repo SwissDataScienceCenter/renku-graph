@@ -35,8 +35,8 @@ private[triplescuration] class UpdatesCreator {
 
   def prepareUpdates[Interpretation[_]](
       persons:   Person
-  )(implicit ME: MonadError[Interpretation, Throwable]): CurationUpdatesGroup[Interpretation] =
-    CurationUpdatesGroup[Interpretation](
+  )(implicit ME: MonadError[Interpretation, Throwable]): CurationUpdatesGroup[Interpretation, SparqlQuery] =
+    CurationUpdatesGroup[Interpretation, SparqlQuery](
       name = "Persons details updates",
       updates(persons): _*
     )

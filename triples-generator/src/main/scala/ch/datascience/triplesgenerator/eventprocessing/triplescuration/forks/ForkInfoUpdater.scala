@@ -23,7 +23,7 @@ import cats.effect._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import ch.datascience.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{CuratedTriples, CurationResults}
 import io.chrisdavenport.log4cats.Logger
@@ -34,8 +34,8 @@ import scala.language.higherKinds
 trait ForkInfoUpdater[Interpretation[_]] {
   def updateForkInfo(
       commit:                  CommitEvent,
-      givenCuratedTriples:     CuratedTriples[Interpretation]
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
+      givenCuratedTriples:     CuratedTriples[Interpretation, SparqlQuery]
+  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation, SparqlQuery]
 }
 
 class ForkInfoUpdaterImpl(
@@ -45,8 +45,8 @@ class ForkInfoUpdaterImpl(
 
   override def updateForkInfo(
       commit:                  CommitEvent,
-      curatedTriples:          CuratedTriples[IO]
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[IO] =
+      curatedTriples:          CuratedTriples[IO, SparqlQuery]
+  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[IO, SparqlQuery] =
     payloadTransformer
       .transform(commit, curatedTriples.triples)
       .map { transformedTriples =>

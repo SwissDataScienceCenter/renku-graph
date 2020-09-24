@@ -25,11 +25,34 @@ import eu.timepit.refined.collection.NonEmpty
 
 import scala.language.higherKinds
 
-final case class SparqlQuery(name:               String Refined NonEmpty,
-                             prefixes:           Set[String Refined NonEmpty],
-                             body:               String,
+trait GraphQuery {
+  def name: String Refined NonEmpty
+  def body: String
+}
+
+final case class CypherQuery(override val name:  String Refined NonEmpty,
+                             override val body:  String,
                              maybePagingRequest: Option[PagingRequest] = None
-) {
+) extends GraphQuery {
+  override lazy val toString: String =
+    s"""|$body
+        |$pagingRequest""".stripMargin.trim
+
+  private lazy val pagingRequest =
+    maybePagingRequest
+      .map { pagingRequest =>
+        import pagingRequest._
+        s"""|LIMIT $perPage
+            |OFFSET ${(page.value - 1) * perPage.value}""".stripMargin
+      }
+      .getOrElse("")
+}
+
+final case class SparqlQuery(override val name:  String Refined NonEmpty,
+                             prefixes:           Set[String Refined NonEmpty],
+                             override val body:  String,
+                             maybePagingRequest: Option[PagingRequest] = None
+) extends GraphQuery {
   override lazy val toString: String =
     s"""|${prefixes.mkString("", "\n", "")}
         |$body

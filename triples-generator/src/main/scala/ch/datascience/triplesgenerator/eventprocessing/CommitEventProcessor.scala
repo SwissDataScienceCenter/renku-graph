@@ -31,7 +31,7 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{IOTriplesCurator, TriplesCurator}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{GraphCurator, IOGraphCurator, IOTriplesCurator, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.GenerationResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
@@ -49,6 +49,7 @@ private trait EventProcessor[Interpretation[_]] {
 
 private class CommitEventProcessor[Interpretation[_]](
     accessTokenFinder:     AccessTokenFinder[Interpretation],
+    graphCurator:          GraphCurator[Interpretation],
     triplesGenerator:      TriplesGenerator[Interpretation],
     triplesCurator:        TriplesCurator[Interpretation],
     uploader:              Uploader[Interpretation],
@@ -101,8 +102,10 @@ private class CommitEventProcessor[Interpretation[_]](
         }
       case Triples(rawTriples) =>
         for {
-          curatedTriples <- curate(commit, rawTriples)
-          result         <- right[ProcessingRecoverableError](upload(curatedTriples) map toUploadingResult(commit))
+          curatedTriples      <- curate(commit, rawTriples)
+          graphCuratedTriples <- graphCurator.curate(commit, rawTriples)
+          result <-
+            right[ProcessingRecoverableError](upload(curatedTriples, graphCuratedTriples) map toUploadingResult(commit))
         } yield result
     }
   }.value map (_.fold(toRecoverableError(commit), identity)) recoverWith nonRecoverableFailure(commit)
@@ -255,11 +258,13 @@ private object IOCommitEventProcessor {
       uploader              <- IOUploader(logger, timeRecorder)
       accessTokenFinder     <- IOAccessTokenFinder(logger)
       triplesCurator        <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)
+      graphCurator          <- IOGraphCurator(gitLabThrottler, logger, timeRecorder)
       eventStatusUpdater    <- IOEventStatusUpdater(logger)
       eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
       executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
     } yield new CommitEventProcessor(
       accessTokenFinder,
+      graphCurator,
       triplesGenerator,
       triplesCurator,
       uploader,

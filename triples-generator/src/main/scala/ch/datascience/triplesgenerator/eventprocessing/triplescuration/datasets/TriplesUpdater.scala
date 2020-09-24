@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 package datasets
 
 import ch.datascience.graph.Schemas._
-import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.rdfstore.{GraphQuery, JsonLDTriples}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
 import io.circe.Json
 import io.circe.optics.JsonOptics._
@@ -33,10 +33,10 @@ import scala.language.higherKinds
 
 private class TriplesUpdater {
 
-  def mergeTopmostDataIntoTriples[Interpretation[_]](
-      curatedTriples: CuratedTriples[Interpretation],
+  def mergeTopmostDataIntoTriples[Interpretation[_], Q <: GraphQuery](
+      curatedTriples: CuratedTriples[Interpretation, Q],
       topmostData:    TopmostData
-  ): CuratedTriples[Interpretation] =
+  ): CuratedTriples[Interpretation, Q] =
     curatedTriples.copy(
       triples = JsonLDTriples(Plated.transform(updateDataset(topmostData))(curatedTriples.triples.value))
     )

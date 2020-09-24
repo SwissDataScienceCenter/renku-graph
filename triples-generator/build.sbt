@@ -18,5 +18,6 @@
 
 name := "triples-generator"
 
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
-libraryDependencies += "com.lihaoyi"    %% "ammonite-ops"   % "2.2.0"
+libraryDependencies += "ch.qos.logback"   % "logback-classic"   % "1.2.3"
+libraryDependencies += "com.lihaoyi"     %% "ammonite-ops"      % "2.2.0"
+libraryDependencies += "org.neo4j.driver" % "neo4j-java-driver" % "4.1.1"

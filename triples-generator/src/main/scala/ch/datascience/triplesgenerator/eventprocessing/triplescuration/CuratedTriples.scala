@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import cats.MonadError
 import cats.data.EitherT
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
+import ch.datascience.rdfstore.{CypherQuery, GraphQuery, JsonLDTriples, SparqlQuery}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import eu.timepit.refined.api.Refined
@@ -28,27 +28,28 @@ import eu.timepit.refined.collection.NonEmpty
 
 import scala.language.higherKinds
 
-final case class CuratedTriples[Interpretation[_]](triples:       JsonLDTriples,
-                                                   updatesGroups: List[CurationUpdatesGroup[Interpretation]]
+final case class CuratedTriples[Interpretation[_], Q <: GraphQuery](
+    triples:       JsonLDTriples,
+    updatesGroups: List[CurationUpdatesGroup[Interpretation, Q]]
 )
 
 object CuratedTriples {
-  private[eventprocessing] type GeneratedQueries[Interpretation[_]] =
-    EitherT[Interpretation, ProcessingRecoverableError, List[SparqlQuery]]
+  private[eventprocessing] type GeneratedQueries[Interpretation[_], Q <: GraphQuery] =
+    EitherT[Interpretation, ProcessingRecoverableError, List[Q]]
 
-  final case class CurationUpdatesGroup[Interpretation[_]](
+  final case class CurationUpdatesGroup[Interpretation[_], Q <: GraphQuery](
       name:           String Refined NonEmpty,
-      queryGenerator: () => GeneratedQueries[Interpretation]
+      queryGenerator: () => GeneratedQueries[Interpretation, Q]
   ) {
-    def generateUpdates(): GeneratedQueries[Interpretation] = queryGenerator()
+    def generateUpdates(): GeneratedQueries[Interpretation, Q] = queryGenerator()
   }
 
   object CurationUpdatesGroup {
-    def apply[Interpretation[_]](
+    def apply[Interpretation[_], Q <: GraphQuery](
         name:          String Refined NonEmpty,
-        sparqlQueries: SparqlQuery*
-    )(implicit ME:     MonadError[Interpretation, Throwable]): CurationUpdatesGroup[Interpretation] =
-      CurationUpdatesGroup[Interpretation](
+        sparqlQueries: Q*
+    )(implicit ME:     MonadError[Interpretation, Throwable]): CurationUpdatesGroup[Interpretation, Q] =
+      CurationUpdatesGroup[Interpretation, Q](
         name,
         () => EitherT.rightT[Interpretation, ProcessingRecoverableError](sparqlQueries.toList)
       )
