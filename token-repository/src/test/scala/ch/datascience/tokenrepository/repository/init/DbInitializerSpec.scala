@@ -41,7 +41,7 @@ class DbInitializerSpec extends AnyWordSpec with InMemoryProjectsTokensDb with M
         .expects()
         .returning(IO.unit)
 
-      dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
+      dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
       tableExists() shouldBe true
 
@@ -57,7 +57,7 @@ class DbInitializerSpec extends AnyWordSpec with InMemoryProjectsTokensDb with M
         .expects()
         .returning(IO.unit)
 
-      dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
+      dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
       tableExists() shouldBe true
 
@@ -75,7 +75,7 @@ class DbInitializerSpec extends AnyWordSpec with InMemoryProjectsTokensDb with M
         .returning(IO raiseError exception)
 
       intercept[Exception] {
-        dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
+        dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
       } shouldBe exception
 
       logger.loggedOnly(Error("Projects Tokens database initialization failure", exception))

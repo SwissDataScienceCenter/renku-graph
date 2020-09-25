@@ -59,7 +59,7 @@ class EventsSynchronizationSchedulerSpec
           .returning(context.unit)
           .atLeastOnce()
 
-        IO.suspend(scheduler.run.pure[IO]).start.unsafeRunAsyncAndForget()
+        IO.suspend(scheduler.run().pure[IO]).start.unsafeRunAsyncAndForget()
 
         eventually {
           eventsLoader.callCounter.get() should be > 5

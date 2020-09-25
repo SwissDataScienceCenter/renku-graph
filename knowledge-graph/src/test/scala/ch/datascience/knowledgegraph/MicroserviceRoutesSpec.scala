@@ -78,7 +78,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
 
         val phrase = nonEmptyStrings().generateOne
         val request =
-          Request[IO](Method.GET, uri"knowledge-graph/datasets" withQueryParam (query.parameterName, phrase))
+          Request[IO](Method.GET, uri"knowledge-graph/datasets".withQueryParam(query.parameterName, phrase))
         (datasetsSearchEndpoint
           .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
           .expects(Phrase(phrase).some,

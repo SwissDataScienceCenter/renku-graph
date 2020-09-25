@@ -50,7 +50,7 @@ class IOLatestEventsFetcherSpec extends AnyWordSpec with ExternalServiceStubbing
           .willReturn(okJson(latestProjectCommitsList.asJson.spaces2))
       }
 
-      fetcher.fetchLatestEvents.unsafeRunSync() shouldBe latestProjectCommitsList
+      fetcher.fetchLatestEvents().unsafeRunSync() shouldBe latestProjectCommitsList
     }
 
     "return an empty list if nothing gets fetched from the Event Log" in new TestCase {
@@ -60,7 +60,7 @@ class IOLatestEventsFetcherSpec extends AnyWordSpec with ExternalServiceStubbing
           .willReturn(okJson(Json.arr().spaces2))
       }
 
-      fetcher.fetchLatestEvents.unsafeRunSync() shouldBe Nil
+      fetcher.fetchLatestEvents().unsafeRunSync() shouldBe Nil
     }
 
     "return a RuntimeException if remote client responds with status different than OK" in new TestCase {
@@ -71,7 +71,7 @@ class IOLatestEventsFetcherSpec extends AnyWordSpec with ExternalServiceStubbing
       }
 
       intercept[Exception] {
-        fetcher.fetchLatestEvents.unsafeRunSync()
+        fetcher.fetchLatestEvents().unsafeRunSync()
       }.getMessage shouldBe s"GET $eventLogUrl/events?latest-per-project=true returned ${Status.NotFound}; body: some error"
     }
 
@@ -83,7 +83,7 @@ class IOLatestEventsFetcherSpec extends AnyWordSpec with ExternalServiceStubbing
       }
 
       intercept[Exception] {
-        fetcher.fetchLatestEvents.unsafeRunSync()
+        fetcher.fetchLatestEvents().unsafeRunSync()
       }.getMessage shouldBe s"GET $eventLogUrl/events?latest-per-project=true returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
   }

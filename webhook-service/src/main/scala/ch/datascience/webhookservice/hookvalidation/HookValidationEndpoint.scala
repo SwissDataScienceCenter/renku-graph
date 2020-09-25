@@ -30,6 +30,7 @@ import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidation
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult._
 import ch.datascience.webhookservice.project.ProjectHookUrl
 import ch.datascience.webhookservice.security.AccessTokenExtractor
+import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response, Status}
 
@@ -39,7 +40,8 @@ import scala.util.control.NonFatal
 
 class HookValidationEndpoint[Interpretation[_]: Effect](
     hookValidator:     HookValidator[Interpretation],
-    accessTokenFinder: AccessTokenExtractor[Interpretation]
+    accessTokenFinder: AccessTokenExtractor[Interpretation],
+    logger:            Logger[Interpretation]
 ) extends Http4sDsl[Interpretation] {
 
   import accessTokenFinder._
@@ -62,14 +64,17 @@ class HookValidationEndpoint[Interpretation[_]: Effect](
       Response[Interpretation](Status.Unauthorized)
         .withEntity[ErrorMessage](ErrorMessage(ex))
         .pure[Interpretation]
-    case NonFatal(exception) => InternalServerError(ErrorMessage(exception))
+    case NonFatal(exception) =>
+      logger.error(exception)(exception.getMessage)
+      InternalServerError(ErrorMessage(exception))
   }
 }
 
 object IOHookValidationEndpoint {
   def apply(
       projectHookUrl:  ProjectHookUrl,
-      gitLabThrottler: Throttler[IO, GitLab]
+      gitLabThrottler: Throttler[IO, GitLab],
+      logger:          Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
@@ -79,6 +84,7 @@ object IOHookValidationEndpoint {
       hookValidator <- IOHookValidator(projectHookUrl, gitLabThrottler)
     } yield new HookValidationEndpoint[IO](
       hookValidator,
-      new AccessTokenExtractor[IO]
+      new AccessTokenExtractor[IO],
+      logger
     )
 }

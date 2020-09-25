@@ -46,7 +46,8 @@ import scala.util.control.NonFatal
 
 class HookEventEndpoint[Interpretation[_]: Effect](
     hookTokenCrypto:  HookTokenCrypto[Interpretation],
-    commitToEventLog: CommitToEventLog[Interpretation]
+    commitToEventLog: CommitToEventLog[Interpretation],
+    logger:           Logger[Interpretation]
 )(implicit ME:        MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
@@ -96,7 +97,10 @@ class HookEventEndpoint[Interpretation[_]: Effect](
       Response[Interpretation](Status.Unauthorized)
         .withEntity[ErrorMessage](ErrorMessage(ex))
         .pure[Interpretation]
-    case NonFatal(exception) => InternalServerError(ErrorMessage(exception))
+    case NonFatal(exception) =>
+      logger.error(exception)(exception.getMessage)
+      InternalServerError(ErrorMessage(exception))
+
   }
 }
 
@@ -132,5 +136,5 @@ object IOHookEventEndpoint {
   ): IO[HookEventEndpoint[IO]] =
     for {
       commitToEventLog <- IOCommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
-    } yield new HookEventEndpoint[IO](hookTokenCrypto, commitToEventLog)
+    } yield new HookEventEndpoint[IO](hookTokenCrypto, commitToEventLog, logger)
 }

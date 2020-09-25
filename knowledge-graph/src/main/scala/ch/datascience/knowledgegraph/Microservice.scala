@@ -51,7 +51,7 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      sentryInitializer       <- SentryInitializer[IO]
+      sentryInitializer       <- SentryInitializer[IO]()
       gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
       metricsRegistry         <- MetricsRegistry()
@@ -88,8 +88,8 @@ private class MicroserviceRunner(
 
   def run(args: List[String]): IO[ExitCode] =
     for {
-      _        <- sentryInitializer.run
-      _        <- kgMetrics.run.start
-      exitCode <- httpServer.run
+      _        <- sentryInitializer.run()
+      _        <- kgMetrics.run().start
+      exitCode <- httpServer.run()
     } yield exitCode
 }

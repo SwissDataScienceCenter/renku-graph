@@ -32,7 +32,8 @@ import io.renku.eventlog._
 import scala.language.higherKinds
 
 trait StatsFinder[Interpretation[_]] {
-  def statuses: Interpretation[Map[EventStatus, Long]]
+  def statuses(): Interpretation[Map[EventStatus, Long]]
+
   def countEvents(statuses: Set[EventStatus]): Interpretation[Map[Path, Long]]
 }
 
@@ -44,7 +45,7 @@ class StatsFinderImpl(
     with StatsFinder[IO]
     with TypesSerializers {
 
-  override def statuses: IO[Map[EventStatus, Long]] =
+  override def statuses(): IO[Map[EventStatus, Long]] =
     measureExecutionTime(findStatuses)
       .transact(transactor.get)
       .map(_.toMap)

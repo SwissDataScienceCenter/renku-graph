@@ -144,7 +144,7 @@ class PagingHeadersSpec extends AnyWordSpec with ScalaCheckPropertyChecks with s
     import pagingInfo._
     import pagingInfo.pagingRequest._
 
-    if ((total.value / perPage.value.toFloat).isWhole()) total.value / perPage.value
+    if ((total.value / perPage.value.toFloat).isWhole) total.value / perPage.value
     else total.value / perPage.value + 1
   }
 

@@ -51,8 +51,8 @@ class DeleteTokenEndpointSpec extends AnyWordSpec with MockFactory with should.M
 
       val response = deleteToken(projectId).unsafeRunSync()
 
-      response.status                              shouldBe Status.NoContent
-      response.body.compile.toVector.unsafeRunSync shouldBe empty
+      response.status                                shouldBe Status.NoContent
+      response.body.compile.toVector.unsafeRunSync() shouldBe empty
 
       logger.expectNoLogs()
     }
@@ -72,7 +72,7 @@ class DeleteTokenEndpointSpec extends AnyWordSpec with MockFactory with should.M
       response.status      shouldBe Status.InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
       val expectedMessage = s"Deleting token for projectId: $projectId failed"
-      response.as[Json].unsafeRunSync shouldBe json"""{"message": $expectedMessage}"""
+      response.as[Json].unsafeRunSync() shouldBe json"""{"message": $expectedMessage}"""
 
       logger.loggedOnly(Error(expectedMessage, exception))
     }

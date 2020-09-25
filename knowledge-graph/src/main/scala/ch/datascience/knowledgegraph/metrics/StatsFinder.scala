@@ -30,7 +30,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 trait StatsFinder[Interpretation[_]] {
-  def entitiesCount: Interpretation[Map[KGEntityType, Long]]
+  def entitiesCount(): Interpretation[Map[KGEntityType, Long]]
 }
 
 class StatsFinderImpl(
@@ -47,7 +47,7 @@ class StatsFinderImpl(
 
   import EntityCount._
 
-  override def entitiesCount: IO[Map[KGEntityType, Long]] =
+  override def entitiesCount(): IO[Map[KGEntityType, Long]] =
     for {
       results <- queryExpecting[List[(KGEntityType, Long)]](using = query)
     } yield addMissingStatues(results.toMap)

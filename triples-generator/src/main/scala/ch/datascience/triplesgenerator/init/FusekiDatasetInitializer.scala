@@ -40,7 +40,7 @@ class FusekiDatasetInitializer[Interpretation[_]](
   import datasetExistenceCreator._
   import fusekiAdminConfig._
 
-  def run: Interpretation[Unit] =
+  def run(): Interpretation[Unit] =
     for {
       datasetExists <- doesDatasetExists() recoverWith loggingError
       result        <- createDatasetIfNeeded(datasetExists) recoverWith loggingError

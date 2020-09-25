@@ -69,9 +69,9 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
 
         val response = processEvent(request).unsafeRunSync()
 
-        response.status                        shouldBe Accepted
-        response.contentType                   shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event accepted for processing")
+        response.status                          shouldBe Accepted
+        response.contentType                     shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event accepted for processing")
 
         logger.loggedOnly(
           Info(s"Event $eventId, projectPath = ${commitEvents.head.project.path} -> ${EventSchedulingResult.Accepted}")
@@ -97,9 +97,9 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
 
         val response = processEvent(request).unsafeRunSync()
 
-        response.status                        shouldBe TooManyRequests
-        response.contentType                   shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Too many events under processing")
+        response.status                          shouldBe TooManyRequests
+        response.contentType                     shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Too many events under processing")
 
         logger.expectNoLogs()
       }
@@ -112,9 +112,11 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
 
       val response = processEvent(request).unsafeRunSync()
 
-      response.status                        shouldBe ServiceUnavailable
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Temporarily unavailable: currently re-provisioning")
+      response.status      shouldBe ServiceUnavailable
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage(
+        "Temporarily unavailable: currently re-provisioning"
+      )
 
       logger.expectNoLogs()
     }
@@ -128,9 +130,9 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
 
       val response = processEvent(request).unsafeRunSync()
 
-      response.status                        shouldBe BadRequest
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe ErrorMessage("Event deserialization error")
+      response.status                          shouldBe BadRequest
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Event deserialization error")
 
       logger.expectNoLogs()
     }
@@ -149,9 +151,9 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
 
       val response = processEvent(request).unsafeRunSync()
 
-      response.status                        shouldBe BadRequest
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe ErrorMessage("Event body deserialization error")
+      response.status                          shouldBe BadRequest
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Event body deserialization error")
 
       logger.expectNoLogs()
     }
@@ -174,9 +176,9 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
 
       val response = processEvent(request).unsafeRunSync()
 
-      response.status                 shouldBe InternalServerError
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage("Scheduling Event for processing failed").asJson
+      response.status                   shouldBe InternalServerError
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Scheduling Event for processing failed").asJson
 
       logger.loggedOnly(Error("Scheduling Event for processing failed", exception))
     }

@@ -30,5 +30,5 @@ class IOHttpServer(
     serviceRoutes: HttpRoutes[IO]
 )(implicit timer:  Timer[IO], contextShift: ContextShift[IO], executionContext: ExecutionContext)
     extends HttpServer[IO](serverPort, serviceRoutes) {
-  override def run: IO[ExitCode] = ???
+  override def run(): IO[ExitCode] = ???
 }

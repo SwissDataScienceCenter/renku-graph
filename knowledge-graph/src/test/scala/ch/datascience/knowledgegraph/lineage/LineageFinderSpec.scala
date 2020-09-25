@@ -58,7 +58,7 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
           .expects(trimmedEdgesMap.keySet, projectPath, runPlanIdQuery)
           .returning(lineage.processRunNodes.pure[Try])
 
-        val nodesSet = trimmedEdgesMap.mapValues { case (s, t) => s ++ t }.values.toSet.flatten
+        val nodesSet = trimmedEdgesMap.view.mapValues { case (s, t) => s ++ t }.values.toSet.flatten
         (nodesDetailsFinder
           .findDetails(_: Set[Node.Location], _: projects.Path)(_: (Node.Location, ResourceId) => SparqlQuery))
           .expects(nodesSet, projectPath, locationQuery)
@@ -153,7 +153,7 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
         .expects(trimmedEdgesMap.keySet, projectPath, runPlanIdQuery)
         .returning(lineage.processRunNodes.pure[Try])
 
-      val nodesSet = trimmedEdgesMap
+      val nodesSet = trimmedEdgesMap.view
         .mapValues { case (s, t) => s ++ t }
         .values
         .toSet
@@ -186,7 +186,7 @@ class LineageFinderSpec extends AnyWordSpec with MockFactory with ScalaCheckDriv
         .expects(trimmedEdgesMap.keySet, projectPath, runPlanIdQuery)
         .returning(lineage.processRunNodes.pure[Try])
 
-      val nodesSet = trimmedEdgesMap
+      val nodesSet = trimmedEdgesMap.view
         .mapValues { case (s, t) => s ++ t }
         .values
         .toSet

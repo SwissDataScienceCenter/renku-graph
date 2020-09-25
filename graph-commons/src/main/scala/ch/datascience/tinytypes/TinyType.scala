@@ -25,8 +25,6 @@ import cats.syntax.all._
 import ch.datascience.tinytypes.constraints.PathSegment
 import io.circe.Json
 
-import scala.language.higherKinds
-
 trait TinyType extends Any {
 
   type V

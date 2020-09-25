@@ -44,7 +44,7 @@ object Person {
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Person] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
       entityId(entity.maybeEmail),
-      EntityTypes of (prov / "Person", schema / "Person"),
+      EntityTypes.of(prov / "Person", schema / "Person"),
       schema / "email"       -> entity.maybeEmail.asJsonLD,
       schema / "name"        -> entity.name.asJsonLD,
       rdfs / "label"         -> entity.name.asJsonLD,

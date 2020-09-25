@@ -78,14 +78,14 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
   ): EitherT[IO, ProcessingRecoverableError, Unit] =
     for {
       repositoryUrl <- findRepositoryUrl(commitEvent.project.path, maybeAccessToken).toRight
-      _             <- git clone (repositoryUrl, repoDirectory, workDirectory)
-      _             <- (git checkout (commitEvent.commitId, repoDirectory)).toRight
+      _             <- git.clone(repositoryUrl, repoDirectory, workDirectory)
+      _             <- (git.checkout(commitEvent.commitId, repoDirectory)).toRight
     } yield ()
 
   private def processEvent(commitEvent:   CommitEvent,
                            repoDirectory: Path
   ): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
-    (git findCommitMessage (commitEvent.commitId, repoDirectory)).toRight flatMap {
+    (git.findCommitMessage(commitEvent.commitId, repoDirectory)).toRight flatMap {
       case message if message contains "renku migrate" => rightT[IO, ProcessingRecoverableError](MigrationEvent)
       case _                                           => migrateAndLog(commitEvent, repoDirectory)
     }
@@ -94,7 +94,7 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
                             repoDirectory: Path
   ): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
     for {
-      _       <- (renku migrate (commitEvent, repoDirectory)).toRight
+      _       <- (renku.migrate(commitEvent, repoDirectory)).toRight
       triples <- findTriples(commitEvent, repoDirectory)
     } yield Triples(triples)
 
@@ -131,7 +131,7 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
         (Option(exception.getMessage) -> maybeAccessToken)
           .mapN { (message, token) =>
             if (message contains token.value)
-              new Exception(s"Triples generation failed: ${message replaceAll (token.value, token.toString)}")
+              new Exception(s"Triples generation failed: ${message.replaceAll(token.value, token.toString)}")
             else
               new Exception("Triples generation failed", exception)
           }

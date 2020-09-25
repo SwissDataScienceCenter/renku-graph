@@ -38,8 +38,8 @@ object WaitingEventsGauge {
                  help = "Number of waiting Events by project path.",
                  labelName = "project",
                  resetDataFetch =
-                   () => statsFinder.countEvents(Set(New, RecoverableFailure)).map(_.mapValues(_.toDouble))
+                   () => statsFinder.countEvents(Set(New, RecoverableFailure)).map(_.view.mapValues(_.toDouble).toMap)
                )(metricsRegistry)
-      _ <- gauge.reset
+      _ <- gauge.reset()
     } yield gauge
 }

@@ -35,7 +35,7 @@ class PersistedTokensFinderSpec extends AnyWordSpec with InMemoryProjectsTokensD
 
       insert(projectId, projectPath, encryptedToken)
 
-      finder.findToken(projectId).value.unsafeRunSync shouldBe Some(encryptedToken)
+      finder.findToken(projectId).value.unsafeRunSync() shouldBe Some(encryptedToken)
     }
 
     "return token associated with the projectPath" in new TestCase {
@@ -44,11 +44,11 @@ class PersistedTokensFinderSpec extends AnyWordSpec with InMemoryProjectsTokensD
 
       insert(projectId, projectPath, encryptedToken)
 
-      finder.findToken(projectPath).value.unsafeRunSync shouldBe Some(encryptedToken)
+      finder.findToken(projectPath).value.unsafeRunSync() shouldBe Some(encryptedToken)
     }
 
     "return None if there's no token associated with the projectId" in new TestCase {
-      finder.findToken(projectId).value.unsafeRunSync shouldBe None
+      finder.findToken(projectId).value.unsafeRunSync() shouldBe None
     }
   }
 

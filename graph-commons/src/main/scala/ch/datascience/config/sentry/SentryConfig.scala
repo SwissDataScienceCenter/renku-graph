@@ -25,8 +25,6 @@ import ch.datascience.tinytypes.constraints.{NonBlank, Url, UrlOps}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
 
-import scala.language.higherKinds
-
 final case class SentryConfig(baseUrl: SentryBaseUrl, environmentName: EnvironmentName, serviceName: ServiceName)
 
 object SentryConfig {

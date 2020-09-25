@@ -22,7 +22,6 @@ import cats.syntax.all._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 
 final class RenkuLogTimeout private (val value: FiniteDuration) extends AnyVal with TinyType { type V = FiniteDuration }
 object RenkuLogTimeout extends TinyTypeFactory[RenkuLogTimeout](new RenkuLogTimeout(_)) {

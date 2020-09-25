@@ -61,9 +61,9 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
 
         val response = addEvent(request).unsafeRunSync()
 
-        response.status                        shouldBe Created
-        response.contentType                   shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event created")
+        response.status                          shouldBe Created
+        response.contentType                     shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event created")
 
         logger.loggedOnly(Info(s"Event ${event.compoundEventId}, projectPath = ${event.project.path} added"))
       }
@@ -82,9 +82,9 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
 
         val response = addEvent(request).unsafeRunSync()
 
-        response.status                        shouldBe Ok
-        response.contentType                   shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Event existed")
+        response.status                          shouldBe Ok
+        response.contentType                     shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
 
         logger.expectNoLogs()
       }
@@ -98,7 +98,7 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
 
       response.status      shouldBe BadRequest
       response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage(
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
         s"Invalid message body: Could not decode JSON: $payload"
       )
 
@@ -117,9 +117,9 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
 
       val response = addEvent(request).unsafeRunSync()
 
-      response.status                 shouldBe InternalServerError
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage("Event creation failed").asJson
+      response.status                   shouldBe InternalServerError
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Event creation failed").asJson
 
       logger.loggedOnly(Error("Event creation failed", exception))
     }

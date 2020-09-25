@@ -66,7 +66,7 @@ class ProjectDatasetsEndpointSpec
         response.status      shouldBe Ok
         response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
 
-        response.as[List[Json]].unsafeRunSync should contain theSameElementsAs (datasetsList map toJson)
+        response.as[List[Json]].unsafeRunSync() should contain theSameElementsAs (datasetsList map toJson)
 
         logger.loggedOnly(
           Warn(s"Finding '$projectPath' datasets finished${executionTimeRecorder.executionTimeInfo}")
@@ -84,9 +84,9 @@ class ProjectDatasetsEndpointSpec
 
       val response = getProjectDatasets(projectPath).unsafeRunSync()
 
-      response.status                       shouldBe Ok
-      response.contentType                  shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[List[Json]].unsafeRunSync shouldBe empty
+      response.status                         shouldBe Ok
+      response.contentType                    shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[List[Json]].unsafeRunSync() shouldBe empty
 
       logger.loggedOnly(
         Warn(s"Finding '$projectPath' datasets finished${executionTimeRecorder.executionTimeInfo}")
@@ -106,7 +106,7 @@ class ProjectDatasetsEndpointSpec
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
 
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(s"Finding $projectPath's datasets failed").asJson
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(s"Finding $projectPath's datasets failed").asJson
 
       logger.loggedOnly(Error(s"Finding $projectPath's datasets failed", exception))
     }

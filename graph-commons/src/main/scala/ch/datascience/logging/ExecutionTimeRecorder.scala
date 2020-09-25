@@ -30,9 +30,8 @@ import eu.timepit.refined.collection.NonEmpty
 import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Histogram
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
-import scala.language.higherKinds
 import scala.util.Try
 
 class ExecutionTimeRecorder[Interpretation[_]](

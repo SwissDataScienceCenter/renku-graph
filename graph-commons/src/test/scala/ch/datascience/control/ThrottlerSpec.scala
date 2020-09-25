@@ -28,7 +28,7 @@ import eu.timepit.refined.auto._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -112,11 +112,11 @@ class ThrottlerSpec extends AnyWordSpec with should.Matchers {
                                              taskProcessingTime: Option[FiniteDuration]
     ): IO[Unit] =
       for {
-        _          <- throttler.acquire
+        _          <- throttler.acquire()
         greenLight <- clock.monotonic(MILLISECONDS)
         _          <- context.pure(register.put(name.toString, greenLight))
         _          <- taskProcessingTime.map(timer.sleep) getOrElse IO.unit
-        _          <- throttler.release
+        _          <- throttler.release()
       } yield ()
 
     def tasksStartDelays(startTime: Long) =

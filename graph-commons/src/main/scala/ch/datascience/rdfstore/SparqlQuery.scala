@@ -23,8 +23,6 @@ import ch.datascience.http.rest.paging.PagingRequest
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 
-import scala.language.higherKinds
-
 final case class SparqlQuery(name:               String Refined NonEmpty,
                              prefixes:           Set[String Refined NonEmpty],
                              body:               String,

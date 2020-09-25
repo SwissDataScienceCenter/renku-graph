@@ -58,11 +58,11 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         val event1Id        = compoundEventIds.generateOne.copy(projectId = projectId)
         val event1Body      = eventBodies.generateOne
         val event1BatchDate = batchDates.generateOne
-        storeNewEvent(event1Id, ExecutionDate(now minus (5, SEC)), event1Body, event1BatchDate, projectPath)
+        storeNewEvent(event1Id, ExecutionDate(now.minus(5, SEC)), event1Body, event1BatchDate, projectPath)
 
         val event2Id   = compoundEventIds.generateOne.copy(projectId = projectId)
         val event2Body = eventBodies.generateOne
-        storeNewEvent(event2Id, ExecutionDate(now plus (5, H)), event2Body, projectPath = projectPath)
+        storeNewEvent(event2Id, ExecutionDate(now.plus(5, H)), event2Body, projectPath = projectPath)
 
         val event3Id        = compoundEventIds.generateOne.copy(projectId = projectId)
         val event3Body      = eventBodies.generateOne
@@ -70,7 +70,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         storeEvent(
           event3Id,
           EventStatus.RecoverableFailure,
-          ExecutionDate(now minus (5, H)),
+          ExecutionDate(now.minus(5, H)),
           eventDates.generateOne,
           event3Body,
           batchDate = event3BatchDate,
@@ -82,20 +82,20 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
 
-        eventLogFetch.popEvent.unsafeRunSync() shouldBe Some(event3Id -> event3Body)
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event3Id -> event3Body)
 
         findEvents(EventStatus.Processing) shouldBe List((event3Id, executionDate, event3BatchDate))
 
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
 
-        eventLogFetch.popEvent.unsafeRunSync() shouldBe Some(event1Id -> event1Body)
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
 
         findEvents(EventStatus.Processing) shouldBe List((event1Id, executionDate, event1BatchDate),
                                                          (event3Id, executionDate, event3BatchDate)
         )
 
-        eventLogFetch.popEvent.unsafeRunSync() shouldBe None
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe None
 
         queriesExecTimes.verifyExecutionTimeMeasured("pop event - projects",
                                                      "pop event - oldest",
@@ -113,7 +113,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         storeEvent(
           eventId,
           EventStatus.Processing,
-          ExecutionDate(now minus (maxProcessingTime.toMinutes + 5, MIN)),
+          ExecutionDate(now.minus(maxProcessingTime.toMinutes + 5, MIN)),
           eventDates.generateOne,
           eventBody,
           batchDate = eventBatchDate,
@@ -123,7 +123,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
 
-        eventLogFetch.popEvent.unsafeRunSync() shouldBe Some(eventId -> eventBody)
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(eventId -> eventBody)
 
         findEvents(EventStatus.Processing) shouldBe List((eventId, executionDate, eventBatchDate))
       }
@@ -139,18 +139,18 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
           eventBodies.generateOne
         )
 
-        eventLogFetch.popEvent.unsafeRunSync() shouldBe None
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe None
       }
 
     "return no events when there are no events matching the criteria" in new TestCase {
 
       storeNewEvent(
         compoundEventIds.generateOne,
-        ExecutionDate(now plus (50, H)),
+        ExecutionDate(now.plus(50, H)),
         eventBodies.generateOne
       )
 
-      eventLogFetch.popEvent.unsafeRunSync() shouldBe None
+      eventLogFetch.popEvent().unsafeRunSync() shouldBe None
     }
 
     "return events from various projects " +
@@ -181,7 +181,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
           TestLabeledHistogram[SqlQuery.Name]("query_id")
         )
         eventIdsBodiesDates.toList foreach { _ =>
-          eventLogFetch.popEvent.unsafeRunSync() shouldBe a[Some[_]]
+          eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
         }
 
         val commitEventsByExecutionOrder = findEvents(
@@ -200,7 +200,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         storeEvent(
           CompoundEventId(eventIds.generateOne, project1Id),
           EventStatus.Processing,
-          ExecutionDate(now minus (maxProcessingTime.toMinutes + 1, MIN)),
+          ExecutionDate(now.minus(maxProcessingTime.toMinutes + 1, MIN)),
           eventDates.generateOne,
           eventBodies.generateOne
         )
@@ -209,7 +209,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         storeEvent(
           CompoundEventId(eventIds.generateOne, project2Id),
           EventStatus.New,
-          ExecutionDate(now minus (1, MIN)),
+          ExecutionDate(now.minus(1, MIN)),
           eventDates.generateOne,
           eventBodies.generateOne
         )
@@ -226,7 +226,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         )
         expectWaitingEventsGaugeDecrement(project2Path)
         expectUnderProcessingGaugeIncrement(project2Path)
-        eventLogFetch.popEvent.unsafeRunSync() shouldBe a[Some[_]]
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
 
         findEvents(
           status = Processing,
@@ -257,7 +257,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
     currentTime.expects().returning(now).anyNumberOfTimes()
 
     def executionDateDifferentiated(by: Id, allProjects: NonEmptyList[Id]) =
-      ExecutionDate(now minus (1000 - (allProjects.toList.indexOf(by) * 10), SEC))
+      ExecutionDate(now.minus(1000 - (allProjects.toList.indexOf(by) * 10), SEC))
 
     def expectWaitingEventsGaugeDecrement(projectPath: Path) =
       (waitingEventsGauge.decrement _)

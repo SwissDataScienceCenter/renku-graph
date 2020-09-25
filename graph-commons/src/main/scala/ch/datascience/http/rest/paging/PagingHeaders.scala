@@ -24,8 +24,6 @@ import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Page.first
 import org.http4s.Header
 
-import scala.language.higherKinds
-
 object PagingHeaders {
 
   val Total:      String = "Total"
@@ -52,7 +50,7 @@ object PagingHeaders {
 
   private def totalPages(pagingInfo: PagingInfo): Int = {
     val pages = pagingInfo.total.value / pagingInfo.pagingRequest.perPage.value.toFloat
-    if (pages.isWhole()) pages.toInt else (pages + 1).toInt
+    if (pages.isWhole) pages.toInt else (pages + 1).toInt
   }
 
   private def nextPage(pagingInfo: PagingInfo): Option[Header] =

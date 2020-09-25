@@ -24,8 +24,6 @@ import ch.datascience.config.renku
 import ch.datascience.http.rest.paging.PagingResponse.PagingInfo
 import ch.datascience.http.rest.paging.model.Total
 
-import scala.language.higherKinds
-
 final class PagingResponse[Result] private (val results: List[Result], val pagingInfo: PagingInfo) {
   override lazy val toString: String = s"PagingResponse(pagingInfo: $pagingInfo, results: $results)"
 }

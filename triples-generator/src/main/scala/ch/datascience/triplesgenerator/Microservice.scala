@@ -55,7 +55,7 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      sentryInitializer        <- SentryInitializer[IO]
+      sentryInitializer        <- SentryInitializer[IO]()
       fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
       subscriber               <- Subscriber(ApplicationLogger)
       triplesGeneration        <- TriplesGeneration[IO]()
@@ -100,11 +100,11 @@ private class MicroserviceRunner(
 
   def run(args: List[String]): IO[ExitCode] =
     for {
-      _        <- sentryInitializer.run
-      _        <- datasetInitializer.run
-      _        <- subscriber.run.start.map(gatherCancelToken)
-      _        <- reProvisioning.run.start.map(gatherCancelToken)
-      exitCode <- httpServer.run
+      _        <- sentryInitializer.run()
+      _        <- datasetInitializer.run()
+      _        <- subscriber.run().start.map(gatherCancelToken)
+      _        <- reProvisioning.run().start.map(gatherCancelToken)
+      exitCode <- httpServer.run()
     } yield exitCode
 
   private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {

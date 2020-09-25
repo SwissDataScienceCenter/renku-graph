@@ -86,7 +86,7 @@ private object Commands {
 
   class Git(
       doClone: (ServiceUrl, Path, Path) => CommandResult = (url, destinationDir, workDir) =>
-        %%('git, 'clone, url.toString, destinationDir.toString)(workDir)
+        %%("git", "clone", url.toString, destinationDir.toString)(workDir)
   ) {
     import cats.data.EitherT
     import cats.syntax.all._
@@ -94,12 +94,12 @@ private object Commands {
 
     def checkout(commitId: CommitId, repositoryDirectory: Path): IO[Unit] =
       IO {
-        %%('git, 'checkout, commitId.value)(repositoryDirectory)
+        %%("git", "checkout", commitId.value)(repositoryDirectory)
       }.map(_ => ())
 
     def findCommitMessage(commitId: CommitId, repositoryDirectory: Path): IO[String] =
       IO {
-        %%('git, 'log, "--format=%B", "-n", "1", commitId.value)(repositoryDirectory)
+        %%("git", "log", "--format=%B", "-n", "1", commitId.value)(repositoryDirectory)
       }.map(_.out.string.trim)
 
     def clone(
@@ -142,7 +142,7 @@ private object Commands {
     import scala.util.Try
 
     def migrate(commitEvent: CommitEvent, destinationDirectory: Path): IO[Unit] =
-      IO(%%('renku, 'migrate)(destinationDirectory))
+      IO(%%("renku", "migrate")(destinationDirectory))
         .flatMap(_ => IO.unit)
         .recoverWith { case NonFatal(exception) =>
           IO.raiseError {
@@ -182,25 +182,25 @@ private object Commands {
               triplesAsString <- Try(generateTriples.out.string.trim)
               wrappedTriples  <- JsonLDTriples.parse[Try](triplesAsString)
             } yield callback(Right(Right(wrappedTriples)))
-          } recover {
+          }.recover {
             case NonFatal(ShelloutException(result)) if result.exitCode == 137 =>
               callback(Right(Left(GenerationRecoverableError("Not enough memory"))))
             case NonFatal(exception) =>
               callback(Left(exception))
-          } fold (throw _, identity)
+          }.fold(throw _, identity)
         }
         IO.unit
       }
 
     implicit val commitWithoutParentTriplesFinder: (CommitEventWithoutParent, Path) => CommandResult = {
       case (_, destinationDirectory) =>
-        %%('renku, 'log, "--format", "json-ld", "--strict")(destinationDirectory)
+        %%("renku", "log", "--format", "json-ld", "--strict")(destinationDirectory)
     }
 
     implicit val commitWithParentTriplesFinder: (CommitEventWithParent, Path) => CommandResult = {
       case (commit, destinationDirectory) =>
         val changedFiles = %%(
-          'git,
+          "git",
           "diff-tree",
           "--no-commit-id",
           "--name-only",
@@ -209,8 +209,8 @@ private object Commands {
         )(destinationDirectory).out.lines
 
         %%(
-          'renku,
-          'log,
+          "renku",
+          "log",
           "--format",
           "json-ld",
           "--strict",

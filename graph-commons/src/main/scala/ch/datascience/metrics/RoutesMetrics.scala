@@ -24,8 +24,6 @@ import org.http4s.HttpRoutes
 import org.http4s.metrics.prometheus.{Prometheus, PrometheusExportService}
 import org.http4s.server.middleware.{Metrics => ServerMetrics}
 
-import scala.language.higherKinds
-
 class RoutesMetrics[Interpretation[_]](metricsRegistry: MetricsRegistry[Interpretation]) {
 
   implicit class RoutesOps(routes: HttpRoutes[Interpretation]) {
