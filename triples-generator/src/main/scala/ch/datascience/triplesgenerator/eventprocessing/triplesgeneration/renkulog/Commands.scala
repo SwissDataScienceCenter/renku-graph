@@ -201,10 +201,11 @@ private object Commands {
       case (commit, destinationDirectory) =>
         val changedFiles = %%(
           "git",
-          "diff",
+          "diff-tree",
+          "--no-commit-id",
           "--name-only",
-          "--diff-filter=d",
-          s"${commit.parentId}..HEAD"
+          "-r",
+          commit.commitId.toString
         )(destinationDirectory).out.lines
 
         %%(
@@ -214,7 +215,7 @@ private object Commands {
           "json-ld",
           "--strict",
           "--revision",
-          s"${commit.parentId}..HEAD",
+          s"${commit.parentId}..${commit.commitId}",
           changedFiles
         )(destinationDirectory)
     }
