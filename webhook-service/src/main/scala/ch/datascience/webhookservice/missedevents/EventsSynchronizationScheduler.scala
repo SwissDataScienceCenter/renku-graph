@@ -39,10 +39,10 @@ class EventsSynchronizationScheduler[Interpretation[_]](
   import eventsLoader._
   import schedulerConfigProvider._
 
-  def run: Interpretation[Unit] =
+  def run(): Interpretation[Unit] =
     for {
-      initialDelay <- getInitialDelay
-      interval     <- getInterval
+      initialDelay <- getInitialDelay()
+      interval     <- getInterval()
       _            <- timer sleep initialDelay
       _            <- loadEvents(interval)
     } yield ()

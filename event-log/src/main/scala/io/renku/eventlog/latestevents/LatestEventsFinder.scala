@@ -29,7 +29,7 @@ import io.renku.eventlog.{EventLogDB, EventProject, TypesSerializers}
 import scala.language.higherKinds
 
 trait LatestEventsFinder[Interpretation[_]] {
-  def findAllLatestEvents: Interpretation[List[IdProjectBody]]
+  def findAllLatestEvents(): Interpretation[List[IdProjectBody]]
 }
 
 class LatestEventsFinderImpl(
@@ -43,7 +43,7 @@ class LatestEventsFinderImpl(
   import LatestEventsFinder._
   import eu.timepit.refined.auto._
 
-  override def findAllLatestEvents: IO[List[IdProjectBody]] =
+  override def findAllLatestEvents(): IO[List[IdProjectBody]] =
     measureExecutionTime(findEvents) transact transactor.get
 
   private def findEvents = SqlQuery(

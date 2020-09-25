@@ -42,7 +42,7 @@ class EventsReSchedulerSpec extends AnyWordSpec with ExternalServiceStubbing wit
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
-      sender.triggerEventsReScheduling.unsafeRunSync() shouldBe ((): Unit)
+      sender.triggerEventsReScheduling().unsafeRunSync() shouldBe ((): Unit)
     }
 
     s"fail when posting to Event Log's events/status/NEW results in status different than $Accepted" in new TestCase {
@@ -54,7 +54,7 @@ class EventsReSchedulerSpec extends AnyWordSpec with ExternalServiceStubbing wit
       }
 
       intercept[Exception] {
-        sender.triggerEventsReScheduling.unsafeRunSync()
+        sender.triggerEventsReScheduling().unsafeRunSync()
       }.getMessage shouldBe s"PATCH $eventLogUrl/events returned $BadRequest; body: $message"
     }
   }

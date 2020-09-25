@@ -82,35 +82,35 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     "reflect the state of the re-provisioning status in the DB" in new TestCase {
       reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
 
-      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
+      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
     }
 
     "cache the value of the flag in DB once it's set to false" in new TestCase {
       reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
 
-      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
-      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
+      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
+      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
 
       clearStatus()
-      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe false
+      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
 
       reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
       sleep(cacheRefreshInterval.toMillis - 500)
-      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe false
+      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
 
       sleep(500 + 100)
-      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
+      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
     }
 
     "check if re-provisioning is done and notify availability to event-log" in new TestCase {
-      reProvisioningStatus.setRunning().unsafeRunSync()     shouldBe ((): Unit)
-      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe true
+      reProvisioningStatus.setRunning().unsafeRunSync()       shouldBe ((): Unit)
+      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
 
       clearStatus()
 
       expectNotificationSent
       sleep(statusRefreshInterval.toMillis)
-      reProvisioningStatus.isReProvisioning.unsafeRunSync() shouldBe false
+      reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
     }
   }
 

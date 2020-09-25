@@ -20,11 +20,12 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId, SchemaVersion}
 import ch.datascience.graph.model.users
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.rdfstore.entities.Project
-import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.entities.bundles.fileCommit
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.optics.JsonOptics._
@@ -133,8 +134,6 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
       def getId[T](implicit decoder: Decoder[T], encoder: Encoder[T]): Option[T] =
         root.selectDynamic(property.toString).as[Json].getOption(json).flatMap(_.getId[T])
 
-      def getJson(implicit decoder: Decoder[Json], encoder: Encoder[Json]): Option[Json] =
-        root.selectDynamic(property.toString).as[Json].getOption(json)
     }
 
   }
@@ -163,4 +162,5 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
         List(SchemaVersion(project.version.toString))
       )
   }
+
 }

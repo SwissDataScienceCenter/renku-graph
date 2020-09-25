@@ -57,7 +57,7 @@ class EventProcessingEndpoint[Interpretation[_]: Effect](
   import org.http4s.circe._
 
   def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] =
-    reProvisioningStatus.isReProvisioning flatMap { isReProvisioning =>
+    reProvisioningStatus.isReProvisioning() flatMap { isReProvisioning =>
       if (isReProvisioning) ServiceUnavailable(InfoMessage("Temporarily unavailable: currently re-provisioning"))
       else process(request)
     }

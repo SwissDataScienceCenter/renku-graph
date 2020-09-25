@@ -19,7 +19,7 @@
 package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
+import ch.datascience.generators.Generators.{nonEmptyStrings, relativePaths}
 import ch.datascience.tinytypes.{RelativePathTinyType, TinyTypeFactory}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

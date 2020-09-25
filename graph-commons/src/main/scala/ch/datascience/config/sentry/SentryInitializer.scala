@@ -22,7 +22,6 @@ import cats.MonadError
 import cats.syntax.all._
 import ch.datascience.config.sentry.SentryConfig.SentryBaseUrl
 
-import scala.language.higherKinds
 import scala.util.Try
 
 class SentryInitializer[Interpretation[_]](
@@ -30,7 +29,7 @@ class SentryInitializer[Interpretation[_]](
     initSentry:        String => Unit
 )(implicit ME:         MonadError[Interpretation, Throwable]) {
 
-  def run: Interpretation[Unit] =
+  def run(): Interpretation[Unit] =
     maybeSentryConfig.map(toDsn) match {
       case Some(dsn) => ME.fromTry(Try(initSentry(dsn.toString)))
       case _         => ME.unit

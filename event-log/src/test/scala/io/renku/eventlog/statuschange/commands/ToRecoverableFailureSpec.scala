@@ -80,7 +80,7 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvent(eventId) shouldBe Some((ExecutionDate(now plus (10, MINUTES)), RecoverableFailure, maybeMessage))
+        findEvent(eventId) shouldBe Some((ExecutionDate(now.plus(10, MINUTES)), RecoverableFailure, maybeMessage))
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }

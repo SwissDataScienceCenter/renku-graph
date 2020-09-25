@@ -164,7 +164,7 @@ object RunPlan {
     self =>
     override def convert[T <: Entity with WorkflowRunPlan]: T => Either[Exception, PartialEntity] = { implicit entity =>
       PartialEntity(
-        EntityTypes of (prov / "Plan", renku / "Run"),
+        EntityTypes.of(prov / "Plan", renku / "Run"),
         renku / "hasArguments"  -> entity.runArguments.asJsonLD,
         renku / "hasInputs"     -> entity.runCommandInputs.asJsonLD,
         renku / "hasOutputs"    -> entity.runCommandOutputs.asJsonLD,
@@ -201,7 +201,7 @@ object RunPlan {
     new PartialEntityConverter[Entity with ProcessRunPlan] {
       override def convert[T <: Entity with ProcessRunPlan]: T => Either[Exception, PartialEntity] = { entity =>
         PartialEntity(
-          EntityTypes of (prov / "Plan", renku / "Run"),
+          EntityTypes.of(prov / "Plan", renku / "Run"),
           renku / "command"      -> entity.runCommand.asJsonLD,
           renku / "hasArguments" -> entity.runArguments.asJsonLD,
           renku / "hasInputs"    -> entity.runCommandInputs.asJsonLD,

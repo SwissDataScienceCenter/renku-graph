@@ -28,7 +28,7 @@ import scala.concurrent.ExecutionContext
 import scala.language.higherKinds
 
 private trait EventsReScheduler[Interpretation[_]] {
-  def triggerEventsReScheduling: Interpretation[Unit]
+  def triggerEventsReScheduling(): Interpretation[Unit]
 }
 
 private class IOEventsReScheduler(
@@ -45,7 +45,7 @@ private class IOEventsReScheduler(
   import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
-  override def triggerEventsReScheduling: IO[Unit] =
+  override def triggerEventsReScheduling(): IO[Unit] =
     for {
       uri           <- validateUri(s"$eventLogUrl/events")
       sendingResult <- send(request(PATCH, uri).withEntity(json"""{"status": "NEW"}"""))(mapResponse)

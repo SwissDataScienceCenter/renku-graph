@@ -58,9 +58,9 @@ class LatestEventsEndpointSpec extends AnyWordSpec with MockFactory with should.
 
       val response = findLatestEvents().unsafeRunSync()
 
-      response.status                                shouldBe Ok
-      response.contentType                           shouldBe Some(`Content-Type`(application.json))
-      response.as[List[IdProjectBody]].unsafeRunSync shouldBe idProjectBodyList
+      response.status                                  shouldBe Ok
+      response.contentType                             shouldBe Some(`Content-Type`(application.json))
+      response.as[List[IdProjectBody]].unsafeRunSync() shouldBe idProjectBodyList
 
       logger.expectNoLogs()
     }
@@ -75,9 +75,9 @@ class LatestEventsEndpointSpec extends AnyWordSpec with MockFactory with should.
 
       val response = findLatestEvents().unsafeRunSync()
 
-      response.status                                shouldBe Ok
-      response.contentType                           shouldBe Some(`Content-Type`(application.json))
-      response.as[List[IdProjectBody]].unsafeRunSync shouldBe Nil
+      response.status                                  shouldBe Ok
+      response.contentType                             shouldBe Some(`Content-Type`(application.json))
+      response.as[List[IdProjectBody]].unsafeRunSync() shouldBe Nil
 
       logger.expectNoLogs()
     }
@@ -93,9 +93,9 @@ class LatestEventsEndpointSpec extends AnyWordSpec with MockFactory with should.
 
       val response = findLatestEvents().unsafeRunSync()
 
-      response.status                 shouldBe InternalServerError
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage("Finding all projects latest events failed").asJson
+      response.status                   shouldBe InternalServerError
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Finding all projects latest events failed").asJson
 
       logger.loggedOnly(Error("Finding all projects latest events failed", exception))
     }

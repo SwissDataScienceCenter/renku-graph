@@ -56,7 +56,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
   "routes" should {
 
     "define a GET /events?latest-per-project=true" in new TestCase {
-      val request = Request[IO](GET, uri"events" withQueryParam ("latest-per-project", "true"))
+      val request = Request[IO](GET, uri"events".withQueryParam("latest-per-project", "true"))
       (latestEventsEndpoint.findLatestEvents _).expects().returning(Response[IO](Ok).pure[IO])
 
       val response = routes.call(request)
@@ -75,7 +75,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "define a GET /events?latest-per-project=true " +
       s"returning $BadRequest if latest-per-project parameter has invalid value" in new TestCase {
-        val response = routes call Request[IO](GET, uri"events" withQueryParam ("latest-per-project", "xxx"))
+        val response = routes call Request[IO](GET, uri"events".withQueryParam("latest-per-project", "xxx"))
 
         response.status             shouldBe BadRequest
         response.contentType        shouldBe Some(`Content-Type`(application.json))
@@ -136,7 +136,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     "define a GET /processing-status?project-id=:id endpoint" in new TestCase {
       val projectId = projectIds.generateOne
 
-      val request = Request[IO](GET, uri"processing-status" withQueryParam ("project-id", projectId.toString))
+      val request = Request[IO](GET, uri"processing-status".withQueryParam("project-id", projectId.toString))
       (processingStatusEndpoint.findProcessingStatus _).expects(projectId).returning(Response[IO](Ok).pure[IO])
 
       val response = routes.call(request)
@@ -161,7 +161,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       s"returning $BadRequest if illegal project-id parameter value is given" in new TestCase {
         val projectId = projectIds.generateOne
 
-        val request = Request[IO](GET, uri"processing-status" withQueryParam ("project-id", "non int value"))
+        val request = Request[IO](GET, uri"processing-status".withQueryParam("project-id", "non int value"))
 
         val response = routes.call(request)
 

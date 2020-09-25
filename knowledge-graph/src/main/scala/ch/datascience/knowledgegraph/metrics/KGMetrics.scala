@@ -29,7 +29,7 @@ import scala.language.{higherKinds, postfixOps}
 import scala.util.control.NonFatal
 
 trait KGMetrics[Interpretation[_]] {
-  def run: Interpretation[Unit]
+  def run(): Interpretation[Unit]
 }
 
 class IOKGMetrics(
@@ -41,7 +41,7 @@ class IOKGMetrics(
 )(implicit ME:      MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
     extends KGMetrics[IO] {
 
-  def run: IO[Unit] =
+  def run(): IO[Unit] =
     for {
       _ <- timer sleep initialDelay
       _ <- updateCounts()
@@ -49,7 +49,7 @@ class IOKGMetrics(
 
   private def updateCounts(): IO[Unit] = {
     for {
-      counts <- statsFinder.entitiesCount
+      counts <- statsFinder.entitiesCount()
       _      <- (counts map toCountsGauge).toList.sequence
       _      <- timer sleep countsInterval
       _      <- updateCounts()
@@ -57,7 +57,7 @@ class IOKGMetrics(
   } recoverWith logAndRetry(continueWith = updateCounts())
 
   private lazy val toCountsGauge: ((KGEntityType, Long)) => IO[Unit] = { case (status, count) =>
-    countsGauge set status -> count
+    countsGauge set status -> count.toDouble
   }
 
   private def logAndRetry(continueWith: => IO[Unit]): PartialFunction[Throwable, IO[Unit]] = {

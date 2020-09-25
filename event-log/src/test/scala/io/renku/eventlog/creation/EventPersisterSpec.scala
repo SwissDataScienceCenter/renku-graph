@@ -53,7 +53,7 @@ class EventPersisterSpec
         // storeNewEvent 1
         (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
 
-        persister.storeNewEvent(event).unsafeRunSync shouldBe Created
+        persister.storeNewEvent(event).unsafeRunSync() shouldBe Created
 
         storedEvent(event.compoundEventId) shouldBe (
           event.compoundEventId,
@@ -72,7 +72,7 @@ class EventPersisterSpec
         val nowForEvent2 = Instant.now()
         currentTime.expects().returning(nowForEvent2)
 
-        persister.storeNewEvent(event2).unsafeRunSync shouldBe Created
+        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
 
         val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
         save2Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
@@ -87,7 +87,7 @@ class EventPersisterSpec
         // storeNewEvent 1
         (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
 
-        persister.storeNewEvent(event).unsafeRunSync shouldBe Created
+        persister.storeNewEvent(event).unsafeRunSync() shouldBe Created
 
         findEvents(status = New).head shouldBe (
           event.compoundEventId, ExecutionDate(now), event.batchDate
@@ -100,7 +100,7 @@ class EventPersisterSpec
         val nowForEvent2 = Instant.now()
         currentTime.expects().returning(nowForEvent2)
 
-        persister.storeNewEvent(event2).unsafeRunSync shouldBe Created
+        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
 
         val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
         save2Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
@@ -112,7 +112,7 @@ class EventPersisterSpec
       // Save 1
       (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
 
-      persister.storeNewEvent(event).unsafeRunSync shouldBe Created
+      persister.storeNewEvent(event).unsafeRunSync() shouldBe Created
 
       val save1Event1 +: Nil = findEvents(status = New)
       save1Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
@@ -124,7 +124,7 @@ class EventPersisterSpec
       val nowForEvent2 = Instant.now()
       currentTime.expects().returning(nowForEvent2)
 
-      persister.storeNewEvent(event2).unsafeRunSync shouldBe Created
+      persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
 
       val save2Event1 +: save2Event2 +: Nil = findEvents(status = New)
       save2Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
@@ -135,11 +135,11 @@ class EventPersisterSpec
 
       (waitingEventsGauge.increment _).expects(event.project.path).returning(IO.unit)
 
-      persister.storeNewEvent(event).unsafeRunSync shouldBe Created
+      persister.storeNewEvent(event).unsafeRunSync() shouldBe Created
 
       storedEvent(event.compoundEventId)._1 shouldBe event.compoundEventId
 
-      persister.storeNewEvent(event.copy(body = eventBodies.generateOne)).unsafeRunSync shouldBe Existed
+      persister.storeNewEvent(event.copy(body = eventBodies.generateOne)).unsafeRunSync() shouldBe Existed
 
       storedEvent(event.compoundEventId) shouldBe (
         event.compoundEventId,

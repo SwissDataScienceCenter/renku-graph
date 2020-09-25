@@ -76,7 +76,7 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val value2      = nonNegativeDoubles().generateOne.value
       gauge.set(labelValue2 -> value2) shouldBe ME.unit
 
-      underlying.collectAllSamples should contain only (
+      underlying.collectAllSamples should contain.only(
         (label, labelValue1.value, value1),
         (label, labelValue2.value, value2)
       )
@@ -98,7 +98,7 @@ class LabeledGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers
       val waitingEvents = waitingEventsGen.generateNonEmptyList().toList.flatten.toMap
       resetDataFetch.expects().returning(waitingEvents.pure[Try])
 
-      gauge.reset shouldBe ME.unit
+      gauge.reset() shouldBe ME.unit
 
       underlying.collectAllSamples should contain theSameElementsAs waitingEvents.map { case (labelValue, value) =>
         (label, labelValue.value, value)

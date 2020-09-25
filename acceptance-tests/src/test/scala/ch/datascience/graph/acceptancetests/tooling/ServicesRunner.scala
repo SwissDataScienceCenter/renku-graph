@@ -26,14 +26,15 @@ import ch.datascience.logging.IOLogger
 import ch.datascience.microservices.IOMicroservice
 import org.slf4j.LoggerFactory
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
 
 final case class ServiceRun(name:             String,
                             service:          IOMicroservice,
                             serviceClient:    ServiceClient,
                             preServiceStart:  List[IO[Unit]] = List.empty,
-                            postServiceStart: List[IO[Unit]] = List.empty)
+                            postServiceStart: List[IO[Unit]] = List.empty
+)
 
 class ServicesRunner(
     semaphore:               Semaphore[IO]
@@ -88,21 +89,21 @@ class ServicesRunner(
 
   def restart(service: ServiceRun): Unit = cancelTokens.asScala.get(service) match {
     case None => throw new IllegalStateException(s"'${service.name}' service not found so cannot be restarted")
-    case Some(cancelToken) => {
-      for {
-        _ <- logger.info(s"Service ${service.name} stopping")
-        _ <- service.service.stopSubProcesses.sequence
-        _ <- cancelToken
-        _ <- verifyServiceDown(service)
-        _ = cancelTokens.remove(service)
-        _ <- start(service)
-      } yield ()
-    }.unsafeRunSync()
+    case Some(cancelToken) =>
+      {
+        for {
+          _ <- logger.info(s"Service ${service.name} stopping")
+          _ <- service.service.stopSubProcesses.sequence
+          _ <- cancelToken
+          _ <- verifyServiceDown(service)
+          _ = cancelTokens.remove(service)
+          _ <- start(service)
+        } yield ()
+      }.unsafeRunSync()
   }
 
-  def stopAllServices(): Unit = cancelTokens.asScala.foreach {
-    case (service, cancelToken) =>
-      logger.info(s"Service ${service.name} stopping")
-      cancelToken.unsafeRunSync()
+  def stopAllServices(): Unit = cancelTokens.asScala.foreach { case (service, cancelToken) =>
+    logger.info(s"Service ${service.name} stopping")
+    cancelToken.unsafeRunSync()
   }
 }

@@ -43,7 +43,7 @@ class IOTriplesVersionFinderSpec extends AnyWordSpec with InMemoryRdfStore with 
 
       loadToStore(cliVersionOnTG(currentCliVersion))
 
-      triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe true
+      triplesVersionFinder.triplesUpToDate().unsafeRunSync() shouldBe true
 
       logger.loggedOnly(Warn(s"cli version find finished${executionTimeRecorder.executionTimeInfo}"))
     }
@@ -52,11 +52,11 @@ class IOTriplesVersionFinderSpec extends AnyWordSpec with InMemoryRdfStore with 
 
       loadToStore(cliVersionOnTG(cliVersions.generateOne))
 
-      triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
+      triplesVersionFinder.triplesUpToDate().unsafeRunSync() shouldBe false
     }
 
     "return false if CLI Version cannot be found in the triples store" in new TestCase {
-      triplesVersionFinder.triplesUpToDate.unsafeRunSync() shouldBe false
+      triplesVersionFinder.triplesUpToDate().unsafeRunSync() shouldBe false
     }
   }
 

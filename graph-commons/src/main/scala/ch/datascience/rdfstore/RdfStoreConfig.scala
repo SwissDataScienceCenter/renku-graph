@@ -27,8 +27,6 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
-import scala.language.higherKinds
-
 final case class RdfStoreConfig(
     fusekiBaseUrl:   FusekiBaseUrl,
     datasetName:     DatasetName,

@@ -25,8 +25,7 @@ import doobie.hikari.HikariTransactor
 import doobie.util.ExecutionContexts
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
+import scala.language.postfixOps
 
 class DbTransactorResource[Interpretation[_], TargetDB](
     dbConfig:          DBConfig[TargetDB],

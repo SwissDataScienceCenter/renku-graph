@@ -42,7 +42,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
       addBatchDate()
       checkColumnExists shouldBe true
 
-      batchDateAdder.run.unsafeRunSync() shouldBe ((): Unit)
+      batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
 
       checkColumnExists shouldBe true
 
@@ -63,7 +63,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
       val event2CreatedDate = createdDates.generateOne
       storeEvent(event2, event2CreatedDate)
 
-      batchDateAdder.run.unsafeRunSync() shouldBe ((): Unit)
+      batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
 
       findBatchDates shouldBe Set(BatchDate(event1CreatedDate.value), BatchDate(event2CreatedDate.value))
 

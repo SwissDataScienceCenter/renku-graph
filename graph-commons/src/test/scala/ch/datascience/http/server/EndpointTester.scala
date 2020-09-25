@@ -49,7 +49,7 @@ object EndpointTester {
       lazy val status:      Status                 = runResponse.status
       lazy val contentType: Option[`Content-Type`] = runResponse.contentType
 
-      def body[T](implicit decoder: EntityDecoder[IO, T]): T = runResponse.as[T].unsafeRunSync
+      def body[T](implicit decoder: EntityDecoder[IO, T]): T = runResponse.as[T].unsafeRunSync()
     }
   }
 

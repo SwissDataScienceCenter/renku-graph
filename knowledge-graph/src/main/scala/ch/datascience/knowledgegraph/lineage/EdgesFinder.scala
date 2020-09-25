@@ -58,8 +58,8 @@ private class IOEdgesFinder(
       for {
         edges <- queryExpecting[Set[EdgeData]](queryWithOffset)
         results <- edges match {
-                     case e if e.size < pageSize => (into ++: edges).pure[IO]
-                     case fullPage               => fetchPaginatedResult(into ++: fullPage, using, offset + pageSize)
+                     case e if e.size < pageSize => (into ++ edges).pure[IO]
+                     case fullPage               => fetchPaginatedResult(into ++ fullPage, using, offset + pageSize)
                    }
       } yield results
     }

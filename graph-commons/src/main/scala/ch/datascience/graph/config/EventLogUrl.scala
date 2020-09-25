@@ -25,8 +25,6 @@ import ch.datascience.tinytypes.constraints.{Url, UrlOps}
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
-import scala.language.higherKinds
-
 final class EventLogUrl private (val value: String) extends AnyVal with StringTinyType
 object EventLogUrl extends TinyTypeFactory[EventLogUrl](new EventLogUrl(_)) with Url with UrlOps[EventLogUrl] {
 

@@ -35,10 +35,10 @@ class DbInitializer[Interpretation[_]](
 
   import doobie.implicits._
 
-  def run: Interpretation[Unit] = {
+  def run(): Interpretation[Unit] = {
     for {
       _ <- createTable
-      _ <- projectPathAdder.run
+      _ <- projectPathAdder.run()
       _ <- logger.info("Projects Tokens database initialization success")
     } yield ()
   } recoverWith logging

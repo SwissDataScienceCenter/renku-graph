@@ -149,5 +149,4 @@ object IORdfStoreClient {
   private final implicit case object RdfQuery extends RdfQueryType
   private type RdfQuery = RdfQuery.type
   private final implicit case object RdfUpdate extends RdfQueryType
-  private type RdfUpdate = RdfUpdate.type
 }

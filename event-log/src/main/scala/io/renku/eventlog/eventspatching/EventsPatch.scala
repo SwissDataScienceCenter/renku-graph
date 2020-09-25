@@ -58,7 +58,7 @@ private case class StatusNewPatch[Interpretation[_]](
 
   override def updateGauges(): Interpretation[Unit] =
     for {
-      _ <- waitingEventsGauge.reset
-      _ <- underProcessingGauge.reset
+      _ <- waitingEventsGauge.reset()
+      _ <- underProcessingGauge.reset()
     } yield ()
 }

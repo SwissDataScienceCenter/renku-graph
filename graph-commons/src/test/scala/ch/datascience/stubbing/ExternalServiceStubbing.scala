@@ -44,11 +44,10 @@ trait ExternalServiceStubbing extends BeforeAndAfterEach with BeforeAndAfterAll 
 
   lazy val externalServiceBaseUrl: String = s"http://localhost:${server.port()}"
 
-  override def beforeEach {
+  override def beforeEach(): Unit =
     server.resetAll()
-  }
 
-  override def afterAll {
+  override def afterAll(): Unit = {
     server.stop()
     server.shutdownServer()
   }

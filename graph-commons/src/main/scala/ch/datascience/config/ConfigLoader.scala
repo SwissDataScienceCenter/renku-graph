@@ -25,7 +25,7 @@ import com.typesafe.config.Config
 import pureconfig._
 import pureconfig.error.{CannotConvert, ConfigReaderFailures}
 
-import scala.language.{higherKinds, implicitConversions}
+import scala.language.implicitConversions
 
 abstract class ConfigLoader[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 

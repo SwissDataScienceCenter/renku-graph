@@ -93,9 +93,9 @@ abstract class IORestClient[ThrottlingTarget](
   protected def send[ResultType](request: HttpRequest)(mapResponse: ResponseMapping[ResultType]): IO[ResultType] =
     BlazeClientBuilder[IO](executionContext).resource.use { httpClient =>
       for {
-        _          <- throttler.acquire
+        _          <- throttler.acquire()
         callResult <- measureExecutionTime(callRemote(httpClient, request, mapResponse, attempt = 1), request)
-        _          <- throttler.release
+        _          <- throttler.release()
       } yield callResult
     }
 
@@ -152,7 +152,7 @@ abstract class IORestClient[ThrottlingTarget](
                                  mapResponse: ResponseMapping[T],
                                  attempt:     Int
   ): PartialFunction[Throwable, IO[T]] = {
-    case error: RestClientError => throttler.release flatMap (_ => error.raiseError[IO, T])
+    case error: RestClientError => throttler.release() flatMap (_ => error.raiseError[IO, T])
     case NonFatal(cause) =>
       cause match {
         case exception: ConnectionFailure if attempt <= maxRetries.value =>
@@ -162,7 +162,7 @@ abstract class IORestClient[ThrottlingTarget](
             result <- callRemote(httpClient, request, mapResponse, attempt + 1)
           } yield result
         case other =>
-          throttler.release flatMap (_ =>
+          throttler.release() flatMap (_ =>
             ConnectivityException(LogMessage(request.request, other), other).raiseError[IO, T]
           )
       }

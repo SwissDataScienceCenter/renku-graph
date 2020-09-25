@@ -22,8 +22,6 @@ import cats.MonadError
 import cats.syntax.all._
 import ch.datascience.http.rest.paging.model.Total
 
-import scala.language.higherKinds
-
 trait Paging[Interpretation[_], Result] {
 
   import Paging.PagedResultsFinder

@@ -29,7 +29,7 @@ final class SubscriberUrl private (val value: String) extends AnyVal with String
 object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url
 
 private trait SubscriptionUrlFinder[Interpretation[_]] {
-  def findSubscriberUrl: Interpretation[SubscriberUrl]
+  def findSubscriberUrl(): Interpretation[SubscriberUrl]
 }
 
 private class SubscriptionUrlFinderImpl[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable])
@@ -37,9 +37,9 @@ private class SubscriptionUrlFinderImpl[Interpretation[_]]()(implicit ME: MonadE
 
   import java.net.NetworkInterface
   import cats.syntax.all._
-  import scala.collection.JavaConverters._
+  import scala.jdk.CollectionConverters._
 
-  override def findSubscriberUrl: Interpretation[SubscriberUrl] =
+  override def findSubscriberUrl(): Interpretation[SubscriberUrl] =
     findAddress flatMap {
       case None =>
         new Exception("Cannot find service IP").raiseError[Interpretation, SubscriberUrl]

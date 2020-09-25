@@ -45,9 +45,9 @@ class LatestEventsEndpoint[Interpretation[_]: Effect](
   import latestEventsFinder._
   import org.http4s.circe._
 
-  def findLatestEvents: Interpretation[Response[Interpretation]] = {
+  def findLatestEvents(): Interpretation[Response[Interpretation]] = {
     for {
-      latestEvents <- findAllLatestEvents
+      latestEvents <- findAllLatestEvents()
       response     <- Ok(latestEvents.asJson)
     } yield response
   } recoverWith internalServerError

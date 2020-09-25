@@ -39,9 +39,9 @@ object UnderProcessingGauge {
                  help = "Number of Events under processing by project path.",
                  labelName = "project",
                  resetDataFetch =
-                   () => statsFinder.countEvents(Set(Processing: EventStatus)).map(_.mapValues(_.toDouble))
+                   () => statsFinder.countEvents(Set(Processing: EventStatus)).map(_.view.mapValues(_.toDouble).toMap)
                )(metricsRegistry)
-      _ <- gauge.reset
+      _ <- gauge.reset()
     } yield gauge
 
 }

@@ -110,8 +110,8 @@ class QuerySchemaSpec
       {
         "data": {
           "lineage": {
-            "nodes": ${Json.arr(lineage.nodes.map(toJson).to[List]: _*)},
-            "edges": ${Json.arr(lineage.edges.map(toJson).to[List]: _*)}
+            "nodes": ${Json.arr(lineage.nodes.map(toJson).toList: _*)},
+            "edges": ${Json.arr(lineage.edges.map(toJson).toList: _*)}
           }
         }
       }"""

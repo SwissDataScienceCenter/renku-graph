@@ -44,7 +44,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
   "entitiesCount" should {
 
     "return zero if there are no entity in the DB" in new TestCase {
-      stats.entitiesCount.unsafeRunSync() shouldBe KGEntityType.all.map(entityType => entityType -> 0).toMap
+      stats.entitiesCount().unsafeRunSync() shouldBe KGEntityType.all.map(entityType => entityType -> 0).toMap
     }
 
     "return info about number of objects by types" in new TestCase {
@@ -72,7 +72,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
 
       loadToStore(datasetsJsons ++ processRunsJsons ++ workflowsJsons: _*)
 
-      stats.entitiesCount.unsafeRunSync() shouldBe entitiesWithWorkflows
+      stats.entitiesCount().unsafeRunSync() shouldBe entitiesWithWorkflows
     }
   }
 

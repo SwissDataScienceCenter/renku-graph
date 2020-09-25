@@ -50,9 +50,9 @@ class HttpServerSpec extends AnyWordSpec with Http4sDsl[IO] with should.Matchers
 
       val response = execute(Request[IO](Method.GET, baseUri / "non-existing"))
 
-      response.status                 shouldBe Status.NotFound
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe json"""{"message": "Resource not found"}"""
+      response.status                   shouldBe Status.NotFound
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Resource not found"}"""
     }
   }
 
@@ -73,5 +73,5 @@ class HttpServerSpec extends AnyWordSpec with Http4sDsl[IO] with should.Matchers
   private val routes = HttpRoutes.of[IO] { case GET -> Root / "resource" =>
     Ok("response")
   }
-  new HttpServer[IO](port.value, routes).run.unsafeRunAsyncAndForget()
+  new HttpServer[IO](port.value, routes).run().unsafeRunAsyncAndForget()
 }

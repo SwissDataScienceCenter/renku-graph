@@ -20,6 +20,6 @@ package ch.datascience.db
 
 import doobie.util.transactor.Transactor
 
-import scala.language.{existentials, higherKinds}
+import scala.language.existentials
 
 case class DbTransactor[Interpretation[_], TargetDB](get: Transactor.Aux[Interpretation, _])

@@ -56,7 +56,7 @@ private object CliVersionFinder {
     import cats.syntax.all._
 
     for {
-      versionAsString <- ME.fromTry(Try(%%('renku, "--version")(pwd).out.string.trim))
+      versionAsString <- ME.fromTry(Try(%%("renku", "--version")(pwd).out.string.trim))
       version         <- ME.fromEither(CliVersion.from(versionAsString))
     } yield version
   }

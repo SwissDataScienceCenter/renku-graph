@@ -39,9 +39,11 @@ import scala.concurrent.duration._
 import scala.language.{higherKinds, postfixOps}
 
 trait ReProvisioningStatus[Interpretation[_]] {
-  def isReProvisioning: Interpretation[Boolean]
-  def setRunning():     Interpretation[Unit]
-  def clear():          Interpretation[Unit]
+  def isReProvisioning(): Interpretation[Boolean]
+
+  def setRunning(): Interpretation[Unit]
+
+  def clear(): Interpretation[Unit]
 }
 
 private class ReProvisioningStatusImpl(
@@ -76,7 +78,7 @@ private class ReProvisioningStatusImpl(
   override def clear(): IO[Unit] =
     for {
       _ <- deleteFromDb()
-      _ <- subscriber.notifyAvailability
+      _ <- subscriber.notifyAvailability()
     } yield ()
 
   private def deleteFromDb() = updateWithNoResult {
@@ -92,7 +94,7 @@ private class ReProvisioningStatusImpl(
     )
   }
 
-  override def isReProvisioning: IO[Boolean] =
+  override def isReProvisioning(): IO[Boolean] =
     for {
       isCacheExpired <- isCacheExpired
       flag <- if (isCacheExpired) fetchStatus flatMap {
@@ -128,7 +130,7 @@ private class ReProvisioningStatusImpl(
              case Some(Running) => periodicStatusCheck
              case _ =>
                runningStatusCheckStarted set false
-               subscriber.notifyAvailability
+               subscriber.notifyAvailability()
            }
     } yield ()
 

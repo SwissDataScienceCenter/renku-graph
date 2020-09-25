@@ -60,9 +60,9 @@ class EventsPatchingEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
       patch.value.getClass shouldBe StatusNewPatch(waitingEventsGauge, underProcessingGauge).getClass
 
-      response.status                        shouldBe Accepted
-      response.contentType                   shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Events patching triggered")
+      response.status                          shouldBe Accepted
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Events patching triggered")
 
       logger.expectNoLogs()
     }
@@ -78,9 +78,9 @@ class EventsPatchingEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
       val response = triggerEventsPatching(request).unsafeRunSync()
 
-      response.status                        shouldBe Accepted
-      response.contentType                   shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[InfoMessage].unsafeRunSync shouldBe InfoMessage("Events patching triggered")
+      response.status                          shouldBe Accepted
+      response.contentType                     shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Events patching triggered")
 
       logger.expectNoLogs()
     }
@@ -94,7 +94,7 @@ class EventsPatchingEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
       response.status      shouldBe BadRequest
       response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage(
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
         s"Invalid message body: Could not decode JSON: $payload"
       )
 
@@ -110,7 +110,7 @@ class EventsPatchingEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
       response.status      shouldBe BadRequest
       response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync shouldBe ErrorMessage(
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
         s"Patching events to '$status' status unsupported"
       )
 

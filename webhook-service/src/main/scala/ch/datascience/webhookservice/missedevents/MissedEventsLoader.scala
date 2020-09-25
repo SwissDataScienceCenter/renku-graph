@@ -65,7 +65,7 @@ private class IOMissedEventsLoader(
   def loadMissedEvents: IO[Unit] =
     measureExecutionTime {
       for {
-        latestLogEvents <- fetchLatestEvents
+        latestLogEvents <- fetchLatestEvents()
         updateSummary <- if (latestLogEvents.isEmpty) IO.pure(UpdateSummary())
                          else (latestLogEvents map loadEvents).sequence map toUpdateSummary
       } yield updateSummary
@@ -133,7 +133,7 @@ private class IOMissedEventsLoader(
   }
 
   private def toUpdateSummary(updateResults: List[UpdateResult]) = UpdateSummary(
-    updateResults.groupBy(identity).mapValues(_.size)
+    updateResults.groupBy(identity).view.mapValues(_.size).toMap
   )
 }
 

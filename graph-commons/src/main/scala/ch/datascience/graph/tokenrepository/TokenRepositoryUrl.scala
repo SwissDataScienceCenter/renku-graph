@@ -25,8 +25,6 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
-import scala.language.higherKinds
-
 final class TokenRepositoryUrl private (val value: String) extends AnyVal with StringTinyType
 object TokenRepositoryUrl
     extends TinyTypeFactory[TokenRepositoryUrl](new TokenRepositoryUrl(_))

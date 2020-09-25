@@ -24,7 +24,7 @@ import io.prometheus.client.{Gauge => LibGauge}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 class MetricsRegistrySpec extends AnyWordSpec with should.Matchers {
 

@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes.constraints
 
-import ch.datascience.generators.Generators._
+import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

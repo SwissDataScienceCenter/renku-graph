@@ -22,8 +22,6 @@ import cats.MonadError
 import ch.datascience.tinytypes.constraints.{BaseUrl, Url, UrlOps}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-import scala.language.{higherKinds, implicitConversions}
-
 object renku {
 
   class ResourcesUrl private (val value: String) extends AnyVal with StringTinyType

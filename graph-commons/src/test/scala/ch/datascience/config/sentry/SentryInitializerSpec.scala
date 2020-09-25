@@ -44,12 +44,12 @@ class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Mat
           s"environment=${urlEncode(sentryConfig.environmentName.toString)}"
       }
 
-      sentryInitializer(Some(sentryConfig)).run shouldBe context.unit
+      sentryInitializer(Some(sentryConfig)).run() shouldBe context.unit
     }
 
     "do nothing if no config given" in new TestCase {
       val maybeConfig = None
-      sentryInitializer(maybeConfig).run shouldBe context.unit
+      sentryInitializer(maybeConfig).run() shouldBe context.unit
     }
 
     "fail if Sentry initialisation fails" in new TestCase {
@@ -58,7 +58,7 @@ class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Mat
       val exception = exceptions.generateOne
       initSentry.expects(*).throwing(exception)
 
-      sentryInitializer(Some(sentryConfig)).run shouldBe context.raiseError(exception)
+      sentryInitializer(Some(sentryConfig)).run() shouldBe context.raiseError(exception)
     }
   }
 

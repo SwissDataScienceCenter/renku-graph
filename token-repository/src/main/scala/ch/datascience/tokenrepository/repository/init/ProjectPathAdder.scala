@@ -34,7 +34,7 @@ import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private trait ProjectPathAdder[Interpretation[_]] {
-  def run: Interpretation[Unit]
+  def run(): Interpretation[Unit]
 }
 
 private class IOProjectPathAdder(
@@ -49,7 +49,7 @@ private class IOProjectPathAdder(
   import accessTokenCrypto._
   import pathFinder._
 
-  def run: IO[Unit] =
+  def run(): IO[Unit] =
     checkColumnExists flatMap {
       case true  => logger.info("'project_path' column exists")
       case false => addColumn()

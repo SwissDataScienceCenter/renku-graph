@@ -27,8 +27,6 @@ import eu.timepit.refined.collection.NonEmpty
 import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Histogram
 
-import scala.language.higherKinds
-
 class SparqlQueryTimeRecorder[Interpretation[_]](val instance: ExecutionTimeRecorder[Interpretation])
 
 object SparqlQueryTimeRecorder {

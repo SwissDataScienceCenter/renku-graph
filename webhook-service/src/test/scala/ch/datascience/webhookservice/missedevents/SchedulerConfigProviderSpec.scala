@@ -24,7 +24,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Try
@@ -34,13 +34,13 @@ class SchedulerConfigProviderSpec extends AnyWordSpec with should.Matchers {
   "getInitialDelay" should {
 
     "return value from events-synchronization.initial-delay" in new TestCase {
-      configLoader.getInitialDelay shouldBe context.pure(10 minutes)
+      configLoader.getInitialDelay() shouldBe context.pure(10 minutes)
     }
   }
 
   "getInterval" should {
     "return value from events-synchronization.interval" in new TestCase {
-      configLoader.getInterval shouldBe context.pure(2 hours)
+      configLoader.getInterval() shouldBe context.pure(2 hours)
     }
   }
 

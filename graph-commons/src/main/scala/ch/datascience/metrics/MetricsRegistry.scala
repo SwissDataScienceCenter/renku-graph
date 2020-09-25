@@ -22,7 +22,6 @@ import cats.MonadError
 import io.prometheus.client.hotspot._
 import io.prometheus.client.{CollectorRegistry, SimpleCollector}
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 trait MetricsRegistry[Interpretation[_]] {

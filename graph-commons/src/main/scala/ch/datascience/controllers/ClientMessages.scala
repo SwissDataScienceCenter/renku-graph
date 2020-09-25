@@ -26,8 +26,6 @@ import io.circe._
 import org.http4s.EntityEncoder
 import org.http4s.circe.jsonEncoderOf
 
-import scala.language.higherKinds
-
 object ErrorMessage {
 
   type ErrorMessage = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]

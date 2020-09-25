@@ -40,7 +40,7 @@ class ProjectPathAdderSpec extends AnyWordSpec with DbInitSpec with should.Match
       addProjectPath()
       checkColumnExists shouldBe true
 
-      projectPathAdder.run.unsafeRunSync() shouldBe ((): Unit)
+      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
 
       checkColumnExists shouldBe true
 
@@ -59,7 +59,7 @@ class ProjectPathAdderSpec extends AnyWordSpec with DbInitSpec with should.Match
       val event2 = events.generateOne
       storeEvent(event2)
 
-      projectPathAdder.run.unsafeRunSync() shouldBe ((): Unit)
+      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
 
       findProjectPaths shouldBe Set(event1.project.path, event2.project.path)
 

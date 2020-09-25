@@ -45,7 +45,7 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, ProjectsTokensDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
-        sentryInitializer      <- SentryInitializer[IO]
+        sentryInitializer      <- SentryInitializer[IO]()
         fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, ApplicationLogger)
         associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, ApplicationLogger)
         dbInitializer          <- IODbInitializer(transactor, ApplicationLogger)
@@ -78,8 +78,8 @@ private class MicroserviceRunner(
 
   def run(args: List[String]): IO[ExitCode] =
     for {
-      _      <- sentryInitializer.run
-      _      <- dbInitializer.run
-      result <- httpServer.run
+      _      <- sentryInitializer.run()
+      _      <- dbInitializer.run()
+      result <- httpServer.run()
     } yield result
 }

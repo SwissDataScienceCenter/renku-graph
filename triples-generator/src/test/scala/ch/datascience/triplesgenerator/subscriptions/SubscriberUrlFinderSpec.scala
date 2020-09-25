@@ -25,7 +25,7 @@ import ch.datascience.triplesgenerator.Microservice
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 class SubscriberUrlFinderSpec extends AnyWordSpec with should.Matchers {
@@ -33,7 +33,7 @@ class SubscriberUrlFinderSpec extends AnyWordSpec with should.Matchers {
   "findSubscriberUrl" should {
 
     "return host IP" in new TestCase {
-      finder.findSubscriberUrl shouldBe SubscriberUrl(
+      finder.findSubscriberUrl() shouldBe SubscriberUrl(
         s"http:/$findAddress:${Microservice.ServicePort}/events"
       ).pure[Try]
     }

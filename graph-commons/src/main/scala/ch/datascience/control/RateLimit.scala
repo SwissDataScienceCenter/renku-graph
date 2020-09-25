@@ -27,8 +27,8 @@ import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.numeric.Positive
 
 import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
 import scala.util.Try
+import scala.language.postfixOps
 
 case class RateLimit[Target](items: Long Refined Positive, per: RateLimitUnit) {
   import RateLimitUnit._

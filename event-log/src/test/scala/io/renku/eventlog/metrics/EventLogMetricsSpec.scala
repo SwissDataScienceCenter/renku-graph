@@ -68,7 +68,7 @@ class EventLogMetricsSpec
         .returning(IO.unit)
         .atLeastOnce()
 
-      metrics.run.unsafeRunAsyncAndForget()
+      metrics.run().unsafeRunAsyncAndForget()
 
       sleep(1000)
 
@@ -99,7 +99,7 @@ class EventLogMetricsSpec
         .returning(IO.unit)
         .atLeastOnce()
 
-      metrics.run.start.unsafeRunAsyncAndForget()
+      metrics.run().start.unsafeRunAsyncAndForget()
 
       sleep(1000)
 

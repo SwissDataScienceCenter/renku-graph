@@ -73,7 +73,7 @@ class DatasetsSearchEndpointSpec
         response.headers.toList should contain allElementsOf PagingHeaders.from(pagingResponse)
         response
           .as[List[Json]]
-          .unsafeRunSync should contain theSameElementsAs (pagingResponse.results map toJson)
+          .unsafeRunSync() should contain theSameElementsAs (pagingResponse.results map toJson)
 
         logger.loggedOnly(warn(maybePhrase))
         logger.reset()
@@ -90,10 +90,10 @@ class DatasetsSearchEndpointSpec
 
       val response = searchForDatasets(maybePhrase, sort, pagingRequest).unsafeRunSync()
 
-      response.status                       shouldBe Ok
-      response.contentType                  shouldBe Some(`Content-Type`(application.json))
-      response.as[List[Json]].unsafeRunSync shouldBe empty
-      response.headers.toList                 should contain allElementsOf PagingHeaders.from(pagingResponse)
+      response.status                         shouldBe Ok
+      response.contentType                    shouldBe Some(`Content-Type`(application.json))
+      response.as[List[Json]].unsafeRunSync() shouldBe empty
+      response.headers.toList                   should contain allElementsOf PagingHeaders.from(pagingResponse)
 
       logger.loggedOnly(warn(maybePhrase))
     }
@@ -114,7 +114,7 @@ class DatasetsSearchEndpointSpec
         case None         => s"Finding all datasets failed"
       }
 
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(errorMessage).asJson
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(errorMessage).asJson
 
       logger.loggedOnly(Error(errorMessage, exception))
     }

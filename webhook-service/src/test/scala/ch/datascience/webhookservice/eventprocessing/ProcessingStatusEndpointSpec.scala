@@ -66,9 +66,10 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
       val response = fetchProcessingStatus(projectId).unsafeRunSync()
 
-      response.status                 shouldBe Ok
-      response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe json"""{
+      response.status      shouldBe Ok
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.as[Json].unsafeRunSync() shouldBe
+        json"""{
         "done": ${processingStatus.done.value},
         "total": ${processingStatus.total.value},
         "progress": ${processingStatus.progress.value}
@@ -94,9 +95,10 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
         val response = fetchProcessingStatus(projectId).unsafeRunSync()
 
-        response.status                 shouldBe Ok
-        response.contentType            shouldBe Some(`Content-Type`(application.json))
-        response.as[Json].unsafeRunSync shouldBe json"""{
+        response.status      shouldBe Ok
+        response.contentType shouldBe Some(`Content-Type`(application.json))
+        response.as[Json].unsafeRunSync() shouldBe
+          json"""{
         "done": ${0},
         "total": ${0}
       }"""
@@ -111,9 +113,11 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
       val response = fetchProcessingStatus(projectId).unsafeRunSync()
 
-      response.status                 shouldBe NotFound
-      response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe InfoMessage(s"Progress status for project '$projectId' not found").asJson
+      response.status      shouldBe NotFound
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.as[Json].unsafeRunSync() shouldBe InfoMessage(
+        s"Progress status for project '$projectId' not found"
+      ).asJson
     }
 
     "return NOT_FOUND if no Access Token found" in new TestCase {
@@ -125,9 +129,11 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
       val response = fetchProcessingStatus(projectId).unsafeRunSync()
 
-      response.status                 shouldBe NotFound
-      response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe InfoMessage(s"Progress status for project '$projectId' not found").asJson
+      response.status      shouldBe NotFound
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.as[Json].unsafeRunSync() shouldBe InfoMessage(
+        s"Progress status for project '$projectId' not found"
+      ).asJson
     }
 
     "return INTERNAL_SERVER_ERROR when checking if the webhook exists fails" in new TestCase {
@@ -140,9 +146,9 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
       val response = fetchProcessingStatus(projectId).unsafeRunSync()
 
-      response.status                 shouldBe InternalServerError
-      response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception).asJson
+      response.status                   shouldBe InternalServerError
+      response.contentType              shouldBe Some(`Content-Type`(application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(exception).asJson
 
       logger.logged(
         Error(s"Finding progress status for project '$projectId' failed", exception)
@@ -164,9 +170,9 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
       val response = fetchProcessingStatus(projectId).unsafeRunSync()
 
-      response.status                 shouldBe InternalServerError
-      response.contentType            shouldBe Some(`Content-Type`(application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception).asJson
+      response.status                   shouldBe InternalServerError
+      response.contentType              shouldBe Some(`Content-Type`(application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(exception).asJson
 
       logger.logged(
         Error(s"Finding progress status for project '$projectId' failed", exception)

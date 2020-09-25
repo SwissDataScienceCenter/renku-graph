@@ -58,9 +58,9 @@ class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val response = fetchToken(projectId).unsafeRunSync()
 
-      response.status                 shouldBe Status.Ok
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe Json.obj("oauthAccessToken" -> Json.fromString(accessToken.value))
+      response.status                   shouldBe Status.Ok
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe Json.obj("oauthAccessToken" -> Json.fromString(accessToken.value))
 
       logger.expectNoLogs()
     }
@@ -80,9 +80,9 @@ class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val response = fetchToken(projectId).unsafeRunSync()
 
-      response.status                 shouldBe Status.Ok
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe Json.obj("personalAccessToken" -> Json.fromString(accessToken.value))
+      response.status                   shouldBe Status.Ok
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe Json.obj("personalAccessToken" -> Json.fromString(accessToken.value))
 
       logger.expectNoLogs()
     }
@@ -102,9 +102,9 @@ class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val response = fetchToken(projectPath).unsafeRunSync()
 
-      response.status                 shouldBe Status.Ok
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe Json.obj("oauthAccessToken" -> Json.fromString(accessToken.value))
+      response.status                   shouldBe Status.Ok
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe Json.obj("oauthAccessToken" -> Json.fromString(accessToken.value))
 
       logger.expectNoLogs()
     }
@@ -126,7 +126,7 @@ class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Ma
 
       response.status      shouldBe Status.NotFound
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe Json.obj(
+      response.as[Json].unsafeRunSync() shouldBe Json.obj(
         "message" -> Json.fromString(s"Token for project: $projectId not found")
       )
 
@@ -151,7 +151,7 @@ class FetchTokenEndpointSpec extends AnyWordSpec with MockFactory with should.Ma
 
       response.status      shouldBe Status.InternalServerError
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe Json.obj(
+      response.as[Json].unsafeRunSync() shouldBe Json.obj(
         "message" -> Json.fromString(s"Finding token for project: $projectId failed")
       )
 

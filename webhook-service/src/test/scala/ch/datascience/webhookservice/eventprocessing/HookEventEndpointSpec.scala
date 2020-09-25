@@ -64,9 +64,9 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
       val response = processPushEvent(request).unsafeRunSync()
 
-      response.status                 shouldBe Accepted
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe InfoMessage("Event accepted").asJson
+      response.status                   shouldBe Accepted
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe InfoMessage("Event accepted").asJson
     }
 
     "return INTERNAL_SERVER_ERROR when storing push event in the event log fails and log the error" in new TestCase {
@@ -85,9 +85,9 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
       val response = processPushEvent(request).unsafeRunSync()
 
-      response.status                 shouldBe InternalServerError
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(exception).asJson
+      response.status                   shouldBe InternalServerError
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(exception).asJson
 
       logger.loggedOnly(
         Error(exception.getMessage, exception)
@@ -104,7 +104,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
       response.status      shouldBe BadRequest
       response.contentType shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(
         s"Invalid message body: Could not decode JSON: ${Json.obj()}"
       ).asJson
     }
@@ -116,9 +116,9 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
       val response = processPushEvent(request).unsafeRunSync()
 
-      response.status                 shouldBe Unauthorized
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException).asJson
+      response.status                   shouldBe Unauthorized
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(UnauthorizedException).asJson
     }
 
     "return UNAUTHORIZED when user X-Gitlab-Token is invalid" in new TestCase {
@@ -134,9 +134,9 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
       val response = processPushEvent(request).unsafeRunSync()
 
-      response.status                 shouldBe Unauthorized
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException).asJson
+      response.status                   shouldBe Unauthorized
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(UnauthorizedException).asJson
     }
 
     "return UNAUTHORIZED when X-Gitlab-Token decryption fails" in new TestCase {
@@ -153,9 +153,9 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
       val response = processPushEvent(request).unsafeRunSync()
 
-      response.status                 shouldBe Unauthorized
-      response.contentType            shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync shouldBe ErrorMessage(UnauthorizedException).asJson
+      response.status                   shouldBe Unauthorized
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(UnauthorizedException).asJson
     }
   }
 
