@@ -110,19 +110,20 @@ object GraphModelGenerators {
       } yield s"$first.$second/zenodo.$third"
     )
     .map(Identifier.apply)
-  implicit val datasetTitles:         Gen[datasets.Title] = nonEmptyStrings() map datasets.Title.apply
-  implicit val datasetNames:          Gen[datasets.Name]  = nonEmptyStrings() map datasets.Name.apply
-  implicit val datasetDescriptions:   Gen[Description]    = paragraphs() map (_.value) map Description.apply
-  implicit val datasetUrls:           Gen[Url]            = validatedUrls map (_.value) map Url.apply
-  val datasetUrlSameAs:               Gen[UrlSameAs]      = validatedUrls map (_.value) map SameAs.fromUrl map (_.fold(throw _, identity))
-  val datasetIdSameAs:                Gen[IdSameAs]       = validatedUrls map (_.value) map SameAs.fromId map (_.fold(throw _, identity))
-  implicit val datasetSameAs:         Gen[SameAs]         = Gen.oneOf(datasetUrlSameAs, datasetIdSameAs)
-  implicit val datasetTopmostSameAs:  Gen[TopmostSameAs]  = datasetSameAs.map(TopmostSameAs.apply)
-  implicit val datasetDerivedFroms:   Gen[DerivedFrom]    = validatedUrls map (_.value) map DerivedFrom.apply
-  implicit val datasetPublishedDates: Gen[PublishedDate]  = localDatesNotInTheFuture map PublishedDate.apply
-  implicit val datasetCreatedDates:   Gen[DateCreated]    = timestampsNotInTheFuture map DateCreated.apply
-  implicit val datasetKeywords:       Gen[Keyword]        = nonBlankStrings() map (_.value) map Keyword.apply
-  implicit val datasetPartNames:      Gen[PartName]       = nonBlankStrings(minLength = 5) map (v => PartName(v.value))
+  implicit val datasetTitles:              Gen[datasets.Title]     = nonEmptyStrings() map datasets.Title.apply
+  implicit val datasetNames:               Gen[datasets.Name]      = nonEmptyStrings() map datasets.Name.apply
+  implicit val datasetDescriptions:        Gen[Description]        = paragraphs() map (_.value) map Description.apply
+  implicit val datasetUrls:                Gen[Url]                = validatedUrls map (_.value) map Url.apply
+  val datasetUrlSameAs:                    Gen[UrlSameAs]          = validatedUrls map (_.value) map SameAs.fromUrl map (_.fold(throw _, identity))
+  val datasetIdSameAs:                     Gen[IdSameAs]           = validatedUrls map (_.value) map SameAs.fromId map (_.fold(throw _, identity))
+  implicit val datasetSameAs:              Gen[SameAs]             = Gen.oneOf(datasetUrlSameAs, datasetIdSameAs)
+  implicit val datasetTopmostSameAs:       Gen[TopmostSameAs]      = datasetSameAs.map(TopmostSameAs.apply)
+  implicit val datasetDerivedFroms:        Gen[DerivedFrom]        = validatedUrls map (_.value) map DerivedFrom.apply
+  implicit val datasetTopmostDerivedFroms: Gen[TopmostDerivedFrom] = datasetDerivedFroms.map(TopmostDerivedFrom.apply)
+  implicit val datasetPublishedDates:      Gen[PublishedDate]      = localDatesNotInTheFuture map PublishedDate.apply
+  implicit val datasetCreatedDates:        Gen[DateCreated]        = timestampsNotInTheFuture map DateCreated.apply
+  implicit val datasetKeywords:            Gen[Keyword]            = nonBlankStrings() map (_.value) map Keyword.apply
+  implicit val datasetPartNames:           Gen[PartName]           = nonBlankStrings(minLength = 5) map (v => PartName(v.value))
   implicit val datasetPartLocations: Gen[PartLocation] =
     relativePaths(minSegments = 2, maxSegments = 2)
       .map(path => s"data/$path")

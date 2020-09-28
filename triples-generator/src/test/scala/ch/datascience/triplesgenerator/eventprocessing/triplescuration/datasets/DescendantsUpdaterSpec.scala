@@ -22,7 +22,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{Identifier, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
@@ -38,39 +38,39 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
 
     "add update queries for all datasets which topmostSameAs or topmostDerivedFrom points to the given datasetId" in new TestCase {
 
-      val dataset1Id            = datasetIdentifiers.generateOne
-      val dataset1DerivedFrom   = datasetDerivedFroms.generateOne
-      val dataset2Id            = datasetIdentifiers.generateOne
-      val dataset2DerivedFrom   = datasetDerivedFroms.generateOne
-      val dataset3Id            = datasetIdentifiers.generateOne
-      val dataset3TopmostSameAs = datasetTopmostSameAs.generateOne
-      val dataset4Id            = datasetIdentifiers.generateOne
-      val dataset4TopmostSameAs = datasetTopmostSameAs.generateOne
-      val dataset5Id            = datasetIdentifiers.generateOne
-      val dataset5TopmostSameAs = datasetTopmostSameAs.generateOne
-      val dataset5DerivedFrom   = datasetDerivedFroms.generateOne
+      val dataset1Id                 = datasetIdentifiers.generateOne
+      val dataset1TopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
+      val dataset2Id                 = datasetIdentifiers.generateOne
+      val dataset2TopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
+      val dataset3Id                 = datasetIdentifiers.generateOne
+      val dataset3TopmostSameAs      = datasetTopmostSameAs.generateOne
+      val dataset4Id                 = datasetIdentifiers.generateOne
+      val dataset4TopmostSameAs      = datasetTopmostSameAs.generateOne
+      val dataset5Id                 = datasetIdentifiers.generateOne
+      val dataset5TopmostSameAs      = datasetTopmostSameAs.generateOne
+      val dataset5TopmostDerivedFrom = datasetTopmostDerivedFroms.generateOne
       loadToStore(
         nonModifiedDataSetCommit()()(datasetIdentifier = dataset1Id,
-                                     overrideTopmostSameAs = topmostData.sameAs.some,
-                                     overrideTopmostDerivedFrom = dataset1DerivedFrom.some
+                                     overrideTopmostSameAs = topmostData.topmostSameAs.some,
+                                     overrideTopmostDerivedFrom = dataset1TopmostDerivedFrom.some
         ),
         nonModifiedDataSetCommit()()(datasetIdentifier = dataset2Id,
-                                     overrideTopmostSameAs = topmostData.sameAs.some,
-                                     overrideTopmostDerivedFrom = dataset2DerivedFrom.some
+                                     overrideTopmostSameAs = topmostData.topmostSameAs.some,
+                                     overrideTopmostDerivedFrom = dataset2TopmostDerivedFrom.some
         ),
         modifiedDataSetCommit()()(
           datasetIdentifier = dataset3Id,
           overrideTopmostSameAs = dataset3TopmostSameAs.some,
-          overrideTopmostDerivedFrom = DerivedFrom(topmostData.datasetId).some
+          overrideTopmostDerivedFrom = TopmostDerivedFrom(topmostData.datasetId).some
         ),
         modifiedDataSetCommit()()(
           datasetIdentifier = dataset4Id,
           overrideTopmostSameAs = dataset4TopmostSameAs.some,
-          overrideTopmostDerivedFrom = DerivedFrom(topmostData.datasetId).some
+          overrideTopmostDerivedFrom = TopmostDerivedFrom(topmostData.datasetId).some
         ),
         modifiedDataSetCommit()()(datasetIdentifier = dataset5Id,
                                   overrideTopmostSameAs = dataset5TopmostSameAs.some,
-                                  overrideTopmostDerivedFrom = dataset5DerivedFrom.some
+                                  overrideTopmostDerivedFrom = dataset5TopmostDerivedFrom.some
         )
       )
 
@@ -88,11 +88,11 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
         .flatMap(_.runAll)
         .unsafeRunSync()
 
-      findTopmostData(dataset1Id) shouldBe topmostData.sameAs    -> dataset1DerivedFrom
-      findTopmostData(dataset2Id) shouldBe topmostData.sameAs    -> dataset2DerivedFrom
-      findTopmostData(dataset3Id) shouldBe dataset3TopmostSameAs -> topmostData.derivedFrom
-      findTopmostData(dataset4Id) shouldBe dataset4TopmostSameAs -> topmostData.derivedFrom
-      findTopmostData(dataset5Id) shouldBe dataset5TopmostSameAs -> dataset5DerivedFrom
+      findTopmostData(dataset1Id) shouldBe topmostData.topmostSameAs -> dataset1TopmostDerivedFrom
+      findTopmostData(dataset2Id) shouldBe topmostData.topmostSameAs -> dataset2TopmostDerivedFrom
+      findTopmostData(dataset3Id) shouldBe dataset3TopmostSameAs     -> topmostData.topmostDerivedFrom
+      findTopmostData(dataset4Id) shouldBe dataset4TopmostSameAs     -> topmostData.topmostDerivedFrom
+      findTopmostData(dataset5Id) shouldBe dataset5TopmostSameAs     -> dataset5TopmostDerivedFrom
     }
   }
 
@@ -106,10 +106,10 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
   private lazy val topmostDatas = for {
     datasetId   <- entityIds
     sameAs      <- datasetTopmostSameAs
-    derivedFrom <- datasetDerivedFroms
+    derivedFrom <- datasetTopmostDerivedFroms
   } yield TopmostData(datasetId, sameAs, derivedFrom)
 
-  private def findTopmostData(id: Identifier): (TopmostSameAs, DerivedFrom) =
+  private def findTopmostData(id: Identifier): (TopmostSameAs, TopmostDerivedFrom) =
     runQuery(s"""|SELECT ?topmostSameAs ?topmostDerivedFrom
                  |WHERE {
                  |  ?dsId rdf:type schema:Dataset;
@@ -119,7 +119,7 @@ class DescendantsUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with shou
                  |}
                  |""".stripMargin)
       .unsafeRunSync()
-      .map(row => TopmostSameAs(row("topmostSameAs")) -> DerivedFrom(row("topmostDerivedFrom"))) match {
+      .map(row => TopmostSameAs(row("topmostSameAs")) -> TopmostDerivedFrom(row("topmostDerivedFrom"))) match {
       case row +: Nil => row
       case _          => fail(s"No or more than one record for dataset with $id id")
     }

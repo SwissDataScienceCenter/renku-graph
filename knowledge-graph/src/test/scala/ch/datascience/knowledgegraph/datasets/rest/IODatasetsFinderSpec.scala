@@ -216,8 +216,8 @@ class IODatasetsFinderSpec
 
           loadToStore(
             original.toJsonLD()(),
-            modification1.toJsonLD(topmostDerivedFrom = original.entityId.asDerivedFrom),
-            modification2.toJsonLD(topmostDerivedFrom = original.entityId.asDerivedFrom)
+            modification1.toJsonLD(topmostDerivedFrom = original.entityId.asTopmostDerivedFrom),
+            modification2.toJsonLD(topmostDerivedFrom = original.entityId.asTopmostDerivedFrom)
           )
 
           val result = datasetsFinder
@@ -238,7 +238,7 @@ class IODatasetsFinderSpec
 
           loadToStore(
             dataset1.toJsonLD()(),
-            dataset1Modification.toJsonLD(topmostDerivedFrom = dataset1.entityId.asDerivedFrom),
+            dataset1Modification.toJsonLD(topmostDerivedFrom = dataset1.entityId.asTopmostDerivedFrom),
             nonModifiedDataset.toJsonLD()()
           )
 
@@ -264,7 +264,7 @@ class IODatasetsFinderSpec
           val jsonsAndDatasets = dataset.toJsonLDsAndDatasets(noSameAs = false)()
           loadToStore(
             jsonsAndDatasets.jsonLDs :+
-              datasetModification.toJsonLD(topmostDerivedFrom = dataset.entityId.asDerivedFrom): _*
+              datasetModification.toJsonLD(topmostDerivedFrom = dataset.entityId.asTopmostDerivedFrom): _*
           )
 
           val result = datasetsFinder
@@ -312,7 +312,7 @@ class IODatasetsFinderSpec
           loadToStore(
             dataset.toJsonLD()(),
             datasetFork.toJsonLD()(),
-            datasetModification.toJsonLD(topmostDerivedFrom = datasetFork.entityId.asDerivedFrom)
+            datasetModification.toJsonLD(topmostDerivedFrom = datasetFork.entityId.asTopmostDerivedFrom)
           )
 
           val result = datasetsFinder
@@ -340,9 +340,11 @@ class IODatasetsFinderSpec
 
           loadToStore(
             dataset.toJsonLD()(),
-            datasetModification.toJsonLD(topmostDerivedFrom = dataset.entityId.asDerivedFrom),
-            datasetModificationFork.toJsonLD(topmostDerivedFrom = dataset.entityId.asDerivedFrom),
-            datasetModificationOnFork.toJsonLD(topmostDerivedFrom = datasetModificationFork.entityId.asDerivedFrom)
+            datasetModification.toJsonLD(topmostDerivedFrom = dataset.entityId.asTopmostDerivedFrom),
+            datasetModificationFork.toJsonLD(topmostDerivedFrom = dataset.entityId.asTopmostDerivedFrom),
+            datasetModificationOnFork.toJsonLD(topmostDerivedFrom =
+              datasetModificationFork.entityId.asTopmostDerivedFrom
+            )
           )
 
           val result = datasetsFinder

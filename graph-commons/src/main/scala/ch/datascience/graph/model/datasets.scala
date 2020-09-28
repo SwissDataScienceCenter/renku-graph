@@ -61,6 +61,20 @@ object datasets {
     }
   }
 
+  final class TopmostDerivedFrom private[datasets] (val value: String) extends AnyVal with UrlTinyType
+
+  implicit object TopmostDerivedFrom
+      extends TinyTypeFactory[TopmostDerivedFrom](new TopmostDerivedFrom(_))
+      with constraints.Url {
+
+    final def apply(derivedFrom: DerivedFrom): TopmostDerivedFrom = apply(derivedFrom.value)
+
+    final def apply(entityId: EntityId): TopmostDerivedFrom = apply(entityId.toString)
+
+    implicit lazy val topmostDerivedFromJsonLdEncoder: JsonLDEncoder[TopmostDerivedFrom] =
+      derivedFrom => EntityId.of(derivedFrom.value).asJsonLD
+  }
+
   sealed trait SameAs extends Any with UrlTinyType {
 
     override def equals(obj: Any): Boolean =

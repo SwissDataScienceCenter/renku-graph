@@ -59,8 +59,8 @@ class IOProjectDatasetsFinderSpec
         loadToStore(
           randomDataSetCommit,
           originalDataset.toJsonLD()(),
-          datasetModification1.toJsonLD(topmostDerivedFrom = originalDataset.entityId.asDerivedFrom),
-          datasetModification2.toJsonLD(topmostDerivedFrom = originalDataset.entityId.asDerivedFrom)
+          datasetModification1.toJsonLD(topmostDerivedFrom = originalDataset.entityId.asTopmostDerivedFrom),
+          datasetModification2.toJsonLD(topmostDerivedFrom = originalDataset.entityId.asTopmostDerivedFrom)
         )
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(

@@ -29,8 +29,6 @@ import io.renku.jsonld.EntityId
 import io.renku.jsonld.syntax._
 import monocle.function.Plated
 
-import scala.language.higherKinds
-
 private class TriplesUpdater {
 
   def mergeTopmostDataIntoTriples[Interpretation[_]](
@@ -46,10 +44,11 @@ private class TriplesUpdater {
       case types if types.contains("http://schema.org/Dataset") =>
         json.get[EntityId]("@id") match {
           case Some(topmostData.datasetId) =>
-            val noSameAsJson = json.remove((renku / "topmostSameAs").toString)
-            noSameAsJson deepMerge Json.obj(
-              (renku / "topmostSameAs").toString      -> topmostData.sameAs.asJsonLD.toJson,
-              (renku / "topmostDerivedFrom").toString -> topmostData.derivedFrom.asJsonLD.toJson
+            val noSameAsJson  = json.remove((renku / "topmostSameAs").toString)
+            val noTopmostJson = noSameAsJson.remove((renku / "topmostDerivedFrom").toString)
+            noTopmostJson deepMerge Json.obj(
+              (renku / "topmostSameAs").toString      -> topmostData.topmostSameAs.asJsonLD.toJson,
+              (renku / "topmostDerivedFrom").toString -> topmostData.topmostDerivedFrom.asJsonLD.toJson
             )
           case _ => json
         }

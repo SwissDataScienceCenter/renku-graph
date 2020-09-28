@@ -19,15 +19,13 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
 import cats.MonadError
-import ch.datascience.graph.model.datasets.{DerivedFrom, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
 import eu.timepit.refined.auto._
 import io.renku.jsonld.EntityId
-
-import scala.language.higherKinds
 
 private class DescendantsUpdater {
 
@@ -37,8 +35,8 @@ private class DescendantsUpdater {
   )(implicit ME:      MonadError[Interpretation, Throwable]): CuratedTriples[Interpretation] = curatedTriples.copy(
     updatesGroups = curatedTriples.updatesGroups :+ CurationUpdatesGroup(
       name = "Dataset descendants updates",
-      prepareSameAsUpdate(topmostData.datasetId, topmostData.sameAs),
-      prepareDerivedFromUpdate(topmostData.datasetId, topmostData.derivedFrom)
+      prepareSameAsUpdate(topmostData.datasetId, topmostData.topmostSameAs),
+      prepareDerivedFromUpdate(topmostData.datasetId, topmostData.topmostDerivedFrom)
     )
   )
 
@@ -58,7 +56,7 @@ private class DescendantsUpdater {
         |""".stripMargin
   )
 
-  private def prepareDerivedFromUpdate(entityId: EntityId, topmostDerivedFrom: DerivedFrom) = SparqlQuery(
+  private def prepareDerivedFromUpdate(entityId: EntityId, topmostDerivedFrom: TopmostDerivedFrom) = SparqlQuery(
     name = "upload - topmostDerivedFrom update",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",

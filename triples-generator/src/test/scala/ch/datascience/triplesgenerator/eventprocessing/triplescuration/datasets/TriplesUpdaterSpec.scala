@@ -56,8 +56,8 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
       val Some(updatedDataset) = updatedTriples.triples.findDataset(datasetId)
 
       findIdentifier(updatedDataset)         shouldBe Some(identifier.toString)
-      findTopmostSameAs(updatedDataset)      shouldBe Some(topmostData.sameAs.toString)
-      findTopmostDerivedFrom(updatedDataset) shouldBe Some(topmostData.derivedFrom.toString)
+      findTopmostSameAs(updatedDataset)      shouldBe Some(topmostData.topmostSameAs.toString)
+      findTopmostDerivedFrom(updatedDataset) shouldBe Some(topmostData.topmostDerivedFrom.toString)
 
       updatedTriples.updatesGroups shouldBe curatedTriples.updatesGroups
     }
@@ -79,9 +79,9 @@ class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {
 
   private def topmostDatas(datasetId: EntityId) =
     for {
-      topmostSameAs <- datasetTopmostSameAs
-      derivedFrom   <- datasetDerivedFroms
-    } yield TopmostData(datasetId, topmostSameAs, derivedFrom)
+      topmostSameAs      <- datasetTopmostSameAs
+      topmostDerivedFrom <- datasetTopmostDerivedFroms
+    } yield TopmostData(datasetId, topmostSameAs, topmostDerivedFrom)
 
   private implicit class JsonLdOps(jsonLd: JsonLDTriples) {
     private val json = jsonLd.value
