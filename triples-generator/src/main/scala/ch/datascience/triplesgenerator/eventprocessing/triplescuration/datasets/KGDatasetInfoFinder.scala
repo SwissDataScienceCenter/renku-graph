@@ -19,18 +19,18 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait KGDatasetInfoFinder[Interpretation[_]] {
-  def findTopmostSameAs(idSameAs:         IdSameAs):    Interpretation[Option[TopmostSameAs]]
-  def findTopmostDerivedFrom(derivedFrom: DerivedFrom): Interpretation[Option[DerivedFrom]]
+  def findTopmostSameAs(idSameAs: IdSameAs): Interpretation[Option[TopmostSameAs]]
+
+  def findTopmostDerivedFrom(derivedFrom: DerivedFrom): Interpretation[Option[TopmostDerivedFrom]]
 }
 
 private class KGDatasetInfoFinderImpl(
@@ -70,9 +70,9 @@ private class KGDatasetInfoFinderImpl(
     _.downField("results").downField("bindings").as(decodeList(topmostSameAs)).map(_.flatten.toSet)
   }
 
-  override def findTopmostDerivedFrom(derivedFrom: DerivedFrom): IO[Option[DerivedFrom]] =
-    queryExpecting[Set[DerivedFrom]](using = queryFindingDerivedFrom(derivedFrom))
-      .flatMap(toOption[DerivedFrom, DerivedFrom](derivedFrom))
+  override def findTopmostDerivedFrom(derivedFrom: DerivedFrom): IO[Option[TopmostDerivedFrom]] =
+    queryExpecting[Set[TopmostDerivedFrom]](using = queryFindingDerivedFrom(derivedFrom))
+      .flatMap(toOption[TopmostDerivedFrom, DerivedFrom](derivedFrom))
 
   private def queryFindingDerivedFrom(derivedFrom: DerivedFrom) = SparqlQuery(
     name = "upload - ds topmostDerivedFrom",
@@ -88,10 +88,10 @@ private class KGDatasetInfoFinderImpl(
         |""".stripMargin
   )
 
-  private implicit val topmostDerivedDecoder: Decoder[Set[DerivedFrom]] = {
-    val derivedFrom: Decoder[Option[DerivedFrom]] =
-      _.downField("maybeTopmostDerivedFrom").downField("value").as[Option[DerivedFrom]]
-    _.downField("results").downField("bindings").as(decodeList(derivedFrom)).map(_.flatten.toSet)
+  private implicit val topmostDerivedDecoder: Decoder[Set[TopmostDerivedFrom]] = {
+    val topmostDerivedFrom: Decoder[Option[TopmostDerivedFrom]] =
+      _.downField("maybeTopmostDerivedFrom").downField("value").as[Option[TopmostDerivedFrom]]
+    _.downField("results").downField("bindings").as(decodeList(topmostDerivedFrom)).map(_.flatten.toSet)
   }
 
   private def toOption[T, ID](id: ID)(implicit entityTypeInfo: ID => String): Set[T] => IO[Option[T]] = {
