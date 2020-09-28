@@ -69,8 +69,8 @@ private class IOProjectDatasetsFinder(
         |               schema:name ?name;
         |               schema:alternateName  ?alternateName;
         |               renku:topmostSameAs ?topmostSameAs .
-        |    OPTIONAL { ?datasetId prov:wasDerivedFrom ?maybeDerivedFrom }.
-        |    FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom ?datasetId }
+        |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
+        |    FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
         |}
         |ORDER BY ?name
         |""".stripMargin

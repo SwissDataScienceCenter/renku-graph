@@ -52,8 +52,13 @@ object datasets {
 
     def apply(datasetEntityId: EntityId): DerivedFrom = DerivedFrom(datasetEntityId.toString)
 
-    implicit val derivedFromJsonLdEncoder: JsonLDEncoder[DerivedFrom] = derivedFrom =>
-      EntityId.of(derivedFrom.value).asJsonLD
+    implicit val derivedFromJsonLdEncoder: JsonLDEncoder[DerivedFrom] = JsonLDEncoder.instance { derivedFrom =>
+      JsonLD.entity(
+        EntityId of s"_:${UUID.randomUUID()}",
+        EntityTypes of (schema / "URL"),
+        schema / "url" -> EntityId.of(derivedFrom.value).asJsonLD
+      )
+    }
   }
 
   sealed trait SameAs extends Any with UrlTinyType {

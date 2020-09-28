@@ -126,7 +126,7 @@ private class IODatasetsFinder(
         |              renku:topmostSameAs ?sameAs;
         |              schema:isPartOf ?projectId.
         |        FILTER NOT EXISTS {
-        |          ?someId prov:wasDerivedFrom ?dsId.
+        |          ?someId prov:wasDerivedFrom/schema:url ?dsId.
         |          ?someId schema:isPartOf ?projectId.
         |        }
         |      }
@@ -142,10 +142,10 @@ private class IODatasetsFinder(
         |          schema:isPartOf ?projectId.
         |    OPTIONAL { ?dsIdExample schema:description ?maybeDescription }
         |    OPTIONAL { ?dsIdExample schema:datePublished ?maybePublishedDate }
-        |    OPTIONAL { ?dsIdExample prov:wasDerivedFrom ?maybeDerivedFrom }
+        |    OPTIONAL { ?dsIdExample prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
         |    OPTIONAL { ?dsIdExample schema:url ?maybeUrl }
         |        FILTER NOT EXISTS {
-        |      ?someId prov:wasDerivedFrom ?dsIdExample.
+        |      ?someId prov:wasDerivedFrom/schema:url ?dsIdExample.
         |      ?someId schema:isPartOf ?projectId.
         |    }
         |  }
