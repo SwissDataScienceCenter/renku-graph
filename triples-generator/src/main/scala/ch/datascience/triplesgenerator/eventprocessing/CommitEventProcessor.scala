@@ -31,6 +31,7 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder.QueryExecutionTimeLabel
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{GraphCurator, IOGraphCurator, IOTriplesCurator, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.GenerationResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
@@ -245,6 +246,7 @@ private object IOCommitEventProcessor {
     Histogram
       .build()
       .name("cypher_query_execution_times")
+      .labelNames("query_id")
       .help("Cypher query execution times")
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000)
 
