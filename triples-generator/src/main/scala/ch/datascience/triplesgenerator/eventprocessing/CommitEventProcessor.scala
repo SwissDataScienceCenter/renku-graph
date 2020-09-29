@@ -40,7 +40,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Histogram
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private trait EventProcessor[Interpretation[_]] {
@@ -242,6 +241,13 @@ private object IOCommitEventProcessor {
       .help("Commit Events processing times")
       .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000)
 
+  private[eventprocessing] lazy val cypherQueryExecutionTimesBuilder =
+    Histogram
+      .build()
+      .name("cypher_query_execution_times")
+      .help("Cypher query execution times")
+      .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000)
+
   def apply(
       triplesGenerator: TriplesGenerator[IO],
       metricsRegistry:  MetricsRegistry[IO],
@@ -255,13 +261,17 @@ private object IOCommitEventProcessor {
       timer:            Timer[IO]
   ): IO[CommitEventProcessor[IO]] =
     for {
-      uploader              <- IOUploader(logger, timeRecorder)
       accessTokenFinder     <- IOAccessTokenFinder(logger)
       triplesCurator        <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)
       graphCurator          <- IOGraphCurator(gitLabThrottler, logger, timeRecorder)
       eventStatusUpdater    <- IOEventStatusUpdater(logger)
       eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
+      cypheQueryExecutionTimes <-
+        metricsRegistry.register[Histogram, Histogram.Builder](cypherQueryExecutionTimesBuilder)
       executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
+      cyhperQueryExecutionTimeRecorder <-
+        ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(cypheQueryExecutionTimes))
+      uploader <- IOUploader(logger, timeRecorder, cyhperQueryExecutionTimeRecorder)
     } yield new CommitEventProcessor(
       accessTokenFinder,
       graphCurator,

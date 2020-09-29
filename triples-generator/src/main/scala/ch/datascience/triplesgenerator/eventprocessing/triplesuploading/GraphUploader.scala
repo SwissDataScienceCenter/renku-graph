@@ -18,46 +18,60 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
+import java.util.concurrent.TimeUnit
+
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult.DeliverySuccess
 import io.chrisdavenport.log4cats.Logger
 import org.neo4j.driver.{Record, Session}
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait GraphUploader[Interpretation[_]] {
   def upload(triples: JsonLDTriples): Interpretation[TriplesUploadResult]
 }
 
 private class IOGraphUploader(
-    logger:                  Logger[IO]
+    logger:                  Logger[IO],
+    timeRecorder:            ExecutionTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends GraphUploader[IO]
     with Neo4jConfig {
 
-  import scala.collection.JavaConverters._
+  import scala.jdk.CollectionConverters._
   def upload(triples: JsonLDTriples): IO[TriplesUploadResult] = {
     logger.info(triples.value.noSpaces)
     val cypherQuery =
       s"""
          |CALL n10s.rdf.import.inline('${triples.value.noSpaces.replace("\\", "\\\\")}', "JSON-LD")
          |""".stripMargin
-    val session: Session = driver.session()
-    val result =
-      session.run(cypherQuery).list().asScala.map((record: Record) => s"values: ${record.values()}").mkString("\n")
-    session.close()
-    logger.info(result)
-    IO(DeliverySuccess)
-  }
 
+    timeRecorder
+      .measureExecutionTime {
+        val session: Session = driver.session()
+        IO.pure(session.run(cypherQuery)).map(r => (session, r))
+      }
+      .map { case (elapsedTime, (session, result)) =>
+        val resultAsString = result
+          .list()
+          .asScala
+          .map((record: Record) => s"values: ${record.values()}")
+          .mkString("\n")
+        session.close()
+        logger.info(resultAsString)
+        (elapsedTime, result)
+      }
+      .map(timeRecorder.logExecutionTime(withMessage = "Cypher triples upload query finished"))
+      .map(_ => DeliverySuccess)
+  }
 }
 
 trait Neo4jConfig {
   import org.neo4j.driver.{AuthTokens, Driver, GraphDatabase}
 
-  val uri      = "bolt://localhost:7687"
+  val uri      = "bolt://10.42.128.14:7687"
   val user     = "neo4j"
   val password = "test"
   val driver: Driver = GraphDatabase.driver(uri, AuthTokens.basic(user, password))

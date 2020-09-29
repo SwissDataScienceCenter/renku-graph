@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 import cats.MonadError
 import cats.effect.{ContextShift, Timer}
 import cats.syntax.all._
+import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.rdfstore.{CypherQuery, GraphQuery, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
@@ -130,15 +131,16 @@ private[eventprocessing] object IOUploader {
 
   def apply(
       logger:                  Logger[IO],
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
+      timeRecorder:            SparqlQueryTimeRecorder[IO],
+      graphTimeRecorder:       ExecutionTimeRecorder[IO]
   )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]): IO[Uploader[IO]] =
     for {
       rdfStoreConfig <- RdfStoreConfig[IO]()
     } yield new Uploader[IO](
-      new IOGraphUploader(logger),
+      new IOGraphUploader(logger, graphTimeRecorder),
       new IOTriplesUploader(rdfStoreConfig, logger),
       new IOUpdatesUploader(rdfStoreConfig, logger, timeRecorder),
-      new IOGraphUpdatesUploader(logger)
+      new IOGraphUpdatesUploader(logger, graphTimeRecorder)
     )
 }
 

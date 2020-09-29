@@ -26,8 +26,10 @@ import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.projects.Id
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
+import ch.datascience.webhookservice.model
 import ch.datascience.webhookservice.model.HookToken
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.RefType
@@ -43,9 +45,12 @@ class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers {
   "encrypt/decrypt" should {
 
     "encrypt and decrypt a given HookToken" in new TestCase {
-      val token: HookToken = hookTokens.generateOne
+      //val token: HookToken = hookTokens.generateOne
+
+      val token = HookToken(Id(3778))
 
       val Success(crypted) = hookTokenCrypto.encrypt(token)
+      println(crypted)
       crypted.value should not be token
 
       val Success(decrypted) = hookTokenCrypto.decrypt(crypted)
@@ -102,7 +107,8 @@ class HookTokenCryptoSpec extends AnyWordSpec with should.Matchers {
 
   private trait TestCase {
 
-    private val secret = new String(Base64.getEncoder.encode("1234567890123456".getBytes("utf-8")), "utf-8")
+    private val secret =
+      "YmIwY2VlOTRmMjQyOGI2Nwo=" //new String(Base64.getEncoder.encode("1234567890123456".getBytes("utf-8")), "utf-8")
     val hookTokenCrypto = new HookTokenCrypto[Try](
       RefType
         .applyRef[Secret](secret)

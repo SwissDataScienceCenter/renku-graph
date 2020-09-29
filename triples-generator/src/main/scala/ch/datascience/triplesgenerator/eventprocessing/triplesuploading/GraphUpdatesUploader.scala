@@ -20,24 +20,21 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.rdfstore.{CypherQuery, IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.NonNegative
+import ch.datascience.logging.ExecutionTimeRecorder
+import ch.datascience.rdfstore.CypherQuery
 import io.chrisdavenport.log4cats.Logger
-import org.neo4j.driver.{Record, Session, Transaction}
+import org.neo4j.driver.{Record, Session}
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 private trait GraphUpdatesUploader[Interpretation[_]] {
   def send(updateQuery: CypherQuery): Interpretation[TriplesUploadResult]
 }
 
 private class IOGraphUpdatesUploader(
-    logger: Logger[IO]
+    logger:            Logger[IO],
+    graphTimeRecorder: ExecutionTimeRecorder[IO]
 )(implicit
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
@@ -49,15 +46,23 @@ private class IOGraphUpdatesUploader(
   import TriplesUploadResult._
   override def send(updateQuery: CypherQuery): IO[TriplesUploadResult] = {
     logger.info(s"Update queries - ${updateQuery.toString}")
-    val session: Session = driver.session()
-    val result = session
-      .run(updateQuery.toString)
-      .list()
-      .asScala
-      .map((record: Record) => s"values: ${record.values()}")
-      .mkString("\n")
-    session.close()
-    logger.info(s"Update queries results - $result")
-    IO(DeliverySuccess)
+
+    graphTimeRecorder
+      .measureExecutionTime {
+        val session: Session = driver.session()
+        IO.pure(session.run(updateQuery.toString)).map(r => (session, r))
+      }
+      .map { case (elapsedTime, (session, result)) =>
+        val resultString = result
+          .list()
+          .asScala
+          .map((record: Record) => s"values: ${record.values()}")
+          .mkString("\n")
+        logger.info(s"Update queries results - $resultString")
+        session.close()
+        (elapsedTime, result)
+      }
+      .map(graphTimeRecorder.logExecutionTime(withMessage = "Cypher update query finished"))
+      .map(_ => DeliverySuccess)
   }
 }
