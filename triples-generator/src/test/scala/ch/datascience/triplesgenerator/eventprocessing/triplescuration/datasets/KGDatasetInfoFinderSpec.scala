@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs, TopmostDerivedFrom}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore._
@@ -69,7 +69,7 @@ class KGDatasetInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with sho
 
     "return None if there's no dataset with the given id" in new TestCase {
       val derivedFrom = datasetDerivedFroms.generateOne
-      kgDatasetInfoFinder.findTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe Option.empty[DerivedFrom]
+      kgDatasetInfoFinder.findTopmostDerivedFrom(derivedFrom).unsafeRunSync() shouldBe Option.empty[TopmostDerivedFrom]
     }
 
     "return the dataset's topmostDerivedFrom if this dataset has one" in new TestCase {

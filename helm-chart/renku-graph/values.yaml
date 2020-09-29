@@ -24,8 +24,8 @@ tokenRepository:
 
 triplesGenerator:
   image:
-    repository: renku/triples-generator
-    tag: 'latest'
+    repository: joke1196/triples-generator
+    tag: '1.8.16-n004.h896d2efe'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP

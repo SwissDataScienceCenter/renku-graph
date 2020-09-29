@@ -25,6 +25,7 @@ import cats.syntax.all._
 import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
 import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.tinytypes.TinyType
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.DataSetInfoFinder.DatasetInfo
 import io.circe.optics.JsonOptics._
@@ -33,7 +34,6 @@ import io.renku.jsonld.EntityId
 import monocle.function.Plated
 
 import scala.collection.mutable
-import scala.language.higherKinds
 
 private trait DataSetInfoFinder[Interpretation[_]] {
   def findDatasetsInfo(triples: JsonLDTriples): Interpretation[Set[DatasetInfo]]
@@ -59,7 +59,8 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
       case types if types contains (schema / "URL").toString =>
         json
           .getId[Interpretation, EntityId]
-          .semiflatMap(collectSameAsInfo(collected, json))
+          .semiflatMap(collectEntityInfo[SameAs](collected, json, SameAs.fromId))
+          .semiflatMap(collectEntityInfo[DerivedFrom](collected, json, DerivedFrom.from))
           .fold(json)(_ => json)
       case _ => json.pure[Interpretation]
     }
@@ -70,42 +71,44 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
       json:      Json
   )(entityId:    EntityId): Interpretation[Unit] =
     for {
-      maybeSameAsUrl   <- getSameAsUrl(json).value
-      maybeDerivedFrom <- getDerivedFrom(json).value
-      _ = collected add CollectedDatasetInfo(entityId, maybeSameAsUrl, maybeDerivedFrom)
+      maybeSameAsUrl      <- getSameAsUrl(json).value
+      maybeDerivedFromUrl <- getDerivedFromUrl(json).value
+      _ = collected add CollectedDatasetInfo(entityId, maybeSameAsUrl, maybeDerivedFromUrl)
     } yield ()
 
   private def getSameAsUrl(json: Json): OptionT[Interpretation, EntityId] =
     json.get[Json]((schema / "sameAs").toString) match {
-      case Some(sameAs) =>
-        sameAs.getId[Interpretation, EntityId]
-      case None =>
-        OptionT.none[Interpretation, EntityId]
+      case Some(sameAs) => sameAs.getId[Interpretation, EntityId]
+      case None         => OptionT.none[Interpretation, EntityId]
     }
 
-  private def getDerivedFrom(json: Json): OptionT[Interpretation, DerivedFrom] =
+  private def getDerivedFromUrl(json: Json): OptionT[Interpretation, EntityId] =
     json.get[Json]((prov / "wasDerivedFrom").toString) match {
-      case Some(derivedFrom) => derivedFrom.getId[Interpretation, DerivedFrom]
-      case None              => OptionT.none[Interpretation, DerivedFrom]
+      case Some(derivedFrom) => derivedFrom.getId[Interpretation, EntityId]
+      case None              => OptionT.none[Interpretation, EntityId]
     }
 
-  private def collectSameAsInfo(
+  private def collectEntityInfo[T](
       collected: mutable.Set[CollectedInfo],
-      json:      Json
-  )(entityId:    EntityId): Interpretation[Unit] =
-    getSameAs(json)
+      json:      Json,
+      fromId:    String => Either[IllegalArgumentException, T]
+  )(entityId:    EntityId)(implicit decoder: Decoder[T]): Interpretation[EntityId] =
+    getEntity[T](json, fromId)
       .map {
-        case Some(sameAs) => collected add CollectedSameAs(entityId, sameAs)
+        case Some(entity) => collected add CollectedEntity(entityId, entity)
         case None         => ()
       }
-      .map(_ => ())
+      .map(_ => entityId)
 
-  private def getSameAs(urlJson: Json): Interpretation[Option[SameAs]] = {
-    val idSameAs: Decoder[SameAs] = Decoder.decodeString.emap(v => SameAs.fromId(v).leftMap(_.toString))
+  private def getEntity[T](
+      urlJson:        Json,
+      fromId:         String => Either[IllegalArgumentException, T]
+  )(implicit decoder: Decoder[T]): Interpretation[Option[T]] = {
+    val idSameAs: Decoder[T] = Decoder.decodeString.emap(value => fromId(value).leftMap(_.toString))
 
     urlJson.get[Json]((schema / "url").toString) match {
-      case None       => OptionT.none[Interpretation, SameAs]
-      case Some(json) => json.getValue[Interpretation, SameAs] orElse json.getId[Interpretation, SameAs](idSameAs, ME)
+      case None       => OptionT.none[Interpretation, T]
+      case Some(json) => json.getValue[Interpretation, T] orElse json.getId[Interpretation, T](idSameAs, ME)
     }
   }.value
 
@@ -118,34 +121,50 @@ private class DataSetInfoFinderImpl[Interpretation[_]]()(implicit ME: MonadError
 
   private def convertToDatasetInfos(collectedInfos: Set[CollectedInfo]) =
     collectedInfos.foldLeft(Set.empty[DatasetInfo]) {
-      case (finalInfos, CollectedDatasetInfo(dsId, maybeSameAsUrl, maybeDerivedFrom)) =>
-        finalInfos + ((dsId, maybeSameAsUrl.findMatchingSameAs(collectedInfos), maybeDerivedFrom))
+      case (finalInfos, CollectedDatasetInfo(dsId, maybeSameAsUrl, maybeDerivedFromUrl)) =>
+        finalInfos + ((dsId,
+                       maybeSameAsUrl.findMatchingEntity[SameAs](collectedInfos),
+                       maybeDerivedFromUrl.findMatchingEntity[DerivedFrom](collectedInfos)
+                      )
+        )
       case (finalInfos, _) => finalInfos
     }
 
-  private implicit class SameAsUrlOps(maybeSameAsUrl: Option[EntityId]) {
+  private implicit class UrlOps(maybeEntityId: Option[EntityId]) {
 
-    def findMatchingSameAs(collectedInfos: Set[CollectedInfo]): Option[SameAs] =
+    def findMatchingEntity[T <: TinyType](
+        collectedInfos:                   Set[CollectedInfo]
+    )(implicit collectedEntityIdToEntity: EntityId => CollectedInfo => Option[T]): Option[T] =
       for {
-        sameAsUrl <- maybeSameAsUrl
-        matchingSameAs <- collectedInfos.flatMap {
-                            case CollectedSameAs(`sameAsUrl`, sameAs) => sameAs.some
-                            case _                                    => None
-                          }.headOption
+        entityId       <- maybeEntityId
+        matchingSameAs <- collectedInfos.flatMap(collectedEntityIdToEntity(entityId)).headOption
+
       } yield matchingSameAs
   }
+
+  private implicit val collectedSameAsIdToEntity: EntityId => CollectedInfo => Option[SameAs] =
+    entityId => {
+      case CollectedEntity(`entityId`, entity: SameAs) => entity.some
+      case _ => None
+    }
+
+  private implicit val collectedDerivedFromIdToEntity: EntityId => CollectedInfo => Option[DerivedFrom] =
+    entityId => {
+      case CollectedEntity(`entityId`, entity: DerivedFrom) => entity.some
+      case _ => None
+    }
 
   private trait CollectedInfo
 
   private object CollectedInfo {
 
     case class CollectedDatasetInfo(
-        id:               EntityId,
-        maybeSameAsUrl:   Option[EntityId],
-        maybeDerivedFrom: Option[DerivedFrom]
+        id:                  EntityId,
+        maybeSameAsUrl:      Option[EntityId],
+        maybeDerivedFromUrl: Option[EntityId]
     ) extends CollectedInfo
 
-    case class CollectedSameAs(sameAsUrl: EntityId, sameAs: SameAs) extends CollectedInfo
+    case class CollectedEntity[T](entityId: EntityId, entity: T) extends CollectedInfo
   }
 }
 

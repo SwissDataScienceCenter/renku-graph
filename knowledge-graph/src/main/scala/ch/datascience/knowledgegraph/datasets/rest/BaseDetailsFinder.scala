@@ -64,7 +64,7 @@ private class BaseDetailsFinder(
         |               schema:name ?name;
         |               schema:alternateName ?alternateName ;
         |               renku:topmostSameAs ?topmostSameAs .
-        |    OPTIONAL { ?datasetId prov:wasDerivedFrom ?maybeDerivedFrom }.
+        |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    OPTIONAL { ?datasetId schema:description ?description }.
         |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate }.
         |}

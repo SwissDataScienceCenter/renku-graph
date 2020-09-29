@@ -52,8 +52,27 @@ object datasets {
 
     def apply(datasetEntityId: EntityId): DerivedFrom = DerivedFrom(datasetEntityId.toString)
 
-    implicit val derivedFromJsonLdEncoder: JsonLDEncoder[DerivedFrom] = derivedFrom =>
-      EntityId.of(derivedFrom.value).asJsonLD
+    implicit val derivedFromJsonLdEncoder: JsonLDEncoder[DerivedFrom] = JsonLDEncoder.instance { derivedFrom =>
+      JsonLD.entity(
+        EntityId of s"_:${UUID.randomUUID()}",
+        EntityTypes of (schema / "URL"),
+        schema / "url" -> EntityId.of(derivedFrom.value).asJsonLD
+      )
+    }
+  }
+
+  final class TopmostDerivedFrom private[datasets] (val value: String) extends AnyVal with UrlTinyType
+
+  implicit object TopmostDerivedFrom
+      extends TinyTypeFactory[TopmostDerivedFrom](new TopmostDerivedFrom(_))
+      with constraints.Url {
+
+    final def apply(derivedFrom: DerivedFrom): TopmostDerivedFrom = apply(derivedFrom.value)
+
+    final def apply(entityId: EntityId): TopmostDerivedFrom = apply(entityId.toString)
+
+    implicit lazy val topmostDerivedFromJsonLdEncoder: JsonLDEncoder[TopmostDerivedFrom] =
+      derivedFrom => EntityId.of(derivedFrom.value).asJsonLD
   }
 
   sealed trait SameAs extends Any with UrlTinyType {

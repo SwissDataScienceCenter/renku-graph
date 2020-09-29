@@ -41,6 +41,7 @@ private class IOGraphUploader(
     with Neo4jConfig {
 
   import scala.jdk.CollectionConverters._
+  import eu.timepit.refined.auto._
   def upload(triples: JsonLDTriples): IO[TriplesUploadResult] = {
     logger.info(triples.value.noSpaces)
     val cypherQuery =
@@ -49,10 +50,12 @@ private class IOGraphUploader(
          |""".stripMargin
 
     timeRecorder
-      .measureExecutionTime {
-        val session: Session = driver.session()
-        IO.pure(session.run(cypherQuery)).map(r => (session, r))
-      }
+      .measureExecutionTime({
+                              val session: Session = driver.session()
+                              IO.pure(session.run(cypherQuery)).map(r => (session, r))
+                            },
+                            Some("upload jsonld")
+      )
       .map { case (elapsedTime, (session, result)) =>
         val resultAsString = result
           .list()

@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 
 import cats.MonadError
-import ch.datascience.graph.model.datasets.{DerivedFrom, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{DerivedFrom, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore.{CypherQuery, GraphQuery, SparqlQuery}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
@@ -38,20 +38,20 @@ private class Neo4jDescendantsUpdater {
     curatedTriples.copy(
       updatesGroups = curatedTriples.updatesGroups :+ CurationUpdatesGroup[Interpretation, CypherQuery](
         name = "Dataset descendants updates",
-        prepareSameAsUpdate(topmostData.datasetId, topmostData.sameAs),
-        prepareDerivedFromUpdate(topmostData.datasetId, topmostData.derivedFrom)
+        prepareSameAsUpdate(topmostData.datasetId, topmostData.topmostSameAs),
+        prepareDerivedFromUpdate(topmostData.datasetId, topmostData.topmostDerivedFrom)
       )
     )
 
   private def prepareSameAsUpdate(entityId: EntityId, topmostSameAs: TopmostSameAs) = CypherQuery(
-    name = "neo4j - upload - topmostSameAs update",
+    name = "cypher - update - topmostSameAs update",
     s"""MATCH (n: sch__Dataset { renku__topmostSameAs: '$entityId' })
        |SET n.renku__topmostSameAs = toString($topmostSameAs)
        |RETURN n""".stripMargin
   )
 
-  private def prepareDerivedFromUpdate(entityId: EntityId, topmostDerivedFrom: DerivedFrom) = CypherQuery(
-    name = "neo4j - upload - topmostDerivedFrom update",
+  private def prepareDerivedFromUpdate(entityId: EntityId, topmostDerivedFrom: TopmostDerivedFrom) = CypherQuery(
+    name = "cypher - update - topmostDerivedFrom update",
     s"""MATCH (n: sch__Dataset { renku__topmostDerivedFrom: '$entityId' })
        |SET n.renku__topmostDerivedFrom = toString($topmostDerivedFrom)
        |RETURN n""".stripMargin

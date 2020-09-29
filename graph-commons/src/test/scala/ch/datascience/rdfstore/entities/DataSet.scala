@@ -41,17 +41,17 @@ trait DataSet {
   val datasetParts:                      List[DataSetPartArtifact]
   val datasetKeywords:                   List[Keyword]
   val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]
-  val overrideDatasetTopmostDerivedFrom: Option[DerivedFrom]
+  val overrideDatasetTopmostDerivedFrom: Option[TopmostDerivedFrom]
 
   def topmostSameAs(implicit renkuBaseUrl: RenkuBaseUrl): TopmostSameAs =
     overrideDatasetTopmostSameAs
       .orElse(maybeDatasetSameAs map TopmostSameAs.apply)
       .getOrElse(TopmostSameAs(DataSet entityId datasetId))
 
-  def topmostDerivedFrom(implicit renkuBaseUrl: RenkuBaseUrl): DerivedFrom =
+  def topmostDerivedFrom(implicit renkuBaseUrl: RenkuBaseUrl): TopmostDerivedFrom =
     overrideDatasetTopmostDerivedFrom
-      .orElse(maybeDatasetDerivedFrom)
-      .getOrElse(DerivedFrom(DataSet.entityId(datasetId)))
+      .orElse(maybeDatasetDerivedFrom map TopmostDerivedFrom.apply)
+      .getOrElse(TopmostDerivedFrom(DataSet.entityId(datasetId)))
 
   def entityId(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = DataSet.entityId(datasetId)
 }
@@ -78,7 +78,7 @@ object DataSet {
                          partsFactories:             List[Activity => DataSetPartArtifact],
                          keywords:                   List[Keyword] = Nil,
                          overrideTopmostSameAs:      Option[TopmostSameAs] = None,
-                         overrideTopmostDerivedFrom: Option[DerivedFrom] = None
+                         overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   )(activity:                                        Activity): DataSetEntity =
     new Entity(activity.commitId,
                Location(".renku") / "datasets" / id,
@@ -86,20 +86,20 @@ object DataSet {
                maybeInvalidationActivity = None,
                maybeGeneration = None
     ) with DataSet with Artifact {
-      override val datasetId:                         Identifier                = id
-      override val datasetTitle:                      Title                     = title
-      override val datasetName:                       Name                      = name
-      override val datasetUrl:                        Url                       = url
-      override val maybeDatasetSameAs:                Option[SameAs]            = maybeSameAs
-      override val maybeDatasetDerivedFrom:           Option[DerivedFrom]       = None
-      override val maybeDatasetDescription:           Option[Description]       = maybeDescription
-      override val maybeDatasetPublishedDate:         Option[PublishedDate]     = maybePublishedDate
-      override val datasetCreatedDate:                DateCreated               = createdDate
-      override val datasetCreators:                   Set[Person]               = creators
-      override val datasetParts:                      List[DataSetPartArtifact] = partsFactories.map(_.apply(activity))
-      override val datasetKeywords:                   List[Keyword]             = keywords
-      override val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]     = overrideTopmostSameAs
-      override val overrideDatasetTopmostDerivedFrom: Option[DerivedFrom]       = overrideTopmostDerivedFrom
+      override val datasetId:                         Identifier                 = id
+      override val datasetTitle:                      Title                      = title
+      override val datasetName:                       Name                       = name
+      override val datasetUrl:                        Url                        = url
+      override val maybeDatasetSameAs:                Option[SameAs]             = maybeSameAs
+      override val maybeDatasetDerivedFrom:           Option[DerivedFrom]        = None
+      override val maybeDatasetDescription:           Option[Description]        = maybeDescription
+      override val maybeDatasetPublishedDate:         Option[PublishedDate]      = maybePublishedDate
+      override val datasetCreatedDate:                DateCreated                = createdDate
+      override val datasetCreators:                   Set[Person]                = creators
+      override val datasetParts:                      List[DataSetPartArtifact]  = partsFactories.map(_.apply(activity))
+      override val datasetKeywords:                   List[Keyword]              = keywords
+      override val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]      = overrideTopmostSameAs
+      override val overrideDatasetTopmostDerivedFrom: Option[TopmostDerivedFrom] = overrideTopmostDerivedFrom
     }
 
   def modifiedFactory(id:                         Identifier,
@@ -114,7 +114,7 @@ object DataSet {
                       partsFactories:             List[Activity => DataSetPartArtifact],
                       keywords:                   List[Keyword] = Nil,
                       overrideTopmostSameAs:      Option[TopmostSameAs] = None,
-                      overrideTopmostDerivedFrom: Option[DerivedFrom] = None
+                      overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   )(activity:                                     Activity): DataSetEntity =
     new Entity(activity.commitId,
                Location(".renku") / "datasets" / id,
@@ -122,20 +122,20 @@ object DataSet {
                maybeInvalidationActivity = None,
                maybeGeneration = None
     ) with DataSet with Artifact {
-      override val datasetId:                         Identifier                = id
-      override val datasetTitle:                      Title                     = title
-      override val datasetName:                       Name                      = name
-      override val datasetUrl:                        Url                       = url
-      override val maybeDatasetSameAs:                Option[SameAs]            = None
-      override val maybeDatasetDerivedFrom:           Option[DerivedFrom]       = derivedFrom.some
-      override val maybeDatasetDescription:           Option[Description]       = maybeDescription
-      override val maybeDatasetPublishedDate:         Option[PublishedDate]     = maybePublishedDate
-      override val datasetCreatedDate:                DateCreated               = createdDate
-      override val datasetCreators:                   Set[Person]               = creators
-      override val datasetParts:                      List[DataSetPartArtifact] = partsFactories.map(_.apply(activity))
-      override val datasetKeywords:                   List[Keyword]             = keywords
-      override val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]     = overrideTopmostSameAs
-      override val overrideDatasetTopmostDerivedFrom: Option[DerivedFrom]       = overrideTopmostDerivedFrom
+      override val datasetId:                         Identifier                 = id
+      override val datasetTitle:                      Title                      = title
+      override val datasetName:                       Name                       = name
+      override val datasetUrl:                        Url                        = url
+      override val maybeDatasetSameAs:                Option[SameAs]             = None
+      override val maybeDatasetDerivedFrom:           Option[DerivedFrom]        = derivedFrom.some
+      override val maybeDatasetDescription:           Option[Description]        = maybeDescription
+      override val maybeDatasetPublishedDate:         Option[PublishedDate]      = maybePublishedDate
+      override val datasetCreatedDate:                DateCreated                = createdDate
+      override val datasetCreators:                   Set[Person]                = creators
+      override val datasetParts:                      List[DataSetPartArtifact]  = partsFactories.map(_.apply(activity))
+      override val datasetKeywords:                   List[Keyword]              = keywords
+      override val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]      = overrideTopmostSameAs
+      override val overrideDatasetTopmostDerivedFrom: Option[TopmostDerivedFrom] = overrideTopmostDerivedFrom
     }
 
   def entityId(identifier: Identifier)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId =

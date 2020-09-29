@@ -48,10 +48,12 @@ private class IOGraphUpdatesUploader(
     logger.info(s"Update queries - ${updateQuery.toString}")
 
     graphTimeRecorder
-      .measureExecutionTime {
-        val session: Session = driver.session()
-        IO.pure(session.run(updateQuery.toString)).map(r => (session, r))
-      }
+      .measureExecutionTime({
+                              val session: Session = driver.session()
+                              IO.pure(session.run(updateQuery.toString)).map(r => (session, r))
+                            },
+                            Some(updateQuery.name)
+      )
       .map { case (elapsedTime, (session, result)) =>
         val resultString = result
           .list()

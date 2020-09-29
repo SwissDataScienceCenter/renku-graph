@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators.{nonBlankStrings, nonEmptyList, posi
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetInProjectCreationDates, userAffiliations, userEmails}
-import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, DerivedFrom, Description, Name, PublishedDate, SameAs, Title, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, DerivedFrom, Description, Name, PublishedDate, SameAs, Title, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasetProjects
@@ -46,9 +46,10 @@ package object rest {
   implicit val searchEndpointSorts: Gen[DatasetsSearchEndpoint.Sort.By] = sortBys(DatasetsSearchEndpoint.Sort)
 
   implicit class EntityIdOps(entityId: EntityId) {
-    lazy val asSameAs:        SameAs        = SameAs(entityId)
-    lazy val asTopmostSameAs: TopmostSameAs = TopmostSameAs(entityId)
-    lazy val asDerivedFrom:   DerivedFrom   = DerivedFrom(entityId.value.toString)
+    lazy val asSameAs:             SameAs             = SameAs(entityId)
+    lazy val asTopmostSameAs:      TopmostSameAs      = TopmostSameAs(entityId)
+    lazy val asDerivedFrom:        DerivedFrom        = DerivedFrom(entityId)
+    lazy val asTopmostDerivedFrom: TopmostDerivedFrom = TopmostDerivedFrom(entityId)
   }
 
   implicit class NonModifiedDatasetOps(
@@ -200,7 +201,7 @@ package object rest {
 
     def toJsonLD(firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
                  commitId:                CommitId = commitIds.generateOne,
-                 topmostDerivedFrom:      DerivedFrom = dataSet.derivedFrom
+                 topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(dataSet.derivedFrom)
     ): JsonLD =
       toJsonLDs(firstDatasetDateCreated, commitId, topmostDerivedFrom) match {
         case first +: Nil => first
@@ -212,7 +213,7 @@ package object rest {
 
     def toJsonLDs(firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
                   commitId:                CommitId = commitIds.generateOne,
-                  topmostDerivedFrom:      DerivedFrom = dataSet.derivedFrom
+                  topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(dataSet.derivedFrom)
     ): List[JsonLD] =
       dataSet.projects match {
         case firstProject +: otherProjects =>

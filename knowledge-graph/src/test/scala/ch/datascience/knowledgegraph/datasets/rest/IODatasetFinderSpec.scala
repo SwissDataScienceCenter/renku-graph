@@ -332,12 +332,12 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset.toJsonLD()(topmostSameAs = TopmostSameAs(dataset.sameAs)),
             modifiedDataset.toJsonLD(
               commitId = projectDatasetModificationCommit,
-              topmostDerivedFrom = dataset.entityId.asDerivedFrom
+              topmostDerivedFrom = dataset.entityId.asTopmostDerivedFrom
             ), // to simulate modifying the data-set
             modifiedDataset // to simulate forking project after dataset modification
               .copy(projects = List(DatasetProject(forkedProject.path, forkedProject.name, modifiedOnProject)))
               .toJsonLD(commitId = projectDatasetModificationCommit,
-                        topmostDerivedFrom = dataset.entityId.asDerivedFrom
+                        topmostDerivedFrom = dataset.entityId.asTopmostDerivedFrom
               )
           )
 
@@ -545,7 +545,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         loadToStore(
           dataset1.toJsonLD()(topmostSameAs = dataset1.entityId.asTopmostSameAs),
           dataset2.toJsonLD()(topmostSameAs = dataset1.entityId.asTopmostSameAs),
-          modifiedDataset2.toJsonLD(topmostDerivedFrom = dataset2.entityId.asDerivedFrom),
+          modifiedDataset2.toJsonLD(topmostDerivedFrom = dataset2.entityId.asTopmostDerivedFrom),
           dataset3.toJsonLD()(topmostSameAs = modifiedDataset2.entityId.asTopmostSameAs)
         )
 

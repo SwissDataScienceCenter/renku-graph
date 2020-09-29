@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, TopmostSameAs, UrlSameAs}
+import ch.datascience.graph.model.datasets.{IdSameAs, TopmostDerivedFrom, TopmostSameAs, UrlSameAs}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.DataSetInfoFinder.DatasetInfo
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.TopmostDataFinder.TopmostData
@@ -29,7 +29,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.jsonld.EntityId
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait TopmostDataFinder[Interpretation[_]] {
   def findTopmostData(datasetInfo: DatasetInfo): Interpretation[TopmostData]
@@ -42,18 +41,18 @@ private class TopmostDataFinderImpl[Interpretation[_]](
 
   def findTopmostData(datasetInfo: DatasetInfo): Interpretation[TopmostData] = datasetInfo match {
     case (entityId, None, None) =>
-      TopmostData(entityId, TopmostSameAs(entityId), DerivedFrom(entityId)).pure[Interpretation]
+      TopmostData(entityId, TopmostSameAs(entityId), TopmostDerivedFrom(entityId)).pure[Interpretation]
     case (entityId, Some(sameAs: UrlSameAs), None) =>
-      TopmostData(entityId, TopmostSameAs(sameAs), DerivedFrom(entityId)).pure[Interpretation]
+      TopmostData(entityId, TopmostSameAs(sameAs), TopmostDerivedFrom(entityId)).pure[Interpretation]
     case (entityId, Some(sameAs: IdSameAs), None) =>
       kgDatasetInfoFinder.findTopmostSameAs(sameAs).map {
-        case Some(parentTopmostSameAs) => TopmostData(entityId, parentTopmostSameAs, DerivedFrom(entityId))
-        case None                      => TopmostData(entityId, TopmostSameAs(sameAs), DerivedFrom(entityId))
+        case Some(parentTopmostSameAs) => TopmostData(entityId, parentTopmostSameAs, TopmostDerivedFrom(entityId))
+        case None                      => TopmostData(entityId, TopmostSameAs(sameAs), TopmostDerivedFrom(entityId))
       }
     case (entityId, None, Some(derivedFrom)) =>
       kgDatasetInfoFinder.findTopmostDerivedFrom(derivedFrom).map {
         case Some(parentDerivedFrom) => TopmostData(entityId, TopmostSameAs(entityId), parentDerivedFrom)
-        case None                    => TopmostData(entityId, TopmostSameAs(entityId), derivedFrom)
+        case None                    => TopmostData(entityId, TopmostSameAs(entityId), TopmostDerivedFrom(derivedFrom))
       }
     case (entityId, Some(_), Some(_)) =>
       new IllegalStateException(
@@ -74,5 +73,10 @@ private object IOTopmostDataFinder {
 }
 
 private object TopmostDataFinder {
-  final case class TopmostData(datasetId: EntityId, sameAs: TopmostSameAs, derivedFrom: DerivedFrom)
+
+  final case class TopmostData(datasetId:          EntityId,
+                               topmostSameAs:      TopmostSameAs,
+                               topmostDerivedFrom: TopmostDerivedFrom
+  )
+
 }
