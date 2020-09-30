@@ -57,16 +57,19 @@ private class IOGraphUploader(
                             Some("upload jsonld")
       )
       .map { case (elapsedTime, (session, result)) =>
+        timeRecorder.logExecutionTime(withMessage = "Cypher triples upload query finished")
+        (elapsedTime, (session, result))
+      }
+      .map { case (elapsedTime, (session, result)) =>
         val resultAsString = result
           .list()
           .asScala
           .map((record: Record) => s"values: ${record.values()}")
           .mkString("\n")
         session.close()
-        logger.info(resultAsString)
+        logger.info(s"Triples upload query done in ${elapsedTime.value} ms - resultAsString")
         (elapsedTime, result)
       }
-      .map(timeRecorder.logExecutionTime(withMessage = "Cypher triples upload query finished"))
       .map(_ => DeliverySuccess)
   }
 }

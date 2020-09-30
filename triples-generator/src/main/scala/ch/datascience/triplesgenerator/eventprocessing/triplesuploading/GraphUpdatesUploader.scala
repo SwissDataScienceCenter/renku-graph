@@ -55,16 +55,19 @@ private class IOGraphUpdatesUploader(
                             Some(updateQuery.name)
       )
       .map { case (elapsedTime, (session, result)) =>
+        graphTimeRecorder.logExecutionTime(withMessage = "Cypher update query finished")
+        (elapsedTime, (session, result))
+      }
+      .map { case (elapsedTime, (session, result)) =>
         val resultString = result
           .list()
           .asScala
           .map((record: Record) => s"values: ${record.values()}")
           .mkString("\n")
-        logger.info(s"Update queries results - $resultString")
         session.close()
+        logger.info(s"Update queries results done in ${elapsedTime.value} ms - $resultString")
         (elapsedTime, result)
       }
-      .map(graphTimeRecorder.logExecutionTime(withMessage = "Cypher update query finished"))
       .map(_ => DeliverySuccess)
   }
 }
