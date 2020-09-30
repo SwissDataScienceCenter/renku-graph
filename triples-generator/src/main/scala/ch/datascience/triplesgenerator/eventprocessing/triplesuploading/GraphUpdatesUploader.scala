@@ -38,18 +38,14 @@ private class IOGraphUpdatesUploader(
 )(implicit
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
-    timer:            Timer[IO],
-    ME:               MonadError[IO, Throwable]
-) extends GraphUpdatesUploader[IO]
-    with Neo4jConfig {
+    timer:            Timer[IO]
+) extends GraphUpdatesUploader[IO] {
 
   import TriplesUploadResult._
-  override def send(updateQuery: CypherQuery): IO[TriplesUploadResult] = {
-    logger.info(s"Update queries - ${updateQuery.toString}")
-
+  override def send(updateQuery: CypherQuery): IO[TriplesUploadResult] =
     graphTimeRecorder
       .measureExecutionTime({
-                              val session: Session = driver.session()
+                              val session: Session = Neo4jConfig.driver.session()
                               IO.pure(session.run(updateQuery.toString)).map(r => (session, r))
                             },
                             Some(updateQuery.name)
@@ -65,9 +61,8 @@ private class IOGraphUpdatesUploader(
           .map((record: Record) => s"values: ${record.values()}")
           .mkString("\n")
         session.close()
-        logger.info(s"Update queries results done in ${elapsedTime.value} ms - $resultString")
-        (elapsedTime, result)
+        logger.info(s"Update query done in ${elapsedTime.value} ms - $resultString")
+        result
       }
       .map(_ => DeliverySuccess)
-  }
 }

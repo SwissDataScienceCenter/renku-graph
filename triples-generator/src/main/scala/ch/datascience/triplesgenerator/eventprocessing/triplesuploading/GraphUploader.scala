@@ -37,13 +37,11 @@ private class IOGraphUploader(
     logger:                  Logger[IO],
     timeRecorder:            ExecutionTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends GraphUploader[IO]
-    with Neo4jConfig {
+    extends GraphUploader[IO] {
 
   import scala.jdk.CollectionConverters._
   import eu.timepit.refined.auto._
   def upload(triples: JsonLDTriples): IO[TriplesUploadResult] = {
-    logger.info(triples.value.noSpaces)
     val cypherQuery =
       s"""
          |CALL n10s.rdf.import.inline('${triples.value.noSpaces.replace("\\", "\\\\")}', "JSON-LD")
@@ -51,7 +49,7 @@ private class IOGraphUploader(
 
     timeRecorder
       .measureExecutionTime({
-                              val session: Session = driver.session()
+                              val session: Session = Neo4jConfig.driver.session()
                               IO.pure(session.run(cypherQuery)).map(r => (session, r))
                             },
                             Some("upload jsonld")
@@ -67,14 +65,14 @@ private class IOGraphUploader(
           .map((record: Record) => s"values: ${record.values()}")
           .mkString("\n")
         session.close()
-        logger.info(s"Triples upload query done in ${elapsedTime.value} ms - resultAsString")
+        logger.info(s"Triples upload query done in ${elapsedTime.value} ms - $resultAsString")
         (elapsedTime, result)
       }
       .map(_ => DeliverySuccess)
   }
 }
 
-trait Neo4jConfig {
+object Neo4jConfig {
   import org.neo4j.driver.{AuthTokens, Driver, GraphDatabase}
 
   val uri      = "bolt://10.42.128.14:7687"

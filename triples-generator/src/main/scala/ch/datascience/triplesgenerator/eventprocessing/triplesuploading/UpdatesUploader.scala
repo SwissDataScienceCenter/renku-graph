@@ -28,7 +28,6 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 
 private trait UpdatesUploader[Interpretation[_]] {
   def send(updateQuery: SparqlQuery): Interpretation[TriplesUploadResult]

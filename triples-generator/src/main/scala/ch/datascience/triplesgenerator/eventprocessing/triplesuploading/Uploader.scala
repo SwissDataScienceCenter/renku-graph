@@ -22,13 +22,12 @@ import cats.MonadError
 import cats.effect.{ContextShift, Timer}
 import cats.syntax.all._
 import ch.datascience.logging.ExecutionTimeRecorder
-import ch.datascience.rdfstore.{CypherQuery, GraphQuery, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.{CypherQuery, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class Uploader[Interpretation[_]](
