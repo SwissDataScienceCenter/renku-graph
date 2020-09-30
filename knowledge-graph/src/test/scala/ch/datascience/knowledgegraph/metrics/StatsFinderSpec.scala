@@ -50,7 +50,8 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         EntityType((prov / "Activity").toString)      -> EntitiesCount(0L),
         EntityType((wfprov / "ProcessRun").toString)  -> EntitiesCount(0L),
         EntityType((wfprov / "WorkflowRun").toString) -> EntitiesCount(0L),
-        EntityType((renku / "Run").toString)          -> EntitiesCount(0L)
+        EntityType((renku / "Run").toString)          -> EntitiesCount(0L),
+        EntityType((schema / "Person").toString)      -> EntitiesCount(0L)
       )
     }
 
@@ -58,11 +59,12 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
 
       val entitiesByType = Map.empty[EntityType, EntitiesCount]
 
-      val datasetsJsons = nonEmptyList(datasetsWithActivities).generateOne.toList
+      val datasetsJsons = datasetsWithActivities.generateNonEmptyList().toList
       val entitiesWithDatasets = entitiesByType
         .update(schema / "Project", datasetsJsons.size)
         .update(prov / "Activity", datasetsJsons.size)
         .update(schema / "Dataset", datasetsJsons.size)
+        .update(schema / "Person", datasetsJsons.size)
 
       val processRunsJsons = nonEmptyList(processRuns).generateOne.toList
       val entitiesWithProcessRuns = entitiesWithDatasets
@@ -70,6 +72,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         .update(prov / "Activity", processRunsJsons.size)
         .update(wfprov / "ProcessRun", processRunsJsons.size)
         .update(renku / "Run", processRunsJsons.size)
+        .update(schema / "Person", processRunsJsons.size)
 
       val workflowsJsons = nonEmptyList(workflows).generateOne.toList
       val entitiesWithWorkflows = entitiesWithProcessRuns
@@ -78,6 +81,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         .update(wfprov / "ProcessRun", workflowsJsons.size)
         .update(wfprov / "WorkflowRun", workflowsJsons.size)
         .update(renku / "Run", workflowsJsons.size)
+        .update(schema / "Person", workflowsJsons.size)
 
       loadToStore(datasetsJsons ++ processRunsJsons ++ workflowsJsons: _*)
 

@@ -81,6 +81,13 @@ class StatsFinderImpl(
         |  } UNION {
         |    SELECT (renku:Run AS ?type) (COUNT(DISTINCT ?id) AS ?count)
         |    WHERE { ?id rdf:type renku:Run }
+        |  } UNION {
+        |    SELECT (schema:Person AS ?type) (COUNT(DISTINCT ?id) AS ?count)
+        |    WHERE { 
+        |      ?activityId rdf:type prov:Activity;
+        |                  prov:wasAssociatedWith ?id.
+        |      ?id rdf:type schema:Person;
+        |    }
         |  }
         |}
         |""".stripMargin
