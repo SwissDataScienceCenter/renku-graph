@@ -20,17 +20,18 @@ package ch.datascience.knowledgegraph.metrics
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import cats.syntax.all._
+import ch.datascience.rdfstore._
+import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Decoder
 import io.circe.Decoder.decodeList
+import io.circe.{Decoder, DecodingFailure}
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 trait StatsFinder[Interpretation[_]] {
-  def entitiesCount(): Interpretation[Map[KGEntityType, Long]]
+  def entitiesCount(): Interpretation[Map[EntityType, EntitiesCount]]
 }
 
 class StatsFinderImpl(
@@ -46,40 +47,50 @@ class StatsFinderImpl(
     with StatsFinder[IO] {
 
   import EntityCount._
+  import ch.datascience.graph.Schemas._
 
-  override def entitiesCount(): IO[Map[KGEntityType, Long]] =
-    for {
-      results <- queryExpecting[List[(KGEntityType, Long)]](using = query)
-    } yield addMissingStatues(results.toMap)
+  override def entitiesCount(): IO[Map[EntityType, EntitiesCount]] =
+    queryExpecting[List[(EntityType, EntitiesCount)]](using = query) map (_.toMap)
 
   private lazy val query = SparqlQuery(
     name = "entities - counts",
     Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
+      rdf    asPrefix "rdf",
+      prov   asPrefix "prov",
+      schema asPrefix "schema",
+      wfprov asPrefix "wfprov",
+      renku  asPrefix "renku"
     ),
-    s"""|SELECT ?type (COUNT(DISTINCT ?id) as ?count)
+    s"""|SELECT ?type ?count
         |WHERE {
-        |  ?id rdf:type ?type
-        |  FILTER (?type IN (<http://schema.org/Dataset>, <http://schema.org/Project>, 
-        |  <http://www.w3.org/ns/prov#Activity>,  <http://purl.org/wf4ever/wfprov#ProcessRun>,
-        |  <http://purl.org/wf4ever/wfprov#WorkflowRun>))
+        |  {
+        |    SELECT (schema:Dataset AS ?type) (COUNT(DISTINCT ?id) AS ?count)
+        |    WHERE { ?id rdf:type schema:Dataset }
+        |  } UNION {
+        |    SELECT (schema:Project AS ?type) (COUNT(DISTINCT ?id) AS ?count)
+        |    WHERE { ?id rdf:type schema:Project }
+        |  } UNION {
+        |    SELECT (prov:Activity AS ?type) (COUNT(DISTINCT ?id) AS ?count)
+        |    WHERE { ?id rdf:type prov:Activity }
+        |  } UNION {
+        |    SELECT (wfprov:ProcessRun AS ?type) (COUNT(DISTINCT ?id) AS ?count)
+        |    WHERE { ?id rdf:type wfprov:ProcessRun }
+        |  } UNION {
+        |    SELECT (wfprov:WorkflowRun AS ?type) (COUNT(DISTINCT ?id) AS ?count)
+        |    WHERE { ?id rdf:type wfprov:WorkflowRun }
+        |  }
         |}
-        |GROUP BY ?type
         |""".stripMargin
   )
-
-  private def addMissingStatues(stats: Map[KGEntityType, Long]): Map[KGEntityType, Long] =
-    KGEntityType.all.map(entityType => entityType -> stats.getOrElse(entityType, 0L)).toMap
-
 }
 
 private object EntityCount {
 
-  private[metrics] implicit val countsDecoder: Decoder[List[(KGEntityType, Long)]] = {
-    val counts: Decoder[(KGEntityType, Long)] = { cursor =>
+  private[metrics] implicit val countsDecoder: Decoder[List[(EntityType, EntitiesCount)]] = {
+    val counts: Decoder[(EntityType, EntitiesCount)] = { cursor =>
       for {
-        entityType <- cursor.downField("type").downField("value").as[KGEntityType]
-        count      <- cursor.downField("count").downField("value").as[Long]
+        entityType <- cursor.downField("type").downField("value").as[String].flatMap(convert[String, EntityType])
+        count      <- cursor.downField("count").downField("value").as[Long].flatMap(convert[Long, EntitiesCount])
       } yield entityType -> count
     }
 
@@ -87,6 +98,14 @@ private object EntityCount {
       .downField("bindings")
       .as(decodeList(counts))
   }
+
+  private def convert[IN, OUT <: TinyType { type V = IN }](implicit
+      tinyTypeFactory: TinyTypeFactory[OUT]
+  ): IN => Either[DecodingFailure, OUT] =
+    value =>
+      tinyTypeFactory
+        .from(value)
+        .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
 }
 
 object IOStatsFinder {
