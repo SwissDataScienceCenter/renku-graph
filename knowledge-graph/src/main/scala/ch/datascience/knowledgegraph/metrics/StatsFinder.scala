@@ -78,6 +78,9 @@ class StatsFinderImpl(
         |  } UNION {
         |    SELECT (wfprov:WorkflowRun AS ?type) (COUNT(DISTINCT ?id) AS ?count)
         |    WHERE { ?id rdf:type wfprov:WorkflowRun }
+        |  } UNION {
+        |    SELECT (renku:Run AS ?type) (COUNT(DISTINCT ?id) AS ?count)
+        |    WHERE { ?id rdf:type renku:Run }
         |  }
         |}
         |""".stripMargin
