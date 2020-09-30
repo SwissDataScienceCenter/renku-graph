@@ -122,7 +122,7 @@ class SparqlQuerySpec extends AnyWordSpec with should.Matchers {
   "toCountQuery" should {
 
     "wrap query's body with the COUNT clause" in {
-      val prefixes = Set(nonBlankStrings().generateOne)
+      val prefixes = Set(nonBlankStrings().generateOne.value)
       val body     = sentences().generateOne.value
       val query    = SparqlQuery(name = "test query", prefixes, body)
 

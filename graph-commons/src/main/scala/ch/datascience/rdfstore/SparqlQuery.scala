@@ -24,7 +24,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 
 final case class SparqlQuery(name:               String Refined NonEmpty,
-                             prefixes:           Set[String Refined NonEmpty],
+                             prefixes:           Set[String],
                              body:               String,
                              maybePagingRequest: Option[PagingRequest] = None
 ) {

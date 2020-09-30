@@ -36,7 +36,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
+import scala.language.postfixOps
 
 class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with IntegrationPatience with should.Matchers {
 
@@ -52,7 +52,7 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
 
       counts foreach { case (entityType, count) =>
         (countsGauge.set _)
-          .expects(entityType -> count.toDouble)
+          .expects(entityType -> count.value.toDouble)
           .returning(IO.unit)
           .atLeastOnce()
       }
@@ -68,7 +68,7 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
       val exception1 = exceptions.generateOne
       (statsFinder.entitiesCount _)
         .expects()
-        .returning(exception1.raiseError[IO, Map[KGEntityType, Long]])
+        .returning(exception1.raiseError[IO, Map[EntityType, EntitiesCount]])
 
       val statuses = entitiesCountGen.generateOne
       (statsFinder.entitiesCount _)
@@ -78,7 +78,7 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
 
       statuses foreach { case (entity, count) =>
         (countsGauge.set _)
-          .expects(entity -> count.toDouble)
+          .expects(entity -> count.value.toDouble)
           .returning(IO.unit)
           .atLeastOnce()
       }
@@ -97,13 +97,13 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
   private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
 
   private trait TestGauges {
-    lazy val countsGauge = mock[LabeledGauge[IO, KGEntityType]]
+    lazy val countsGauge = mock[LabeledGauge[IO, EntityType]]
   }
 
   private trait TestCase extends TestGauges {
     lazy val statsFinder: StatsFinder[IO] = mock[StatsFinder[IO]]
     lazy val logger = TestLogger[IO]()
-    lazy val metrics = new IOKGMetrics(
+    lazy val metrics = new KGMetricsImpl(
       statsFinder,
       logger,
       countsGauge,
@@ -112,10 +112,10 @@ class KGMetricsSpec extends AnyWordSpec with MockFactory with Eventually with In
     )
   }
 
-  private lazy val entitiesCountGen: Gen[Map[KGEntityType, Long]] = nonEmptySet {
+  private lazy val entitiesCountGen: Gen[Map[EntityType, EntitiesCount]] = nonEmptySet {
     for {
       entityType <- entitiesTypes
-      count      <- nonNegativeLongs()
-    } yield entityType -> count.value
+      count      <- nonNegativeLongs() map (long => EntitiesCount(long.value))
+    } yield entityType -> count
   }.map(_.toMap)
 }

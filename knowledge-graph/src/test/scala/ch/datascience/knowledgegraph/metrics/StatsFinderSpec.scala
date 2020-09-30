@@ -29,11 +29,11 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
 import ch.datascience.rdfstore.entities._
-import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.entities.bundles.{generateProject, nonModifiedDataSetCommit, renkuBaseUrl}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.auto._
-import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
+import io.renku.jsonld.{JsonLD, Property}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -44,31 +44,44 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
   "entitiesCount" should {
 
     "return zero if there are no entity in the DB" in new TestCase {
-      stats.entitiesCount().unsafeRunSync() shouldBe KGEntityType.all.map(entityType => entityType -> 0).toMap
+      stats.entitiesCount().unsafeRunSync() shouldBe Map(
+        EntityType((schema / "Dataset").toString)     -> EntitiesCount(0L),
+        EntityType((schema / "Project").toString)     -> EntitiesCount(0L),
+        EntityType((prov / "Activity").toString)      -> EntitiesCount(0L),
+        EntityType((wfprov / "ProcessRun").toString)  -> EntitiesCount(0L),
+        EntityType((wfprov / "WorkflowRun").toString) -> EntitiesCount(0L),
+        EntityType((renku / "Run").toString)          -> EntitiesCount(0L),
+        EntityType((schema / "Person").toString)      -> EntitiesCount(0L)
+      )
     }
 
     "return info about number of objects by types" in new TestCase {
 
-      val entitiesByType = Map.empty[KGEntityType, Int]
+      val entitiesByType = Map.empty[EntityType, EntitiesCount]
 
-      val datasetsJsons = nonEmptyList(datasetsWithActivities).generateOne.toList
+      val datasetsJsons = datasetsWithActivities.generateNonEmptyList().toList
       val entitiesWithDatasets = entitiesByType
-        .update(KGEntityType.Project, datasetsJsons.size)
-        .update(KGEntityType.Activity, datasetsJsons.size)
-        .update(KGEntityType.Dataset, datasetsJsons.size)
+        .update(schema / "Project", datasetsJsons.size)
+        .update(prov / "Activity", datasetsJsons.size)
+        .update(schema / "Dataset", datasetsJsons.size)
+        .update(schema / "Person", datasetsJsons.size)
 
       val processRunsJsons = nonEmptyList(processRuns).generateOne.toList
       val entitiesWithProcessRuns = entitiesWithDatasets
-        .update(KGEntityType.Project, processRunsJsons.size)
-        .update(KGEntityType.Activity, processRunsJsons.size)
-        .update(KGEntityType.ProcessRun, processRunsJsons.size)
+        .update(schema / "Project", processRunsJsons.size)
+        .update(prov / "Activity", processRunsJsons.size)
+        .update(wfprov / "ProcessRun", processRunsJsons.size)
+        .update(renku / "Run", processRunsJsons.size)
+        .update(schema / "Person", processRunsJsons.size)
 
       val workflowsJsons = nonEmptyList(workflows).generateOne.toList
       val entitiesWithWorkflows = entitiesWithProcessRuns
-        .update(KGEntityType.Project, workflowsJsons.size)
-        .update(KGEntityType.Activity, workflowsJsons.size)
-        .update(KGEntityType.ProcessRun, workflowsJsons.size)
-        .update(KGEntityType.WorkflowRun, workflowsJsons.size)
+        .update(schema / "Project", workflowsJsons.size)
+        .update(prov / "Activity", workflowsJsons.size)
+        .update(wfprov / "ProcessRun", workflowsJsons.size)
+        .update(wfprov / "WorkflowRun", workflowsJsons.size)
+        .update(renku / "Run", workflowsJsons.size)
+        .update(schema / "Person", workflowsJsons.size)
 
       loadToStore(datasetsJsons ++ processRunsJsons ++ workflowsJsons: _*)
 
@@ -157,8 +170,11 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
       ).asJsonLD
     }
 
-  private implicit class MapOps(entitiesByType: Map[KGEntityType, Int]) {
-    def update(entityType: KGEntityType, entities: Int): Map[KGEntityType, Int] =
-      entitiesByType.updated(entityType, entitiesByType.getOrElse(entityType, 0) + entities)
+  private implicit class MapOps(entitiesByType: Map[EntityType, EntitiesCount]) {
+    def update(entityType: Property, count: Long): Map[EntityType, EntitiesCount] = {
+      val entity       = EntityType(entityType.toString)
+      val runningTotal = entitiesByType.getOrElse(entity, EntitiesCount(0L)).value
+      entitiesByType.updated(entity, EntitiesCount(runningTotal + count))
+    }
   }
 }

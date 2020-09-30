@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
-import ch.datascience.knowledgegraph.metrics.IOKGMetrics
+import ch.datascience.knowledgegraph.metrics.KGMetrics
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -110,7 +110,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     val sentryInitializer = mock[IOSentryInitializer]
     val httpServer        = mock[IOHttpServer]
-    val kgMetrics         = mock[IOKGMetrics]
+    val kgMetrics         = mock[KGMetrics[IO]]
     val runner            = new MicroserviceRunner(sentryInitializer, httpServer, kgMetrics)
   }
 }

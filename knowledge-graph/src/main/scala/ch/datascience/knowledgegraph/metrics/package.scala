@@ -18,58 +18,26 @@
 
 package ch.datascience.knowledgegraph
 
-import cats.syntax.all._
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import io.circe.Decoder
-import io.circe.Decoder.decodeString
+import ch.datascience.graph.Schemas
+import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{LongTinyType, StringTinyType, TinyTypeFactory}
 
 package object metrics {
-
-  sealed trait KGEntityType extends StringTinyType {
-    def rdfType: String
+  final class EntityType private (val value: String) extends AnyVal with StringTinyType
+  implicit object EntityType extends TinyTypeFactory[EntityType](new EntityType(_)) with NonBlank {
+    private val allSchemas = Schemas.all.map(_.toString)
+    override val transform: String => Either[Throwable, String] = entityType =>
+      allSchemas
+        .find(schema => entityType.startsWith(schema))
+        .map(schema => entityType.replace(schema, ""))
+        .toRight(left = new IllegalArgumentException(s"$entityType not recognizable"))
   }
 
-  object KGEntityType extends TinyTypeFactory[KGEntityType](EventStatusInstantiator) {
-
-    val all: Set[KGEntityType] =
-      Set(Dataset, Project, ProcessRun, Activity, WorkflowRun)
-
-    final case object Dataset extends KGEntityType {
-      override val value: String = "Dataset"
-      val rdfType = "http://schema.org/Dataset"
-    }
-    final case object Project extends KGEntityType {
-      override val value: String = "Project"
-      val rdfType = "http://schema.org/Project"
-    }
-
-    final case object ProcessRun extends KGEntityType {
-      override val value: String = "ProcessRun"
-      val rdfType = "http://purl.org/wf4ever/wfprov#ProcessRun"
-    }
-
-    final case object Activity extends KGEntityType {
-      override val value: String = "Activity"
-      val rdfType = "http://www.w3.org/ns/prov#Activity"
-    }
-
-    final case object WorkflowRun extends KGEntityType {
-      override val value: String = "WorkflowRun"
-      val rdfType = "http://purl.org/wf4ever/wfprov#WorkflowRun"
-    }
-
-    implicit val kgEntityTypeDecoder: Decoder[KGEntityType] = decodeString.emap { value =>
-      Either.fromOption(
-        KGEntityType.all.find(_.rdfType == value),
-        ifNone = s"'$value' unknown KGEntityType"
-      )
-    }
+  final class EntitiesCount private (val value: Long) extends AnyVal with LongTinyType
+  implicit object EntitiesCount extends TinyTypeFactory[EntitiesCount](new EntitiesCount(_)) {
+    addConstraint(
+      check = _ >= 0L,
+      message = _ => s"$typeName has to be >= 0"
+    )
   }
-
-  private object EventStatusInstantiator extends (String => KGEntityType) {
-    override def apply(value: String): KGEntityType = KGEntityType.all.find(_.value == value).getOrElse {
-      throw new IllegalArgumentException(s"'$value' unknown KGEntityType")
-    }
-  }
-
 }

@@ -19,8 +19,17 @@
 package ch.datascience.knowledgegraph.metrics
 
 import org.scalacheck.Gen
+import ch.datascience.graph.Schemas._
 
 private object MetricsGenerators {
 
-  implicit val entitiesTypes: Gen[KGEntityType] = Gen.oneOf(KGEntityType.all)
+  implicit val entitiesTypes: Gen[EntityType] = Gen
+    .oneOf(
+      schema / "Dataset",
+      schema / "Project",
+      prov / "Activity",
+      wfprov / "ProcessRun",
+      wfprov / "WorkflowRun"
+    )
+    .map(objectType => EntityType(objectType.toString))
 }

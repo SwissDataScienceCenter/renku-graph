@@ -29,6 +29,8 @@ trait Schemas {
   val xmlSchema: Schema = Schema.from("http://www.w3.org/2001/XMLSchema", separator = "#")
   val schema:    Schema = Schema.from("http://schema.org")
   val renku:     Schema = Schema.from("https://swissdatasciencecenter.github.io/renku-ontology", separator = "#")
+
+  val all: Set[Schema] = Set(prov, wfprov, wfdesc, rdf, rdfs, xmlSchema, schema, renku)
 }
 
 object Schemas extends Schemas
