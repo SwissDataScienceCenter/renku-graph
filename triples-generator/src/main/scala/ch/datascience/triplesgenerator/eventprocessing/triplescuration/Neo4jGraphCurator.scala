@@ -19,12 +19,14 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import cats.MonadError
+import cats.data.EitherT
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.{CypherQuery, JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.{IONeo4jDatasetInfoEnricher, Neo4jDatasetInfoEnricher}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.{Neo4jPersonDetailsUpdater, PersonDetailsUpdater}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -38,8 +40,9 @@ trait GraphCurator[Interpretation[_]] {
 }
 
 private[eventprocessing] class GraphCuratorImpl[Interpretation[_]](
-    dataSetInfoEnricher: Neo4jDatasetInfoEnricher[Interpretation]
-)(implicit ME:           MonadError[Interpretation, Throwable])
+    personDetailsUpdater: Neo4jPersonDetailsUpdater[Interpretation],
+    dataSetInfoEnricher:  Neo4jDatasetInfoEnricher[Interpretation]
+)(implicit ME:            MonadError[Interpretation, Throwable])
     extends GraphCurator[Interpretation] {
 
   override def curate(
@@ -47,11 +50,14 @@ private[eventprocessing] class GraphCuratorImpl[Interpretation[_]](
       triples:                 JsonLDTriples
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation, CypherQuery] =
     for {
-      triplesWithEnrichedDatasets <-
-        dataSetInfoEnricher.enrichDataSetInfo(
-          CuratedTriples(triples, List.empty[CurationUpdatesGroup[Interpretation, CypherQuery]])
-        )
+      triplesWithPersonDetails <-
+        personDetailsUpdater.curate(CuratedTriples[Interpretation, CypherQuery](triples, updatesGroups = Nil)).toRight
+      triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithPersonDetails)
     } yield triplesWithEnrichedDatasets
+
+  private implicit class InterpretationOps(out: Interpretation[CuratedTriples[Interpretation, CypherQuery]]) {
+    lazy val toRight: CurationResults[Interpretation, CypherQuery] = EitherT.right[ProcessingRecoverableError](out)
+  }
 }
 
 private[eventprocessing] object IOGraphCurator {
@@ -71,5 +77,5 @@ private[eventprocessing] object IOGraphCurator {
   )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[GraphCurator[IO]] =
     for {
       datasetInfoEnricher <- IONeo4jDatasetInfoEnricher(logger, timeRecorder)
-    } yield new GraphCuratorImpl(datasetInfoEnricher)
+    } yield new GraphCuratorImpl[IO](Neo4jPersonDetailsUpdater[IO](), datasetInfoEnricher)
 }

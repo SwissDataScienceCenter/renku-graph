@@ -23,32 +23,31 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
+import ch.datascience.rdfstore.{CypherQuery, JsonLDTriples}
 import io.circe.Json
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath._
 import monocle.function.Plated
 
-private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
-    updatesCreator: UpdatesCreator
+private[triplescuration] class Neo4jPersonDetailsUpdater[Interpretation[_]](
+    updatesCreator: Neo4jUpdatesCreator
 )(implicit ME:      MonadError[Interpretation, Throwable]) {
 
   import PersonDetailsUpdater._
   import updatesCreator._
 
   def curate(
-      curatedTriples: CuratedTriples[Interpretation, SparqlQuery]
-  ): Interpretation[CuratedTriples[Interpretation, SparqlQuery]] =
+      curatedTriples: CuratedTriples[Interpretation, CypherQuery]
+  ): Interpretation[CuratedTriples[Interpretation, CypherQuery]] =
     removePersonsAttributes(curatedTriples.triples) map { case (updatedTriples, persons) =>
       val newUpdatesGroups = persons map prepareUpdates[Interpretation]
       CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
     }
 
   private object removePersonsAttributes extends (JsonLDTriples => Interpretation[(JsonLDTriples, Set[Person])]) {
+    import scala.collection.mutable
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
     import ch.datascience.tinytypes.json.TinyTypeEncoders._
-
-    import scala.collection.mutable
 
     override def apply(triples: JsonLDTriples): Interpretation[(JsonLDTriples, Set[Person])] = {
       val persons = mutable.HashSet[Person]()
@@ -109,11 +108,10 @@ private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
   }
 }
 
-private[triplescuration] object PersonDetailsUpdater {
+private[triplescuration] object Neo4jPersonDetailsUpdater {
 
   def apply[Interpretation[_]]()(implicit
       ME: MonadError[Interpretation, Throwable]
-  ): PersonDetailsUpdater[Interpretation] = new PersonDetailsUpdater[Interpretation](new UpdatesCreator)
-
-  final case class Person(id: ResourceId, names: NonEmptyList[Name], emails: Set[Email])
+  ): Neo4jPersonDetailsUpdater[Interpretation] =
+    new Neo4jPersonDetailsUpdater[Interpretation](new Neo4jUpdatesCreator())
 }
