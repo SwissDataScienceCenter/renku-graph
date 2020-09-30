@@ -26,7 +26,7 @@ import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.{IONeo4jDatasetInfoEnricher, Neo4jDatasetInfoEnricher}
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.{Neo4jPersonDetailsUpdater, PersonDetailsUpdater}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.{IONeo4jPersonDetailsUpdater, Neo4jPersonDetailsUpdater, PersonDetailsUpdater}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -76,6 +76,7 @@ private[eventprocessing] object IOGraphCurator {
       timeRecorder:            SparqlQueryTimeRecorder[IO]
   )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[GraphCurator[IO]] =
     for {
-      datasetInfoEnricher <- IONeo4jDatasetInfoEnricher(logger, timeRecorder)
-    } yield new GraphCuratorImpl[IO](Neo4jPersonDetailsUpdater[IO](), datasetInfoEnricher)
+      datasetInfoEnricher       <- IONeo4jDatasetInfoEnricher(logger, timeRecorder)
+      neo4jPersonDetailsUpdater <- IONeo4jPersonDetailsUpdater()
+    } yield new GraphCuratorImpl[IO](neo4jPersonDetailsUpdater, datasetInfoEnricher)
 }

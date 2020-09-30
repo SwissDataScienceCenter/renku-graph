@@ -21,6 +21,7 @@ package persondetails
 
 import cats.MonadError
 import cats.data.NonEmptyList
+import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.{CypherQuery, JsonLDTriples}
@@ -28,6 +29,8 @@ import io.circe.Json
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath._
 import monocle.function.Plated
+
+import scala.concurrent.ExecutionContext
 
 private[triplescuration] class Neo4jPersonDetailsUpdater[Interpretation[_]](
     updatesCreator: Neo4jUpdatesCreator
@@ -114,4 +117,15 @@ private[triplescuration] object Neo4jPersonDetailsUpdater {
       ME: MonadError[Interpretation, Throwable]
   ): Neo4jPersonDetailsUpdater[Interpretation] =
     new Neo4jPersonDetailsUpdater[Interpretation](new Neo4jUpdatesCreator())
+}
+
+private[triplescuration] object IONeo4jPersonDetailsUpdater {
+  import cats.effect.Timer
+
+  def apply()(implicit
+      executionContext: ExecutionContext,
+      cs:               ContextShift[IO],
+      timer:            Timer[IO],
+      ME:               MonadError[IO, Throwable]
+  ): IO[Neo4jPersonDetailsUpdater[IO]] = IO(new Neo4jPersonDetailsUpdater[IO](new Neo4jUpdatesCreator()))
 }
