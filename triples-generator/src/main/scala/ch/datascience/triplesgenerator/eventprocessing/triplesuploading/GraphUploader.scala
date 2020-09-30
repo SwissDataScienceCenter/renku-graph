@@ -48,27 +48,25 @@ private class IOGraphUploader(
          |""".stripMargin
 
     timeRecorder
-      .measureExecutionTime({
-                              val session: Session = Neo4jConfig.driver.session()
-                              IO.pure(session.run(cypherQuery)).map(r => (session, r))
-                            },
-                            Some("upload jsonld")
+      .measureExecutionTime(
+        {
+          val session: Session = Neo4jConfig.driver.session()
+          IO.pure(session.run(cypherQuery))
+            .map { result =>
+              val resultAsString = result
+                .list()
+                .asScala
+                .map((record: Record) => s"values: ${record.values()}")
+                .mkString("\n")
+              session.close()
+              logger.info(s"Triples upload query - $resultAsString")
+            }
+            .map(_ => DeliverySuccess)
+        },
+        Some("upload jsonld")
       )
-      .map { case (elapsedTime, (session, result)) =>
-        timeRecorder.logExecutionTime(withMessage = "Cypher triples upload query finished")
-        (elapsedTime, (session, result))
-      }
-      .map { case (elapsedTime, (session, result)) =>
-        val resultAsString = result
-          .list()
-          .asScala
-          .map((record: Record) => s"values: ${record.values()}")
-          .mkString("\n")
-        session.close()
-        logger.info(s"Triples upload query done in ${elapsedTime.value} ms - $resultAsString")
-        (elapsedTime, result)
-      }
-      .map(_ => DeliverySuccess)
+      .map(timeRecorder.logExecutionTime(withMessage = "Cypher triples upload query finished"))
+
   }
 }
 

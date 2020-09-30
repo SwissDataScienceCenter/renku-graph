@@ -44,25 +44,24 @@ private class IOGraphUpdatesUploader(
   import TriplesUploadResult._
   override def send(updateQuery: CypherQuery): IO[TriplesUploadResult] =
     graphTimeRecorder
-      .measureExecutionTime({
-                              val session: Session = Neo4jConfig.driver.session()
-                              IO.pure(session.run(updateQuery.toString)).map(r => (session, r))
-                            },
-                            Some(updateQuery.name)
+      .measureExecutionTime(
+        {
+          val session: Session = Neo4jConfig.driver.session()
+          IO.pure(session.run(updateQuery.toString))
+            .map { result =>
+              val resultString = result
+                .list()
+                .asScala
+                .map((record: Record) => s"values: ${record.values()}")
+                .mkString("\n")
+              session.close()
+              logger.info(s"Update query done - $resultString")
+              result
+            }
+            .map(_ => DeliverySuccess)
+        },
+        Some(updateQuery.name)
       )
-      .map { case (elapsedTime, (session, result)) =>
-        graphTimeRecorder.logExecutionTime(withMessage = "Cypher update query finished")
-        (elapsedTime, (session, result))
-      }
-      .map { case (elapsedTime, (session, result)) =>
-        val resultString = result
-          .list()
-          .asScala
-          .map((record: Record) => s"values: ${record.values()}")
-          .mkString("\n")
-        session.close()
-        logger.info(s"Update query done in ${elapsedTime.value} ms - $resultString")
-        result
-      }
-      .map(_ => DeliverySuccess)
+      .map(graphTimeRecorder.logExecutionTime(withMessage = "Cypher update query finished"))
+
 }
