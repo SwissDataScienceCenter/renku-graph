@@ -60,11 +60,10 @@ private class IOGraphUpdatesUploader(
               logger.info(s"Query consumed for update query - ${updateQuery.name}")
               summary
             }
-
             logger.info(
               s"Update query done in ${resultSummary.resultAvailableAfter(TimeUnit.MILLISECONDS)} ms - $resultSummary"
             )
-            ()
+            resultSummary
           }.getOrElse(throw new Exception(s"Could not execute query: ${updateQuery.name}"))
         }.map(_ => DeliverySuccess),
         Some(updateQuery.name)
