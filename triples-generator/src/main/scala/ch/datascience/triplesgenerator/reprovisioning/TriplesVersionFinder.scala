@@ -24,7 +24,6 @@ import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait TriplesVersionFinder[Interpretation[_]] {
   def triplesUpToDate(): Interpretation[Boolean]

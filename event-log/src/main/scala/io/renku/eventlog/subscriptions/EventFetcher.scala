@@ -36,7 +36,6 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
 
-import scala.language.higherKinds
 import scala.util.Random
 
 private trait EventFetcher[Interpretation[_]] {

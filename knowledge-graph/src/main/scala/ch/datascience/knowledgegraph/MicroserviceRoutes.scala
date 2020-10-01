@@ -35,8 +35,6 @@ import ch.datascience.metrics.RoutesMetrics
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{ParseFailure, Response}
 
-import scala.language.higherKinds
-
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     queryEndpoint:           QueryEndpoint[F],
     projectEndpoint:         ProjectEndpoint[F],

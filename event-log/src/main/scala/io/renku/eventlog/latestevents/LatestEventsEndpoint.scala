@@ -27,7 +27,6 @@ import io.chrisdavenport.log4cats.Logger
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class LatestEventsEndpoint[Interpretation[_]: Effect](

@@ -34,7 +34,6 @@ import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.Proc
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private object Commands {

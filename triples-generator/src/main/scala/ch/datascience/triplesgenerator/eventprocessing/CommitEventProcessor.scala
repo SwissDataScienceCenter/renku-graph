@@ -40,7 +40,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Histogram
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private trait EventProcessor[Interpretation[_]] {

@@ -32,7 +32,6 @@ import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 trait CommitEventSender[Interpretation[_]] {
   def send(commitEvent: CommitEvent): Interpretation[EventSendingResult]

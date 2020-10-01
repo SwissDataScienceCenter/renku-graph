@@ -30,7 +30,6 @@ import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResul
 import io.renku.eventlog.{EventLogDB, EventMessage}
 import org.http4s.dsl.Http4sDsl
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class StatusChangeEndpoint[Interpretation[_]: Effect](

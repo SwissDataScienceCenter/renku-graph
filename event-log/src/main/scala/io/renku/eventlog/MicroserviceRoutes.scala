@@ -36,7 +36,6 @@ import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Response}
 
-import scala.language.higherKinds
 import scala.util.Try
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](

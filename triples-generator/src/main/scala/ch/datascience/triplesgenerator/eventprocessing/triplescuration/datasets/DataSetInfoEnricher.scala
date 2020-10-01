@@ -31,7 +31,6 @@ import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private[triplescuration] trait DataSetInfoEnricher[Interpretation[_]] {
   def enrichDataSetInfo(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation]

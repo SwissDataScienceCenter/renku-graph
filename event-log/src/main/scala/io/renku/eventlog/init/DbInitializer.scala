@@ -25,7 +25,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.EventStatus.RecoverableFailure
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class DbInitializer[Interpretation[_]](

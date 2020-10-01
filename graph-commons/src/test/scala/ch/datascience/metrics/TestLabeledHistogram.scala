@@ -24,8 +24,6 @@ import eu.timepit.refined.collection.NonEmpty
 import io.prometheus.client.{Histogram => LibHistogram}
 import org.scalatest.Assertions.fail
 
-import scala.language.higherKinds
-
 class TestLabeledHistogram[LabelValue](
     protected val histogram: LibHistogram
 ) extends LabeledHistogram[IO, LabelValue] {

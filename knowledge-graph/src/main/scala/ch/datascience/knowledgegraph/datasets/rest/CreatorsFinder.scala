@@ -30,7 +30,6 @@ import io.circe.Decoder.{Result, decodeList}
 import io.circe.HCursor
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private class CreatorsFinder(
     rdfStoreConfig:          RdfStoreConfig,

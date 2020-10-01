@@ -24,7 +24,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventStatus
 import org.http4s.dsl.Http4sDsl
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class SubscriptionsEndpoint[Interpretation[_]: Effect](

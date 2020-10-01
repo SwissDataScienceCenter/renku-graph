@@ -26,8 +26,6 @@ import doobie.implicits._
 import io.renku.eventlog.latestevents.LatestEventsFinder.IdProjectBody
 import io.renku.eventlog.{EventLogDB, EventProject, TypesSerializers}
 
-import scala.language.higherKinds
-
 trait LatestEventsFinder[Interpretation[_]] {
   def findAllLatestEvents(): Interpretation[List[IdProjectBody]]
 }

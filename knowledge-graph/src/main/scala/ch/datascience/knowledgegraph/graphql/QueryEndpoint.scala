@@ -33,7 +33,6 @@ import sangria.renderer.SchemaRenderer.renderSchema
 import sangria.schema.Schema
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.Try
 import scala.util.control.NonFatal
 

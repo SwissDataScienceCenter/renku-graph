@@ -39,7 +39,6 @@ import ch.datascience.webhookservice.tokenrepository.{AccessTokenAssociator, IOA
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private class HookCreator[Interpretation[_]](

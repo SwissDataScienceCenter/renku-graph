@@ -29,7 +29,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.circe.HCursor
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private class BaseDetailsFinder(
     rdfStoreConfig: RdfStoreConfig,

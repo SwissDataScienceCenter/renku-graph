@@ -23,8 +23,6 @@ import ch.datascience.metrics.RoutesMetrics
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingEndpoint
 import org.http4s.dsl.Http4sDsl
 
-import scala.language.higherKinds
-
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     eventProcessingEndpoint: EventProcessingEndpoint[F],
     routesMetrics:           RoutesMetrics[F]

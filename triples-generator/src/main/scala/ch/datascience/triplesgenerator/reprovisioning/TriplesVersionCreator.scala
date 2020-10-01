@@ -27,7 +27,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.jsonld.EntityId
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait TriplesVersionCreator[Interpretation[_]] {
   def updateCliVersion(): Interpretation[Unit]

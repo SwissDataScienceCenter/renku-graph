@@ -126,6 +126,9 @@ Response body example:
     }
   ],
   "identifier" : "6f622603-2129-4058-ad29-3ff927481461",
+  "versions" : {
+    "initial: "6f622603-2129-4058-ad29-3ff927481460"
+  }
   "title" : "dataset title",
   "name" : "dataset alternate name",
   "url" : "http://host/url1",  // optional property

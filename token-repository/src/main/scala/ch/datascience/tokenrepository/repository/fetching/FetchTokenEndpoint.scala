@@ -33,7 +33,6 @@ import org.http4s.Response
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class FetchTokenEndpoint[Interpretation[_]: Effect](

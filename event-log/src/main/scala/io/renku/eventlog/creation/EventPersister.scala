@@ -36,8 +36,6 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus.{New, Processing, RecoverableFailure}
 import io.renku.eventlog.{Event, EventLogDB, EventStatus}
 
-import scala.language.higherKinds
-
 trait EventPersister[Interpretation[_]] {
   def storeNewEvent(event: Event): Interpretation[Result]
 }

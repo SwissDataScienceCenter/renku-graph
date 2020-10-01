@@ -25,7 +25,6 @@ import ch.datascience.triplesgenerator.config.FusekiAdminConfig
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait DatasetExistenceChecker[Interpretation[_]] {
   def doesDatasetExists(): Interpretation[Boolean]

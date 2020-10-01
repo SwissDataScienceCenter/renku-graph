@@ -25,8 +25,6 @@ import ch.datascience.graph.model.projects
 import doobie.implicits._
 import io.renku.eventlog.EventLogDB
 
-import scala.language.higherKinds
-
 private object ProjectPathFinder {
 
   import io.renku.eventlog.TypesSerializers._

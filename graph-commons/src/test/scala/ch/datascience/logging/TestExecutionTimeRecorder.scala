@@ -30,7 +30,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Histogram
 
 import scala.concurrent.duration.TimeUnit
-import scala.language.higherKinds
 import scala.util.Try
 
 object TestExecutionTimeRecorder {

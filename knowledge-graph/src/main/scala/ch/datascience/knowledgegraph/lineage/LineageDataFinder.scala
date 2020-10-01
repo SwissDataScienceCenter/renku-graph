@@ -30,7 +30,6 @@ import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait LineageDataFinder[Interpretation[_]] {
   def find(projectPath: Path): OptionT[Interpretation, Lineage]

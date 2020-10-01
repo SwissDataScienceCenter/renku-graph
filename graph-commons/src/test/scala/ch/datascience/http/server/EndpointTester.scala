@@ -31,7 +31,6 @@ import org.http4s.headers.`Content-Type`
 import org.http4s._
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 object EndpointTester {
 

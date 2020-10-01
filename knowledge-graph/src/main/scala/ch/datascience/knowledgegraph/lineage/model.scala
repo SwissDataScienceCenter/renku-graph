@@ -22,8 +22,6 @@ import cats.MonadError
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import io.renku.jsonld.EntityId
 
-import scala.language.higherKinds
-
 object model {
 
   private[lineage] type EdgeMap = Map[EntityId, (Set[Node.Location], Set[Node.Location])]

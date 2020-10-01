@@ -27,8 +27,6 @@ import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
 import org.scalacheck.Gen
 
-import scala.language.higherKinds
-
 object CurationGenerators {
 
   implicit def curatedTriplesObjects[Interpretation[_]](implicit

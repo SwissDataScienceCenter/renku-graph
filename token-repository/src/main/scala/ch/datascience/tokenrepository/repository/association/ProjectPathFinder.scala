@@ -28,7 +28,6 @@ import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonOf
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 trait ProjectPathFinder[Interpretation[_]] {
   def findProjectPath(

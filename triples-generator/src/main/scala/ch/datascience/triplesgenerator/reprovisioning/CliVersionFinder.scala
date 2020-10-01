@@ -25,7 +25,6 @@ import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
-import scala.language.higherKinds
 import scala.util.Try
 
 private object CliVersionFinder {

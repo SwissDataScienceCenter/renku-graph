@@ -30,7 +30,6 @@ import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, Status}
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 trait CommitInfoFinder[Interpretation[_]] {
   def findCommitInfo(

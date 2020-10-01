@@ -23,7 +23,6 @@ import ch.datascience.config.ConfigLoader
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 
 private class SchedulerConfigProvider[Interpretation[_]](
     configuration: Config = ConfigFactory.load()
