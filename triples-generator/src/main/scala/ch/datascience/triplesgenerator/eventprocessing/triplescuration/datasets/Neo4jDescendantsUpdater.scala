@@ -46,14 +46,14 @@ private class Neo4jDescendantsUpdater {
   private def prepareSameAsUpdate(entityId: EntityId, topmostSameAs: TopmostSameAs) = CypherQuery(
     name = "update - topmostSameAs update",
     s"""MATCH (n: sch__Dataset { renku__topmostSameAs: '$entityId' })
-       |SET n.renku__topmostSameAs = toString($topmostSameAs)
+       |SET n.renku__topmostSameAs = '$topmostSameAs'
        |RETURN n""".stripMargin
   )
 
   private def prepareDerivedFromUpdate(entityId: EntityId, topmostDerivedFrom: TopmostDerivedFrom) = CypherQuery(
     name = "update - topmostDerivedFrom update",
     s"""MATCH (n: sch__Dataset { renku__topmostDerivedFrom: '$entityId' })
-       |SET n.renku__topmostDerivedFrom = toString($topmostDerivedFrom)
+       |SET n.renku__topmostDerivedFrom = '$topmostDerivedFrom'
        |RETURN n""".stripMargin
   )
 
