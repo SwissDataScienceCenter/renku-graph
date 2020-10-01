@@ -18,9 +18,12 @@
 
 package io.renku.jsonld
 
-abstract class Schema(value: String, separator: String) extends Product with Serializable {
-  def /(name: String): Property = Property(s"$value$separator$name")
-  def /(name: Number): Property = Property(s"$value$separator$name")
+abstract class Schema(url: String, separator: String) extends Product with Serializable {
+  def /(name: String): Property = Property(s"$url$separator$name")
+  def /(name: Number): Property = Property(s"$url$separator$name")
+  def asPrefix(name: String): String = s"PREFIX $name: <$url$separator>"
+
+  override lazy val toString: String = s"$url$separator"
 }
 
 final case class Property(url: String) {

@@ -23,7 +23,7 @@ import ch.datascience.http.rest.paging.PagingRequest
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 
-import scala.language.higherKinds
+
 
 trait GraphQuery {
   def name: String Refined NonEmpty
@@ -49,7 +49,7 @@ final case class CypherQuery(override val name:  String Refined NonEmpty,
 }
 
 final case class SparqlQuery(override val name:  String Refined NonEmpty,
-                             prefixes:           Set[String Refined NonEmpty],
+                             prefixes:           Set[String],
                              override val body:  String,
                              maybePagingRequest: Option[PagingRequest] = None
 ) extends GraphQuery {

@@ -53,13 +53,18 @@ private class IOGraphUpdatesUploader(
           Try {
             val session: Session = Neo4jConfig.driver.session()
             logger.info(s"Session open for update query - ${updateQuery.name} ${updateQuery.toString}")
-            val result = session.run(updateQuery.toString)
-            logger.info(s"Query ran for update query - ${updateQuery.name}")
-            val resultString = result.consume()
+            val resultSummary = session.writeTransaction { tx =>
+              val result = tx.run(updateQuery.toString)
+              logger.info(s"Query ran for update query - ${updateQuery.name}")
+              val summary = result.consume()
+              logger.info(s"Query consumed for update query - ${updateQuery.name}")
+              summary
+            }
+
             logger.info(
-              s"Update query done in ${resultString.resultAvailableAfter(TimeUnit.MILLISECONDS)} ms - $resultString"
+              s"Update query done in ${resultSummary.resultAvailableAfter(TimeUnit.MILLISECONDS)} ms - $resultSummary"
             )
-            result
+            ()
           }.getOrElse(throw new Exception(s"Could not execute query: ${updateQuery.name}"))
         }.map(_ => DeliverySuccess),
         Some(updateQuery.name)

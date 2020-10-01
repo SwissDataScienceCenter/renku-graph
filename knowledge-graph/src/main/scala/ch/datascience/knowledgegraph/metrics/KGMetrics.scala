@@ -25,17 +25,17 @@ import ch.datascience.metrics._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
-import scala.language.{higherKinds, postfixOps}
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 trait KGMetrics[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-class IOKGMetrics(
+class KGMetricsImpl(
     statsFinder:    StatsFinder[IO],
     logger:         Logger[IO],
-    countsGauge:    LabeledGauge[IO, KGEntityType],
+    countsGauge:    LabeledGauge[IO, EntityType],
     initialDelay:   FiniteDuration = IOKGMetrics.initialDelay,
     countsInterval: FiniteDuration = IOKGMetrics.countsInterval
 )(implicit ME:      MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
@@ -56,8 +56,8 @@ class IOKGMetrics(
     } yield ()
   } recoverWith logAndRetry(continueWith = updateCounts())
 
-  private lazy val toCountsGauge: ((KGEntityType, Long)) => IO[Unit] = { case (status, count) =>
-    countsGauge set status -> count.toDouble
+  private lazy val toCountsGauge: ((EntityType, EntitiesCount)) => IO[Unit] = { case (status, count) =>
+    countsGauge set status -> count.value.toDouble
   }
 
   private def logAndRetry(continueWith: => IO[Unit]): PartialFunction[Throwable, IO[Unit]] = {
@@ -77,8 +77,8 @@ object IOKGMetrics {
 
   import scala.concurrent.duration._
 
-  private val initialDelay:   FiniteDuration = 10 seconds
-  private val countsInterval: FiniteDuration = 1 minute
+  private[metrics] val initialDelay:   FiniteDuration = 10 seconds
+  private[metrics] val countsInterval: FiniteDuration = 1 minute
 
   def apply(
       statsFinder:         StatsFinder[IO],
@@ -87,9 +87,11 @@ object IOKGMetrics {
   )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[KGMetrics[IO]] =
     for {
       entitiesCountGauge <-
-        Gauge[IO, KGEntityType](name = "entities_count", help = "Total object by type.", labelName = "entities")(
-          metricsRegistry
-        )
+        Gauge[IO, EntityType](
+          name = "entities_count",
+          help = "Total object by type.",
+          labelName = "entities"
+        )(metricsRegistry)
 
-    } yield new IOKGMetrics(statsFinder, logger, entitiesCountGauge)
+    } yield new KGMetricsImpl(statsFinder, logger, entitiesCountGauge)
 }
