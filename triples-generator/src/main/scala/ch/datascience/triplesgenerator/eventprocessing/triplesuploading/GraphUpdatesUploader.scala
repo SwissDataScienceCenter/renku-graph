@@ -29,6 +29,7 @@ import org.neo4j.driver.{Record, Session}
 
 import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters._
+import scala.util.Try
 
 private trait GraphUpdatesUploader[Interpretation[_]] {
   def send(updateQuery: CypherQuery): Interpretation[TriplesUploadResult]
@@ -49,17 +50,17 @@ private class IOGraphUpdatesUploader(
       .measureExecutionTime(
         IO.pure {
           logger.info(s"Starting update query - ${updateQuery.name}")
-          val session: Session = Neo4jConfig.driver.session()
-          logger.info(s"Session open for update query - ${updateQuery.name}")
-          val result = session.run(updateQuery.toString)
-          logger.info(s"Query ran for update query - ${updateQuery.name}")
-          val resultString = result.consume()
-          session.close()
-          logger.info(s"Session closed for update query - ${updateQuery.name}")
-          logger.info(
-            s"Update query done in ${resultString.resultAvailableAfter(TimeUnit.MILLISECONDS)} ms - $resultString"
-          )
-          result
+          Try {
+            val session: Session = Neo4jConfig.driver.session()
+            logger.info(s"Session open for update query - ${updateQuery.name}")
+            val result = session.run(updateQuery.toString)
+            logger.info(s"Query ran for update query - ${updateQuery.name}")
+            val resultString = result.consume()
+            logger.info(
+              s"Update query done in ${resultString.resultAvailableAfter(TimeUnit.MILLISECONDS)} ms - $resultString"
+            )
+            result
+          }.getOrElse(throw new Exception(s"Could not execute query: ${updateQuery.name}"))
         }.map(_ => DeliverySuccess),
         Some(updateQuery.name)
       )

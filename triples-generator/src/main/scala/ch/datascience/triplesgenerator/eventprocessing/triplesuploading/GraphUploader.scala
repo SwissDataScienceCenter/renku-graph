@@ -28,6 +28,7 @@ import io.chrisdavenport.log4cats.Logger
 import org.neo4j.driver.{Record, Session}
 
 import scala.concurrent.ExecutionContext
+import scala.util.Try
 
 private trait GraphUploader[Interpretation[_]] {
   def upload(triples: JsonLDTriples): Interpretation[TriplesUploadResult]
@@ -49,20 +50,18 @@ private class IOGraphUploader(
 
     timeRecorder
       .measureExecutionTime(
-        {
-          val session: Session = Neo4jConfig.driver.session()
-          IO.pure(session.run(cypherQuery))
-            .map { result =>
-              val resultAsString = result
-                .list()
-                .asScala
-                .map((record: Record) => s"values: ${record.values()}")
-                .mkString("\n")
-              session.close()
-              logger.info(s"Triples upload query - $resultAsString")
-            }
-            .map(_ => DeliverySuccess)
-        },
+        IO.pure {
+          Try {
+            val session: Session = Neo4jConfig.driver.session()
+            val result = session.run(cypherQuery)
+            val resultAsString = result
+              .list()
+              .asScala
+              .map((record: Record) => s"values: ${record.values()}")
+              .mkString("\n")
+            logger.info(s"Triples upload query - $resultAsString")
+          }.getOrElse(throw new Exception("Could not execute triples upload query"))
+        }.map(_ => DeliverySuccess),
         Some("upload jsonld")
       )
       .map(timeRecorder.logExecutionTime(withMessage = "Cypher triples upload query finished"))
