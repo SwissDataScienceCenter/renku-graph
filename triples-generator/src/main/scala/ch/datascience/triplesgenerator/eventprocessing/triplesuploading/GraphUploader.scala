@@ -60,6 +60,7 @@ private class IOGraphUploader(
               .map((record: Record) => s"values: ${record.values()}")
               .mkString("\n")
             logger.info(s"Triples upload query - $resultAsString")
+            session.close()
           }.getOrElse(throw new Exception("Could not execute triples upload query"))
         }.map(_ => DeliverySuccess),
         Some("upload jsonld")

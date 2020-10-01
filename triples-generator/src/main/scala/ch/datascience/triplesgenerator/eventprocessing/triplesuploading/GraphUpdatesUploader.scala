@@ -60,6 +60,7 @@ private class IOGraphUpdatesUploader(
               logger.info(s"Query consumed for update query - ${updateQuery.name}")
               summary
             }
+            session.close()
             logger.info(
               s"Update query done in ${resultSummary.resultAvailableAfter(TimeUnit.MILLISECONDS)} ms - $resultSummary"
             )
