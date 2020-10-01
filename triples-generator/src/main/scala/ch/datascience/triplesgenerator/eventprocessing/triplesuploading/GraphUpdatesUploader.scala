@@ -61,7 +61,7 @@ private class IOGraphUpdatesUploader(
               throw e
           } finally if (session != null) session.close()
           logger.info(
-            s"Update query done in se"
+            s"Update query done ${updateQuery.name}"
           )
         }.map(_ => DeliverySuccess),
         Some(updateQuery.name)
