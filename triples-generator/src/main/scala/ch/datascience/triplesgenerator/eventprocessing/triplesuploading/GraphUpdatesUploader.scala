@@ -25,7 +25,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.rdfstore.CypherQuery
 import io.chrisdavenport.log4cats.Logger
-import org.neo4j.driver.{Record, Session}
+import org.neo4j.driver.{Record, Session, Transaction}
 
 import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters._
@@ -50,22 +50,19 @@ private class IOGraphUpdatesUploader(
       .measureExecutionTime(
         IO.pure {
           logger.info(s"Starting update query - ${updateQuery.name}")
-          Try {
-            val session: Session = Neo4jConfig.driver.session()
-            logger.info(s"Session open for update query - ${updateQuery.name} ${updateQuery.toString}")
-            val resultSummary = session.writeTransaction { tx =>
-              val result = tx.run(updateQuery.toString)
-              logger.info(s"Query ran for update query - ${updateQuery.name}")
-              val summary = result.consume()
-              logger.info(s"Query consumed for update query - ${updateQuery.name}")
-              summary
-            }
-            session.close()
-            logger.info(
-              s"Update query done in ${resultSummary.resultAvailableAfter(TimeUnit.MILLISECONDS)} ms - $resultSummary"
-            )
-            resultSummary
-          }.getOrElse(throw new Exception(s"Could not execute query: ${updateQuery.name}"))
+          val session: Session = Neo4jConfig.driver.session()
+          try session.writeTransaction { (tx: Transaction) =>
+            tx.run(updateQuery.toString)
+            logger.info(s"Query ran for update query - ${updateQuery.name}")
+            1
+          } catch {
+            case e =>
+              logger.error(e.getMessage)
+              throw e
+          } finally if (session != null) session.close()
+          logger.info(
+            s"Update query done in se"
+          )
         }.map(_ => DeliverySuccess),
         Some(updateQuery.name)
       )

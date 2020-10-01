@@ -25,7 +25,7 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult.DeliverySuccess
 import io.chrisdavenport.log4cats.Logger
-import org.neo4j.driver.{Record, Session}
+import org.neo4j.driver.{Record, Session, Transaction}
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try
