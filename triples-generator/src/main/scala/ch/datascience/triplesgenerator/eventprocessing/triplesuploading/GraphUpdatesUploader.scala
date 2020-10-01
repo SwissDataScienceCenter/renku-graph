@@ -18,6 +18,8 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
+import java.util.concurrent.TimeUnit
+
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.logging.ExecutionTimeRecorder
@@ -48,14 +50,15 @@ private class IOGraphUpdatesUploader(
         IO.pure {
           logger.info(s"Starting update query - ${updateQuery.name}")
           val session: Session = Neo4jConfig.driver.session()
+          logger.info(s"Session open for update query - ${updateQuery.name}")
           val result = session.run(updateQuery.toString)
-          val resultString = result
-            .list()
-            .asScala
-            .map((record: Record) => s"values: ${record.values()}")
-            .mkString("\n")
+          logger.info(s"Query ran for update query - ${updateQuery.name}")
+          val resultString = result.consume()
           session.close()
-          logger.info(s"Update query done - $resultString")
+          logger.info(s"Session closed for update query - ${updateQuery.name}")
+          logger.info(
+            s"Update query done in ${resultString.resultAvailableAfter(TimeUnit.MILLISECONDS)} ms - $resultString"
+          )
           result
         }.map(_ => DeliverySuccess),
         Some(updateQuery.name)
