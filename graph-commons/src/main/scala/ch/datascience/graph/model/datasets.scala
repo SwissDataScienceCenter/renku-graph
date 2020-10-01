@@ -29,8 +29,13 @@ import io.renku.jsonld.syntax._
 
 object datasets {
 
-  final class Identifier private (val value: String) extends AnyVal with StringTinyType
+  sealed trait DatasetIdentifier extends Any with StringTinyType
+
+  final class Identifier private (val value: String) extends AnyVal with DatasetIdentifier
   implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank
+
+  final class InitialVersion private (val value: String) extends AnyVal with DatasetIdentifier
+  implicit object InitialVersion extends TinyTypeFactory[InitialVersion](new InitialVersion(_)) with NonBlank
 
   final class Title private (val value: String) extends AnyVal with StringTinyType
   implicit object Title extends TinyTypeFactory[Title](new Title(_)) with NonBlank

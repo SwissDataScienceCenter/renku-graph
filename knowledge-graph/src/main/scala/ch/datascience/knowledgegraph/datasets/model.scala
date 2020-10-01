@@ -35,6 +35,7 @@ object model {
     val parts:            List[DatasetPart]
     val projects:         List[DatasetProject]
     val keywords:         List[Keyword]
+    val versions:         DatasetVersions
   }
 
   final case class NonModifiedDataset(id:               Identifier,
@@ -42,6 +43,7 @@ object model {
                                       name:             Name,
                                       url:              Url,
                                       sameAs:           SameAs,
+                                      versions:         DatasetVersions,
                                       maybeDescription: Option[Description],
                                       published:        DatasetPublishing,
                                       parts:            List[DatasetPart],
@@ -54,6 +56,7 @@ object model {
                                    name:             Name,
                                    url:              Url,
                                    derivedFrom:      DerivedFrom,
+                                   versions:         DatasetVersions,
                                    maybeDescription: Option[Description],
                                    published:        DatasetPublishing,
                                    parts:            List[DatasetPart],
@@ -65,6 +68,7 @@ object model {
   final case class DatasetCreator(maybeEmail: Option[Email], name: UserName, maybeAffiliation: Option[Affiliation])
 
   final case class DatasetPart(name: PartName, atLocation: PartLocation)
+  final case class DatasetVersions(initial: InitialVersion)
 
   final case class DatasetProject(path: Path, name: projects.Name, created: AddedToProject)
   final case class AddedToProject(date: DateCreatedInProject, agent: DatasetAgent)

@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Keyword, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{InitialVersion, Keyword, TopmostSameAs}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
@@ -145,18 +145,23 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
                datasetProjects,
                addedToProjectObjects
         ) { (project1, addedToProject1, project2, addedToProject2, project3, addedToProject3) =>
-          val sourceDataset =
-            nonModifiedDatasets(projects = project1.copy(created = addedToProject1).toGenerator).generateOne
+          val sourceDataset = nonModifiedDatasets(
+            projects = project1.copy(created = addedToProject1).toGenerator
+          ).generateOne
+          val dataset2Id = datasetIdentifiers.generateOne
           val dataset2 = sourceDataset.copy(
-            id = datasetIdentifiers.generateOne,
+            id = dataset2Id,
             sameAs = sourceDataset.entityId.asSameAs,
+            versions = DatasetVersions(InitialVersion(dataset2Id.toString)),
             projects = List(DatasetProject(project2.path, project2.name, addedToProject2))
           )
+          val dataset3Id = datasetIdentifiers.generateOne
           val dataset3 = sourceDataset.copy(
-            id = datasetIdentifiers.generateOne,
+            id = dataset3Id,
             sameAs = sourceDataset.entityId.asSameAs,
+            versions = DatasetVersions(InitialVersion(dataset3Id.toString)),
             projects = List(DatasetProject(project3.path, project3.name, addedToProject3))
-          ) // to simulate adding the first project's original data-set to another project
+          ) // to simulate adding the first project's original dataset to another project
 
           loadToStore(
             sourceDataset.toJsonLD(noSameAs = true)(topmostSameAs = sourceDataset.entityId.asTopmostSameAs),
@@ -190,7 +195,6 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               keywords = dataset2.keywords.sorted
             )
           )
-
         }
       }
 
@@ -239,8 +243,10 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               nonModifiedDatasets(projects = project1.copy(created = addedToProject1).toGenerator).generateOne
             val project2DatasetCommit = commitIds.generateOne
 
+            val importedDatasetId = datasetIdentifiers.generateOne
             val importedDataset = dataset.copy(
-              id = datasetIdentifiers.generateOne,
+              id = importedDatasetId,
+              versions = DatasetVersions(InitialVersion(importedDatasetId.toString)),
               projects = List(DatasetProject(project2.path, project2.name, addedToProject2))
             ) // to simulate adding the same data-set to another project
 
@@ -323,10 +329,9 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           val modifiedOnProject = addedToProjectObjects.generateOne.copy(
             date = datasetInProjectCreationDates generateGreaterThan addedToProject.date
           )
-          val modifiedDataset =
-            modifiedDatasetsOnFirstProject(dataset.changeCreationOnProject(to = modifiedOnProject)).generateOne.copy(
-              maybeDescription = datasetDescriptions.generateSome
-            )
+          val modifiedDataset = modifiedDatasetsOnFirstProject(
+            dataset.changeCreationOnProject(to = modifiedOnProject)
+          ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
 
           loadToStore(
             dataset.toJsonLD()(topmostSameAs = TopmostSameAs(dataset.sameAs)),
@@ -457,16 +462,20 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           .copy(projects = List(dataset1Project))
 
         val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
+        val dataset2Id      = datasetIdentifiers.generateOne
         val dataset2 = dataset1.copy(
-          id = datasetIdentifiers.generateOne,
+          id = dataset2Id,
           sameAs = dataset1.entityId.asSameAs,
+          versions = DatasetVersions(InitialVersion(dataset2Id.toString)),
           projects = List(dataset2Project)
         )
 
         val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project
+        val dataset3Id      = datasetIdentifiers.generateOne
         val dataset3 = dataset2.copy(
-          id = datasetIdentifiers.generateOne,
+          id = dataset3Id,
           sameAs = dataset2.entityId.asSameAs,
+          versions = DatasetVersions(InitialVersion(dataset3Id.toString)),
           projects = List(dataset3Project)
         )
 
@@ -511,9 +520,11 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         )
 
         val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
+        val dataset2Id      = datasetIdentifiers.generateOne
         val dataset2 = dataset1.copy(
-          id = datasetIdentifiers.generateOne,
+          id = dataset2Id,
           sameAs = dataset1.entityId.asSameAs,
+          versions = DatasetVersions(InitialVersion(dataset2Id.toString)),
           projects = List(dataset2Project)
         )
 
@@ -521,20 +532,21 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           date = datasetInProjectCreationDates generateGreaterThan dataset2Project.created.date
         )
         val dataset2ModifiedProject = dataset2Project.copy(created = modifiedOnProject2)
-        val modifiedDataset2 =
-          modifiedDatasetsOnFirstProject(dataset2.copy(projects = List(dataset2ModifiedProject))).generateOne.copy(
-            maybeDescription = datasetDescriptions.generateSome
-          )
+        val modifiedDataset2 = modifiedDatasetsOnFirstProject(
+          dataset2.copy(projects = List(dataset2ModifiedProject))
+        ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
 
         val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project.copy(
           created = modifiedOnProject2
         )
+        val dataset3Id = datasetIdentifiers.generateOne
         val dataset3 = NonModifiedDataset(
-          id = datasetIdentifiers.generateOne,
+          id = dataset3Id,
           title = modifiedDataset2.title,
           name = modifiedDataset2.name,
           url = datasetUrls.generateOne,
           sameAs = modifiedDataset2.entityId.asSameAs,
+          versions = DatasetVersions(InitialVersion(dataset3Id.toString)),
           maybeDescription = datasetDescriptions.generateSome,
           published = modifiedDataset2.published,
           parts = modifiedDataset2.parts,

@@ -54,15 +54,16 @@ private class BaseDetailsFinder(
       "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
       "PREFIX schema: <http://schema.org/>"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?description ?publishedDate
+    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?publishedDate
         |WHERE {
         |    ?datasetId schema:identifier "$identifier";
         |               schema:identifier ?identifier;
         |               rdf:type <http://schema.org/Dataset>;
         |               schema:url ?url;
         |               schema:name ?name;
-        |               schema:alternateName ?alternateName ;
-        |               renku:topmostSameAs ?topmostSameAs .
+        |               schema:alternateName ?alternateName;
+        |               renku:topmostSameAs ?topmostSameAs;
+        |               renku:topmostDerivedFrom/schema:identifier ?initialVersion.
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    OPTIONAL { ?datasetId schema:description ?description }.
         |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate }.
@@ -109,6 +110,7 @@ private object BaseDetailsFinder {
         url                <- extract[Url]("url")
         maybeDerivedFrom   <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
         sameAs             <- extract[SameAs]("topmostSameAs")
+        initialVersion     <- extract[InitialVersion]("initialVersion")
         maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate")
         maybeDescription <- extract[Option[String]]("description")
                               .map(blankToNone)
@@ -121,6 +123,7 @@ private object BaseDetailsFinder {
             name,
             url,
             derivedFrom,
+            DatasetVersions(initialVersion),
             maybeDescription,
             DatasetPublishing(maybePublishedDate, Set.empty),
             parts = List.empty,
@@ -134,6 +137,7 @@ private object BaseDetailsFinder {
             name,
             url,
             sameAs,
+            DatasetVersions(initialVersion),
             maybeDescription,
             DatasetPublishing(maybePublishedDate, Set.empty),
             parts = List.empty,

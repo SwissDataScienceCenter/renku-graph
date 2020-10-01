@@ -122,12 +122,16 @@ Response body example:
   "_links" : [
     {
       "rel" : "self",
-      "href" : "https://zemdgsw:9540/datasets/6f622603-2129-4058-ad29-3ff927481461"
+      "href" : "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
+    },
+    {
+      "rel" : "initial-version",
+      "href" : "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
     }
   ],
-  "identifier" : "6f622603-2129-4058-ad29-3ff927481461",
+  "identifier" : "22222222-2222-2222-2222-222222222222",
   "versions" : {
-    "initial: "6f622603-2129-4058-ad29-3ff927481460"
+    "initial: "11111111-1111-1111-1111-111111111111"
   }
   "title" : "dataset title",
   "name" : "dataset alternate name",

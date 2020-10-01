@@ -138,7 +138,7 @@ object DataSet {
       override val overrideDatasetTopmostDerivedFrom: Option[TopmostDerivedFrom] = overrideTopmostDerivedFrom
     }
 
-  def entityId(identifier: Identifier)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId =
+  def entityId(identifier: DatasetIdentifier)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId =
     EntityId of (renkuBaseUrl / "datasets" / identifier)
 
   private implicit def converter(implicit
