@@ -52,7 +52,7 @@ private class IOGraphUpdatesUploader(
           logger.info(s"Starting update query - ${updateQuery.name}")
           Try {
             val session: Session = Neo4jConfig.driver.session()
-            logger.info(s"Session open for update query - ${updateQuery.name}")
+            logger.info(s"Session open for update query - ${updateQuery.name} ${updateQuery.toString}")
             val result = session.run(updateQuery.toString)
             logger.info(s"Query ran for update query - ${updateQuery.name}")
             val resultString = result.consume()
