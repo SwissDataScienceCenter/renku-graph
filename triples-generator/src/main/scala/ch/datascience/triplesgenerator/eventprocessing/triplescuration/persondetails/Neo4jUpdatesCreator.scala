@@ -50,7 +50,7 @@ private[triplescuration] class Neo4jUpdatesCreator {
     CypherQuery(
       name = "upload - person name update",
       s"""MATCH (n: sch__Person { uri: '$id' })
-         |SET n.sch_name = toString(${names.head})
+         |SET n.sch_name = '${names.head.toString}'
          |RETURN n""".stripMargin
     )
   }
@@ -59,7 +59,7 @@ private[triplescuration] class Neo4jUpdatesCreator {
     CypherQuery(
       name = "upload - person email update",
       s"""MATCH (n: sch__Person { uri: '$id' })
-         |SET n.sch_email = toString(${emails.head})
+         |SET n.sch_email = '${emails.head.toString}'
          |RETURN n""".stripMargin
     )
   }
