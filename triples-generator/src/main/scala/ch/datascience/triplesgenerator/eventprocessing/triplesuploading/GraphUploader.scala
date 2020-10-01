@@ -25,7 +25,7 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult.DeliverySuccess
 import io.chrisdavenport.log4cats.Logger
-import org.neo4j.driver.{Record, Session, Transaction}
+import org.neo4j.driver.{Driver, Record, Session, Transaction}
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try
@@ -38,10 +38,13 @@ private class IOGraphUploader(
     logger:                  Logger[IO],
     timeRecorder:            ExecutionTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends GraphUploader[IO] {
+    extends GraphUploader[IO]
+    with AutoCloseable {
 
   import scala.jdk.CollectionConverters._
   import eu.timepit.refined.auto._
+  val driver: Driver = new Neo4jConfig().driver
+
   def upload(triples: JsonLDTriples): IO[TriplesUploadResult] = {
     val cypherQuery =
       s"""
@@ -52,7 +55,7 @@ private class IOGraphUploader(
       .measureExecutionTime(
         IO.pure {
           Try {
-            val session: Session = Neo4jConfig.driver.session()
+            val session: Session = driver.session()
             val result = session.run(cypherQuery)
             val resultAsString = result
               .list()
@@ -68,9 +71,10 @@ private class IOGraphUploader(
       .map(timeRecorder.logExecutionTime(withMessage = "Cypher triples upload query finished"))
 
   }
+  override def close(): Unit = driver.close()
 }
 
-object Neo4jConfig {
+class Neo4jConfig() {
   import org.neo4j.driver.{AuthTokens, Driver, GraphDatabase}
 
   val uri      = "bolt://10.42.128.14:7687"

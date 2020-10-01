@@ -25,7 +25,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.rdfstore.CypherQuery
 import io.chrisdavenport.log4cats.Logger
-import org.neo4j.driver.{Record, Session, Transaction}
+import org.neo4j.driver.{Driver, Record, Session, Transaction}
 
 import scala.concurrent.ExecutionContext
 import scala.jdk.CollectionConverters._
@@ -42,7 +42,10 @@ private class IOGraphUpdatesUploader(
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
-) extends GraphUpdatesUploader[IO] {
+) extends GraphUpdatesUploader[IO]
+    with AutoCloseable {
+
+  val driver: Driver = new Neo4jConfig().driver
 
   import TriplesUploadResult._
   override def send(updateQuery: CypherQuery): IO[TriplesUploadResult] =
@@ -50,13 +53,16 @@ private class IOGraphUpdatesUploader(
       .measureExecutionTime(
         IO.pure {
           logger.info(s"Starting update query - ${updateQuery.name}")
-          val session: Session = Neo4jConfig.driver.session()
-          try session.writeTransaction { (tx: Transaction) =>
-            tx.run(updateQuery.toString)
-            logger.info(s"Query ran for update query - ${updateQuery.name}")
-            1
+          var session: Session = null
+          try {
+            session = driver.session()
+            session.writeTransaction { (tx: Transaction) =>
+              tx.run(updateQuery.toString)
+              logger.info(s"Query ran for update query - ${updateQuery.name}")
+              1
+            }
           } catch {
-            case e =>
+            case e: Exception =>
               logger.error(e.getMessage)
               throw e
           } finally if (session != null) session.close()
@@ -67,5 +73,5 @@ private class IOGraphUpdatesUploader(
         Some(updateQuery.name)
       )
       .map(graphTimeRecorder.logExecutionTime(withMessage = "Cypher update query finished"))
-
+  override def close(): Unit = driver.close()
 }
