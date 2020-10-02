@@ -48,7 +48,7 @@ private[triplescuration] class Neo4jUpdatesCreator {
 
   private def namesUpdate(id: ResourceId, names: NonEmptyList[Name]) = Some {
     CypherQuery(
-      name = "upload - person name update",
+      name = "update - person name update",
       s"""MATCH (n: sch__Person { uri: '$id' })
          |SET n.sch_name = '${names.head.toString}'
          |RETURN n""".stripMargin
@@ -57,7 +57,7 @@ private[triplescuration] class Neo4jUpdatesCreator {
 
   private def emailsUpdate(id: ResourceId, emails: Set[Email]) = Some {
     CypherQuery(
-      name = "upload - person email update",
+      name = "update - person email update",
       s"""MATCH (n: sch__Person { uri: '$id' })
          |SET n.sch_email = '${emails.head.toString}'
          |RETURN n""".stripMargin
@@ -66,7 +66,7 @@ private[triplescuration] class Neo4jUpdatesCreator {
 
   private def labelsDelete(id: ResourceId) = Some {
     CypherQuery(
-      name = "upload - person label delete",
+      name = "update - person label delete",
       s"""MATCH (n: sch__Person { uri: '$id' })
          |REMOVE n.rdfs_label
          |RETURN n""".stripMargin
