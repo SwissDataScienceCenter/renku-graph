@@ -248,7 +248,7 @@ private object IOCommitEventProcessor {
       .name("cypher_query_execution_times")
       .labelNames("query_id")
       .help("Cypher query execution times")
-      .buckets(.1, .5, 1, 5, 10, 50, 100, 500, 1000, 5000)
+      .buckets(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 25, 50)
 
   def apply(
       triplesGenerator: TriplesGenerator[IO],
