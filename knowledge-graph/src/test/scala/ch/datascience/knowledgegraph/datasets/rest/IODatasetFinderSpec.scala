@@ -152,14 +152,14 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           val dataset2 = sourceDataset.copy(
             id = dataset2Id,
             sameAs = sourceDataset.entityId.asSameAs,
-            versions = DatasetVersions(InitialVersion(dataset2Id.toString)),
+            versions = DatasetVersions(InitialVersion(dataset2Id)),
             projects = List(DatasetProject(project2.path, project2.name, addedToProject2))
           )
           val dataset3Id = datasetIdentifiers.generateOne
           val dataset3 = sourceDataset.copy(
             id = dataset3Id,
             sameAs = sourceDataset.entityId.asSameAs,
-            versions = DatasetVersions(InitialVersion(dataset3Id.toString)),
+            versions = DatasetVersions(InitialVersion(dataset3Id)),
             projects = List(DatasetProject(project3.path, project3.name, addedToProject3))
           ) // to simulate adding the first project's original dataset to another project
 
@@ -239,16 +239,18 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
       "- a case when unrelated projects are sharing a dataset and one of the projects is forked" in new TestCase {
         forAll(datasetProjects, addedToProjectObjects, datasetProjects, addedToProjectObjects, datasetProjects) {
           (project1, addedToProject1, project2, addedToProject2, project2Fork) =>
-            val dataset =
-              nonModifiedDatasets(projects = project1.copy(created = addedToProject1).toGenerator).generateOne
+            val dataset = nonModifiedDatasets(
+              projects = project1.copy(created = addedToProject1).toGenerator
+            ).generateOne
             val project2DatasetCommit = commitIds.generateOne
 
+            // to simulate adding the same data-set to another project
             val importedDatasetId = datasetIdentifiers.generateOne
             val importedDataset = dataset.copy(
               id = importedDatasetId,
-              versions = DatasetVersions(InitialVersion(importedDatasetId.toString)),
+              versions = DatasetVersions(InitialVersion(importedDatasetId)),
               projects = List(DatasetProject(project2.path, project2.name, addedToProject2))
-            ) // to simulate adding the same data-set to another project
+            )
 
             val forkedDataset = importedDataset.copy(
               projects = List(DatasetProject(project2Fork.path, project2Fork.name, addedToProject2))
@@ -466,7 +468,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         val dataset2 = dataset1.copy(
           id = dataset2Id,
           sameAs = dataset1.entityId.asSameAs,
-          versions = DatasetVersions(InitialVersion(dataset2Id.toString)),
+          versions = DatasetVersions(InitialVersion(dataset2Id)),
           projects = List(dataset2Project)
         )
 
@@ -524,7 +526,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         val dataset2 = dataset1.copy(
           id = dataset2Id,
           sameAs = dataset1.entityId.asSameAs,
-          versions = DatasetVersions(InitialVersion(dataset2Id.toString)),
+          versions = DatasetVersions(InitialVersion(dataset2Id)),
           projects = List(dataset2Project)
         )
 
@@ -546,7 +548,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           name = modifiedDataset2.name,
           url = datasetUrls.generateOne,
           sameAs = modifiedDataset2.entityId.asSameAs,
-          versions = DatasetVersions(InitialVersion(dataset3Id.toString)),
+          versions = DatasetVersions(InitialVersion(dataset3Id)),
           maybeDescription = datasetDescriptions.generateSome,
           published = modifiedDataset2.published,
           parts = modifiedDataset2.parts,

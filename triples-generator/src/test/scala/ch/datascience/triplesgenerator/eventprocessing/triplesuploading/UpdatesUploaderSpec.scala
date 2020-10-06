@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.generators.CommonGraphGenerators.rdfStoreConfigs
+import ch.datascience.generators.CommonGraphGenerators.{rdfStoreConfigs, sparqlQueries}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.client.UrlEncoder.urlEncode
@@ -27,7 +27,6 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{FusekiBaseUrl, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult.{DeliverySuccess, InvalidUpdatesFailure, RecoverableFailure}
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._

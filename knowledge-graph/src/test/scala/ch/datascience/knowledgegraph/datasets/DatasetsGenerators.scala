@@ -49,17 +49,18 @@ object DatasetsGenerators {
       published        <- datasetPublishingInfos
       part             <- listOf(datasetParts)
       projects         <- projects
-    } yield NonModifiedDataset(id,
-                               title,
-                               name,
-                               url,
-                               sameAs,
-                               DatasetVersions(InitialVersion(id.toString)),
-                               maybeDescription,
-                               published,
-                               part,
-                               projects.toList,
-                               keywords
+    } yield NonModifiedDataset(
+      id,
+      title,
+      name,
+      url,
+      sameAs,
+      DatasetVersions(InitialVersion(id)),
+      maybeDescription,
+      published,
+      part,
+      projects.toList,
+      keywords
     )
 
   def modifiedDatasetsOnFirstProject(

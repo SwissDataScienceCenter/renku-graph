@@ -28,6 +28,7 @@ import ch.datascience.control.{RateLimit, RateLimitUnit}
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl, RenkuLogTimeout}
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
@@ -39,7 +40,9 @@ import ch.datascience.http.rest.{Links, SortBy, paging}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import io.circe.literal._
+import io.renku.jsonld.Schema
 import org.scalacheck.Gen
 
 import scala.concurrent.duration._
@@ -187,4 +190,21 @@ object CommonGraphGenerators {
         "rdfs:label": $obj
       }"""
   }
+
+  implicit lazy val sparqlPrefixes: Gen[SparqlQuery.Prefix] = Gen.oneOf(
+    SparqlQuery.Prefix("prov", Schemas.prov),
+    SparqlQuery.Prefix("wfprov", Schemas.wfprov),
+    SparqlQuery.Prefix("wfdesc", Schemas.wfdesc),
+    SparqlQuery.Prefix("rdf", Schemas.rdf),
+    SparqlQuery.Prefix("rdfs", Schemas.rdfs),
+    SparqlQuery.Prefix("xmlSchema", Schemas.xmlSchema),
+    SparqlQuery.Prefix("schema", Schemas.schema),
+    SparqlQuery.Prefix("renku", Schemas.renku)
+  )
+
+  implicit lazy val sparqlQueries: Gen[SparqlQuery] = for {
+    sparqlQuery <- sentences() map (v => SparqlQuery("curation update", Set.empty[String Refined NonEmpty], v.value))
+  } yield sparqlQuery
+
+  implicit lazy val schemas: Gen[Schema] = Gen.oneOf(Schemas.all)
 }

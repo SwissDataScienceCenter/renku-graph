@@ -21,6 +21,7 @@ package ch.datascience.knowledgegraph.metrics
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
@@ -52,14 +53,14 @@ class StatsFinderImpl(
   override def entitiesCount(): IO[Map[EntityType, EntitiesCount]] =
     queryExpecting[List[(EntityType, EntitiesCount)]](using = query) map (_.toMap)
 
-  private lazy val query = SparqlQuery(
+  private lazy val query = SparqlQuery.of(
     name = "entities - counts",
-    Set(
-      rdf    asPrefix "rdf",
-      prov   asPrefix "prov",
-      schema asPrefix "schema",
-      wfprov asPrefix "wfprov",
-      renku  asPrefix "renku"
+    Prefixes.of(
+      rdf    -> "rdf",
+      prov   -> "prov",
+      schema -> "schema",
+      wfprov -> "wfprov",
+      renku  -> "renku"
     ),
     s"""|SELECT ?type ?count
         |WHERE {

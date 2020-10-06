@@ -19,9 +19,9 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import cats.MonadError
-import ch.datascience.generators.CommonGraphGenerators.jsonLDTriples
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
+import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
@@ -58,8 +58,4 @@ object CurationGenerators {
       name        <- nonBlankStrings(minLength = 5)
       sparqlQuery <- sparqlQueries
     } yield CurationUpdatesGroup[Interpretation](name, sparqlQuery)
-
-  implicit lazy val sparqlQueries: Gen[SparqlQuery] = for {
-    sparqlQuery <- sentences() map (v => SparqlQuery("curation update", Set.empty, v.value))
-  } yield sparqlQuery
 }

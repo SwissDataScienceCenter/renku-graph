@@ -31,11 +31,22 @@ object datasets {
 
   sealed trait DatasetIdentifier extends Any with StringTinyType
 
+  trait DatasetIdentifierFactory[T <: DatasetIdentifier] {
+    self: TinyTypeFactory[T] =>
+    def apply(id: DatasetIdentifier): T = apply(id.toString)
+  }
+
   final class Identifier private (val value: String) extends AnyVal with DatasetIdentifier
-  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank
+  implicit object Identifier
+      extends TinyTypeFactory[Identifier](new Identifier(_))
+      with DatasetIdentifierFactory[Identifier]
+      with NonBlank
 
   final class InitialVersion private (val value: String) extends AnyVal with DatasetIdentifier
-  implicit object InitialVersion extends TinyTypeFactory[InitialVersion](new InitialVersion(_)) with NonBlank
+  implicit object InitialVersion
+      extends TinyTypeFactory[InitialVersion](new InitialVersion(_))
+      with DatasetIdentifierFactory[InitialVersion]
+      with NonBlank
 
   final class Title private (val value: String) extends AnyVal with StringTinyType
   implicit object Title extends TinyTypeFactory[Title](new Title(_)) with NonBlank
