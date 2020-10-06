@@ -32,8 +32,8 @@ triplesGenerator:
     port: 9002
   resources:
     limits:
-      memory: 4500Mi
-  jvmXmx: 1536M
+      memory: 3500Mi
+  jvmXmx: 1024M
   renkuLogTimeout: 60 minutes
   reProvisioningRemovalBatchSize: 1000
   gitlab:
