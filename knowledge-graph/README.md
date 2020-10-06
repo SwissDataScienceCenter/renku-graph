@@ -132,7 +132,7 @@ Response body example:
   "identifier" : "22222222-2222-2222-2222-222222222222",
   "versions" : {
     "initial: "11111111-1111-1111-1111-111111111111"
-  }
+  },
   "title" : "dataset title",
   "name" : "dataset alternate name",
   "url" : "http://host/url1",  // optional property
@@ -378,6 +378,9 @@ Response body example:
 [  
    {  
       "identifier": "9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c",
+      "versions" : {
+        "initial": "11111111-1111-1111-1111-111111111111"
+      },
       "title": "rmDaYfpehl",
       "name": "mniouUnmal",
       "sameAs": "http://host/url1",
@@ -386,11 +389,18 @@ Response body example:
          {  
             "rel": "details",
             "href": "http://t:5511/datasets/9f94add6-6d68-4cf4-91d9-4ba9e6b7dc4c"
+         },
+         {
+           "rel" : "initial-version",
+           "href" : "https://zemdgsw:9540/datasets/11111111-1111-1111-1111-111111111111"
          }
       ]
    },
    {  
       "identifier": "a1b1cb86-c664-4250-a1e3-578a8a22dcbb",
+      "versions" : {
+        "initial": "22222222-2222-2222-2222-222222222222"
+      },
       "name": "a",
       "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
       "derivedFrom" : "http://host/url2",             // optional property when no "sameAs" exists
@@ -398,6 +408,10 @@ Response body example:
          {  
             "rel": "details",
             "href": "http://t:5511/datasets/a1b1cb86-c664-4250-a1e3-578a8a22dcbb"
+         },
+         {
+           "rel" : "initial-version",
+           "href" : "https://zemdgsw:9540/datasets/22222222-2222-2222-2222-222222222222"
          }
       ]
    }
