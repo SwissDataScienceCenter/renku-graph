@@ -67,6 +67,7 @@ object Microservice extends IOMicroservice {
         eventLogMetrics      <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
         waitingEventsGauge   <- WaitingEventsGauge(metricsRegistry, statsFinder, ApplicationLogger)
         underProcessingGauge <- UnderProcessingGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        gaugeScheduler       <- IOEventGaugeScheduler(List(waitingEventsGauge, underProcessingGauge))
         eventCreationEndpoint <-
           IOEventCreationEndpoint(transactor, waitingEventsGauge, queriesExecTimes, ApplicationLogger)
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
@@ -108,6 +109,7 @@ object Microservice extends IOMicroservice {
                         sentryInitializer,
                         eventLogMetrics,
                         eventsDispatcher,
+                        gaugeScheduler,
                         httpServer,
                         subProcessesCancelTokens
                       ).run()
@@ -122,6 +124,7 @@ private class MicroserviceRunner(
     sentryInitializer:        SentryInitializer[IO],
     metrics:                  EventLogMetrics,
     eventsDispatcher:         EventsDispatcher,
+    gaugeScheduler:           EventGaugeScheduler[IO],
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
 )(implicit contextShift:      ContextShift[IO]) {
@@ -131,6 +134,7 @@ private class MicroserviceRunner(
       _      <- sentryInitializer.run()
       _      <- metrics.run().start map gatherCancelToken
       _      <- eventsDispatcher.run().start map gatherCancelToken
+      _      <- gaugeScheduler.run()
       result <- httpServer.run()
     } yield result
 
