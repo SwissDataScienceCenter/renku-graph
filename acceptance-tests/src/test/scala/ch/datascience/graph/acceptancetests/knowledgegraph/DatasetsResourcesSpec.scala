@@ -198,7 +198,7 @@ class DatasetsResourcesSpec
       Then("he should get OK response with dataset details")
       datasetDetailsResponse.status shouldBe Ok
       val foundDatasetDetails = datasetDetailsResponse.bodyAsJson
-      val expectedDataset = List(dataset1, dataset2)
+      val expectedDataset = List(dataset1, modifiedDataset2)
         .find(dataset => someDatasetDetailsLink.value contains urlEncode(dataset.id.value))
         .getOrFail(message = "Returned 'details' link does not point to any dataset in the RDF store")
       findIdentifier(foundDatasetDetails) shouldBe expectedDataset.id
