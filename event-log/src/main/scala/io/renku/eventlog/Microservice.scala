@@ -134,7 +134,7 @@ private class MicroserviceRunner(
       _      <- sentryInitializer.run()
       _      <- metrics.run().start map gatherCancelToken
       _      <- eventsDispatcher.run().start map gatherCancelToken
-      _      <- gaugeScheduler.run().start
+      _      <- gaugeScheduler.run().start map gatherCancelToken
       result <- httpServer.run()
     } yield result
 

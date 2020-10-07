@@ -57,6 +57,10 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
           .expects()
           .returning(IO.unit)
 
+        (gaugeScheduler.run _)
+          .expects()
+          .returning(IO.unit)
+
         (httpServer.run _)
           .expects()
           .returning(context.pure(ExitCode.Success))
@@ -90,6 +94,10 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(IO.unit)
 
+      (gaugeScheduler.run _)
+        .expects()
+        .returning(IO.unit)
+
       val exception = exceptions.generateOne
       (httpServer.run _)
         .expects()
@@ -114,6 +122,10 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(IO.unit)
 
+      (gaugeScheduler.run _)
+        .expects()
+        .returning(IO.unit)
+
       (httpServer.run _)
         .expects()
         .returning(context.pure(ExitCode.Success))
@@ -132,6 +144,35 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val exception = exceptions.generateOne
       (metrics.run _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      (gaugeScheduler.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (httpServer.run _)
+        .expects()
+        .returning(context.pure(ExitCode.Success))
+
+      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+    }
+
+    "return Success ExitCode even if Event Log Metrics scheduler initialisation fails" in new TestCase {
+      (sentryInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (eventsDispatcher.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (metrics.run _)
+        .expects()
+        .returning(IO.unit)
+
+      val exception = exceptions.generateOne
+      (gaugeScheduler.run _)
         .expects()
         .returning(IO.raiseError(exception))
 
