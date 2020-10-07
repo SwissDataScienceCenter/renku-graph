@@ -15,5 +15,5 @@ class MetricsConfigProviderImpl[Interpretation[_]](
 )(implicit ME:     MonadError[Interpretation, Throwable])
     extends MetricsConfigProvider[Interpretation] {
   def getInterval(): Interpretation[FiniteDuration] =
-    find[FiniteDuration]("events-log.metrics.scheduler-interval", configuration)
+    find[FiniteDuration]("event-log.metrics.scheduler-reset-interval", configuration)
 }
