@@ -32,7 +32,6 @@ import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class AssociateTokenEndpoint[Interpretation[_]: Effect](

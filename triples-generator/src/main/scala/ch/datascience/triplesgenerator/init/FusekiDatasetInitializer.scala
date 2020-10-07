@@ -26,7 +26,6 @@ import ch.datascience.triplesgenerator.config.FusekiAdminConfig
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class FusekiDatasetInitializer[Interpretation[_]](

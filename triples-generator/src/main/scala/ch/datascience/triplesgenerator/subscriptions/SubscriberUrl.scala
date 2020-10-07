@@ -23,8 +23,6 @@ import ch.datascience.tinytypes.constraints.Url
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.Microservice
 
-import scala.language.higherKinds
-
 final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
 object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url
 

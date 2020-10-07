@@ -24,7 +24,6 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class DbInitializer[Interpretation[_]](

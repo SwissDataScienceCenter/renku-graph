@@ -30,7 +30,6 @@ import org.http4s.circe.jsonOf
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 trait EventsPatchingEndpoint[Interpretation[_]] {

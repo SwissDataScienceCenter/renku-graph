@@ -36,7 +36,6 @@ import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class DatasetEndpoint[Interpretation[_]: Effect](
@@ -82,35 +81,42 @@ class DatasetEndpoint[Interpretation[_]: Effect](
   private implicit lazy val datasetEncoder: Encoder[Dataset] = Encoder.instance[Dataset] { dataset =>
     Json.obj(
       List(
-        Some("identifier" -> dataset.id.asJson),
-        Some("name" -> dataset.name.asJson),
-        Some("title" -> dataset.title.asJson),
-        Some("url" -> dataset.url.asJson),
-        Some {
-          dataset match {
-            case ds: NonModifiedDataset => "sameAs" -> ds.sameAs.asJson
-            case ds: ModifiedDataset    => "derivedFrom" -> ds.derivedFrom.asJson
-          }
+        ("identifier" -> dataset.id.asJson).some,
+        ("name" -> dataset.name.asJson).some,
+        ("title" -> dataset.title.asJson).some,
+        ("url" -> dataset.url.asJson).some,
+        dataset match {
+          case ds: NonModifiedDataset => ("sameAs" -> ds.sameAs.asJson).some
+          case ds: ModifiedDataset    => ("derivedFrom" -> ds.derivedFrom.asJson).some
         },
+        ("versions" -> dataset.versions.asJson).some,
         dataset.maybeDescription.map(description => "description" -> description.asJson),
-        Some("published" -> Json.obj(List(
-          dataset.published.maybeDate.map(date => "datePublished" -> date.asJson),
-          Some("creator" -> dataset.published.creators.toList.asJson)
-        ).flatten: _*)),
-        Some("hasPart" -> dataset.parts.asJson),
-        Some("isPartOf" -> dataset.projects.asJson),
-        Some("keywords" -> dataset.keywords.asJson)
+        ("published" -> dataset.published.asJson).some,
+        ("hasPart" -> dataset.parts.asJson).some,
+        ("isPartOf" -> dataset.projects.asJson).some,
+        ("keywords" -> dataset.keywords.asJson).some
       ).flatten: _*
     ) deepMerge _links(
-      Link(Rel.Self -> Href(renkuResourcesUrl / "datasets" / dataset.id))
+      Rel.Self -> Href(renkuResourcesUrl / "datasets" / dataset.id),
+      Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.versions.initial)
     )
   }
   // format: on
 
+  private implicit lazy val publishingEncoder: Encoder[DatasetPublishing] = Encoder.instance[DatasetPublishing] {
+    published =>
+      Json.obj(
+        List(
+          published.maybeDate.map(date => "datePublished" -> date.asJson),
+          ("creator" -> published.creators.toList.asJson).some
+        ).flatten: _*
+      )
+  }
+
   // format: off
   private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] { creator =>
     Json.obj(List(
-      Some("name" -> creator.name.asJson),
+      ("name" -> creator.name.asJson).some,
       creator.maybeEmail.map(email => "email" -> email.asJson),
       creator.maybeAffiliation.map(affiliation => "affiliation" -> affiliation.asJson)
     ).flatten: _*)
@@ -138,6 +144,12 @@ class DatasetEndpoint[Interpretation[_]: Effect](
     }""" deepMerge _links(
       Link(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / project.path))
     )
+  }
+
+  private implicit lazy val versionsEncoder: Encoder[DatasetVersions] = Encoder.instance[DatasetVersions] { versions =>
+    json"""{
+      "initial": ${versions.initial}
+    }"""
   }
 }
 

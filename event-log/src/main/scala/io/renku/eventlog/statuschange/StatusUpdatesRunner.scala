@@ -26,8 +26,6 @@ import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 
-import scala.language.higherKinds
-
 trait StatusUpdatesRunner[Interpretation[_]] {
   def run(command: ChangeStatusCommand[Interpretation]): Interpretation[UpdateResult]
 }

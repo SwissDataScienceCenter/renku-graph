@@ -29,7 +29,6 @@ import io.circe.parser._
 import io.circe.{Decoder, HCursor}
 import io.renku.eventlog.EventLogDB
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private class ProjectPathAdder[Interpretation[_]](

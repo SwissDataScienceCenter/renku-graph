@@ -110,6 +110,7 @@ object GraphModelGenerators {
       } yield s"$first.$second/zenodo.$third"
     )
     .map(Identifier.apply)
+  implicit val datasetInitialVersions:     Gen[InitialVersion]     = datasetIdentifiers map (id => InitialVersion(id.toString))
   implicit val datasetTitles:              Gen[datasets.Title]     = nonEmptyStrings() map datasets.Title.apply
   implicit val datasetNames:               Gen[datasets.Name]      = nonEmptyStrings() map datasets.Name.apply
   implicit val datasetDescriptions:        Gen[Description]        = paragraphs() map (_.value) map Description.apply

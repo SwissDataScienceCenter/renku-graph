@@ -32,8 +32,6 @@ import io.renku.eventlog.EventStatus.{NonRecoverableFailure, Processing}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage, EventStatus}
 
-import scala.language.higherKinds
-
 final case class ToNonRecoverableFailure[Interpretation[_]](
     eventId:              CompoundEventId,
     maybeMessage:         Option[EventMessage],

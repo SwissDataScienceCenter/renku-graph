@@ -31,7 +31,6 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError._
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators.sparqlQueries
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import eu.timepit.refined.auto._
 import org.scalamock.handlers.CallHandler
@@ -40,7 +39,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.{higherKinds, reflectiveCalls}
+import scala.language.reflectiveCalls
 
 class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
 

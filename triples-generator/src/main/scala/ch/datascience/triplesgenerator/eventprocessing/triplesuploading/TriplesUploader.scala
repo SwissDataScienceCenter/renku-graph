@@ -31,7 +31,6 @@ import org.http4s.Uri
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private trait TriplesUploader[Interpretation[_]] {

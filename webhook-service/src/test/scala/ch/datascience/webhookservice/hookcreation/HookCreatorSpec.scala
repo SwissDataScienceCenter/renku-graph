@@ -41,7 +41,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
 

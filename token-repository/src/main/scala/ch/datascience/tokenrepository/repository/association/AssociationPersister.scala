@@ -25,8 +25,6 @@ import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 
-import scala.language.higherKinds
-
 private class AssociationPersister[Interpretation[_]: Monad](
     transactor: DbTransactor[Interpretation, ProjectsTokensDB]
 )(implicit ME:  Bracket[Interpretation, Throwable]) {

@@ -27,7 +27,6 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
-import io.renku.jsonld.EntityId
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -65,6 +64,7 @@ class IOProjectDatasetsFinderSpec
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
           (datasetModification2.id,
+           originalDataset.versions.initial,
            datasetModification2.title,
            datasetModification2.name,
            Right(datasetModification2.derivedFrom)
@@ -90,8 +90,9 @@ class IOProjectDatasetsFinderSpec
         )
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.title, dataset1.name, Left(dataset1.sameAs)),
+          (dataset1.id, dataset1.versions.initial, dataset1.title, dataset1.name, Left(dataset1.sameAs)),
           (dataset2Modification.id,
+           dataset2.versions.initial,
            dataset2Modification.title,
            dataset2Modification.name,
            Right(dataset2Modification.derivedFrom)
@@ -103,14 +104,12 @@ class IOProjectDatasetsFinderSpec
     "return all datasets of the given project without merging datasets having the same sameAs" in new TestCase {
       forAll(datasetProjects) { project =>
         val sharedSameAs = datasetSameAs.generateOne
-        val dataset1 = nonModifiedDatasets(projects = project.toGenerator).generateOne.copy(
-          sameAs = sharedSameAs
-        )
+        val dataset1 = nonModifiedDatasets(
+          projects = project.toGenerator
+        ).generateOne.copy(sameAs = sharedSameAs)
         val dataset2 = nonModifiedDatasets(
           projects = project.copy(created = addedToProjectObjects.generateOne).toGenerator
-        ).generateOne.copy(
-          sameAs = sharedSameAs
-        )
+        ).generateOne.copy(sameAs = sharedSameAs)
 
         loadToStore(
           randomDataSetCommit,
@@ -119,8 +118,8 @@ class IOProjectDatasetsFinderSpec
         )
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.title, dataset1.name, Left(sharedSameAs)),
-          (dataset2.id, dataset2.title, dataset2.name, Left(sharedSameAs))
+          (dataset1.id, dataset1.versions.initial, dataset1.title, dataset1.name, Left(sharedSameAs)),
+          (dataset2.id, dataset2.versions.initial, dataset2.title, dataset2.name, Left(sharedSameAs))
         )
       }
     }

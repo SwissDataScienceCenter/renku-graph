@@ -42,7 +42,6 @@ import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class ProcessingStatusEndpoint[Interpretation[_]: Effect](

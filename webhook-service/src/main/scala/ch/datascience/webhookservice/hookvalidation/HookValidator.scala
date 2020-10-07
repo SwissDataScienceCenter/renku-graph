@@ -35,7 +35,6 @@ import ch.datascience.webhookservice.tokenrepository._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class HookValidator[Interpretation[_]](

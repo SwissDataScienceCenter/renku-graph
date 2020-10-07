@@ -90,6 +90,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
           "description": {"value": $blank},
           "url": {"value": ${dataset.url.value}},
           "topmostSameAs": {"value": ${SameAs(DataSet.entityId(dataset.id)).toString} },
+          "initialVersion": {"value": ${dataset.versions.initial.toString} },
           "keywords": {"value": ${dataset.keywords.map(_.value).asJson}}
         }
       ]
@@ -108,8 +109,9 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
           "publishedDate": {"value": ${publishedDate.value}},
           "description": {"value": $blank},
           "url": {"value": ${dataset.url.value}},
-          "maybeDerivedFrom": {"value": ${dataset.derivedFrom.value}},
           "topmostSameAs": {"value": ${DataSet.entityId(dataset.id).toString} },
+          "maybeDerivedFrom": {"value": ${dataset.derivedFrom.value}},
+          "initialVersion": {"value": ${dataset.versions.initial.toString} },
           "keywords": {"value": ${dataset.keywords.map(_.value).asJson}}
         }
       ]

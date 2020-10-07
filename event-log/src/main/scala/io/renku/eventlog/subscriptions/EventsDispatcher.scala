@@ -32,7 +32,7 @@ import io.renku.eventlog.{EventLogDB, EventMessage}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 class EventsDispatcher(

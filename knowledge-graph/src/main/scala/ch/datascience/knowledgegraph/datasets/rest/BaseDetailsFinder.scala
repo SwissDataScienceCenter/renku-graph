@@ -23,13 +23,13 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{Identifier, Keyword}
 import ch.datascience.knowledgegraph.datasets.model.Dataset
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.HCursor
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private class BaseDetailsFinder(
     rdfStoreConfig: RdfStoreConfig,
@@ -43,27 +43,29 @@ private class BaseDetailsFinder(
 ) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
 
   import BaseDetailsFinder._
+  import ch.datascience.graph.Schemas._
 
   def findBaseDetails(identifier: Identifier): IO[Option[Dataset]] =
     queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier)) flatMap toSingleDataset
 
-  private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery(
+  private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - details",
-    Set(
-      "PREFIX prov: <http://www.w3.org/ns/prov#>",
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX renku: <https://swissdatasciencecenter.github.io/renku-ontology#>",
-      "PREFIX schema: <http://schema.org/>"
+    Prefixes.of(
+      prov   -> "prov",
+      rdf    -> "rdf",
+      renku  -> "renku",
+      schema -> "schema"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?description ?publishedDate
+    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?publishedDate
         |WHERE {
         |    ?datasetId schema:identifier "$identifier";
         |               schema:identifier ?identifier;
         |               rdf:type <http://schema.org/Dataset>;
         |               schema:url ?url;
         |               schema:name ?name;
-        |               schema:alternateName ?alternateName ;
-        |               renku:topmostSameAs ?topmostSameAs .
+        |               schema:alternateName ?alternateName;
+        |               renku:topmostSameAs ?topmostSameAs;
+        |               renku:topmostDerivedFrom/schema:identifier ?initialVersion.
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    OPTIONAL { ?datasetId schema:description ?description }.
         |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate }.
@@ -74,11 +76,9 @@ private class BaseDetailsFinder(
   def findKeywords(identifier: Identifier): IO[List[Keyword]] =
     queryExpecting[List[Keyword]](using = queryKeywords(identifier)).flatMap(s => ME.pure(s))
 
-  private def queryKeywords(identifier: Identifier) = SparqlQuery(
+  private def queryKeywords(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - keyword details",
-    Set(
-      "PREFIX schema: <http://schema.org/>"
-    ),
+    Prefixes.of(schema -> "schema"),
     s"""|SELECT DISTINCT ?keyword
         |WHERE {
         |    ?datasetId schema:identifier "$identifier" ;
@@ -110,6 +110,7 @@ private object BaseDetailsFinder {
         url                <- extract[Url]("url")
         maybeDerivedFrom   <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
         sameAs             <- extract[SameAs]("topmostSameAs")
+        initialVersion     <- extract[InitialVersion]("initialVersion")
         maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate")
         maybeDescription <- extract[Option[String]]("description")
                               .map(blankToNone)
@@ -122,6 +123,7 @@ private object BaseDetailsFinder {
             name,
             url,
             derivedFrom,
+            DatasetVersions(initialVersion),
             maybeDescription,
             DatasetPublishing(maybePublishedDate, Set.empty),
             parts = List.empty,
@@ -135,6 +137,7 @@ private object BaseDetailsFinder {
             name,
             url,
             sameAs,
+            DatasetVersions(initialVersion),
             maybeDescription,
             DatasetPublishing(maybePublishedDate, Set.empty),
             parts = List.empty,
@@ -149,11 +152,8 @@ private object BaseDetailsFinder {
 
   private implicit val keywordsDecoder: Decoder[List[Keyword]] = {
 
-    implicit val keywordDecoder: Decoder[Keyword] = { cursor =>
-      for {
-        keywordString <- cursor.downField("keyword").downField("value").as[String]
-      } yield Keyword(keywordString)
-    }
+    implicit val keywordDecoder: Decoder[Keyword] =
+      _.downField("keyword").downField("value").as[String].map(Keyword.apply)
 
     _.downField("results").downField("bindings").as(decodeList[Keyword])
   }

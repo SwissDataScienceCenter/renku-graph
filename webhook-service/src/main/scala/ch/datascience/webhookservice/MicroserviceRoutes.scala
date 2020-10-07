@@ -26,8 +26,6 @@ import ch.datascience.webhookservice.hookcreation.HookCreationEndpoint
 import ch.datascience.webhookservice.hookvalidation.HookValidationEndpoint
 import org.http4s.dsl.Http4sDsl
 
-import scala.language.higherKinds
-
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     hookEventEndpoint:        HookEventEndpoint[F],
     hookCreationEndpoint:     HookCreationEndpoint[F],

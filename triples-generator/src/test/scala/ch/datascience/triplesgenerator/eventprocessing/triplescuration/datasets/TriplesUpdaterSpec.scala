@@ -33,7 +33,6 @@ import io.renku.jsonld.{EntityId, Property}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.language.higherKinds
 import scala.util.Try
 
 class TriplesUpdaterSpec extends AnyWordSpec with should.Matchers {

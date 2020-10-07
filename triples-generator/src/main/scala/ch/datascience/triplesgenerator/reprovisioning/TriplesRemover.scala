@@ -26,7 +26,6 @@ import eu.timepit.refined.numeric.Positive
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait TriplesRemover[Interpretation[_]] {
   def removeAllTriples(): Interpretation[Unit]

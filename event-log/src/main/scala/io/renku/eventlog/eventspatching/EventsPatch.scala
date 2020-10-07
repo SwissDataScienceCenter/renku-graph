@@ -32,8 +32,6 @@ import eu.timepit.refined.collection.NonEmpty
 import io.renku.eventlog.EventStatus.New
 import io.renku.eventlog.{EventStatus, TypesSerializers}
 
-import scala.language.higherKinds
-
 private trait EventsPatch[Interpretation[_]] extends Product with Serializable with TypesSerializers {
   def name:               String Refined NonEmpty
   def updateGauges():     Interpretation[Unit]

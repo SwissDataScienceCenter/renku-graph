@@ -29,7 +29,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.jsonld.EntityId
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 trait LineageFinder[Interpretation[_]] {
   def find(projectPath: Path, location: Location): Interpretation[Option[Lineage]]

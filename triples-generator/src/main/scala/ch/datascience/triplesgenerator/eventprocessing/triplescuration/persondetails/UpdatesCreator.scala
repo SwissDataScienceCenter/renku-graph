@@ -29,8 +29,6 @@ import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTr
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.Person
 import eu.timepit.refined.auto._
 
-import scala.language.higherKinds
-
 private[triplescuration] class UpdatesCreator {
 
   def prepareUpdates[Interpretation[_]](

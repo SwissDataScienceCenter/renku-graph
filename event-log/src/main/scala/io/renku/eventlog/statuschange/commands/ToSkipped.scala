@@ -32,8 +32,6 @@ import io.renku.eventlog.EventStatus.{Processing, Skipped}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage, EventStatus}
 
-import scala.language.higherKinds
-
 final case class ToSkipped[Interpretation[_]](
     eventId:              CompoundEventId,
     message:              EventMessage,

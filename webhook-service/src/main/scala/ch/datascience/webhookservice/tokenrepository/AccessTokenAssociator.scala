@@ -27,7 +27,6 @@ import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 trait AccessTokenAssociator[Interpretation[_]] {
   def associate(projectId: Id, accessToken: AccessToken): Interpretation[Unit]

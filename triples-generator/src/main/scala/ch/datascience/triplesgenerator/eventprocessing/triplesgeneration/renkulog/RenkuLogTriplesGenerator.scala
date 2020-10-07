@@ -36,7 +36,7 @@ import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulo
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.{GenerationResult, TriplesGenerator}
 
 import scala.concurrent.ExecutionContext
-import scala.language.{higherKinds, postfixOps}
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (

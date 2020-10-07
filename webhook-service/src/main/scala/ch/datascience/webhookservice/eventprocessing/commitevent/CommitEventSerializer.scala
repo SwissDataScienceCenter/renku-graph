@@ -23,7 +23,6 @@ import ch.datascience.webhookservice.eventprocessing.{CommitEvent, Person}
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 
-import scala.language.higherKinds
 import scala.util.Try
 
 private class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {

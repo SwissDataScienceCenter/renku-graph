@@ -30,7 +30,6 @@ import doobie.implicits._
 import doobie.util.fragment.Fragment
 import io.chrisdavenport.log4cats.Logger
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private trait ProjectPathAdder[Interpretation[_]] {

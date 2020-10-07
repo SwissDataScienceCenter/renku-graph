@@ -30,7 +30,6 @@ import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 trait KGProjectFinder[Interpretation[_]] {
   def findProject(path: Path): Interpretation[Option[KGProject]]

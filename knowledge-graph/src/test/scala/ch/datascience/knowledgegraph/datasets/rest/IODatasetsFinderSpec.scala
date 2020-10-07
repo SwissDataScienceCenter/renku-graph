@@ -134,18 +134,18 @@ class IODatasetsFinderSpec
         "- case of shared sameAs with modification on some projects" in new TestCase {
 
           val sharedSameAs = datasetSameAs.generateOne
-          val datasets1    = nonModifiedDatasets(projects = single).generateOne.copy(sameAs = sharedSameAs)
-          val datasets2    = datasets1.copy(id = datasetIdentifiers.generateOne, projects = single.generateOne.toList)
-          val datasets2Modification = modifiedDatasetsOnFirstProject(datasets2).generateOne
+          val dataset1     = nonModifiedDatasets(projects = single).generateOne.copy(sameAs = sharedSameAs)
+          val dataset2     = dataset1.copy(id = datasetIdentifiers.generateOne, projects = single.generateOne.toList)
+          val datasets2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
             .copy(title = datasetTitles.generateOne)
 
-          loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()(), datasets2Modification.toJsonLD())
+          loadToStore(dataset1.toJsonLD()(), dataset2.toJsonLD()(), datasets2Modification.toJsonLD())
 
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
             .unsafeRunSync()
 
-          result.results shouldBe List(List(datasets1), List(datasets2Modification))
+          result.results shouldBe List(List(dataset1), List(datasets2Modification))
             .flatMap(_.toDatasetSearchResult(matchIdFrom = result.results))
             .sortBy(_.title.value)
 
@@ -187,7 +187,7 @@ class IODatasetsFinderSpec
             .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
             .toList
           val modifiedDatasetsList = originalDatasetsList.map { ds =>
-            modifiedDatasetsOnFirstProject(ds, ds.entityId.asDerivedFrom.some).generateOne
+            modifiedDatasetsOnFirstProject(ds, derivedFromOverride = ds.entityId.asDerivedFrom.some).generateOne
               .copy(name = datasetNames.generateOne)
           }
 

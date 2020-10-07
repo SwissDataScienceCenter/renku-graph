@@ -32,7 +32,6 @@ import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog.{EventLogDB, EventStatus}
 
-import scala.language.higherKinds
 import scala.math.BigDecimal.RoundingMode
 
 trait ProcessingStatusFinder[Interpretation[_]] {

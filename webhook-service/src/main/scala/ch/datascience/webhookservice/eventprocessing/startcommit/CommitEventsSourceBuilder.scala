@@ -34,7 +34,6 @@ import ch.datascience.webhookservice.eventprocessing.startcommit.CommitEventsSou
 import ch.datascience.webhookservice.eventprocessing.{CommitEvent, StartCommit}
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private class CommitEventsSourceBuilder[Interpretation[_]](
     commitInfoFinder: CommitInfoFinder[Interpretation]

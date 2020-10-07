@@ -23,9 +23,10 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
+import ch.datascience.generators.CommonGraphGenerators.{renkuBaseUrls, renkuResourcesUrls}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects
@@ -43,7 +44,7 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder._
 import io.circe.syntax._
-import io.circe.{Decoder, HCursor, Json}
+import io.circe.{Decoder, Json}
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.circe.jsonOf
@@ -58,7 +59,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
   "getDataset" should {
 
     "respond with OK and the found dataset" in new TestCase {
-      forAll { dataset: Dataset =>
+      forAll(datasets) { dataset =>
         (datasetsFinder
           .findDataset(_: Identifier))
           .expects(dataset.id)
@@ -69,9 +70,12 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
         response.status                      shouldBe Ok
         response.contentType                 shouldBe Some(`Content-Type`(MediaType.application.json))
         response.as[Dataset].unsafeRunSync() shouldBe dataset
-        response.as[Json].unsafeRunSync()._links shouldBe Right(
-          Links.of(Self -> Href(renkuResourcesUrl / "datasets" / dataset.id))
-        )
+        response.as[Json].unsafeRunSync()._links shouldBe Links
+          .of(
+            Self                   -> Href(renkuResourcesUrl / "datasets" / dataset.id),
+            Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.versions.initial)
+          )
+          .asRight
         val Right(projectsJsons) = response.as[Json].unsafeRunSync().hcursor.downField("isPartOf").as[List[Json]]
         projectsJsons should have size dataset.projects.size
         projectsJsons.foreach { json =>
@@ -129,6 +133,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
   private trait TestCase {
     val context = MonadError[IO, Throwable]
+    implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
     val datasetsFinder        = mock[DatasetFinder[IO]]
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
@@ -157,53 +162,75 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       keywords         <- cursor.downField("keywords").as[List[Keyword]]
       maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
       maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
+      versions         <- cursor.downField("versions").as[DatasetVersions]
     } yield maybeSameAs
-      .map(NonModifiedDataset(id, title, name, url, _, maybeDescription, published, parts, projects, keywords))
+      .map { sameAs =>
+        NonModifiedDataset(id,
+                           title,
+                           name,
+                           url,
+                           sameAs,
+                           versions,
+                           maybeDescription,
+                           published,
+                           parts,
+                           projects,
+                           keywords
+        )
+      }
       .orElse(
-        maybeDerivedFrom map (ModifiedDataset(id,
-                                              title,
-                                              name,
-                                              url,
-                                              _,
-                                              maybeDescription,
-                                              published,
-                                              parts,
-                                              projects,
-                                              keywords
-        ))
+        maybeDerivedFrom map { derivedFrom =>
+          ModifiedDataset(id,
+                          title,
+                          name,
+                          url,
+                          derivedFrom,
+                          versions,
+                          maybeDescription,
+                          published,
+                          parts,
+                          projects,
+                          keywords
+          )
+        }
       )
       .getOrElse(fail("Cannot decode payload as Dataset"))
 
-  private implicit lazy val datasetPublishingDecoder: Decoder[DatasetPublishing] = (cursor: HCursor) =>
+  private implicit lazy val publishingDecoder: Decoder[DatasetPublishing] = cursor =>
     for {
       maybeDate <- cursor.downField("datePublished").as[Option[PublishedDate]]
       creators  <- cursor.downField("creator").as[List[DatasetCreator]].map(_.toSet)
     } yield DatasetPublishing(maybeDate, creators)
 
-  private implicit lazy val datasetCreatorDecoder: Decoder[DatasetCreator] = (cursor: HCursor) =>
+  private implicit lazy val creatorDecoder: Decoder[DatasetCreator] = cursor =>
     for {
       name             <- cursor.downField("name").as[UserName]
       maybeEmail       <- cursor.downField("email").as[Option[Email]]
       maybeAffiliation <- cursor.downField("affiliation").as[Option[Affiliation]]
     } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
 
-  private implicit lazy val datasetPartDecoder: Decoder[DatasetPart] = (cursor: HCursor) =>
+  private implicit lazy val partDecoder: Decoder[DatasetPart] = cursor =>
     for {
       name     <- cursor.downField("name").as[PartName]
       location <- cursor.downField("atLocation").as[PartLocation]
     } yield DatasetPart(name, location)
 
-  private implicit lazy val datasetProjectDecoder: Decoder[DatasetProject] = (cursor: HCursor) =>
+  private implicit lazy val projectDecoder: Decoder[DatasetProject] = cursor =>
     for {
       path    <- cursor.downField("path").as[Path]
       name    <- cursor.downField("name").as[projects.Name]
       created <- cursor.downField("created").as[AddedToProject]
     } yield DatasetProject(path, name, created)
 
-  private implicit lazy val datasetInProjectCreationDecoder: Decoder[AddedToProject] = (cursor: HCursor) =>
+  private implicit lazy val addedToProjectDecoder: Decoder[AddedToProject] = cursor =>
     for {
       date            <- cursor.downField("dateCreated").as[DateCreatedInProject]
       maybeAgentEmail <- cursor.downField("agent").downField("email").as[Option[Email]]
       agentName       <- cursor.downField("agent").downField("name").as[UserName]
     } yield AddedToProject(date, DatasetAgent(maybeAgentEmail, agentName))
+
+  private implicit lazy val versionsDecoder: Decoder[DatasetVersions] = cursor =>
+    for {
+      initial <- cursor.downField("initial").as[InitialVersion]
+    } yield DatasetVersions(initial)
 }

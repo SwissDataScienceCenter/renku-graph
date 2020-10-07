@@ -29,7 +29,6 @@ import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{CuratedT
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 trait ForkInfoUpdater[Interpretation[_]] {
   def updateForkInfo(

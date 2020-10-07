@@ -29,8 +29,6 @@ import doobie.util.fragments.in
 import eu.timepit.refined.auto._
 import io.renku.eventlog._
 
-import scala.language.higherKinds
-
 trait StatsFinder[Interpretation[_]] {
   def statuses(): Interpretation[Map[EventStatus, Long]]
 

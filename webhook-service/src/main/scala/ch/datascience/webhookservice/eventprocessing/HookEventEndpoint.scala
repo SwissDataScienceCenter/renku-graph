@@ -41,7 +41,6 @@ import org.http4s.util.CaseInsensitiveString
 import org.http4s.{EntityDecoder, Request, Response, Status}
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class HookEventEndpoint[Interpretation[_]: Effect](

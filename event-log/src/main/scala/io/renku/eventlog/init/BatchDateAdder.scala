@@ -28,7 +28,6 @@ import doobie.implicits.javatime._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private class BatchDateAdder[Interpretation[_]](

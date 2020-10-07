@@ -26,8 +26,6 @@ import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTr
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 
-import scala.language.higherKinds
-
 final case class CuratedTriples[Interpretation[_]](triples:       JsonLDTriples,
                                                    updatesGroups: List[CurationUpdatesGroup[Interpretation]]
 )

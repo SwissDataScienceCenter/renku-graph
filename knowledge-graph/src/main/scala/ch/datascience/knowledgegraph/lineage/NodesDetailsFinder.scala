@@ -33,7 +33,6 @@ import io.circe.Decoder
 import io.renku.jsonld.EntityId
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait NodesDetailsFinder[Interpretation[_]] {
 

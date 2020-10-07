@@ -37,7 +37,6 @@ import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response, Status}
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class HookCreationEndpoint[Interpretation[_]: Effect](

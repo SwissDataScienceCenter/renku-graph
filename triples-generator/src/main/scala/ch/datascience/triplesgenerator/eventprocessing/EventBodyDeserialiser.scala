@@ -28,8 +28,6 @@ import ch.datascience.triplesgenerator.eventprocessing.CommitEvent.{CommitEventW
 import io.circe.parser._
 import io.circe.{Decoder, DecodingFailure, Error, HCursor, ParsingFailure}
 
-import scala.language.higherKinds
-
 private class EventBodyDeserialiser[Interpretation[_]](implicit
     ME: MonadError[Interpretation, Throwable]
 ) {

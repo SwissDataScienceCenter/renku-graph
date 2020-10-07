@@ -23,7 +23,6 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 trait Subscriber[Interpretation[_]] {

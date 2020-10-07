@@ -25,7 +25,6 @@ import ch.datascience.http.client.IORestClient
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait SubscriptionSender[Interpretation[_]] {
   def postToEventLog(subscriberUrl: SubscriberUrl): Interpretation[Unit]

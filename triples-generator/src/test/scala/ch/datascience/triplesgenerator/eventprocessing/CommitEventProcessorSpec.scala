@@ -64,7 +64,6 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.higherKinds
 import scala.util.Try
 
 class CommitEventProcessorSpec

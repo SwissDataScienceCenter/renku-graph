@@ -29,8 +29,6 @@ import org.http4s.headers.Authorization
 import org.http4s.util.CaseInsensitiveString
 import org.http4s.{Header, Request}
 
-import scala.language.higherKinds
-
 class AccessTokenExtractor[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
 
   def findAccessToken(request: Request[Interpretation]): Interpretation[AccessToken] =

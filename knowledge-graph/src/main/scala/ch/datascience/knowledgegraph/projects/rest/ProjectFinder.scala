@@ -32,7 +32,6 @@ import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabPro
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.{KGProject, Parent}
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.Try
 
 trait ProjectFinder[Interpretation[_]] {

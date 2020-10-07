@@ -30,7 +30,6 @@ import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait EventStatusUpdater[Interpretation[_]] {
   def markEventNew(eventId:                  CompoundEventId):           Interpretation[Unit]
