@@ -85,7 +85,7 @@ object WorkflowRun {
       override def convert[T <: Activity with WorkflowRun]: T => Either[Exception, PartialEntity] =
         entity =>
           for {
-            reverse <- Reverse.of((prov / "wasPartOfWorkflowRun") -> entity.processRuns.map(_.asJsonLD))
+            reverse <- Reverse.of((wfprov / "wasPartOfWorkflowRun") -> entity.processRuns.map(_.asJsonLD))
           } yield PartialEntity(
             EntityTypes of (wfprov / "WorkflowRun"),
             reverse,

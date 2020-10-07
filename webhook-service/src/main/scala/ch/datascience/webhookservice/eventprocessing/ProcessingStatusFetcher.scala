@@ -33,7 +33,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.math.BigDecimal.RoundingMode
 
 private trait ProcessingStatusFetcher[Interpretation[_]] {

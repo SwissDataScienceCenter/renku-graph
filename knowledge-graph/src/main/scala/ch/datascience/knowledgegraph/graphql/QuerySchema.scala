@@ -20,8 +20,6 @@ package ch.datascience.knowledgegraph.graphql
 
 import sangria.schema._
 
-import scala.language.higherKinds
-
 object QuerySchema {
 
   def apply[Interpretation[_]](

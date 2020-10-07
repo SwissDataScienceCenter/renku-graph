@@ -27,7 +27,6 @@ import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 trait AccessTokenRemover[Interpretation[_]] {
   def removeAccessToken(projectId: Id): Interpretation[Unit]

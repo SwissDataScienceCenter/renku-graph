@@ -33,7 +33,6 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.chrisdavenport.log4cats.Logger
 
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 private trait EventsProcessingRunner[Interpretation[_]] {

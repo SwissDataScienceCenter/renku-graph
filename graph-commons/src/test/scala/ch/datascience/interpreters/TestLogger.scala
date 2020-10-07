@@ -27,8 +27,6 @@ import org.scalatest.Assertion
 import org.scalatest.matchers.should
 import scala.jdk.CollectionConverters._
 
-import scala.language.higherKinds
-
 class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] with should.Matchers {
 
   import TestLogger.Level._

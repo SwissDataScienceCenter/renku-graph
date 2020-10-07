@@ -31,7 +31,6 @@ import io.circe.Decoder.decodeList
 import io.circe.DecodingFailure
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.Try
 
 private class ProjectsFinder(

@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs, Url}
+import ch.datascience.graph.model.datasets.{DerivedFrom, InitialVersion, SameAs, Url}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.entities.DataSet
 import eu.timepit.refined.auto._
@@ -32,12 +32,12 @@ import org.scalacheck.Gen
 
 object DatasetsGenerators {
 
-  implicit val datasets: Gen[NonModifiedDataset] = nonModifiedDatasets()
+  implicit def datasets(implicit renkuBaseUrl: RenkuBaseUrl): Gen[NonModifiedDataset] = nonModifiedDatasets()
 
   def nonModifiedDatasets(
-      sameAs:   Gen[SameAs] = datasetSameAs,
-      projects: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
-  ): Gen[NonModifiedDataset] =
+      sameAs:              Gen[SameAs] = datasetSameAs,
+      projects:            Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
+  )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[NonModifiedDataset] =
     for {
       id               <- datasetIdentifiers
       title            <- datasetTitles
@@ -49,21 +49,25 @@ object DatasetsGenerators {
       published        <- datasetPublishingInfos
       part             <- listOf(datasetParts)
       projects         <- projects
-    } yield NonModifiedDataset(id,
-                               title,
-                               name,
-                               url,
-                               sameAs,
-                               maybeDescription,
-                               published,
-                               part,
-                               projects.toList,
-                               keywords
+    } yield NonModifiedDataset(
+      id,
+      title,
+      name,
+      url,
+      sameAs,
+      DatasetVersions(InitialVersion(id)),
+      maybeDescription,
+      published,
+      part,
+      projects.toList,
+      keywords
     )
 
-  def modifiedDatasetsOnFirstProject(dataset: Dataset, derivedFromOverride: Option[DerivedFrom] = None)(implicit
-      renkuBaseUrl:                           RenkuBaseUrl
-  ): Gen[ModifiedDataset] =
+  def modifiedDatasetsOnFirstProject(
+      dataset:             Dataset,
+      versionsOverride:    Option[DatasetVersions] = None,
+      derivedFromOverride: Option[DerivedFrom] = None
+  )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[ModifiedDataset] =
     for {
       id        <- datasetIdentifiers
       published <- datasetPublishingInfos
@@ -74,6 +78,7 @@ object DatasetsGenerators {
       dataset.name,
       Url(DataSet.entityId(id).toString),
       derivedFromOverride getOrElse DerivedFrom(DataSet.entityId(dataset.id)),
+      versionsOverride getOrElse DatasetVersions(dataset.versions.initial),
       dataset.maybeDescription,
       published,
       dataset.parts,
@@ -115,4 +120,8 @@ object DatasetsGenerators {
     maybeEmail <- userEmails.toGeneratorOfOptions
     name       <- userNames
   } yield DatasetAgent(maybeEmail, name)
+
+  private implicit lazy val datasetVersions: Gen[DatasetVersions] = for {
+    initialVersion <- datasetInitialVersions
+  } yield DatasetVersions(initialVersion)
 }

@@ -30,7 +30,6 @@ import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondet
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 trait TriplesCurator[Interpretation[_]] {
   def curate(

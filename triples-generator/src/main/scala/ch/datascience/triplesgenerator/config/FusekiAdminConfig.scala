@@ -28,8 +28,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 import pureconfig.error.CannotConvert
 
-import scala.language.higherKinds
-
 final case class FusekiAdminConfig(
     fusekiBaseUrl:   FusekiBaseUrl,
     datasetName:     DatasetName,

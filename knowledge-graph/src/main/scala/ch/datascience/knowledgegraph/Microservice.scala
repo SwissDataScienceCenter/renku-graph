@@ -36,7 +36,6 @@ import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 object Microservice extends IOMicroservice {
 

@@ -24,7 +24,6 @@ import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 class QueryContext[Interpretation[_]](
     val lineageFinder: LineageFinder[Interpretation]

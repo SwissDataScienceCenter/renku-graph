@@ -32,7 +32,6 @@ import ch.datascience.tokenrepository.repository.init.{DbInitializer, IODbInitia
 import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.higherKinds
 
 object Microservice extends IOMicroservice {
 

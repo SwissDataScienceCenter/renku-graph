@@ -27,8 +27,6 @@ import ch.datascience.tokenrepository.repository.deletion.DeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.FetchTokenEndpoint
 import org.http4s.dsl.Http4sDsl
 
-import scala.language.higherKinds
-
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     fetchTokenEndpoint:     FetchTokenEndpoint[F],
     associateTokenEndpoint: AssociateTokenEndpoint[F],

@@ -21,8 +21,6 @@ package ch.datascience.triplesgenerator.config
 import cats.MonadError
 import com.typesafe.config.{Config, ConfigFactory}
 
-import scala.language.higherKinds
-
 trait TriplesGeneration extends Product with Serializable
 
 object TriplesGeneration {

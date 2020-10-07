@@ -22,6 +22,7 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.rdfstore.SparqlQuery.{Prefix, Prefixes}
 import eu.timepit.refined.auto._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -29,6 +30,42 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.util.{Failure, Success, Try}
 
 class SparqlQuerySpec extends AnyWordSpec with should.Matchers {
+
+  "of" should {
+
+    "instantiate SparqlQuery using a set of Prefix objects" in {
+      val name   = nonBlankStrings().generateOne
+      val body   = sentences().generateOne.value
+      val prefix = sparqlPrefixes.generateOne
+
+      val sparql = SparqlQuery.of(name, Set(prefix), body)
+
+      sparql.name               shouldBe name
+      sparql.prefixes           shouldBe Set(prefix)
+      sparql.body               shouldBe body
+      sparql.maybePagingRequest shouldBe None
+    }
+
+    "instantiate SparqlQuery using the Prefixes.of set" in {
+      val name              = nonBlankStrings().generateOne
+      val body              = sentences().generateOne.value
+      val prefixName        = nonBlankStrings().generateOne
+      val prefixSchema      = schemas.generateOne
+      val otherPrefixName   = nonBlankStrings().generateOne
+      val otherPrefixSchema = schemas.generateDifferentThan(prefixSchema)
+
+      val sparql = SparqlQuery.of(
+        name,
+        Prefixes.of(prefixSchema -> prefixName, otherPrefixSchema -> otherPrefixName),
+        body
+      )
+
+      sparql.name               shouldBe name
+      sparql.prefixes           shouldBe Set(Prefix(prefixName, prefixSchema)) + Prefix(otherPrefixName, otherPrefixSchema)
+      sparql.body               shouldBe body
+      sparql.maybePagingRequest shouldBe None
+    }
+  }
 
   "toString" should {
 
@@ -122,9 +159,9 @@ class SparqlQuerySpec extends AnyWordSpec with should.Matchers {
   "toCountQuery" should {
 
     "wrap query's body with the COUNT clause" in {
-      val prefixes = Set(nonBlankStrings().generateOne.value)
+      val prefixes = Set(sparqlPrefixes.generateOne)
       val body     = sentences().generateOne.value
-      val query    = SparqlQuery(name = "test query", prefixes, body)
+      val query    = SparqlQuery.of(name = "test query", prefixes, body)
 
       val actual = query.toCountQuery
 

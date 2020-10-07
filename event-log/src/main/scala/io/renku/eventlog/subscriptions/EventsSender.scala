@@ -30,7 +30,6 @@ import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
-import scala.language.higherKinds
 
 private trait EventsSender[Interpretation[_]] {
   def sendEvent(subscriptionUrl: SubscriberUrl, id: CompoundEventId, body: EventBody): Interpretation[SendingResult]

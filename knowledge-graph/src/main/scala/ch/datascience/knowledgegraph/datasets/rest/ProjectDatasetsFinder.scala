@@ -21,21 +21,21 @@ package ch.datascience.knowledgegraph.datasets.rest
 import ProjectDatasetsFinder._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, Name, SameAs, Title}
+import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, InitialVersion, Name, SameAs, Title}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait ProjectDatasetsFinder[Interpretation[_]] {
-  def findProjectDatasets(projectPath: Path): Interpretation[List[(Identifier, Title, Name, SameAsOrDerived)]]
+  def findProjectDatasets(projectPath: Path): Interpretation[List[ProjectDataset]]
 }
 
 private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
+  type ProjectDataset  = (Identifier, InitialVersion, Title, Name, SameAsOrDerived)
 }
 
 private class IOProjectDatasetsFinder(
@@ -50,8 +50,8 @@ private class IOProjectDatasetsFinder(
   import IOProjectDatasetsFinder._
   import eu.timepit.refined.auto._
 
-  def findProjectDatasets(projectPath: Path): IO[List[(Identifier, Title, Name, SameAsOrDerived)]] =
-    queryExpecting[List[(Identifier, Title, Name, SameAsOrDerived)]](using = query(projectPath))
+  def findProjectDatasets(projectPath: Path): IO[List[ProjectDataset]] =
+    queryExpecting[List[ProjectDataset]](using = query(projectPath))
 
   private def query(path: Path) = SparqlQuery(
     name = "ds projects",
@@ -61,14 +61,15 @@ private class IOProjectDatasetsFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX prov: <http://www.w3.org/ns/prov#>"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom
+    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion
         |WHERE {
         |    ?datasetId rdf:type <http://schema.org/Dataset>;
         |               schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |               schema:identifier ?identifier;
         |               schema:name ?name;
         |               schema:alternateName  ?alternateName;
-        |               renku:topmostSameAs ?topmostSameAs .
+        |               renku:topmostSameAs ?topmostSameAs;
+        |               renku:topmostDerivedFrom/schema:identifier ?initialVersion.
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
         |}
@@ -82,7 +83,7 @@ private object IOProjectDatasetsFinder {
   import io.circe.Decoder
   import io.circe.Decoder.decodeList
 
-  private implicit val recordsDecoder: Decoder[List[(Identifier, Title, Name, SameAsOrDerived)]] = {
+  private implicit val recordsDecoder: Decoder[List[ProjectDataset]] = {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
     def sameAsOrDerived(from: SameAs, and: Option[DerivedFrom]): SameAsOrDerived = from -> and match {
@@ -90,16 +91,17 @@ private object IOProjectDatasetsFinder {
       case (sameAs, _)            => Left(sameAs)
     }
 
-    implicit val recordDecoder: Decoder[(Identifier, Title, Name, SameAsOrDerived)] = { cursor =>
+    implicit val recordDecoder: Decoder[ProjectDataset] = { cursor =>
       for {
         id               <- cursor.downField("identifier").downField("value").as[Identifier]
         title            <- cursor.downField("name").downField("value").as[Title]
         name             <- cursor.downField("alternateName").downField("value").as[Name]
         sameAs           <- cursor.downField("topmostSameAs").downField("value").as[SameAs]
         maybeDerivedFrom <- cursor.downField("maybeDerivedFrom").downField("value").as[Option[DerivedFrom]]
-      } yield (id, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom))
+        initialVersion   <- cursor.downField("initialVersion").downField("value").as[InitialVersion]
+      } yield (id, initialVersion, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom))
     }
 
-    _.downField("results").downField("bindings").as(decodeList[(Identifier, Title, Name, SameAsOrDerived)])
+    _.downField("results").downField("bindings").as(decodeList[ProjectDataset])
   }
 }

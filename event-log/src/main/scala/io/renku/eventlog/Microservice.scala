@@ -39,7 +39,6 @@ import io.renku.eventlog.subscriptions.{EventsDispatcher, IOSubscriptionsEndpoin
 import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 object Microservice extends IOMicroservice {
 

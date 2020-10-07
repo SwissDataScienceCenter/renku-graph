@@ -29,7 +29,6 @@ import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulo
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private[eventprocessing] trait TriplesGenerator[Interpretation[_]] {
   def generateTriples(

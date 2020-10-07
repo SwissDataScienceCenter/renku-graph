@@ -30,7 +30,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder.decodeList
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait ProjectHookVerifier[Interpretation[_]] {
   def checkHookPresence(

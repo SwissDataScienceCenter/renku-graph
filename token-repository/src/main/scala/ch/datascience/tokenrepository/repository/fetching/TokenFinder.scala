@@ -26,8 +26,6 @@ import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository._
 
-import scala.language.higherKinds
-
 private class TokenFinder[Interpretation[_]](
     tokenInRepoFinder: PersistedTokensFinder[Interpretation],
     accessTokenCrypto: AccessTokenCrypto[Interpretation]

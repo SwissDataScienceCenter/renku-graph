@@ -35,7 +35,6 @@ import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class ProjectEndpoint[Interpretation[_]: Effect](

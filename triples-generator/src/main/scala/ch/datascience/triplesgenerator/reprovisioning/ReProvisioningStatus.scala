@@ -36,7 +36,7 @@ import io.renku.jsonld.EntityId
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
+import scala.language.postfixOps
 
 trait ReProvisioningStatus[Interpretation[_]] {
   def isReProvisioning(): Interpretation[Boolean]

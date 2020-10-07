@@ -32,8 +32,6 @@ import io.renku.eventlog.EventStatus.{Processing, TriplesStore}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventStatus}
 
-import scala.language.higherKinds
-
 final case class ToTriplesStore[Interpretation[_]](
     eventId:              CompoundEventId,
     underProcessingGauge: LabeledGauge[Interpretation, projects.Path],

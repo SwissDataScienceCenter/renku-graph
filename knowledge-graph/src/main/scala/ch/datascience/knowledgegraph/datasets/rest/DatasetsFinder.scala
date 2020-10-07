@@ -35,7 +35,6 @@ import eu.timepit.refined.predicates.all.NonEmpty
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait DatasetsFinder[Interpretation[_]] {
   def findDatasets(maybePhrase: Option[Phrase],

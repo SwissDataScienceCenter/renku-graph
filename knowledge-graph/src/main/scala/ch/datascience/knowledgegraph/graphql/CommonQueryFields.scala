@@ -23,11 +23,9 @@ import ch.datascience.knowledgegraph.graphql.Arguments._
 import eu.timepit.refined.auto._
 import sangria.schema._
 
-import scala.language.higherKinds
-
 object CommonQueryFields {
 
-  val projectPathArgument = Argument(
+  val projectPathArgument: Argument[Path] = Argument(
     name = "projectPath",
     argumentType = Path.toScalarType(
       name = "ProjectPath",

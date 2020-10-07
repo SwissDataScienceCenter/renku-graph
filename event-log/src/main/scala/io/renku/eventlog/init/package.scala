@@ -24,8 +24,6 @@ import ch.datascience.db.DbTransactor
 import doobie.implicits._
 import doobie.util.fragment.Fragment
 
-import scala.language.higherKinds
-
 package object init {
 
   def execute[Interpretation[_]](

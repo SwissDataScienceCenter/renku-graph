@@ -29,8 +29,6 @@ import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath._
 import monocle.function.Plated
 
-import scala.language.higherKinds
-
 private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
     updatesCreator: UpdatesCreator
 )(implicit ME:      MonadError[Interpretation, Throwable]) {

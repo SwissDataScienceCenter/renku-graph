@@ -28,8 +28,6 @@ import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import eu.timepit.refined.auto._
 
-import scala.language.higherKinds
-
 private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
 
   def updateWasDerivedFrom(projectPath: Path, maybeForkPath: Option[Path]) = List {

@@ -25,8 +25,6 @@ import cats.syntax.all._
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 
-import scala.language.higherKinds
-
 trait LineageDataCurator[Interpretation[_]] {
   def curate(lineage: Lineage, location: Location): OptionT[Interpretation, Lineage]
 }

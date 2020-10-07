@@ -27,7 +27,6 @@ import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTr
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.control.NonFatal
 
 class Uploader[Interpretation[_]](

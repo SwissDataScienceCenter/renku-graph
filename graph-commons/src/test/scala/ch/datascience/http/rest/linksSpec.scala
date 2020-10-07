@@ -47,6 +47,18 @@ class linksSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
 
   "_links" should {
 
+    "create a Json object with '_links' property and the given Rel and Href tuples as the value" in {
+      forAll { links: Links =>
+        val relHrefTuple +: relHrefTuples = links.links.map { case Link(rel, href) =>
+          rel -> href
+        }.toList
+
+        _links(relHrefTuple, relHrefTuples: _*) shouldBe json"""{
+          "_links": $links
+        }"""
+      }
+    }
+
     "create a Json object with '_links' property and the given Links as the value" in {
       forAll { links: Links =>
         _links(links) shouldBe json"""{

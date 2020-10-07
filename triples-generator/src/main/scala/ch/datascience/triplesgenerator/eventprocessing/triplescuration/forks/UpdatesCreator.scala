@@ -36,7 +36,6 @@ import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private[triplescuration] trait UpdatesCreator[Interpretation[_]] {
   def create(commit:    CommitEvent)(implicit

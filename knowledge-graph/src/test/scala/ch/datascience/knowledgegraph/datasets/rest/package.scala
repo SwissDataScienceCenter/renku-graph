@@ -27,10 +27,10 @@ import ch.datascience.generators.Generators.{nonBlankStrings, nonEmptyList, posi
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators.{datasetIdentifiers, datasetInProjectCreationDates, userAffiliations, userEmails}
-import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, DerivedFrom, Description, Name, PublishedDate, SameAs, Title, TopmostDerivedFrom, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, DerivedFrom, Description, Identifier, Name, PublishedDate, SameAs, Title, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.datasetProjects
+import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.{datasetProjects, datasets}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.rdfstore.FusekiBaseUrl
@@ -201,7 +201,7 @@ package object rest {
 
     def toJsonLD(firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
                  commitId:                CommitId = commitIds.generateOne,
-                 topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(dataSet.derivedFrom)
+                 topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(DataSet.entityId(dataSet.versions.initial))
     ): JsonLD =
       toJsonLDs(firstDatasetDateCreated, commitId, topmostDerivedFrom) match {
         case first +: Nil => first

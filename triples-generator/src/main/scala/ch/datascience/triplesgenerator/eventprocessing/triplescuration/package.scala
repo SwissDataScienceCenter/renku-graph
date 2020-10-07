@@ -28,8 +28,6 @@ import io.circe.Decoder.decodeString
 import io.circe.{Decoder, Json}
 import io.renku.jsonld.EntityId
 
-import scala.language.higherKinds
-
 package object triplescuration {
 
   private[eventprocessing] type CurationResults[Interpretation[_]] =

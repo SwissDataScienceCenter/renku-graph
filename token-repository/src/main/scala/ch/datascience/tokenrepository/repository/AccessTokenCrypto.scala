@@ -33,7 +33,7 @@ import eu.timepit.refined.string.MatchesRegex
 import io.circe._
 import io.circe.parser._
 
-import scala.language.{higherKinds, implicitConversions}
+import scala.language.implicitConversions
 import scala.util.control.NonFatal
 
 private class AccessTokenCrypto[Interpretation[_]](

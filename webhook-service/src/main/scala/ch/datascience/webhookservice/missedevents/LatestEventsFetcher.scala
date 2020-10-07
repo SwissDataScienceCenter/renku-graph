@@ -29,7 +29,6 @@ import ch.datascience.webhookservice.missedevents.LatestEventsFetcher.LatestProj
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait LatestEventsFetcher[Interpretation[_]] {
   def fetchLatestEvents(): Interpretation[List[LatestProjectCommit]]

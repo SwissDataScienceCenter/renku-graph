@@ -31,7 +31,6 @@ import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriples
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private[triplescuration] trait PayloadTransformer[Interpretation[_]] {
   def transform(

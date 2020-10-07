@@ -32,8 +32,6 @@ import io.renku.eventlog.EventStatus.{New, Processing}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventStatus}
 
-import scala.language.higherKinds
-
 final case class ToNew[Interpretation[_]](
     eventId:              CompoundEventId,
     waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],

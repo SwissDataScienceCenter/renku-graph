@@ -18,20 +18,19 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import cats.MonadError
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Identifier, Name, SameAs, Title}
+import ch.datascience.graph.model.datasets.{Identifier, InitialVersion, Name, Title}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
-import ch.datascience.knowledgegraph.datasets.rest.ProjectDatasetsFinder.SameAsOrDerived
 import ch.datascience.logging.TestExecutionTimeRecorder
 import io.circe.Json
 import io.circe.literal._
@@ -51,6 +50,8 @@ class ProjectDatasetsEndpointSpec
     with ScalaCheckPropertyChecks
     with should.Matchers {
 
+  import ProjectDatasetsFinder._
+
   "getProjectDatasets" should {
 
     "respond with OK and the found datasets" in new TestCase {
@@ -59,7 +60,7 @@ class ProjectDatasetsEndpointSpec
         (projectDatasetsFinder
           .findProjectDatasets(_: Path))
           .expects(projectPath)
-          .returning(context.pure(datasetsList))
+          .returning(datasetsList.pure[IO])
 
         val response = getProjectDatasets(projectPath).unsafeRunSync()
 
@@ -80,13 +81,13 @@ class ProjectDatasetsEndpointSpec
       (projectDatasetsFinder
         .findProjectDatasets(_: Path))
         .expects(projectPath)
-        .returning(context.pure(Nil))
+        .returning(List.empty[ProjectDataset].pure[IO])
 
       val response = getProjectDatasets(projectPath).unsafeRunSync()
 
       response.status                         shouldBe Ok
       response.contentType                    shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[List[Json]].unsafeRunSync() shouldBe empty
+      response.as[List[Json]].unsafeRunSync() shouldBe List.empty
 
       logger.loggedOnly(
         Warn(s"Finding '$projectPath' datasets finished${executionTimeRecorder.executionTimeInfo}")
@@ -99,7 +100,7 @@ class ProjectDatasetsEndpointSpec
       (projectDatasetsFinder
         .findProjectDatasets(_: Path))
         .expects(projectPath)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, List[ProjectDataset]])
 
       val response = getProjectDatasets(projectPath).unsafeRunSync()
 
@@ -113,8 +114,6 @@ class ProjectDatasetsEndpointSpec
   }
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
-
     val projectPath = projectPaths.generateOne
 
     val projectDatasetsFinder = mock[ProjectDatasetsFinder[IO]]
@@ -128,36 +127,49 @@ class ProjectDatasetsEndpointSpec
       logger
     ).getProjectDatasets _
 
-    lazy val toJson: ((Identifier, Title, Name, SameAsOrDerived)) => Json = {
-      case (id, title, name, Left(sameAs)) =>
+    lazy val toJson: ((Identifier, InitialVersion, Title, Name, SameAsOrDerived)) => Json = {
+      case (id, initialVersion, title, name, Left(sameAs)) =>
         json"""{
           "identifier": ${id.value},
+          "versions": {
+            "initial": ${initialVersion.value}
+          },
           "title": ${title.value},
           "name": ${name.value},
           "sameAs": ${sameAs.value},
           "_links": [{
             "rel": "details",
             "href": ${(renkuResourcesUrl / "datasets" / id).value}
+          }, {
+            "rel": "initial-version",
+            "href": ${(renkuResourcesUrl / "datasets" / initialVersion).value}
           }]
         }"""
-      case (id, title, name, Right(derivedFrom)) =>
+      case (id, initialVersion, title, name, Right(derivedFrom)) =>
         json"""{
           "identifier": ${id.value},
+          "versions" : {
+            "initial": ${initialVersion.value}
+          },
           "title": ${title.value},
           "name": ${name.value},
           "derivedFrom": ${derivedFrom.value},
           "_links": [{
             "rel": "details",
             "href": ${(renkuResourcesUrl / "datasets" / id).value}
+          }, {
+            "rel": "initial-version",
+            "href": ${(renkuResourcesUrl / "datasets" / initialVersion).value}
           }]
         }"""
     }
   }
 
-  private implicit lazy val datasetBasicDetails: Gen[(Identifier, Title, Name, SameAsOrDerived)] = for {
+  private implicit lazy val datasetBasicDetails: Gen[ProjectDataset] = for {
     id                      <- datasetIdentifiers
+    initialVersion          <- datasetInitialVersions
     title                   <- datasetTitles
     name                    <- datasetNames
     sameAsEitherDerivedFrom <- Gen.oneOf(datasetSameAs map (Left(_)), datasetDerivedFroms map (Right(_)))
-  } yield (id, title, name, sameAsEitherDerivedFrom)
+  } yield (id, initialVersion, title, name, sameAsEitherDerivedFrom)
 }

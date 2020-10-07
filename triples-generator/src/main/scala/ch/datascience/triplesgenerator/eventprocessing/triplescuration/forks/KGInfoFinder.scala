@@ -26,7 +26,6 @@ import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait KGInfoFinder[Interpretation[_]] {
   def findCreatorId(email: users.Email): Interpretation[Option[users.ResourceId]]

@@ -20,13 +20,16 @@ package ch.datascience.rdfstore
 
 import cats.syntax.all._
 import ch.datascience.http.rest.paging.PagingRequest
+import ch.datascience.rdfstore.SparqlQuery.Prefix
+import ch.datascience.tinytypes.StringTinyType
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
+import io.renku.jsonld.Schema
 
 final case class SparqlQuery(name:               String Refined NonEmpty,
-                             prefixes:           Set[String],
+                             prefixes:           Set[Prefix],
                              body:               String,
-                             maybePagingRequest: Option[PagingRequest] = None
+                             maybePagingRequest: Option[PagingRequest]
 ) {
   override lazy val toString: String =
     s"""|${prefixes.mkString("", "\n", "")}
@@ -46,6 +49,36 @@ final case class SparqlQuery(name:               String Refined NonEmpty,
 object SparqlQuery {
 
   import cats.MonadError
+  import ch.datascience.tinytypes.TinyTypeFactory
+  import ch.datascience.tinytypes.constraints.NonBlank
+
+  def of(
+      name:     String Refined NonEmpty,
+      prefixes: Set[Prefix],
+      body:     String
+  ): SparqlQuery = SparqlQuery(name, prefixes map (p => Prefix(p.value)), body, maybePagingRequest = None)
+
+  def apply(
+      name:     String Refined NonEmpty,
+      prefixes: Set[String Refined NonEmpty],
+      body:     String
+  ): SparqlQuery = SparqlQuery(name, prefixes.map(p => Prefix(p.value)), body, maybePagingRequest = None)
+
+  def apply(name:          String Refined NonEmpty,
+            prefixes:      Set[String Refined NonEmpty],
+            body:          String,
+            pagingRequest: PagingRequest
+  ): SparqlQuery = SparqlQuery(name, prefixes.map(p => Prefix(p.value)), body, pagingRequest.some)
+
+  final class Prefix private (val value: String) extends AnyVal with StringTinyType
+  implicit object Prefix extends TinyTypeFactory[Prefix](new Prefix(_)) with NonBlank {
+    def apply(name: String Refined NonEmpty, schema: Schema): Prefix = Prefix(schema asPrefix name.value)
+  }
+
+  object Prefixes {
+    def of(first: (Schema, String Refined NonEmpty), other: (Schema, String Refined NonEmpty)*): Set[Prefix] =
+      (first +: other).map { case (schema, name) => Prefix(name, schema) }.toSet
+  }
 
   val totalField: String = "total"
 

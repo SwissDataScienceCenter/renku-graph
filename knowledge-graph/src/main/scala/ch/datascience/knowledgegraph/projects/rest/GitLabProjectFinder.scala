@@ -33,7 +33,6 @@ import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabPro
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 trait GitLabProjectFinder[Interpretation[_]] {
   def findProject(

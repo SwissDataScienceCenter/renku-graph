@@ -23,8 +23,6 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 
-import scala.language.higherKinds
-
 class TokenRemover[Interpretation[_]](
     transactor: DbTransactor[Interpretation, ProjectsTokensDB]
 )(implicit ME:  Bracket[Interpretation, Throwable]) {

@@ -27,7 +27,6 @@ import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 
 private trait DatasetFinder[Interpretation[_]] {
   def findDataset(identifier: Identifier): Interpretation[Option[Dataset]]

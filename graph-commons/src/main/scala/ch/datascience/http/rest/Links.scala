@@ -39,7 +39,7 @@ object Links {
   def of(link:    Link, other: Link*): Links = Links(NonEmptyList.of(link, other: _*))
   def of(link:    (Rel, Href), other: (Rel, Href)*): Links = Links(NonEmptyList.of(link, other: _*).map(Link.apply))
 
-  def self(href: Href) = Links(NonEmptyList.of(Link.self(href)))
+  def self(href: Href): Links = Links(NonEmptyList.of(Link.self(href)))
 
   final class Rel private (val value: String) extends AnyVal with StringTinyType
   implicit object Rel extends TinyTypeFactory[Rel](new Rel(_)) with NonBlank {
@@ -85,6 +85,14 @@ object Links {
       case head +: tail => Right(Links(NonEmptyList.of(head, tail: _*)))
     }
   }
+
+  def _links(link: (Rel, Href), other: (Rel, Href)*): Json = _links(
+    Links(
+      NonEmptyList.fromListUnsafe(
+        (link +: other).map(Link.apply).toList
+      )
+    )
+  )
 
   def _links(link: Link, more: Link*): Json =
     _links(Links(NonEmptyList.of(link, more: _*)))

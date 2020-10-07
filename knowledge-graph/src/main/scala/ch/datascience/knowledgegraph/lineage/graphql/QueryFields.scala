@@ -26,8 +26,6 @@ import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import eu.timepit.refined.auto._
 import sangria.schema._
 
-import scala.language.higherKinds
-
 object QueryFields {
 
   import modelSchema._

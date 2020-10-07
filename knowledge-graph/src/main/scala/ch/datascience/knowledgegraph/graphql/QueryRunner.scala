@@ -26,7 +26,6 @@ import sangria.marshalling.circe._
 import sangria.schema.Schema
 
 import scala.concurrent.ExecutionContext
-import scala.language.higherKinds
 import scala.util.{Failure, Success}
 
 class QueryRunner[Interpretation[_]: Async, +QueryContext](
