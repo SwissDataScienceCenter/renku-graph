@@ -293,7 +293,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenThereIs(freeSubscriber = subscriber)
         givenSending(event, to = subscriber, got = Misdelivered)
 
-        (subscriptions.remove _)
+        (subscriptions.delete _)
           .expects(subscriber)
           .returning(exception.raiseError[IO, Unit])
 
@@ -396,7 +396,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       }
 
     def expectRemoval(of: SubscriberUrl) =
-      (subscriptions.remove _)
+      (subscriptions.delete _)
         .expects(of)
         .returning(IO.unit)
 
