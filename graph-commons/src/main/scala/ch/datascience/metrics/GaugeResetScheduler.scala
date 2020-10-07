@@ -16,26 +16,26 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.metrics
+package ch.datascience.metrics
 
 import cats.MonadError
 import cats.effect.{IO, Timer}
 import cats.syntax.all._
-import ch.datascience.metrics.LabeledGauge
+import ch.datascience.config.MetricsConfigProvider
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
 
-trait EventGaugeScheduler[Interpretation[_]] {
+trait GaugeResetScheduler[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-class EventGaugeSchedulerImpl[Interpretation[_], LabelValue](
+class GaugeResetSchedulerImpl[Interpretation[_], LabelValue](
     gauges:                 List[LabeledGauge[Interpretation, LabelValue]],
     metricsSchedulerConfig: MetricsConfigProvider[Interpretation],
     logger:                 Logger[Interpretation]
 )(implicit ME:              MonadError[Interpretation, Throwable], timer: Timer[Interpretation])
-    extends EventGaugeScheduler[Interpretation] {
+    extends GaugeResetScheduler[Interpretation] {
   override def run(): Interpretation[Unit] = (for {
     interval <- metricsSchedulerConfig.getInterval()
     _        <- resetGaugesEvery(interval)
@@ -52,11 +52,12 @@ class EventGaugeSchedulerImpl[Interpretation[_], LabelValue](
   }
 }
 
-object IOEventGaugeScheduler {
+object IOGaugeResetScheduler {
   def apply[LabelValue](
       gauges:    List[LabeledGauge[IO, LabelValue]],
+      config:    MetricsConfigProvider[IO],
       logger:    Logger[IO]
-  )(implicit ME: MonadError[IO, Throwable], timer: Timer[IO]): IO[EventGaugeSchedulerImpl[IO, LabelValue]] = IO(
-    new EventGaugeSchedulerImpl[IO, LabelValue](gauges, new MetricsConfigProviderImpl[IO](), logger)
+  )(implicit ME: MonadError[IO, Throwable], timer: Timer[IO]): IO[GaugeResetSchedulerImpl[IO, LabelValue]] = IO(
+    new GaugeResetSchedulerImpl[IO, LabelValue](gauges, config, logger)
   )
 }

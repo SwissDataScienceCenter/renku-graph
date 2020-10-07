@@ -26,9 +26,9 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
-import ch.datascience.metrics.{LabeledGauge, SingleValueGauge}
+import ch.datascience.metrics.{GaugeResetScheduler, LabeledGauge, SingleValueGauge}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.metrics.{EventGaugeScheduler, EventLogMetrics, StatsFinder}
+import io.renku.eventlog.metrics.{EventLogMetrics, StatsFinder}
 import io.renku.eventlog.subscriptions.EventsDispatcher
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -194,7 +194,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
     val eventsDispatcher  = mock[EventsDispatcher]
     val metrics           = mock[TestEventLogMetrics]
     val httpServer        = mock[IOHttpServer]
-    val gaugeScheduler    = mock[EventGaugeScheduler[IO]]
+    val gaugeScheduler    = mock[GaugeResetScheduler[IO]]
     val runner = new MicroserviceRunner(sentryInitializer,
                                         metrics,
                                         eventsDispatcher,

@@ -26,7 +26,7 @@ import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
+import ch.datascience.metrics.{GaugeResetScheduler, IOGaugeResetScheduler, MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import io.renku.eventlog.creation.IOEventCreationEndpoint
 import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
@@ -67,7 +67,11 @@ object Microservice extends IOMicroservice {
         eventLogMetrics      <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
         waitingEventsGauge   <- WaitingEventsGauge(metricsRegistry, statsFinder, ApplicationLogger)
         underProcessingGauge <- UnderProcessingGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        gaugeScheduler       <- IOEventGaugeScheduler(List(waitingEventsGauge, underProcessingGauge), ApplicationLogger)
+        gaugeScheduler <- IOGaugeResetScheduler(
+                            List(waitingEventsGauge, underProcessingGauge),
+                            new MetricsConfigProviderImpl[IO](),
+                            ApplicationLogger
+                          )
         eventCreationEndpoint <-
           IOEventCreationEndpoint(transactor, waitingEventsGauge, queriesExecTimes, ApplicationLogger)
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
@@ -124,7 +128,7 @@ private class MicroserviceRunner(
     sentryInitializer:        SentryInitializer[IO],
     metrics:                  EventLogMetrics,
     eventsDispatcher:         EventsDispatcher,
-    gaugeScheduler:           EventGaugeScheduler[IO],
+    gaugeScheduler:           GaugeResetScheduler[IO],
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
 )(implicit contextShift:      ContextShift[IO]) {
