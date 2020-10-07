@@ -26,7 +26,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventStatus
 
 import scala.concurrent.duration.FiniteDuration
-import scala.language.{higherKinds, postfixOps}
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 class EventLogMetrics(

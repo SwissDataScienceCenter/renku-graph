@@ -22,8 +22,6 @@ import cats.MonadError
 import ch.datascience.db.DBConfigProvider
 import eu.timepit.refined.auto._
 
-import scala.language.higherKinds
-
 sealed trait EventLogDB
 
 class EventLogDbConfigProvider[Interpretation[_]](implicit

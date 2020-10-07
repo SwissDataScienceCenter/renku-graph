@@ -36,7 +36,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.language.{higherKinds, reflectiveCalls}
+import scala.language.reflectiveCalls
 
 class PayloadTransformerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 

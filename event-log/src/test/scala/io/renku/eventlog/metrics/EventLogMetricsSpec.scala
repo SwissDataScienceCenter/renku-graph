@@ -37,7 +37,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.{higherKinds, postfixOps}
+import scala.language.postfixOps
 
 class EventLogMetricsSpec
     extends AnyWordSpec
