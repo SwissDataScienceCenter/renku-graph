@@ -6,11 +6,14 @@ import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.concurrent.duration.FiniteDuration
 
-private class MetricsConfigProvider[Interpretation[_]](
+trait MetricsConfigProvider[Interpretation[_]] extends ConfigLoader[Interpretation] {
+  def getInterval(): Interpretation[FiniteDuration]
+}
+
+class MetricsConfigProviderImpl[Interpretation[_]](
     configuration: Config = ConfigFactory.load()
 )(implicit ME:     MonadError[Interpretation, Throwable])
-    extends ConfigLoader[Interpretation] {
-
+    extends MetricsConfigProvider[Interpretation] {
   def getInterval(): Interpretation[FiniteDuration] =
-    find[FiniteDuration]("events-log.metrics-scheduler.interval", configuration)
+    find[FiniteDuration]("events-log.metrics.scheduler-interval", configuration)
 }

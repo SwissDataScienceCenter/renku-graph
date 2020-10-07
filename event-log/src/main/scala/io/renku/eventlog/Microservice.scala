@@ -67,7 +67,7 @@ object Microservice extends IOMicroservice {
         eventLogMetrics      <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
         waitingEventsGauge   <- WaitingEventsGauge(metricsRegistry, statsFinder, ApplicationLogger)
         underProcessingGauge <- UnderProcessingGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        gaugeScheduler       <- IOEventGaugeScheduler(List(waitingEventsGauge, underProcessingGauge))
+        gaugeScheduler       <- IOEventGaugeScheduler(List(waitingEventsGauge, underProcessingGauge), ApplicationLogger)
         eventCreationEndpoint <-
           IOEventCreationEndpoint(transactor, waitingEventsGauge, queriesExecTimes, ApplicationLogger)
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
