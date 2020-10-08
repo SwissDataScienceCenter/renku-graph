@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
-import ch.datascience.metrics.{LabeledGauge, SingleValueGauge}
+import ch.datascience.metrics.{GaugeResetScheduler, LabeledGauge, SingleValueGauge}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.metrics.{EventLogMetrics, StatsFinder}
 import io.renku.eventlog.subscriptions.EventsDispatcher
@@ -54,6 +54,10 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
           .returning(IO.unit)
 
         (eventsDispatcher.run _)
+          .expects()
+          .returning(IO.unit)
+
+        (gaugeScheduler.run _)
           .expects()
           .returning(IO.unit)
 
@@ -90,6 +94,10 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(IO.unit)
 
+      (gaugeScheduler.run _)
+        .expects()
+        .returning(IO.unit)
+
       val exception = exceptions.generateOne
       (httpServer.run _)
         .expects()
@@ -114,6 +122,10 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(IO.unit)
 
+      (gaugeScheduler.run _)
+        .expects()
+        .returning(IO.unit)
+
       (httpServer.run _)
         .expects()
         .returning(context.pure(ExitCode.Success))
@@ -135,6 +147,35 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
         .expects()
         .returning(IO.raiseError(exception))
 
+      (gaugeScheduler.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (httpServer.run _)
+        .expects()
+        .returning(context.pure(ExitCode.Success))
+
+      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+    }
+
+    "return Success ExitCode even if Event Log Metrics scheduler initialisation fails" in new TestCase {
+      (sentryInitializer.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (eventsDispatcher.run _)
+        .expects()
+        .returning(IO.unit)
+
+      (metrics.run _)
+        .expects()
+        .returning(IO.unit)
+
+      val exception = exceptions.generateOne
+      (gaugeScheduler.run _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
       (httpServer.run _)
         .expects()
         .returning(context.pure(ExitCode.Success))
@@ -153,9 +194,11 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
     val eventsDispatcher  = mock[EventsDispatcher]
     val metrics           = mock[TestEventLogMetrics]
     val httpServer        = mock[IOHttpServer]
+    val gaugeScheduler    = mock[GaugeResetScheduler[IO]]
     val runner = new MicroserviceRunner(sentryInitializer,
                                         metrics,
                                         eventsDispatcher,
+                                        gaugeScheduler,
                                         httpServer,
                                         new ConcurrentHashMap[CancelToken[IO], Unit]()
     )
