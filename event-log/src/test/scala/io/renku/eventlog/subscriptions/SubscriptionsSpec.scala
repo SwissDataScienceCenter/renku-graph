@@ -18,25 +18,25 @@
 
 package io.renku.eventlog.subscriptions
 
-import java.lang.Thread.sleep
-
-import cats.effect.concurrent.Ref
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.concurrent.{Deferred, Ref}
+import cats.effect.{ContextShift, Fiber, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Info
 import eu.timepit.refined.auto._
+import org.scalamock.matchers.ArgCapture.CaptureAll
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class SubscriptionsSpec extends AnyWordSpec with should.Matchers with Eventually {
+class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matchers with Eventually {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(3, Seconds)),
@@ -45,149 +45,159 @@ class SubscriptionsSpec extends AnyWordSpec with should.Matchers with Eventually
 
   "add" should {
 
-    "make the subscriber available such that given functions can be executed" in new TestCase {
+    "adds the given subscriber to the registry and logs info when it was added" in new TestCase {
 
-      val functionId = nonEmptyStrings().generateOne
+      (subscribersRegistry.add _)
+        .expects(subscriberUrl)
+        .returning(true.pure[IO])
 
       subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
-      subscriptions.runOnSubscriber(function(functionId)).unsafeRunSync()
-
-      verifyFunctionsRun(subscriberUrl -> functionId)
+      logger.loggedOnly(Info(s"$subscriberUrl added"))
     }
 
-    "wait with executing the function until there's a subscriber available" in new TestCase {
+    "adds the given subscriber to the registry and do not log info message when it was already added" in new TestCase {
 
-      val functionId = nonEmptyStrings().generateOne
-
-      subscriptions.runOnSubscriber(function(functionId)).unsafeRunAsyncAndForget()
-
-      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-
-      verifyFunctionsRun(subscriberUrl -> functionId)
-    }
-
-    "subscribers become available once they run the function" in new TestCase {
-
-      val function1Id = nonEmptyStrings().generateOne
-      subscriptions.runOnSubscriber(function(function1Id)).unsafeRunAsyncAndForget()
+      (subscribersRegistry.add _)
+        .expects(subscriberUrl)
+        .returning(false.pure[IO])
 
       subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
-      verifyFunctionsRun(subscriberUrl -> function1Id)
-
-      val function2Id = nonEmptyStrings().generateOne
-      subscriptions.runOnSubscriber(function(function2Id)).unsafeRunAsyncAndForget()
-
-      verifyFunctionsRun(subscriberUrl -> function1Id, subscriberUrl -> function2Id)
-    }
-
-    "run all functions and utilise all subscribers" in new TestCase {
-
-      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-      val anotherSubscriberUrl = subscriberUrls.generateOne
-      subscriptions.add(anotherSubscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-
-      val functionIds = nonEmptyStrings().generateNonEmptyList(minElements = 30, maxElements = 50).toList
-      functionIds
-        .map(id => subscriptions.runOnSubscriber(function(id)))
-        .sequence
-        .unsafeRunAsyncAndForget()
-
-      eventually {
-        functionsExecutions.get
-          .unsafeRunSync()
-          .map { case (subscriberUrl, _) => subscriberUrl }
-          .toSet shouldBe Set(subscriberUrl, anotherSubscriberUrl)
-      }
-
-      eventually {
-        functionsExecutions.get.unsafeRunSync().map { case (_, functionId) => functionId } shouldBe functionIds
-      }
+      logger.expectNoLogs()
     }
   }
 
-  "remove" should {
+  "runOnSubscriber" should {
 
-    "block the function execution until there's available subscriber" in new TestCase {
+    "run the given function when there is available subscriber" in new TestCase {
 
-      val function1Id = nonEmptyStrings().generateOne
-      subscriptions.runOnSubscriber(function(function1Id)).unsafeRunAsyncAndForget()
+      (subscribersRegistry.findAvailableSubscriber _)
+        .expects()
+        .returning(subscriberUrl.some)
 
-      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      val function = mockFunction[SubscriberUrl, IO[Unit]]
+      function.expects(subscriberUrl).returning(IO.unit)
 
-      verifyFunctionsRun(subscriberUrl -> function1Id)
+      subscriptions.runOnSubscriber(function).unsafeRunSync() shouldBe ((): Unit)
+    }
 
-      subscriptions.remove(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+    "block execution of the function until there's a subscriber available" in new TestCase {
 
-      val function2Id = nonEmptyStrings().generateOne
-      subscriptions.runOnSubscriber(function(function2Id)).unsafeRunAsyncAndForget()
+      (subscribersRegistry.findAvailableSubscriber _)
+        .expects()
+        .returning(None)
 
-      val anotherSubscriberUrl = subscriberUrls.generateOne
+      (subscribersRegistry.findAvailableSubscriber _)
+        .expects()
+        .returning(subscriberUrl.some)
 
-      subscriptions.add(anotherSubscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      val subscribersCount = nonNegativeInts().generateOne
+      (subscribersRegistry.subscriberCount _)
+        .expects()
+        .returning(subscribersCount)
 
-      verifyFunctionsRun(subscriberUrl -> function1Id, anotherSubscriberUrl -> function2Id)
+      val function = mockFunction[SubscriberUrl, IO[Unit]]
+      function.expects(subscriberUrl).returning(IO.unit)
+
+      val hook = CaptureAll[Option[Deferred[IO, Unit]]]()
+      (executionHookContainer.set _)
+        .expects(capture(hook))
+        .returning(IO.unit)
+
+      subscriptions.runOnSubscriber(function).unsafeRunAsyncAndForget()
+
+      eventually {
+        hook.value.map(_.complete(()).unsafeRunSync())
+      }
+
+      logger.loggedOnly(Info(s"All $subscribersCount subscribers are busy; waiting for one to become available"))
+    }
+  }
+
+  "delete" should {
+    "completely remove a subscriber from the registry" in new TestCase {
+      (subscribersRegistry.delete _)
+        .expects(subscriberUrl)
+        .returning(true.pure[IO])
+
+      subscriptions.delete(subscriberUrl = subscriberUrl).unsafeRunSync()
+
+      logger.loggedOnly(Info(s"$subscriberUrl gone - deleting"))
+    }
+
+    "not log if nothing was deleted" in new TestCase {
+      (subscribersRegistry.delete _)
+        .expects(subscriberUrl)
+        .returning(false.pure[IO])
+
+      subscriptions.delete(subscriberUrl = subscriberUrl).unsafeRunSync()
+
+      logger.expectNoLogs()
     }
   }
 
   "markBusy" should {
-
     "put on hold selected subscriber" in new TestCase {
+      (subscribersRegistry.markBusy _)
+        .expects(subscriberUrl)
+        .returning(IO.unit)
 
-      val function1Id = nonEmptyStrings().generateOne
-      subscriptions.runOnSubscriber(function(function1Id)).unsafeRunAsyncAndForget()
+      subscriptions.markBusy(subscriberUrl).unsafeRunSync()
 
-      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-
-      verifyFunctionsRun(subscriberUrl -> function1Id)
-
-      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-
-      val function2Id = nonEmptyStrings().generateOne
-      subscriptions.runOnSubscriber(function(function2Id)).unsafeRunAsyncAndForget()
-
-      sleep(busySleep.toMillis + 100)
-
-      verifyFunctionsRun(subscriberUrl -> function1Id, subscriberUrl -> function2Id)
-    }
-
-    "use some other subscriber if one is unavailable" in new TestCase {
-
-      val function1Id = nonEmptyStrings().generateOne
-      subscriptions.runOnSubscriber(function(function1Id)).unsafeRunAsyncAndForget()
-
-      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-
-      verifyFunctionsRun(subscriberUrl -> function1Id)
-
-      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-
-      val anotherSubscriberUrl = subscriberUrls.generateOne
-      subscriptions.add(anotherSubscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-
-      val function2Id = nonEmptyStrings().generateOne
-      subscriptions.runOnSubscriber(function(function2Id)).unsafeRunAsyncAndForget()
-
-      verifyFunctionsRun(subscriberUrl -> function1Id, anotherSubscriberUrl -> function2Id)
+      logger.loggedOnly(Info(s"$subscriberUrl busy - putting on hold"))
     }
   }
 
-  private trait TestCase {
-    val functionsExecutions = Ref.of[IO, List[(SubscriberUrl, String)]](List.empty).unsafeRunSync()
+  "releaseHook" should {
 
-    def function(id: String): SubscriberUrl => IO[Unit] = url => functionsExecutions.update(_ :+ (url, id))
+    "do nothing if there is no hook in the container" in new TestCase {
+      (executionHookContainer.getAndSet _)
+        .expects(None)
+        .returning(None.pure[IO])
 
-    val subscriberUrl = subscriberUrls.generateOne
-    val busySleep     = 1000 millis
+      subscriptions.releaseHook().unsafeRunSync() should be((): Unit)
 
-    private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-    private implicit val timer: Timer[IO]        = IO.timer(global)
-    val logger        = TestLogger[IO]()
-    val subscriptions = Subscriptions(logger, busySleep).unsafeRunSync()
-
-    def verifyFunctionsRun(functionIds: (SubscriberUrl, String)*) = eventually {
-      functionsExecutions.get.unsafeRunSync() shouldBe functionIds
     }
+
+    "execute complete on hook" in new TestCase {
+      val hook = mock[Deferred[IO, Unit]]
+
+      (executionHookContainer.getAndSet _)
+        .expects(None)
+        .returning(hook.some.pure[IO])
+
+      (hook.complete _)
+        .expects(())
+        .returning(IO.unit)
+
+      subscriptions.releaseHook().unsafeRunSync() should be((): Unit)
+
+    }
+
+  }
+  "apply" should {
+    "start subscriber registry" in new TestCase {
+      val notifyFunction = CaptureAll[() => IO[Unit]]()
+      (subscribersRegistry.start _)
+        .expects(capture(notifyFunction))
+        .returning(IO.pure(mock[Fiber[IO, Unit]]))
+
+      val newSubscriptions = Subscriptions(logger, Some(subscribersRegistry.pure[IO])).unsafeRunSync()
+
+      notifyFunction.value shouldBe newSubscriptions.asInstanceOf[HookReleaser[IO]].releaseHook
+    }
+  }
+
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
+
+  private trait TestCase {
+    val subscriberUrl = subscriberUrls.generateOne
+
+    val executionHookContainer = mock[Ref[IO, Option[Deferred[IO, Unit]]]]
+    val subscribersRegistry    = mock[SubscribersRegistry]
+    val logger                 = TestLogger[IO]()
+    val subscriptions          = new SubscriptionsImpl(executionHookContainer, subscribersRegistry, logger)
   }
 }

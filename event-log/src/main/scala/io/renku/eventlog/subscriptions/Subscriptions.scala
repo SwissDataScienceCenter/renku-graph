@@ -18,132 +18,103 @@
 
 package io.renku.eventlog.subscriptions
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
-
+import cats.Applicative
 import cats.effect.concurrent.{Deferred, Ref}
-import cats.effect.{ContextShift, Fiber, IO, Timer}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.Random
 
 trait Subscriptions[Interpretation[_]] {
-  def add(subscriberUrl:      SubscriberUrl):                         Interpretation[Unit]
-  def remove(subscriberUrl:   SubscriberUrl):                         Interpretation[Unit]
-  def markBusy(subscriberUrl: SubscriberUrl):                         Interpretation[Unit]
-  def runOnSubscriber(f:      SubscriberUrl => Interpretation[Unit]): Interpretation[Unit]
+  def add(subscriberUrl: SubscriberUrl): Interpretation[Unit]
+
+  def delete(subscriberUrl: SubscriberUrl): Interpretation[Unit]
+
+  def markBusy(subscriberUrl: SubscriberUrl): Interpretation[Unit]
+
+  def runOnSubscriber(f: SubscriberUrl => Interpretation[Unit]): Interpretation[Unit]
+}
+
+private[subscriptions] trait HookReleaser[Interpretation[_]] {
+  self: Subscriptions[Interpretation] =>
+
+  private[subscriptions] val releaseHook: () => Interpretation[Unit]
 }
 
 class SubscriptionsImpl private[subscriptions] (
     executionHookContainer: Ref[IO, Option[Deferred[IO, Unit]]],
-    logger:                 Logger[IO],
-    busySleep:              FiniteDuration
-)(implicit contextShift:    ContextShift[IO], timer: Timer[IO], executionContext: ExecutionContext)
-    extends Subscriptions[IO] {
+    subscribersRegistry:    SubscribersRegistry,
+    logger:                 Logger[IO]
+)(implicit contextShift:    ContextShift[IO])
+    extends Subscriptions[IO]
+    with HookReleaser[IO] {
 
-  import scala.jdk.CollectionConverters._
-
-  private val subscriptionsPool  = new ConcurrentHashMap[SubscriberUrl, Unit]()
-  private val busySubscriberPool = new ConcurrentHashMap[SubscriberUrl, AddWithDelay]()
-
-  override def add(subscriberUrl: SubscriberUrl): IO[Unit] =
-    addAndLog(subscriberUrl, logMessage = s"$subscriberUrl added")
-
-  private def addAndLog(subscriberUrl: SubscriberUrl, logMessage: String): IO[Unit] = for {
-    _ <- addToThePool(subscriberUrl, logMessage)
-    _ <- releaseHook()
+  override def add(subscriberUrl: SubscriberUrl): IO[Unit] = for {
+    wasAdded <- subscribersRegistry add subscriberUrl
+    _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$subscriberUrl added"))
   } yield ()
 
-  private def addToThePool(subscriberUrl: SubscriberUrl, logMessage: String) = IO {
-    val added = Option {
-      subscriptionsPool.putIfAbsent(subscriberUrl, ())
-    }.isEmpty
-    if (added) logger.info(logMessage)
-    ()
-  }
-
-  private def releaseHook() = for {
-    maybeExecutionHook <- executionHookContainer.getAndSet(None)
-    _ <- maybeExecutionHook match {
-           case Some(executionHook) => executionHook.complete(())
-           case _                   => IO.unit
-         }
-  } yield ()
-
-  override def remove(subscriberUrl: SubscriberUrl): IO[Unit] =
-    removeAndLog(subscriberUrl, logMessage = s"$subscriberUrl gone - removing") map (_ => ())
+  override def delete(subscriberUrl: SubscriberUrl): IO[Unit] =
+    for {
+      removed <- subscribersRegistry delete subscriberUrl
+      _       <- Applicative[IO].whenA(removed)(logger.info(s"$subscriberUrl gone - deleting"))
+    } yield ()
 
   override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
-      removed <- removeAndLog(subscriberUrl, logMessage = s"$subscriberUrl busy - putting on hold")
-      _       <- if (removed) waitAndBringBack(subscriberUrl) else IO.unit
+      _ <- subscribersRegistry markBusy subscriberUrl
+      _ <- logger.info(s"$subscriberUrl busy - putting on hold")
     } yield ()
-
-  private def removeAndLog(subscriberUrl: SubscriberUrl, logMessage: String): IO[Boolean] =
-    for {
-      removed <- IO(Option(subscriptionsPool remove subscriberUrl).isDefined)
-      _       <- if (removed) logger.info(logMessage) else IO.unit
-    } yield removed
-
-  private def waitAndBringBack(subscriberUrl: SubscriberUrl): IO[Unit] =
-    for {
-      _ <- Option(busySubscriberPool.get(subscriberUrl)).fold(IO.unit)(_.cancel)
-      addWithDelay = AddWithDelay(subscriberUrl)
-      _ <- addWithDelay.start
-      _ = busySubscriberPool.put(subscriberUrl, addWithDelay)
-    } yield ()
-
-  private case class AddWithDelay(subscriberUrl: SubscriberUrl) {
-    private val active = new AtomicBoolean(true)
-
-    def start: IO[Fiber[IO, Unit]] = {
-      for {
-        _ <- timer sleep busySleep
-        _ <- if (active.get()) addAndLog(subscriberUrl, logMessage = s"$subscriberUrl taken from on hold") else IO.unit
-      } yield ()
-    }.start
-
-    def cancel: IO[Unit] = IO(active.set(false))
-  }
 
   override def runOnSubscriber(f: SubscriberUrl => IO[Unit]): IO[Unit] =
-    maybeRandomSubscriber match {
+    subscribersRegistry.findAvailableSubscriber() match {
       case Some(url) => f(url)
       case None =>
         for {
           executionHook <- Deferred[IO, Unit]
           _             <- executionHookContainer set executionHook.some
-          _ <- logger.info(
-                 s"All ${busySubscriberPool.size()} subscribers are busy; waiting for one to become available"
-               )
-          _ <- executionHook.get
-          _ <- runOnSubscriber(f)
+          _             <- logNoFreeSubscribersInfo
+          _             <- executionHook.get
+          _             <- runOnSubscriber(f)
         } yield ()
     }
 
-  private def maybeRandomSubscriber = Random.shuffle {
-    subscriptionsPool.keySet().asScala.toList
-  }.headOption
+  private def logNoFreeSubscribersInfo: IO[Unit] = logger.info(
+    s"All ${subscribersRegistry.subscriberCount()} subscribers are busy; waiting for one to become available"
+  )
+
+  private[subscriptions] override val releaseHook: () => IO[Unit] = () =>
+    for {
+      maybeExecutionHook <- executionHookContainer getAndSet None
+      _                  <- maybeExecutionHook map (_.complete(())) getOrElse IO.unit
+    } yield ()
 }
 
 object Subscriptions {
+
   import cats.effect.IO
 
-  private val busySleep: FiniteDuration = 5 minutes
-
   def apply(
-      logger:    Logger[IO],
-      busySleep: FiniteDuration = Subscriptions.busySleep
+      logger: Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       timer:            Timer[IO],
       executionContext: ExecutionContext
-  ): IO[Subscriptions[IO]] =
-    for {
-      executionHookContainer <- Ref.of[IO, Option[Deferred[IO, Unit]]](None)
-    } yield new SubscriptionsImpl(executionHookContainer, logger, busySleep)
+  ): IO[Subscriptions[IO]] = Subscriptions(logger, maybeSubscribersRegistry = None)
+
+  private[subscriptions] def apply(
+      logger:                   Logger[IO],
+      maybeSubscribersRegistry: Option[IO[SubscribersRegistry]]
+  )(implicit
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO],
+      executionContext: ExecutionContext
+  ): IO[Subscriptions[IO]] = for {
+    subscribersRegistry    <- maybeSubscribersRegistry getOrElse SubscribersRegistry(logger)
+    executionHookContainer <- Ref.of[IO, Option[Deferred[IO, Unit]]](None)
+    subscriptions          <- IO(new SubscriptionsImpl(executionHookContainer, subscribersRegistry, logger))
+    _                      <- subscribersRegistry.start(notifyWhenAvailable = subscriptions.releaseHook)
+  } yield subscriptions
 }
