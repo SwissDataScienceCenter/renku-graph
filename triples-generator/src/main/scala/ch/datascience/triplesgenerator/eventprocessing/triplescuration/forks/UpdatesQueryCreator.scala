@@ -93,7 +93,7 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
         ),
         s"""|INSERT DATA {
             |  _:b0 rdf:type <http://schema.org/Person>;
-            |       schema:name '${sparqlEncode(creatorName.value)}'.
+            |       schema:name '${sparqlEncode(creatorName.toEscapedName.value)}'.
             |  $rdfResource schema:creator _:b0.
             |}
             |""".stripMargin
@@ -137,7 +137,7 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
             s"""|DELETE { $creatorResource schema:name ?name }
                 |INSERT { $creatorResource rdf:type <http://schema.org/Person>;
                 |         schema:email '${sparqlEncode(email.value)}';
-                |         schema:name '${sparqlEncode(name.value)}' .
+                |         schema:name '${sparqlEncode(name.toEscapedName.value)}' .
                 |}
                 |WHERE  { 
                 |  OPTIONAL { $creatorResource schema:name ?maybeName} 
@@ -166,7 +166,7 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
             ),
             s"""|INSERT DATA {
                 |  $creatorResource rdf:type <http://schema.org/Person>;
-                |                   schema:name '${sparqlEncode(name.value)}' .
+                |                   schema:name '${sparqlEncode(name.toEscapedName.value)}' .
                 |}""".stripMargin
           ).some
         case _ => None
