@@ -200,5 +200,4 @@ class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matcher
     val logger                 = TestLogger[IO]()
     val subscriptions          = new SubscriptionsImpl(executionHookContainer, subscribersRegistry, logger)
   }
-
 }

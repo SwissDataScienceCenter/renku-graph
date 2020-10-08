@@ -24,9 +24,10 @@ import java.time.Instant
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits.GenOps
-import ch.datascience.generators.Generators._
-import eu.timepit.refined.auto._
+import ch.datascience.generators.Generators.exceptions
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -156,134 +157,85 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
       subscribersRegistry.findAvailableSubscriber()                 shouldBe Some(anotherSubscriberUrl)
       subscribersRegistry.subscriberCount()                         shouldBe 2
     }
-
-    "findAvailableSubscriber" should {
-
-      "not always return the same subscriber" in new TestCase {
-
-        val subscribers = subscriberUrls.generateNonEmptyList(minElements = 10, maxElements = 20).toList
-
-        subscribers.map(subscribersRegistry.add).sequence.unsafeRunSync()
-
-        subscribersRegistry.subscriberCount() shouldBe subscribers.size
-
-        val subscribersFound = (1 to 20).foldLeft(Set.empty[SubscriberUrl]) { (returnedSubscribers, _) =>
-          subscribersRegistry.findAvailableSubscriber().map(returnedSubscribers + _).getOrElse(returnedSubscribers)
-        }
-        subscribersFound.size should be > 1
-      }
-    }
-    //
-    //    "subscribers become available once they run the function" in new TestCase {
-    //
-    //      val function1Id = nonEmptyStrings().generateOne
-    //      subscriptions.runOnSubscriber(function(function1Id)).unsafeRunAsyncAndForget()
-    //
-    //      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-    //
-    //      verifyFunctionsRun(subscriberUrl -> function1Id)
-    //
-    //      val function2Id = nonEmptyStrings().generateOne
-//      subscriptions.runOnSubscriber(function(function2Id)).unsafeRunAsyncAndForget()
-//
-//      verifyFunctionsRun(subscriberUrl -> function1Id, subscriberUrl -> function2Id)
-//    }
-//
-//    "run all functions and utilise all subscribers" in new TestCase {
-//
-//      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-//      val anotherSubscriberUrl = subscriberUrls.generateOne
-//      subscriptions.add(anotherSubscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-//
-//      val functionIds = nonEmptyStrings().generateNonEmptyList(minElements = 30, maxElements = 50).toList
-//      functionIds
-//        .map(id => subscriptions.runOnSubscriber(function(id)))
-//        .sequence
-//        .unsafeRunAsyncAndForget()
-//
-//      eventually {
-//        functionsExecutions.get
-//          .unsafeRunSync()
-//          .map { case (subscriberUrl, _) => subscriberUrl }
-//          .toSet shouldBe Set(subscriberUrl, anotherSubscriberUrl)
-//      }
-//
-//      eventually {
-//        functionsExecutions.get.unsafeRunSync().map { case (_, functionId) => functionId } shouldBe functionIds
-//      }
-//    }
   }
-//
-//  "remove" should {
-//
-//    "block the function execution until there's available subscriber" in new TestCase {
-//
-//      val function1Id = nonEmptyStrings().generateOne
-//      subscriptions.runOnSubscriber(function(function1Id)).unsafeRunAsyncAndForget()
-//
-//      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-//
-//      verifyFunctionsRun(subscriberUrl -> function1Id)
-//
-//      subscriptions.delete(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-//
-//      val function2Id = nonEmptyStrings().generateOne
-//      subscriptions.runOnSubscriber(function(function2Id)).unsafeRunAsyncAndForget()
-//
-//      val anotherSubscriberUrl = subscriberUrls.generateOne
-//
-//      subscriptions.add(anotherSubscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-//
-//      verifyFunctionsRun(subscriberUrl -> function1Id, anotherSubscriberUrl -> function2Id)
-//    }
-//  }
-//
-//  "markBusy" should {
-//
-//    "put on hold selected subscriber" in new TestCase {
-//
-//      val function1Id = nonEmptyStrings().generateOne
-//      subscriptions.runOnSubscriber(function(function1Id)).unsafeRunAsyncAndForget()
-//
-//      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-//
-//      verifyFunctionsRun(subscriberUrl -> function1Id)
-//
-//      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-//
-//      val function2Id = nonEmptyStrings().generateOne
-//      subscriptions.runOnSubscriber(function(function2Id)).unsafeRunAsyncAndForget()
-//
-//      sleep(busySleep.toMillis + 100)
-//
-//      verifyFunctionsRun(subscriberUrl -> function1Id, subscriberUrl -> function2Id)
-//    }
-//
-//    "use some other subscriber if one is unavailable" in new TestCase {
-//
-//      val function1Id = nonEmptyStrings().generateOne
-//      subscriptions.runOnSubscriber(function(function1Id)).unsafeRunAsyncAndForget()
-//
-//      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-//
-//      verifyFunctionsRun(subscriberUrl -> function1Id)
-//
-//      subscriptions.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-//
-//      val anotherSubscriberUrl = subscriberUrls.generateOne
-//      subscriptions.add(anotherSubscriberUrl).unsafeRunSync() shouldBe ((): Unit)
-//
-//      val function2Id = nonEmptyStrings().generateOne
-//      subscriptions.runOnSubscriber(function(function2Id)).unsafeRunAsyncAndForget()
-//
-//      verifyFunctionsRun(subscriberUrl -> function1Id, anotherSubscriberUrl -> function2Id)
-//    }
-//  }
-//
-  private trait TestCase {
-    //    val functionsExecutions = Ref.of[IO, List[(SubscriberUrl, String)]](List.empty).unsafeRunSync()
 
-    //    def function(id: String): SubscriberUrl => IO[Unit] = url => functionsExecutions.update(_ :+ (url, id))
+  "findAvailableSubscriber" should {
+
+    "not always return the same subscriber" in new TestCase {
+
+      val subscribers = subscriberUrls.generateNonEmptyList(minElements = 10, maxElements = 20).toList
+
+      subscribers.map(subscribersRegistry.add).sequence.unsafeRunSync()
+
+      subscribersRegistry.subscriberCount() shouldBe subscribers.size
+
+      val subscribersFound = (1 to 20).foldLeft(Set.empty[SubscriberUrl]) { (returnedSubscribers, _) =>
+        subscribersRegistry.findAvailableSubscriber().map(returnedSubscribers + _).getOrElse(returnedSubscribers)
+      }
+      subscribersFound.size should be > 1
+    }
+
+    "return subscribers from the available pool" in new TestCase {
+
+      val busySubscriber = subscriberUrls.generateOne
+      subscribersRegistry.add(busySubscriber).unsafeRunSync()      shouldBe true
+      subscribersRegistry.findAvailableSubscriber()                shouldBe Some(busySubscriber)
+      subscribersRegistry.markBusy(busySubscriber).unsafeRunSync() shouldBe ((): Unit)
+
+      subscribersRegistry.add(subscriberUrl).unsafeRunSync() shouldBe true
+      subscribersRegistry.findAvailableSubscriber()          shouldBe Some(subscriberUrl)
+
+      val subscribersFound = (1 to 10).foldLeft(Set.empty[SubscriberUrl]) { (returnedSubscribers, _) =>
+        subscribersRegistry.findAvailableSubscriber().map(returnedSubscribers + _).getOrElse(returnedSubscribers)
+      }
+      subscribersFound shouldBe Set(subscriberUrl)
+    }
+  }
+
+  "start" should {
+
+    "execute the given notify function when a subscriber is moved back to the available pool" in new TestCase {
+      val notifyFunction = mockFunction[IO[Unit]]
+      subscribersRegistry.start(notifyWhenAvailable = notifyFunction).unsafeRunAsyncAndForget()
+
+      subscribersRegistry.add(subscriberUrl).unsafeRunSync() shouldBe true
+      subscribersRegistry.findAvailableSubscriber()          shouldBe Some(subscriberUrl)
+
+      notifyFunction.expects().returning(IO.unit)
+      subscribersRegistry.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      sleep((busySleep + checkupInterval + (100 millis)).toMillis)
+      subscribersRegistry.findAvailableSubscriber() shouldBe Some(subscriberUrl)
+    }
+
+    "not break the process when executing the given notify function gives an error" in new TestCase {
+      val notifyFunction = mockFunction[IO[Unit]]
+      subscribersRegistry.start(notifyWhenAvailable = notifyFunction).unsafeRunAsyncAndForget()
+
+      subscribersRegistry.add(subscriberUrl).unsafeRunSync() shouldBe true
+      subscribersRegistry.findAvailableSubscriber()          shouldBe Some(subscriberUrl)
+
+      val exception = exceptions.generateOne
+      notifyFunction.expects().returning(exception.raiseError[IO, Unit])
+      notifyFunction.expects().returning(IO.unit)
+      subscribersRegistry.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+
+      sleep((busySleep + checkupInterval + (100 millis)).toMillis)
+      subscribersRegistry.findAvailableSubscriber() shouldBe Some(subscriberUrl)
+
+      subscribersRegistry.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      sleep((busySleep + checkupInterval + (100 millis)).toMillis)
+      subscribersRegistry.findAvailableSubscriber() shouldBe Some(subscriberUrl)
+
+      logger.loggedOnly(
+        Error(s"Notifying about $subscriberUrl taken from busy state failed", exception),
+        Info(s"$subscriberUrl taken from busy state"),
+        Info(s"$subscriberUrl taken from busy state")
+      )
+    }
+  }
+
+  private trait TestCase {
 
     private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
     private implicit val timer: Timer[IO]        = IO.timer(global)

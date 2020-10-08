@@ -96,14 +96,18 @@ object Subscriptions {
 
   import cats.effect.IO
 
-  def apply(logger:     Logger[IO])(implicit
+  def apply(
+      logger: Logger[IO]
+  )(implicit
       contextShift:     ContextShift[IO],
       timer:            Timer[IO],
       executionContext: ExecutionContext
-  ): IO[Subscriptions[IO]] = apply(logger, None)
+  ): IO[Subscriptions[IO]] = Subscriptions(logger, maybeSubscribersRegistry = None)
 
-  private[subscriptions] def apply(logger: Logger[IO], maybeSubscribersRegistry: Option[IO[SubscribersRegistry]])(
-      implicit
+  private[subscriptions] def apply(
+      logger:                   Logger[IO],
+      maybeSubscribersRegistry: Option[IO[SubscribersRegistry]]
+  )(implicit
       contextShift:     ContextShift[IO],
       timer:            Timer[IO],
       executionContext: ExecutionContext
@@ -113,5 +117,4 @@ object Subscriptions {
     subscriptions          <- IO(new SubscriptionsImpl(executionHookContainer, subscribersRegistry, logger))
     _                      <- subscribersRegistry.start(notifyWhenAvailable = subscriptions.releaseHook)
   } yield subscriptions
-
 }

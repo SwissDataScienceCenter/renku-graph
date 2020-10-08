@@ -31,6 +31,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Random
+import scala.util.control.NonFatal
 
 private class SubscribersRegistry(
     busySleep:           FiniteDuration,
@@ -59,14 +60,18 @@ private class SubscribersRegistry(
   ): IO[List[Unit]] = subscribers.map { subscriberUrl =>
     for {
       wasAdded <- add(subscriberUrl)
-      _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$subscriberUrl taken from on hold"))
-      _        <- Applicative[IO].whenA(wasAdded)(notifyWhenAvailable())
+      _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$subscriberUrl taken from busy state"))
+      _        <- Applicative[IO].whenA(wasAdded)(notifyWhenAvailable() recoverWith logError(subscriberUrl))
     } yield ()
   }.sequence
 
+  private def logError(subscriberUrl: SubscriberUrl): PartialFunction[Throwable, IO[Unit]] = {
+    case NonFatal(exception) => logger.error(exception)(s"Notifying about $subscriberUrl taken from busy state failed")
+  }
+
   def add(subscriberUrl: SubscriberUrl): IO[Boolean] = IO {
     Option {
-      busyPool.remove(subscriberUrl)
+      busyPool remove subscriberUrl
       availablePool.putIfAbsent(subscriberUrl, ())
     }.isEmpty
   }
@@ -108,7 +113,9 @@ private object SubscribersRegistry {
 
   private val busySleep: FiniteDuration = 5 minutes
 
-  def apply(logger:     Logger[IO])(implicit
+  def apply(
+      logger: Logger[IO]
+  )(implicit
       contextShift:     ContextShift[IO],
       timer:            Timer[IO],
       executionContext: ExecutionContext
