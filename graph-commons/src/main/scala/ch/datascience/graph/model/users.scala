@@ -58,11 +58,7 @@ object users {
   }
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
-  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank {
-    implicit class NameOps(name: Name) {
-      lazy val toEscapedName: users.Name = users.Name(name.value.replaceAll("\\\\", "\\\\\\\\"))
-    }
-  }
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
 
   final class Username private (val value: String) extends AnyVal with StringTinyType
   implicit object Username extends TinyTypeFactory[Username](new Username(_)) with NonBlank

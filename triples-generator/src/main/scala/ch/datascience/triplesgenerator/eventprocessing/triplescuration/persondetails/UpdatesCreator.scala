@@ -56,7 +56,7 @@ private[triplescuration] class UpdatesCreator {
         "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
       ),
       s"""|DELETE { $resource schema:name ?name }
-          |${INSERT(resource, "schema:name", names.map(_.toEscapedName).toList).getOrElse("")}
+          |${INSERT(resource, "schema:name", names.toList).getOrElse("")}
           |WHERE { 
           |  OPTIONAL { $resource schema:name ?maybeName }
           |  BIND (IF(BOUND(?maybeName), ?maybeName, "nonexisting") AS ?name)
