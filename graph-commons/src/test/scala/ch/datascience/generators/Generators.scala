@@ -18,8 +18,8 @@
 
 package ch.datascience.generators
 
-import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
 import java.time._
+import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
 
 import cats.data.NonEmptyList
 import ch.datascience.config.ServiceUrl
@@ -45,7 +45,7 @@ object Generators {
 
   def nonEmptyStrings(maxLength: Int = 10, charsGenerator: Gen[Char] = alphaChar): Gen[String] = {
     require(maxLength > 0)
-    nonBlankStrings(maxLength = Refined.unsafeApply(maxLength)) map (_.value)
+    nonBlankStrings(maxLength = Refined.unsafeApply(maxLength), charsGenerator = charsGenerator) map (_.value)
   }
 
   def nonBlankStrings(minLength:      Int Refined Positive = 1,
