@@ -22,6 +22,7 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 
 import cats.Applicative
+import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{ContextShift, Fiber, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
@@ -31,14 +32,14 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Random
-import scala.util.control.NonFatal
 
 private class SubscribersRegistry(
-    busySleep:           FiniteDuration,
-    now:                 () => Instant,
-    logger:              Logger[IO],
-    checkupInterval:     FiniteDuration = 500 millis
-)(implicit contextShift: ContextShift[IO], timer: Timer[IO], executionContext: ExecutionContext) {
+    subscriberUrlReferenceQueue: Ref[IO, List[Deferred[IO, SubscriberUrl]]],
+    now:                         () => Instant,
+    logger:                      Logger[IO],
+    busySleep:                   FiniteDuration,
+    checkupInterval:             FiniteDuration
+)(implicit contextShift:         ContextShift[IO], timer: Timer[IO], executionContext: ExecutionContext) {
   import SubscribersRegistry._
 
   import scala.jdk.CollectionConverters._
@@ -46,35 +47,47 @@ private class SubscribersRegistry(
   private val availablePool = new ConcurrentHashMap[SubscriberUrl, Unit]()
   private val busyPool      = new ConcurrentHashMap[SubscriberUrl, CheckupTime]()
 
-  def start(notifyWhenAvailable: () => IO[Unit]): IO[Fiber[IO, Unit]] = {
-    for {
-      _                        <- timer sleep checkupInterval
-      subscribersDueForCheckup <- findSubscribersDueForCheckup
-      _                        <- bringBackAvailable(subscribersDueForCheckup, notifyWhenAvailable)
-      _                        <- start(notifyWhenAvailable)
-    } yield ()
-  }.start
+  def add(subscriberUrl: SubscriberUrl): IO[Boolean] = for {
+    _        <- IO(busyPool remove subscriberUrl)
+    wasAdded <- IO(Option(availablePool.putIfAbsent(subscriberUrl, ())).isEmpty)
+    _        <- Applicative[IO].whenA(wasAdded)(notifyCallerAboutAvailability(subscriberUrl))
+  } yield wasAdded
 
-  private def bringBackAvailable(subscribers:         List[SubscriberUrl],
-                                 notifyWhenAvailable: () => IO[Unit]
-  ): IO[List[Unit]] = subscribers.map { subscriberUrl =>
-    for {
-      wasAdded <- add(subscriberUrl)
-      _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$subscriberUrl taken from busy state"))
-      _        <- Applicative[IO].whenA(wasAdded)(notifyWhenAvailable() recoverWith logError(subscriberUrl))
-    } yield ()
-  }.sequence
+  private def notifyCallerAboutAvailability(subscriberUrl: SubscriberUrl): IO[Unit] = for {
+    oldQueue <- shrinkCallersQueue
+    _        <- oldQueue.headOption.map(notifyFirstCaller(subscriberUrl)).getOrElse(IO.unit)
+  } yield ()
 
-  private def logError(subscriberUrl: SubscriberUrl): PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) => logger.error(exception)(s"Notifying about $subscriberUrl taken from busy state failed")
+  private def shrinkCallersQueue = subscriberUrlReferenceQueue.getAndUpdate {
+    case Nil   => Nil
+    case queue => queue.tail
   }
 
-  def add(subscriberUrl: SubscriberUrl): IO[Boolean] = IO {
-    Option {
-      busyPool remove subscriberUrl
-      availablePool.putIfAbsent(subscriberUrl, ())
-    }.isEmpty
-  }
+  private def notifyFirstCaller(subscriberUrl: SubscriberUrl)(subscriberUrlReference: Deferred[IO, SubscriberUrl]) =
+    for {
+      _ <- subscriberUrlReference complete subscriberUrl
+      _ <- notifyCallerAboutAvailability(subscriberUrl)
+    } yield ()
+
+  def findAvailableSubscriber(): IO[Deferred[IO, SubscriberUrl]] = for {
+    subscriberUrlReference <- Deferred[IO, SubscriberUrl]
+    _                      <- maybeSubscriberUrl map subscriberUrlReference.complete getOrElse makeCallerToWait(subscriberUrlReference)
+  } yield subscriberUrlReference
+
+  private def maybeSubscriberUrl = Random.shuffle {
+    availablePool.keySet().asScala.toList
+  }.headOption
+
+  private def makeCallerToWait(subscriberUrlReference: Deferred[IO, SubscriberUrl]) = for {
+    _ <- logNoFreeSubscribersInfo
+    _ <- subscriberUrlReferenceQueue modify { queue =>
+           queue -> (queue :+ subscriberUrlReference)
+         }
+  } yield ()
+
+  private def logNoFreeSubscribersInfo: IO[Unit] = logger.info(
+    s"All ${subscriberCount()} subscribers are busy; waiting for one to become available"
+  )
 
   def delete(subscriberUrl: SubscriberUrl): IO[Boolean] = IO {
     Option(busyPool remove subscriberUrl).isDefined |
@@ -89,11 +102,16 @@ private class SubscribersRegistry(
     ()
   }
 
-  def findAvailableSubscriber(): Option[SubscriberUrl] = Random.shuffle {
-    availablePool.keySet().asScala.toList
-  }.headOption
-
   def subscriberCount(): Int = busyPool.size() + availablePool.size()
+
+  private def start(): IO[Fiber[IO, Unit]] = {
+    for {
+      _                        <- timer sleep checkupInterval
+      subscribersDueForCheckup <- findSubscribersDueForCheckup
+      _                        <- bringToAvailable(subscribersDueForCheckup)
+      _                        <- start()
+    } yield ()
+  }.start
 
   private def findSubscribersDueForCheckup: IO[List[SubscriberUrl]] = IO {
     busyPool.asScala.toList
@@ -104,6 +122,13 @@ private class SubscribersRegistry(
   private val isDueForCheckup: PartialFunction[(SubscriberUrl, CheckupTime), Boolean] = { case (_, checkupTime) =>
     (checkupTime.value compareTo now()) <= 0
   }
+
+  private def bringToAvailable(subscribers: List[SubscriberUrl]): IO[List[Unit]] = subscribers.map { subscriberUrl =>
+    for {
+      wasAdded <- add(subscriberUrl)
+      _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$subscriberUrl taken from busy state"))
+    } yield ()
+  }.sequence
 }
 
 private object SubscribersRegistry {
@@ -111,15 +136,18 @@ private object SubscribersRegistry {
   private final class CheckupTime private (val value: Instant) extends InstantTinyType
   private object CheckupTime extends TinyTypeFactory[CheckupTime](new CheckupTime(_))
 
-  private val busySleep: FiniteDuration = 5 minutes
-
   def apply(
-      logger: Logger[IO]
+      logger:          Logger[IO],
+      busySleep:       FiniteDuration = 5 minutes,
+      checkupInterval: FiniteDuration = 500 millis
   )(implicit
       contextShift:     ContextShift[IO],
       timer:            Timer[IO],
       executionContext: ExecutionContext
-  ): IO[SubscribersRegistry] = IO {
-    new SubscribersRegistry(busySleep, Instant.now, logger)
-  }
+  ): IO[SubscribersRegistry] = for {
+    subscriberUrlReferenceQueue <- Ref.of[IO, List[Deferred[IO, SubscriberUrl]]](List.empty)
+    registry <-
+      IO(new SubscribersRegistry(subscriberUrlReferenceQueue, Instant.now, logger, busySleep, checkupInterval))
+    _ <- registry.start()
+  } yield registry
 }

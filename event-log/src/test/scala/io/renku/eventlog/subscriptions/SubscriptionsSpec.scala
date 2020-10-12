@@ -18,30 +18,21 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.concurrent.{Deferred, Ref}
-import cats.effect.{ContextShift, Fiber, IO, Timer}
+import cats.effect.concurrent.Deferred
+import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import eu.timepit.refined.auto._
-import org.scalamock.matchers.ArgCapture.CaptureAll
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
-import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
 
-class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matchers with Eventually {
-
-  implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout = scaled(Span(3, Seconds)),
-    interval = scaled(Span(150, Millis))
-  )
+class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "add" should {
 
@@ -70,11 +61,17 @@ class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matcher
 
   "runOnSubscriber" should {
 
-    "run the given function when there is available subscriber" in new TestCase {
+    "run the given function on subscriber once available" in new TestCase {
+
+      val subscriberUrlReference = mock[Deferred[IO, SubscriberUrl]]
+
+      (() => subscriberUrlReference.get)
+        .expects()
+        .returning(subscriberUrl.pure[IO])
 
       (subscribersRegistry.findAvailableSubscriber _)
         .expects()
-        .returning(subscriberUrl.some)
+        .returning(subscriberUrlReference.pure[IO])
 
       val function = mockFunction[SubscriberUrl, IO[Unit]]
       function.expects(subscriberUrl).returning(IO.unit)
@@ -82,40 +79,30 @@ class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matcher
       subscriptions.runOnSubscriber(function).unsafeRunSync() shouldBe ((): Unit)
     }
 
-    "block execution of the function until there's a subscriber available" in new TestCase {
+    "fail if the given function fails when run on available subscriber" in new TestCase {
+
+      val subscriberUrlReference = mock[Deferred[IO, SubscriberUrl]]
+
+      (() => subscriberUrlReference.get)
+        .expects()
+        .returning(subscriberUrl.pure[IO])
 
       (subscribersRegistry.findAvailableSubscriber _)
         .expects()
-        .returning(None)
+        .returning(subscriberUrlReference.pure[IO])
 
-      (subscribersRegistry.findAvailableSubscriber _)
-        .expects()
-        .returning(subscriberUrl.some)
+      val exception = exceptions.generateOne
+      val function  = mockFunction[SubscriberUrl, IO[Unit]]
+      function.expects(subscriberUrl).returning(exception.raiseError[IO, Unit])
 
-      val subscribersCount = nonNegativeInts().generateOne
-      (subscribersRegistry.subscriberCount _)
-        .expects()
-        .returning(subscribersCount)
-
-      val function = mockFunction[SubscriberUrl, IO[Unit]]
-      function.expects(subscriberUrl).returning(IO.unit)
-
-      val hook = CaptureAll[Option[Deferred[IO, Unit]]]()
-      (executionHookContainer.set _)
-        .expects(capture(hook))
-        .returning(IO.unit)
-
-      subscriptions.runOnSubscriber(function).unsafeRunAsyncAndForget()
-
-      eventually {
-        hook.value.map(_.complete(()).unsafeRunSync())
-      }
-
-      logger.loggedOnly(Info(s"All $subscribersCount subscribers are busy; waiting for one to become available"))
+      intercept[Exception] {
+        subscriptions.runOnSubscriber(function).unsafeRunSync()
+      } shouldBe exception
     }
   }
 
   "delete" should {
+
     "completely remove a subscriber from the registry" in new TestCase {
       (subscribersRegistry.delete _)
         .expects(subscriberUrl)
@@ -149,55 +136,14 @@ class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matcher
     }
   }
 
-  "releaseHook" should {
-
-    "do nothing if there is no hook in the container" in new TestCase {
-      (executionHookContainer.getAndSet _)
-        .expects(None)
-        .returning(None.pure[IO])
-
-      subscriptions.releaseHook().unsafeRunSync() should be((): Unit)
-
-    }
-
-    "execute complete on hook" in new TestCase {
-      val hook = mock[Deferred[IO, Unit]]
-
-      (executionHookContainer.getAndSet _)
-        .expects(None)
-        .returning(hook.some.pure[IO])
-
-      (hook.complete _)
-        .expects(())
-        .returning(IO.unit)
-
-      subscriptions.releaseHook().unsafeRunSync() should be((): Unit)
-
-    }
-
-  }
-  "apply" should {
-    "start subscriber registry" in new TestCase {
-      val notifyFunction = CaptureAll[() => IO[Unit]]()
-      (subscribersRegistry.start _)
-        .expects(capture(notifyFunction))
-        .returning(IO.pure(mock[Fiber[IO, Unit]]))
-
-      val newSubscriptions = Subscriptions(logger, Some(subscribersRegistry.pure[IO])).unsafeRunSync()
-
-      notifyFunction.value shouldBe newSubscriptions.asInstanceOf[HookReleaser[IO]].releaseHook
-    }
-  }
-
   private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
     val subscriberUrl = subscriberUrls.generateOne
 
-    val executionHookContainer = mock[Ref[IO, Option[Deferred[IO, Unit]]]]
-    val subscribersRegistry    = mock[SubscribersRegistry]
-    val logger                 = TestLogger[IO]()
-    val subscriptions          = new SubscriptionsImpl(executionHookContainer, subscribersRegistry, logger)
+    val subscribersRegistry = mock[SubscribersRegistry]
+    val logger              = TestLogger[IO]()
+    val subscriptions       = new SubscriptionsImpl(subscribersRegistry, logger)
   }
 }
