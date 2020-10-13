@@ -61,7 +61,7 @@ class EventsDispatcher(
   private def popEvent: IO[(CompoundEventId, EventBody)] =
     eventsFinder
       .popEvent()
-      .recoverWith(loggingError("Finding events to dispatch failed", retry = eventsFinder.popEvent()))
+      .recoverWith(loggingError(retry = eventsFinder.popEvent()))
       .flatMap {
         case None            => (timer sleep noEventSleep) flatMap (_ => popEvent)
         case Some(idAndBody) => idAndBody.pure[IO]
@@ -76,7 +76,7 @@ class EventsDispatcher(
              case ServiceBusy =>
                markBusy(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(id, body)))
              case Misdelivered =>
-               remove(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(id, body)))
+               delete(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(id, body)))
            }
     } yield ()
   } recoverWith markEventAsNonRecoverable(subscriber, id)
@@ -109,13 +109,12 @@ class EventsDispatcher(
     } yield ()
   }
 
-  private def loggingError[O](errorMessage: String, retry: => IO[O]): PartialFunction[Throwable, IO[O]] = {
-    case NonFatal(exception) =>
-      for {
-        _      <- logger.error(exception)(errorMessage)
-        _      <- timer sleep onErrorSleep
-        result <- retry
-      } yield result
+  private def loggingError[O](retry: => IO[O]): PartialFunction[Throwable, IO[O]] = { case NonFatal(exception) =>
+    for {
+      _      <- logger.error(exception)("Finding events to dispatch failed")
+      _      <- timer sleep onErrorSleep
+      result <- retry
+    } yield result
   }
 
   private def retry(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
