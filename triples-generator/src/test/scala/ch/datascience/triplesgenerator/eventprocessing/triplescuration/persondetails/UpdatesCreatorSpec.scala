@@ -60,20 +60,21 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
     }
 
     "generate query creating a Person with a name only" in new TestCase {
+      forAll { name: Name =>
+        val personId = Person(name).asJsonLD.entityId.get
 
-      val name     = userNames.generateOne
-      val personId = Person(name).asJsonLD.entityId.get
+        val updatesGroup = updatesCreator.prepareUpdates[IO](
+          UpdatedPerson(ResourceId(personId), NonEmptyList.of(name), emails = Set.empty)
+        )
 
-      val updatesGroup = updatesCreator.prepareUpdates[IO](
-        UpdatedPerson(ResourceId(personId), NonEmptyList.of(name), emails = Set.empty)
-      )
+        updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
 
-      updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
-
-      val actual = findPersons
-      actual should have size 1
-      val (_, Some(actualName), None, None) = actual.head
-      actualName shouldBe name.value
+        val actual = findPersons
+        actual should have size 1
+        val (_, Some(actualName), None, None) = actual.head
+        actualName shouldBe name.value
+        clearDataset()
+      }
     }
 
     "generate query updating person's name and removing label - case when person id is known" in new TestCase {

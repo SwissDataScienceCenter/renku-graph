@@ -51,8 +51,8 @@ object GraphModelGenerators {
   }
 
   implicit val userNames: Gen[users.Name] = for {
-    first  <- nonEmptyStrings()
-    second <- nonEmptyStrings()
+    first  <- nonEmptyStrings(charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '/', '`')))
+    second <- nonEmptyStrings(charsGenerator = frequency(9 -> alphaChar, 1 -> oneOf('-', '_', '\\', '/', '`')))
   } yield Name(s"$first $second")
 
   implicit val userResourceIds: Gen[users.ResourceId] = userResourceIds(userEmails.toGeneratorOfOptions)

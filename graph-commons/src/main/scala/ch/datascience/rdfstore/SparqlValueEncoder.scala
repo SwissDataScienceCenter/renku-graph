@@ -22,6 +22,7 @@ object SparqlValueEncoder {
 
   def sparqlEncode(string: String): String =
     string
+      .replaceAll("\\\\", "\\\\\\\\")
       .map {
         case c if c.isLetterOrDigit => c.toString
         case c                      => f"\\u${c.toInt}%04x"
