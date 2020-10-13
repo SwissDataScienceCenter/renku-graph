@@ -80,9 +80,7 @@ private class SubscribersRegistry(
 
   private def makeCallerToWait(subscriberUrlReference: Deferred[IO, SubscriberUrl]) = for {
     _ <- logNoFreeSubscribersInfo
-    _ <- subscriberUrlReferenceQueue modify { queue =>
-           queue -> (queue :+ subscriberUrlReference)
-         }
+    _ <- subscriberUrlReferenceQueue update (_ :+ subscriberUrlReference)
   } yield ()
 
   private def logNoFreeSubscribersInfo: IO[Unit] = logger.info(
