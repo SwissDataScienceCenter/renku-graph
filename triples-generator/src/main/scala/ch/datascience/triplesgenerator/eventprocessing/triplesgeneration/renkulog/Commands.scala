@@ -113,7 +113,11 @@ private object Commands {
           .recoverWith(relevantError)
       }
 
-    private val recoverableErrors = Set("SSL_ERROR_SYSCALL", "the remote end hung up unexpectedly")
+    private val recoverableErrors = Set("SSL_ERROR_SYSCALL",
+                                        "the remote end hung up unexpectedly",
+                                        "The requested URL returned error: 502",
+                                        "Could not resolve host:"
+    )
     private lazy val relevantError: PartialFunction[Throwable, IO[Either[GenerationRecoverableError, Unit]]] = {
       case ShelloutException(result) =>
         def errorMessage(message: String) = s"git clone failed with: $message"

@@ -22,8 +22,10 @@ import ammonite.ops.{Bytes, CommandResult, Path, ShelloutException}
 import ch.datascience.config.ServiceUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.Git
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -42,27 +44,35 @@ class GitSpec extends AnyWordSpec with MockFactory with should.Matchers {
       git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Right(())
     }
 
-    ("SSL_ERROR_SYSCALL": NonBlank) +: ("the remote end hung up unexpectedly": NonBlank) +: Nil foreach {
-      recoverableError =>
-        s"return $GenerationRecoverableError if command fails with a message containing '$recoverableError'" in new TestCase {
+    val recoverableFailureMessagesToCheck = Set[NonBlank](
+      "SSL_ERROR_SYSCALL",
+      "the remote end hung up unexpectedly",
+      Refined.unsafeApply(
+        s"fatal: unable to access 'https://renkulab.io/gitlab/${projectPaths.generateOne}.git/': The requested URL returned error: 502"
+      ),
+      "Could not resolve host: renkulab.io"
+    )
 
-          val errorMessage = sentenceContaining(recoverableError).generateOne.value
-          val commandResultException = ShelloutException {
-            CommandResult(
-              exitCode = 1,
-              chunks = Seq(Left(new Bytes(errorMessage.getBytes())))
-            )
-          }
-          cloneCommand
-            .expects(repositoryUrl, destDirectory, workDirectory)
-            .throwing(commandResultException)
+    recoverableFailureMessagesToCheck foreach { recoverableError =>
+      s"return $GenerationRecoverableError if command fails with a message containing '$recoverableError'" in new TestCase {
 
-          git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Left(
-            GenerationRecoverableError(
-              s"git clone failed with: ${commandResultException.result.toString}"
-            )
+        val errorMessage = sentenceContaining(recoverableError).generateOne.value
+        val commandResultException = ShelloutException {
+          CommandResult(
+            exitCode = 1,
+            chunks = Seq(Left(new Bytes(errorMessage.getBytes())))
           )
         }
+        cloneCommand
+          .expects(repositoryUrl, destDirectory, workDirectory)
+          .throwing(commandResultException)
+
+        git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Left(
+          GenerationRecoverableError(
+            s"git clone failed with: ${commandResultException.result.toString}"
+          )
+        )
+      }
     }
 
     "fail if command fails with an unknown message" in new TestCase {
