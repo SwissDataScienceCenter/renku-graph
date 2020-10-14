@@ -36,6 +36,7 @@ import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
+import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
@@ -49,6 +50,11 @@ class EventsProcessingRunnerSpec
     with Eventually
     with IntegrationPatience
     with should.Matchers {
+
+  implicit override val patienceConfig: PatienceConfig = PatienceConfig(
+    timeout = scaled(Span(3, Seconds)),
+    interval = scaled(Span(100, Millis))
+  )
 
   "scheduleForProcessing" should {
 
@@ -70,7 +76,7 @@ class EventsProcessingRunnerSpec
         expectAvailabilityIsCommunicated
 
         // once at least one process is done, new events should be accepted again
-        sleep(eventProcessingTime + 50)
+        sleep(eventProcessingTime.toMillis + 150)
         processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
       }
 
@@ -86,7 +92,7 @@ class EventsProcessingRunnerSpec
       expectAvailabilityIsCommunicated
 
       // once at least one process is done, new events should be accepted again
-      sleep(eventProcessingTime + 50)
+      sleep(eventProcessingTime.toMillis + 150)
       processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
 
       eventually {
@@ -105,14 +111,14 @@ class EventsProcessingRunnerSpec
     val events                = commitEvents.generateNonEmptyList()
     val exception             = exceptions.generateOne
 
-    val eventProcessingTime = 500
+    val eventProcessingTime = 500 millis
     val eventProcessor: EventProcessor[IO] =
       (id: CompoundEventId, _: NonEmptyList[CommitEvent]) =>
         id match {
           case `eventIdCausingFailure` =>
-            timer sleep (eventProcessingTime millis) flatMap (_ => exception.raiseError[IO, Unit])
+            timer sleep eventProcessingTime flatMap (_ => exception.raiseError[IO, Unit])
           case _ =>
-            timer sleep (eventProcessingTime millis)
+            timer sleep eventProcessingTime
         }
 
     val processesNumber = 2

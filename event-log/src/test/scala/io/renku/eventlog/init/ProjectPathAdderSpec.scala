@@ -28,10 +28,16 @@ import doobie.implicits._
 import io.circe.literal._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.Event
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectPathAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
+class ProjectPathAdderSpec
+    extends AnyWordSpec
+    with DbInitSpec
+    with should.Matchers
+    with Eventually
+    with IntegrationPatience {
 
   "run" should {
 
@@ -65,7 +71,9 @@ class ProjectPathAdderSpec extends AnyWordSpec with DbInitSpec with should.Match
 
       verifyTrue(sql"DROP INDEX idx_project_path;")
 
-      logger.loggedOnly(Info("'project_path' column added"))
+      eventually {
+        logger.loggedOnly(Info("'project_path' column added"))
+      }
     }
   }
 
@@ -75,9 +83,8 @@ class ProjectPathAdderSpec extends AnyWordSpec with DbInitSpec with should.Match
   }
 
   private def addProjectPath(): Unit = execute {
-    sql"""
-         |ALTER TABLE event_log 
-         |ADD COLUMN project_path VARCHAR;
+    sql"""|ALTER TABLE event_log 
+          |ADD COLUMN project_path VARCHAR;
        """.stripMargin.update.run.map(_ => ())
   }
 

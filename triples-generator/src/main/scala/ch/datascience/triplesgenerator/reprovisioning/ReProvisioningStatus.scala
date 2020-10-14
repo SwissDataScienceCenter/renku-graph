@@ -21,10 +21,13 @@ package ch.datascience.triplesgenerator.reprovisioning
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
+import cats.Applicative
 import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.graph.Schemas.rdf
 import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import com.typesafe.config.{Config, ConfigFactory}
@@ -64,9 +67,9 @@ private class ReProvisioningStatusImpl(
   private val runningStatusCheckStarted = new AtomicBoolean(false)
 
   override def setRunning(): IO[Unit] = updateWithNoResult {
-    SparqlQuery(
+    SparqlQuery.of(
       name = "re-provisioning - status insert",
-      Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),
+      Prefixes.of(rdf -> "rdf"),
       s"""|INSERT DATA { 
           |  <${id(renkuBaseUrl)}> rdf:type <$objectType>;
           |                        <$reProvisioningStatus> '$Running'.
@@ -82,9 +85,9 @@ private class ReProvisioningStatusImpl(
     } yield ()
 
   private def deleteFromDb() = updateWithNoResult {
-    SparqlQuery(
+    SparqlQuery.of(
       name = "re-provisioning - status remove",
-      Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),
+      Prefixes.of(rdf -> "rdf"),
       s"""|DELETE { ?s ?p ?o }
           |WHERE {
           | ?s ?p ?o;
@@ -117,16 +120,15 @@ private class ReProvisioningStatusImpl(
     } yield ()
 
   private def triggerPeriodicStatusCheck(): IO[Unit] =
-    if (runningStatusCheckStarted.get()) IO.unit
-    else {
+    Applicative[IO].whenA(!runningStatusCheckStarted.get()) {
       runningStatusCheckStarted set true
-      periodicStatusCheck.start map (_ => ())
+      periodicStatusCheck.start.void
     }
 
   private def periodicStatusCheck: IO[Unit] =
     for {
       _ <- timer sleep statusRefreshInterval
-      _ <- fetchStatus.flatMap {
+      _ <- fetchStatus flatMap {
              case Some(Running) => periodicStatusCheck
              case _ =>
                runningStatusCheckStarted set false
@@ -134,19 +136,18 @@ private class ReProvisioningStatusImpl(
            }
     } yield ()
 
-  private def fetchStatus: IO[Option[Status]] =
-    queryExpecting[Option[Status]] {
-      SparqlQuery(
-        name = "re-provisioning - get status",
-        Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),
-        s"""|SELECT ?status
-            |WHERE { 
-            |  <${id(renkuBaseUrl)}> rdf:type <$objectType>;
-            |                        <$reProvisioningStatus> ?status.
-            |}
-            |""".stripMargin
-      )
-    }(statusDecoder)
+  private def fetchStatus: IO[Option[Status]] = queryExpecting[Option[Status]] {
+    SparqlQuery.of(
+      name = "re-provisioning - get status",
+      Prefixes.of(rdf -> "rdf"),
+      s"""|SELECT ?status
+          |WHERE { 
+          |  <${id(renkuBaseUrl)}> rdf:type <$objectType>;
+          |                        <$reProvisioningStatus> ?status.
+          |}
+          |""".stripMargin
+    )
+  }(statusDecoder)
 
   private lazy val statusDecoder: Decoder[Option[Status]] = {
     val ofStatuses: Decoder[Status] = _.downField("status").downField("value").as[String].flatMap {

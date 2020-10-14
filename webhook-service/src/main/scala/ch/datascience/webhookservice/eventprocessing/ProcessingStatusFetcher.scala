@@ -52,7 +52,7 @@ private object ProcessingStatusFetcher {
   object ProcessingStatus {
 
     type Done     = Int Refined NonNegative
-    type Total    = Int Refined Positive
+    type Total    = Int Refined NonNegative
     type Progress = Double Refined NonNegative
 
     def from(
