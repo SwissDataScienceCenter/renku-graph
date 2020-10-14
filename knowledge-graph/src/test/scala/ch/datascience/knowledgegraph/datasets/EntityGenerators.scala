@@ -4,7 +4,7 @@ import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
-import ch.datascience.graph.model.datasets.Identifier
+import ch.datascience.graph.model.datasets.{Identifier, TopmostDerivedFrom}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.addedToProjectObjects
 import ch.datascience.knowledgegraph.datasets.model.DatasetProject
 import ch.datascience.rdfstore.entities.Person.persons
@@ -36,11 +36,14 @@ object EntityGenerators {
     Nil
   )
 
-  def invalidationEntity(datasetId: Identifier, project: Project): Gen[Entity with Artifact] = for {
+  def invalidationEntity(datasetId:          Identifier,
+                         project:            Project,
+                         topmostDerivedFrom: Option[TopmostDerivedFrom] = None
+  ): Gen[Entity with Artifact] = for {
     activity <- activities(project)
   } yield new Entity(
     activity.commitId,
-    Location(".renku") / "datasets" / datasetId / "metadata.yml",
+    Location(".renku") / "datasets" / topmostDerivedFrom.map(_.value).getOrElse(datasetId.value) / "metadata.yml",
     project,
     Some(activity),
     None

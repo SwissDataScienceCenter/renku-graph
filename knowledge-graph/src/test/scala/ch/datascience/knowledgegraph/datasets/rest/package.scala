@@ -30,12 +30,12 @@ import ch.datascience.graph.model.GraphModelGenerators.{datasetIdentifiers, data
 import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, DerivedFrom, Description, Identifier, Name, PublishedDate, SameAs, Title, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
-import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.{datasetProjects, datasets}
+import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.{addedToProjectObjects, datasetProjects, datasets}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.bundles.{modifiedDataSetCommit, nonModifiedDataSetCommit}
-import ch.datascience.rdfstore.entities.{DataSet, Person}
+import ch.datascience.rdfstore.entities.{DataSet, Person, Project}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.jsonld.{EntityId, JsonLD}
@@ -306,4 +306,9 @@ package object rest {
 
   val single: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects, maxElements = 1)
   val two:    Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)
+
+  implicit class ProjectOps(project: Project) {
+    lazy val toDatasetProject: DatasetProject =
+      DatasetProject(project.path, project.name, addedToProjectObjects.generateOne)
+  }
 }

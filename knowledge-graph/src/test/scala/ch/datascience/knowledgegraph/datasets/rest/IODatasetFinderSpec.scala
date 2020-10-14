@@ -19,12 +19,14 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{InitialVersion, Keyword, TopmostSameAs}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
+import ch.datascience.knowledgegraph.datasets.EntityGenerators.invalidationEntity
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.bundles._
@@ -33,6 +35,8 @@ import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
+import io.renku.jsonld.syntax._
 
 class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -578,6 +582,77 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             keywords = modifiedDataset2.keywords.sorted
           )
         )
+      }
+
+    "not return the details of a dataset" +
+      "- case when the dataset has been invalidated" in new TestCase {
+        val project = projects.generateOne
+        val dataset = nonModifiedDatasets().generateOne.copy(
+          projects = List(project.toDatasetProject)
+        )
+
+        val entityWithInvalidation = invalidationEntity(dataset.id, project).generateOne
+
+        loadToStore(
+          dataset.toJsonLD()(),
+          entityWithInvalidation.asJsonLD
+        )
+
+        datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe None
+      }
+
+    "not return the details of a dataset" +
+      "- case when the latest version of the dataset has been invalidated" in new TestCase {
+        val project = projects.generateOne
+        private val datasetProject: DatasetProject = project.toDatasetProject
+        val dataset = nonModifiedDatasets().generateOne.copy(
+          projects = List(datasetProject)
+        )
+
+        val modifiedDataset = modifiedDatasetsOnFirstProject(
+          dataset.copy(projects = List(datasetProject))
+        ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
+
+        val entityWithInvalidation =
+          invalidationEntity(modifiedDataset.id, project, dataset.entityId.asTopmostDerivedFrom.some).generateOne
+
+        loadToStore(
+          dataset.toJsonLD()(),
+          modifiedDataset.toJsonLD(topmostDerivedFrom = dataset.entityId.asTopmostDerivedFrom),
+          entityWithInvalidation.asJsonLD
+        )
+
+        datasetFinder.findDataset(modifiedDataset.id).unsafeRunSync() shouldBe None
+      }
+
+    "not return the details of a dataset" +
+      "- case when the latest version of the dataset has been invalidated " +
+      "and the requested id is anywhere in the hierarchy" in new TestCase {
+        val project = projects.generateOne
+        private val datasetProject: DatasetProject = project.toDatasetProject
+        val dataset = nonModifiedDatasets().generateOne.copy(
+          projects = List(datasetProject)
+        )
+
+        val modifiedDataset = modifiedDatasetsOnFirstProject(
+          dataset.copy(projects = List(datasetProject))
+        ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
+
+        val modifiedDataset2 = modifiedDatasetsOnFirstProject(
+          modifiedDataset.copy(projects = List(datasetProject))
+        ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
+
+        val entityWithInvalidation =
+          invalidationEntity(modifiedDataset2.id, project, dataset.entityId.asTopmostDerivedFrom.some).generateOne
+
+        loadToStore(
+          dataset.toJsonLD()(),
+          modifiedDataset.toJsonLD(topmostDerivedFrom = dataset.entityId.asTopmostDerivedFrom),
+          modifiedDataset2.toJsonLD(topmostDerivedFrom = dataset.entityId.asTopmostDerivedFrom),
+          entityWithInvalidation.asJsonLD
+        )
+
+        datasetFinder.findDataset(modifiedDataset.id).unsafeRunSync() shouldBe None
       }
   }
 

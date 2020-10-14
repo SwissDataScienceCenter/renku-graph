@@ -127,11 +127,11 @@ private class IODatasetsFinder(
         |              schema:isPartOf ?projectId ;
         |              prov:atLocation ?location .
         |              
-        |        BIND(CONCAT(?location, "/metadata.yml") AS ?metaLocation).
+        |        BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
         |        FILTER NOT EXISTS {
         |            # Removing dataset that have an activity that invalidates them
         |            ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
-        |                               prov:atLocation ?metaLocation ;
+        |                               prov:atLocation ?metaDataLocation ;
         |                               prov:wasInvalidatedBy ?invalidationActivity ;
         |                               schema:isPartOf ?projectId .
         |        }

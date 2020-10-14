@@ -424,7 +424,10 @@ class IODatasetsFinderSpec
             .copy(name = datasetNames.generateOne)
 
           val entityWithInvalidation: Entity with Artifact =
-            invalidationEntity(dataset0Modification.id, project).generateOne
+            invalidationEntity(dataset0Modification.id,
+                               project,
+                               dataset0.entityId.asTopmostDerivedFrom.some
+            ).generateOne
 
           loadToStore(
             dataset0.toJsonLD()(),
@@ -879,10 +882,5 @@ class IODatasetsFinderSpec
           }
         } getOrElse fail(s"Cannot find dataset for project ${havingOnly.path}")
     }._2
-  }
-
-  implicit class ProjectOps(project: Project) {
-    lazy val toDatasetProject: DatasetProject =
-      DatasetProject(project.path, project.name, addedToProjectObjects.generateOne)
   }
 }
