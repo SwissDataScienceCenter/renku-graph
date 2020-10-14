@@ -128,7 +128,7 @@ private class ReProvisioningStatusImpl(
   private def periodicStatusCheck: IO[Unit] =
     for {
       _ <- timer sleep statusRefreshInterval
-      _ <- fetchStatus.flatMap {
+      _ <- fetchStatus flatMap {
              case Some(Running) => periodicStatusCheck
              case _ =>
                runningStatusCheckStarted set false

@@ -87,7 +87,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
     }
 
-    "cache the value of the flag in DB once it's set to false" in new TestCase {
+    "cache the value of the flag in the DB once it's set to false" in new TestCase {
       reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
 
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
@@ -97,10 +97,10 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
 
       reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
-      sleep(cacheRefreshInterval.toMillis - 500)
+      sleep(cacheRefreshInterval.toMillis - cacheRefreshInterval.toMillis * 2 / 3)
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
 
-      sleep(500 + 100)
+      sleep(cacheRefreshInterval.toMillis * 2 / 3 + 100)
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
     }
 
