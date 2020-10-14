@@ -27,12 +27,15 @@ import scala.math.BigDecimal.RoundingMode
 
 private object ProcessingStatusGenerator {
 
-  implicit val processingStatuses: Gen[ProcessingStatus] =
-    for {
-      total <- positiveInts(max = Integer.MAX_VALUE)
-      done  <- nonNegativeInts(max = total.value)
-      progress = Refined.unsafeApply(
-                   BigDecimal((done.value.toDouble / total.value) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
-                 ): ProcessingStatus.Progress
-    } yield ProcessingStatus(done, total, progress)
+  implicit val processingStatuses: Gen[ProcessingStatus] = for {
+    total <- nonNegativeInts(max = Integer.MAX_VALUE)
+    done  <- nonNegativeInts(max = total.value)
+    progress = Refined.unsafeApply(
+                 if (total.value == 0) 100d
+                 else
+                   BigDecimal((done.value.toDouble / total.value) * 100)
+                     .setScale(2, RoundingMode.HALF_DOWN)
+                     .toDouble
+               ): ProcessingStatus.Progress
+  } yield ProcessingStatus(done, total, progress)
 }
