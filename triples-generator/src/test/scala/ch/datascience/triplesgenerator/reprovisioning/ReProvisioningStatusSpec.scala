@@ -24,12 +24,14 @@ import cats.effect.IO
 import cats.effect.concurrent.Ref
 import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.Schemas._
 import ch.datascience.interpreters.TestLogger
-import eu.timepit.refined.auto._
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningJsonLD.{Running, objectType}
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
+import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -85,7 +87,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
     }
 
-    "cache the value of the flag in DB once it's set to false" in new TestCase {
+    "cache the value of the flag in the DB once it's set to false" in new TestCase {
       reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
 
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
@@ -95,10 +97,10 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
 
       reProvisioningStatus.setRunning().unsafeRunSync() shouldBe ((): Unit)
-      sleep(cacheRefreshInterval.toMillis - 500)
+      sleep(cacheRefreshInterval.toMillis - cacheRefreshInterval.toMillis * 2 / 3)
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
 
-      sleep(500 + 100)
+      sleep(cacheRefreshInterval.toMillis * 2 / 3 + 100)
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
     }
 
@@ -106,10 +108,12 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
       reProvisioningStatus.setRunning().unsafeRunSync()       shouldBe ((): Unit)
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe true
 
+      expectNotificationSent
+
       clearStatus()
 
-      expectNotificationSent
-      sleep(statusRefreshInterval.toMillis)
+      sleep((statusRefreshInterval + (100 millis)).toMillis)
+
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
     }
   }
@@ -150,17 +154,16 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
       .map(row => row("status"))
       .headOption
 
-  private def clearStatus(): Unit =
-    runUpdate {
-      SparqlQuery(
-        name = "re-provisioning - status remove",
-        Set("PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"),
-        s"""|DELETE { ?s ?p ?o }
-            |WHERE {
-            | ?s ?p ?o;
-            |    rdf:type <$objectType> .
-            |}
-            |""".stripMargin
-      )
-    }.unsafeRunSync()
+  private def clearStatus(): Unit = runUpdate {
+    SparqlQuery.of(
+      name = "re-provisioning - status remove",
+      Prefixes.of(rdf -> "rdf"),
+      s"""|DELETE { ?s ?p ?o }
+          |WHERE {
+          | ?s ?p ?o;
+          |    rdf:type <$objectType> .
+          |}
+          |""".stripMargin
+    )
+  }.unsafeRunSync()
 }

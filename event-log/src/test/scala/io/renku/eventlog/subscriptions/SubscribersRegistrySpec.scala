@@ -165,10 +165,12 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
       (endTime.toEpochMilli - startTime.toEpochMilli) should be > busySleep.toMillis
       (endTime.toEpochMilli - startTime.toEpochMilli) should be < (busySleep + checkupInterval + (100 millis)).toMillis
 
-      logger.loggedOnly(
-        Info(s"All 1 subscribers are busy; waiting for one to become available"),
-        Info(s"$subscriberUrl taken from busy state")
-      )
+      eventually {
+        logger.loggedOnly(
+          Info(s"All 1 subscribers are busy; waiting for one to become available"),
+          Info(s"$subscriberUrl taken from busy state")
+        )
+      }
     }
 
     "extend unavailable time if the subscriber is already unavailable" in new TestCase {

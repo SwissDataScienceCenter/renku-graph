@@ -126,7 +126,9 @@ class ProjectPathAdderSpec
         verifyTrue(sql"DROP INDEX idx_project_path;")
       }
 
-      logger.loggedOnly(Info("'project_path' column added"))
+      eventually {
+        logger.loggedOnly(Info("'project_path' column added"))
+      }
     }
   }
 
