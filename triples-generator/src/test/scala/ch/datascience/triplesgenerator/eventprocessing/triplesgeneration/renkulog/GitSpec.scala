@@ -50,7 +50,8 @@ class GitSpec extends AnyWordSpec with MockFactory with should.Matchers {
       Refined.unsafeApply(
         s"fatal: unable to access 'https://renkulab.io/gitlab/${projectPaths.generateOne}.git/': The requested URL returned error: 502"
       ),
-      "Could not resolve host: renkulab.io"
+      "Could not resolve host: renkulab.io",
+      "Failed to connect to renkulab.io port 443: Host is unreachable"
     )
 
     recoverableFailureMessagesToCheck foreach { recoverableError =>
