@@ -23,35 +23,32 @@ import java.time.LocalDate
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, Identifier, PublishedDate, Title}
+import ch.datascience.graph.model.datasets.{Description, PublishedDate, Title}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
+import ch.datascience.knowledgegraph.datasets.EntityGenerators.invalidationEntity
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
 import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.{Activity, Agent, Artifact, Entity, Location, Project}
+import ch.datascience.rdfstore.entities.{Artifact, Entity, Project}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
-import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -629,6 +626,30 @@ class IODatasetsFinderSpec
         .unsafeRunSync()
         .results shouldBe List(dataset2Modification.toDatasetSearchResult(projectsCount = 1))
     }
+
+    s"not return deleted datasets even if the phrase match" +
+      "- case with unrelated datasets" in new TestCase {
+        val phrase         = phrases.generateOne
+        val project        = projects.generateOne
+        val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
+        val datasetToBeInvalidated =
+          nonModifiedDatasets(projects = datasetProject).generateOne.makeTitleContaining(phrase)
+        val entityWithInvalidation: Entity with Artifact =
+          invalidationEntity(datasetToBeInvalidated.id, project).generateOne
+
+        loadToStore(
+          datasetToBeInvalidated.toJsonLD()(),
+          entityWithInvalidation.asJsonLD
+        )
+
+        val result = datasetsFinder
+          .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
+
+        result.results shouldBe empty
+
+        result.pagingInfo.total shouldBe Total(0)
+      }
   }
 
   "findDatasets with explicit sorting given" should {
@@ -864,33 +885,4 @@ class IODatasetsFinderSpec
     lazy val toDatasetProject: DatasetProject =
       DatasetProject(project.path, project.name, addedToProjectObjects.generateOne)
   }
-
-  private def activities(project: Project): Gen[Activity] = for {
-    commitId      <- commitIds
-    committedDate <- committedDates
-    committer     <- persons
-    cliVersion    <- cliVersions
-    comment       <- nonEmptyStrings()
-  } yield Activity(
-    commitId,
-    committedDate,
-    committer,
-    project,
-    Agent(cliVersion),
-    comment,
-    None,
-    None,
-    None,
-    Nil
-  )
-
-  private def invalidationEntity(datasetId: Identifier, project: Project): Gen[Entity with Artifact] = for {
-    activity <- activities(project)
-  } yield new Entity(
-    activity.commitId,
-    Location(".renku") / "datasets" / datasetId / "metadata.yml",
-    project,
-    Some(activity),
-    None
-  ) with Artifact
 }
