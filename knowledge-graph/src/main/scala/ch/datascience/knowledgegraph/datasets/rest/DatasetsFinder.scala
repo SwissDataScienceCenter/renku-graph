@@ -129,19 +129,16 @@ private class IODatasetsFinder(
         |              
         |        BIND(CONCAT(?location, "/metadata.yml") AS ?metaLocation).
         |        FILTER NOT EXISTS {
-        |          {
         |            # Removing dataset that have an activity that invalidates them
         |            ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
         |                               prov:atLocation ?metaLocation ;
         |                               prov:wasInvalidatedBy ?invalidationActivity ;
         |                               schema:isPartOf ?projectId .
-        |
-        |          }
-        |          {
+        |        }
+        |        
+        |        FILTER NOT EXISTS {
         |            ?someId prov:wasDerivedFrom/schema:url ?dsId.
         |            ?someId schema:isPartOf ?projectId.
-        |            
-        |          }
         |        }
         |      }
         |    }

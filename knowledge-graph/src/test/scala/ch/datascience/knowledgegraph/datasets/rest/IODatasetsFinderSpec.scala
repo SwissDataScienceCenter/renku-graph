@@ -20,11 +20,11 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import java.time.LocalDate
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
-import io.renku.jsonld.syntax._
-import ch.datascience.generators.{CommonGraphGenerators, Generators}
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
+import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -41,23 +41,20 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearch
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
-import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.{Activity, Agent, Artifact, Entity, Location}
+import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
 import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.entities.{Activity, Agent, Artifact, Entity, Location, Project}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
+import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import ch.datascience.rdfstore.entities.Person.persons
-import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
-import eu.timepit.refined.auto._
-
-import scala.meta.internal.semanticdb.Tree.NonEmpty
 
 class IODatasetsFinderSpec
     extends AnyWordSpec
@@ -372,16 +369,16 @@ class IODatasetsFinderSpec
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with unrelated datasets" in new TestCase {
-          val dataset0               = nonModifiedDatasets(projects = single).generateOne
-          val datasetToBeInvalidated = nonModifiedDatasets(projects = single).generateOne
+          val project                = projects.generateOne
+          val datasetProject         = NonEmptyList(project.toDatasetProject, Nil)
+          val dataset0               = nonModifiedDatasets(projects = datasetProject).generateOne
+          val datasetToBeInvalidated = nonModifiedDatasets(projects = datasetProject).generateOne
+          val entityWithInvalidation: Entity with Artifact =
+            invalidationEntity(datasetToBeInvalidated.id, project).generateOne
+
           loadToStore(
             dataset0.toJsonLD()(),
-            datasetToBeInvalidated.toJsonLD()()
-          )
-
-          val entityWithInvalidation: Entity with Artifact = invalidationEntity(datasetToBeInvalidated.id).generateOne
-
-          loadToStore(
+            datasetToBeInvalidated.toJsonLD()(),
             entityWithInvalidation.asJsonLD
           )
 
@@ -396,21 +393,20 @@ class IODatasetsFinderSpec
           result.pagingInfo.total shouldBe Total(1)
         }
 
-      s"not return deleted forked datasets when the given phrase is $maybePhrase" +
+      s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets" in new TestCase {
-          val dataset     = nonModifiedDatasets(projects = single).generateOne
-          val datasetFork = dataset.copy(projects = List(datasetProjects.generateOne))
+          val project        = projects.generateOne
+          val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
+          val dataset        = nonModifiedDatasets(projects = datasetProject).generateOne
+          val datasetFork    = dataset.copy(projects = List(datasetProjects.generateOne))
+          val entityWithInvalidation: Entity with Artifact = invalidationEntity(datasetFork.id, project).generateOne
 
           loadToStore(
             dataset.toJsonLD(noSameAs = true)(),
-            datasetFork.toJsonLD(noSameAs = true)()
-          )
-
-          val entityWithInvalidation: Entity with Artifact = invalidationEntity(datasetFork.id).generateOne
-
-          loadToStore(
+            datasetFork.toJsonLD(noSameAs = true)(),
             entityWithInvalidation.asJsonLD
           )
+
           val result = datasetsFinder
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
             .unsafeRunSync()
@@ -423,12 +419,15 @@ class IODatasetsFinderSpec
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with modification on renku created datasets" in new TestCase {
-          val dataset0 = nonModifiedDatasets(projects = single).generateOne
-          val dataset1 = nonModifiedDatasets(projects = single).generateOne
+          val project        = projects.generateOne
+          val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
+          val dataset0       = nonModifiedDatasets(projects = datasetProject).generateOne
+          val dataset1       = nonModifiedDatasets(projects = datasetProject).generateOne
           val dataset0Modification = modifiedDatasetsOnFirstProject(dataset0).generateOne
             .copy(name = datasetNames.generateOne)
 
-          val entityWithInvalidation: Entity with Artifact = invalidationEntity(dataset0Modification.id).generateOne
+          val entityWithInvalidation: Entity with Artifact =
+            invalidationEntity(dataset0Modification.id, project).generateOne
 
           loadToStore(
             dataset0.toJsonLD()(),
@@ -861,11 +860,15 @@ class IODatasetsFinderSpec
     }._2
   }
 
-  private lazy val activities: Gen[Activity] = for {
+  implicit class ProjectOps(project: Project) {
+    lazy val toDatasetProject: DatasetProject =
+      DatasetProject(project.path, project.name, addedToProjectObjects.generateOne)
+  }
+
+  private def activities(project: Project): Gen[Activity] = for {
     commitId      <- commitIds
     committedDate <- committedDates
     committer     <- persons
-    project       <- projects
     cliVersion    <- cliVersions
     comment       <- nonEmptyStrings()
   } yield Activity(
@@ -881,12 +884,12 @@ class IODatasetsFinderSpec
     Nil
   )
 
-  private def invalidationEntity(datasetId: Identifier): Gen[Entity with Artifact] = for {
-    activity <- activities
+  private def invalidationEntity(datasetId: Identifier, project: Project): Gen[Entity with Artifact] = for {
+    activity <- activities(project)
   } yield new Entity(
     activity.commitId,
     Location(".renku") / "datasets" / datasetId / "metadata.yml",
-    activity.project,
+    project,
     Some(activity),
     None
   ) with Artifact
