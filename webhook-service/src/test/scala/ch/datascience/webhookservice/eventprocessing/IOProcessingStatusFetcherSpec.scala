@@ -151,13 +151,9 @@ class IOProcessingStatusFetcherSpec
       }
     }
 
-    "fail if total <= 0" in {
+    "fail if total < 0" in {
       forAll(nonNegativeInts(), nonPositiveInts()) { (done, total) =>
-        val progress = BigDecimal((done.value.toDouble / total.value) * 100)
-          .setScale(2, RoundingMode.HALF_DOWN)
-          .toDouble
-
-        ProcessingStatus.from(done.value, total.value, progress) shouldBe Left(
+        ProcessingStatus.from(done.value, total.value, 0d) shouldBe Left(
           "ProcessingStatus's 'total' cannot be negative"
         )
       }
