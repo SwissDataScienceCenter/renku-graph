@@ -391,7 +391,7 @@ class IODatasetsFinderSpec
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
-        "- case with forks on renku created datasets" in new TestCase {
+        "- case with forks on renku created datasets and the fork dataset is deleted" in new TestCase {
           val project        = projects.generateOne
           val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
           val dataset        = nonModifiedDatasets(projects = datasetProject).generateOne
