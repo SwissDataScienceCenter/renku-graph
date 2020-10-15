@@ -116,7 +116,8 @@ private object Commands {
     private val recoverableErrors = Set("SSL_ERROR_SYSCALL",
                                         "the remote end hung up unexpectedly",
                                         "The requested URL returned error: 502",
-                                        "Could not resolve host:"
+                                        "Could not resolve host:",
+                                        "Host is unreachable"
     )
     private lazy val relevantError: PartialFunction[Throwable, IO[Either[GenerationRecoverableError, Unit]]] = {
       case ShelloutException(result) =>
