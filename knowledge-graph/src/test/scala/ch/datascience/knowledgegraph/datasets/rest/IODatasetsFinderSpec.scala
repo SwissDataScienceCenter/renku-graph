@@ -415,6 +415,30 @@ class IODatasetsFinderSpec
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
+        "- case with forks on renku created datasets and original dataset is deleted" in new TestCase {
+          val project        = projects.generateOne
+          val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
+          val dataset        = nonModifiedDatasets(projects = datasetProject).generateOne
+          val datasetFork    = dataset.copy(projects = List(datasetProjects.generateOne))
+          val entityWithInvalidation: Entity with Artifact = invalidationEntity(dataset.id, project).generateOne
+
+          loadToStore(
+            dataset.toJsonLD(noSameAs = true)(),
+            datasetFork.toJsonLD(noSameAs = true)(),
+            entityWithInvalidation.asJsonLD
+          )
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
+
+          result.results should contain theSameElementsAs List(datasetFork.toDatasetSearchResult(projectsCount = 1))
+
+          result.pagingInfo.total shouldBe Total(1)
+
+        }
+
+      s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with modification on renku created datasets" in new TestCase {
           val project        = projects.generateOne
           val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
