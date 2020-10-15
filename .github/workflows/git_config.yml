@@ -1,0 +1,27 @@
+name: Setup git config
+
+on:
+  push:
+    branches:
+    - '**'
+    tags:
+    - 'v*.*.*'
+jobs:
+  configure-git:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: rokroskar/workflow-run-cleanup-action@master
+      env:
+        GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+  automerge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: automerge
+        uses: "pascalgn/automerge-action@v0.7.3"
+        env:
+          GITHUB_TOKEN: "${{ secrets.RENKU_CI_TOKEN }}"
+          MERGE_METHOD: "squash"
+          MERGE_DELETE_BRANCH: "true"
+          MERGE_LABELS: "automerge,!do-not-merge"
+          MERGE_RETRIES: 5
+          MERGE_RETRY_SLEEP: 60000

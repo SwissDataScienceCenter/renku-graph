@@ -31,7 +31,7 @@ The standard release process is done by Travis and it happens automatically on a
 
 #### Hotfixes
 
-In a case of hoftixes, changes to a relevant commit/tag needs to be done and pushed to a special branch with name following the `hotfix-<major>.<minor>` pattern. Once the fix is pushed, Travis will automatically release a new hotfix version according to the versions set in `version.sbt` and `helm-chart/renku-graph/Chart.yaml`. Both mentioned files needs to be updated manually so 
+In a case of hotfixes, changes to a relevant commit/tag needs to be done and pushed to a special branch with name following the `hotfix-<major>.<minor>` pattern. Once the fix is pushed, Travis will automatically release a new hotfix version according to the versions set in `version.sbt` and `helm-chart/renku-graph/Chart.yaml`. Both mentioned files needs to be updated manually so 
 - version in the `version.sbt` has to follow `0.10.1-SNAPSHOT`
 - version in the `helm-chart/renku-graph/Chart.yaml` has to follow `0.10.1-706fb4d`
 
