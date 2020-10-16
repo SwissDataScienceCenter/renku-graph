@@ -17,7 +17,8 @@ jobs:
     env:
       SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
     runs-on: ubuntu-latest
-    nees: cleanup-previous-runs
+    if: github.event.action != 'closed'
+    needs: [cleanup-previous-runs]
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 1.11
