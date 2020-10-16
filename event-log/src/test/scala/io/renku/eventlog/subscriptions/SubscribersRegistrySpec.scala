@@ -41,7 +41,7 @@ import scala.language.postfixOps
 class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers with Eventually {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout = scaled(Span(3, Seconds)),
+    timeout = scaled(Span(5, Seconds)),
     interval = scaled(Span(100, Millis))
   )
 
@@ -113,7 +113,9 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
     "be able to queue callers when all subscribers are busy" in new TestCase {
 
       val collectedCallerIds = new ConcurrentHashMap[Unit, List[Int]]()
-      val callerIds          = (1 to 5).toList
+      collectedCallerIds.put((), List.empty[Int])
+
+      val callerIds = (1 to 5).toList
 
       callerIds
         .map(callerId => IO(callFindSubscriber(callerId, collectedCallerIds)))
