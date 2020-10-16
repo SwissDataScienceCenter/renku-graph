@@ -117,7 +117,7 @@ object DataSet {
                       overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   )(activity:                                     Activity): DataSetEntity =
     new Entity(activity.commitId,
-               Location(".renku") / "datasets" / id,
+               Location(".renku") / "datasets" / overrideTopmostDerivedFrom.map(_.value).getOrElse(id.value),
                activity.project,
                maybeInvalidationActivity = None,
                maybeGeneration = None

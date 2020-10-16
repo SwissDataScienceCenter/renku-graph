@@ -19,14 +19,18 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
+import ch.datascience.knowledgegraph.datasets.EntityGenerators.invalidationEntity
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
+import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -127,6 +131,54 @@ class IOProjectDatasetsFinderSpec
     "return None if there are no datasets in the project" in new TestCase {
       val projectPath = projectPaths.generateOne
       datasetsFinder.findProjectDatasets(projectPath).unsafeRunSync() shouldBe List.empty
+    }
+
+    "not returned deleted dataset" in new TestCase {
+      forAll(projects, addedToProjectObjects) { (project, addedToProject) =>
+        val datasetProject = project.toDatasetProject
+        val dataset1       = nonModifiedDatasets(projects = datasetProject.toGenerator).generateOne
+        val datasetToBeInvalidated = nonModifiedDatasets(
+          projects = datasetProject.copy(created = addedToProject).toGenerator
+        ).generateOne
+
+        val entityWithInvalidation = invalidationEntity(datasetToBeInvalidated.id, project).generateOne
+        loadToStore(
+          dataset1.toJsonLD()(),
+          datasetToBeInvalidated.toJsonLD()(),
+          entityWithInvalidation.asJsonLD
+        )
+
+        datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
+          (dataset1.id, dataset1.versions.initial, dataset1.title, dataset1.name, Left(dataset1.sameAs))
+        )
+      }
+    }
+
+    "not returned deleted dataset when its latest version was deleted" in new TestCase {
+      forAll(projects, addedToProjectObjects) { (project, addedToProject) =>
+        val datasetProject = project.toDatasetProject
+        val dataset1       = nonModifiedDatasets(projects = datasetProject.toGenerator).generateOne
+        val dataset2 = nonModifiedDatasets(
+          projects = datasetProject.copy(created = addedToProject).toGenerator
+        ).generateOne
+
+        val dataset2Modification = modifiedDatasetsOnFirstProject(
+          dataset2.copy(projects = List(datasetProject.copy(created = addedToProject) shiftDateAfter datasetProject))
+        ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
+
+        val entityWithInvalidation =
+          invalidationEntity(dataset2Modification.id, project, dataset2.entityId.asTopmostDerivedFrom.some).generateOne
+        loadToStore(
+          dataset1.toJsonLD()(),
+          dataset2.toJsonLD()(),
+          dataset2Modification.toJsonLD(topmostDerivedFrom = dataset2.entityId.asTopmostDerivedFrom),
+          entityWithInvalidation.asJsonLD
+        )
+
+        datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
+          (dataset1.id, dataset1.versions.initial, dataset1.title, dataset1.name, Left(dataset1.sameAs))
+        )
+      }
     }
   }
 

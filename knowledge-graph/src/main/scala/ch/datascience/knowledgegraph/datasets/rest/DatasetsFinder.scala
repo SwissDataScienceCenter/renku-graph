@@ -118,15 +118,27 @@ private class IODatasetsFinder(
         |            ?luceneDsId schema:creator ?id;
         |                        rdf:type <http://schema.org/Dataset>;
         |                        renku:topmostSameAs ?sameAs.
+        |                        
         |          }
         |        }
         |      } {
         |        ?dsId rdf:type <http://schema.org/Dataset>;
         |              renku:topmostSameAs ?sameAs;
-        |              schema:isPartOf ?projectId.
+        |              schema:isPartOf ?projectId ;
+        |              prov:atLocation ?location .
+        |              
+        |        BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
         |        FILTER NOT EXISTS {
-        |          ?someId prov:wasDerivedFrom/schema:url ?dsId.
-        |          ?someId schema:isPartOf ?projectId.
+        |            # Removing dataset that have an activity that invalidates them
+        |            ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
+        |                               prov:atLocation ?metaDataLocation ;
+        |                               prov:wasInvalidatedBy ?invalidationActivity ;
+        |                               schema:isPartOf ?projectId .
+        |        }
+        |        
+        |        FILTER NOT EXISTS {
+        |            ?someId prov:wasDerivedFrom/schema:url ?dsId.
+        |            ?someId schema:isPartOf ?projectId.
         |        }
         |      }
         |    }
