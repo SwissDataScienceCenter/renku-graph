@@ -102,14 +102,12 @@ private class SubscribersRegistry(
 
   def subscriberCount(): Int = busyPool.size() + availablePool.size()
 
-  private def start(): IO[Fiber[IO, Unit]] = {
-    for {
-      _                        <- timer sleep checkupInterval
-      subscribersDueForCheckup <- findSubscribersDueForCheckup
-      _                        <- bringToAvailable(subscribersDueForCheckup)
-      _                        <- start()
-    } yield ()
-  }.start
+  private def busySubscriberCheckup(): IO[Unit] = for {
+    _                        <- timer sleep checkupInterval
+    subscribersDueForCheckup <- findSubscribersDueForCheckup
+    _                        <- bringToAvailable(subscribersDueForCheckup)
+    _                        <- busySubscriberCheckup()
+  } yield ()
 
   private def findSubscribersDueForCheckup: IO[List[SubscriberUrl]] = IO {
     busyPool.asScala.toList
@@ -146,6 +144,6 @@ private object SubscribersRegistry {
     subscriberUrlReferenceQueue <- Ref.of[IO, List[Deferred[IO, SubscriberUrl]]](List.empty)
     registry <-
       IO(new SubscribersRegistry(subscriberUrlReferenceQueue, Instant.now, logger, busySleep, checkupInterval))
-    _ <- registry.start()
+    _ <- registry.busySubscriberCheckup().start
   } yield registry
 }
