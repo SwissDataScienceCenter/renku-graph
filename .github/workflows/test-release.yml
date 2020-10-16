@@ -1,6 +1,5 @@
 name: Test and release
 on:
-  tags: false
   push:
     branches:
       - master
@@ -14,8 +13,6 @@ jobs:
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
   test:
-    env:
-      SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
     runs-on: ubuntu-latest
     nees: cleanup-previous-runs
     steps:
@@ -25,10 +22,10 @@ jobs:
         with:
           java-version: 1.11
       - name: Test and format
-      - run: sbt -Dsbt.color=always -Dsbt.supershell=false clean test && sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test && sbt scalafmtCheck
+        env:
+          SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
+        run: sbt -Dsbt.color=always -Dsbt.supershell=false clean test && sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test && sbt scalafmtCheck
   release:
-    env:
-      SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
     runs-on: ubuntu-latest
     needs: test
     if: "!contains(github.event.head_commit.message, 'Setting version to .')"
@@ -39,12 +36,14 @@ jobs:
         with:
           java-version: 1.11
       - name: Configure git
-      - run: |
+        env:
+            SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
+        run: |
           git config --global user.name "RenkuBot"
           git config --global user.email "renku@datascience.ch"
           git config credential.helper "store --file=.git/credentials"
           echo "https://${GITHUB_TOKEN}:@github.com" >.git/credentials
       - name: Test and format
-      - run: sbt -Dsbt.color=always -Dsbt.supershell=false clean test && sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test && sbt scalafmtCheck
+        run: sbt -Dsbt.color=always -Dsbt.supershell=false clean test && sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test && sbt scalafmtCheck
       - name: Create release
         run: sbt "release skip-tests default-tag-exists-answer k with-defaults"

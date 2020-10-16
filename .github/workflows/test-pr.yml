@@ -14,8 +14,6 @@ jobs:
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
   test-pr:
-    env:
-      SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
     runs-on: ubuntu-latest
     if: github.event.action != 'closed'
     needs: [cleanup-previous-runs]
@@ -26,5 +24,7 @@ jobs:
         with:
           java-version: 1.11
       - name: Test and format
-      - run: sbt -Dsbt.color=always -Dsbt.supershell=false clean test && sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test && sbt scalafmtCheck
+        env:
+          SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
+        run: sbt -Dsbt.color=always -Dsbt.supershell=false clean test && sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test && sbt scalafmtCheck
 
