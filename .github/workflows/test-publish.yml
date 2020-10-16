@@ -1,0 +1,74 @@
+name: Test and publish
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+jobs:
+  test:
+    env:
+      SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 1.11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.11
+      - name: Test and format
+      - run: sbt -Dsbt.color=always -Dsbt.supershell=false clean test && sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test && sbt scalafmtCheck
+  publish:
+    env:
+      DOCKER_LABEL: ${{ github.head_ref }}
+      DOCKER_PUSH_LATEST: true
+      DOCKER_REPOSITORY: renku/
+      HELM_URL: https://storage.googleapis.com/kubernetes-helm
+      HELM_TGZ: helm-v2.8.2-linux-amd64.tar.gz
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.8
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.8'
+      - name: Intall dependencies
+      - run: |
+          python -m pip install --upgrade pip
+          python -m pip install "docker==4.2.2" "chartpress==0.6.0" "ruamel.yaml==0.15.54"
+          echo Installing Helm
+          wget -q ${HELM_URL}/${HELM_TGZ}
+          tar xzfv ${HELM_TGZ}
+          PATH=`pwd`/linux-amd64/:$PATH
+          helm init --client-only
+      - name: Docker Login
+        uses: Azure/docker-login@v1
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build and push image
+        run: |
+          make push
+      - name: Publish the chart
+        run: |
+          cd helm-chart
+          chartpress --push --publish-chart
+          git diff
+          chartpress --tag latest --push
+      - name: set up environment variables
+        run: |
+          echo ::set-env name=GIT_USER::"Renku Bot"
+          echo ::set-env name=GIT_EMAIL::"renku@datascience.ch"
+      - name: Push chart and images
+        uses: SwissDataScienceCenter/renku/actions/publish-chart@master
+        env:
+          CHART_PATH: helm-chart/renku-graph
+          GITHUB_TOKEN: ${{ secrets.RENKU_CI_TOKEN }}
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Wait for chart to be available
+        run: sleep 120
+      - name: Update component version
+        uses: SwissDataScienceCenter/renku/actions/update-component-version@master
+        env:
+          CHART_NAME: renku-graph
+          GITHUB_TOKEN: ${{ secrets.RENKU_CI_TOKEN }}
