@@ -22,13 +22,16 @@ import java.io.Serializable
 import java.time.{Instant, LocalDate}
 
 import cats.data.NonEmptyList
+import cats.syntax.all._
 import io.circe.{Encoder, Json}
+import io.renku.jsonld.JsonLD.MalformedJsonLD
 
 abstract class JsonLD extends Product with Serializable {
   def toJson:      Json
   def entityId:    Option[EntityId]
   def entityTypes: Option[EntityTypes]
   def cursor: Cursor = Cursor.from(this)
+  def flatten: Either[MalformedJsonLD, JsonLD]
 }
 
 object JsonLD {
@@ -101,8 +104,39 @@ object JsonLD {
       }
     }
 
-    override lazy val entityId:    Option[EntityId]    = Some(id)
-    override lazy val entityTypes: Option[EntityTypes] = Some(types)
+    override lazy val entityId:    Option[EntityId]                = Some(id)
+    override lazy val entityTypes: Option[EntityTypes]             = Some(types)
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = ???
+
+    /**
+      * Perhaps it might be implemented with a recursive method like this:
+      * @tailrec
+      * def deNest(objectsToCheck: List[JsonLD], deNested: Map[EntityId, JsonLD]): Map[EntityId, JsonLD] = {
+      *     objectsToCheck.headOption match {
+      *        case Some(firstToCheck: JsonLDEntity) =>
+      *          // check if such entityId is already in the deNested and raise the MalformedJsonLD if it is
+      *          val (updatedProperties, updatedObjectsToCheck) = firstToCheck.properties.foldLeft(List.empty[(Property, JsonLD)]) {
+      *            case (deNestedProperties, ((propertyName, entity: JsonLDEntity)) =>
+      *              (deNestedProperties :+ (propertyName -> entity.entityId.asJsonLD)) -> (objectsToCheck :+ entity)
+      *            case (deNestedProperties, ((propertyName, entity: JsonLDArray(jsons))) =>
+      *              val (idJsons, updatedObjectsToCheck) = jsons.foldLeft(List.empty[JsonLD] -> objectsToCheck) {
+      *                case ((deNestedJsons, updatedObjectsToCheck), entity: JsonLDEntity) =>
+      *                  deNestedJsons :+ entity.entityId.asJsonLD
+      *                  updatedObjectsToCheck :+ entity
+      *              }
+      *              (deNestedProperties :+ (propertyName -> JsonLDArray(idJsons: _*))) -> updatedObjectsToCheck
+      *            case (deNestedProperties, (propertyName, json)) =>
+      *              (deNestedProperties :+ (propertyName -> json)) -> objectsToCheck
+      *          }
+      *          deNest(updatedObjectsToCheck, deNested.put(firstToCheck.entityId -> firstToCheck.copy(properties = NonEmptyList.fromListUnsafe(updatedProperties))))
+      *        case Some(firstToCheck: JsonLDArray(jsons)) =>
+      *          deNest(objectsToCheck :++ jsons, deNested)
+      *        case Some(firstToCheck) =>
+      *          // not so sure what to do here... Is that even possible? If yes, should we maybe put it to the deNested with some BlankNode?
+      *        case None => deNested
+      *     }
+      * }
+      */
   }
 
   private[jsonld] final case class JsonLDValue[V](
@@ -115,8 +149,9 @@ object JsonLD {
       case Some(t) => Json.obj("@type" -> t.asJson, "@value" -> value.asJson)
     }
 
-    override lazy val entityId:    Option[EntityId]    = None
-    override lazy val entityTypes: Option[EntityTypes] = None
+    override lazy val entityId:    Option[EntityId]                = None
+    override lazy val entityTypes: Option[EntityTypes]             = None
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] object JsonLDValue {
@@ -125,9 +160,10 @@ object JsonLD {
   }
 
   private[jsonld] final case object JsonLDNull extends JsonLD {
-    override lazy val toJson:      Json                = Json.Null
-    override lazy val entityId:    Option[EntityId]    = None
-    override lazy val entityTypes: Option[EntityTypes] = None
+    override lazy val toJson:      Json                            = Json.Null
+    override lazy val entityId:    Option[EntityId]                = None
+    override lazy val entityTypes: Option[EntityTypes]             = None
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] final case object JsonLDOptionValue {
@@ -139,14 +175,19 @@ object JsonLD {
   }
 
   private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD {
-    override lazy val toJson:      Json                = Json.arr(jsons.map(_.toJson): _*)
-    override lazy val entityId:    Option[EntityId]    = None
-    override lazy val entityTypes: Option[EntityTypes] = None
+    override lazy val toJson:      Json                            = Json.arr(jsons.map(_.toJson): _*)
+    override lazy val entityId:    Option[EntityId]                = None
+    override lazy val entityTypes: Option[EntityTypes]             = None
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = ???
+    // maybe can be similar to the JsonLDEntity#flatten?
   }
 
   private[jsonld] final case class JsonLDEntityId[V <: EntityId](id: V)(implicit encoder: Encoder[V]) extends JsonLD {
-    override lazy val toJson:      Json                = Json.obj("@id" -> id.asJson)
-    override lazy val entityId:    Option[EntityId]    = None
-    override lazy val entityTypes: Option[EntityTypes] = None
+    override lazy val toJson:      Json                            = Json.obj("@id" -> id.asJson)
+    override lazy val entityId:    Option[EntityId]                = None
+    override lazy val entityTypes: Option[EntityTypes]             = None
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
   }
+
+  final case class MalformedJsonLD(message: String) extends RuntimeException(message)
 }
