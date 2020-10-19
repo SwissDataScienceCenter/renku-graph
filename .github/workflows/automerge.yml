@@ -20,7 +20,7 @@ jobs:
     steps:
     - uses: rokroskar/workflow-run-cleanup-action@master
       env:
-        GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+        GITHUB_TOKEN: "${{ secrets.RENKU_CI_TOKEN }}"
   automerge:
     runs-on: ubuntu-latest
     steps:

@@ -1,4 +1,4 @@
-name: Deploy and Test PR
+name: Test PR
 on:
   pull_request:
     types:
@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: rokroskar/workflow-run-cleanup-action@master
         env:
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GITHUB_TOKEN: "${{ secrets.RENKU_CI_TOKEN }}"
   test:
     runs-on: ubuntu-latest
     if: github.event.action != 'closed'

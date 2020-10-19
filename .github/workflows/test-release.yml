@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: rokroskar/workflow-run-cleanup-action@master
         env:
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          GITHUB_TOKEN: "${{ secrets.RENKU_CI_TOKEN }}"
   test:
     runs-on: ubuntu-latest
     needs: cleanup-previous-runs
@@ -64,6 +64,7 @@ jobs:
       - name: Configure git
         env:
             SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
+            GITHUB_TOKEN: "${{ secrets.RENKU_CI_TOKEN }}"
         run: |
           git config --global user.name "RenkuBot"
           git config --global user.email "renku@datascience.ch"
