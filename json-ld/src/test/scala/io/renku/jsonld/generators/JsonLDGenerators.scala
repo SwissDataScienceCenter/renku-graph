@@ -19,7 +19,7 @@
 package io.renku.jsonld.generators
 
 import Generators._
-import io.renku.jsonld.JsonLD.JsonLDEntity
+import io.renku.jsonld.JsonLD.{JsonLDEntity, JsonLDValue}
 import io.renku.jsonld._
 import org.scalacheck.{Arbitrary, Gen}
 
@@ -57,7 +57,7 @@ object JsonLDGenerators {
     propertyName <- nonBlankStrings()
   } yield schema / propertyName.value
 
-  implicit val entityProperties: Gen[(Property, JsonLD)] = for {
+  implicit val valuesProperties: Gen[(Property, JsonLD)] = for {
     property <- properties
     value    <- jsonLDValues
   } yield property -> value
@@ -65,6 +65,6 @@ object JsonLDGenerators {
   implicit val jsonLDEntities: Gen[JsonLDEntity] = for {
     id         <- entityIds
     types      <- entityTypesObject
-    properties <- nonEmptyList(entityProperties)
+    properties <- nonEmptyList(valuesProperties)
   } yield JsonLD.entity(id, types, properties)
 }
