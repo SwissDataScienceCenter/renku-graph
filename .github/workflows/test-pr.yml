@@ -37,7 +37,7 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.11
-      - name: Test and format
+      - name: Acceptance tests
         env:
           SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
         run: sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test
@@ -51,7 +51,7 @@ jobs:
           uses: actions/setup-java@v1
           with:
             java-version: 1.11
-        - name: Test and format
+        - name: Format
           env:
             SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
           run: sbt scalafmtCheck

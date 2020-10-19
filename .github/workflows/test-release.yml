@@ -61,11 +61,15 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.11
+      - uses: FranzDiebold/github-env-vars-action@v1.2.1
       - name: Configure git
         env:
             SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
             GITHUB_TOKEN: "${{ secrets.RENKU_CI_TOKEN }}"
         run: |
+          git branch -u origin/${GITHUB_REF_NAME_SLUG}
+          git config branch.${GITHUB_REF_NAME_SLUG}.remote origin
+          git config branch.${GITHUB_REF_NAME_SLUG}.merge refs/heads/${GITHUB_REF_NAME_SLUG}
           git config --global user.name "RenkuBot"
           git config --global user.email "renku@datascience.ch"
           git config credential.helper "store --file=.git/credentials"
