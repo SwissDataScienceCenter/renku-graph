@@ -72,12 +72,6 @@ jobs:
       - name: Build and push image
         run: |
           make push
-      - name: Publish the chart
-        run: |
-          cd helm-chart
-          chartpress --push --publish-chart
-          git diff
-          chartpress --tag latest --push
       - name: set up environment variables
         run: |
           echo ::set-env name=GIT_USER::"Renku Bot"
