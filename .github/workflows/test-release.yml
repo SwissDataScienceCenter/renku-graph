@@ -4,6 +4,9 @@ on:
     branches:
       - master
       - 'hotfix-[0-9]+.[0-9]+**'
+env:
+  SCALA_VERSION: "2.13.3"
+  SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
 jobs:
   cleanup-previous-runs:
     runs-on: ubuntu-latest
@@ -22,8 +25,6 @@ jobs:
         with:
           java-version: 1.11
       - name: Unit test
-        env:
-          SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
         run: sbt -Dsbt.color=always -Dsbt.supershell=false clean test
   acceptance-test:
     runs-on: ubuntu-latest
@@ -35,8 +36,6 @@ jobs:
         with:
           java-version: 1.11
       - name: Acceptance tests
-        env:
-          SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
         run: sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test
   formatter:
     runs-on: ubuntu-latest
@@ -48,8 +47,6 @@ jobs:
         with:
           java-version: 1.11
       - name: Formatter
-        env:
-          SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
         run: sbt scalafmtCheck
   release:
     runs-on: ubuntu-latest
@@ -63,8 +60,7 @@ jobs:
           java-version: 1.11
       - name: Configure git
         env:
-            SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
-            GITHUB_TOKEN: "${{ secrets.RENKU_CI_TOKEN }}"
+          GITHUB_TOKEN: "${{ secrets.RENKU_CI_TOKEN }}"
         run: |
           git config --global user.name "Renku Bot"
           git config --global user.email "renku@datascience.ch"
