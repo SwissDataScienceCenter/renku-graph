@@ -46,9 +46,10 @@ jobs:
       needs: [ cleanup-previous-runs ]
       steps:
         - uses: actions/checkout@v2
-        - uses: olafurpg/setup-scala@v10
-            with:
-              java-version: adopt@1.11
+        - name: Set up JDK 1.11
+          uses: olafurpg/setup-scala@v10
+          with:
+            java-version: adopt@1.11
         - name: Format
           run: sbt scalafmtCheck
 
