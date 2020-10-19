@@ -58,12 +58,7 @@ jobs:
       - name: Intall dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "docker==4.2.2" "chartpress==0.6.0" "ruamel.yaml==0.15.54"
-          echo Installing Helm
-          wget -q ${HELM_URL}/${HELM_TGZ}
-          tar xzfv ${HELM_TGZ}
-          PATH=`pwd`/linux-amd64/:$PATH
-          helm init --client-only
+          python -m pip install "docker==4.2.2"
       - name: Docker Login
         uses: Azure/docker-login@v1
         with:
