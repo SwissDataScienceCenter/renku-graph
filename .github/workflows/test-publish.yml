@@ -70,8 +70,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Build and push image
-        run: |
-          make push
+        run: make push
       - name: set up environment variables
         run: |
           echo ::set-env name=GIT_USER::"Renku Bot"
