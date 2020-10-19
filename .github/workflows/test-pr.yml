@@ -12,7 +12,7 @@ jobs:
     steps:
       - uses: rokroskar/workflow-run-cleanup-action@master
         env:
-          GITHUB_TOKEN: "${{ secrets.RENKU_CI_TOKEN }}"
+          GITHUB_TOKEN: "${{ secrets.GITHUB_CI_TOKEN }}"
   test:
     runs-on: ubuntu-latest
     if: github.event.action != 'closed'
