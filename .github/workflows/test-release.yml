@@ -14,7 +14,7 @@ jobs:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
   test:
     runs-on: ubuntu-latest
-    needs: cleanup-previous-runs
+    needs: [cleanup-previous-runs]
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 1.11
@@ -27,7 +27,7 @@ jobs:
         run: sbt -Dsbt.color=always -Dsbt.supershell=false clean test
   acceptance-test:
     runs-on: ubuntu-latest
-    needs: cleanup-previous-runs
+    needs: [cleanup-previous-runs]
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 1.11
@@ -40,7 +40,7 @@ jobs:
         run: sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test
   formatter:
     runs-on: ubuntu-latest
-    needs: cleanup-previous-runs
+    needs: [cleanup-previous-runs]
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 1.11
@@ -70,7 +70,5 @@ jobs:
           git config --global user.email "renku@datascience.ch"
           git config credential.helper "store --file=.git/credentials"
           echo "https://${GITHUB_TOKEN}:@github.com" >.git/credentials
-      - name: Test and format
-        run: sbt -Dsbt.color=always -Dsbt.supershell=false clean test && sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test && sbt scalafmtCheck
       - name: Create release
         run: sbt "release skip-tests default-tag-exists-answer k with-defaults"
