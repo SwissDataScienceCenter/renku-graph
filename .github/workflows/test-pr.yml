@@ -6,7 +6,6 @@ on:
       - synchronize
       - reopened
 env:
-  SCALA_VERSION: "2.13.2"
   SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
 jobs:
   cleanup-previous-runs:
