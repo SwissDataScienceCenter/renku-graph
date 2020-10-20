@@ -67,11 +67,21 @@ private class IOProjectDatasetsFinder(
         |               schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |               schema:identifier ?identifier;
         |               schema:name ?name;
+        |               prov:atLocation ?location;
         |               schema:alternateName  ?alternateName;
         |               renku:topmostSameAs ?topmostSameAs;
         |               renku:topmostDerivedFrom/schema:identifier ?initialVersion.
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
+        |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
+        |
+        |    FILTER NOT EXISTS { 
+        |      # Removing dataset that have an activity that invalidates them
+        |      ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
+        |                         prov:atLocation ?metaDataLocation ;
+        |                         schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
+        |                         prov:wasInvalidatedBy ?invalidationActivity .	
+        |      }
         |}
         |ORDER BY ?name
         |""".stripMargin

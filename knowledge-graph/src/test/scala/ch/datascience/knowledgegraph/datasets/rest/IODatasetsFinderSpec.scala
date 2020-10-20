@@ -20,6 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import java.time.LocalDate
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators
@@ -33,17 +34,21 @@ import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage, Total}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
+import ch.datascience.knowledgegraph.datasets.EntityGenerators.invalidationEntity
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
 import ch.datascience.rdfstore.entities.bundles._
+import ch.datascience.rdfstore.entities.{Artifact, Entity, Project}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
+import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -358,6 +363,111 @@ class IODatasetsFinderSpec
 
           result.pagingInfo.total shouldBe Total(2)
         }
+
+      s"not return deleted datasets when the given phrase is $maybePhrase" +
+        "- case with unrelated datasets" in new TestCase {
+          val project                = projects.generateOne
+          val datasetProject         = NonEmptyList(project.toDatasetProject, Nil)
+          val dataset0               = nonModifiedDatasets(projects = datasetProject).generateOne
+          val datasetToBeInvalidated = nonModifiedDatasets(projects = datasetProject).generateOne
+          val entityWithInvalidation: Entity with Artifact =
+            invalidationEntity(datasetToBeInvalidated.id, project).generateOne
+
+          loadToStore(
+            dataset0.toJsonLD()(),
+            datasetToBeInvalidated.toJsonLD()(),
+            entityWithInvalidation.asJsonLD
+          )
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
+
+          result.results should contain theSameElementsAs List(
+            dataset0.toDatasetSearchResult(projectsCount = 1)
+          )
+
+          result.pagingInfo.total shouldBe Total(1)
+        }
+
+      s"not return deleted datasets when the given phrase is $maybePhrase" +
+        "- case with forks on renku created datasets and the fork dataset is deleted" in new TestCase {
+          val project        = projects.generateOne
+          val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
+          val dataset        = nonModifiedDatasets(projects = datasetProject).generateOne
+          val datasetFork    = dataset.copy(projects = List(datasetProjects.generateOne))
+          val entityWithInvalidation: Entity with Artifact = invalidationEntity(datasetFork.id, project).generateOne
+
+          loadToStore(
+            dataset.toJsonLD(noSameAs = true)(),
+            datasetFork.toJsonLD(noSameAs = true)(),
+            entityWithInvalidation.asJsonLD
+          )
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
+
+          result.results should contain theSameElementsAs List(dataset.toDatasetSearchResult(projectsCount = 1))
+
+          result.pagingInfo.total shouldBe Total(1)
+
+        }
+
+      s"not return deleted datasets when the given phrase is $maybePhrase" +
+        "- case with forks on renku created datasets and original dataset is deleted" in new TestCase {
+          val project        = projects.generateOne
+          val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
+          val dataset        = nonModifiedDatasets(projects = datasetProject).generateOne
+          val datasetFork    = dataset.copy(projects = List(datasetProjects.generateOne))
+          val entityWithInvalidation: Entity with Artifact = invalidationEntity(dataset.id, project).generateOne
+
+          loadToStore(
+            dataset.toJsonLD(noSameAs = true)(),
+            datasetFork.toJsonLD(noSameAs = true)(),
+            entityWithInvalidation.asJsonLD
+          )
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
+
+          result.results should contain theSameElementsAs List(datasetFork.toDatasetSearchResult(projectsCount = 1))
+
+          result.pagingInfo.total shouldBe Total(1)
+
+        }
+
+      s"not return deleted datasets when the given phrase is $maybePhrase" +
+        "- case with modification on renku created datasets" in new TestCase {
+          val project        = projects.generateOne
+          val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
+          val dataset0       = nonModifiedDatasets(projects = datasetProject).generateOne
+          val dataset1       = nonModifiedDatasets(projects = datasetProject).generateOne
+          val dataset0Modification = modifiedDatasetsOnFirstProject(dataset0).generateOne
+            .copy(name = datasetNames.generateOne)
+
+          val entityWithInvalidation: Entity with Artifact =
+            invalidationEntity(dataset0Modification.id,
+                               project,
+                               dataset0.entityId.asTopmostDerivedFrom.some
+            ).generateOne
+
+          loadToStore(
+            dataset0.toJsonLD()(),
+            dataset1.toJsonLD()(),
+            dataset0Modification.toJsonLD(topmostDerivedFrom = dataset0.entityId.asTopmostDerivedFrom),
+            entityWithInvalidation.asJsonLD
+          )
+
+          val result = datasetsFinder
+            .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+            .unsafeRunSync()
+
+          result.results            should contain theSameElementsAs List(dataset1.toDatasetSearchResult(projectsCount = 1))
+          result.pagingInfo.total shouldBe Total(1)
+
+        }
     }
   }
 
@@ -543,6 +653,30 @@ class IODatasetsFinderSpec
         .unsafeRunSync()
         .results shouldBe List(dataset2Modification.toDatasetSearchResult(projectsCount = 1))
     }
+
+    s"not return deleted datasets even if the phrase match" +
+      "- case with unrelated datasets" in new TestCase {
+        val phrase         = phrases.generateOne
+        val project        = projects.generateOne
+        val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
+        val datasetToBeInvalidated =
+          nonModifiedDatasets(projects = datasetProject).generateOne.makeTitleContaining(phrase)
+        val entityWithInvalidation: Entity with Artifact =
+          invalidationEntity(datasetToBeInvalidated.id, project).generateOne
+
+        loadToStore(
+          datasetToBeInvalidated.toJsonLD()(),
+          entityWithInvalidation.asJsonLD
+        )
+
+        val result = datasetsFinder
+          .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
+          .unsafeRunSync()
+
+        result.results shouldBe empty
+
+        result.pagingInfo.total shouldBe Total(0)
+      }
   }
 
   "findDatasets with explicit sorting given" should {
