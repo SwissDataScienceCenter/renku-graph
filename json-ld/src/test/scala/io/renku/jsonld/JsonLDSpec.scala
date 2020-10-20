@@ -524,6 +524,9 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
       values <- nonEmptyList(valuesGen, minElements = 2)
     } yield property -> values
 
+  private def listEntities(schema: Schema): Gen[(Property, NonEmptyList[JsonLDEntity])] =
+    ???
+
   private def singleValueProperties(schema: Schema): Gen[(Property, JsonLD)] =
     for {
       property <- nonBlankStrings() map (p => schema / p.value)
