@@ -26,6 +26,8 @@ import cats.syntax.all._
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD.MalformedJsonLD
 
+import scala.annotation.tailrec
+
 abstract class JsonLD extends Product with Serializable {
   def toJson:      Json
   def entityId:    Option[EntityId]
@@ -104,39 +106,57 @@ object JsonLD {
       }
     }
 
-    override lazy val entityId:    Option[EntityId]                = Some(id)
-    override lazy val entityTypes: Option[EntityTypes]             = Some(types)
-    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = ???
+    override lazy val entityId:    Option[EntityId]    = Some(id)
+    override lazy val entityTypes: Option[EntityTypes] = Some(types)
+    override lazy val flatten: Either[MalformedJsonLD, JsonLD] =
+      deNest(properties, Map.empty[EntityId, JsonLDEntity]).map {
+        case (props, entities) if entities.isEmpty => this.copy(properties = props)
+        case (props, entities) =>
+          JsonLDArray(this.copy(properties = props) +: entities.values.toList)
+      }
 
-    /**
-      * Perhaps it might be implemented with a recursive method like this:
-      * @tailrec
-      * def deNest(objectsToCheck: List[JsonLD], deNested: Map[EntityId, JsonLD]): Map[EntityId, JsonLD] = {
-      *     objectsToCheck.headOption match {
-      *        case Some(firstToCheck: JsonLDEntity) =>
-      *          // check if such entityId is already in the deNested and raise the MalformedJsonLD if it is
-      *          val (updatedProperties, updatedObjectsToCheck) = firstToCheck.properties.foldLeft(List.empty[(Property, JsonLD)]) {
-      *            case (deNestedProperties, ((propertyName, entity: JsonLDEntity)) =>
-      *              (deNestedProperties :+ (propertyName -> entity.entityId.asJsonLD)) -> (objectsToCheck :+ entity)
-      *            case (deNestedProperties, ((propertyName, entity: JsonLDArray(jsons))) =>
-      *              val (idJsons, updatedObjectsToCheck) = jsons.foldLeft(List.empty[JsonLD] -> objectsToCheck) {
-      *                case ((deNestedJsons, updatedObjectsToCheck), entity: JsonLDEntity) =>
-      *                  deNestedJsons :+ entity.entityId.asJsonLD
-      *                  updatedObjectsToCheck :+ entity
-      *              }
-      *              (deNestedProperties :+ (propertyName -> JsonLDArray(idJsons: _*))) -> updatedObjectsToCheck
-      *            case (deNestedProperties, (propertyName, json)) =>
-      *              (deNestedProperties :+ (propertyName -> json)) -> objectsToCheck
-      *          }
-      *          deNest(updatedObjectsToCheck, deNested.put(firstToCheck.entityId -> firstToCheck.copy(properties = NonEmptyList.fromListUnsafe(updatedProperties))))
-      *        case Some(firstToCheck: JsonLDArray(jsons)) =>
-      *          deNest(objectsToCheck :++ jsons, deNested)
-      *        case Some(firstToCheck) =>
-      *          // not so sure what to do here... Is that even possible? If yes, should we maybe put it to the deNested with some BlankNode?
-      *        case None => deNested
-      *     }
-      * }
-      */
+    def deNest(properties: NonEmptyList[(Property, JsonLD)],
+               deNested:   Map[EntityId, JsonLDEntity]
+    ): Either[MalformedJsonLD, (NonEmptyList[(Property, JsonLD)], Map[EntityId, JsonLDEntity])] =
+      properties.toList.foldLeft(List.empty[(Property, JsonLD)], deNested: Map[EntityId, JsonLDEntity]) {
+        case ((props, entities), (property, jsonLDEntity: JsonLDEntity)) => ???
+//          jsonLDEntity.flatten
+//          (props :+ property -> JsonLDEntityId(jsonLDEntity.id)) -> entities.updated(jsonLDEntity.id, jsonLDEntity)
+        case ((props, entities), (property, jsonLDArray: JsonLDArray)) =>
+          (props :+ property -> jsonLDArray) -> entities
+        case ((props, entities), (property, j)) => ???
+      } match {
+        case (prop :: props, entities) => Right((NonEmptyList(prop, props), entities))
+        case _                         => Left(MalformedJsonLD("Properties cannot be empty"))
+      }
+
+    //    @tailrec
+//    def deNest(objectsToCheck: List[JsonLD], deNested: Map[EntityId, JsonLD]): Map[EntityId, JsonLD] = {
+//       objectsToCheck.headOption match {
+//          case Some(firstToCheck: JsonLDEntity) =>
+    // check if such entityId is already in the deNested and raise the MalformedJsonLD if it is
+//            val (updatedProperties, updatedObjectsToCheck) = firstToCheck.properties.foldLeft(List.empty[(Property, JsonLD)]) {
+//              case (deNestedProperties, ((propertyName, entity: JsonLDEntity)) =>
+//                (deNestedProperties :+ (propertyName -> entity.entityId.asJsonLD)) -> (objectsToCheck :+ entity)
+//              case (deNestedProperties, ((propertyName,  JsonLDArray(jsons))) =>
+//                val (idJsons, updatedObjectsToCheck) = jsons.foldLeft(List.empty[JsonLD] -> objectsToCheck) {
+//                  case ((deNestedJsons, updatedObjectsToCheck), entity: JsonLDEntity) =>
+//                    deNestedJsons :+ entity.entityId.asJsonLD
+//                    updatedObjectsToCheck :+ entity
+//                }
+//                (deNestedProperties :+ (propertyName -> JsonLDArray(idJsons: _))) -> updatedObjectsToCheck
+//              case (deNestedProperties, (propertyName, json)) =>
+//                (deNestedProperties :+ (propertyName -> json)) -> objectsToCheck
+//            }
+//            deNest(updatedObjectsToCheck, deNested.put(firstToCheck.entityId -> firstToCheck.copy(properties = NonEmptyList.fromListUnsafe(updatedProperties))))
+//          case Some(JsonLDArray(jsons)) =>
+//            deNest(objectsToCheck :++ jsons, deNested)
+//          case Some(firstToCheck) =>
+//            // not so sure what to do here... Is that even possible? If yes, should we maybe put it to the deNested with some BlankNode?
+//          case None => deNested
+//       }
+//    }
+
   }
 
   private[jsonld] final case class JsonLDValue[V](
