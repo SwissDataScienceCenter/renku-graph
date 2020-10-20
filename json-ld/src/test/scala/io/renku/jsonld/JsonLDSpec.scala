@@ -27,7 +27,7 @@ import io.circe.Json
 import io.circe.literal._
 import io.circe.parser._
 import io.circe.syntax._
-import io.renku.jsonld.JsonLD.JsonLDEntity
+import io.renku.jsonld.JsonLD.{JsonLDEntity, MalformedJsonLD}
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
 import io.renku.jsonld.generators.JsonLDGenerators._
@@ -478,42 +478,69 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
     "do nothing if JsonLDEntity does not have nested object in its properties" in {
       forAll { (id: EntityId, types: EntityTypes, property1: (Property, JsonLD), other: List[(Property, JsonLD)]) =>
-        val json = JsonLD.entity(id, types, property1, other: _*)
-        json.flatten shouldBe Right(json)
+        val entityAsJsonLD = JsonLD.entity(id, types, property1, other: _*)
+        entityAsJsonLD.flatten shouldBe Right(entityAsJsonLD)
       }
     }
 
     "pull out all the nested JsonLDEntity entities into a flat JsonLDArray " +
       "and replace the nested properties values with relevant EntityIds" in {
         forAll {
-          (grandparentNotNested: JsonLDEntity, parentRelationProperty: Property, parentNotNested: JsonLDEntity) =>
-            val childrenProperties = entityProperties.generateNonEmptyList().toList
-            val parent             = parentNotNested.add(childrenProperties)
-            val grandparent        = grandparentNotNested.add(parentRelationProperty -> parent)
+          (childlessGrandparent: JsonLDEntity, parentRelationProperty: Property, parentNotNested: JsonLDEntity) =>
+            val childrenTuples       = entityProperties.generateNonEmptyList().toList
+            val parentWithProperties = parentNotNested.add(childrenTuples)
+            val grandparentWithChild = childlessGrandparent.add(parentRelationProperty -> parentWithProperties)
 
-            grandparent.flatten shouldBe Right {
-              JsonLD.arr(
-                grandparentNotNested.add(parentRelationProperty -> JsonLD.fromEntityId(parent.id)) +:
-                  childrenProperties
-                    .foldLeft(parentNotNested) { case (parent, (property, child)) =>
-                      parent.add(property -> child.id.asJsonLD)
-                    } +:
-                  childrenProperties.map { case (_, entity) => entity: JsonLD }: _*
-              )
+            val flattenedGrandparent =
+              childlessGrandparent.add(parentRelationProperty -> JsonLD.fromEntityId(parentWithProperties.id))
+            val flattenedParent = childrenTuples
+              .foldLeft(parentNotNested) { case (parent, (property, child)) =>
+                parent.add(property -> child.id.asJsonLD)
+              }
+            val children = childrenTuples.map { case (_, entity) => entity: JsonLD }
+
+            grandparentWithChild.flatten shouldBe Right {
+              JsonLD.arr(flattenedGrandparent +: flattenedParent +: children: _*)
             }
         }
       }
 
-    "should fail if there are two not equal entities with the same EntityId in the nested structure" in {
-      fail("boom!")
+    "should fail if there are two unequal entities with the same EntityId in the nested structure" in {
+      forAll { (parent0: JsonLDEntity, parent1: JsonLDEntity) =>
+        val childrenTuples = entityProperties.generateNonEmptyList().toList
+        val newProperties  = valuesProperties.generateNonEmptyList()
+        val modifiedChild = childrenTuples.head match {
+          case (property, entity) =>
+            (property, entity.copy(properties = newProperties))
+        }
+        val childrenWithModified        = modifiedChild +: childrenTuples.tail
+        val parent0WithNormalChildren   = parent0.add(childrenTuples)
+        val parent1WithModifiedChildren = parent0.add(childrenWithModified)
+
+        JsonLD.arr(parent0WithNormalChildren, parent1WithModifiedChildren).flatten shouldBe Left(
+          MalformedJsonLD("Children with same entity ID are not equal")
+        )
+      }
     }
 
     "do nothing for JsonLDArray if all its items do not have nested entities" in {
-      fail("boom!")
+      forAll { (entity0: JsonLDEntity, entity1: JsonLDEntity) =>
+        val entity0WithEntity1IdAsProperty = entity0.add(properties.generateOne -> entity1.id.asJsonLD)
+        val arrayOfEntities                = JsonLD.arr(entity0WithEntity1IdAsProperty, entity1)
+        arrayOfEntities.flatten shouldBe Right(arrayOfEntities)
+      }
     }
 
     "pull out nested entities from JsonLDArray items and put them on the root level" in {
-      fail("boom!")
+
+      forAll { (entity0: JsonLDEntity, entityWithoutChildren: JsonLDEntity, child: JsonLDEntity) =>
+        val property                    = properties.generateOne
+        val entityWithChildren          = entity0.add(property -> child)
+        val entityWithChildrenFlattened = entity0.add(property -> child.id.asJsonLD)
+        JsonLD.arr(entityWithChildren, entityWithoutChildren).flatten shouldBe
+          Right(JsonLD.arr(entityWithChildrenFlattened, entityWithoutChildren, child))
+      }
+
     }
   }
 
@@ -523,9 +550,6 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
       valuesGen = nonBlankStrings() map (v => JsonLD.fromString(v.value))
       values <- nonEmptyList(valuesGen, minElements = 2)
     } yield property -> values
-
-  private def listEntities(schema: Schema): Gen[(Property, NonEmptyList[JsonLDEntity])] =
-    ???
 
   private def singleValueProperties(schema: Schema): Gen[(Property, JsonLD)] =
     for {
