@@ -75,7 +75,8 @@ jobs:
     if: "!startsWith(github.event.head_commit.message, 'Setting version to')"
     steps:
       - uses: actions/checkout@v2
-        fetch-depth: 0
+        with:
+          fetch-depth: 0
       - name: Set up JDK 1.11
         uses: actions/setup-java@v1
         with:
@@ -87,7 +88,6 @@ jobs:
             ~/.ivy2
             ~/.sbt
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
-      - uses: nelonoel/branch-name@v1
       - name: Configure git
         env:
           GITHUB_TOKEN: "${{ secrets.RENKU_CI_TOKEN }}"
