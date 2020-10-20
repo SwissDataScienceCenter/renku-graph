@@ -24,6 +24,13 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.11
+      - name: Setup cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Unit test
         run: sbt -Dsbt.color=always -Dsbt.supershell=false clean test
   acceptance-test:
@@ -35,6 +42,13 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.11
+      - name: Setup cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Acceptance tests
         run: sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test
   formatter:
@@ -46,6 +60,13 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.11
+      - name: Setup cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Formatter
         run: sbt scalafmtCheck
   release:
@@ -54,19 +75,23 @@ jobs:
     if: "!startsWith(github.event.head_commit.message, 'Setting version to')"
     steps:
       - uses: actions/checkout@v2
+        fetch-depth: 0
       - name: Set up JDK 1.11
         uses: actions/setup-java@v1
         with:
           java-version: 1.11
+      - name: Setup cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - uses: nelonoel/branch-name@v1
       - name: Configure git
         env:
           GITHUB_TOKEN: "${{ secrets.RENKU_CI_TOKEN }}"
         run: |
-          echo ${BRANCH_NAME}
-          git branch -u origin/${BRANCH_NAME}
-          git config branch.${BRANCH_NAME}.remote origin
-          git config branch.${BRANCH_NAME}.merge ${GITHUB_REF}
           git config --global user.name "Renku Bot"
           git config --global user.email "renku@datascience.ch"
           git config credential.helper "store --file=.git/credentials"

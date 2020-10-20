@@ -26,9 +26,14 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.11
+      - name: Setup cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Unit test
-        env:
-
         run: sbt -Dsbt.color=always -Dsbt.supershell=false clean test
   acceptance-test:
     runs-on: ubuntu-latest
@@ -40,6 +45,13 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.11
+      - name: Setup cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Acceptance tests
         run: sbt -Dsbt.color=always -Dsbt.supershell=false "project acceptance-tests" clean test
   formatter:
@@ -52,6 +64,13 @@ jobs:
           uses: actions/setup-java@v1
           with:
             java-version: 1.11
+        - name: Setup cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
         - name: Format
           run: sbt scalafmtCheck
 
