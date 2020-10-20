@@ -58,10 +58,15 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: 1.11
+      - uses: nelonoel/branch-name@v1
       - name: Configure git
         env:
           GITHUB_TOKEN: "${{ secrets.RENKU_CI_TOKEN }}"
         run: |
+          echo ${BRANCH_NAME}
+          git branch -u origin/${BRANCH_NAME}
+          git config branch.${BRANCH_NAME}.remote origin
+          git config branch.${BRANCH_NAME}.merge ${GITHUB_REF}
           git config --global user.name "Renku Bot"
           git config --global user.email "renku@datascience.ch"
           git config credential.helper "store --file=.git/credentials"
