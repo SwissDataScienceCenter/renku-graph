@@ -499,8 +499,9 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
               }
             val children = childrenTuples.map { case (_, entity) => entity: JsonLD }
 
-            grandparentWithChild.flatten shouldBe Right {
-              JsonLD.arr(flattenedGrandparent +: flattenedParent +: children: _*)
+            val Right(expected) = grandparentWithChild.flatten
+            expected.toJson.asArray.get should contain theSameElementsAs {
+              JsonLD.arr(flattenedGrandparent +: flattenedParent +: children: _*).toJson.asArray.get
             }
         }
       }
@@ -515,7 +516,7 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
         }
         val childrenWithModified        = modifiedChild +: childrenTuples.tail
         val parent0WithNormalChildren   = parent0.add(childrenTuples)
-        val parent1WithModifiedChildren = parent0.add(childrenWithModified)
+        val parent1WithModifiedChildren = parent1.add(childrenWithModified)
 
         JsonLD.arr(parent0WithNormalChildren, parent1WithModifiedChildren).flatten shouldBe Left(
           MalformedJsonLD("Children with same entity ID are not equal")

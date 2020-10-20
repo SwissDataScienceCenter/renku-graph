@@ -109,25 +109,18 @@ object JsonLD {
     override lazy val entityId:    Option[EntityId]    = Some(id)
     override lazy val entityTypes: Option[EntityTypes] = Some(types)
     override lazy val flatten: Either[MalformedJsonLD, JsonLD] =
-      deNest(properties, Map.empty[EntityId, JsonLDEntity]).map {
-        case (props, entities) if entities.isEmpty => this.copy(properties = props)
-        case (props, entities) =>
-          JsonLDArray(this.copy(properties = props) +: entities.values.toList)
-      }
-
-    def deNest(properties: NonEmptyList[(Property, JsonLD)],
-               deNested:   Map[EntityId, JsonLDEntity]
-    ): Either[MalformedJsonLD, (NonEmptyList[(Property, JsonLD)], Map[EntityId, JsonLDEntity])] =
-      properties.toList.foldLeft(List.empty[(Property, JsonLD)], deNested: Map[EntityId, JsonLDEntity]) {
-        case ((props, entities), (property, jsonLDEntity: JsonLDEntity)) => ???
-//          jsonLDEntity.flatten
-//          (props :+ property -> JsonLDEntityId(jsonLDEntity.id)) -> entities.updated(jsonLDEntity.id, jsonLDEntity)
-        case ((props, entities), (property, jsonLDArray: JsonLDArray)) =>
-          (props :+ property -> jsonLDArray) -> entities
-        case ((props, entities), (property, j)) => ???
-      } match {
-        case (prop :: props, entities) => Right((NonEmptyList(prop, props), entities))
-        case _                         => Left(MalformedJsonLD("Properties cannot be empty"))
+      deNest(properties, List.empty[JsonLDEntity]) match {
+        case (Nil, _)                                      => Left(MalformedJsonLD("Empty property list"))
+        case (prop :: props, entities) if entities.isEmpty => Right(this.copy(properties = NonEmptyList(prop, props)))
+        case (prop :: props, entities) =>
+          val groupedEntities = entities.groupBy(entity => entity.id)
+          val idsReferToSameEntities: Boolean = groupedEntities.forall { case (_, entitiesPerId) =>
+            entitiesPerId.forall(_ == entitiesPerId.head)
+          }
+          if (idsReferToSameEntities)
+            Right(JsonLDArray(this.copy(properties = NonEmptyList(prop, props)) +: entities))
+          else
+            Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
       }
 
     //    @tailrec
@@ -195,10 +188,19 @@ object JsonLD {
   }
 
   private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD {
-    override lazy val toJson:      Json                            = Json.arr(jsons.map(_.toJson): _*)
-    override lazy val entityId:    Option[EntityId]                = None
-    override lazy val entityTypes: Option[EntityTypes]             = None
-    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = ???
+    override lazy val toJson:      Json                = Json.arr(jsons.map(_.toJson): _*)
+    override lazy val entityId:    Option[EntityId]    = None
+    override lazy val entityTypes: Option[EntityTypes] = None
+    override lazy val flatten: Either[MalformedJsonLD, JsonLD] =
+      jsons.flatMap {
+        case jsonLDEntity: JsonLDEntity =>
+          val (updatedProperties, entities) = deNest(jsonLDEntity.properties, List.empty[JsonLDEntity])
+          jsonLDEntity.copy(properties = updatedProperties) +: entities
+        case JsonLDArray(jsonlds) =>
+          val (arrayElements, entities: Seq[JsonLDEntity]) = deNestJsonLDArray(jsonlds, List.empty[JsonLDEntity])
+          JsonLDArray(arrayElements) +: entities
+        case other => List(other)
+      }
     // maybe can be similar to the JsonLDEntity#flatten?
   }
 
@@ -210,4 +212,33 @@ object JsonLD {
   }
 
   final case class MalformedJsonLD(message: String) extends RuntimeException(message)
+
+  private def deNest(properties: NonEmptyList[(Property, JsonLD)],
+                     deNested:   List[JsonLDEntity]
+  ): (List[(Property, JsonLD)], List[JsonLDEntity]) =
+    properties.toList.foldLeft(List.empty[(Property, JsonLD)], deNested: List[JsonLDEntity]) {
+      case ((props, entities), (property, jsonLDEntity: JsonLDEntity)) =>
+        val (prop :: propertiesOfNestedEntity, updatedEntities) = deNest(jsonLDEntity.properties, entities)
+        val updatedNestedEntity                                 = jsonLDEntity.copy(properties = NonEmptyList(prop, propertiesOfNestedEntity))
+        (props :+ (property -> JsonLDEntityId(jsonLDEntity.id))) -> (updatedEntities :+ updatedNestedEntity)
+
+      case ((props, entities), (property, JsonLDArray(jsonLDs))) =>
+        val (arrayElements, deNestedEntities) = deNestJsonLDArray(jsonLDs, entities)
+        (props :+ property -> JsonLDArray(arrayElements)) -> deNestedEntities
+      case ((props, entities), (property, json)) => (props :+ (property -> json)) -> entities
+    }
+  private def deNestJsonLDArray(jsonLDs:  Seq[JsonLD],
+                                entities: List[JsonLDEntity]
+  ): (List[JsonLD], List[JsonLDEntity]) =
+    jsonLDs.foldLeft((List.empty[JsonLD], entities)) {
+      case ((arrayElements, toplevelEntities), jsonLDEntity: JsonLDEntity) =>
+        val (prop :: propertiesOfNestedEntity, listOfEntities) = deNest(jsonLDEntity.properties, toplevelEntities)
+        val updatedEntity                                      = jsonLDEntity.copy(properties = NonEmptyList(prop, propertiesOfNestedEntity))
+        (arrayElements :+ updatedEntity) -> (listOfEntities :+ updatedEntity)
+      case ((arrayElements, toplevelEntities), JsonLDArray(jsonLDs)) =>
+        val (nestedArrayElements, deNestedEntities) = deNestJsonLDArray(jsonLDs, toplevelEntities)
+        (arrayElements :+ JsonLDArray(nestedArrayElements)) -> deNestedEntities
+      case ((arrayElements, toplevelEntities), entity) => (arrayElements :+ entity) -> toplevelEntities
+    }
+
 }
