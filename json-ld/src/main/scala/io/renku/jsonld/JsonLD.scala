@@ -192,15 +192,21 @@ object JsonLD {
     override lazy val entityId:    Option[EntityId]    = None
     override lazy val entityTypes: Option[EntityTypes] = None
     override lazy val flatten: Either[MalformedJsonLD, JsonLD] =
-      jsons.flatMap {
-        case jsonLDEntity: JsonLDEntity =>
-          val (updatedProperties, entities) = deNest(jsonLDEntity.properties, List.empty[JsonLDEntity])
-          jsonLDEntity.copy(properties = updatedProperties) +: entities
-        case JsonLDArray(jsonlds) =>
-          val (arrayElements, entities: Seq[JsonLDEntity]) = deNestJsonLDArray(jsonlds, List.empty[JsonLDEntity])
-          JsonLDArray(arrayElements) +: entities
-        case other => List(other)
-      }
+      jsons
+        .foldLeft(Either.right[MalformedJsonLD, List[JsonLD]](List.empty[JsonLD])) {
+          case (Right(acc), jsonLDEntity: JsonLDEntity) =>
+            val (updatedProperties, entities) = deNest(jsonLDEntity.properties, List.empty[JsonLDEntity])
+            NonEmptyList.fromList(updatedProperties) match {
+              case Some(properties) => Right(entities ++ acc :+ jsonLDEntity.copy(properties = properties))
+              case None             => Left(MalformedJsonLD("Empty properties list"))
+            }
+          case (Right(acc), JsonLDArray(jsonlds)) =>
+            val (arrayElements, entities) = deNestJsonLDArray(jsonlds, List.empty[JsonLDEntity])
+            Right(entities ++ acc :+ JsonLDArray(arrayElements))
+          case (Right(acc), other: JsonLD) => Right(acc :+ other)
+          case (error @ Left(_), _) => error
+        }
+        .map(list => JsonLD.arr(list: _*))
     // maybe can be similar to the JsonLDEntity#flatten?
   }
 

@@ -27,7 +27,7 @@ import io.circe.Json
 import io.circe.literal._
 import io.circe.parser._
 import io.circe.syntax._
-import io.renku.jsonld.JsonLD.{JsonLDEntity, MalformedJsonLD}
+import io.renku.jsonld.JsonLD.{JsonLDEntity, JsonLDEntityId, MalformedJsonLD, entity}
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
 import io.renku.jsonld.generators.JsonLDGenerators._
@@ -506,6 +506,8 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
         }
       }
 
+    "should fail if there are two unequal child entities with the same EntityID in a single Entity" in {}
+
     "should fail if there are two unequal entities with the same EntityId in the nested structure" in {
       forAll { (parent0: JsonLDEntity, parent1: JsonLDEntity) =>
         val childrenTuples = entityProperties.generateNonEmptyList().toList
@@ -538,10 +540,28 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
         val property                    = properties.generateOne
         val entityWithChildren          = entity0.add(property -> child)
         val entityWithChildrenFlattened = entity0.add(property -> child.id.asJsonLD)
-        JsonLD.arr(entityWithChildren, entityWithoutChildren).flatten shouldBe
-          Right(JsonLD.arr(entityWithChildrenFlattened, entityWithoutChildren, child))
+        JsonLD
+          .arr(entityWithChildren, entityWithoutChildren)
+          .flatten
+          .unsafeGetRight
+          .toJson
+          .asArray
+          .get should contain theSameElementsAs
+          JsonLD.arr(entityWithChildrenFlattened, entityWithoutChildren, child).toJson.asArray.get
       }
+    }
 
+    "pull out entities from JsonLDArray within reversed section" in {
+      forAll { (entity0: JsonLDEntity, child0: JsonLDEntity, child1: JsonLDEntity, reverseProperty: Property) =>
+        val children = List(child0, child1)
+        val parent: JsonLDEntity =
+          entity0.copy(reverse = Reverse.of((reverseProperty, children)).unsafeGetRight)
+        val expectedReverse =
+          Reverse.of((reverseProperty, children.map(child => JsonLDEntityId(child.id)))).unsafeGetRight
+        val parentWithIdsOfChildren = parent.copy(reverse = expectedReverse)
+        parent.flatten.unsafeGetRight.toJson.asArray.get should contain theSameElementsAs
+          JsonLD.arr(parentWithIdsOfChildren, child0, child1).toJson.asArray.get
+      }
     }
   }
 
@@ -574,4 +594,9 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
     def add(property: (Property, JsonLD)): JsonLDEntity = entity.copy(properties = entity.properties :+ property)
   }
+
+  private implicit class EitherJsonLDOps[T <: Exception, U](either: Either[T, U]) {
+    lazy val unsafeGetRight: U = either.fold(throw _, identity)
+  }
+
 }
