@@ -105,7 +105,7 @@ jobs:
       - name: Create release
         run: sbt "release skip-tests default-tag-exists-answer k with-defaults"
   publish:
-    if: "!startsWith(github.ref, 'refs/tags/') && github.ref != 'refs/heads/master'"
+    if: "startsWith(github.ref, 'refs/tags/')"
     env:
       DOCKER_LABEL: ${{ github.head_ref }}
       DOCKER_PUSH_LATEST: true
@@ -129,13 +129,11 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - name: Build and push image
-        run: make push
       - name: set up environment variables
         run: |
           echo ::set-env name=GIT_USER::"Renku Bot"
           echo ::set-env name=GIT_EMAIL::"renku@datascience.ch"
-      - name: Push chart and images
+      - name: Build and push chart and images
         uses: SwissDataScienceCenter/renku/actions/publish-chart@master
         env:
           CHART_PATH: helm-chart/renku-graph
