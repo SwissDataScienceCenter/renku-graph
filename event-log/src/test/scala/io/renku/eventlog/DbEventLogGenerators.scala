@@ -47,7 +47,8 @@ object DbEventLogGenerators {
     date      <- eventDates
     batchDate <- batchDates
     body      <- eventBodies
-  } yield Event(eventId, project, date, batchDate, body)
+    status    <- eventStatuses
+  } yield Event(eventId, project, date, batchDate, body, status)
 
   implicit lazy val eventProjects: Gen[EventProject] = for {
     id   <- projectIds

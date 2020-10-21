@@ -34,7 +34,8 @@ final case class Event(
     project:   EventProject,
     date:      EventDate,
     batchDate: BatchDate,
-    body:      EventBody
+    body:      EventBody,
+    status:    EventStatus
 )
 
 object Event {

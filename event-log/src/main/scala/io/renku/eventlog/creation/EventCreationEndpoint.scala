@@ -19,7 +19,7 @@
 package io.renku.eventlog.creation
 
 import cats.MonadError
-import cats.effect.Effect
+import cats.effect.{Effect, IO}
 import cats.syntax.all._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
@@ -49,6 +49,7 @@ class EventCreationEndpoint[Interpretation[_]: Effect](
   def addEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
       event         <- request.as[Event] recoverWith badRequest
+      _             <- checkIfStatusIsAcceptable(event) recoverWith badStatusInRequest
       storingResult <- storeNewEvent(event)
       _             <- logInfo(event, storingResult)
       response      <- storingResult.asHttpResponse
@@ -58,6 +59,16 @@ class EventCreationEndpoint[Interpretation[_]: Effect](
   private lazy val badRequest: PartialFunction[Throwable, Interpretation[Event]] = { case NonFatal(exception) =>
     ME.raiseError(BadRequestError(exception))
   }
+
+  private lazy val badStatusInRequest: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    ME.raiseError(BadRequestError(exception))
+  }
+
+  private def checkIfStatusIsAcceptable(event: Event): Interpretation[Unit] =
+    event.status match {
+      case EventStatus.New | EventStatus.Skipped => ???
+      case _                                     => throw new Exception("Unacceptable status. Only NEW and SKIPPED are accepted.")
+    }
 
   private implicit class ResultOps(result: Result) {
     lazy val asHttpResponse: Interpretation[Response[Interpretation]] = result match {
@@ -96,7 +107,8 @@ object EventCreationEndpoint {
       date      <- cursor.downField("date").as[EventDate]
       batchDate <- cursor.downField("batchDate").as[BatchDate]
       body      <- cursor.downField("body").as[EventBody]
-    } yield Event(id, project, date, batchDate, body)
+      status    <- cursor.downField("status").as[EventStatus]
+    } yield Event(id, project, date, batchDate, body, status)
 
   implicit val projectDecoder: Decoder[EventProject] = (cursor: HCursor) =>
     for {
