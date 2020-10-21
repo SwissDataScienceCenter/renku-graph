@@ -20,7 +20,7 @@ package io.renku.jsonld
 
 import cats.syntax.all._
 import io.circe.{Encoder, Json}
-import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity}
+import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId}
 
 final class Reverse private (val properties: List[(Property, JsonLD)]) {
 
@@ -77,6 +77,7 @@ object Reverse {
   private object `value which is neither Entity nor Array(Entity)` {
     def unapply(tuple: (Property, JsonLD)): Option[Exception] = tuple match {
       case (_, _: JsonLDEntity) => None
+      case (_, JsonLDEntityId(_)) => None
       case (property, JsonLDArray(jsons)) =>
         jsons find nonEntity match {
           case None => None
@@ -94,7 +95,8 @@ object Reverse {
 
   private val nonEntity: JsonLD => Boolean = {
     case _: JsonLDEntity => false
-    case _ => true
+    case JsonLDEntityId(_) => false
+    case _                 => true
   }
 
   def fromListUnsafe(properties: List[(Property, JsonLD)]): Reverse =

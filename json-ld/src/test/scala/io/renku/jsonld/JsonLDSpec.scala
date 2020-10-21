@@ -506,7 +506,24 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
         }
       }
 
-    "should fail if there are two unequal child entities with the same EntityID in a single Entity" in {}
+    "should fail if there are two unequal child entities with the same EntityID in a single Entity" in {
+      forAll { (grandParent: JsonLDEntity) =>
+        val newProperties   = valuesProperties.generateNonEmptyList()
+        val parent0         = jsonLDEntities.generateOne
+        val parent1         = jsonLDEntities.generateOne
+        val modifiedParent0 = parent0.copy(properties = newProperties)
+        val parent1WithModifiedChild =
+          parent1.copy(properties = parent1.properties :+ (properties.generateOne -> modifiedParent0))
+
+        val grandParentWithModifiedChildren =
+          grandParent.add(List(properties.generateOne -> parent0, properties.generateOne -> parent1WithModifiedChild))
+
+        grandParentWithModifiedChildren.flatten shouldBe Left(
+          MalformedJsonLD("Some entities share an ID even though they're not the same")
+        )
+      }
+
+    }
 
     "should fail if there are two unequal entities with the same EntityId in the nested structure" in {
       forAll { (parent0: JsonLDEntity, parent1: JsonLDEntity) =>
@@ -521,7 +538,7 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
         val parent1WithModifiedChildren = parent1.add(childrenWithModified)
 
         JsonLD.arr(parent0WithNormalChildren, parent1WithModifiedChildren).flatten shouldBe Left(
-          MalformedJsonLD("Children with same entity ID are not equal")
+          MalformedJsonLD("Some entities share an ID even though they're not the same")
         )
       }
     }
