@@ -1,4 +1,4 @@
-name: Test, publish and release
+name: Test and release
 on:
   push:
     branches:
