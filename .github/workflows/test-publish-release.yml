@@ -109,7 +109,7 @@ jobs:
       HELM_URL: https://storage.googleapis.com/kubernetes-helm
       HELM_TGZ: helm-v2.8.2-linux-amd64.tar.gz
     runs-on: ubuntu-latest
-    needs: [ test, acceptance-test, formatter ]
+    needs: [ test, acceptance-test, formatter, release ]
     steps:
       - uses: actions/checkout@v2
       - name: Set up Python 3.8
