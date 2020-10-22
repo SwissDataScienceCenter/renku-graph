@@ -165,7 +165,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
       val endTime = Instant.now()
 
       (endTime.toEpochMilli - startTime.toEpochMilli) should be > busySleep.toMillis
-      (endTime.toEpochMilli - startTime.toEpochMilli) should be < (busySleep + checkupInterval + (100 millis)).toMillis
+      (endTime.toEpochMilli - startTime.toEpochMilli) should be < (busySleep + checkupInterval + (200 millis)).toMillis
 
       eventually {
         logger.loggedOnly(
