@@ -88,7 +88,7 @@ jobs:
         env:
           GIT_USER: "Renku Bot"
           GIT_EMAIL: renku@datascience.ch
-          CHART_PATH: helm-chart
+          CHART_PATH: helm-chart/renku-graph
           GITHUB_TOKEN: ${{ secrets.RENKU_CI_TOKEN }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
