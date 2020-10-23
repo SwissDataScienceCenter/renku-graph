@@ -21,13 +21,14 @@ package io.renku.jsonld
 import java.time.{Instant, LocalDate}
 
 import cats.data.NonEmptyList
+import cats.syntax.all._
 import io.renku.jsonld.syntax._
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.literal._
 import io.circe.parser._
 import io.circe.syntax._
-import io.renku.jsonld.JsonLD.{JsonLDEntity, JsonLDEntityId, MalformedJsonLD, entity}
+import io.renku.jsonld.JsonLD.{JsonLDEntity, JsonLDEntityId, MalformedJsonLD}
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
 import io.renku.jsonld.generators.JsonLDGenerators._
@@ -553,31 +554,62 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
 
     "pull out nested entities from JsonLDArray items and put them on the root level" in {
 
-      forAll { (entity0: JsonLDEntity, entityWithoutChildren: JsonLDEntity, child: JsonLDEntity) =>
+      forAll { (entity: JsonLDEntity, entityWithoutChildren: JsonLDEntity, child: JsonLDEntity) =>
         val property                    = properties.generateOne
-        val entityWithChildren          = entity0.add(property -> child)
-        val entityWithChildrenFlattened = entity0.add(property -> child.id.asJsonLD)
-        JsonLD
-          .arr(entityWithChildren, entityWithoutChildren)
-          .flatten
-          .unsafeGetRight
-          .toJson
-          .asArray
-          .get should contain theSameElementsAs
-          JsonLD.arr(entityWithChildrenFlattened, entityWithoutChildren, child).toJson.asArray.get
+        val entityWithChildren          = entity.add(property -> child)
+        val entityWithChildrenFlattened = entity.add(property -> child.id.asJsonLD)
+        JsonLD.arr(entityWithChildren, entityWithoutChildren).flatten.map(_.asArray) shouldBe
+          Some(Vector(child, entityWithChildrenFlattened, entityWithoutChildren)).asRight
       }
     }
 
-    "pull out entities from JsonLDArray within reversed section" in {
+    "de-duplicate same children found in multiple entities" in {
+      // child0 is direct child of entity0 and grandchild of entity1
+    }
+
+    "pull out child entities from reversed property of an entity" in {
       forAll { (entity0: JsonLDEntity, child0: JsonLDEntity, child1: JsonLDEntity, reverseProperty: Property) =>
         val children = List(child0, child1)
         val parent: JsonLDEntity =
           entity0.copy(reverse = Reverse.of((reverseProperty, children)).unsafeGetRight)
+
         val expectedReverse =
           Reverse.of((reverseProperty, children.map(child => JsonLDEntityId(child.id)))).unsafeGetRight
+
         val parentWithIdsOfChildren = parent.copy(reverse = expectedReverse)
-        parent.flatten.unsafeGetRight.toJson.asArray.get should contain theSameElementsAs
-          JsonLD.arr(parentWithIdsOfChildren, child0, child1).toJson.asArray.get
+
+        parent.flatten.map(_.asArray) shouldBe Some(Vector(parentWithIdsOfChildren, child0, child1)).asRight
+      }
+    }
+  }
+
+  "asArray" should {
+    "return vector with single JsonLDValue" in {
+      forAll(jsonLDValues) { json =>
+        json.asArray shouldBe Some(Vector(json))
+      }
+    }
+
+    "return vector with single JsonLDEntityID" in {
+      forAll { entityId: EntityId =>
+        val idAsJson = JsonLD.fromEntityId(entityId)
+        idAsJson.asArray shouldBe Some(Vector(idAsJson))
+      }
+    }
+
+    "return vector containing a null" in {
+      JsonLD.Null.asArray shouldBe Some(Vector(JsonLD.Null))
+    }
+
+    "return vector containing the entity" in {
+      forAll(jsonLDEntities) { entity =>
+        entity.asArray shouldBe Some(Vector(entity))
+      }
+    }
+
+    "return a vector with the same elements as the array" in {
+      forAll(nonEmptyList(jsonLDEntities)) { entities =>
+        JsonLD.arr(entities.toList: _*).asArray shouldBe Some(entities.toList.toVector)
       }
     }
   }

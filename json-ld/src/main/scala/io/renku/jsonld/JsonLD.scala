@@ -24,16 +24,22 @@ import java.time.{Instant, LocalDate}
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.{Encoder, Json}
-import io.renku.jsonld.JsonLD.MalformedJsonLD
+import io.renku.jsonld.JsonLD.{JsonLDArray, MalformedJsonLD}
 
 import scala.annotation.tailrec
 
 abstract class JsonLD extends Product with Serializable {
-  def toJson:      Json
-  def entityId:    Option[EntityId]
+  def toJson: Json
+
+  def entityId: Option[EntityId]
+
   def entityTypes: Option[EntityTypes]
+
   def cursor: Cursor = Cursor.from(this)
+
   def flatten: Either[MalformedJsonLD, JsonLD]
+
+  def asArray: Option[Vector[JsonLD]]
 }
 
 object JsonLD {
@@ -42,15 +48,23 @@ object JsonLD {
 
   val Null: JsonLD = JsonLDNull
 
-  def fromString(value:    String):    JsonLD = JsonLDValue(value)
-  def fromInt(value:       Int):       JsonLD = JsonLDValue(value)
-  def fromLong(value:      Long):      JsonLD = JsonLDValue(value)
-  def fromInstant(value:   Instant):   JsonLD = JsonLDValue(value, "http://www.w3.org/2001/XMLSchema#dateTime")
+  def fromString(value: String): JsonLD = JsonLDValue(value)
+
+  def fromInt(value: Int): JsonLD = JsonLDValue(value)
+
+  def fromLong(value: Long): JsonLD = JsonLDValue(value)
+
+  def fromInstant(value: Instant): JsonLD = JsonLDValue(value, "http://www.w3.org/2001/XMLSchema#dateTime")
+
   def fromLocalDate(value: LocalDate): JsonLD = JsonLDValue(value, "http://schema.org/Date")
-  def fromBoolean(value:   Boolean): JsonLD = JsonLDValue(value)
+
+  def fromBoolean(value: Boolean): JsonLD = JsonLDValue(value)
+
   def fromOption[V](value: Option[V])(implicit encoder: JsonLDEncoder[V]): JsonLD = JsonLDOptionValue(value)
-  def fromEntityId(id:     EntityId):  JsonLD = JsonLDEntityId(id)
-  def arr(jsons:           JsonLD*):   JsonLD = JsonLDArray(jsons)
+
+  def fromEntityId(id: EntityId): JsonLD = JsonLDEntityId(id)
+
+  def arr(jsons: JsonLD*): JsonLD = JsonLDArray(jsons)
 
   def entity(
       id:            EntityId,
@@ -118,7 +132,7 @@ object JsonLD {
           else
             Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
       }
-
+    override lazy val asArray: Option[Vector[JsonLD]] = Some(Vector(this))
   }
 
   object JsonLDEntity {
@@ -153,6 +167,8 @@ object JsonLD {
     override lazy val entityId:    Option[EntityId]                = None
     override lazy val entityTypes: Option[EntityTypes]             = None
     override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+
+    override lazy val asArray: Option[Vector[JsonLD]] = Some(Vector(this))
   }
 
   private[jsonld] object JsonLDValue {
@@ -165,6 +181,7 @@ object JsonLD {
     override lazy val entityId:    Option[EntityId]                = None
     override lazy val entityTypes: Option[EntityTypes]             = None
     override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(JsonLD.Null))
   }
 
   private[jsonld] final case object JsonLDOptionValue {
@@ -197,7 +214,7 @@ object JsonLD {
         Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
       }
     }
-    // maybe can be similar to the JsonLDEntity#flatten?
+    override lazy val asArray: Option[Vector[JsonLD]] = Some(jsons.toVector)
   }
 
   private def areEntitiesIDsUnique(list: List[JsonLD]): Boolean = {
@@ -213,6 +230,7 @@ object JsonLD {
     override lazy val entityId:    Option[EntityId]                = None
     override lazy val entityTypes: Option[EntityTypes]             = None
     override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
   }
 
   final case class MalformedJsonLD(message: String) extends RuntimeException(message)
