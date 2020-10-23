@@ -85,7 +85,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Build and push chart and images
         uses: SwissDataScienceCenter/renku/actions/publish-chart@master
-        working-directory: ./helm-chart
+        working-directory: helm-chart
         env:
           GIT_USER: "Renku Bot"
           GIT_EMAIL: renku@datascience.ch
