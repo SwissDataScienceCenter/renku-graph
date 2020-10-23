@@ -100,7 +100,7 @@ jobs:
           key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
       - name: Create release
         run: |
-          sudo rm -rf .git/index.lock
           git config --global user.name "Renku Bot"
           git config --global user.email "renku@datascience.ch"
+          sudo rm -rf .git/index.lock
           sbt "release skip-tests default-tag-exists-answer k with-defaults"
