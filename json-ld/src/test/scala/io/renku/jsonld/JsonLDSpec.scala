@@ -564,7 +564,58 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
     }
 
     "de-duplicate same children found in multiple entities" in {
-      // child0 is direct child of entity0 and grandchild of entity1
+      /*
+      (parent0, parent1)
+        |         |
+      child     parent2
+                  |
+                child
+
+             |
+             |
+             V
+
+     (child, parent0, parent2, parent1)
+
+       */
+
+      def replaceEntityProperty(properties: NonEmptyList[(Property, JsonLD)],
+                                property:   Property,
+                                entity:     JsonLDEntity
+      ) =
+        NonEmptyList(property -> JsonLDEntityId(entity.id),
+                     properties.filterNot { case (_, item) =>
+                       item == entity
+                     }
+        )
+
+      forAll {
+        (entity0:  JsonLDEntity,
+         entity1:  JsonLDEntity,
+         entity2:  JsonLDEntity,
+         child:    JsonLDEntity,
+         property: Property
+        ) =>
+          val nestedParent0 = entity0.add(property -> child)
+          val nestedParent2 = entity2.add(property -> child)
+          val nestedParent1 = entity1.add(property -> nestedParent2)
+
+          val deNestedParent0Properties = replaceEntityProperty(nestedParent0.properties, property, child)
+          val deNestedParent0           = nestedParent0.copy(properties = deNestedParent0Properties)
+
+          val deNestedParent1Properties = replaceEntityProperty(nestedParent1.properties, property, nestedParent2)
+          val deNestedParent1           = nestedParent1.copy(properties = deNestedParent1Properties)
+
+          val deNestedParent2Properties = replaceEntityProperty(nestedParent2.properties, property, child)
+          val deNestedParent2           = nestedParent2.copy(properties = deNestedParent2Properties)
+
+          JsonLD
+            .arr(nestedParent0, nestedParent1)
+            .flatten
+            .map(_.asArray.get)
+            .unsafeGetRight should contain theSameElementsAs
+            Vector(child, deNestedParent0, deNestedParent1, deNestedParent2)
+      }
     }
 
     "pull out child entities from reversed property of an entity" in {
