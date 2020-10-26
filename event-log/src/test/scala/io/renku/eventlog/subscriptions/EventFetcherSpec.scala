@@ -25,7 +25,6 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.db.SqlQuery
-import ch.datascience.generators.CommonGraphGenerators.renkuLogTimeouts
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -42,6 +41,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
@@ -175,10 +175,10 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
 
         override val eventLogFetch = new EventFetcherImpl(
           transactor,
-          renkuLogTimeout,
           waitingEventsGauge,
           underProcessingGauge,
-          TestLabeledHistogram[SqlQuery.Name]("query_id")
+          TestLabeledHistogram[SqlQuery.Name]("query_id"),
+          maxProcessingTime = maxProcessingTime
         )
         eventIdsBodiesDates.toList foreach { _ =>
           eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
@@ -218,11 +218,11 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
 
         override val eventLogFetch = new EventFetcherImpl(
           transactor,
-          renkuLogTimeout,
           waitingEventsGauge,
           underProcessingGauge,
           TestLabeledHistogram[SqlQuery.Name]("query_id"),
-          pickRandomlyFrom = _ => (project2Id -> project2Path).some
+          pickRandomlyFrom = _ => (project2Id -> project2Path).some,
+          maxProcessingTime = maxProcessingTime
         )
         expectWaitingEventsGaugeDecrement(project2Path)
         expectUnderProcessingGaugeIncrement(project2Path)
@@ -238,18 +238,17 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
   private trait TestCase {
 
     val currentTime          = mockFunction[Instant]
-    val renkuLogTimeout      = renkuLogTimeouts.generateOne
     val waitingEventsGauge   = mock[LabeledGauge[IO, Path]]
     val underProcessingGauge = mock[LabeledGauge[IO, Path]]
     val queriesExecTimes     = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val maxProcessingTime    = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
+    val maxProcessingTime    = Duration.ofMillis(durations(max = 10 hours).generateOne.toMillis)
     val eventLogFetch = new EventFetcherImpl(
       transactor,
-      renkuLogTimeout,
       waitingEventsGauge,
       underProcessingGauge,
       queriesExecTimes,
-      currentTime
+      currentTime,
+      maxProcessingTime = maxProcessingTime
     )
 
     val now           = Instant.now()

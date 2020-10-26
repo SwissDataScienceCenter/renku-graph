@@ -25,7 +25,6 @@ import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
-import ch.datascience.graph.config.RenkuLogTimeout
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -36,6 +35,7 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
 
+import scala.language.postfixOps
 import scala.util.Random
 
 private trait EventFetcher[Interpretation[_]] {
@@ -44,11 +44,11 @@ private trait EventFetcher[Interpretation[_]] {
 
 private class EventFetcherImpl(
     transactor:           DbTransactor[IO, EventLogDB],
-    renkuLogTimeout:      RenkuLogTimeout,
     waitingEventsGauge:   LabeledGauge[IO, projects.Path],
     underProcessingGauge: LabeledGauge[IO, projects.Path],
     queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
     now:                  () => Instant = () => Instant.now,
+    maxProcessingTime:    Duration,
     pickRandomlyFrom: List[(projects.Id, projects.Path)] => Option[(projects.Id, projects.Path)] = ids =>
       ids.get(Random nextInt ids.size)
 )(implicit ME: Bracket[IO, Throwable])
@@ -56,8 +56,6 @@ private class EventFetcherImpl(
     with EventFetcher[IO] {
 
   import TypesSerializers._
-
-  private lazy val MaxProcessingTime = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
 
   private type EventIdAndBody   = (CompoundEventId, EventBody)
   private type ProjectIdAndPath = (projects.Id, projects.Path)
@@ -83,7 +81,7 @@ private class EventFetcherImpl(
       fr"""select distinct project_id, project_path
            from event_log
            where (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
-                 or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})"""
+                 or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})"""
     }.query[ProjectIdAndPath].to[List],
     name = "pop event - projects"
   )
@@ -96,7 +94,7 @@ private class EventFetcherImpl(
            where project_id = ${idAndPath._1}
              and (
                (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
-               or (status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
+               or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
              )
            order by execution_date asc
            limit 1"""
@@ -125,7 +123,7 @@ private class EventFetcherImpl(
     sql"""|update event_log 
           |set status = ${EventStatus.Processing: EventStatus}, execution_date = ${now()}
           |where (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status <> ${Processing: EventStatus})
-          |  or (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus} and execution_date < ${now() minus MaxProcessingTime})
+          |  or (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
           |""".stripMargin.update.run,
     name = "pop event - status update"
   )
@@ -146,16 +144,19 @@ private class EventFetcherImpl(
 
 private object IOEventLogFetch {
 
+  private val MaxProcessingTime: Duration = Duration.ofMinutes(120)
+
   def apply(
       transactor:           DbTransactor[IO, EventLogDB],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name]
-  )(implicit contextShift:  ContextShift[IO]): IO[EventFetcher[IO]] =
-    RenkuLogTimeout[IO]() map (new EventFetcherImpl(transactor,
-                                                    _,
-                                                    waitingEventsGauge,
-                                                    underProcessingGauge,
-                                                    queriesExecTimes
-    ))
+  )(implicit contextShift:  ContextShift[IO]): IO[EventFetcher[IO]] = IO {
+    new EventFetcherImpl(transactor,
+                         waitingEventsGauge,
+                         underProcessingGauge,
+                         queriesExecTimes,
+                         maxProcessingTime = MaxProcessingTime
+    )
+  }
 }
