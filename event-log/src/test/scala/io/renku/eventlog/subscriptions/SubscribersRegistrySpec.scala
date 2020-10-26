@@ -31,7 +31,7 @@ import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
-import org.scalatest.time.{Millis, Seconds, Span}
+import org.scalatest.time.{Millis, Minute, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -41,7 +41,7 @@ import scala.language.postfixOps
 class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers with Eventually {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout = scaled(Span(5, Seconds)),
+    timeout = scaled(Span(1, Minute)),
     interval = scaled(Span(100, Millis))
   )
 
@@ -165,7 +165,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
       val endTime = Instant.now()
 
       (endTime.toEpochMilli - startTime.toEpochMilli) should be > busySleep.toMillis
-      (endTime.toEpochMilli - startTime.toEpochMilli) should be < (busySleep + checkupInterval + (100 millis)).toMillis
+      (endTime.toEpochMilli - startTime.toEpochMilli) should be < (busySleep + checkupInterval + (200 millis)).toMillis
 
       eventually {
         logger.loggedOnly(
