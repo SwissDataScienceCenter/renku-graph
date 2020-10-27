@@ -84,15 +84,15 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event3Id -> event3Body)
 
-        findEvents(EventStatus.Processing) shouldBe List((event3Id, executionDate, event3BatchDate))
+        findEvents(EventStatus.Processing).noBatchDate shouldBe List((event3Id, executionDate))
 
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
 
-        findEvents(EventStatus.Processing) shouldBe List((event1Id, executionDate, event1BatchDate),
-                                                         (event3Id, executionDate, event3BatchDate)
+        findEvents(EventStatus.Processing).noBatchDate shouldBe List((event1Id, executionDate),
+                                                                     (event3Id, executionDate)
         )
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe None

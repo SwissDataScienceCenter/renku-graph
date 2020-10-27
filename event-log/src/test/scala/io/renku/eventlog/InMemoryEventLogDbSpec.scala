@@ -91,6 +91,12 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
     }
   // format: on
 
+  protected implicit class FoundEventsOps(events: List[(CompoundEventId, ExecutionDate, BatchDate)]) {
+    lazy val noBatchDate: List[(CompoundEventId, ExecutionDate)] = events.map { case (id, executionDate, _) =>
+      id -> executionDate
+    }
+  }
+
   protected def findEventMessage(eventId: CompoundEventId): Option[EventMessage] =
     execute {
       sql"""select message
