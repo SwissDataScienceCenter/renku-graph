@@ -25,7 +25,6 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.db.SqlQuery
-import ch.datascience.generators.CommonGraphGenerators.renkuLogTimeouts
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -38,42 +37,36 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
   "popEvent" should {
 
-    "return an event with execution date farthest in the past " +
+    "return an event with event date farthest in the past " +
       s"and status $New or $RecoverableFailure " +
       s"and mark it as $Processing" in new TestCase {
 
         val projectId   = projectIds.generateOne
         val projectPath = projectPaths.generateOne
 
-        val event1Id        = compoundEventIds.generateOne.copy(projectId = projectId)
-        val event1Body      = eventBodies.generateOne
-        val event1BatchDate = batchDates.generateOne
-        storeNewEvent(event1Id, ExecutionDate(now.minus(5, SEC)), event1Body, event1BatchDate, projectPath)
+        val (event1Id, event1Body) = createEvent(
+          status = New,
+          EventDate(now.minus(1, H)),
+          projectId = projectId,
+          projectPath = projectPath
+        )
 
-        val event2Id   = compoundEventIds.generateOne.copy(projectId = projectId)
-        val event2Body = eventBodies.generateOne
-        storeNewEvent(event2Id, ExecutionDate(now.plus(5, H)), event2Body, projectPath = projectPath)
-
-        val event3Id        = compoundEventIds.generateOne.copy(projectId = projectId)
-        val event3Body      = eventBodies.generateOne
-        val event3BatchDate = batchDates.generateOne
-        storeEvent(
-          event3Id,
-          EventStatus.RecoverableFailure,
-          ExecutionDate(now.minus(5, H)),
-          eventDates.generateOne,
-          event3Body,
-          batchDate = event3BatchDate,
+        val (event2Id, event2Body) = createEvent(
+          status = EventStatus.RecoverableFailure,
+          EventDate(now.minus(5, H)),
+          projectId = projectId,
           projectPath = projectPath
         )
 
@@ -82,17 +75,17 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event3Id -> event3Body)
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event2Id -> event2Body)
 
-        findEvents(EventStatus.Processing) shouldBe List((event3Id, executionDate, event3BatchDate))
+        findEvents(EventStatus.Processing).noBatchDate shouldBe List((event2Id, executionDate))
 
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
 
-        findEvents(EventStatus.Processing) shouldBe List((event1Id, executionDate, event1BatchDate),
-                                                         (event3Id, executionDate, event3BatchDate)
+        findEvents(EventStatus.Processing).noBatchDate shouldBe List((event1Id, executionDate),
+                                                                     (event2Id, executionDate)
         )
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe None
@@ -103,20 +96,56 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         )
       }
 
-    s"return an event with the $Processing status " +
-      "and execution date older than RenkuLogTimeout + 5 min" in new TestCase {
+    "return no event when execution date is in the future " +
+      s"and status $New or $RecoverableFailure " in new TestCase {
 
-        val projectPath    = projectPaths.generateOne
-        val eventId        = compoundEventIds.generateOne
-        val eventBody      = eventBodies.generateOne
-        val eventBatchDate = batchDates.generateOne
-        storeEvent(
-          eventId,
-          EventStatus.Processing,
-          ExecutionDate(now.minus(maxProcessingTime.toMinutes + 5, MIN)),
-          eventDates.generateOne,
-          eventBody,
-          batchDate = eventBatchDate,
+        val projectId   = projectIds.generateOne
+        val projectPath = projectPaths.generateOne
+
+        val (event1Id, event1Body) = createEvent(
+          status = New,
+          projectId = projectId,
+          projectPath = projectPath
+        )
+
+        createEvent(
+          status = RecoverableFailure,
+          executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
+          projectId = projectId,
+          projectPath = projectPath
+        )
+
+        createEvent(
+          status = New,
+          executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
+          projectId = projectId,
+          projectPath = projectPath
+        )
+
+        findEvents(EventStatus.Processing) shouldBe List.empty
+
+        expectWaitingEventsGaugeDecrement(projectPath)
+        expectUnderProcessingGaugeIncrement(projectPath)
+
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
+
+        findEvents(EventStatus.Processing).noBatchDate shouldBe List((event1Id, executionDate))
+
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe None
+
+        queriesExecTimes.verifyExecutionTimeMeasured("pop event - projects",
+                                                     "pop event - oldest",
+                                                     "pop event - status update"
+        )
+      }
+
+    s"return an event with the $Processing status " +
+      "if execution date is longer than MaxProcessingTime" in new TestCase {
+
+        val projectPath = projectPaths.generateOne
+        val (eventId, eventBody) = createEvent(
+          status = Processing,
+          executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes + 1, MIN)),
           projectPath = projectPath
         )
 
@@ -125,139 +154,135 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(eventId -> eventBody)
 
-        findEvents(EventStatus.Processing) shouldBe List((eventId, executionDate, eventBatchDate))
+        findEvents(EventStatus.Processing).noBatchDate shouldBe List((eventId, executionDate))
       }
 
-    s"return no event when there there's one with $Processing status " +
-      "but execution date from less than RenkuLogTimeout + 1 min" in new TestCase {
+    s"return no event when there's one with $Processing status " +
+      "if execution date is shorter than MaxProcessingTime" in new TestCase {
 
-        storeEvent(
-          compoundEventIds.generateOne,
-          EventStatus.Processing,
-          ExecutionDate(now minus (maxProcessingTime minusSeconds 1)),
-          eventDates.generateOne,
-          eventBodies.generateOne
+        createEvent(
+          status = Processing,
+          executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes - 1, MIN))
         )
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe None
       }
 
-    "return no events when there are no events matching the criteria" in new TestCase {
+    "return events from various projects" in new TestCase {
 
-      storeNewEvent(
-        compoundEventIds.generateOne,
-        ExecutionDate(now.plus(50, H)),
-        eventBodies.generateOne
+      val ids = readyStatuses
+        .generateNonEmptyList(minElements = 2)
+        .map(status => createEvent(status)._1)
+        .toList
+
+      findEvents(EventStatus.Processing) shouldBe List.empty
+
+      expectGaugeUpdated(times = ids.size)
+
+      ids foreach { _ =>
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+      }
+
+      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs ids
+    }
+
+    "return events from the projects with latest commit before projects with older commits" in new TestCase {
+
+      val activeProject = projectIds.generateOne
+
+      val activeProjectEventIdsAndDates = readyStatuses
+        .generateNonEmptyList(minElements = 2)
+        .map { status =>
+          val eventDate = eventDates.generateOne
+          val (id, _)   = createEvent(status, eventDate = eventDate, projectId = activeProject)
+          id -> eventDate
+        }
+        .toList
+
+      val (_, mostRecentEventDate) = activeProjectEventIdsAndDates.maxBy { case (_, eventDate) => eventDate.value }
+
+      val eventDateBeforeTheMostRecent = EventDate(
+        mostRecentEventDate.value.minus(nonNegativeInts(max = 10).generateOne.toLong, H)
       )
+
+      val (olderProjectEventId, _) =
+        createEvent(readyStatuses.generateOne, eventDate = eventDateBeforeTheMostRecent)
+
+      findEvents(EventStatus.Processing) shouldBe List.empty
+
+      expectGaugeUpdated(times = activeProjectEventIdsAndDates.size)
+
+      activeProjectEventIdsAndDates foreach { _ =>
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+      }
+
+      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs activeProjectEventIdsAndDates.map(
+        _._1
+      )
+
+      expectGaugeUpdated()
+
+      eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+
+      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs
+        olderProjectEventId +: activeProjectEventIdsAndDates.map(_._1)
+    }
+
+    "return events from all the projects" in new TestCase {
+
+      override val eventLogFetch = new EventFetcherImpl(
+        transactor,
+        waitingEventsGauge,
+        underProcessingGauge,
+        queriesExecTimes,
+        currentTime,
+        maxProcessingTime = maxProcessingTime,
+        projectsFetchingLimit = 5
+      )
+
+      val eventIds = readyStatuses
+        .generateNonEmptyList(minElements = 3, maxElements = 6)
+        .toList
+        .flatMap { status =>
+          val projectId = projectIds.generateOne
+          (1 to positiveInts(max = 2).generateOne.value)
+            .map(_ => createEvent(status, projectId = projectId)._1)
+        }
+
+      findEvents(EventStatus.Processing) shouldBe List.empty
+
+      expectGaugeUpdated(times = eventIds.size)
+
+      eventIds foreach { _ =>
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+      }
+
+      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs eventIds
 
       eventLogFetch.popEvent().unsafeRunSync() shouldBe None
     }
-
-    "return events from various projects " +
-      "even if some projects have events with execution dates far in the past" in new TestCase {
-
-        val allProjectIds = nonEmptyList(projectIds, minElements = 2).generateOne
-        val eventIdsBodiesDates = for {
-          projectId     <- allProjectIds
-          eventId       <- nonEmptyList(eventIds, minElements = 5).generateOne map (CompoundEventId(_, projectId))
-          eventBody     <- nonEmptyList(eventBodies, maxElements = 1).generateOne
-          executionDate <- NonEmptyList.of(executionDateDifferentiated(by = projectId, allProjectIds))
-        } yield (eventId, executionDate, eventBody)
-
-        eventIdsBodiesDates.toList foreach { case (eventId, eventExecutionDate, eventBody) =>
-          storeNewEvent(eventId, eventExecutionDate, eventBody)
-        }
-
-        findEvents(EventStatus.Processing) shouldBe List.empty
-
-        (waitingEventsGauge.decrement _).expects(*).returning(IO.unit).repeat(eventIdsBodiesDates.size)
-        (underProcessingGauge.increment _).expects(*).returning(IO.unit).repeat(eventIdsBodiesDates.size)
-
-        override val eventLogFetch = new EventFetcherImpl(
-          transactor,
-          renkuLogTimeout,
-          waitingEventsGauge,
-          underProcessingGauge,
-          TestLabeledHistogram[SqlQuery.Name]("query_id")
-        )
-        eventIdsBodiesDates.toList foreach { _ =>
-          eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
-        }
-
-        val commitEventsByExecutionOrder = findEvents(
-          status = Processing,
-          orderBy = fr"execution_date asc"
-        ).map(_._1)
-        val commitEventsByExecutionDate = eventIdsBodiesDates.map(_._1)
-        commitEventsByExecutionOrder.map(_.projectId) should not be commitEventsByExecutionDate.map(_.projectId).toList
-      }
-
-    "return events from various projects " +
-      "even if there are events with execution dates far in the past " +
-      s"and $Processing status " in new TestCase {
-
-        val project1Id = projectIds.generateOne
-        storeEvent(
-          CompoundEventId(eventIds.generateOne, project1Id),
-          EventStatus.Processing,
-          ExecutionDate(now.minus(maxProcessingTime.toMinutes + 1, MIN)),
-          eventDates.generateOne,
-          eventBodies.generateOne
-        )
-        val project2Id   = projectIds.generateOne
-        val project2Path = projectPaths.generateOne
-        storeEvent(
-          CompoundEventId(eventIds.generateOne, project2Id),
-          EventStatus.New,
-          ExecutionDate(now.minus(1, MIN)),
-          eventDates.generateOne,
-          eventBodies.generateOne
-        )
-
-        findEvents(EventStatus.Processing).map(_._1.projectId) shouldBe List(project1Id)
-
-        override val eventLogFetch = new EventFetcherImpl(
-          transactor,
-          renkuLogTimeout,
-          waitingEventsGauge,
-          underProcessingGauge,
-          TestLabeledHistogram[SqlQuery.Name]("query_id"),
-          pickRandomlyFrom = _ => (project2Id -> project2Path).some
-        )
-        expectWaitingEventsGaugeDecrement(project2Path)
-        expectUnderProcessingGaugeIncrement(project2Path)
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
-
-        findEvents(
-          status = Processing,
-          orderBy = fr"execution_date asc"
-        ).map(_._1.projectId) should contain theSameElementsAs List(project1Id, project2Id)
-      }
   }
 
   private trait TestCase {
 
     val currentTime          = mockFunction[Instant]
-    val renkuLogTimeout      = renkuLogTimeouts.generateOne
     val waitingEventsGauge   = mock[LabeledGauge[IO, Path]]
     val underProcessingGauge = mock[LabeledGauge[IO, Path]]
     val queriesExecTimes     = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val maxProcessingTime    = renkuLogTimeout.toUnsafe[Duration] plusMinutes 5
+    val maxProcessingTime    = Duration.ofMillis(durations(max = 10 hours).generateOne.toMillis)
     val eventLogFetch = new EventFetcherImpl(
       transactor,
-      renkuLogTimeout,
       waitingEventsGauge,
       underProcessingGauge,
       queriesExecTimes,
-      currentTime
+      currentTime,
+      maxProcessingTime = maxProcessingTime,
+      projectsFetchingLimit = 1
     )
 
     val now           = Instant.now()
     val executionDate = ExecutionDate(now)
     currentTime.expects().returning(now).anyNumberOfTimes()
-
-    def executionDateDifferentiated(by: Id, allProjects: NonEmptyList[Id]) =
-      ExecutionDate(now.minus(1000 - (allProjects.toList.indexOf(by) * 10), SEC))
 
     def expectWaitingEventsGaugeDecrement(projectPath: Path) =
       (waitingEventsGauge.decrement _)
@@ -268,20 +293,31 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
       (underProcessingGauge.increment _)
         .expects(projectPath)
         .returning(IO.unit)
+
+    def expectGaugeUpdated(times: Int = 1) = {
+      (waitingEventsGauge.decrement _).expects(*).returning(IO.unit).repeat(times)
+      (underProcessingGauge.increment _).expects(*).returning(IO.unit).repeat(times)
+    }
   }
 
-  private def storeNewEvent(commitEventId: CompoundEventId,
-                            executionDate: ExecutionDate,
-                            eventBody:     EventBody,
-                            batchDate:     BatchDate = batchDates.generateOne,
-                            projectPath:   Path = projectPaths.generateOne
-  ): Unit =
-    storeEvent(commitEventId,
-               New,
-               executionDate,
-               eventDates.generateOne,
-               eventBody,
-               batchDate = batchDate,
-               projectPath = projectPath
-    )
+  private def executionDatesInThePast: Gen[ExecutionDate] = timestampsNotInTheFuture map ExecutionDate.apply
+
+  private def readyStatuses = Gen
+    .oneOf(EventStatus.New, EventStatus.RecoverableFailure)
+
+  private def createEvent(status:        EventStatus,
+                          eventDate:     EventDate = eventDates.generateOne,
+                          executionDate: ExecutionDate = executionDatesInThePast.generateOne,
+                          batchDate:     BatchDate = batchDates.generateOne,
+                          projectId:     Id = projectIds.generateOne,
+                          projectPath:   Path = projectPaths.generateOne
+  ): (CompoundEventId, EventBody) = {
+    val eventId   = compoundEventIds.generateOne.copy(projectId = projectId)
+    val eventBody = eventBodies.generateOne
+
+    storeEvent(eventId, status, executionDate, eventDate, eventBody, batchDate = batchDate, projectPath = projectPath)
+
+    eventId -> eventBody
+  }
+
 }
