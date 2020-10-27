@@ -176,7 +176,7 @@ private class EventFetcherImpl(
 private object IOEventLogFetch {
 
   private val MaxProcessingTime:     Duration             = Duration.ofMinutes(120)
-  private val ProjectsFetchingLimit: Int Refined Positive = 5
+  private val ProjectsFetchingLimit: Int Refined Positive = 10
 
   def apply(
       transactor:           DbTransactor[IO, EventLogDB],
