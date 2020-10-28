@@ -18,12 +18,10 @@
 
 package io.renku.eventlog.subscriptions
 
-import java.time.temporal.ChronoUnit.{HOURS => H, MINUTES => MIN, SECONDS => SEC}
+import java.time.temporal.ChronoUnit.{HOURS => H, MINUTES => MIN}
 import java.time.{Duration, Instant}
 
-import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.syntax.all._
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -32,7 +30,6 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
@@ -188,13 +185,14 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
 
     "return events from the projects with latest commit before projects with older commits" in new TestCase {
 
-      val activeProject = projectIds.generateOne
+      val activeProjectId   = projectIds.generateOne
+      val activeProjectPath = projectPaths.generateOne
 
       val activeProjectEventIdsAndDates = readyStatuses
         .generateNonEmptyList(minElements = 2)
         .map { status =>
           val eventDate = eventDates.generateOne
-          val (id, _)   = createEvent(status, eventDate = eventDate, projectId = activeProject)
+          val (id, _)   = createEvent(status, eventDate, projectId = activeProjectId, projectPath = activeProjectPath)
           id -> eventDate
         }
         .toList
@@ -240,24 +238,31 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         projectsFetchingLimit = 5
       )
 
-      val eventIds = readyStatuses
-        .generateNonEmptyList(minElements = 3, maxElements = 6)
+      val eventIdsAndDates = readyStatuses
+        .generateNonEmptyList(minElements = 10, maxElements = 15)
         .toList
-        .flatMap { status =>
-          val projectId = projectIds.generateOne
-          (1 to positiveInts(max = 2).generateOne.value)
-            .map(_ => createEvent(status, projectId = projectId)._1)
+        .map { status =>
+          val eventDate    = eventDates.generateOne
+          val (eventId, _) = createEvent(status, eventDate)
+          eventId -> eventDate
         }
+        .sortBy { case (_, eventDate) => eventDate.value }
+        .reverse
 
       findEvents(EventStatus.Processing) shouldBe List.empty
 
-      expectGaugeUpdated(times = eventIds.size)
+      expectGaugeUpdated(times = eventIdsAndDates.size)
 
-      eventIds foreach { _ =>
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+      val selectedEventIds = eventIdsAndDates map { _ =>
+        val Some((eventId, _)) = eventLogFetch.popEvent().unsafeRunSync()
+        eventId
       }
 
-      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs eventIds
+      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs eventIdsAndDates.map(_._1)
+
+      selectedEventIds.size shouldBe eventIdsAndDates.size
+      selectedEventIds        should contain theSameElementsAs eventIdsAndDates.map(_._1)
+      selectedEventIds        should not be eventIdsAndDates.map(_._1)
 
       eventLogFetch.popEvent().unsafeRunSync() shouldBe None
     }
@@ -302,8 +307,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
 
   private def executionDatesInThePast: Gen[ExecutionDate] = timestampsNotInTheFuture map ExecutionDate.apply
 
-  private def readyStatuses = Gen
-    .oneOf(EventStatus.New, EventStatus.RecoverableFailure)
+  private def readyStatuses = Gen.oneOf(EventStatus.New, EventStatus.RecoverableFailure)
 
   private def createEvent(status:        EventStatus,
                           eventDate:     EventDate = eventDates.generateOne,

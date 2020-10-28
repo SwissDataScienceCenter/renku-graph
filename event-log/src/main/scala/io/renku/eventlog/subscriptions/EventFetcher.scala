@@ -38,6 +38,7 @@ import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
 
 import scala.language.postfixOps
+import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
 private trait EventFetcher[Interpretation[_]] {
@@ -80,20 +81,6 @@ private class EventFetcherImpl(
       maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
     } yield maybeProject -> maybeBody
 
-  private def findWeight(projects: List[ProjectIdAndPathWithLatestEventDate]): List[(ProjectIdAndPath, BigDecimal)] = {
-    def findWeight(eventDate: EventDate): BigDecimal = {
-      val (_, _, latestEventDate) = projects.head
-      val (_, _, oldestEventDate) = projects.last
-      val maxDistance             = BigDecimal(Duration.between(oldestEventDate.value, latestEventDate.value).toHours)
-      val normalisedDistance =
-        if (maxDistance == 0) BigDecimal(1)
-        else BigDecimal(Duration.between(oldestEventDate.value, eventDate.value).toHours.toDouble) / maxDistance
-      if (normalisedDistance == 0) BigDecimal(.1)
-      else normalisedDistance
-    }
-    projects.map { case (projectId, projectPath, eventDate) => ((projectId, projectPath), findWeight(eventDate)) }
-  }
-
   // format: off
   private def findProjectsWithEventsInQueue = SqlQuery({
       fr"""select distinct event_log.project_id, event_log.project_path, MAX(event_date) latest_event_date
@@ -132,6 +119,20 @@ private class EventFetcherImpl(
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
     in(fr"status", NonEmptyList.of(status, otherStatuses: _*))
 
+  private def findWeight(projects: List[ProjectIdAndPathWithLatestEventDate]): List[(ProjectIdAndPath, BigDecimal)] = {
+    def findWeight(eventDate: EventDate): BigDecimal = {
+      val (_, _, latestEventDate) = projects.head
+      val (_, _, oldestEventDate) = projects.last
+      val maxDistance             = BigDecimal(Duration.between(oldestEventDate.value, latestEventDate.value).toHours)
+      val normalisedDistance =
+        if (maxDistance == 0) BigDecimal(1)
+        else BigDecimal(Duration.between(oldestEventDate.value, eventDate.value).toHours.toDouble) / maxDistance
+      if (normalisedDistance == 0) BigDecimal(.1)
+      else normalisedDistance
+    }
+    projects.map { case (projectId, projectPath, eventDate) => ((projectId, projectPath), findWeight(eventDate)) }
+  }
+
   private lazy val selectProject: List[(ProjectIdAndPath, BigDecimal)] => Option[ProjectIdAndPath] = {
     case Nil                          => None
     case (projectIdAndPath, _) +: Nil => Some(projectIdAndPath)
@@ -140,7 +141,9 @@ private class EventFetcherImpl(
 
   private def weightedList(from: List[((projects.Id, projects.Path), BigDecimal)]): List[ProjectIdAndPath] =
     from.foldLeft(List.empty[ProjectIdAndPath]) { case (acc, (projectIdAndPath, weight)) =>
-      acc :++ List.fill(weight.setScale(2, BigDecimal.RoundingMode.HALF_UP).toInt)(projectIdAndPath)
+      acc :++ List.fill(
+        (weight * 10).setScale(2, RoundingMode.HALF_UP).toInt
+      )(projectIdAndPath)
     }
 
   private lazy val markAsProcessing: Option[EventIdAndBody] => Free[ConnectionOp, Option[EventIdAndBody]] = {
