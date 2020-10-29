@@ -60,9 +60,9 @@ private class EventFetcherImpl(
 
   import TypesSerializers._
 
-  private type EventIdAndBody                      = (CompoundEventId, EventBody)
-  private type ProjectIdAndPath                    = (projects.Id, projects.Path)
-  private type ProjectIdAndPathWithLatestEventDate = (projects.Id, projects.Path, EventDate)
+  private type EventIdAndBody   = (CompoundEventId, EventBody)
+  private type ProjectIdAndPath = (projects.Id, projects.Path)
+  private type ProjectInfo      = (projects.Id, projects.Path, EventDate, Int)
 
   override def popEvent(): IO[Option[EventIdAndBody]] =
     for {
@@ -73,30 +73,64 @@ private class EventFetcherImpl(
 
   private def findEventAndUpdateForProcessing() =
     for {
-      maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue) map findWeight map selectProject
+      maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
+                        .map(findWeightsBasedOnMostRecentActivity)
+                        .map(correctWeightsUsingOccupancyPerProject)
+                        .map(selectProject)
       maybeIdAndProjectAndBody <- maybeProject
                                     .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
                                     .getOrElse(Free.pure[ConnectionOp, Option[EventIdAndBody]](None))
       maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
     } yield maybeProject -> maybeBody
 
-  private def findWeight(projects: List[ProjectIdAndPathWithLatestEventDate]): List[(ProjectIdAndPath, BigDecimal)] = {
-    def findWeight(eventDate: EventDate): BigDecimal = {
-      val (_, _, latestEventDate) = projects.head
-      val (_, _, oldestEventDate) = projects.last
-      val maxDistance             = BigDecimal(Duration.between(oldestEventDate.value, latestEventDate.value).toHours)
-      val normalisedDistance =
-        if (maxDistance == 0) BigDecimal(1)
-        else BigDecimal(Duration.between(oldestEventDate.value, eventDate.value).toHours.toDouble) / maxDistance
-      if (normalisedDistance == 0) BigDecimal(.1)
-      else normalisedDistance
-    }
-    projects.map { case (projectId, projectPath, eventDate) => ((projectId, projectPath), findWeight(eventDate)) }
+  private lazy val findWeightsBasedOnMostRecentActivity
+      : List[ProjectInfo] => List[(ProjectIdAndPath, BigDecimal, Int)] = {
+    case Nil => Nil
+    case (projectId, projectPath, _, currentOccupancy) :: Nil =>
+      List(((projectId, projectPath), BigDecimal(1.0), currentOccupancy))
+    case projects =>
+      val (_, _, latestEventDate, _) = projects.head
+      val (_, _, oldestEventDate, _) = projects.last
+      val maxDistance                = BigDecimal(latestEventDate.distance(from = oldestEventDate))
+
+      def findWeight(eventDate: EventDate): BigDecimal = maxDistance match {
+        case maxDistance if maxDistance == 0 => BigDecimal(1.0)
+        case maxDistance =>
+          val normalisedDistance = BigDecimal(eventDate.distance(from = oldestEventDate).toDouble) / maxDistance
+          if (normalisedDistance == 0) BigDecimal(.1)
+          else normalisedDistance
+      }
+      projects.map { case (projectId, projectPath, eventDate, currentOccupancy) =>
+        ((projectId, projectPath), findWeight(eventDate), currentOccupancy)
+      }
+  }
+
+  private lazy val correctWeightsUsingOccupancyPerProject
+      : List[(ProjectIdAndPath, BigDecimal, Int)] => List[(ProjectIdAndPath, BigDecimal)] = {
+    case Nil => Nil
+    case weightedList @ _ :: Nil =>
+      weightedList.map { case (projectIdAndPath, weight, _) => (projectIdAndPath, weight) }
+    case weightedList =>
+      val totalWeight        = weightedList.map(_._2).sum
+      val processingCapacity = weightedList.map(_._3).sum
+      weightedList map correctWeight(processingCapacity, totalWeight)
+  }
+
+  private def correctWeight(processingCapacity: Int,
+                            totalWeight:        BigDecimal
+  ): ((ProjectIdAndPath, BigDecimal, Int)) => (ProjectIdAndPath, BigDecimal) = {
+    case (project, currentWeight, 0) => project -> currentWeight
+    case (project, currentWeight, currentOccupancy) =>
+      val maxOccupancyPerProject = currentWeight * processingCapacity / totalWeight
+      val correction             = maxOccupancyPerProject / currentOccupancy
+      val correctedWeight        = currentWeight * correction
+      project -> (if (correctedWeight < .1) BigDecimal(.1) else correctedWeight)
   }
 
   // format: off
   private def findProjectsWithEventsInQueue = SqlQuery({
-      fr"""select distinct event_log.project_id, event_log.project_path, MAX(event_date) latest_event_date
+      fr"""select distinct event_log.project_id, event_log.project_path, MAX(event_date) latest_event_date, 
+           COUNT(case WHEN status = ${Processing: EventStatus}  THEN event_id END) as current_occupancy 
            from (
              select distinct project_id
              from event_log
@@ -108,7 +142,7 @@ private class EventFetcherImpl(
            order by latest_event_date desc
            limit ${projectsFetchingLimit.value}  
            """ 
-    }.query[ProjectIdAndPathWithLatestEventDate].to[List],
+    }.query[ProjectInfo].to[List],
     name = "pop event - projects"
   )
   // format: on
@@ -171,6 +205,10 @@ private class EventFetcherImpl(
         _ <- underProcessingGauge increment projectPath
       } yield ()
     } getOrElse ME.unit
+
+  private implicit class EventDateOps(eventDate: EventDate) {
+    def distance(from: EventDate): Long = Duration.between(from.value, eventDate.value).toHours
+  }
 }
 
 private object IOEventLogFetch {

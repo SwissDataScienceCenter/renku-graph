@@ -18,12 +18,10 @@
 
 package io.renku.eventlog.subscriptions
 
-import java.time.temporal.ChronoUnit.{HOURS => H, MINUTES => MIN, SECONDS => SEC}
+import java.time.temporal.ChronoUnit.{HOURS => H, MINUTES => MIN}
 import java.time.{Duration, Instant}
 
-import cats.data.NonEmptyList
 import cats.effect.IO
-import cats.syntax.all._
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -32,7 +30,6 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
