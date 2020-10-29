@@ -90,8 +90,8 @@ knowledgeGraph:
 
 eventLog:
   image:
-    repository: renku/event-log
-    tag: 'latest'
+    repository: joke1196/event-log
+    tag: '1.11.0-n002.h61004756'
     pullPolicy: IfNotPresent
   service:
     type: ClusterIP

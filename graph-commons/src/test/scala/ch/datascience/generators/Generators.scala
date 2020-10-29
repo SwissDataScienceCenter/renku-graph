@@ -147,8 +147,8 @@ object Generators {
 
   def nonNegativeLongs(max: Long = 1000): Gen[Long Refined NonNegative] = choose(0L, max) map Refined.unsafeApply
 
-  def durations(max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
-    choose(1, max.toMillis) map (FiniteDuration(_, MILLISECONDS).toCoarsest)
+  def durations(min: FiniteDuration = 0 millis, max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
+    choose(min.toMillis, max.toMillis) map (FiniteDuration(_, MILLISECONDS).toCoarsest)
 
   def relativePaths(minSegments: Int = 1,
                     maxSegments: Int = 10,
