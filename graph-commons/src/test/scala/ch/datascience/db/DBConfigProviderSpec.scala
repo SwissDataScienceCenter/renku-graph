@@ -42,7 +42,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val user           = nonEmptyStrings().generateOne
       val password       = nonEmptyStrings().generateOne
       val connectionPool = positiveInts().generateOne
-      val maxLifetime    = durations(30 minutes).generateOne
+      val maxLifetime    = durations(max = 30 minutes).generateOne
 
       val config = ConfigFactory.parseMap(
         Map(
@@ -85,7 +85,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -105,7 +105,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -125,7 +125,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> "",
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -144,7 +144,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -163,7 +163,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -202,7 +202,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
