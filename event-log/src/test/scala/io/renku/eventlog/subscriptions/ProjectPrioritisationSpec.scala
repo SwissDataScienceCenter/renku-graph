@@ -105,11 +105,11 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
         val currentOccupancy: Int Refined NonNegative = 1
         val project1 = projectInfos.generateOne.copy(currentOccupancy = currentOccupancy)
         val project2 = projectInfos.generateOne.copy(
-          latestEventDate = project1.latestEventDate.plus(durations(max = 59 minutes).generateOne),
+          latestEventDate = project1.latestEventDate.plus(durations(max = 30 minutes).generateOne),
           currentOccupancy = currentOccupancy
         )
         val project3 = projectInfos.generateOne.copy(
-          latestEventDate = project2.latestEventDate.plus(durations(max = 59 minutes).generateOne),
+          latestEventDate = project2.latestEventDate.plus(durations(max = 29 minutes).generateOne),
           currentOccupancy = currentOccupancy
         )
 
