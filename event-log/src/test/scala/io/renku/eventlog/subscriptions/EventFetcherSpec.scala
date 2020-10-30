@@ -192,7 +192,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         eventLogFetch.popEvent().unsafeRunSync() shouldBe None
       }
 
-    "return events from various projects" in new TestCase {
+    "return events from all the projects" in new TestCase {
 
       val events = readyStatuses
         .generateNonEmptyList(minElements = 2)
@@ -217,7 +217,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
       findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs events.map(_._1)
     }
 
-    "return events from all the projects" in new TestCase {
+    "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCase {
 
       override val eventLogFetch = new EventFetcherImpl(
         transactor,
@@ -244,15 +244,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
 
       expectGaugeUpdated(times = events.size)
 
-      val projectsEventDates = events
-        .groupBy(_._4)
-        .view
-        .mapValues(projectEvents => projectEvents.maxBy(_._3.value)._3)
-
-      (projectPrioritisation.prioritise _)
-        .expects(where { infos: List[ProjectInfo] => infos.size == 5 })
-        .returning(List(ProjectIdAndPath(events.head._1.projectId, events.head._4) -> MaxPriority))
-      events.tail foreach { case (eventId, _, _, projectPath) =>
+      events foreach { case (eventId, _, _, projectPath) =>
         (projectPrioritisation.prioritise _)
           .expects(*)
           .returning(List(ProjectIdAndPath(eventId.projectId, projectPath) -> MaxPriority))
