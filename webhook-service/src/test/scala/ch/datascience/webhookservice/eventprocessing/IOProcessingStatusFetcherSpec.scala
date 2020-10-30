@@ -152,8 +152,8 @@ class IOProcessingStatusFetcherSpec
     }
 
     "fail if total < 0" in {
-      forAll(nonNegativeInts(), nonPositiveInts()) { (done, total) =>
-        ProcessingStatus.from(done.value, total.value, 0d) shouldBe Left(
+      forAll(nonNegativeInts(), negativeInts()) { (done, total) =>
+        ProcessingStatus.from(done.value, total, 0d) shouldBe Left(
           "ProcessingStatus's 'total' cannot be negative"
         )
       }
