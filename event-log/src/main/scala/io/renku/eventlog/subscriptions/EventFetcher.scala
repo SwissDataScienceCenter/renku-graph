@@ -54,6 +54,7 @@ private class EventFetcherImpl(
     now:                   () => Instant = () => Instant.now,
     maxProcessingTime:     Duration,
     projectsFetchingLimit: Int Refined Positive,
+    projectPrioritisation: ProjectPrioritisation,
     pickRandomlyFrom:      List[ProjectIdAndPath] => Option[ProjectIdAndPath] = ids => ids.get(Random nextInt ids.size)
 )(implicit ME:             Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
@@ -73,7 +74,7 @@ private class EventFetcherImpl(
   private def findEventAndUpdateForProcessing() =
     for {
       maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
-                        .map(ProjectPrioritisation.prioritise)
+                        .map(projectPrioritisation.prioritise)
                         .map(selectProject)
       maybeIdAndProjectAndBody <- maybeProject
                                     .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
@@ -179,7 +180,8 @@ private object IOEventLogFetch {
                          underProcessingGauge,
                          queriesExecTimes,
                          maxProcessingTime = MaxProcessingTime,
-                         projectsFetchingLimit = ProjectsFetchingLimit
+                         projectsFetchingLimit = ProjectsFetchingLimit,
+                         projectPrioritisation = new ProjectPrioritisation()
     )
   }
 }

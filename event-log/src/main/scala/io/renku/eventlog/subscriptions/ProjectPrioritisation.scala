@@ -25,36 +25,9 @@ import ch.datascience.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventDate
+import io.renku.eventlog.subscriptions.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
 
-private object ProjectPrioritisation {
-
-  final case class ProjectIdAndPath(id: projects.Id, path: projects.Path)
-  final case class ProjectInfo(id:               projects.Id,
-                               path:             projects.Path,
-                               latestEventDate:  EventDate,
-                               currentOccupancy: Int Refined NonNegative
-  )
-  final class Priority private (val value: BigDecimal) extends AnyVal with BigDecimalTinyType
-  object Priority extends TinyTypeFactory[Priority](new Priority(_)) {
-
-    addConstraint(
-      value => (value >= .1) && (value <= BigDecimal(1)),
-      value => s"$value is not valid $typeName as it has to be >= 0.1 && <= 1"
-    )
-
-    val MaxPriority: Priority = Priority(1.0)
-    val MinPriority: Priority = Priority(0.1)
-
-    private def apply(value: Double): Priority = Priority(BigDecimal(value))
-
-    def safeApply(value: BigDecimal): Priority = value match {
-      case value if value <= .1  => MinPriority
-      case value if value >= 1.0 => MaxPriority
-      case value                 => Priority(value)
-    }
-    def safeApply(value: Double): Priority = safeApply(BigDecimal(value))
-  }
-
+private class ProjectPrioritisation {
   import Priority._
 
   def prioritise(projects: List[ProjectInfo]): List[(ProjectIdAndPath, Priority)] =
@@ -107,5 +80,35 @@ private object ProjectPrioritisation {
 
   private implicit class EventDateOps(eventDate: EventDate) {
     def distance(from: EventDate): Long = Duration.between(from.value, eventDate.value).toHours
+  }
+}
+
+private object ProjectPrioritisation {
+
+  final case class ProjectIdAndPath(id: projects.Id, path: projects.Path)
+  final case class ProjectInfo(id:               projects.Id,
+                               path:             projects.Path,
+                               latestEventDate:  EventDate,
+                               currentOccupancy: Int Refined NonNegative
+  )
+  final class Priority private (val value: BigDecimal) extends AnyVal with BigDecimalTinyType
+  object Priority extends TinyTypeFactory[Priority](new Priority(_)) {
+
+    addConstraint(
+      value => (value >= .1) && (value <= BigDecimal(1)),
+      value => s"$value is not valid $typeName as it has to be >= 0.1 && <= 1"
+    )
+
+    val MaxPriority: Priority = Priority(1.0)
+    val MinPriority: Priority = Priority(0.1)
+
+    private def apply(value: Double): Priority = Priority(BigDecimal(value))
+
+    def safeApply(value: BigDecimal): Priority = value match {
+      case value if value <= .1  => MinPriority
+      case value if value >= 1.0 => MaxPriority
+      case value                 => Priority(value)
+    }
+    def safeApply(value: Double): Priority = safeApply(BigDecimal(value))
   }
 }

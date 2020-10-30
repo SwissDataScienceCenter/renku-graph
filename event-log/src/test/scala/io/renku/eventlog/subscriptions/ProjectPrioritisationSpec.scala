@@ -40,13 +40,13 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
   "prioritize" should {
 
     "return an empty list if there are no projects" in {
-      prioritise(Nil) shouldBe Nil
+      projectPrioritisation.prioritise(Nil) shouldBe Nil
     }
 
     "put priority 1 if the list contains only one project" in {
       val project = projectInfos.generateOne
 
-      prioritise(List(project)) shouldBe List((project.toIdAndPath, MaxPriority))
+      projectPrioritisation.prioritise(List(project)) shouldBe List((project.toIdAndPath, MaxPriority))
     }
 
     "put priority 1 if projects event dates are within and hour and currentOccupancy is 0" in {
@@ -56,7 +56,7 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
         currentOccupancy = 0
       )
 
-      prioritise(List(project1, project2)) shouldBe List(
+      projectPrioritisation.prioritise(List(project1, project2)) shouldBe List(
         (project1.toIdAndPath, MaxPriority),
         (project2.toIdAndPath, MaxPriority)
       )
@@ -70,7 +70,7 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
           currentOccupancy = 0
         )
 
-        prioritise(List(project1, project2)) shouldBe List(
+        projectPrioritisation.prioritise(List(project1, project2)) shouldBe List(
           (project1.toIdAndPath, MaxPriority),
           (project2.toIdAndPath, MinPriority)
         )
@@ -89,7 +89,7 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
         )
 
         val (projectIdAndPath1, priority1) :: (projectIdAndPath2, priority2) :: (projectIdAndPath3, priority3) :: Nil =
-          prioritise(List(project1, project2, project3))
+          projectPrioritisation.prioritise(List(project1, project2, project3))
 
         projectIdAndPath1.id shouldBe project1.id
         projectIdAndPath2.id shouldBe project2.id
@@ -114,7 +114,7 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
         )
 
         val (projectIdAndPath1, priority1) :: (projectIdAndPath2, priority2) :: (projectIdAndPath3, priority3) :: Nil =
-          prioritise(List(project1, project2, project3))
+          projectPrioritisation.prioritise(List(project1, project2, project3))
 
         projectIdAndPath1.id shouldBe project1.id
         projectIdAndPath2.id shouldBe project2.id
@@ -140,7 +140,7 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
         )
 
         val (projectIdAndPath1, priority1) :: (projectIdAndPath2, priority2) :: (projectIdAndPath3, priority3) :: Nil =
-          prioritise(List(project1, project2, project3))
+          projectPrioritisation.prioritise(List(project1, project2, project3))
 
         projectIdAndPath1.id shouldBe project1.id
         projectIdAndPath2.id shouldBe project2.id
@@ -151,6 +151,8 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
         priority3.value   should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
       }
   }
+
+  private lazy val projectPrioritisation = new ProjectPrioritisation()
 
   private implicit lazy val projectInfos: Gen[ProjectInfo] = for {
     projectId        <- projectIds
