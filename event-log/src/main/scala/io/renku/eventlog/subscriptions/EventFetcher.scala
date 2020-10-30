@@ -36,6 +36,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
+import io.renku.eventlog.subscriptions.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
 
 import scala.language.postfixOps
 import scala.math.BigDecimal.RoundingMode
@@ -53,17 +54,15 @@ private class EventFetcherImpl(
     now:                   () => Instant = () => Instant.now,
     maxProcessingTime:     Duration,
     projectsFetchingLimit: Int Refined Positive,
-    pickRandomlyFrom: List[(projects.Id, projects.Path)] => Option[(projects.Id, projects.Path)] = ids =>
-      ids.get(Random nextInt ids.size)
-)(implicit ME: Bracket[IO, Throwable])
+    projectPrioritisation: ProjectPrioritisation,
+    pickRandomlyFrom:      List[ProjectIdAndPath] => Option[ProjectIdAndPath] = ids => ids.get(Random nextInt ids.size)
+)(implicit ME:             Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
     with EventFetcher[IO] {
 
   import TypesSerializers._
 
-  private type EventIdAndBody                      = (CompoundEventId, EventBody)
-  private type ProjectIdAndPath                    = (projects.Id, projects.Path)
-  private type ProjectIdAndPathWithLatestEventDate = (projects.Id, projects.Path, EventDate)
+  private type EventIdAndBody = (CompoundEventId, EventBody)
 
   override def popEvent(): IO[Option[EventIdAndBody]] =
     for {
@@ -74,7 +73,9 @@ private class EventFetcherImpl(
 
   private def findEventAndUpdateForProcessing() =
     for {
-      maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue) map findWeight map selectProject
+      maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
+                        .map(projectPrioritisation.prioritise)
+                        .map(selectProject)
       maybeIdAndProjectAndBody <- maybeProject
                                     .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
                                     .getOrElse(Free.pure[ConnectionOp, Option[EventIdAndBody]](None))
@@ -83,7 +84,8 @@ private class EventFetcherImpl(
 
   // format: off
   private def findProjectsWithEventsInQueue = SqlQuery({
-      fr"""select distinct event_log.project_id, event_log.project_path, MAX(event_date) latest_event_date
+      fr"""select distinct event_log.project_id, event_log.project_path, MAX(event_date) latest_event_date, 
+           COUNT(case WHEN status = ${Processing: EventStatus}  THEN event_id END) as current_occupancy 
            from (
              select distinct project_id
              from event_log
@@ -95,7 +97,9 @@ private class EventFetcherImpl(
            order by latest_event_date desc
            limit ${projectsFetchingLimit.value}  
            """ 
-    }.query[ProjectIdAndPathWithLatestEventDate].to[List],
+    }.query[(projects.Id, projects.Path, EventDate, Int)]
+    .map{case (projectId, projectPath, eventDate, currentOccupancy) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy)) }
+    .to[List],
     name = "pop event - projects"
   )
   // format: on
@@ -104,7 +108,7 @@ private class EventFetcherImpl(
   private def findOldestEvent(idAndPath: ProjectIdAndPath) = SqlQuery({
       fr"""select event_log.event_id, event_log.project_id, event_log.event_body
            from event_log
-           where project_id = ${idAndPath._1}
+           where project_id = ${idAndPath.id}
              and (
                (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
                or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
@@ -119,31 +123,15 @@ private class EventFetcherImpl(
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
     in(fr"status", NonEmptyList.of(status, otherStatuses: _*))
 
-  private def findWeight(projects: List[ProjectIdAndPathWithLatestEventDate]): List[(ProjectIdAndPath, BigDecimal)] = {
-    def findWeight(eventDate: EventDate): BigDecimal = {
-      val (_, _, latestEventDate) = projects.head
-      val (_, _, oldestEventDate) = projects.last
-      val maxDistance             = BigDecimal(Duration.between(oldestEventDate.value, latestEventDate.value).toHours)
-      val normalisedDistance =
-        if (maxDistance == 0) BigDecimal(1)
-        else BigDecimal(Duration.between(oldestEventDate.value, eventDate.value).toHours.toDouble) / maxDistance
-      if (normalisedDistance == 0) BigDecimal(.1)
-      else normalisedDistance
-    }
-    projects.map { case (projectId, projectPath, eventDate) => ((projectId, projectPath), findWeight(eventDate)) }
-  }
-
-  private lazy val selectProject: List[(ProjectIdAndPath, BigDecimal)] => Option[ProjectIdAndPath] = {
+  private lazy val selectProject: List[(ProjectIdAndPath, Priority)] => Option[ProjectIdAndPath] = {
     case Nil                          => None
     case (projectIdAndPath, _) +: Nil => Some(projectIdAndPath)
-    case many                         => pickRandomlyFrom(weightedList(from = many))
+    case many                         => pickRandomlyFrom(prioritiesList(from = many))
   }
 
-  private def weightedList(from: List[((projects.Id, projects.Path), BigDecimal)]): List[ProjectIdAndPath] =
-    from.foldLeft(List.empty[ProjectIdAndPath]) { case (acc, (projectIdAndPath, weight)) =>
-      acc :++ List.fill(
-        (weight * 10).setScale(2, RoundingMode.HALF_UP).toInt
-      )(projectIdAndPath)
+  private def prioritiesList(from: List[(ProjectIdAndPath, Priority)]): List[ProjectIdAndPath] =
+    from.foldLeft(List.empty[ProjectIdAndPath]) { case (acc, (projectIdAndPath, priority)) =>
+      acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
     }
 
   private lazy val markAsProcessing: Option[EventIdAndBody] => Free[ConnectionOp, Option[EventIdAndBody]] = {
@@ -168,7 +156,7 @@ private class EventFetcherImpl(
   }
 
   private def maybeUpdateMetrics(maybeProject: Option[ProjectIdAndPath], maybeBody: Option[EventIdAndBody]) =
-    (maybeBody, maybeProject) mapN { case (_, (_, projectPath)) =>
+    (maybeBody, maybeProject) mapN { case (_, ProjectIdAndPath(_, projectPath)) =>
       for {
         _ <- waitingEventsGauge decrement projectPath
         _ <- underProcessingGauge increment projectPath
@@ -192,7 +180,8 @@ private object IOEventLogFetch {
                          underProcessingGauge,
                          queriesExecTimes,
                          maxProcessingTime = MaxProcessingTime,
-                         projectsFetchingLimit = ProjectsFetchingLimit
+                         projectsFetchingLimit = ProjectsFetchingLimit,
+                         projectPrioritisation = new ProjectPrioritisation()
     )
   }
 }

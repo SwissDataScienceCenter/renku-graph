@@ -21,22 +21,26 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{InitialVersion, Keyword, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{DateCreatedInProject, InitialVersion, Keyword, TopmostSameAs}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.EntityGenerators.invalidationEntity
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
-import io.renku.jsonld.syntax._
+
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -110,7 +114,9 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         forAll(datasetProjects, addedToProjectObjects) { (project, addedToProject) =>
           val dataset = nonModifiedDatasets(projects = project.copy(created = addedToProject).toGenerator).generateOne
           val modifiedOnProject = addedToProjectObjects.generateOne.copy(
-            date = datasetInProjectCreationDates generateGreaterThan addedToProject.date
+            date = DateCreatedInProject(
+              addedToProject.date.value.plusSeconds(durations(min = 1 minute, max = 30 days).generateOne.toSeconds)
+            )
           )
           val modifiedDataset =
             modifiedDatasetsOnFirstProject(dataset.changeCreationOnProject(to = modifiedOnProject)).generateOne.copy(
@@ -333,7 +339,9 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           ).generateOne
           val projectDatasetModificationCommit = commitIds.generateOne
           val modifiedOnProject = addedToProjectObjects.generateOne.copy(
-            date = datasetInProjectCreationDates generateGreaterThan addedToProject.date
+            date = DateCreatedInProject(
+              addedToProject.date.value.plusSeconds(durations(min = 1 minute, max = 30 days).generateOne.toSeconds)
+            )
           )
           val modifiedDataset = modifiedDatasetsOnFirstProject(
             dataset.changeCreationOnProject(to = modifiedOnProject)
@@ -535,7 +543,10 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         )
 
         val modifiedOnProject2 = addedToProjectObjects.generateOne.copy(
-          date = datasetInProjectCreationDates generateGreaterThan dataset2Project.created.date
+          date = DateCreatedInProject(
+            dataset2Project.created.date.value
+              .plusSeconds(durations(min = 1 minute, max = 30 days).generateOne.toSeconds)
+          )
         )
         val dataset2ModifiedProject = dataset2Project.copy(created = modifiedOnProject2)
         val modifiedDataset2 = modifiedDatasetsOnFirstProject(

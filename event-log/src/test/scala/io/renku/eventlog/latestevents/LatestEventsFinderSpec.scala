@@ -41,7 +41,7 @@ class LatestEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
     "return (projectId, eventBody) tuples with the youngest eventId (event_date wise) " +
       "for all the projects in the db" in new TestCase {
-        val project1 = projects.generateOne
+        val project1 = eventProjects.generateOne
         storeEvent(
           compoundEventIds.generateOne.copy(projectId = project1.id),
           eventStatuses.generateOne,
@@ -62,7 +62,7 @@ class LatestEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           projectPath = project1.path
         )
 
-        val project2          = projects.generateOne
+        val project2          = eventProjects.generateOne
         val eventIdProject2   = compoundEventIds.generateOne.copy(projectId = project2.id)
         val eventBodyProject2 = eventBodies.generateOne
         storeEvent(

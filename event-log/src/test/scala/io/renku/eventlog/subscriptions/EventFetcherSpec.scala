@@ -34,6 +34,8 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
+import io.renku.eventlog.subscriptions.ProjectPrioritisation.Priority.MaxPriority
+import io.renku.eventlog.subscriptions.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -53,14 +55,14 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         val projectId   = projectIds.generateOne
         val projectPath = projectPaths.generateOne
 
-        val (event1Id, event1Body) = createEvent(
+        val (event1Id, event1Body, latestEventDate, _) = createEvent(
           status = New,
-          EventDate(now.minus(1, H)),
+          eventDate = EventDate(now.minus(1, H)),
           projectId = projectId,
           projectPath = projectPath
         )
 
-        val (event2Id, event2Body) = createEvent(
+        val (event2Id, event2Body, _, _) = createEvent(
           status = EventStatus.RecoverableFailure,
           EventDate(now.minus(5, H)),
           projectId = projectId,
@@ -72,6 +74,11 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
 
+        givenPrioritisation(
+          takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
+          returns = List(ProjectIdAndPath(projectId, projectPath) -> MaxPriority)
+        )
+
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event2Id -> event2Body)
 
         findEvents(EventStatus.Processing).noBatchDate shouldBe List((event2Id, executionDate))
@@ -79,11 +86,18 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
 
+        givenPrioritisation(
+          takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 1)),
+          returns = List(ProjectIdAndPath(projectId, projectPath) -> MaxPriority)
+        )
+
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
 
         findEvents(EventStatus.Processing).noBatchDate shouldBe List((event1Id, executionDate),
                                                                      (event2Id, executionDate)
         )
+
+        givenPrioritisation(takes = Nil, returns = Nil)
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe None
 
@@ -99,20 +113,20 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         val projectId   = projectIds.generateOne
         val projectPath = projectPaths.generateOne
 
-        val (event1Id, event1Body) = createEvent(
+        val (event1Id, event1Body, event1Date, _) = createEvent(
           status = New,
           projectId = projectId,
           projectPath = projectPath
         )
 
-        createEvent(
+        val (_, _, event2Date, _) = createEvent(
           status = RecoverableFailure,
           executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
           projectId = projectId,
           projectPath = projectPath
         )
 
-        createEvent(
+        val (_, _, event3Date, _) = createEvent(
           status = New,
           executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
           projectId = projectId,
@@ -124,9 +138,17 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
 
+        val latestEventDate = List(event1Date, event2Date, event3Date).maxBy(_.value)
+        givenPrioritisation(
+          takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
+          returns = List(ProjectIdAndPath(projectId, projectPath) -> MaxPriority)
+        )
+
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
 
         findEvents(EventStatus.Processing).noBatchDate shouldBe List((event1Id, executionDate))
+
+        givenPrioritisation(takes = Nil, returns = Nil)
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe None
 
@@ -139,15 +161,18 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
     s"return an event with the $Processing status " +
       "if execution date is longer than MaxProcessingTime" in new TestCase {
 
-        val projectPath = projectPaths.generateOne
-        val (eventId, eventBody) = createEvent(
+        val (eventId, eventBody, eventDate, projectPath) = createEvent(
           status = Processing,
-          executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes + 1, MIN)),
-          projectPath = projectPath
+          executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes + 1, MIN))
         )
 
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
+
+        givenPrioritisation(
+          takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 1)),
+          returns = List(ProjectIdAndPath(eventId.projectId, projectPath) -> MaxPriority)
+        )
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(eventId -> eventBody)
 
@@ -162,68 +187,34 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
           executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes - 1, MIN))
         )
 
+        givenPrioritisation(takes = Nil, returns = Nil)
+
         eventLogFetch.popEvent().unsafeRunSync() shouldBe None
       }
 
     "return events from various projects" in new TestCase {
 
-      val ids = readyStatuses
+      val events = readyStatuses
         .generateNonEmptyList(minElements = 2)
-        .map(status => createEvent(status)._1)
+        .map(status => createEvent(status))
         .toList
 
       findEvents(EventStatus.Processing) shouldBe List.empty
 
-      expectGaugeUpdated(times = ids.size)
+      expectGaugeUpdated(times = events.size)
 
-      ids foreach { _ =>
+      events foreach { case (eventId, _, eventDate, projectPath) =>
+        givenPrioritisation(
+          takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 0)),
+          returns = List(ProjectIdAndPath(eventId.projectId, projectPath) -> MaxPriority)
+        )
+      }
+
+      events foreach { _ =>
         eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
       }
 
-      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs ids
-    }
-
-    "return events from the projects with latest commit before projects with older commits" in new TestCase {
-
-      val activeProjectId   = projectIds.generateOne
-      val activeProjectPath = projectPaths.generateOne
-
-      val activeProjectEventIdsAndDates = readyStatuses
-        .generateNonEmptyList(minElements = 2)
-        .map { status =>
-          val eventDate = eventDates.generateOne
-          val (id, _)   = createEvent(status, eventDate, projectId = activeProjectId, projectPath = activeProjectPath)
-          id -> eventDate
-        }
-        .toList
-
-      val (_, mostRecentEventDate) = activeProjectEventIdsAndDates.maxBy { case (_, eventDate) => eventDate.value }
-
-      val eventDateBeforeTheMostRecent = EventDate(
-        mostRecentEventDate.value.minus(nonNegativeInts(max = 10).generateOne.toLong, H)
-      )
-
-      val (olderProjectEventId, _) =
-        createEvent(readyStatuses.generateOne, eventDate = eventDateBeforeTheMostRecent)
-
-      findEvents(EventStatus.Processing) shouldBe List.empty
-
-      expectGaugeUpdated(times = activeProjectEventIdsAndDates.size)
-
-      activeProjectEventIdsAndDates foreach { _ =>
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
-      }
-
-      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs activeProjectEventIdsAndDates.map(
-        _._1
-      )
-
-      expectGaugeUpdated()
-
-      eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
-
-      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs
-        olderProjectEventId +: activeProjectEventIdsAndDates.map(_._1)
+      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs events.map(_._1)
     }
 
     "return events from all the projects" in new TestCase {
@@ -235,34 +226,45 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         queriesExecTimes,
         currentTime,
         maxProcessingTime = maxProcessingTime,
-        projectsFetchingLimit = 5
+        projectsFetchingLimit = 5,
+        projectPrioritisation = projectPrioritisation
       )
 
-      val eventIdsAndDates = readyStatuses
-        .generateNonEmptyList(minElements = 10, maxElements = 15)
+      val events = readyStatuses
+        .generateNonEmptyList(minElements = 3, maxElements = 6)
         .toList
-        .map { status =>
-          val eventDate    = eventDates.generateOne
-          val (eventId, _) = createEvent(status, eventDate)
-          eventId -> eventDate
+        .flatMap { status =>
+          val projectId   = projectIds.generateOne
+          val projectPath = projectPaths.generateOne
+          (1 to positiveInts(max = 2).generateOne.value)
+            .map(_ => createEvent(status, projectId = projectId, projectPath = projectPath))
         }
-        .sortBy { case (_, eventDate) => eventDate.value }
-        .reverse
 
       findEvents(EventStatus.Processing) shouldBe List.empty
 
-      expectGaugeUpdated(times = eventIdsAndDates.size)
+      expectGaugeUpdated(times = events.size)
 
-      val selectedEventIds = eventIdsAndDates map { _ =>
-        val Some((eventId, _)) = eventLogFetch.popEvent().unsafeRunSync()
-        eventId
+      val projectsEventDates = events
+        .groupBy(_._4)
+        .view
+        .mapValues(projectEvents => projectEvents.maxBy(_._3.value)._3)
+
+      (projectPrioritisation.prioritise _)
+        .expects(where { infos: List[ProjectInfo] => infos.size == 5 })
+        .returning(List(ProjectIdAndPath(events.head._1.projectId, events.head._4) -> MaxPriority))
+      events.tail foreach { case (eventId, _, _, projectPath) =>
+        (projectPrioritisation.prioritise _)
+          .expects(*)
+          .returning(List(ProjectIdAndPath(eventId.projectId, projectPath) -> MaxPriority))
       }
 
-      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs eventIdsAndDates.map(_._1)
+      events foreach { _ =>
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+      }
 
-      selectedEventIds.size shouldBe eventIdsAndDates.size
-      selectedEventIds        should contain theSameElementsAs eventIdsAndDates.map(_._1)
-      selectedEventIds        should not be eventIdsAndDates.map(_._1)
+      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs events.map(_._1)
+
+      givenPrioritisation(takes = Nil, returns = Nil)
 
       eventLogFetch.popEvent().unsafeRunSync() shouldBe None
     }
@@ -270,11 +272,12 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
 
   private trait TestCase {
 
-    val currentTime          = mockFunction[Instant]
-    val waitingEventsGauge   = mock[LabeledGauge[IO, Path]]
-    val underProcessingGauge = mock[LabeledGauge[IO, Path]]
-    val queriesExecTimes     = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val maxProcessingTime    = Duration.ofMillis(durations(max = 10 hours).generateOne.toMillis)
+    val currentTime           = mockFunction[Instant]
+    val waitingEventsGauge    = mock[LabeledGauge[IO, Path]]
+    val underProcessingGauge  = mock[LabeledGauge[IO, Path]]
+    val projectPrioritisation = mock[ProjectPrioritisation]
+    val queriesExecTimes      = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val maxProcessingTime     = Duration.ofMillis(durations(max = 10 hours).generateOne.toMillis)
     val eventLogFetch = new EventFetcherImpl(
       transactor,
       waitingEventsGauge,
@@ -282,7 +285,8 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
       queriesExecTimes,
       currentTime,
       maxProcessingTime = maxProcessingTime,
-      projectsFetchingLimit = 1
+      projectsFetchingLimit = 1,
+      projectPrioritisation = projectPrioritisation
     )
 
     val now           = Instant.now()
@@ -303,11 +307,17 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
       (waitingEventsGauge.decrement _).expects(*).returning(IO.unit).repeat(times)
       (underProcessingGauge.increment _).expects(*).returning(IO.unit).repeat(times)
     }
+
+    def givenPrioritisation(takes: List[ProjectInfo], returns: List[(ProjectIdAndPath, Priority)]) =
+      (projectPrioritisation.prioritise _)
+        .expects(takes)
+        .returning(returns)
   }
 
   private def executionDatesInThePast: Gen[ExecutionDate] = timestampsNotInTheFuture map ExecutionDate.apply
 
-  private def readyStatuses = Gen.oneOf(EventStatus.New, EventStatus.RecoverableFailure)
+  private def readyStatuses = Gen
+    .oneOf(EventStatus.New, EventStatus.RecoverableFailure)
 
   private def createEvent(status:        EventStatus,
                           eventDate:     EventDate = eventDates.generateOne,
@@ -315,13 +325,12 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
                           batchDate:     BatchDate = batchDates.generateOne,
                           projectId:     Id = projectIds.generateOne,
                           projectPath:   Path = projectPaths.generateOne
-  ): (CompoundEventId, EventBody) = {
+  ): (CompoundEventId, EventBody, EventDate, Path) = {
     val eventId   = compoundEventIds.generateOne.copy(projectId = projectId)
     val eventBody = eventBodies.generateOne
 
     storeEvent(eventId, status, executionDate, eventDate, eventBody, batchDate = batchDate, projectPath = projectPath)
 
-    eventId -> eventBody
+    (eventId, eventBody, eventDate, projectPath)
   }
-
 }
