@@ -36,9 +36,10 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
-import io.renku.eventlog.subscriptions.ProjectPrioritisation.{ProjectIdAndPath, ProjectInfo}
+import io.renku.eventlog.subscriptions.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
 
 import scala.language.postfixOps
+import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
 private trait EventFetcher[Interpretation[_]] {
@@ -121,15 +122,15 @@ private class EventFetcherImpl(
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
     in(fr"status", NonEmptyList.of(status, otherStatuses: _*))
 
-  private lazy val selectProject: List[(ProjectIdAndPath, BigDecimal)] => Option[ProjectIdAndPath] = {
+  private lazy val selectProject: List[(ProjectIdAndPath, Priority)] => Option[ProjectIdAndPath] = {
     case Nil                          => None
     case (projectIdAndPath, _) +: Nil => Some(projectIdAndPath)
-    case many                         => pickRandomlyFrom(weightedList(from = many))
+    case many                         => pickRandomlyFrom(prioritiesList(from = many))
   }
 
-  private def weightedList(from: List[(ProjectIdAndPath, BigDecimal)]): List[ProjectIdAndPath] =
-    from.foldLeft(List.empty[ProjectIdAndPath]) { case (acc, (projectIdAndPath, weight)) =>
-      acc :++ List.fill((weight * 10).setScale(2, BigDecimal.RoundingMode.HALF_UP).toInt)(projectIdAndPath)
+  private def prioritiesList(from: List[(ProjectIdAndPath, Priority)]): List[ProjectIdAndPath] =
+    from.foldLeft(List.empty[ProjectIdAndPath]) { case (acc, (projectIdAndPath, priority)) =>
+      acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
     }
 
   private lazy val markAsProcessing: Option[EventIdAndBody] => Free[ConnectionOp, Option[EventIdAndBody]] = {

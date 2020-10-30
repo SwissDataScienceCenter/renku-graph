@@ -35,6 +35,7 @@ import scala.language.postfixOps
 
 class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
   import ProjectPrioritisation._
+  import Priority._
 
   "prioritize" should {
 
@@ -45,7 +46,7 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
     "put priority 1 if the list contains only one project" in {
       val project = projectInfos.generateOne
 
-      prioritise(List(project)) shouldBe List((project.toIdAndPath, BigDecimal(1.0)))
+      prioritise(List(project)) shouldBe List((project.toIdAndPath, MaxPriority))
     }
 
     "put priority 1 if projects event dates are within and hour and currentOccupancy is 0" in {
@@ -56,8 +57,8 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
       )
 
       prioritise(List(project1, project2)) shouldBe List(
-        (project1.toIdAndPath, BigDecimal(1.0)),
-        (project2.toIdAndPath, BigDecimal(1.0))
+        (project1.toIdAndPath, MaxPriority),
+        (project2.toIdAndPath, MaxPriority)
       )
     }
 
@@ -70,8 +71,8 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
         )
 
         prioritise(List(project1, project2)) shouldBe List(
-          (project1.toIdAndPath, BigDecimal(1.0)),
-          (project2.toIdAndPath, BigDecimal(0.1))
+          (project1.toIdAndPath, MaxPriority),
+          (project2.toIdAndPath, MinPriority)
         )
       }
 
@@ -94,9 +95,9 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
         projectIdAndPath2.id shouldBe project2.id
         projectIdAndPath3.id shouldBe project3.id
 
-        priority1 shouldBe BigDecimal(1.0)
-        priority2   should (be < BigDecimal(1.0) and be > BigDecimal(0.1))
-        priority3 shouldBe BigDecimal(0.1)
+        priority1.value shouldBe BigDecimal(1.0)
+        priority2.value   should (be < BigDecimal(1.0) and be > BigDecimal(0.1))
+        priority3.value shouldBe BigDecimal(0.1)
       }
 
     "put priority 1 to all projects " +
@@ -119,9 +120,9 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
         projectIdAndPath2.id shouldBe project2.id
         projectIdAndPath3.id shouldBe project3.id
 
-        priority1 shouldBe BigDecimal(1.0)
-        priority2 shouldBe BigDecimal(1.0)
-        priority3 shouldBe BigDecimal(1.0)
+        priority1 shouldBe MaxPriority
+        priority2 shouldBe MaxPriority
+        priority3 shouldBe MaxPriority
       }
 
     "correct priorities based on event dates using the currentOccupancy " +
@@ -145,9 +146,9 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
         projectIdAndPath2.id shouldBe project2.id
         projectIdAndPath3.id shouldBe project3.id
 
-        priority1 shouldBe BigDecimal(1.0)
-        priority2   should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
-        priority3   should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
+        priority1.value shouldBe BigDecimal(1.0)
+        priority2.value   should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
+        priority3.value   should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
       }
   }
 
