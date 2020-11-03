@@ -133,6 +133,21 @@ object JsonLD {
             Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
       }
     override lazy val asArray: Option[Vector[JsonLD]] = Some(Vector(this))
+
+    override def hashCode(): Int =
+      ((id.hashCode().toLong +
+        types.hashCode().toLong +
+        properties.toList.toSet.hashCode().toLong +
+        reverse.hashCode().toLong) % Int.MaxValue).toInt
+
+    override def equals(that: Any): Boolean = that match {
+      case JsonLDEntity(id, types, properties, reverse) =>
+        id == this.id &&
+          types == this.types &&
+          properties.toList.toSet == this.properties.toList.toSet &&
+          reverse == this.reverse
+      case _ => false
+    }
   }
 
   object JsonLDEntity {
@@ -193,6 +208,14 @@ object JsonLD {
   }
 
   private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD {
+
+    override def hashCode(): Int = jsons.toSet.hashCode()
+
+    override def equals(that: Any): Boolean = that match {
+      case JsonLDArray(thatJsons) => thatJsons.toSet.equals(this.jsons.toSet)
+      case _                      => false
+    }
+
     override lazy val toJson:      Json                = Json.arr(jsons.map(_.toJson): _*)
     override lazy val entityId:    Option[EntityId]    = None
     override lazy val entityTypes: Option[EntityTypes] = None
@@ -208,9 +231,9 @@ object JsonLD {
           case (acc, other: JsonLD) => acc :+ other
         }
       val idsReferToSameEntities: Boolean = areEntitiesIDsUnique(jsonArray)
-      if (idsReferToSameEntities)
-        Right(JsonLD.arr(jsonArray: _*))
-      else {
+      if (idsReferToSameEntities) {
+        Right(JsonLD.arr(jsonArray.distinct: _*))
+      } else {
         Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
       }
     }
