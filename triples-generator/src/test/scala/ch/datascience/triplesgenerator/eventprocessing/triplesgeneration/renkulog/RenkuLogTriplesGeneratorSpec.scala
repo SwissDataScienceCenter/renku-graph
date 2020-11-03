@@ -53,7 +53,6 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
     "create a temp directory, " +
       "clone the repo into it, " +
-      "check out the commit, " +
       "verify it's not a migration commit, " +
       "call 'renku migrate', " +
       "call 'renku log' without --revision when no parent commit, " +
@@ -73,12 +72,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         (git
           .clone(_: ServiceUrl, _: Path, _: Path))
           .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-          .returning(rightT[IO, GenerationRecoverableError](()))
-
-        (git
-          .checkout(_: CommitId, _: Path))
-          .expects(commitId, repositoryDirectory)
-          .returning(IO.unit)
+          .returning(rightT[IO, ProcessingRecoverableError](()))
 
         (git
           .findCommitMessage(_: CommitId, _: Path))
@@ -126,12 +120,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         (git
           .clone(_: ServiceUrl, _: Path, _: Path))
           .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-          .returning(rightT[IO, GenerationRecoverableError](()))
-
-        (git
-          .checkout(_: CommitId, _: Path))
-          .expects(commitId, repositoryDirectory)
-          .returning(IO.unit)
+          .returning(rightT[IO, ProcessingRecoverableError](()))
 
         (git
           .findCommitMessage(_: CommitId, _: Path))
@@ -173,12 +162,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
-
-      (git
-        .checkout(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(IO.unit)
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       (git
         .findCommitMessage(_: CommitId, _: Path))
@@ -224,12 +208,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         (git
           .clone(_: ServiceUrl, _: Path, _: Path))
           .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-          .returning(rightT[IO, GenerationRecoverableError](()))
-
-        (git
-          .checkout(_: CommitId, _: Path))
-          .expects(commitId, repositoryDirectory)
-          .returning(IO.unit)
+          .returning(rightT[IO, ProcessingRecoverableError](()))
 
         (git
           .findCommitMessage(_: CommitId, _: Path))
@@ -334,7 +313,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(EitherT.liftF[IO, GenerationRecoverableError, Unit](IO.raiseError(exception)))
+        .returning(EitherT.liftF[IO, ProcessingRecoverableError, Unit](IO.raiseError(exception)))
 
       (file
         .deleteDirectory(_: Path))
@@ -352,42 +331,6 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       actual.getCause shouldBe null
     }
 
-    "fail if checking out the sha fails" in new TestCase {
-
-      (file
-        .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
-
-      (gitLabRepoUrlFinder
-        .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
-        .expects(projectPath, maybeAccessToken)
-        .returning(IO.pure(gitRepositoryUrl))
-
-      (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
-
-      val exception = exceptions.generateOne
-      (git
-        .checkout(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(IO.raiseError(exception))
-
-      (file
-        .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.unit)
-        .atLeastOnce()
-
-      val actual = intercept[Exception] {
-        triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
-      }
-      actual.getMessage shouldBe "Triples generation failed"
-      actual.getCause   shouldBe exception
-    }
-
     "fail if finding commit message fails" in new TestCase {
 
       (file
@@ -403,12 +346,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
-
-      (git
-        .checkout(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(IO.unit)
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       val exception = exceptions.generateOne
       (git
@@ -438,12 +376,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
-
-      (git
-        .checkout(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(IO.unit)
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       (git
         .findCommitMessage(_: CommitId, _: Path))
@@ -484,12 +417,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
-
-      (git
-        .checkout(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(IO.unit)
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       (git
         .findCommitMessage(_: CommitId, _: Path))
@@ -535,12 +463,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       (git
         .clone(_: ServiceUrl, _: Path, _: Path))
         .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
-        .returning(rightT[IO, GenerationRecoverableError](()))
-
-      (git
-        .checkout(_: CommitId, _: Path))
-        .expects(commitId, repositoryDirectory)
-        .returning(IO.unit)
+        .returning(rightT[IO, ProcessingRecoverableError](()))
 
       (git
         .findCommitMessage(_: CommitId, _: Path))

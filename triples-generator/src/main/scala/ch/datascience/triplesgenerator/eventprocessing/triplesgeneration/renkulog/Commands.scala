@@ -105,8 +105,8 @@ private object Commands {
         repositoryUrl:        ServiceUrl,
         destinationDirectory: Path,
         workDirectory:        Path
-    ): EitherT[IO, GenerationRecoverableError, Unit] =
-      EitherT[IO, GenerationRecoverableError, Unit] {
+    ): EitherT[IO, ProcessingRecoverableError, Unit] =
+      EitherT[IO, ProcessingRecoverableError, Unit] {
         IO {
           doClone(repositoryUrl, destinationDirectory, workDirectory)
         }.map(_ => ().asRight[GenerationRecoverableError])
@@ -197,8 +197,17 @@ private object Commands {
       }
 
     implicit val commitWithoutParentTriplesFinder: (CommitEventWithoutParent, Path) => CommandResult = {
-      case (_, destinationDirectory) =>
-        %%("renku", "log", "--format", "json-ld", "--strict")(destinationDirectory)
+      case (commit, destinationDirectory) =>
+        val changedFiles = %%(
+          "git",
+          "diff-tree",
+          "--no-commit-id",
+          "--name-only",
+          "-r",
+          s"${commit.commitId.toString}..${commit.commitId.toString}"
+        )(destinationDirectory).out.lines
+
+        %%("renku", "log", "--format", "json-ld", "--strict", "--", changedFiles)(destinationDirectory)
     }
 
     implicit val commitWithParentTriplesFinder: (CommitEventWithParent, Path) => CommandResult = {

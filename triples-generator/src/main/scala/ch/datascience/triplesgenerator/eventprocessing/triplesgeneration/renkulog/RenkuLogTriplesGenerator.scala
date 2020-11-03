@@ -79,7 +79,6 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
     for {
       repositoryUrl <- findRepositoryUrl(commitEvent.project.path, maybeAccessToken).toRight
       _             <- git.clone(repositoryUrl, repoDirectory, workDirectory)
-      _             <- (git.checkout(commitEvent.commitId, repoDirectory)).toRight
     } yield ()
 
   private def processEvent(commitEvent:   CommitEvent,
