@@ -24,9 +24,7 @@ import java.time.{Instant, LocalDate}
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import io.circe.{Encoder, Json}
-import io.renku.jsonld.JsonLD.{JsonLDArray, MalformedJsonLD}
-
-import scala.annotation.tailrec
+import io.renku.jsonld.JsonLD.MalformedJsonLD
 
 abstract class JsonLD extends Product with Serializable {
   def toJson: Json
@@ -36,8 +34,6 @@ abstract class JsonLD extends Product with Serializable {
   def entityTypes: Option[EntityTypes]
 
   def cursor: Cursor = Cursor.from(this)
-
-  def flatten: Either[MalformedJsonLD, JsonLD]
 
   def asArray: Option[Vector[JsonLD]]
 }
@@ -122,16 +118,16 @@ object JsonLD {
 
     override lazy val entityId:    Option[EntityId]    = Some(id)
     override lazy val entityTypes: Option[EntityTypes] = Some(types)
-    override lazy val flatten: Either[MalformedJsonLD, JsonLD] =
-      deNest(this, List.empty[JsonLDEntity]) match {
-        case (updatedEntity, entities) if entities.isEmpty => Right(updatedEntity)
-        case (updatedEntity, entities) =>
-          val idsReferToSameEntities = areEntitiesIDsUnique(entities)
-          if (idsReferToSameEntities)
-            Right(JsonLDArray(updatedEntity +: entities))
-          else
-            Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
-      }
+    //    override lazy val flatten: Either[MalformedJsonLD, JsonLD] =
+    //      deNest(this, List.empty[JsonLDEntity]) match {
+    //        case (updatedEntity, entities) if entities.isEmpty => Right(updatedEntity)
+    //        case (updatedEntity, entities) =>
+    //          val idsReferToSameEntities = areEntitiesIDsUnique(entities)
+    //          if (idsReferToSameEntities)
+    //            Right(JsonLDArray(updatedEntity +: entities))
+    //          else
+    //            Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
+    //      }
     override lazy val asArray: Option[Vector[JsonLD]] = Some(Vector(this))
 
     override def hashCode(): Int =
@@ -179,9 +175,8 @@ object JsonLD {
       case Some(t) => Json.obj("@type" -> t.asJson, "@value" -> value.asJson)
     }
 
-    override lazy val entityId:    Option[EntityId]                = None
-    override lazy val entityTypes: Option[EntityTypes]             = None
-    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val entityId:    Option[EntityId]    = None
+    override lazy val entityTypes: Option[EntityTypes] = None
 
     override lazy val asArray: Option[Vector[JsonLD]] = Some(Vector(this))
   }
@@ -192,11 +187,10 @@ object JsonLD {
   }
 
   private[jsonld] final case object JsonLDNull extends JsonLD {
-    override lazy val toJson:      Json                            = Json.Null
-    override lazy val entityId:    Option[EntityId]                = None
-    override lazy val entityTypes: Option[EntityTypes]             = None
-    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
-    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(JsonLD.Null))
+    override lazy val toJson:      Json                   = Json.Null
+    override lazy val entityId:    Option[EntityId]       = None
+    override lazy val entityTypes: Option[EntityTypes]    = None
+    override lazy val asArray:     Option[Vector[JsonLD]] = Some(Vector(JsonLD.Null))
   }
 
   private[jsonld] final case object JsonLDOptionValue {
@@ -219,24 +213,24 @@ object JsonLD {
     override lazy val toJson:      Json                = Json.arr(jsons.map(_.toJson): _*)
     override lazy val entityId:    Option[EntityId]    = None
     override lazy val entityTypes: Option[EntityTypes] = None
-    override lazy val flatten: Either[MalformedJsonLD, JsonLD] = {
-      val jsonArray = jsons
-        .foldLeft(List.empty[JsonLD]) {
-          case (acc, jsonLDEntity: JsonLDEntity) =>
-            val (updatedEntity, entities) = deNest(jsonLDEntity, List.empty[JsonLDEntity])
-            entities ++ acc :+ updatedEntity
-          case (acc, JsonLDArray(jsonlds)) =>
-            val (arrayElements, entities) = deNestJsonLDArray(jsonlds, List.empty[JsonLDEntity])
-            entities ++ acc :+ JsonLDArray(arrayElements)
-          case (acc, other: JsonLD) => acc :+ other
-        }
-      val idsReferToSameEntities: Boolean = areEntitiesIDsUnique(jsonArray)
-      if (idsReferToSameEntities) {
-        Right(JsonLD.arr(jsonArray.distinct: _*))
-      } else {
-        Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
-      }
-    }
+    //    override lazy val flatten: Either[MalformedJsonLD, JsonLD] = {
+    //      val jsonArray = jsons
+    //        .foldLeft(List.empty[JsonLD]) {
+    //          case (acc, jsonLDEntity: JsonLDEntity) =>
+    //            val (updatedEntity, entities) = deNest(jsonLDEntity, List.empty[JsonLDEntity])
+    //            entities ++ acc :+ updatedEntity
+    //          case (acc, JsonLDArray(jsonlds)) =>
+    //            val (arrayElements, entities) = deNestJsonLDArray(jsonlds, List.empty[JsonLDEntity])
+    //            entities ++ acc :+ JsonLDArray(arrayElements)
+    //          case (acc, other: JsonLD) => acc :+ other
+    //        }
+    //      val idsReferToSameEntities: Boolean = areEntitiesIDsUnique(jsonArray)
+    //      if (idsReferToSameEntities) {
+    //        Right(JsonLD.arr(jsonArray.distinct: _*))
+    //      } else {
+    //        Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
+    //      }
+    //    }
     override lazy val asArray: Option[Vector[JsonLD]] = Some(jsons.toVector)
   }
 
@@ -249,11 +243,10 @@ object JsonLD {
   }
 
   private[jsonld] final case class JsonLDEntityId[V <: EntityId](id: V)(implicit encoder: Encoder[V]) extends JsonLD {
-    override lazy val toJson:      Json                            = Json.obj("@id" -> id.asJson)
-    override lazy val entityId:    Option[EntityId]                = None
-    override lazy val entityTypes: Option[EntityTypes]             = None
-    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
-    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
+    override lazy val toJson:      Json                   = Json.obj("@id" -> id.asJson)
+    override lazy val entityId:    Option[EntityId]       = None
+    override lazy val entityTypes: Option[EntityTypes]    = None
+    override lazy val asArray:     Option[Vector[JsonLD]] = Some(Vector(this))
   }
 
   final case class MalformedJsonLD(message: String) extends RuntimeException(message)
@@ -298,5 +291,9 @@ object JsonLD {
         (arrayElements :+ JsonLDArray(nestedArrayElements)) -> deNestedEntities
       case ((arrayElements, toplevelEntities), entity) => (arrayElements :+ entity) -> toplevelEntities
     }
+
+  implicit class JsonLDOps(jsonLD: JsonLD) {
+    def flatten: Either[MalformedJsonLD, JsonLD] = Flattener.flatten(jsonLD)
+  }
 
 }
