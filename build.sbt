@@ -203,10 +203,10 @@ releaseProcess := Seq[ReleaseStep](
   checkSnapshotDependencies,
   inquireVersions,
   runClean,
-  runTest,
   setReleaseVersion,
   setReleaseVersionToChart,
   commitReleaseVersion,
+  waitForVcs,
   tagRelease,
   publishArtifacts,
   setNextVersion,
@@ -217,6 +217,10 @@ releaseProcess := Seq[ReleaseStep](
 
 lazy val setReleaseVersionToChart: ReleaseStep = setReleaseVersionChart(_._1)
 lazy val setNextVersionToChart:    ReleaseStep = setNextReleaseVersionChart(_._2)
+lazy val waitForVcs: ReleaseStep = { state: State =>
+  Thread sleep 1000
+  state
+}
 
 def setReleaseVersionChart(selectVersion: Versions => String): ReleaseStep = { state: State =>
   val version = findVersion(selectVersion, state)
