@@ -84,16 +84,15 @@ private class EventFetcherImpl(
 
   // format: off
   private def findProjectsWithEventsInQueue = SqlQuery({
-      fr"""select distinct event_log.project_id, event_log.project_path, MAX(event_date) latest_event_date, 
-           COUNT(case WHEN status = ${Processing: EventStatus}  THEN event_id END) as current_occupancy 
-           from (
-             select distinct project_id
-             from event_log
-             where (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
-                   or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
-           ) projects_with_work
-           join event_log on event_log.project_id = projects_with_work.project_id
-           group by event_log.project_id, event_log.project_path
+      fr"""select 
+             project_id,
+             project_path,
+             MAX(event_date) latest_event_date,
+             (select count(event_id) from event_log el_int where el_int.project_id = el.project_id and el_int.status = 'PROCESSING') as current_occupancy 
+           from event_log el
+           where (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
+             or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
+           group by project_id, project_path
            order by latest_event_date desc
            limit ${projectsFetchingLimit.value}  
            """ 
@@ -106,15 +105,18 @@ private class EventFetcherImpl(
 
   // format: off
   private def findOldestEvent(idAndPath: ProjectIdAndPath) = SqlQuery({
-      fr"""select event_log.event_id, event_log.project_id, event_log.event_body
-           from event_log
-           where project_id = ${idAndPath.id}
-             and (
-               (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
-               or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
-             )
-           order by event_date asc
-           limit 1"""
+      fr"""select el.event_id, el.project_id, el.event_body
+           from (
+             select project_id, min(event_date) as min_event_date
+             from event_log
+             where project_id = ${idAndPath.id}
+               and ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
+                 or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime}))
+             group by project_id
+           ) oldest_event_date
+           join event_log el on oldest_event_date.project_id = el.project_id and oldest_event_date.min_event_date = el.event_date
+           limit 1
+           """
     }.query[EventIdAndBody].option,
     name = "pop event - oldest"
   )
