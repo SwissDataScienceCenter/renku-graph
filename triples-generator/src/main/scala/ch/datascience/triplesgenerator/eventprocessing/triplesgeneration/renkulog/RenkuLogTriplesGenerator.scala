@@ -18,6 +18,7 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
+import java.nio.file.Paths
 import java.security.SecureRandom
 
 import cats.data.EitherT
@@ -25,6 +26,7 @@ import cats.data.EitherT.{right, rightT}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabUrl, RenkuLogTimeout}
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
@@ -54,6 +56,7 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
 
   private val workDirectory: Path = root / "tmp"
   private val repositoryDirectoryFinder = ".*/(.*)$".r
+  private val gitAttributeFileName      = ".gitattributes"
 
   override def generateTriples(
       commitEvent:             CommitEvent
@@ -69,6 +72,7 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
   ): IO[Either[ProcessingRecoverableError, GenerationResult]] = {
     for {
       _      <- prepareRepository(commitEvent, repoDirectory)
+      _      <- cleanUpRepository(repoDirectory).toRight
       result <- processEvent(commitEvent, repoDirectory)
     } yield result
   }.value
@@ -81,6 +85,18 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
       _             <- git.clone(repositoryUrl, repoDirectory, workDirectory)
       _             <- (git.checkout(commitEvent.commitId, repoDirectory)).toRight
     } yield ()
+
+  private def cleanUpRepository(repoDirectory: Path) = {
+    val gitAttributeFilePath: Path = repoDirectory / gitAttributeFileName
+    file.exists(gitAttributeFilePath).flatMap {
+      case false => IO.unit
+      case true =>
+        for {
+          _ <- git.rm(gitAttributeFilePath, repoDirectory)
+          _ <- git.checkoutCurrent(repoDirectory)
+        } yield ()
+    }
+  }
 
   private def processEvent(commitEvent:   CommitEvent,
                            repoDirectory: Path

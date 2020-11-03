@@ -18,6 +18,8 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
+import java.nio.file.Paths
+
 import cats.MonadError
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
@@ -32,6 +34,7 @@ import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
+import sourcecode.FileName
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -81,6 +84,10 @@ private object Commands {
     def deleteDirectory(repositoryDirectory: Path): IO[Unit] = IO {
       ops.rm ! repositoryDirectory
     }
+
+    def exists(fileName: Path): IO[Boolean] = IO {
+      ops.exists(fileName)
+    }
   }
 
   class Git(
@@ -94,6 +101,11 @@ private object Commands {
     def checkout(commitId: CommitId, repositoryDirectory: Path): IO[Unit] =
       IO {
         %%("git", "checkout", commitId.value)(repositoryDirectory)
+      }.map(_ => ())
+
+    def checkoutCurrent(repositoryDirectory: Path): IO[Unit] =
+      IO {
+        %%("git", "checkout", ".")(repositoryDirectory)
       }.map(_ => ())
 
     def findCommitMessage(commitId: CommitId, repositoryDirectory: Path): IO[String] =
@@ -112,6 +124,10 @@ private object Commands {
         }.map(_ => ().asRight[GenerationRecoverableError])
           .recoverWith(relevantError)
       }
+
+    def rm(fileName: Path, repositoryDirectory: Path): IO[Unit] = IO {
+      %%("git", "rm", fileName)(repositoryDirectory)
+    }.map(_ => ())
 
     private val recoverableErrors = Set("SSL_ERROR_SYSCALL",
                                         "the remote end hung up unexpectedly",
