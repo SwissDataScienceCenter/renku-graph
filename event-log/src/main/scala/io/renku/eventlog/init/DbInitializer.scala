@@ -41,6 +41,7 @@ class DbInitializer[Interpretation[_]](
     for {
       _ <- createTable()
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)")
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_log(event_id)")
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)")
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)")
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)")
