@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
-import java.nio.file.Paths
 import java.security.SecureRandom
 
 import cats.data.EitherT
@@ -26,7 +25,6 @@ import cats.data.EitherT.{right, rightT}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabUrl, RenkuLogTimeout}
-import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
@@ -34,7 +32,7 @@ import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.GenerationResult._
-import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.GitLabRepoUrlFinder
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.{GenerationResult, TriplesGenerator}
 
 import scala.concurrent.ExecutionContext
@@ -63,55 +61,57 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
     EitherT {
       createRepositoryDirectory(commitEvent.project.path)
-        .bracket(cloneCheckoutGenerate(commitEvent))(deleteDirectory)
+        .bracket(path => cloneCheckoutGenerate(commitEvent)(maybeAccessToken, RepositoryPath(path)))(deleteDirectory)
         .recoverWith(meaningfulError(maybeAccessToken))
     }
 
-  private def cloneCheckoutGenerate(commitEvent: CommitEvent)(repoDirectory: Path)(implicit
-      maybeAccessToken:                          Option[AccessToken]
+  private def cloneCheckoutGenerate(commitEvent: CommitEvent)(implicit
+      maybeAccessToken:                          Option[AccessToken],
+      repoDirectory:                             RepositoryPath
   ): IO[Either[ProcessingRecoverableError, GenerationResult]] = {
     for {
-      _      <- prepareRepository(commitEvent, repoDirectory)
-      _      <- cleanUpRepository(repoDirectory).toRight
-      result <- processEvent(commitEvent, repoDirectory)
+      _      <- prepareRepository(commitEvent)
+      _      <- cleanUpRepository().toRight
+      result <- processEvent(commitEvent)
     } yield result
   }.value
 
-  private def prepareRepository(commitEvent: CommitEvent, repoDirectory: Path)(implicit
-      maybeAccessToken:                      Option[AccessToken]
+  private def prepareRepository(commitEvent: CommitEvent)(implicit
+      maybeAccessToken:                      Option[AccessToken],
+      repoDirectory:                         RepositoryPath
   ): EitherT[IO, ProcessingRecoverableError, Unit] =
     for {
       repositoryUrl <- findRepositoryUrl(commitEvent.project.path, maybeAccessToken).toRight
-      _             <- git.clone(repositoryUrl, repoDirectory, workDirectory)
-      _             <- (git.checkout(commitEvent.commitId, repoDirectory)).toRight
+      _             <- git.clone(repositoryUrl, workDirectory)
+      _             <- (git.checkout(commitEvent.commitId)).toRight
     } yield ()
 
-  private def cleanUpRepository(repoDirectory: Path) = {
-    val gitAttributeFilePath: Path = repoDirectory / gitAttributeFileName
+  private def cleanUpRepository()(implicit repoDirectory: RepositoryPath) = {
+    val gitAttributeFilePath = repoDirectory.value / gitAttributeFileName
     file.exists(gitAttributeFilePath).flatMap {
       case false => IO.unit
       case true =>
         for {
-          _ <- git.rm(gitAttributeFilePath, repoDirectory)
-          _ <- git.checkoutCurrent(repoDirectory)
+          _ <- git.rm(gitAttributeFilePath)
+          _ <- git.checkoutCurrent()
         } yield ()
     }
   }
 
-  private def processEvent(commitEvent:   CommitEvent,
-                           repoDirectory: Path
-  ): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
-    (git.findCommitMessage(commitEvent.commitId, repoDirectory)).toRight flatMap {
+  private def processEvent(
+      commitEvent:          CommitEvent
+  )(implicit repoDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
+    (git.findCommitMessage(commitEvent.commitId)).toRight flatMap {
       case message if message contains "renku migrate" => rightT[IO, ProcessingRecoverableError](MigrationEvent)
-      case _                                           => migrateAndLog(commitEvent, repoDirectory)
+      case _                                           => migrateAndLog(commitEvent)
     }
 
-  private def migrateAndLog(commitEvent:   CommitEvent,
-                            repoDirectory: Path
-  ): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
+  private def migrateAndLog(
+      commitEvent:          CommitEvent
+  )(implicit repoDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
     for {
-      _       <- (renku.migrate(commitEvent, repoDirectory)).toRight
-      triples <- findTriples(commitEvent, repoDirectory)
+      _       <- (renku.migrate(commitEvent)).toRight
+      triples <- findTriples(commitEvent)
     } yield Triples(triples)
 
   private implicit class IOOps[Right](io: IO[Right]) {
@@ -128,14 +128,14 @@ private[eventprocessing] class RenkuLogTriplesGenerator private[renkulog] (
     case repositoryDirectoryFinder(folderName) => folderName
   }
 
-  private def findTriples(commitEvent:         CommitEvent,
-                          repositoryDirectory: Path
-  ): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = {
+  private def findTriples(
+      commitEvent:                CommitEvent
+  )(implicit repositoryDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = {
     import renku._
 
     commitEvent match {
-      case withParent:    CommitEventWithParent    => renku.log(withParent, repositoryDirectory)
-      case withoutParent: CommitEventWithoutParent => renku.log(withoutParent, repositoryDirectory)
+      case withParent:    CommitEventWithParent    => renku.log(withParent)
+      case withoutParent: CommitEventWithoutParent => renku.log(withoutParent)
     }
   }
 

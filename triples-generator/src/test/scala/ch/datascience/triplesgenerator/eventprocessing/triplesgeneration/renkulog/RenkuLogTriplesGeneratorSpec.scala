@@ -37,6 +37,7 @@ import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.GenerationResult.{MigrationEvent, Triples}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.RepositoryPath
 import ch.datascience.triplesgenerator.eventprocessing.{CommitEvent, Project}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
@@ -63,8 +64,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
         (file
           .mkdir(_: Path))
-          .expects(repositoryDirectory)
-          .returning(IO.pure(repositoryDirectory))
+          .expects(repositoryDirectory.value)
+          .returning(IO.pure(repositoryDirectory.value))
 
         (gitLabRepoUrlFinder
           .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -72,42 +73,42 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
           .returning(IO.pure(gitRepositoryUrl))
 
         (git
-          .clone(_: ServiceUrl, _: Path, _: Path))
-          .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+          .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+          .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
           .returning(rightT[IO, GenerationRecoverableError](()))
 
         (git
-          .checkout(_: CommitId, _: Path))
+          .checkout(_: CommitId)(_: RepositoryPath))
           .expects(commitId, repositoryDirectory)
           .returning(IO.unit)
 
         (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(true.pure[IO])
 
-        (git.rm(_: Path, _: Path)).expects(dirtyRepoFilePath, repositoryDirectory).returning(IO.unit)
+        (git.rm(_: Path)(_: RepositoryPath)).expects(dirtyRepoFilePath, repositoryDirectory).returning(IO.unit)
 
         (git
-          .checkoutCurrent(_: Path))
+          .checkoutCurrent()(_: RepositoryPath))
           .expects(repositoryDirectory)
           .returning(IO.unit)
 
         (git
-          .findCommitMessage(_: CommitId, _: Path))
+          .findCommitMessage(_: CommitId)(_: RepositoryPath))
           .expects(commitId, repositoryDirectory)
           .returning(nonBlankStrings().generateOne.value.pure[IO])
 
         (renku
-          .migrate(_: CommitEvent, _: Path))
+          .migrate(_: CommitEvent)(_: RepositoryPath))
           .expects(commitWithoutParent, repositoryDirectory)
           .returning(IO.unit)
 
         (renku
-          .log(_: CommitEventWithoutParent, _: Path)(_: (CommitEventWithoutParent, Path) => CommandResult))
-          .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
+          .log(_: CommitEventWithoutParent)(_: (CommitEventWithoutParent, Path) => CommandResult, _: RepositoryPath))
+          .expects(commitWithoutParent, renku.commitWithoutParentTriplesFinder, repositoryDirectory)
           .returning(rightT[IO, ProcessingRecoverableError](triples))
 
         (file
           .deleteDirectory(_: Path))
-          .expects(repositoryDirectory)
+          .expects(repositoryDirectory.value)
           .returning(IO.unit)
           .atLeastOnce()
 
@@ -125,8 +126,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
         (file
           .mkdir(_: Path))
-          .expects(repositoryDirectory)
-          .returning(IO.pure(repositoryDirectory))
+          .expects(repositoryDirectory.value)
+          .returning(IO.pure(repositoryDirectory.value))
 
         (gitLabRepoUrlFinder
           .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -134,35 +135,35 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
           .returning(IO.pure(gitRepositoryUrl))
 
         (git
-          .clone(_: ServiceUrl, _: Path, _: Path))
-          .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+          .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+          .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
           .returning(rightT[IO, GenerationRecoverableError](()))
 
         (git
-          .checkout(_: CommitId, _: Path))
+          .checkout(_: CommitId)(_: RepositoryPath))
           .expects(commitId, repositoryDirectory)
           .returning(IO.unit)
 
         (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
         (git
-          .findCommitMessage(_: CommitId, _: Path))
+          .findCommitMessage(_: CommitId)(_: RepositoryPath))
           .expects(commitId, repositoryDirectory)
           .returning(nonBlankStrings().generateOne.value.pure[IO])
 
         (renku
-          .migrate(_: CommitEvent, _: Path))
+          .migrate(_: CommitEvent)(_: RepositoryPath))
           .expects(commitWithoutParent, repositoryDirectory)
           .returning(IO.unit)
 
         (renku
-          .log(_: CommitEventWithoutParent, _: Path)(_: (CommitEventWithoutParent, Path) => CommandResult))
-          .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
+          .log(_: CommitEventWithoutParent)(_: (CommitEventWithoutParent, Path) => CommandResult, _: RepositoryPath))
+          .expects(commitWithoutParent, renku.commitWithoutParentTriplesFinder, repositoryDirectory)
           .returning(rightT[IO, ProcessingRecoverableError](triples))
 
         (file
           .deleteDirectory(_: Path))
-          .expects(repositoryDirectory)
+          .expects(repositoryDirectory.value)
           .returning(IO.unit)
           .atLeastOnce()
 
@@ -180,8 +181,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
         (file
           .mkdir(_: Path))
-          .expects(repositoryDirectory)
-          .returning(IO.pure(repositoryDirectory))
+          .expects(repositoryDirectory.value)
+          .returning(IO.pure(repositoryDirectory.value))
 
         (gitLabRepoUrlFinder
           .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -189,36 +190,36 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
           .returning(IO.pure(gitRepositoryUrl))
 
         (git
-          .clone(_: ServiceUrl, _: Path, _: Path))
-          .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+          .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+          .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
           .returning(rightT[IO, GenerationRecoverableError](()))
 
         (git
-          .checkout(_: CommitId, _: Path))
+          .checkout(_: CommitId)(_: RepositoryPath))
           .expects(commitId, repositoryDirectory)
           .returning(IO.unit)
 
         (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
         (git
-          .findCommitMessage(_: CommitId, _: Path))
+          .findCommitMessage(_: CommitId)(_: RepositoryPath))
           .expects(commitId, repositoryDirectory)
           .returning(nonBlankStrings().generateOne.value.pure[IO])
 
         val commitWithParent = toCommitWithParent(commitWithoutParent)
         (renku
-          .migrate(_: CommitEvent, _: Path))
+          .migrate(_: CommitEvent)(_: RepositoryPath))
           .expects(commitWithParent, repositoryDirectory)
           .returning(IO.unit)
 
         (renku
-          .log(_: CommitEventWithParent, _: Path)(_: (CommitEventWithParent, Path) => CommandResult))
-          .expects(commitWithParent, repositoryDirectory, renku.commitWithParentTriplesFinder)
+          .log(_: CommitEventWithParent)(_: (CommitEventWithParent, Path) => CommandResult, _: RepositoryPath))
+          .expects(commitWithParent, renku.commitWithParentTriplesFinder, repositoryDirectory)
           .returning(rightT(triples))
 
         (file
           .deleteDirectory(_: Path))
-          .expects(repositoryDirectory)
+          .expects(repositoryDirectory.value)
           .returning(IO.unit)
           .atLeastOnce()
 
@@ -229,8 +230,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
         .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -238,37 +239,37 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
         .returning(rightT[IO, GenerationRecoverableError](()))
 
       (git
-        .checkout(_: CommitId, _: Path))
+        .checkout(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
       (git
-        .findCommitMessage(_: CommitId, _: Path))
+        .findCommitMessage(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(nonBlankStrings().generateOne.value.pure[IO])
 
       val commitWithParent = toCommitWithParent(commitWithoutParent)
       (renku
-        .migrate(_: CommitEvent, _: Path))
+        .migrate(_: CommitEvent)(_: RepositoryPath))
         .expects(commitWithParent, repositoryDirectory)
         .returning(IO.unit)
 
       val error = GenerationRecoverableError(nonBlankStrings().generateOne)
       (renku
-        .log(_: CommitEventWithParent, _: Path)(_: (CommitEventWithParent, Path) => CommandResult))
-        .expects(commitWithParent, repositoryDirectory, renku.commitWithParentTriplesFinder)
+        .log(_: CommitEventWithParent)(_: (CommitEventWithParent, Path) => CommandResult, _: RepositoryPath))
+        .expects(commitWithParent, renku.commitWithParentTriplesFinder, repositoryDirectory)
         .returning(leftT(error))
 
       (file
         .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
+        .expects(repositoryDirectory.value)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -282,8 +283,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
         (file
           .mkdir(_: Path))
-          .expects(repositoryDirectory)
-          .returning(IO.pure(repositoryDirectory))
+          .expects(repositoryDirectory.value)
+          .returning(IO.pure(repositoryDirectory.value))
 
         (gitLabRepoUrlFinder
           .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -291,25 +292,25 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
           .returning(IO.pure(gitRepositoryUrl))
 
         (git
-          .clone(_: ServiceUrl, _: Path, _: Path))
-          .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+          .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+          .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
           .returning(rightT[IO, GenerationRecoverableError](()))
 
         (git
-          .checkout(_: CommitId, _: Path))
+          .checkout(_: CommitId)(_: RepositoryPath))
           .expects(commitId, repositoryDirectory)
           .returning(IO.unit)
 
         (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
         (git
-          .findCommitMessage(_: CommitId, _: Path))
+          .findCommitMessage(_: CommitId)(_: RepositoryPath))
           .expects(commitId, repositoryDirectory)
           .returning(sentenceContaining("renku migrate").generateOne.value.pure[IO])
 
         (file
           .deleteDirectory(_: Path))
-          .expects(repositoryDirectory)
+          .expects(repositoryDirectory.value)
           .returning(IO.unit)
           .atLeastOnce()
 
@@ -320,8 +321,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
 
       implicit override lazy val maybeAccessToken: Option[AccessToken] = accessTokens.generateSome
       (gitLabRepoUrlFinder
@@ -331,13 +332,13 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       val exception = GenerationRecoverableError(nonBlankStrings().generateOne.value)
       (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
         .returning(EitherT.leftT[IO, Unit](exception))
 
       (file
         .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
+        .expects(repositoryDirectory.value)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -351,7 +352,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       val exception = exceptions.generateOne
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
+        .expects(repositoryDirectory.value)
         .returning(IO.raiseError(exception))
 
       val actual = intercept[Exception] {
@@ -365,8 +366,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
 
       val exception = exceptions.generateOne
       (gitLabRepoUrlFinder
@@ -376,7 +377,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
+        .expects(repositoryDirectory.value)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -391,8 +392,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
 
       val accessToken = accessTokens.generateOne
       implicit override lazy val maybeAccessToken: Option[AccessToken] = Some(accessToken)
@@ -403,13 +404,13 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       val exception = new Exception(s"${exceptions.generateOne.getMessage} $gitRepositoryUrl")
       (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
         .returning(EitherT.liftF[IO, GenerationRecoverableError, Unit](IO.raiseError(exception)))
 
       (file
         .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
+        .expects(repositoryDirectory.value)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -427,8 +428,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
         .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -436,19 +437,19 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
         .returning(rightT[IO, GenerationRecoverableError](()))
 
       val exception = exceptions.generateOne
       (git
-        .checkout(_: CommitId, _: Path))
+        .checkout(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(IO.raiseError(exception))
 
       (file
         .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
+        .expects(repositoryDirectory.value)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -463,8 +464,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
         .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -472,12 +473,12 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
         .returning(rightT[IO, GenerationRecoverableError](()))
 
       (git
-        .checkout(_: CommitId, _: Path))
+        .checkout(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
@@ -489,7 +490,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
+        .expects(repositoryDirectory.value)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -504,8 +505,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
         .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -513,23 +514,26 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
         .returning(rightT[IO, GenerationRecoverableError](()))
 
       (git
-        .checkout(_: CommitId, _: Path))
+        .checkout(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(true.pure[IO])
 
       val exception = exceptions.generateOne
-      (git.rm(_: Path, _: Path)).expects(dirtyRepoFilePath, repositoryDirectory).returning(IO.raiseError(exception))
+      (git
+        .rm(_: Path)(_: RepositoryPath))
+        .expects(dirtyRepoFilePath, repositoryDirectory)
+        .returning(IO.raiseError(exception))
 
       (file
         .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
+        .expects(repositoryDirectory.value)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -544,8 +548,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
         .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -553,29 +557,29 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
         .returning(rightT[IO, GenerationRecoverableError](()))
 
       (git
-        .checkout(_: CommitId, _: Path))
+        .checkout(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(true.pure[IO])
 
-      (git.rm(_: Path, _: Path)).expects(dirtyRepoFilePath, repositoryDirectory).returning(IO.unit)
+      (git.rm(_: Path)(_: RepositoryPath)).expects(dirtyRepoFilePath, repositoryDirectory).returning(IO.unit)
 
       val exception = exceptions.generateOne
 
       (git
-        .checkoutCurrent(_: Path))
+        .checkoutCurrent()(_: RepositoryPath))
         .expects(repositoryDirectory)
         .returning(IO.raiseError(exception))
 
       (file
         .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
+        .expects(repositoryDirectory.value)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -590,8 +594,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
         .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -599,12 +603,12 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
         .returning(rightT[IO, GenerationRecoverableError](()))
 
       (git
-        .checkout(_: CommitId, _: Path))
+        .checkout(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
@@ -612,7 +616,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       val exception = exceptions.generateOne
       (git
-        .findCommitMessage(_: CommitId, _: Path))
+        .findCommitMessage(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(IO.raiseError(exception))
 
@@ -627,8 +631,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
         .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -636,31 +640,31 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
         .returning(rightT[IO, GenerationRecoverableError](()))
 
       (git
-        .checkout(_: CommitId, _: Path))
+        .checkout(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
       (git
-        .findCommitMessage(_: CommitId, _: Path))
+        .findCommitMessage(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(nonBlankStrings().generateOne.value.pure[IO])
 
       val exception = exceptions.generateOne
       (renku
-        .migrate(_: CommitEvent, _: Path))
+        .migrate(_: CommitEvent)(_: RepositoryPath))
         .expects(commitWithoutParent, repositoryDirectory)
         .returning(IO.raiseError(exception))
 
       (file
         .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
+        .expects(repositoryDirectory.value)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -675,8 +679,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
         .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -684,36 +688,36 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
         .returning(rightT[IO, GenerationRecoverableError](()))
 
       (git
-        .checkout(_: CommitId, _: Path))
+        .checkout(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
       (git
-        .findCommitMessage(_: CommitId, _: Path))
+        .findCommitMessage(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(nonBlankStrings().generateOne.value.pure[IO])
 
       (renku
-        .migrate(_: CommitEvent, _: Path))
+        .migrate(_: CommitEvent)(_: RepositoryPath))
         .expects(commitWithoutParent, repositoryDirectory)
         .returning(IO.unit)
 
       val exception = exceptions.generateOne
       (renku
-        .log(_: CommitEventWithoutParent, _: Path)(_: (CommitEventWithoutParent, Path) => CommandResult))
-        .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
+        .log(_: CommitEventWithoutParent)(_: (CommitEventWithoutParent, Path) => CommandResult, _: RepositoryPath))
+        .expects(commitWithoutParent, renku.commitWithoutParentTriplesFinder, repositoryDirectory)
         .returning(EitherT.right[ProcessingRecoverableError](exception.raiseError[IO, JsonLDTriples]))
 
       (file
         .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
+        .expects(repositoryDirectory.value)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -728,8 +732,8 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
       (file
         .mkdir(_: Path))
-        .expects(repositoryDirectory)
-        .returning(IO.pure(repositoryDirectory))
+        .expects(repositoryDirectory.value)
+        .returning(IO.pure(repositoryDirectory.value))
 
       (gitLabRepoUrlFinder
         .findRepositoryUrl(_: projects.Path, _: Option[AccessToken]))
@@ -737,36 +741,36 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         .returning(IO.pure(gitRepositoryUrl))
 
       (git
-        .clone(_: ServiceUrl, _: Path, _: Path))
-        .expects(gitRepositoryUrl, repositoryDirectory, workDirectory)
+        .clone(_: ServiceUrl, _: Path)(_: RepositoryPath))
+        .expects(gitRepositoryUrl, workDirectory, repositoryDirectory)
         .returning(rightT[IO, GenerationRecoverableError](()))
 
       (git
-        .checkout(_: CommitId, _: Path))
+        .checkout(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(IO.unit)
 
       (file.exists(_: Path)).expects(dirtyRepoFilePath).returning(false.pure[IO])
 
       (git
-        .findCommitMessage(_: CommitId, _: Path))
+        .findCommitMessage(_: CommitId)(_: RepositoryPath))
         .expects(commitId, repositoryDirectory)
         .returning(nonBlankStrings().generateOne.value.pure[IO])
 
       (renku
-        .migrate(_: CommitEvent, _: Path))
+        .migrate(_: CommitEvent)(_: RepositoryPath))
         .expects(commitWithoutParent, repositoryDirectory)
         .returning(IO.unit)
 
       (renku
-        .log(_: CommitEventWithoutParent, _: Path)(_: (CommitEventWithoutParent, Path) => CommandResult))
-        .expects(commitWithoutParent, repositoryDirectory, renku.commitWithoutParentTriplesFinder)
+        .log(_: CommitEventWithoutParent)(_: (CommitEventWithoutParent, Path) => CommandResult, _: RepositoryPath))
+        .expects(commitWithoutParent, renku.commitWithoutParentTriplesFinder, repositoryDirectory)
         .returning(rightT(triples))
 
       val exception = exceptions.generateOne
       (file
         .deleteDirectory(_: Path))
-        .expects(repositoryDirectory)
+        .expects(repositoryDirectory.value)
         .returning(IO.raiseError(exception))
         .atLeastOnce()
 
@@ -803,10 +807,12 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
     val pathDifferentiator: Int = Gen.choose(1, 100).generateOne
 
-    val workDirectory:       Path          = root / "tmp"
-    val repositoryDirectory: Path          = workDirectory / s"$repositoryName-$pathDifferentiator"
-    val triples:             JsonLDTriples = jsonLDTriples.generateOne
-    val dirtyRepoFilePath = repositoryDirectory / ".gitattributes"
+    val workDirectory: Path = root / "tmp"
+    implicit val repositoryDirectory: RepositoryPath = RepositoryPath(
+      workDirectory / s"$repositoryName-$pathDifferentiator"
+    )
+    val triples:           JsonLDTriples = jsonLDTriples.generateOne
+    val dirtyRepoFilePath: Path          = repositoryDirectory.value / ".gitattributes"
 
     val gitLabRepoUrlFinder = mock[IOGitLabRepoUrlFinder]
     val file                = mock[Commands.File]

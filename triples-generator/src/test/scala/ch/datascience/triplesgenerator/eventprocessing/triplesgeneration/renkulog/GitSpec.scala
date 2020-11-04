@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
-import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.Git
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.{Git, RepositoryPath}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
@@ -41,7 +41,7 @@ class GitSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .expects(repositoryUrl, destDirectory, workDirectory)
         .returning(CommandResult(exitCode = 0, chunks = Seq.empty))
 
-      git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Right(())
+      git.clone(repositoryUrl, workDirectory).value.unsafeRunSync() shouldBe Right(())
     }
 
     val recoverableFailureMessagesToCheck = Set[NonBlank](
@@ -68,7 +68,7 @@ class GitSpec extends AnyWordSpec with MockFactory with should.Matchers {
           .expects(repositoryUrl, destDirectory, workDirectory)
           .throwing(commandResultException)
 
-        git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync() shouldBe Left(
+        git.clone(repositoryUrl, workDirectory).value.unsafeRunSync() shouldBe Left(
           GenerationRecoverableError(
             s"git clone failed with: ${commandResultException.result.toString}"
           )
@@ -89,7 +89,7 @@ class GitSpec extends AnyWordSpec with MockFactory with should.Matchers {
         .throwing(commandException)
 
       intercept[Exception] {
-        git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync()
+        git.clone(repositoryUrl, workDirectory).value.unsafeRunSync()
       }.getMessage shouldBe s"git clone failed with: ${commandException.result.toString}"
     }
 
@@ -105,17 +105,17 @@ class GitSpec extends AnyWordSpec with MockFactory with should.Matchers {
         })
 
       intercept[Exception] {
-        git.clone(repositoryUrl, destDirectory, workDirectory).value.unsafeRunSync()
+        git.clone(repositoryUrl, workDirectory).value.unsafeRunSync()
       } shouldBe an[Exception]
     }
   }
 
   private trait TestCase {
     val repositoryUrl = serviceUrls.generateOne
-    val destDirectory = paths.generateOne
+    implicit val destDirectory: RepositoryPath = RepositoryPath(paths.generateOne)
     val workDirectory = paths.generateOne
 
-    val cloneCommand = mockFunction[ServiceUrl, Path, Path, CommandResult]
+    val cloneCommand = mockFunction[ServiceUrl, RepositoryPath, Path, CommandResult]
     val git          = new Git(cloneCommand)
   }
 }
