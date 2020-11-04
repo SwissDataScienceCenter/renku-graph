@@ -18,6 +18,7 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog
 
+import ammonite.ops.Path
 import cats.MonadError
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
@@ -28,6 +29,8 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath, RelativePathOps}
+import ch.datascience.tinytypes.{RelativePathTinyType, TinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent._
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
@@ -37,6 +40,11 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private object Commands {
+
+  trait AbsolutePathTinyType extends Any with TinyType { type V = Path }
+
+  final class RepositoryPath private (val value: Path) extends AnyVal with AbsolutePathTinyType
+  object RepositoryPath extends TinyTypeFactory[RepositoryPath](new RepositoryPath(_))
 
   class GitLabRepoUrlFinder[Interpretation[_]](
       gitLabUrl: GitLabUrl
@@ -81,37 +89,49 @@ private object Commands {
     def deleteDirectory(repositoryDirectory: Path): IO[Unit] = IO {
       ops.rm ! repositoryDirectory
     }
+
+    def exists(fileName: Path): IO[Boolean] = IO {
+      ops.exists(fileName)
+    }
   }
 
   class Git(
-      doClone: (ServiceUrl, Path, Path) => CommandResult = (url, destinationDir, workDir) =>
+      doClone: (ServiceUrl, RepositoryPath, Path) => CommandResult = (url, destinationDir, workDir) =>
         %%("git", "clone", url.toString, destinationDir.toString)(workDir)
   ) {
     import cats.data.EitherT
     import cats.syntax.all._
     import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
-    def checkout(commitId: CommitId, repositoryDirectory: Path): IO[Unit] =
+    def checkout(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): IO[Unit] =
       IO {
-        %%("git", "checkout", commitId.value)(repositoryDirectory)
-      }.map(_ => ())
+        %%("git", "checkout", commitId.value)(repositoryDirectory.value)
+      }.void
 
-    def findCommitMessage(commitId: CommitId, repositoryDirectory: Path): IO[String] =
+    def checkoutCurrent()(implicit repositoryDirectory: RepositoryPath): IO[Unit] =
       IO {
-        %%("git", "log", "--format=%B", "-n", "1", commitId.value)(repositoryDirectory)
+        %%("git", "checkout", ".")(repositoryDirectory.value)
+      }.void
+
+    def findCommitMessage(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): IO[String] =
+      IO {
+        %%("git", "log", "--format=%B", "-n", "1", commitId.value)(repositoryDirectory.value)
       }.map(_.out.string.trim)
 
     def clone(
-        repositoryUrl:        ServiceUrl,
-        destinationDirectory: Path,
-        workDirectory:        Path
-    ): EitherT[IO, GenerationRecoverableError, Unit] =
+        repositoryUrl:               ServiceUrl,
+        workDirectory:               Path
+    )(implicit destinationDirectory: RepositoryPath): EitherT[IO, GenerationRecoverableError, Unit] =
       EitherT[IO, GenerationRecoverableError, Unit] {
         IO {
           doClone(repositoryUrl, destinationDirectory, workDirectory)
         }.map(_ => ().asRight[GenerationRecoverableError])
           .recoverWith(relevantError)
       }
+
+    def rm(fileName: Path)(implicit repositoryDirectory: RepositoryPath): IO[Unit] = IO {
+      %%("git", "rm", fileName)(repositoryDirectory.value)
+    }.void
 
     private val recoverableErrors = Set("SSL_ERROR_SYSCALL",
                                         "the remote end hung up unexpectedly",
@@ -145,8 +165,8 @@ private object Commands {
 
     import scala.util.Try
 
-    def migrate(commitEvent: CommitEvent, destinationDirectory: Path): IO[Unit] =
-      IO(%%("renku", "migrate")(destinationDirectory))
+    def migrate(commitEvent: CommitEvent)(implicit destinationDirectory: RepositoryPath): IO[Unit] =
+      IO(%%("renku", "migrate")(destinationDirectory.value))
         .flatMap(_ => IO.unit)
         .recoverWith { case NonFatal(exception) =>
           IO.raiseError {
@@ -158,12 +178,14 @@ private object Commands {
         }
 
     def log[T <: CommitEvent](
-        commit:                 T,
-        destinationDirectory:   Path
-    )(implicit generateTriples: (T, Path) => CommandResult): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
+        commit: T
+    )(implicit
+        generateTriples:      (T, Path) => CommandResult,
+        destinationDirectory: RepositoryPath
+    ): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
       EitherT {
         IO.race(
-          call(generateTriples(commit, destinationDirectory)),
+          call(generateTriples(commit, destinationDirectory.value)),
           timer sleep timeout.value
         ).flatMap {
           case Left(result) => IO.pure(result)
