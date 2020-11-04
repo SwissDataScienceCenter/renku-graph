@@ -217,9 +217,9 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
       findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs events.map(_._1)
     }
 
-    "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCase {
+    "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
-      override val eventLogFetch = new EventFetcherImpl(
+      val eventLogFetch = new EventFetcherImpl(
         transactor,
         waitingEventsGauge,
         underProcessingGauge,
@@ -227,8 +227,10 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         currentTime,
         maxProcessingTime = maxProcessingTime,
         projectsFetchingLimit = 5,
-        projectPrioritisation = projectPrioritisation
+        projectPrioritisation = projectPrioritisation,
+        waitForViewRefresh = true
       )
+      eventLogFetch.createView.unsafeRunSync() shouldBe ((): Unit)
 
       val events = readyStatuses
         .generateNonEmptyList(minElements = 3, maxElements = 6)
@@ -262,28 +264,17 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
     }
   }
 
-  private trait TestCase {
+  private trait TestCaseCommons {
+    val now           = Instant.now()
+    val executionDate = ExecutionDate(now)
+    val currentTime   = mockFunction[Instant]
+    currentTime.expects().returning(now).anyNumberOfTimes()
 
-    val currentTime           = mockFunction[Instant]
     val waitingEventsGauge    = mock[LabeledGauge[IO, Path]]
     val underProcessingGauge  = mock[LabeledGauge[IO, Path]]
     val projectPrioritisation = mock[ProjectPrioritisation]
     val queriesExecTimes      = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val maxProcessingTime     = Duration.ofMillis(durations(max = 10 hours).generateOne.toMillis)
-    val eventLogFetch = new EventFetcherImpl(
-      transactor,
-      waitingEventsGauge,
-      underProcessingGauge,
-      queriesExecTimes,
-      currentTime,
-      maxProcessingTime = maxProcessingTime,
-      projectsFetchingLimit = 1,
-      projectPrioritisation = projectPrioritisation
-    )
-
-    val now           = Instant.now()
-    val executionDate = ExecutionDate(now)
-    currentTime.expects().returning(now).anyNumberOfTimes()
 
     def expectWaitingEventsGaugeDecrement(projectPath: Path) =
       (waitingEventsGauge.decrement _)
@@ -304,6 +295,23 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
       (projectPrioritisation.prioritise _)
         .expects(takes)
         .returning(returns)
+  }
+
+  private trait TestCase extends TestCaseCommons {
+
+    val eventLogFetch = new EventFetcherImpl(
+      transactor,
+      waitingEventsGauge,
+      underProcessingGauge,
+      queriesExecTimes,
+      currentTime,
+      maxProcessingTime = maxProcessingTime,
+      projectsFetchingLimit = 1,
+      projectPrioritisation = projectPrioritisation,
+      waitForViewRefresh = true
+    )
+
+    eventLogFetch.createView.unsafeRunSync() shouldBe ((): Unit)
   }
 
   private def executionDatesInThePast: Gen[ExecutionDate] = timestampsNotInTheFuture map ExecutionDate.apply

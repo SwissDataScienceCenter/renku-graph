@@ -26,7 +26,7 @@ import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.metrics.{GaugeResetScheduler, IOGaugeResetScheduler, MetricsRegistry, RoutesMetrics}
+import ch.datascience.metrics._
 import ch.datascience.microservices.IOMicroservice
 import io.renku.eventlog.creation.IOEventCreationEndpoint
 import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
@@ -51,7 +51,7 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      transactorResource <- new EventLogDbConfigProvider[IO] map DbTransactorResource[IO, EventLogDB]
+      transactorResource <- new EventLogDbConfigProvider[IO](args) map DbTransactorResource[IO, EventLogDB]
       exitCode           <- runMicroservice(transactorResource)
     } yield exitCode
 

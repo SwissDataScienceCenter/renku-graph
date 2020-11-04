@@ -18,4 +18,6 @@
 
 name := "event-log"
 
+Test / fork := true
+
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
