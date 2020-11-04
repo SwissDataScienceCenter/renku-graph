@@ -118,19 +118,9 @@ object JsonLD {
       }
     }
 
-    override lazy val entityId:    Option[EntityId]    = Some(id)
-    override lazy val entityTypes: Option[EntityTypes] = Some(types)
-    //    override lazy val flatten: Either[MalformedJsonLD, JsonLD] =
-    //      deNest(this, List.empty[JsonLDEntity]) match {
-    //        case (updatedEntity, entities) if entities.isEmpty => Right(updatedEntity)
-    //        case (updatedEntity, entities) =>
-    //          val idsReferToSameEntities = areEntitiesIDsUnique(entities)
-    //          if (idsReferToSameEntities)
-    //            Right(JsonLDArray(updatedEntity +: entities))
-    //          else
-    //            Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
-    //      }
-    override lazy val asArray: Option[Vector[JsonLD]] = Some(Vector(this))
+    override lazy val entityId:    Option[EntityId]       = Some(id)
+    override lazy val entityTypes: Option[EntityTypes]    = Some(types)
+    override lazy val asArray:     Option[Vector[JsonLD]] = Some(Vector(this))
 
     override def hashCode(): Int =
       ((id.hashCode().toLong +
@@ -212,36 +202,10 @@ object JsonLD {
       case _                      => false
     }
 
-    override lazy val toJson:      Json                = Json.arr(jsons.map(_.toJson): _*)
-    override lazy val entityId:    Option[EntityId]    = None
-    override lazy val entityTypes: Option[EntityTypes] = None
-    //    override lazy val flatten: Either[MalformedJsonLD, JsonLD] = {
-    //      val jsonArray = jsons
-    //        .foldLeft(List.empty[JsonLD]) {
-    //          case (acc, jsonLDEntity: JsonLDEntity) =>
-    //            val (updatedEntity, entities) = deNest(jsonLDEntity, List.empty[JsonLDEntity])
-    //            entities ++ acc :+ updatedEntity
-    //          case (acc, JsonLDArray(jsonlds)) =>
-    //            val (arrayElements, entities) = deNestJsonLDArray(jsonlds, List.empty[JsonLDEntity])
-    //            entities ++ acc :+ JsonLDArray(arrayElements)
-    //          case (acc, other: JsonLD) => acc :+ other
-    //        }
-    //      val idsReferToSameEntities: Boolean = areEntitiesIDsUnique(jsonArray)
-    //      if (idsReferToSameEntities) {
-    //        Right(JsonLD.arr(jsonArray.distinct: _*))
-    //      } else {
-    //        Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
-    //      }
-    //    }
-    override lazy val asArray: Option[Vector[JsonLD]] = Some(jsons.toVector)
-  }
-
-  private def areEntitiesIDsUnique(list: List[JsonLD]): Boolean = {
-    val groupedEntities = list.collect { case entity: JsonLDEntity => entity }.groupBy(entity => entity.id)
-    val idsReferToSameEntities: Boolean = groupedEntities.forall { case (_, entitiesPerId) =>
-      entitiesPerId.forall(_ == entitiesPerId.head)
-    }
-    idsReferToSameEntities
+    override lazy val toJson:      Json                   = Json.arr(jsons.map(_.toJson): _*)
+    override lazy val entityId:    Option[EntityId]       = None
+    override lazy val entityTypes: Option[EntityTypes]    = None
+    override lazy val asArray:     Option[Vector[JsonLD]] = Some(jsons.toVector)
   }
 
   private[jsonld] final case class JsonLDEntityId[V <: EntityId](id: V)(implicit encoder: Encoder[V]) extends JsonLD {
