@@ -38,7 +38,7 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
 
     "do nothing if JsonLDEntity does not have nested object in its properties" in {
       forAll { (id: EntityId, types: EntityTypes, property1: (Property, JsonLD), other: List[(Property, JsonLD)]) =>
-        val entityAsJsonLD = JsonLD.entity(id, types, property1, other: _*)
+        val entityAsJsonLD = JsonLD.arr(JsonLD.entity(id, types, property1, other: _*))
         entityAsJsonLD.flatten shouldBe Right(entityAsJsonLD)
       }
     }
@@ -46,16 +46,14 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
     "pull out all the nested JsonLDEntity entities into a flat JsonLDArray " +
       "and replace the nested properties values with relevant EntityIds" in {
         /*
-grandparent
-|
-parent
-|
-child
-
-|
-|
-V
-
+      grandparent
+         |
+      parent
+        |
+      child
+         |
+         |
+         V
 (child, parent, grandparent)  // order not guaranteed
 
          */
@@ -221,7 +219,8 @@ V
 
         val parentWithIdsOfChildren = parent.copy(reverse = expectedReverse)
 
-        parent.flatten.map(_.asArray) shouldBe Some(Vector(parentWithIdsOfChildren, child0, child1)).asRight
+        parent.flatten.unsafeGetRight.asArray.get should contain theSameElementsAs
+          Vector(parentWithIdsOfChildren, child0, child1)
       }
     }
   }
