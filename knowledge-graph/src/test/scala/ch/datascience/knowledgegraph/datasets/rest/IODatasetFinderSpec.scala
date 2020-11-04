@@ -115,7 +115,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           val dataset = nonModifiedDatasets(projects = project.copy(created = addedToProject).toGenerator).generateOne
           val modifiedOnProject = addedToProjectObjects.generateOne.copy(
             date = DateCreatedInProject(
-              addedToProject.date.value.plusSeconds(durations(min = 1 minute, max = 30 days).generateOne.toSeconds)
+              timestampsNotInTheFuture(butOlderThan = addedToProject.date.value).generateOne
             )
           )
           val modifiedDataset =
@@ -340,7 +340,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           val projectDatasetModificationCommit = commitIds.generateOne
           val modifiedOnProject = addedToProjectObjects.generateOne.copy(
             date = DateCreatedInProject(
-              addedToProject.date.value.plusSeconds(durations(min = 1 minute, max = 30 days).generateOne.toSeconds)
+              timestampsNotInTheFuture(butOlderThan = addedToProject.date.value).generateOne
             )
           )
           val modifiedDataset = modifiedDatasetsOnFirstProject(
@@ -544,8 +544,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
 
         val modifiedOnProject2 = addedToProjectObjects.generateOne.copy(
           date = DateCreatedInProject(
-            dataset2Project.created.date.value
-              .plusSeconds(durations(min = 1 minute, max = 30 days).generateOne.toSeconds)
+            timestampsNotInTheFuture(butOlderThan = dataset2Project.created.date.value).generateOne
           )
         )
         val dataset2ModifiedProject = dataset2Project.copy(created = modifiedOnProject2)
