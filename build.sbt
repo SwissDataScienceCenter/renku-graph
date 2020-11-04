@@ -210,10 +210,10 @@ releaseProcess := Seq[ReleaseStep](
   setReleaseVersion,
   log("Setting Release version to Chart"),
   setReleaseVersionToChart,
-  log("Commit Release version"),
-  commitReleaseVersion,
   log("A brief respite"),
   waitForVcs,
+  log("Commit Release version"),
+  commitReleaseVersion,
   log("Tagging Release"),
   tagRelease,
   log("Publishing artifacts"),
@@ -222,6 +222,8 @@ releaseProcess := Seq[ReleaseStep](
   setNextVersion,
   log("Setting next version to Chart"),
   setNextVersionToChart,
+  log("A brief respite"),
+  waitForVcs,
   log("Commit next version"),
   commitNextVersion,
   log("Pushing changes"),
@@ -271,6 +273,7 @@ def updateAndCommitChart(version: String): Unit = {
   writeChartVersion(version)
   println("Adding chart to VCS")
   addChartToVcs()
+  println("Chart added to VCS")
 }
 
 val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
