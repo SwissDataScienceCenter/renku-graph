@@ -36,6 +36,8 @@ abstract class JsonLD extends Product with Serializable {
   def cursor: Cursor = Cursor.from(this)
 
   def asArray: Option[Vector[JsonLD]]
+
+  def flatten: Either[MalformedJsonLD, JsonLD] = Flattener.flatten(this)
 }
 
 object JsonLD {
@@ -291,9 +293,4 @@ object JsonLD {
         (arrayElements :+ JsonLDArray(nestedArrayElements)) -> deNestedEntities
       case ((arrayElements, toplevelEntities), entity) => (arrayElements :+ entity) -> toplevelEntities
     }
-
-  implicit class JsonLDOps(jsonLD: JsonLD) {
-    def flatten: Either[MalformedJsonLD, JsonLD] = Flattener.flatten(jsonLD)
-  }
-
 }
