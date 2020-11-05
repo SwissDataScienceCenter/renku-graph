@@ -18,12 +18,6 @@
 
 name := "token-repository"
 
+Test / fork := true
+
 libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
-
-val doobieVersion = "0.9.2"
-libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
-libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
-
-//Test dependencies
-libraryDependencies += "org.tpolecat" %% "doobie-h2"        % doobieVersion % Test
-libraryDependencies += "org.tpolecat" %% "doobie-scalatest" % doobieVersion % Test

@@ -67,5 +67,12 @@ libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Te
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
 libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.2"   % Test
 
+val testContainersVersion = "1.15.0-rc2"
+libraryDependencies += "org.testcontainers" % "testcontainers" % testContainersVersion % Test
+libraryDependencies += "org.testcontainers" % "postgresql"     % testContainersVersion % Test
+val testContainersScalaVersion = "0.38.4"
+libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
+libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
+
 libraryDependencies += "org.tpolecat" %% "doobie-h2"        % doobieVersion % Test
 libraryDependencies += "org.tpolecat" %% "doobie-scalatest" % doobieVersion % Test

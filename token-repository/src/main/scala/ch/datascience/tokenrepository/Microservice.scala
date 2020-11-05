@@ -26,7 +26,7 @@ import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEndpoint
-import ch.datascience.tokenrepository.repository.deletion.{DeleteTokenEndpoint, IODeleteTokenEndpoint, TokenRemover}
+import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
 import ch.datascience.tokenrepository.repository.init.{DbInitializer, IODbInitializer}
 import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
@@ -37,7 +37,7 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      transactorResource <- new ProjectsTokensDbConfigProvider[IO] map DbTransactorResource[IO, ProjectsTokensDB]
+      transactorResource <- new ProjectsTokensDbConfigProvider[IO](args) map DbTransactorResource[IO, ProjectsTokensDB]
       exitCode           <- runMicroservice(transactorResource, args)
     } yield exitCode
 

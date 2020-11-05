@@ -23,7 +23,7 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.sortBys
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{durations, nonBlankStrings, nonEmptyList, positiveInts, sentenceContaining}
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators.{datasetIdentifiers, userAffiliations, userEmails}
@@ -244,7 +244,7 @@ package object rest {
 
           val otherJsonLds = otherProjects.map { project =>
             val projectDateCreated = DateCreatedInProject(
-              firstDatasetDateCreated.value.plusSeconds(durations(min = 1 minute, max = 30 days).generateOne.toSeconds)
+              timestampsNotInTheFuture(butOlderThan = firstDatasetDateCreated.value).generateOne
             )
 
             modifiedDataSetCommit(
@@ -285,7 +285,7 @@ package object rest {
       datasetProject.copy(
         created = datasetProject.created.copy(
           date = DateCreatedInProject(
-            project.created.date.value.plusSeconds(durations(min = 1 minute, max = 30 days).generateOne.toSeconds)
+            timestampsNotInTheFuture(butOlderThan = project.created.date.value).generateOne
           )
         )
       )

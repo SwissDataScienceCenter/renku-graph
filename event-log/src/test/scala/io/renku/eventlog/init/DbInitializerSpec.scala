@@ -95,6 +95,7 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
       dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
       verifyTrue(sql"DROP INDEX idx_project_id;")
+      verifyTrue(sql"DROP INDEX idx_event_id;")
       verifyTrue(sql"DROP INDEX idx_status;")
       verifyTrue(sql"DROP INDEX idx_execution_date;")
       verifyTrue(sql"DROP INDEX idx_event_date;")

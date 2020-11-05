@@ -19,6 +19,7 @@
 package ch.datascience.db
 
 import cats.MonadError
+import cats.data.OptionT
 import cats.syntax.all._
 import ch.datascience.config.ConfigLoader
 import ch.datascience.db.DBConfigProvider.DBConfig
@@ -32,10 +33,11 @@ import eu.timepit.refined.string.MatchesRegex
 import scala.concurrent.duration.FiniteDuration
 
 class DBConfigProvider[Interpretation[_], TargetDB](
-    namespace: String,
-    dbName:    DBConfig.DbName,
-    config:    Config = ConfigFactory.load()
-)(implicit ME: MonadError[Interpretation, Throwable])
+    namespace:       String,
+    dbName:          DBConfig.DbName,
+    config:          Config = ConfigFactory.load(),
+    jdbcUrlOverride: Option[DBConfig.Url] = None
+)(implicit ME:       MonadError[Interpretation, Throwable])
     extends ConfigLoader[Interpretation] {
 
   import DBConfigProvider._
@@ -52,7 +54,7 @@ class DBConfigProvider[Interpretation[_], TargetDB](
       connectionPool <- find[DBConfig.ConnectionPool](s"$namespace.connection-pool", config)
       maxLifetime    <- find[DBConfig.MaxLifetime](s"$namespace.max-connection-lifetime", config)
       urlTemplate    <- find[DBConfig.UrlTemplate](s"$namespace.db-url-template", config)
-      url            <- findUrl(urlTemplate, host)
+      url            <- OptionT.fromOption(jdbcUrlOverride) getOrElseF findUrl(urlTemplate, host)
     } yield DBConfig(driver, url, user, pass, connectionPool, maxLifetime)
 
   private def findUrl(urlTeplate: DBConfig.UrlTemplate, host: DBConfig.Host): Interpretation[DBConfig.Url] =
@@ -83,5 +85,17 @@ object DBConfigProvider {
     type Pass           = String
     type ConnectionPool = Int Refined Positive
     type MaxLifetime    = FiniteDuration
+  }
+
+  val JdbcUrl: String = "jdbc-url"
+
+  implicit class SettingsListOps(settings: List[String]) {
+
+    private val jdbcUrlExtractor = s"$JdbcUrl=(.*)$$".r
+
+    lazy val findJdbcUrl: Option[DBConfig.Url] =
+      settings
+        .collectFirst { case jdbcUrlExtractor(url) => url }
+        .flatMap(url => RefType.applyRef[DBConfig.Url](url).fold(_ => Option.empty[DBConfig.Url], Option.apply))
   }
 }

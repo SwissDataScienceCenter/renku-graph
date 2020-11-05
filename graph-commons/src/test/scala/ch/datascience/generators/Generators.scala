@@ -206,6 +206,11 @@ object Generators {
       .choose(Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli)
       .map(Instant.ofEpochMilli)
 
+  def timestampsNotInTheFuture(butOlderThan: Instant): Gen[Instant] =
+    Gen
+      .choose(butOlderThan.toEpochMilli, Instant.now().toEpochMilli)
+      .map(Instant.ofEpochMilli)
+
   val timestampsInTheFuture: Gen[Instant] =
     Gen
       .choose(Instant.now().plus(10, JAVA_MINS).toEpochMilli, Instant.now().plus(2000, JAVA_DAYS).toEpochMilli)

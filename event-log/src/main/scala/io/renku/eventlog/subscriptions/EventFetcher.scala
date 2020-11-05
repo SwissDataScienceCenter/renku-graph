@@ -43,6 +43,7 @@ import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
 private trait EventFetcher[Interpretation[_]] {
+  def createView: Interpretation[Unit]
   def popEvent(): Interpretation[Option[(CompoundEventId, EventBody)]]
 }
 
@@ -55,21 +56,52 @@ private class EventFetcherImpl(
     maxProcessingTime:     Duration,
     projectsFetchingLimit: Int Refined Positive,
     projectPrioritisation: ProjectPrioritisation,
-    pickRandomlyFrom:      List[ProjectIdAndPath] => Option[ProjectIdAndPath] = ids => ids.get(Random nextInt ids.size)
-)(implicit ME:             Bracket[IO, Throwable])
+    pickRandomlyFrom:      List[ProjectIdAndPath] => Option[ProjectIdAndPath] = ids => ids.get(Random nextInt ids.size),
+    waitForViewRefresh:    Boolean = false
+)(implicit ME:             Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
-    with EventFetcher[IO] {
-
-  import TypesSerializers._
+    with EventFetcher[IO]
+    with TypesSerializers {
 
   private type EventIdAndBody = (CompoundEventId, EventBody)
 
+  override def createView: IO[Unit] = {
+    for {
+      _ <- createProjectLatestEventDateView.update.run
+      _ <- createIndexForView.update.run
+    } yield ()
+  } transact transactor.get
+
+  private lazy val createProjectLatestEventDateView = sql"""
+    CREATE MATERIALIZED VIEW IF NOT EXISTS project_latest_event_date AS
+      select
+        project_id,
+        project_path,
+        MAX(event_date) latest_event_date
+      from event_log
+      group by project_id, project_path
+      order by latest_event_date desc;
+    """
+
+  private lazy val createIndexForView = sql"""
+    CREATE UNIQUE INDEX IF NOT EXISTS project_latest_event_date_project_idx 
+    ON project_latest_event_date (project_id, project_path)
+    """
+
   override def popEvent(): IO[Option[EventIdAndBody]] =
     for {
+      _                          <- refreshProjectsView
       maybeProjectEventIdAndBody <- findEventAndUpdateForProcessing() transact transactor.get
       (maybeProject, maybeEventIdAndBody) = maybeProjectEventIdAndBody
       _ <- maybeUpdateMetrics(maybeProject, maybeEventIdAndBody)
     } yield maybeEventIdAndBody
+
+  private lazy val refreshProjectsView: IO[Unit] = {
+    val refreshUpdate = sql"""
+      REFRESH MATERIALIZED VIEW CONCURRENTLY project_latest_event_date
+    """.update.run transact transactor.get
+    if (waitForViewRefresh) refreshUpdate.void else refreshUpdate.start.void
+  }
 
   private def findEventAndUpdateForProcessing() =
     for {
@@ -83,22 +115,25 @@ private class EventFetcherImpl(
     } yield maybeProject -> maybeBody
 
   // format: off
-  private def findProjectsWithEventsInQueue = SqlQuery({
-      fr"""select distinct event_log.project_id, event_log.project_path, MAX(event_date) latest_event_date, 
-           COUNT(case WHEN status = ${Processing: EventStatus}  THEN event_id END) as current_occupancy 
-           from (
-             select distinct project_id
-             from event_log
-             where (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
-                   or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
-           ) projects_with_work
-           join event_log on event_log.project_id = projects_with_work.project_id
-           group by event_log.project_id, event_log.project_path
-           order by latest_event_date desc
-           limit ${projectsFetchingLimit.value}  
-           """ 
+  private def findProjectsWithEventsInQueue = SqlQuery({fr"""
+      select 
+        pled.project_id,
+        pled.project_path,
+        pled.latest_event_date,
+        (select count(event_id) from event_log el_int where el_int.project_id = pled.project_id and el_int.status = ${Processing: EventStatus}) as current_occupancy 
+      from project_latest_event_date pled
+      where exists (
+        select project_id
+        from event_log el
+        where el.project_id = pled.project_id
+          and ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
+            or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
+          )
+      )
+      limit ${projectsFetchingLimit.value}  
+      """ 
     }.query[(projects.Id, projects.Path, EventDate, Int)]
-    .map{case (projectId, projectPath, eventDate, currentOccupancy) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy)) }
+    .map { case (projectId, projectPath, eventDate, currentOccupancy) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy)) }
     .to[List],
     name = "pop event - projects"
   )
@@ -106,15 +141,18 @@ private class EventFetcherImpl(
 
   // format: off
   private def findOldestEvent(idAndPath: ProjectIdAndPath) = SqlQuery({
-      fr"""select event_log.event_id, event_log.project_id, event_log.event_body
-           from event_log
-           where project_id = ${idAndPath.id}
-             and (
-               (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
-               or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
-             )
-           order by event_date asc
-           limit 1"""
+      fr"""select el.event_id, el.project_id, el.event_body
+           from (
+             select project_id, min(event_date) as min_event_date
+             from event_log
+             where project_id = ${idAndPath.id}
+               and ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
+                 or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime}))
+             group by project_id
+           ) oldest_event_date
+           join event_log el on oldest_event_date.project_id = el.project_id and oldest_event_date.min_event_date = el.event_date
+           limit 1
+           """
     }.query[EventIdAndBody].option,
     name = "pop event - oldest"
   )
@@ -174,14 +212,17 @@ private object IOEventLogFetch {
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name]
-  )(implicit contextShift:  ContextShift[IO]): IO[EventFetcher[IO]] = IO {
-    new EventFetcherImpl(transactor,
-                         waitingEventsGauge,
-                         underProcessingGauge,
-                         queriesExecTimes,
-                         maxProcessingTime = MaxProcessingTime,
-                         projectsFetchingLimit = ProjectsFetchingLimit,
-                         projectPrioritisation = new ProjectPrioritisation()
-    )
-  }
+  )(implicit contextShift:  ContextShift[IO]): IO[EventFetcher[IO]] = for {
+    fetcher <- IO {
+                 new EventFetcherImpl(transactor,
+                                      waitingEventsGauge,
+                                      underProcessingGauge,
+                                      queriesExecTimes,
+                                      maxProcessingTime = MaxProcessingTime,
+                                      projectsFetchingLimit = ProjectsFetchingLimit,
+                                      projectPrioritisation = new ProjectPrioritisation()
+                 )
+               }
+    _ <- fetcher.createView
+  } yield fetcher
 }
