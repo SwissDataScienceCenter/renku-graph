@@ -28,11 +28,12 @@ import io.renku.eventlog.EventStatus.RecoverableFailure
 import scala.util.control.NonFatal
 
 class DbInitializer[Interpretation[_]](
-    projectPathAdder: ProjectPathAdder[Interpretation],
-    batchDateAdder:   BatchDateAdder[Interpretation],
-    transactor:       DbTransactor[Interpretation, EventLogDB],
-    logger:           Logger[Interpretation]
-)(implicit ME:        Bracket[Interpretation, Throwable]) {
+    projectPathAdder:            ProjectPathAdder[Interpretation],
+    batchDateAdder:              BatchDateAdder[Interpretation],
+    latestEventDatesViewCreator: LatestEventDatesViewCreator[Interpretation],
+    transactor:                  DbTransactor[Interpretation, EventLogDB],
+    logger:                      Logger[Interpretation]
+)(implicit ME:                   Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
@@ -50,6 +51,7 @@ class DbInitializer[Interpretation[_]](
       _ <- logger.info("Event Log database initialization success")
       _ <- projectPathAdder.run()
       _ <- batchDateAdder.run()
+      _ <- latestEventDatesViewCreator.run()
     } yield ()
   } recoverWith logging
 
@@ -83,6 +85,7 @@ class IODbInitializer(
     extends DbInitializer[IO](
       new ProjectPathAdder[IO](transactor, logger),
       new BatchDateAdder[IO](transactor, logger),
+      LatestEventDatesViewCreator[IO](transactor, logger),
       transactor,
       logger
     )

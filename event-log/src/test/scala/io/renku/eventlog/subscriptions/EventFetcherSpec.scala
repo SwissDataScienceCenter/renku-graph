@@ -29,11 +29,13 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects.{Id, Path}
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
+import io.renku.eventlog.init.LatestEventDatesViewCreator
 import io.renku.eventlog.subscriptions.ProjectPrioritisation.Priority.MaxPriority
 import io.renku.eventlog.subscriptions.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
 import org.scalacheck.Gen
@@ -230,7 +232,6 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         projectPrioritisation = projectPrioritisation,
         waitForViewRefresh = true
       )
-      eventLogFetch.createView.unsafeRunSync() shouldBe ((): Unit)
 
       val events = readyStatuses
         .generateNonEmptyList(minElements = 3, maxElements = 6)
@@ -298,6 +299,7 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
   }
 
   private trait TestCase extends TestCaseCommons {
+    LatestEventDatesViewCreator[IO](transactor, TestLogger()).run().unsafeRunSync()
 
     val eventLogFetch = new EventFetcherImpl(
       transactor,
@@ -310,8 +312,6 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
       projectPrioritisation = projectPrioritisation,
       waitForViewRefresh = true
     )
-
-    eventLogFetch.createView.unsafeRunSync() shouldBe ((): Unit)
   }
 
   private def executionDatesInThePast: Gen[ExecutionDate] = timestampsNotInTheFuture map ExecutionDate.apply

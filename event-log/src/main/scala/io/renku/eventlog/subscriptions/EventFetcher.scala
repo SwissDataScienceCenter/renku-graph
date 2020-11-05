@@ -43,7 +43,6 @@ import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
 private trait EventFetcher[Interpretation[_]] {
-  def createView: Interpretation[Unit]
   def popEvent(): Interpretation[Option[(CompoundEventId, EventBody)]]
 }
 
@@ -64,29 +63,6 @@ private class EventFetcherImpl(
     with TypesSerializers {
 
   private type EventIdAndBody = (CompoundEventId, EventBody)
-
-  override def createView: IO[Unit] = {
-    for {
-      _ <- createProjectLatestEventDateView.update.run
-      _ <- createIndexForView.update.run
-    } yield ()
-  } transact transactor.get
-
-  private lazy val createProjectLatestEventDateView = sql"""
-    CREATE MATERIALIZED VIEW IF NOT EXISTS project_latest_event_date AS
-      select
-        project_id,
-        project_path,
-        MAX(event_date) latest_event_date
-      from event_log
-      group by project_id, project_path
-      order by latest_event_date desc;
-    """
-
-  private lazy val createIndexForView = sql"""
-    CREATE UNIQUE INDEX IF NOT EXISTS project_latest_event_date_project_idx 
-    ON project_latest_event_date (project_id, project_path)
-    """
 
   override def popEvent(): IO[Option[EventIdAndBody]] =
     for {
@@ -202,7 +178,7 @@ private class EventFetcherImpl(
     } getOrElse ME.unit
 }
 
-private object IOEventLogFetch {
+private object IOEventFetcher {
 
   private val MaxProcessingTime:     Duration             = Duration.ofMinutes(120)
   private val ProjectsFetchingLimit: Int Refined Positive = 10
@@ -212,17 +188,14 @@ private object IOEventLogFetch {
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name]
-  )(implicit contextShift:  ContextShift[IO]): IO[EventFetcher[IO]] = for {
-    fetcher <- IO {
-                 new EventFetcherImpl(transactor,
-                                      waitingEventsGauge,
-                                      underProcessingGauge,
-                                      queriesExecTimes,
-                                      maxProcessingTime = MaxProcessingTime,
-                                      projectsFetchingLimit = ProjectsFetchingLimit,
-                                      projectPrioritisation = new ProjectPrioritisation()
-                 )
-               }
-    _ <- fetcher.createView
-  } yield fetcher
+  )(implicit contextShift:  ContextShift[IO]): IO[EventFetcher[IO]] = IO {
+    new EventFetcherImpl(transactor,
+                         waitingEventsGauge,
+                         underProcessingGauge,
+                         queriesExecTimes,
+                         maxProcessingTime = MaxProcessingTime,
+                         projectsFetchingLimit = ProjectsFetchingLimit,
+                         projectPrioritisation = new ProjectPrioritisation()
+    )
+  }
 }
