@@ -20,13 +20,15 @@ package io.renku.eventlog.metrics
 
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
+import ch.datascience.generators.Generators.nonEmptyList
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.TestLabeledHistogram
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
@@ -37,6 +39,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class StatsFinderSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
+    with LatestEventDatesViewPresence
     with ScalaCheckPropertyChecks
     with should.Matchers {
 
@@ -71,35 +74,64 @@ class StatsFinderSpec
         val events = generateEventsFor(projectPaths.toList)
 
         events foreach store
+        refreshView()
 
         stats.countEvents(Set(New, RecoverableFailure)).unsafeRunSync() shouldBe events
           .groupBy(_._1)
           .map { case (projectPath, sameProjectGroup) =>
-            projectPath -> sameProjectGroup.count { case (_, _, status) =>
+            projectPath -> sameProjectGroup.count { case (_, _, status, _) =>
               Set(New, RecoverableFailure) contains status
             }
           }
-          .filter { case (_, count) =>
-            count > 0
-          }
+          .filter { case (_, count) => count > 0 }
 
         queriesExecTimes.verifyExecutionTimeMeasured("projects events count")
       }
     }
+
+    "return info about number of events with the given status in the queue from the first given number of projects" in {
+      val projectPathsList = nonEmptyList(projectPaths, minElements = 3, maxElements = 8).generateOne
+      val events           = generateEventsFor(projectPathsList.toList)
+
+      events foreach store
+      refreshView()
+
+      val limit: Int Refined Positive = 2
+
+      stats.countEvents(Set(New, RecoverableFailure), Some(limit)).unsafeRunSync() shouldBe events
+        .groupBy(_._1)
+        .toSeq
+        .sortBy { case (_, sameProjectGroup) =>
+          val (_, _, _, maxEventDate) = sameProjectGroup.maxBy { case (_, _, _, eventDate) => eventDate.value }
+          maxEventDate.value
+        }
+        .reverse
+        .map { case (projectPath, sameProjectGroup) =>
+          projectPath -> sameProjectGroup.count { case (_, _, status, _) =>
+            Set(New, RecoverableFailure) contains status
+          }
+        }
+        .filter { case (_, count) => count > 0 }
+        .take(limit.value)
+        .toMap
+
+      queriesExecTimes.verifyExecutionTimeMeasured("projects events count")
+    }
   }
 
-  private val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-  private lazy val stats       = new StatsFinderImpl(transactor, queriesExecTimes)
+  private lazy val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+  private lazy val stats            = new StatsFinderImpl(transactor, queriesExecTimes)
 
-  private def store: ((Path, EventId, EventStatus)) => Unit = { case (projectPath, eventId, status) =>
-    storeEvent(
-      CompoundEventId(eventId, Id(Math.abs(projectPath.value.hashCode))),
-      status,
-      executionDates.generateOne,
-      eventDates.generateOne,
-      eventBodies.generateOne,
-      projectPath = projectPath
-    )
+  private def store: ((Path, EventId, EventStatus, EventDate)) => Unit = {
+    case (projectPath, eventId, status, eventDate) =>
+      storeEvent(
+        CompoundEventId(eventId, Id(Math.abs(projectPath.value.hashCode))),
+        status,
+        executionDates.generateOne,
+        eventDate,
+        eventBodies.generateOne,
+        projectPath = projectPath
+      )
   }
 
   private def store(status: EventStatus): Unit =
@@ -112,14 +144,14 @@ class StatsFinderSpec
 
   private def generateEventsFor(projectPaths: List[Path]) =
     projectPaths flatMap { projectPath =>
-      nonEmptyList(eventIdsAndStatuses, maxElements = 20).generateOne.toList.map { case (commitId, status) =>
-        (projectPath, commitId, status)
+      nonEmptyList(eventData, maxElements = 20).generateOne.toList.map { case (commitId, status, eventDate) =>
+        (projectPath, commitId, status, eventDate)
       }
     }
 
-  private val eventIdsAndStatuses =
-    for {
-      eventId <- eventIds
-      status  <- eventStatuses
-    } yield eventId -> status
+  private val eventData = for {
+    eventId   <- eventIds
+    status    <- eventStatuses
+    eventDate <- eventDates
+  } yield (eventId, status, eventDate)
 }

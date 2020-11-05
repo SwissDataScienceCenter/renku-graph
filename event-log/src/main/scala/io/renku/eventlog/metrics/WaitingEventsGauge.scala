@@ -21,11 +21,15 @@ package io.renku.eventlog.metrics
 import cats.effect.IO
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics._
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventStatus.{New, RecoverableFailure}
 
 object WaitingEventsGauge {
+
+  val NumberOfProjects: Int Refined Positive = 20
 
   def apply(
       metricsRegistry: MetricsRegistry[IO],
@@ -37,8 +41,10 @@ object WaitingEventsGauge {
                  name = "events_waiting_count",
                  help = "Number of waiting Events by project path.",
                  labelName = "project",
-                 resetDataFetch =
-                   () => statsFinder.countEvents(Set(New, RecoverableFailure)).map(_.view.mapValues(_.toDouble).toMap)
+                 resetDataFetch = () =>
+                   statsFinder
+                     .countEvents(Set(New, RecoverableFailure), maybeLimit = Some(NumberOfProjects))
+                     .map(_.view.mapValues(_.toDouble).toMap)
                )(metricsRegistry)
       _ <- gauge.reset()
     } yield gauge
