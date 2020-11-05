@@ -24,6 +24,7 @@ import com.dimafeng.testcontainers._
 import doobie.Transactor
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
+import doobie.util.fragment.Fragment
 import org.scalatest.Suite
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -55,4 +56,8 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypesSerializers {
     query
       .transact(transactor.get)
       .unsafeRunSync()
+
+  def verifyTrue(sql: Fragment): Unit = execute {
+    sql.update.run.map(_ => ())
+  }
 }

@@ -44,7 +44,12 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
+class EventFetcherSpec
+    extends AnyWordSpec
+    with InMemoryEventLogDbSpec
+    with LatestEventDatesViewPresence
+    with MockFactory
+    with should.Matchers {
 
   "popEvent" should {
 
@@ -230,7 +235,6 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
         projectPrioritisation = projectPrioritisation,
         waitForViewRefresh = true
       )
-      eventLogFetch.createView.unsafeRunSync() shouldBe ((): Unit)
 
       val events = readyStatuses
         .generateNonEmptyList(minElements = 3, maxElements = 6)
@@ -310,8 +314,6 @@ class EventFetcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mock
       projectPrioritisation = projectPrioritisation,
       waitForViewRefresh = true
     )
-
-    eventLogFetch.createView.unsafeRunSync() shouldBe ((): Unit)
   }
 
   private def executionDatesInThePast: Gen[ExecutionDate] = timestampsNotInTheFuture map ExecutionDate.apply

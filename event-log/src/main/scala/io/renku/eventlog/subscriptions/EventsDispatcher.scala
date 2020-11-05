@@ -146,7 +146,7 @@ object EventsDispatcher {
       timer:            Timer[IO]
   ): IO[EventsDispatcher] =
     for {
-      eventsFinder        <- IOEventLogFetch(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
+      eventsFinder        <- IOEventFetcher(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
       eventsSender        <- IOEventsSender(logger)
       updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
     } yield new EventsDispatcher(subscriptions,

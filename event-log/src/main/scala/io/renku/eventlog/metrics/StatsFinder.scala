@@ -25,14 +25,17 @@ import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
-import doobie.util.fragments.in
+import doobie.util.fragment.Fragment
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
 
 trait StatsFinder[Interpretation[_]] {
   def statuses(): Interpretation[Map[EventStatus, Long]]
-
-  def countEvents(statuses: Set[EventStatus]): Interpretation[Map[Path, Long]]
+  def countEvents(statuses:   Set[EventStatus],
+                  maybeLimit: Option[Int Refined Positive] = None
+  ): Interpretation[Map[Path, Long]]
 }
 
 class StatsFinderImpl(
@@ -59,29 +62,41 @@ class StatsFinderImpl(
   private def addMissingStatues(stats: Map[EventStatus, Long]): Map[EventStatus, Long] =
     EventStatus.all.map(status => status -> stats.getOrElse(status, 0L)).toMap
 
-  override def countEvents(statuses: Set[EventStatus]): IO[Map[Path, Long]] =
+  override def countEvents(statuses:   Set[EventStatus],
+                           maybeLimit: Option[Int Refined Positive] = None
+  ): IO[Map[Path, Long]] =
     NonEmptyList.fromList(statuses.toList) match {
       case None => Map.empty[Path, Long].pure[IO]
       case Some(statusesList) =>
-        measureExecutionTime(countProjectsEvents(statusesList))
+        measureExecutionTime(countProjectsEvents(statusesList, maybeLimit))
           .transact(transactor.get)
           .map(_.toMap)
     }
 
-  // format: off
-  private def countProjectsEvents(statuses: NonEmptyList[EventStatus]) = SqlQuery({
-    fr"""
-    |select project_path, count(event_id)
-    |from event_log
-    |where """ ++ `status IN`(statuses) ++ fr"""
-    |group by project_path
-    |"""
-    }.stripMargin.query[(Path, Long)].to[List],
+  private def countProjectsEvents(statuses:   NonEmptyList[EventStatus],
+                                  maybeLimit: Option[Int Refined Positive] = None
+  ) = SqlQuery(
+    Fragment
+      .const(s"""|select
+                 |  project_path,
+                 |  (select count(event_id) from event_log el_int where el_int.project_id = pled.project_id and status IN (${statuses.toSql})) as count
+                 |from project_latest_event_date pled
+                 |where exists (
+                 |        select project_id
+                 |        from event_log el
+                 |        where el.project_id = pled.project_id and status IN (${statuses.toSql})
+                 |      )
+                 |order by latest_event_date desc
+                 |${maybeLimit.map(limit => s"limit $limit").getOrElse("")};
+                 |""".stripMargin)
+      .query[(Path, Long)]
+      .to[List],
     name = "projects events count"
   )
-  // format: on
 
-  private def `status IN`(statuses: NonEmptyList[EventStatus]) = in(fr"status", statuses)
+  private implicit class StatusesOps(statuses: NonEmptyList[EventStatus]) {
+    lazy val toSql: String = statuses.map(status => s"'$status'").mkString_(", ")
+  }
 }
 
 object IOStatsFinder {
