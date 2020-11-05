@@ -117,15 +117,21 @@ private class EventFetcherImpl(
 
   // format: off
   private def findOldestEvent(idAndPath: ProjectIdAndPath) = SqlQuery({
-    fr"""select event_log.event_id, event_log.project_id, event_log.event_body
-         from event_log
-         where project_id = ${idAndPath.id}
-           and (
-             (""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
-             or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
-           )
-         order by event_date asc
-         limit 1"""
+    fr"""select el.event_id, el.project_id, el.event_body
+           from (
+             select project_id, min(event_date) as min_event_date
+             from event_log
+             where project_id = ${idAndPath.id}
+               and ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
+                 or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime}))
+             group by project_id
+           ) oldest_event_date
+           join event_log el on oldest_event_date.project_id = el.project_id 
+             and oldest_event_date.min_event_date = el.event_date
+             and ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
+                 or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})) 
+           limit 1
+           """
     }.query[EventIdAndBody].option,
     name = "pop event - oldest"
   )
