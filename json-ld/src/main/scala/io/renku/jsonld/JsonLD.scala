@@ -125,7 +125,7 @@ object JsonLD {
     override def hashCode(): Int =
       ((id.hashCode().toLong +
         types.hashCode().toLong +
-        properties.toList.toSet.hashCode().toLong +
+        properties.toList.sortBy(_.hashCode()).hashCode().toLong +
         reverse.hashCode().toLong) % Int.MaxValue).toInt
 
     override def equals(that: Any): Boolean = that match {
@@ -195,10 +195,10 @@ object JsonLD {
 
   private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD {
 
-    override def hashCode(): Int = jsons.toSet.hashCode()
+    override def hashCode(): Int = jsons.sortBy(_.hashCode()).hashCode()
 
     override def equals(that: Any): Boolean = that match {
-      case JsonLDArray(thatJsons) => thatJsons.toSet.equals(this.jsons.toSet)
+      case JsonLDArray(thatJsons) => thatJsons.sortBy(_.hashCode()) == this.jsons.sortBy(_.hashCode())
       case _                      => false
     }
 
@@ -216,45 +216,4 @@ object JsonLD {
   }
 
   final case class MalformedJsonLD(message: String) extends RuntimeException(message)
-
-  private def deNestProperties(entity:                  JsonLDEntity,
-                               properties:              List[(Property, JsonLD)],
-                               replacePropertyFunction: (JsonLDEntity, (Property, JsonLD)) => JsonLDEntity,
-                               topLevelEntities:        List[JsonLDEntity]
-  ) =
-    properties.foldLeft(entity, topLevelEntities) {
-      case ((mainEntity, entities), (property, jsonLDEntity: JsonLDEntity)) =>
-        val (updatedNestedEntity, updatedEntities) = deNest(jsonLDEntity, entities)
-        replacePropertyFunction(mainEntity,
-                                property -> JsonLDEntityId(updatedNestedEntity.id)
-        ) -> (updatedEntities :+ updatedNestedEntity)
-      case ((mainEntity, entities), (property, JsonLDArray(jsonLDs))) =>
-        val (arrayElements, deNestedEntities) = deNestJsonLDArray(jsonLDs, entities)
-        replacePropertyFunction(mainEntity, property -> JsonLDArray(arrayElements)) -> deNestedEntities
-      case ((mainEntity, entities), (_, _)) => mainEntity -> entities
-    }
-
-  private def deNest(entity: JsonLDEntity, topLevelEntities: List[JsonLDEntity]): (JsonLDEntity, List[JsonLDEntity]) = {
-    val (updatedEntity, listOfDeNestedEntities) =
-      deNestProperties(entity, entity.properties.toList, JsonLDEntity.replaceProperty, topLevelEntities)
-    val (resultEntity, listOfAllDeNestedEntities) = deNestProperties(updatedEntity,
-                                                                     updatedEntity.reverse.properties,
-                                                                     JsonLDEntity.replaceReverseProperty,
-                                                                     listOfDeNestedEntities
-    )
-    resultEntity -> listOfAllDeNestedEntities
-  }
-
-  private def deNestJsonLDArray(jsonLDs:  Seq[JsonLD],
-                                entities: List[JsonLDEntity]
-  ): (List[JsonLD], List[JsonLDEntity]) =
-    jsonLDs.foldLeft((List.empty[JsonLD], entities)) {
-      case ((arrayElements, toplevelEntities), jsonLDEntity: JsonLDEntity) =>
-        val (updatedEntity, listOfEntities) = deNest(jsonLDEntity, toplevelEntities)
-        (arrayElements :+ JsonLDEntityId(updatedEntity.id)) -> (listOfEntities :+ updatedEntity)
-      case ((arrayElements, toplevelEntities), JsonLDArray(jsonLDs)) =>
-        val (nestedArrayElements, deNestedEntities) = deNestJsonLDArray(jsonLDs, toplevelEntities)
-        (arrayElements :+ JsonLDArray(nestedArrayElements)) -> deNestedEntities
-      case ((arrayElements, toplevelEntities), entity) => (arrayElements :+ entity) -> toplevelEntities
-    }
 }

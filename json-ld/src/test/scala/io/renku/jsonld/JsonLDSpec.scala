@@ -28,7 +28,7 @@ import io.circe.Json
 import io.circe.literal._
 import io.circe.parser._
 import io.circe.syntax._
-import io.renku.jsonld.JsonLD.{JsonLDEntity, JsonLDEntityId, MalformedJsonLD}
+import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId, MalformedJsonLD}
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
 import io.renku.jsonld.generators.JsonLDGenerators._
@@ -698,6 +698,31 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
         JsonLD.arr(entities.toList: _*).asArray shouldBe Some(entities.toList.toVector)
       }
     }
+  }
+
+  "equals & hashCode" should {
+    "return true for two JsonLDArrays with the same elements in the same order" in {
+      forAll(nonEmptyList(jsonLDEntities)) { entities =>
+        JsonLD.arr(entities.toList: _*) shouldBe JsonLD.arr(entities.toList: _*)
+        JsonLD.arr(entities.toList: _*).hashCode() shouldBe JsonLD.arr(entities.toList: _*).hashCode()
+      }
+    }
+
+    "return true for two JsonLDArrays with the same elements in *different* order" in {
+      forAll(nonEmptyList(jsonLDEntities)) { entities =>
+        JsonLD.arr(entities.toList: _*) shouldBe JsonLD.arr(Random.shuffle(entities.toList): _*)
+        JsonLD.arr(entities.toList: _*).hashCode() shouldBe JsonLD.arr(Random.shuffle(entities.toList): _*).hashCode()
+      }
+    }
+
+    "return true for two JsonLDEntities with the same properties" in {
+      forAll(nonEmptyList(entityProperties), entityIds, entityTypesObject) { (properties, id, entityTypes) =>
+        JsonLD.entity(id, entityTypes, properties) shouldBe JsonLD.entity(id, entityTypes, properties)
+        JsonLD.entity(id, entityTypes, properties).hashCode() shouldBe
+          JsonLD.entity(id, entityTypes, properties).hashCode()
+      }
+    }
+
   }
 
   private def listValueProperties(schema: Schema): Gen[(Property, NonEmptyList[JsonLD])] =
