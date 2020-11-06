@@ -21,8 +21,6 @@ package io.renku.jsonld
 import java.io.Serializable
 import java.time.{Instant, LocalDate}
 
-import cats.data.NonEmptyList
-import cats.syntax.all._
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD.MalformedJsonLD
 
@@ -74,7 +72,7 @@ object JsonLD {
   def entity(
       id:         EntityId,
       types:      EntityTypes,
-      properties: NonEmptyList[(Property, JsonLD)],
+      properties: Map[Property, JsonLD],
       other:      (Property, JsonLD)*
   ): JsonLDEntity = JsonLDEntity(id, types, properties ++ other.toList, Reverse.empty)
 
@@ -84,18 +82,18 @@ object JsonLD {
       reverse:       Reverse,
       firstProperty: (Property, JsonLD),
       other:         (Property, JsonLD)*
-  ): JsonLDEntity = JsonLDEntity(id, types, properties = NonEmptyList.of(firstProperty, other: _*), reverse)
+  ): JsonLDEntity = JsonLDEntity(id, types, properties = other.toMap + firstProperty, reverse)
 
   def entity(
       id:         EntityId,
       types:      EntityTypes,
       reverse:    Reverse,
-      properties: NonEmptyList[(Property, JsonLD)]
+      properties: Map[Property, JsonLD]
   ): JsonLDEntity = JsonLDEntity(id, types, properties, reverse)
 
   private[jsonld] final case class JsonLDEntity(id:         EntityId,
                                                 types:      EntityTypes,
-                                                properties: NonEmptyList[(Property, JsonLD)],
+                                                properties: Map[Property, JsonLD],
                                                 reverse:    Reverse
   ) extends JsonLD {
 
@@ -122,39 +120,6 @@ object JsonLD {
     override lazy val entityTypes: Option[EntityTypes]    = Some(types)
     override lazy val asArray:     Option[Vector[JsonLD]] = Some(Vector(this))
 
-    override def hashCode(): Int =
-      ((id.hashCode().toLong +
-        types.hashCode().toLong +
-        properties.toList.sortBy(_.hashCode()).hashCode().toLong +
-        reverse.hashCode().toLong) % Int.MaxValue).toInt
-
-    override def equals(that: Any): Boolean = that match {
-      case JsonLDEntity(id, types, properties, reverse) =>
-        id == this.id &&
-          types == this.types &&
-          properties.toList.toSet == this.properties.toList.toSet &&
-          reverse == this.reverse
-      case _ => false
-    }
-  }
-
-  object JsonLDEntity {
-    def replaceProperty(of: JsonLDEntity, `with`: (Property, JsonLD)): JsonLDEntity = {
-      val (propertyName, _) = `with`
-      val updateListOfProperties =
-        NonEmptyList(`with`, of.properties.filterNot { case (property, _) => property == propertyName })
-      of.copy(properties = updateListOfProperties)
-    }
-
-    def replaceReverseProperty(of: JsonLDEntity, `with`: (Property, JsonLD)): JsonLDEntity = {
-      val (propertyName, _) = `with`
-      val filteredProperties = of.reverse.properties.filterNot { case (property, _) =>
-        property == propertyName
-      }
-      val updatedReverseProperties = Reverse
-        .fromListUnsafe(`with` +: filteredProperties)
-      of.copy(reverse = updatedReverseProperties)
-    }
   }
 
   private[jsonld] final case class JsonLDValue[V](

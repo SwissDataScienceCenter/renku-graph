@@ -1,3 +1,21 @@
+/*
+ * Copyright 2020 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.jsonld
 
 import cats.data.NonEmptyList
@@ -80,12 +98,12 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
 
     "should fail if there are two unequal child entities with the same EntityID in a single Entity" in {
       forAll { (grandParent: JsonLDEntity) =>
-        val newProperties   = valuesProperties.generateNonEmptyList()
+        val newProperties   = valuesProperties.generateNonEmptyMap()
         val parent0         = jsonLDEntities.generateOne
         val parent1         = jsonLDEntities.generateOne
         val modifiedParent0 = parent0.copy(properties = newProperties)
         val parent1WithModifiedChild =
-          parent1.copy(properties = parent1.properties :+ (properties.generateOne -> modifiedParent0))
+          parent1.copy(properties = parent1.properties + (properties.generateOne -> modifiedParent0))
 
         val grandParentWithModifiedChildren =
           grandParent.add(List(properties.generateOne -> parent0, properties.generateOne -> parent1WithModifiedChild))
@@ -100,7 +118,7 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
     "should fail if there are two unequal entities with the same EntityId in the nested structure" in {
       forAll { (parent0: JsonLDEntity, parent1: JsonLDEntity) =>
         val childrenTuples = entityProperties.generateNonEmptyList().toList
-        val newProperties  = valuesProperties.generateNonEmptyList()
+        val newProperties  = valuesProperties.generateNonEmptyMap()
         val modifiedChild = childrenTuples.head match {
           case (property, entity) =>
             (property, entity.copy(properties = newProperties))
@@ -158,15 +176,8 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
 
        */
 
-      def replaceEntityProperty(properties: NonEmptyList[(Property, JsonLD)],
-                                property:   Property,
-                                entity:     JsonLDEntity
-      ) =
-        NonEmptyList(property -> JsonLDEntityId(entity.id),
-                     properties.filterNot { case (_, item) =>
-                       item == entity
-                     }
-        )
+      def replaceEntityProperty(properties: Map[Property, JsonLD], property: Property, entity: JsonLDEntity) =
+        properties.removed(property) + (property -> JsonLDEntityId(entity.id))
 
       forAll {
         (entity0:  JsonLDEntity,
@@ -201,8 +212,8 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
       forAll { (property: Property, entity: JsonLDEntity) =>
         val normalValues: List[JsonLD] = jsonLDValues.generateNonEmptyList(minElements = 2).toList
         val mixedUpValues = Random.shuffle(normalValues)
-        val normalEntity  = entity.copy(properties = entity.properties :+ (property, JsonLD.arr(normalValues: _*)))
-        val mixedUpEntity = entity.copy(properties = entity.properties :+ (property, JsonLD.arr(mixedUpValues: _*)))
+        val normalEntity  = entity.copy(properties = entity.properties + (property -> JsonLD.arr(normalValues: _*)))
+        val mixedUpEntity = entity.copy(properties = entity.properties + (property -> JsonLD.arr(mixedUpValues: _*)))
 
         JsonLD.arr(normalEntity, mixedUpEntity).flatten.unsafeGetRight.asArray.get.size == 1
       }
@@ -241,7 +252,7 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
         entity.add(property -> entityValue)
       }
 
-    def add(property: (Property, JsonLD)): JsonLDEntity = entity.copy(properties = entity.properties :+ property)
+    def add(property: (Property, JsonLD)): JsonLDEntity = entity.copy(properties = entity.properties + property)
   }
 
 }

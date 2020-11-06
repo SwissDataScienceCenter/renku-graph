@@ -19,7 +19,7 @@
 package io.renku.jsonld.generators
 
 import Generators._
-import io.renku.jsonld.JsonLD.{JsonLDEntity, JsonLDValue}
+import io.renku.jsonld.JsonLD.{JsonLDEntity}
 import io.renku.jsonld._
 import org.scalacheck.{Arbitrary, Gen}
 
@@ -66,5 +66,5 @@ object JsonLDGenerators {
     id         <- entityIds
     types      <- entityTypesObject
     properties <- nonEmptyList(valuesProperties)
-  } yield JsonLD.entity(id, types, properties)
+  } yield JsonLD.entity(id, types, properties.toList.toMap)
 }

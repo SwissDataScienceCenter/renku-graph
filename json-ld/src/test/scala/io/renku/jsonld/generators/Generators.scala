@@ -31,6 +31,7 @@ import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 
+import scala.annotation.tailrec
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
 
@@ -272,6 +273,24 @@ object Generators {
         else generated
       }
 
+    }
+
+    implicit class GenTuple2Ops[T, U](generator: Gen[(T, U)]) {
+      def generateNonEmptyMap(minElements: Int Refined Positive = 1,
+                              maxElements: Int Refined Positive = 5
+      ): Map[T, U] = {
+
+        val numberOfElementsInMap = Gen.choose(minElements.value, maxElements.value).generateOne
+
+        @tailrec
+        def addNextEntry(acc: Map[T, U]): Map[T, U] =
+          if (acc.size == numberOfElementsInMap)
+            acc
+          else
+            addNextEntry(acc + generator.generateOne)
+
+        addNextEntry(Map.empty[T, U])
+      }
     }
 
     implicit def asArbitrary[T](implicit generator: Gen[T]): Arbitrary[T] = Arbitrary(generator)

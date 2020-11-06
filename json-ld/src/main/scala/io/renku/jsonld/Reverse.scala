@@ -22,24 +22,17 @@ import cats.syntax.all._
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId}
 
-final class Reverse private (val properties: List[(Property, JsonLD)]) {
-
-  override def equals(obj: Any): Boolean = obj match {
-    case Reverse(otherProperties) => properties == otherProperties
-    case _                        => false
-  }
+final case class Reverse(properties: Map[Property, JsonLD]) {
 
   override lazy val toString: String = s"Reverse($properties)"
 }
 
 object Reverse {
 
-  def unapply(reverse: Reverse): Option[List[(Property, JsonLD)]] = Some(reverse.properties)
-
-  lazy val empty: Reverse = new Reverse(Nil)
+  lazy val empty: Reverse = new Reverse(Map.empty)
 
   def ofEntities(first: (Property, JsonLDEntity), other: (Property, JsonLDEntity)*): Reverse =
-    new Reverse((first +: other).toList)
+    new Reverse((first +: other).toMap)
 
   def of(first: (Property, JsonLD), other: (Property, JsonLD)*): Either[Exception, Reverse] =
     fromList((first +: other).toList)
@@ -51,7 +44,7 @@ object Reverse {
       case Nil => Reverse.empty.asRight[Exception]
       case nonEmpty =>
         nonEmpty find nonEntity match {
-          case None => new Reverse(List(name -> JsonLD.arr(list: _*))).asRight[Exception]
+          case None => new Reverse(Map(name -> JsonLD.arr(list: _*))).asRight[Exception]
           case _ =>
             new IllegalArgumentException(
               s""""@reverse" "$name" property can exist on entity only"""
@@ -69,7 +62,7 @@ object Reverse {
             list collectFirst { case `value which is neither Entity nor Array(Entity)`(exception) =>
               exception
             },
-            ifNone = new Reverse(properties)
+            ifNone = new Reverse(properties.toMap)
           )
           .swap
     }
@@ -103,8 +96,8 @@ object Reverse {
     fromList(properties).fold(throw _, identity)
 
   implicit val jsonEncoder: Encoder[Reverse] = Encoder.instance {
-    case Reverse(Nil)                  => Json.Null
-    case Reverse((prop, value) +: Nil) => Json.obj(prop.url -> value.toJson)
-    case Reverse(props)                => Json.obj(props.map { case (prop, value) => prop.url -> value.toJson }: _*)
+    case Reverse(properties) if properties.isEmpty   => Json.Null
+    case Reverse(properties) if properties.size == 1 => Json.obj(properties.head._1.url -> properties.head._2.toJson)
+    case Reverse(props)                              => Json.obj(props.map { case (prop, value) => prop.url -> value.toJson }.toSeq: _*)
   }
 }
