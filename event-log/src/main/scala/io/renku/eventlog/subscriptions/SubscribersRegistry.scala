@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.Applicative
 import cats.effect.concurrent.{Deferred, Ref}
-import cats.effect.{ContextShift, Fiber, IO, Timer}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
@@ -106,7 +106,6 @@ private class SubscribersRegistry(
     _                        <- timer sleep checkupInterval
     subscribersDueForCheckup <- findSubscribersDueForCheckup
     _                        <- bringToAvailable(subscribersDueForCheckup)
-    _                        <- busySubscriberCheckup()
   } yield ()
 
   private def findSubscribersDueForCheckup: IO[List[SubscriberUrl]] = IO {
@@ -144,6 +143,6 @@ private object SubscribersRegistry {
     subscriberUrlReferenceQueue <- Ref.of[IO, List[Deferred[IO, SubscriberUrl]]](List.empty)
     registry <-
       IO(new SubscribersRegistry(subscriberUrlReferenceQueue, Instant.now, logger, busySleep, checkupInterval))
-    _ <- registry.busySubscriberCheckup().start
+    _ <- registry.busySubscriberCheckup().foreverM.start
   } yield registry
 }
