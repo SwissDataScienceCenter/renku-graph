@@ -18,20 +18,17 @@
 
 package io.renku.jsonld
 
-import cats.data.NonEmptyList
+import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD.{JsonLDEntity, JsonLDEntityId, MalformedJsonLD}
-import io.renku.jsonld.generators.Generators.Implicits.asArbitrary
-import io.renku.jsonld.generators.JsonLDGenerators.{jsonLDEntities, jsonLDValues, properties, valuesProperties}
+import io.renku.jsonld.generators.Generators.Implicits._
+import io.renku.jsonld.generators.JsonLDGenerators._
+import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import cats.syntax.all._
-import io.renku.jsonld.generators.Generators.Implicits._
-import io.renku.jsonld.generators.JsonLDGenerators._
-import io.renku.jsonld.syntax._
+
 import scala.util.Random
-import eu.timepit.refined.auto._
 
 class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -133,7 +130,7 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
       }
     }
 
-    "do nothing for JsonLDArray if all its items do not have nested entities" in {
+    "do nothing for JsonLDArray if none of its items have nested entities" in {
       forAll { (entity0: JsonLDEntity, entity1: JsonLDEntity) =>
         val entity0WithEntity1IdAsProperty = entity0.add(properties.generateOne -> entity1.id.asJsonLD)
         val arrayOfEntities                = JsonLD.arr(entity0WithEntity1IdAsProperty, entity1)
@@ -147,16 +144,7 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
         val entityWithChildren          = entity.add(property -> child)
         val entityWithChildrenFlattened = entity.add(property -> child.id.asJsonLD)
 
-        val arrayAfterFlattening = JsonLD
-          .arr(entityWithChildren)
-          .flatten
-          .unsafeGetRight
-          .asArray
-          .get
-
-        val expected = Vector(child, entityWithChildrenFlattened)
-
-        arrayAfterFlattening should contain theSameElementsAs expected
+        JsonLD.arr(entityWithChildren).flatten shouldBe Right(JsonLD.arr(child, entityWithChildrenFlattened))
       }
     }
 
@@ -198,40 +186,44 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
 
           val deNestedParent2Properties = replaceEntityProperty(nestedParent2.properties, property, child)
           val deNestedParent2           = nestedParent2.copy(properties = deNestedParent2Properties)
-
-          JsonLD
-            .arr(nestedParent0, nestedParent1)
-            .flatten
-            .map(_.asArray.get)
-            .unsafeGetRight should contain theSameElementsAs
-            Vector(child, deNestedParent0, deNestedParent1, deNestedParent2)
+          JsonLD.arr(nestedParent0, nestedParent1).flatten shouldBe
+            Right(JsonLD.arr(child, deNestedParent0, deNestedParent1, deNestedParent2))
       }
     }
 
     "deduplicate pulled out entities which contain an array property with elements in a different order" in {
+      /*
+        JsonLDArray(entity0,       entity1)
+          |                         |
+        properties(1,2)        properties(2,1)
+
+                       |
+                       |
+                       V
+
+                  (entity0)        // or entity1
+       */
       forAll { (property: Property, entity: JsonLDEntity) =>
         val normalValues: List[JsonLD] = jsonLDValues.generateNonEmptyList(minElements = 2).toList
         val mixedUpValues = Random.shuffle(normalValues)
         val normalEntity  = entity.copy(properties = entity.properties + (property -> JsonLD.arr(normalValues: _*)))
         val mixedUpEntity = entity.copy(properties = entity.properties + (property -> JsonLD.arr(mixedUpValues: _*)))
-
-        JsonLD.arr(normalEntity, mixedUpEntity).flatten.unsafeGetRight.asArray.get.size == 1
+        JsonLD.arr(normalEntity, mixedUpEntity).flatten should (be(Right(JsonLD.arr(normalEntity))) or be(
+          Right(JsonLD.arr(mixedUpEntity))
+        ))
       }
     }
 
     "pull out child entities from reversed property of an entity" in {
       forAll { (entity0: JsonLDEntity, child0: JsonLDEntity, child1: JsonLDEntity, reverseProperty: Property) =>
-        val children = List(child0, child1)
-        val parent: JsonLDEntity =
-          entity0.copy(reverse = Reverse.of((reverseProperty, children)).unsafeGetRight)
+        val children                       = List(child0, child1)
+        val Right(parentReverseProperties) = Reverse.of((reverseProperty, children))
+        val parent: JsonLDEntity = entity0.copy(reverse = parentReverseProperties)
 
-        val expectedReverse =
-          Reverse.of((reverseProperty, children.map(child => JsonLDEntityId(child.id)))).unsafeGetRight
+        val Right(expectedReverse) = Reverse.of((reverseProperty, children.map(child => JsonLDEntityId(child.id))))
 
         val parentWithIdsOfChildren = parent.copy(reverse = expectedReverse)
-
-        parent.flatten.unsafeGetRight.asArray.get should contain theSameElementsAs
-          Vector(parentWithIdsOfChildren, child0, child1)
+        parent.flatten shouldBe Right(JsonLD.arr(parentWithIdsOfChildren, child0, child1))
       }
     }
   }
@@ -240,10 +232,6 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
     property <- properties
     entity   <- jsonLDEntities
   } yield property -> entity
-
-  private implicit class EitherJsonLDOps[T <: Exception, U](either: Either[T, U]) {
-    lazy val unsafeGetRight: U = either.fold(throw _, identity)
-  }
 
   private implicit class JsonLDEntityOps(entity: JsonLDEntity) {
 

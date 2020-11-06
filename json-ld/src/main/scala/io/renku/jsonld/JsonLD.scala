@@ -21,6 +21,7 @@ package io.renku.jsonld
 import java.io.Serializable
 import java.time.{Instant, LocalDate}
 
+import cats.implicits.catsSyntaxEitherId
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD.MalformedJsonLD
 
@@ -35,7 +36,7 @@ abstract class JsonLD extends Product with Serializable {
 
   def asArray: Option[Vector[JsonLD]]
 
-  def flatten: Either[MalformedJsonLD, JsonLD] = Flattener.flatten(this)
+  def flatten: Either[MalformedJsonLD, JsonLD]
 }
 
 object JsonLD {
@@ -95,7 +96,8 @@ object JsonLD {
                                                 types:      EntityTypes,
                                                 properties: Map[Property, JsonLD],
                                                 reverse:    Reverse
-  ) extends JsonLD {
+  ) extends JsonLD
+      with JsonLDEntityFlattener {
 
     override lazy val toJson: Json = Json.obj(
       List(
@@ -136,6 +138,8 @@ object JsonLD {
     override lazy val entityTypes: Option[EntityTypes] = None
 
     override lazy val asArray: Option[Vector[JsonLD]] = Some(Vector(this))
+
+    override lazy val flatten: Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] object JsonLDValue {
@@ -144,10 +148,11 @@ object JsonLD {
   }
 
   private[jsonld] final case object JsonLDNull extends JsonLD {
-    override lazy val toJson:      Json                   = Json.Null
-    override lazy val entityId:    Option[EntityId]       = None
-    override lazy val entityTypes: Option[EntityTypes]    = None
-    override lazy val asArray:     Option[Vector[JsonLD]] = Some(Vector(JsonLD.Null))
+    override lazy val toJson:      Json                            = Json.Null
+    override lazy val entityId:    Option[EntityId]                = None
+    override lazy val entityTypes: Option[EntityTypes]             = None
+    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(JsonLD.Null))
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] final case object JsonLDOptionValue {
@@ -158,7 +163,7 @@ object JsonLD {
       }
   }
 
-  private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD {
+  private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD with JsonLDArrayFlattener {
 
     override def hashCode(): Int = jsons.sortBy(_.hashCode()).hashCode()
 
@@ -174,10 +179,11 @@ object JsonLD {
   }
 
   private[jsonld] final case class JsonLDEntityId[V <: EntityId](id: V)(implicit encoder: Encoder[V]) extends JsonLD {
-    override lazy val toJson:      Json                   = Json.obj("@id" -> id.asJson)
-    override lazy val entityId:    Option[EntityId]       = None
-    override lazy val entityTypes: Option[EntityTypes]    = None
-    override lazy val asArray:     Option[Vector[JsonLD]] = Some(Vector(this))
+    override lazy val toJson:      Json                            = Json.obj("@id" -> id.asJson)
+    override lazy val entityId:    Option[EntityId]                = None
+    override lazy val entityTypes: Option[EntityTypes]             = None
+    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   final case class MalformedJsonLD(message: String) extends RuntimeException(message)

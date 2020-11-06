@@ -507,14 +507,6 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
       }
     }
 
-    "return true for two JsonLDEntities with the same properties" in {
-      forAll(nonEmptyMap(entityProperties), entityIds, entityTypesObject) { (properties, id, entityTypes) =>
-        JsonLD.entity(id, entityTypes, properties) shouldBe JsonLD.entity(id, entityTypes, properties)
-        JsonLD.entity(id, entityTypes, properties).hashCode() shouldBe
-          JsonLD.entity(id, entityTypes, properties).hashCode()
-      }
-    }
-
   }
 
   private def listValueProperties(schema: Schema): Gen[(Property, NonEmptyList[JsonLD])] =

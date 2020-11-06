@@ -18,38 +18,40 @@
 
 package io.renku.jsonld
 
-import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId, JsonLDNull, JsonLDValue, MalformedJsonLD}
 import cats.syntax.all._
+import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId, MalformedJsonLD}
 
 import scala.annotation.tailrec
 
-private[jsonld] object Flattener {
-
-  def flatten(jsonLD: JsonLD): Either[MalformedJsonLD, JsonLD] =
-    jsonLD match {
-      case array:    JsonLDArray       => flattenArray(array)
-      case entity:   JsonLDEntity      => deNest(List(entity), Nil).flatMap(checkForUniqueIds)
-      case entityId: JsonLDEntityId[_] => entityId.asRight
-      case value:    JsonLDValue[_]    => value.asRight
-      case JsonLDNull => JsonLDNull.asRight
-    }
-
-  private def flattenArray(array: JsonLDArray) =
+trait JsonLDArrayFlattener extends Flattener {
+  self: JsonLDArray =>
+  lazy val flatten: Either[MalformedJsonLD, JsonLD] =
     for {
-      flattenedJsons <- array.jsons
+      flattenedJsons <- this.jsons
                           .foldLeft(Either.right[MalformedJsonLD, List[JsonLD]](List.empty[JsonLD])) {
                             case (acc, jsonLDEntity: JsonLDEntity) =>
                               for {
                                 jsons    <- deNest(List(jsonLDEntity), List.empty[JsonLDEntity])
                                 accRight <- acc
-                              } yield (accRight ++ jsons)
+                              } yield accRight ++ jsons
                             case (acc, other) => acc.map(other +: _)
                           }
       flattenedArray <- checkForUniqueIds(flattenedJsons.distinct)
     } yield flattenedArray
+}
+
+trait JsonLDEntityFlattener extends Flattener {
+  self: JsonLDEntity =>
+
+  lazy val flatten: Either[MalformedJsonLD, JsonLD] = deNest(List(this), Nil).flatMap(checkForUniqueIds)
+}
+
+private[jsonld] trait Flattener {
 
   @tailrec
-  private def deNest(toProcess: List[JsonLD], topLevelEntities: List[JsonLD]): Either[MalformedJsonLD, List[JsonLD]] =
+  protected final def deNest(toProcess:        List[JsonLD],
+                             topLevelEntities: List[JsonLD]
+  ): Either[MalformedJsonLD, List[JsonLD]] =
     toProcess match {
       case (entity: JsonLDEntity) :: entities =>
         val processNext: List[JsonLDEntity] =
@@ -64,14 +66,14 @@ private[jsonld] object Flattener {
     properties.foldLeft(List.empty[JsonLDEntity]) {
       case (acc, (_, nestedEntity: JsonLDEntity)) => nestedEntity +: acc
       case (acc, (_, array: JsonLDArray)) =>
-        array.jsons.collect { case (entity: JsonLDEntity) => entity }.toList ++ acc
+        array.jsons.collect { case entity: JsonLDEntity => entity }.toList ++ acc
       case (acc, _) => acc
     }
 
   private def extractReverseProperties(properties: Map[Property, JsonLD]): List[JsonLDEntity] =
     properties
       .collect { case (_, entities: JsonLDArray) =>
-        entities.asArray.toList.flatten.collect { case (entity: JsonLDEntity) => entity }
+        entities.asArray.toList.flatten.collect { case entity: JsonLDEntity => entity }
       }
       .flatten
       .toList
@@ -93,7 +95,9 @@ private[jsonld] object Flattener {
     case other => other
   }
 
-  private def checkForUniqueIds(flattenedJsons: List[JsonLD]) = if (areIdsUnique(flattenedJsons))
+  protected def checkForUniqueIds(flattenedJsons: List[JsonLD]): Either[MalformedJsonLD, JsonLD] = if (
+    areIdsUnique(flattenedJsons)
+  )
     Right(JsonLD.arr(flattenedJsons: _*))
   else
     Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
