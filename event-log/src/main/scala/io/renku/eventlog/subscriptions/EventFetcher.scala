@@ -106,6 +106,7 @@ private class EventFetcherImpl(
             or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
           )
       )
+      order by latest_event_date desc
       limit ${projectsFetchingLimit.value}  
       """ 
     }.query[(projects.Id, projects.Path, EventDate, Int)]
