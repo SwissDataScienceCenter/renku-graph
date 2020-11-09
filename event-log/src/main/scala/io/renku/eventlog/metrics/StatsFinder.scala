@@ -76,23 +76,42 @@ class StatsFinderImpl(
   private def countProjectsEvents(statuses:   NonEmptyList[EventStatus],
                                   maybeLimit: Option[Int Refined Positive] = None
   ) = SqlQuery(
-    Fragment
-      .const(s"""|select
-                 |  project_path,
-                 |  (select count(event_id) from event_log el_int where el_int.project_id = pled.project_id and status IN (${statuses.toSql})) as count
-                 |from project_latest_event_date pled
-                 |where exists (
-                 |        select project_id
-                 |        from event_log el
-                 |        where el.project_id = pled.project_id and status IN (${statuses.toSql})
-                 |      )
-                 |order by latest_event_date desc
-                 |${maybeLimit.map(limit => s"limit $limit").getOrElse("")};
-                 |""".stripMargin)
-      .query[(Path, Long)]
-      .to[List],
+    prepareQuery(statuses, maybeLimit).query[(Path, Long)].to[List],
     name = "projects events count"
   )
+
+  private def prepareQuery(
+      statuses:   NonEmptyList[EventStatus],
+      maybeLimit: Option[Int Refined Positive]
+  ): Fragment = Fragment.const {
+    maybeLimit match {
+      case None =>
+        s"""|select
+            |  project_path,
+            |  (select count(event_id) from event_log el_int where el_int.project_id = pled.project_id and status IN (${statuses.toSql})) as count
+            |from project_latest_event_date pled
+            |where exists (
+            |        select project_id
+            |        from event_log el
+            |        where el.project_id = pled.project_id and status IN (${statuses.toSql})
+            |      )
+            |""".stripMargin
+      case Some(limit) =>
+        s"""|select
+            |  project_path,
+            |  (select count(event_id) from event_log el_int where el_int.project_id = pled.project_id and status IN (${statuses.toSql})) as count
+            |from (select project_id, project_path, latest_event_date
+            |      from project_latest_event_date
+            |      order by latest_event_date desc) pled
+            |where exists (
+            |        select project_id
+            |        from event_log el
+            |        where el.project_id = pled.project_id and status IN (${statuses.toSql})
+            |      )
+            |limit $limit;
+            |""".stripMargin
+    }
+  }
 
   private implicit class StatusesOps(statuses: NonEmptyList[EventStatus]) {
     lazy val toSql: String = statuses.map(status => s"'$status'").mkString_(", ")

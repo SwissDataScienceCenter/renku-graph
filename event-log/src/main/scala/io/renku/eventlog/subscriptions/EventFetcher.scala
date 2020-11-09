@@ -97,7 +97,9 @@ private class EventFetcherImpl(
         pled.project_path,
         pled.latest_event_date,
         (select count(event_id) from event_log el_int where el_int.project_id = pled.project_id and el_int.status = ${Processing: EventStatus}) as current_occupancy 
-      from project_latest_event_date pled
+      from (select project_id, project_path, latest_event_date 
+            from project_latest_event_date 
+            order by latest_event_date desc) pled
       where exists (
         select project_id
         from event_log el
