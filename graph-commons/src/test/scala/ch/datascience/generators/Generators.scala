@@ -147,8 +147,8 @@ object Generators {
 
   def nonNegativeLongs(max: Long = 1000): Gen[Long Refined NonNegative] = choose(0L, max) map Refined.unsafeApply
 
-  def durations(max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
-    choose(1, max.toMillis) map (FiniteDuration(_, MILLISECONDS).toCoarsest)
+  def durations(min: FiniteDuration = 0 millis, max: FiniteDuration = 5 seconds): Gen[FiniteDuration] =
+    choose(min.toMillis, max.toMillis) map (FiniteDuration(_, MILLISECONDS).toCoarsest)
 
   def relativePaths(minSegments: Int = 1,
                     maxSegments: Int = 10,
@@ -204,6 +204,11 @@ object Generators {
   val timestampsNotInTheFuture: Gen[Instant] =
     Gen
       .choose(Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli)
+      .map(Instant.ofEpochMilli)
+
+  def timestampsNotInTheFuture(butOlderThan: Instant): Gen[Instant] =
+    Gen
+      .choose(butOlderThan.toEpochMilli, Instant.now().toEpochMilli)
       .map(Instant.ofEpochMilli)
 
   val timestampsInTheFuture: Gen[Instant] =
@@ -307,11 +312,6 @@ object Generators {
         val generated = generator.sample.getOrElse(generateDifferentThan(value))
         if (generated == value) generateDifferentThan(value)
         else generated
-      }
-
-      def generateGreaterThan(value: T)(implicit ordering: Ordering[T]): T = {
-        val candidate = generator.generateOne
-        if (ordering.compare(candidate, value) > 0) candidate else generateGreaterThan(value)
       }
 
       def toGeneratorOfSomes:   Gen[Option[T]] = generator map Option.apply

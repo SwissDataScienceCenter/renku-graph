@@ -45,7 +45,7 @@ private class BatchDateAdder[Interpretation[_]](
 
   private def checkColumnExists: Interpretation[Boolean] =
     sql"select batch_date from event_log limit 1"
-      .query[Instant]
+      .query[String]
       .option
       .transact(transactor.get)
       .map(_ => true)

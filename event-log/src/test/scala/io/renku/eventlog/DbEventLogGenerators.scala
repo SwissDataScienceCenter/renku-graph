@@ -43,13 +43,13 @@ object DbEventLogGenerators {
 
   implicit lazy val events: Gen[Event] = for {
     eventId   <- eventIds
-    project   <- projects
+    project   <- eventProjects
     date      <- eventDates
     batchDate <- batchDates
     body      <- eventBodies
   } yield Event(eventId, project, date, batchDate, body)
 
-  implicit lazy val projects: Gen[EventProject] = for {
+  implicit lazy val eventProjects: Gen[EventProject] = for {
     id   <- projectIds
     path <- projectPaths
   } yield EventProject(id, path)

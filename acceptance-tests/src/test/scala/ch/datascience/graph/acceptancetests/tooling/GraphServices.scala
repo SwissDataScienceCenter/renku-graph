@@ -20,6 +20,8 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect._
 import cats.effect.concurrent.Semaphore
+import ch.datascience.db.DBConfigProvider
+import ch.datascience.graph.acceptancetests.db.{EventLog, TokenRepository}
 import ch.datascience.graph.acceptancetests.stubs.GitLab
 import ch.datascience.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import ch.datascience.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
@@ -77,15 +79,27 @@ object GraphServices {
   val knowledgeGraphClient   = KnowledgeGraphClient()
   val eventLogClient         = EventLogClient()
 
-  val webhookService  = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
-  val tokenRepository = ServiceRun("token-repository", tokenrepository.Microservice, tokenRepositoryClient)
-  val knowledgeGraph  = ServiceRun("knowledge-graph", knowledgegraph.Microservice, knowledgeGraphClient)
-  val eventLog        = ServiceRun("event-log", eventlog.Microservice, eventLogClient)
+  val webhookService = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
+  val knowledgeGraph = ServiceRun("knowledge-graph", knowledgegraph.Microservice, knowledgeGraphClient)
+  val tokenRepository = ServiceRun(
+    "token-repository",
+    tokenrepository.Microservice,
+    tokenRepositoryClient,
+    preServiceStart = List(IO.pure(TokenRepository.postgresContainer.start())),
+    serviceArgsList = List(s"${DBConfigProvider.JdbcUrl}=${TokenRepository.postgresContainer.jdbcUrl}")
+  )
+  val eventLog = ServiceRun(
+    "event-log",
+    eventlog.Microservice,
+    eventLogClient,
+    preServiceStart = List(IO.pure(EventLog.postgresContainer.start())),
+    serviceArgsList = List(s"${DBConfigProvider.JdbcUrl}=${EventLog.postgresContainer.jdbcUrl}")
+  )
   val triplesGenerator = ServiceRun(
     "triples-generator",
-    service          = triplesgenerator.Microservice,
-    serviceClient    = triplesGeneratorClient,
-    preServiceStart  = List(RDFStore.stop(), IO(RdfStoreStub.start()), IO(RdfStoreStub.givenRenkuDatasetExists())),
+    service = triplesgenerator.Microservice,
+    serviceClient = triplesGeneratorClient,
+    preServiceStart = List(RDFStore.stop(), IO(RdfStoreStub.start()), IO(RdfStoreStub.givenRenkuDatasetExists())),
     postServiceStart = List(IO(RdfStoreStub.shutdown()), RDFStore.start())
   )
 

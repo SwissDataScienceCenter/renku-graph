@@ -55,8 +55,4 @@ trait DbInitSpec extends InMemoryEventLogDb {
   protected def dropTable(): Unit = execute {
     sql"DROP TABLE IF EXISTS event_log".update.run.map(_ => ())
   }
-
-  protected def verifyTrue(sql: Fragment): Unit = execute {
-    sql.update.run.map(_ => ())
-  }
 }

@@ -27,7 +27,7 @@ import ch.datascience.graph.config.RenkuLogTimeout
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
-import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.Renku
+import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.renkulog.Commands.{Renku, RepositoryPath}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -47,7 +47,7 @@ class RenkuSpec extends AnyWordSpec with should.Matchers {
         chunks = Seq(Left(new Bytes(commandBody.value.noSpaces.getBytes())))
       )
 
-      val Right(triples) = renku().log(event, path)(triplesGeneration(returning = commandResult)).value.unsafeRunSync()
+      val Right(triples) = renku().log(event)(triplesGeneration(returning = commandResult), path).value.unsafeRunSync()
 
       triples shouldBe commandBody
     }
@@ -56,14 +56,14 @@ class RenkuSpec extends AnyWordSpec with should.Matchers {
       val exception = exceptions.generateOne
 
       intercept[Exception] {
-        renku().log(event, path)(triplesGeneration(failingWith = exception)).value.unsafeRunSync()
+        renku().log(event)(triplesGeneration(failingWith = exception), path).value.unsafeRunSync()
       } shouldBe exception
     }
 
     s"return $GenerationRecoverableError if calling 'renku log' results in a 137 exit code" in new TestCase {
       val exception = ShelloutException(CommandResult(exitCode = 137, chunks = Nil))
 
-      val Left(error) = renku().log(event, path)(triplesGeneration(failingWith = exception)).value.unsafeRunSync()
+      val Left(error) = renku().log(event)(triplesGeneration(failingWith = exception), path).value.unsafeRunSync()
 
       error            shouldBe a[GenerationRecoverableError]
       error.getMessage shouldBe "Not enough memory"
@@ -73,7 +73,7 @@ class RenkuSpec extends AnyWordSpec with should.Matchers {
       val timeout = RenkuLogTimeout(100 millis)
 
       intercept[Exception] {
-        renku(timeout).log(event, path)(triplesGenerationTakingTooLong).value.unsafeRunSync()
+        renku(timeout).log(event)(triplesGenerationTakingTooLong, path).value.unsafeRunSync()
       }.getMessage shouldBe s"'renku log' execution for commit: ${event.commitId}, project: ${event.project.id} " +
         s"took longer than $timeout - terminating"
     }
@@ -84,7 +84,7 @@ class RenkuSpec extends AnyWordSpec with should.Matchers {
 
   private trait TestCase {
     val event = commitEvents.generateOne
-    val path  = paths.generateOne
+    val path  = RepositoryPath(paths.generateOne)
 
     private val renkuLogTimeout = RenkuLogTimeout(1500 millis)
     def renku(timeout: RenkuLogTimeout = renkuLogTimeout) = new Renku(timeout)

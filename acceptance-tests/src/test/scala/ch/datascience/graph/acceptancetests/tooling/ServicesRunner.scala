@@ -33,7 +33,8 @@ final case class ServiceRun(name:             String,
                             service:          IOMicroservice,
                             serviceClient:    ServiceClient,
                             preServiceStart:  List[IO[Unit]] = List.empty,
-                            postServiceStart: List[IO[Unit]] = List.empty
+                            postServiceStart: List[IO[Unit]] = List.empty,
+                            serviceArgsList:  List[String] = List.empty
 )
 
 class ServicesRunner(
@@ -67,7 +68,11 @@ class ServicesRunner(
         for {
           _ <- logger.info(s"Service ${serviceRun.name} starting")
           _ <- preServiceStart.sequence
-          _ = service.run(Nil).start.map(fiber => cancelTokens.put(serviceRun, fiber.cancel)).unsafeRunAsyncAndForget()
+          _ = service
+                .run(serviceRun.serviceArgsList)
+                .start
+                .map(fiber => cancelTokens.put(serviceRun, fiber.cancel))
+                .unsafeRunAsyncAndForget()
           _ <- verifyServiceReady(serviceRun)
         } yield ()
     }

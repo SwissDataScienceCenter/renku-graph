@@ -19,17 +19,23 @@
 package ch.datascience.graph.acceptancetests.db
 
 import cats.data.NonEmptyList
-import cats.effect.IO
-import ch.datascience.db.DBConfigProvider
+import cats.effect.{ContextShift, IO}
+import ch.datascience.db.{DBConfigProvider, DbTransactor}
 import ch.datascience.graph.model.events.{CommitId, EventId}
 import ch.datascience.graph.model.projects.Id
+import com.dimafeng.testcontainers.{Container, JdbcDatabaseContainer, PostgreSQLContainer}
+import doobie.Transactor
+import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import doobie.util.fragments.in
 import io.renku.eventlog._
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
 
-object EventLog extends InMemoryEventLogDb {
+object EventLog extends TypesSerializers {
+
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 
   def findEvents(projectId: Id, status: EventStatus*): List[CommitId] = execute {
     (fr"""
@@ -44,6 +50,27 @@ object EventLog extends InMemoryEventLogDb {
   private def `status IN`(status: List[EventStatus]) =
     in(fr"status", NonEmptyList.fromListUnsafe(status))
 
-  protected override val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
+  def execute[O](query: ConnectionIO[O]): O =
+    query
+      .transact(transactor.get)
+      .unsafeRunSync()
+
+  private val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
     new EventLogDbConfigProvider[IO].get().unsafeRunSync()
+
+  val postgresContainer: Container with JdbcDatabaseContainer = PostgreSQLContainer(
+    dockerImageNameOverride = "postgres:9.6.19-alpine",
+    databaseName = "event_log",
+    username = dbConfig.user.value,
+    password = dbConfig.pass
+  )
+
+  private lazy val transactor: DbTransactor[IO, EventLogDB] = DbTransactor[IO, EventLogDB] {
+    Transactor.fromDriverManager[IO](
+      dbConfig.driver.value,
+      postgresContainer.jdbcUrl,
+      dbConfig.user.value,
+      dbConfig.pass
+    )
+  }
 }

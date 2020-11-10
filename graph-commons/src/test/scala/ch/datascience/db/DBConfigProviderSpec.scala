@@ -23,13 +23,13 @@ import ch.datascience.db.DBConfigProvider.DBConfig._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
-import eu.timepit.refined.api.RefType
+import eu.timepit.refined.api.{RefType, Refined}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.language.postfixOps
 import scala.util.{Failure, Success, Try}
 
@@ -42,7 +42,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val user           = nonEmptyStrings().generateOne
       val password       = nonEmptyStrings().generateOne
       val connectionPool = positiveInts().generateOne
-      val maxLifetime    = durations(30 minutes).generateOne
+      val maxLifetime    = durations(max = 30 minutes).generateOne
 
       val config = ConfigFactory.parseMap(
         Map(
@@ -68,6 +68,43 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       dbConfig.maxLifetime    shouldBe maxLifetime
     }
 
+    "return db config read from the configuration except from url if overridden" in new TestCase {
+      val host           = hosts.generateOne
+      val user           = nonEmptyStrings().generateOne
+      val password       = nonEmptyStrings().generateOne
+      val connectionPool = positiveInts().generateOne
+      val maxLifetime    = durations(max = 30 minutes).generateOne
+      val url: Url = Refined.unsafeApply(httpUrls().generateOne)
+
+      val config = ConfigFactory.parseMap(
+        Map(
+          namespace -> Map(
+            "db-driver"               -> driver.value,
+            "db-url-template"         -> urlTemplate.value,
+            "db-host"                 -> host.value,
+            "db-user"                 -> user,
+            "db-pass"                 -> password,
+            "connection-pool"         -> connectionPool.value,
+            "max-connection-lifetime" -> maxLifetime.toString()
+          ).asJava
+        ).asJava
+      )
+
+      val Success(dbConfig) = new DBConfigProvider[Try, TestDB](
+        namespace,
+        dbName,
+        config,
+        jdbcUrlOverride = Some(url)
+      ).get()
+
+      dbConfig.url            shouldBe url
+      dbConfig.driver         shouldBe driver
+      dbConfig.user.value     shouldBe user
+      dbConfig.pass           shouldBe password
+      dbConfig.connectionPool shouldBe connectionPool
+      dbConfig.maxLifetime    shouldBe maxLifetime
+    }
+
     "fail if there is no db config namespace in the config" in new TestCase {
       val Failure(exception) =
         new DBConfigProvider[Try, TestDB](namespace, dbName, ConfigFactory.empty()).get()
@@ -85,7 +122,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -105,7 +142,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -125,7 +162,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> "",
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -144,7 +181,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -163,7 +200,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -202,7 +239,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(30 minutes).generateOne.toString()
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
         ).asJava
       )
@@ -210,6 +247,30 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val Failure(exception) = new DBConfigProvider[Try, TestDB](namespace, dbName, config).get()
 
       exception shouldBe a[ConfigLoadingException]
+    }
+  }
+
+  "findJdbcUrl" should {
+
+    import DBConfigProvider._
+
+    "return some DBConfig.Url if there's a 'jdbc-url=url' entry in the given list of settings" in {
+
+      val jdbcUrl: DBConfig.Url = Refined.unsafeApply(httpUrls().generateOne)
+
+      List(
+        nonBlankStrings().generateOne.value,
+        s"jdbc-url=$jdbcUrl",
+        nonBlankStrings().generateOne.value
+      ).findJdbcUrl shouldBe Some(jdbcUrl)
+    }
+
+    "return None if there's no 'jdbc-url=url' entry in the given list of settings" in {
+      List("jdbc-url=").findJdbcUrl shouldBe None
+    }
+
+    "return None if there's a 'jdbc-url=url' entry without a value" in {
+      List().findJdbcUrl shouldBe None
     }
   }
 

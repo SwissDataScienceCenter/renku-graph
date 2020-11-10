@@ -23,13 +23,10 @@ import ch.datascience.db.DbTransactor
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
-import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
-import doobie.implicits.javatime._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog._
@@ -52,6 +49,9 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
       (batchDateAdder.run _)
         .expects()
         .returning(IO.unit)
+      (viewCreator.run _)
+        .expects()
+        .returning(IO.unit)
 
       dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
@@ -69,6 +69,9 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
         .expects()
         .returning(IO.unit)
       (batchDateAdder.run _)
+        .expects()
+        .returning(IO.unit)
+      (viewCreator.run _)
         .expects()
         .returning(IO.unit)
 
@@ -91,10 +94,14 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
       (batchDateAdder.run _)
         .expects()
         .returning(IO.unit)
+      (viewCreator.run _)
+        .expects()
+        .returning(IO.unit)
 
       dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
 
       verifyTrue(sql"DROP INDEX idx_project_id;")
+      verifyTrue(sql"DROP INDEX idx_event_id;")
       verifyTrue(sql"DROP INDEX idx_status;")
       verifyTrue(sql"DROP INDEX idx_execution_date;")
       verifyTrue(sql"DROP INDEX idx_event_date;")
@@ -111,6 +118,9 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
         .expects()
         .returning(IO.unit)
       (batchDateAdder.run _)
+        .expects()
+        .returning(IO.unit)
+      (viewCreator.run _)
         .expects()
         .returning(IO.unit)
 
@@ -163,13 +173,36 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
         dbInitializer.run.unsafeRunSync()
       } shouldBe exception
     }
+
+    "fails if creating the latest event dates view fails" in new TestCase {
+
+      if (!tableExists()) createTable()
+
+      tableExists() shouldBe true
+
+      (projectPathAdder.run _)
+        .expects()
+        .returning(IO.unit)
+      (batchDateAdder.run _)
+        .expects()
+        .returning(IO.unit)
+      val exception = exceptions.generateOne
+      (viewCreator.run _)
+        .expects()
+        .returning(IO.raiseError(exception))
+
+      intercept[Exception] {
+        dbInitializer.run.unsafeRunSync()
+      } shouldBe exception
+    }
   }
 
   private trait TestCase {
     val projectPathAdder = mock[IOProjectPathAdder]
     val batchDateAdder   = mock[IOBatchDateAdder]
+    val viewCreator      = mock[LatestEventDatesViewCreator[IO]]
     val logger           = TestLogger[IO]()
-    val dbInitializer    = new DbInitializer[IO](projectPathAdder, batchDateAdder, transactor, logger)
+    val dbInitializer    = new DbInitializer[IO](projectPathAdder, batchDateAdder, viewCreator, transactor, logger)
   }
 
   private class IOProjectPathAdder(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO])
@@ -182,8 +215,7 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
                          executionDate: ExecutionDate = executionDates.generateOne,
                          eventDate:     EventDate = eventDates.generateOne,
                          eventBody:     EventBody = eventBodies.generateOne,
-                         createdDate:   CreatedDate = createdDates.generateOne,
-                         projectPath:   Path = projectPaths.generateOne
+                         createdDate:   CreatedDate = createdDates.generateOne
   ): Unit = execute {
     sql"""|insert into 
           |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 

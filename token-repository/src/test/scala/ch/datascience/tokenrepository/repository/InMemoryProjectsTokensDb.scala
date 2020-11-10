@@ -21,28 +21,37 @@ package ch.datascience.tokenrepository.repository
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.DbTransactor
-import ch.datascience.db.TestDbConfig.newDbConfig
+import com.dimafeng.testcontainers._
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import doobie.util.fragment.Fragment
 import doobie.util.transactor.Transactor
+import org.scalatest.Suite
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-trait InMemoryProjectsTokensDb {
+trait InMemoryProjectsTokensDb extends ForAllTestContainer {
+  self: Suite =>
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 
-  private val dbConfig = newDbConfig[ProjectsTokensDB]
+  private val dbConfig = new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
-  lazy val transactor: DbTransactor[IO, ProjectsTokensDB] = DbTransactor[IO, ProjectsTokensDB](
+  override val container: Container with JdbcDatabaseContainer = PostgreSQLContainer(
+    dockerImageNameOverride = "postgres:9.6.19-alpine",
+    databaseName = "projects_tokens",
+    username = dbConfig.user.value,
+    password = dbConfig.pass
+  )
+
+  lazy val transactor: DbTransactor[IO, ProjectsTokensDB] = DbTransactor[IO, ProjectsTokensDB] {
     Transactor.fromDriverManager[IO](
       dbConfig.driver.value,
-      dbConfig.url.value,
+      container.jdbcUrl,
       dbConfig.user.value,
       dbConfig.pass
     )
-  )
+  }
 
   def execute[O](query: ConnectionIO[O]): O =
     query

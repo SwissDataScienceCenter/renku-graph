@@ -31,6 +31,7 @@ import ch.datascience.metrics.MetricsTools._
 import ch.datascience.metrics.{LabeledGauge, MetricsRegistry}
 import io.prometheus.client.{Gauge => LibGauge}
 import io.renku.eventlog.EventStatus.{New, RecoverableFailure}
+import io.renku.eventlog.metrics.WaitingEventsGauge.NumberOfProjects
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -58,7 +59,7 @@ class WaitingEventsGaugeSpec extends AnyWordSpec with MockFactory with should.Ma
 
         val waitingEvents = waitingEventsGen.generateOne
         (statsFinder.countEvents _)
-          .expects(Set(New, RecoverableFailure))
+          .expects(Set(New, RecoverableFailure), Some(NumberOfProjects))
           .returning(waitingEvents.pure[IO])
 
         val gauge = WaitingEventsGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
@@ -81,7 +82,7 @@ class WaitingEventsGaugeSpec extends AnyWordSpec with MockFactory with should.Ma
 
       val exception = exceptions.generateOne
       (statsFinder.countEvents _)
-        .expects(Set(New, RecoverableFailure))
+        .expects(Set(New, RecoverableFailure), Some(NumberOfProjects))
         .returning(exception.raiseError[IO, Map[projects.Path, Long]])
 
       intercept[Exception] {

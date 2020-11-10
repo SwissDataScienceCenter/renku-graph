@@ -19,31 +19,45 @@
 package io.renku.eventlog
 
 import cats.effect.{ContextShift, IO}
-import ch.datascience.db.TestDbConfig._
-import ch.datascience.db.{DBConfigProvider, DbTransactor}
+import ch.datascience.db.DbTransactor
+import com.dimafeng.testcontainers._
+import doobie.Transactor
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
-import doobie.util.transactor.Transactor
+import doobie.util.fragment.Fragment
+import org.scalatest.Suite
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-trait InMemoryEventLogDb extends TypesSerializers {
+trait InMemoryEventLogDb extends ForAllTestContainer with TypesSerializers {
+  self: Suite =>
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 
-  protected val dbConfig: DBConfigProvider.DBConfig[EventLogDB] = newDbConfig[EventLogDB]
+  private val dbConfig = new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
-  lazy val transactor: DbTransactor[IO, EventLogDB] = DbTransactor[IO, EventLogDB](
+  override val container: Container with JdbcDatabaseContainer = PostgreSQLContainer(
+    dockerImageNameOverride = "postgres:9.6.19-alpine",
+    databaseName = "event_log",
+    username = dbConfig.user.value,
+    password = dbConfig.pass
+  )
+
+  lazy val transactor: DbTransactor[IO, EventLogDB] = DbTransactor[IO, EventLogDB] {
     Transactor.fromDriverManager[IO](
       dbConfig.driver.value,
-      dbConfig.url.value,
+      container.jdbcUrl,
       dbConfig.user.value,
       dbConfig.pass
     )
-  )
+  }
 
   def execute[O](query: ConnectionIO[O]): O =
     query
       .transact(transactor.get)
       .unsafeRunSync()
+
+  def verifyTrue(sql: Fragment): Unit = execute {
+    sql.update.run.map(_ => ())
+  }
 }

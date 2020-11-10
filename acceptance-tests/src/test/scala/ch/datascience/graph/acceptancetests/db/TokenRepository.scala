@@ -16,20 +16,22 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog
+package ch.datascience.graph.acceptancetests.db
 
-import cats.MonadError
+import cats.effect.IO
 import ch.datascience.db.DBConfigProvider
-import ch.datascience.db.DBConfigProvider._
-import eu.timepit.refined.auto._
+import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
+import com.dimafeng.testcontainers.{Container, JdbcDatabaseContainer, PostgreSQLContainer}
 
-sealed trait EventLogDB
+object TokenRepository {
 
-class EventLogDbConfigProvider[Interpretation[_]](
-    settings:  List[String] = Nil
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends DBConfigProvider[Interpretation, EventLogDB](
-      namespace = "event-log",
-      dbName = "event_log",
-      jdbcUrlOverride = settings.findJdbcUrl
-    )
+  private val dbConfig: DBConfigProvider.DBConfig[ProjectsTokensDB] =
+    new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
+
+  val postgresContainer: Container with JdbcDatabaseContainer = PostgreSQLContainer(
+    dockerImageNameOverride = "postgres:9.6.19-alpine",
+    databaseName = "projects_tokens",
+    username = dbConfig.user.value,
+    password = dbConfig.pass
+  )
+}

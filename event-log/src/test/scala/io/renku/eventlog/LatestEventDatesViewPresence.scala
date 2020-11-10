@@ -18,18 +18,21 @@
 
 package io.renku.eventlog
 
-import cats.MonadError
-import ch.datascience.db.DBConfigProvider
-import ch.datascience.db.DBConfigProvider._
-import eu.timepit.refined.auto._
+import cats.effect.IO
+import ch.datascience.interpreters.TestLogger
+import doobie.implicits._
+import io.renku.eventlog.init.LatestEventDatesViewCreator
+import org.scalatest.{BeforeAndAfterAll, Suite}
 
-sealed trait EventLogDB
+trait LatestEventDatesViewPresence extends BeforeAndAfterAll {
+  self: Suite with InMemoryEventLogDbSpec =>
 
-class EventLogDbConfigProvider[Interpretation[_]](
-    settings:  List[String] = Nil
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends DBConfigProvider[Interpretation, EventLogDB](
-      namespace = "event-log",
-      dbName = "event_log",
-      jdbcUrlOverride = settings.findJdbcUrl
-    )
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    LatestEventDatesViewCreator[IO](transactor, TestLogger()).run().unsafeRunSync()
+  }
+
+  protected def refreshView(): Unit = verifyTrue {
+    sql""" REFRESH MATERIALIZED VIEW CONCURRENTLY project_latest_event_date"""
+  }
+}

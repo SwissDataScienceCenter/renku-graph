@@ -28,11 +28,12 @@ import io.renku.eventlog.EventStatus.RecoverableFailure
 import scala.util.control.NonFatal
 
 class DbInitializer[Interpretation[_]](
-    projectPathAdder: ProjectPathAdder[Interpretation],
-    batchDateAdder:   BatchDateAdder[Interpretation],
-    transactor:       DbTransactor[Interpretation, EventLogDB],
-    logger:           Logger[Interpretation]
-)(implicit ME:        Bracket[Interpretation, Throwable]) {
+    projectPathAdder:            ProjectPathAdder[Interpretation],
+    batchDateAdder:              BatchDateAdder[Interpretation],
+    latestEventDatesViewCreator: LatestEventDatesViewCreator[Interpretation],
+    transactor:                  DbTransactor[Interpretation, EventLogDB],
+    logger:                      Logger[Interpretation]
+)(implicit ME:                   Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
@@ -41,6 +42,7 @@ class DbInitializer[Interpretation[_]](
     for {
       _ <- createTable()
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)")
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_log(event_id)")
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)")
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)")
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)")
@@ -49,6 +51,7 @@ class DbInitializer[Interpretation[_]](
       _ <- logger.info("Event Log database initialization success")
       _ <- projectPathAdder.run()
       _ <- batchDateAdder.run()
+      _ <- latestEventDatesViewCreator.run()
     } yield ()
   } recoverWith logging
 
@@ -82,6 +85,7 @@ class IODbInitializer(
     extends DbInitializer[IO](
       new ProjectPathAdder[IO](transactor, logger),
       new BatchDateAdder[IO](transactor, logger),
+      LatestEventDatesViewCreator[IO](transactor, logger),
       transactor,
       logger
     )

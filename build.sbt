@@ -200,23 +200,47 @@ def collectCommitsMessages(commitsCounter: Int = 1, messages: List[String] = Lis
   }
 
 releaseProcess := Seq[ReleaseStep](
+  log("Checking snapshot dependencies"),
   checkSnapshotDependencies,
+  log("Inquiring version"),
   inquireVersions,
+  log("Cleaning"),
   runClean,
-  runTest,
+  log("Setting Release version"),
   setReleaseVersion,
+  log("Setting Release version to Chart"),
   setReleaseVersionToChart,
+  log("A brief respite"),
+  waitForVcs,
+  log("Commit Release version"),
   commitReleaseVersion,
+  log("Tagging Release"),
   tagRelease,
+  log("Publishing artifacts"),
   publishArtifacts,
+  log("Setting next version"),
   setNextVersion,
+  log("Setting next version to Chart"),
   setNextVersionToChart,
+  log("A brief respite"),
+  waitForVcs,
+  log("Commit next version"),
   commitNextVersion,
+  log("Pushing changes"),
   pushChanges
 )
 
 lazy val setReleaseVersionToChart: ReleaseStep = setReleaseVersionChart(_._1)
 lazy val setNextVersionToChart:    ReleaseStep = setNextReleaseVersionChart(_._2)
+lazy val waitForVcs: ReleaseStep = { state: State =>
+  Thread sleep 1000
+  state
+}
+
+def log(message: String): ReleaseStep = { state: State =>
+  println(message)
+  state
+}
 
 def setReleaseVersionChart(selectVersion: Versions => String): ReleaseStep = { state: State =>
   val version = findVersion(selectVersion, state)
@@ -245,9 +269,11 @@ def findVersion(selectVersion: Versions => String, state: State) = {
 }
 
 def updateAndCommitChart(version: String): Unit = {
+  println("Writing chart version")
   writeChartVersion(version)
-
+  println("Adding chart to VCS")
   addChartToVcs()
+  println("Chart added to VCS")
 }
 
 val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
