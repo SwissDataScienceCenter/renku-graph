@@ -34,27 +34,27 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
 
   "flatten" should {
 
-    "do nothing for JsonLDValue" in {
+    "wrap a JsonLDValue in a list" in {
       forAll(jsonLDValues) { json =>
-        json.flatten shouldBe Right(json)
+        json.flatten shouldBe Right(List(json))
       }
     }
 
-    "do nothing for JsonLDEntityId" in {
+    "wrap JsonLDEntityId in a list" in {
       forAll { entityId: EntityId =>
         val json = JsonLD.fromEntityId(entityId)
-        json.flatten shouldBe Right(json)
+        json.flatten shouldBe Right(List(json))
       }
     }
 
-    "do nothing for JsonLDNull" in {
-      JsonLD.Null.flatten shouldBe Right(JsonLD.Null)
+    "wrap JsonLDNull in a list" in {
+      JsonLD.Null.flatten shouldBe Right(List(JsonLD.Null))
     }
 
-    "do nothing if JsonLDEntity does not have nested object in its properties" in {
+    "wrap a JsonLDEntity in a list if it doesn' have nested object in its properties" in {
       forAll { (id: EntityId, types: EntityTypes, property1: (Property, JsonLD), other: List[(Property, JsonLD)]) =>
-        val entityAsJsonLD = JsonLD.arr(JsonLD.entity(id, types, property1, other: _*))
-        entityAsJsonLD.flatten shouldBe Right(entityAsJsonLD)
+        val entityAsJsonLD = JsonLD.entity(id, types, property1, other: _*)
+        entityAsJsonLD.flatten shouldBe Right(List(entityAsJsonLD))
       }
     }
 
@@ -87,9 +87,7 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
             val children = childrenTuples.map { case (_, entity) => entity: JsonLD }
 
             val Right(actual) = grandparentWithChild.flatten
-            actual.toJson.asArray.get should contain theSameElementsAs {
-              JsonLD.arr(flattenedGrandparent +: flattenedParent +: children: _*).toJson.asArray.get
-            }
+            actual should contain theSameElementsAs List(flattenedGrandparent +: flattenedParent +: children: _*)
         }
       }
 
@@ -130,11 +128,11 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
       }
     }
 
-    "do nothing for JsonLDArray if none of its items have nested entities" in {
+    "return a list of the same elements of the original JsonLDArray if none of its items have nested entities" in {
       forAll { (entity0: JsonLDEntity, entity1: JsonLDEntity) =>
         val entity0WithEntity1IdAsProperty = entity0.add(properties.generateOne -> entity1.id.asJsonLD)
         val arrayOfEntities                = JsonLD.arr(entity0WithEntity1IdAsProperty, entity1)
-        arrayOfEntities.flatten shouldBe Right(arrayOfEntities)
+        arrayOfEntities.flatten shouldBe Right(List(entity0WithEntity1IdAsProperty, entity1))
       }
     }
 
@@ -144,7 +142,7 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
         val entityWithChildren          = entity.add(property -> child)
         val entityWithChildrenFlattened = entity.add(property -> child.id.asJsonLD)
 
-        JsonLD.arr(entityWithChildren).flatten shouldBe Right(JsonLD.arr(child, entityWithChildrenFlattened))
+        JsonLD.arr(entityWithChildren).flatten shouldBe Right(List(child, entityWithChildrenFlattened))
       }
     }
 
@@ -187,7 +185,7 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
           val deNestedParent2Properties = replaceEntityProperty(nestedParent2.properties, property, child)
           val deNestedParent2           = nestedParent2.copy(properties = deNestedParent2Properties)
           JsonLD.arr(nestedParent0, nestedParent1).flatten shouldBe
-            Right(JsonLD.arr(child, deNestedParent0, deNestedParent1, deNestedParent2))
+            Right(List(child, deNestedParent0, deNestedParent2, deNestedParent1))
       }
     }
 
@@ -208,13 +206,26 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
         val mixedUpValues = Random.shuffle(normalValues)
         val normalEntity  = entity.copy(properties = entity.properties + (property -> JsonLD.arr(normalValues: _*)))
         val mixedUpEntity = entity.copy(properties = entity.properties + (property -> JsonLD.arr(mixedUpValues: _*)))
-        JsonLD.arr(normalEntity, mixedUpEntity).flatten should (be(Right(JsonLD.arr(normalEntity))) or be(
-          Right(JsonLD.arr(mixedUpEntity))
+        JsonLD.arr(normalEntity, mixedUpEntity).flatten should (be(Right(List(normalEntity))) or be(
+          Right(List(mixedUpEntity))
         ))
       }
     }
 
     "pull out child entities from reversed property of an entity" in {
+      /*
+      parent
+        |
+      Reversed
+         |
+      (property0 -> (child0, child1))
+
+         |
+         |
+         V
+
+      (child0, child1, parentDeNested)
+       */
       forAll { (entity0: JsonLDEntity, child0: JsonLDEntity, child1: JsonLDEntity, reverseProperty: Property) =>
         val children                       = List(child0, child1)
         val Right(parentReverseProperties) = Reverse.of((reverseProperty, children))
@@ -223,14 +234,17 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
         val Right(expectedReverse) = Reverse.of((reverseProperty, children.map(child => JsonLDEntityId(child.id))))
 
         val parentWithIdsOfChildren = parent.copy(reverse = expectedReverse)
-        parent.flatten shouldBe Right(JsonLD.arr(parentWithIdsOfChildren, child0, child1))
+        parent.flatten shouldBe Right(List(child1, child0, parentWithIdsOfChildren))
       }
     }
 
     "produce the same result the second time as the first time called on the previous result" in {
       forAll { (id: EntityId, types: EntityTypes, property1: (Property, JsonLD), other: List[(Property, JsonLD)]) =>
-        val entityAsJsonLD = JsonLD.arr(JsonLD.entity(id, types, property1, other: _*))
-        entityAsJsonLD.flatten.flatMap(_.flatten) shouldBe Right(entityAsJsonLD)
+        val entityAsJsonLD = JsonLD.entity(id, types, property1, other: _*)
+
+        val flattenedOnce  = entityAsJsonLD.flatten.fold(throw _, identity)
+        val flattenedTwice = flattenedOnce.flatMap(_.flatten.fold(throw _, identity))
+        flattenedTwice shouldBe List(entityAsJsonLD)
       }
     }
   }

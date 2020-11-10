@@ -57,7 +57,7 @@ object RemoteTriplesGenerator {
     stubFor {
       get(s"/projects/${project.id}/commits/$commitId")
         .willReturn(
-          ok(triples.flatten.fold(throw _, identity).toJson.spaces2)
+          ok(triples.toJson.spaces2)
         )
     }
     ()

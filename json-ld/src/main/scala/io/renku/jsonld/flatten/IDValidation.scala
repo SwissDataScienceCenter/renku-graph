@@ -22,10 +22,10 @@ import io.renku.jsonld.JsonLD
 import io.renku.jsonld.JsonLD.{JsonLDEntity, MalformedJsonLD}
 
 trait IDValidation {
-  protected[flatten] def checkForUniqueIds(flattenedJsons: List[JsonLD]): Either[MalformedJsonLD, JsonLD] = if (
+  protected[flatten] def checkForUniqueIds(flattenedJsons: List[JsonLD]): Either[MalformedJsonLD, List[JsonLD]] = if (
     areIdsUnique(flattenedJsons)
   )
-    Right(JsonLD.arr(flattenedJsons: _*))
+    Right(flattenedJsons)
   else
     Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
 

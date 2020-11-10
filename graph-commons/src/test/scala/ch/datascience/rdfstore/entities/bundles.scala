@@ -134,7 +134,7 @@ object bundles extends Schemas {
       datasetKeywords,
       overrideTopmostSameAs,
       overrideTopmostDerivedFrom
-    ).asJsonLD.flatten.fold(throw _, identity)
+    ).asJsonLD
 
   def nonModifiedDataSetActivity(
       commitId:      CommitId = commitIds.generateOne,

@@ -36,5 +36,5 @@ trait JsonLDArrayFlatten extends Flatten {
                             case (acc, other) => acc.map(other +: _)
                           }
       flattenedArray <- checkForUniqueIds(flattenedJsons.distinct)
-    } yield flattenedArray.asArray.getOrElse(List.empty[JsonLD])
+    } yield flattenedArray
 }
