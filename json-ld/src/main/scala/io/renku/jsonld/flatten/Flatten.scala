@@ -16,41 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.jsonld
+package io.renku.jsonld.flatten
 
 import cats.syntax.all._
 import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId, MalformedJsonLD}
+import io.renku.jsonld.{JsonLD, Property, Reverse}
 
 import scala.annotation.tailrec
 
-trait JsonLDArrayFlattener extends Flattener {
-  self: JsonLDArray =>
-  lazy val flatten: Either[MalformedJsonLD, JsonLD] =
-    for {
-      flattenedJsons <- this.jsons
-                          .foldLeft(Either.right[MalformedJsonLD, List[JsonLD]](List.empty[JsonLD])) {
-                            case (acc, jsonLDEntity: JsonLDEntity) =>
-                              for {
-                                jsons    <- deNest(List(jsonLDEntity), List.empty[JsonLDEntity])
-                                accRight <- acc
-                              } yield accRight ++ jsons
-                            case (acc, other) => acc.map(other +: _)
-                          }
-      flattenedArray <- checkForUniqueIds(flattenedJsons.distinct)
-    } yield flattenedArray
-}
-
-trait JsonLDEntityFlattener extends Flattener {
-  self: JsonLDEntity =>
-
-  lazy val flatten: Either[MalformedJsonLD, JsonLD] = deNest(List(this), Nil).flatMap(checkForUniqueIds)
-}
-
-private[jsonld] trait Flattener {
+private[jsonld] trait Flatten extends IDValidation {
 
   @tailrec
-  protected final def deNest(toProcess:        List[JsonLD],
-                             topLevelEntities: List[JsonLD]
+  protected[flatten] final def deNest(toProcess:        List[JsonLD],
+                                      topLevelEntities: List[JsonLD]
   ): Either[MalformedJsonLD, List[JsonLD]] =
     toProcess match {
       case (entity: JsonLDEntity) :: entities =>
@@ -95,18 +73,4 @@ private[jsonld] trait Flattener {
     case other => other
   }
 
-  protected def checkForUniqueIds(flattenedJsons: List[JsonLD]): Either[MalformedJsonLD, JsonLD] = if (
-    areIdsUnique(flattenedJsons)
-  )
-    Right(JsonLD.arr(flattenedJsons: _*))
-  else
-    Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
-
-  private def areIdsUnique(jsons: List[JsonLD]): Boolean =
-    jsons
-      .collect { case entity: JsonLDEntity => entity }
-      .groupBy(entity => entity.id)
-      .forall { case (_, entitiesPerId) =>
-        entitiesPerId.forall(_ == entitiesPerId.head)
-      }
 }

@@ -226,6 +226,34 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
         parent.flatten shouldBe Right(JsonLD.arr(parentWithIdsOfChildren, child0, child1))
       }
     }
+
+    "produce the same result the second time as the first time called on the previous result" in {
+      forAll { (id: EntityId, types: EntityTypes, property1: (Property, JsonLD), other: List[(Property, JsonLD)]) =>
+        val entityAsJsonLD = JsonLD.arr(JsonLD.entity(id, types, property1, other: _*))
+        entityAsJsonLD.flatten.flatMap(_.flatten) shouldBe Right(entityAsJsonLD)
+      }
+    }
+  }
+
+  "unsafeFlatten" should {
+    "throw an error in the case of MalformedJsonLD" in {
+      val parent0        = jsonLDEntities.generateOne
+      val parent1        = jsonLDEntities.generateOne
+      val childrenTuples = entityProperties.generateNonEmptyList().toList
+      val newProperties  = valuesProperties.generateNonEmptyMap()
+      val modifiedChild = childrenTuples.head match {
+        case (property, entity) =>
+          (property, entity.copy(properties = newProperties))
+      }
+      val childrenWithModified        = modifiedChild +: childrenTuples.tail
+      val parent0WithNormalChildren   = parent0.add(childrenTuples)
+      val parent1WithModifiedChildren = parent1.add(childrenWithModified)
+
+      intercept[MalformedJsonLD] {
+        JsonLD.arr(parent0WithNormalChildren, parent1WithModifiedChildren).unsafeFlatten
+      }.getMessage shouldBe "Some entities share an ID even though they're not the same"
+    }
+
   }
 
   private lazy val entityProperties: Gen[(Property, JsonLDEntity)] = for {

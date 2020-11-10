@@ -53,7 +53,8 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience with 
       project,
       commitId,
       fileCommit(commitId = commitId, cliVersion = schemaVersion)(projectPath = project.path,
-                                                                  projectVersion = project.version)
+                                                                  projectVersion = project.version
+      )
     )
 
   def `data in the RDF store`(
@@ -69,7 +70,7 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience with 
 
     `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
 
-    `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
+    `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples.unsafeFlatten)
 
     webhookServiceClient
       .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))
@@ -103,15 +104,18 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience with 
 
   def `triples updates run`(emails: Set[Email]): Assertion = eventually {
 
-    val emailsInStore = RDFStore.run("""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                                        |PREFIX schema: <http://schema.org/>
-                                        |
-                                        |SELECT ?email
-                                        |WHERE {
-                                        |  ?resource rdf:type <http://schema.org/Person> ;
-                                        |            schema:email ?email .
-                                        |}
-                                        |""".stripMargin).flatMap(_.get("email")).toSet
+    val emailsInStore = RDFStore
+      .run("""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+              |PREFIX schema: <http://schema.org/>
+              |
+              |SELECT ?email
+              |WHERE {
+              |  ?resource rdf:type <http://schema.org/Person> ;
+              |            schema:email ?email .
+              |}
+              |""".stripMargin)
+      .flatMap(_.get("email"))
+      .toSet
 
     (emails.map(_.value) diff emailsInStore) shouldBe empty
   }

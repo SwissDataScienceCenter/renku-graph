@@ -24,6 +24,7 @@ import java.time.{Instant, LocalDate}
 import cats.implicits.catsSyntaxEitherId
 import io.circe.{Encoder, Json}
 import io.renku.jsonld.JsonLD.MalformedJsonLD
+import io.renku.jsonld.flatten.{JsonLDArrayFlatten, JsonLDEntityFlatten}
 
 abstract class JsonLD extends Product with Serializable {
   def toJson: Json
@@ -37,6 +38,11 @@ abstract class JsonLD extends Product with Serializable {
   def asArray: Option[Vector[JsonLD]]
 
   def flatten: Either[MalformedJsonLD, JsonLD]
+
+  /**
+    * @throws MalformedJsonLD
+    */
+  def unsafeFlatten: JsonLD = this.flatten.fold(throw _, identity)
 }
 
 object JsonLD {
@@ -97,7 +103,7 @@ object JsonLD {
                                                 properties: Map[Property, JsonLD],
                                                 reverse:    Reverse
   ) extends JsonLD
-      with JsonLDEntityFlattener {
+      with JsonLDEntityFlatten {
 
     override lazy val toJson: Json = Json.obj(
       List(
@@ -163,7 +169,7 @@ object JsonLD {
       }
   }
 
-  private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD with JsonLDArrayFlattener {
+  private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD with JsonLDArrayFlatten {
 
     override def hashCode(): Int = jsons.sortBy(_.hashCode()).hashCode()
 
