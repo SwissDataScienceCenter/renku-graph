@@ -122,7 +122,7 @@ object JsonLD {
 
     override lazy val entityId:    Option[EntityId]       = Some(id)
     override lazy val entityTypes: Option[EntityTypes]    = Some(types)
-    override lazy val asArray:     Option[Vector[JsonLD]] = Some(Vector(this))
+    override lazy val asArray:     Option[Vector[JsonLD]] = None
 
   }
 
@@ -139,7 +139,7 @@ object JsonLD {
     override lazy val entityId:    Option[EntityId]    = None
     override lazy val entityTypes: Option[EntityTypes] = None
 
-    override lazy val asArray: Option[Vector[JsonLD]] = Some(Vector(this))
+    override lazy val asArray: Option[Vector[JsonLD]] = None
 
     override lazy val flatten: Either[MalformedJsonLD, List[JsonLD]] = List(this).asRight
   }
@@ -153,7 +153,7 @@ object JsonLD {
     override lazy val toJson:      Json                                  = Json.Null
     override lazy val entityId:    Option[EntityId]                      = None
     override lazy val entityTypes: Option[EntityTypes]                   = None
-    override lazy val asArray:     Option[Vector[JsonLD]]                = Some(Vector(JsonLD.Null))
+    override lazy val asArray:     Option[Vector[JsonLD]]                = None
     override lazy val flatten:     Either[MalformedJsonLD, List[JsonLD]] = List(this).asRight
   }
 
@@ -184,7 +184,7 @@ object JsonLD {
     override lazy val toJson:      Json                                  = Json.obj("@id" -> id.asJson)
     override lazy val entityId:    Option[EntityId]                      = None
     override lazy val entityTypes: Option[EntityTypes]                   = None
-    override lazy val asArray:     Option[Vector[JsonLD]]                = Some(Vector(this))
+    override lazy val asArray:     Option[Vector[JsonLD]]                = None
     override lazy val flatten:     Either[MalformedJsonLD, List[JsonLD]] = List(this).asRight
   }
 
