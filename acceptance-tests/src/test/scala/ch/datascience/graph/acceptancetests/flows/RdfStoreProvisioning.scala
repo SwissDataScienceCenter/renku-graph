@@ -70,7 +70,10 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience with 
 
     `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
 
-    `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples.unsafeFlatten)
+    `GET <triples-generator>/projects/:id/commits/:id returning OK`(project,
+                                                                    commitId,
+                                                                    triples.flatten.fold(throw _, identity)
+    )
 
     webhookServiceClient
       .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))

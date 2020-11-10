@@ -38,14 +38,14 @@ object RemoteTriplesGenerator {
       project,
       commitId,
       fileCommit(
-        commitId   = commitId,
+        commitId = commitId,
         cliVersion = cliVersion
       )(
-        projectPath         = project.path,
-        projectName         = project.name,
-        projectDateCreated  = project.created.date,
+        projectPath = project.path,
+        projectName = project.name,
+        projectDateCreated = project.created.date,
         maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-        projectVersion      = project.version
+        projectVersion = project.version
       )
     )
 
@@ -57,7 +57,7 @@ object RemoteTriplesGenerator {
     stubFor {
       get(s"/projects/${project.id}/commits/$commitId")
         .willReturn(
-          ok(triples.toJson.spaces2)
+          ok(triples.flatten.fold(throw _, identity).toJson.spaces2)
         )
     }
     ()

@@ -250,7 +250,7 @@ class FlattenerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with shoul
       val parent1WithModifiedChildren = parent1.add(childrenWithModified)
 
       intercept[MalformedJsonLD] {
-        JsonLD.arr(parent0WithNormalChildren, parent1WithModifiedChildren).unsafeFlatten
+        JsonLD.arr(parent0WithNormalChildren, parent1WithModifiedChildren).flatten.fold(throw _, identity)
       }.getMessage shouldBe "Some entities share an ID even though they're not the same"
     }
 

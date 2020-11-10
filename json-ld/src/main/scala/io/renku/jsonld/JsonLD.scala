@@ -37,12 +37,8 @@ abstract class JsonLD extends Product with Serializable {
 
   def asArray: Option[Vector[JsonLD]]
 
-  def flatten: Either[MalformedJsonLD, JsonLD]
+  def flatten: Either[MalformedJsonLD, List[JsonLD]]
 
-  /**
-    * @throws MalformedJsonLD
-    */
-  def unsafeFlatten: JsonLD = this.flatten.fold(throw _, identity)
 }
 
 object JsonLD {
@@ -145,7 +141,7 @@ object JsonLD {
 
     override lazy val asArray: Option[Vector[JsonLD]] = Some(Vector(this))
 
-    override lazy val flatten: Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val flatten: Either[MalformedJsonLD, List[JsonLD]] = List(this).asRight
   }
 
   private[jsonld] object JsonLDValue {
@@ -154,11 +150,11 @@ object JsonLD {
   }
 
   private[jsonld] final case object JsonLDNull extends JsonLD {
-    override lazy val toJson:      Json                            = Json.Null
-    override lazy val entityId:    Option[EntityId]                = None
-    override lazy val entityTypes: Option[EntityTypes]             = None
-    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(JsonLD.Null))
-    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val toJson:      Json                                  = Json.Null
+    override lazy val entityId:    Option[EntityId]                      = None
+    override lazy val entityTypes: Option[EntityTypes]                   = None
+    override lazy val asArray:     Option[Vector[JsonLD]]                = Some(Vector(JsonLD.Null))
+    override lazy val flatten:     Either[MalformedJsonLD, List[JsonLD]] = List(this).asRight
   }
 
   private[jsonld] final case object JsonLDOptionValue {
@@ -185,11 +181,11 @@ object JsonLD {
   }
 
   private[jsonld] final case class JsonLDEntityId[V <: EntityId](id: V)(implicit encoder: Encoder[V]) extends JsonLD {
-    override lazy val toJson:      Json                            = Json.obj("@id" -> id.asJson)
-    override lazy val entityId:    Option[EntityId]                = None
-    override lazy val entityTypes: Option[EntityTypes]             = None
-    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
-    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
+    override lazy val toJson:      Json                                  = Json.obj("@id" -> id.asJson)
+    override lazy val entityId:    Option[EntityId]                      = None
+    override lazy val entityTypes: Option[EntityTypes]                   = None
+    override lazy val asArray:     Option[Vector[JsonLD]]                = Some(Vector(this))
+    override lazy val flatten:     Either[MalformedJsonLD, List[JsonLD]] = List(this).asRight
   }
 
   final case class MalformedJsonLD(message: String) extends RuntimeException(message)

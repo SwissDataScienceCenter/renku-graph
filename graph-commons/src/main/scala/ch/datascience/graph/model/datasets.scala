@@ -72,7 +72,7 @@ object datasets {
       JsonLD.entity(
         EntityId of s"_:${UUID.randomUUID()}",
         EntityTypes of (schema / "URL"),
-        schema / "url" -> EntityId.of(derivedFrom.value).asJsonLD
+        schema / "url" -> EntityId.of(derivedFrom.value).asJsonLD.flatten.fold(throw _, identity)
       )
     }
   }
@@ -88,7 +88,7 @@ object datasets {
     final def apply(entityId: EntityId): TopmostDerivedFrom = apply(entityId.toString)
 
     implicit lazy val topmostDerivedFromJsonLdEncoder: JsonLDEncoder[TopmostDerivedFrom] =
-      derivedFrom => EntityId.of(derivedFrom.value).asJsonLD
+      derivedFrom => EntityId.of(derivedFrom.value).asJsonLD.flatten.fold(throw _, identity)
   }
 
   sealed trait SameAs extends Any with UrlTinyType {
@@ -122,7 +122,7 @@ object datasets {
       JsonLD.entity(
         EntityId of s"_:${UUID.randomUUID()}",
         EntityTypes of (schema / "URL"),
-        schema / "url" -> EntityId.of(sameAs.value).asJsonLD
+        schema / "url" -> EntityId.of(sameAs.value).asJsonLD.flatten.fold(throw _, identity)
       )
     }
 
@@ -130,7 +130,7 @@ object datasets {
       JsonLD.entity(
         EntityId of s"_:${UUID.randomUUID()}",
         EntityTypes of (schema / "URL"),
-        schema / "url" -> sameAs.value.asJsonLD
+        schema / "url" -> sameAs.value.asJsonLD.flatten.fold(throw _, identity)
       )
     }
   }
@@ -142,7 +142,7 @@ object datasets {
     final def apply(entityId: EntityId): TopmostSameAs = apply(entityId.toString)
 
     implicit lazy val topmostSameAsJsonLdEncoder: JsonLDEncoder[TopmostSameAs] =
-      sameAs => EntityId.of(sameAs.value).asJsonLD
+      sameAs => EntityId.of(sameAs.value).asJsonLD.flatten.fold(throw _, identity)
   }
 
   final class DateCreatedInProject private (val value: Instant) extends AnyVal with InstantTinyType

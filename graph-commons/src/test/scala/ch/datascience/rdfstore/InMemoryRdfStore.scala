@@ -21,6 +21,7 @@ package ch.datascience.rdfstore
 import java.io.ByteArrayInputStream
 import java.net.{ServerSocket, SocketException}
 import java.nio.charset.StandardCharsets.UTF_8
+import java.util
 
 import cats.MonadError
 import cats.data.Validated
@@ -144,14 +145,21 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
         IO {
           connection.load {
             val model = ModelFactory.createDefaultModel()
+
+            val jsonLdsFlattened: Seq[JsonLD] = jsonLDs.map(_.flatten.fold(throw _, identity))
+            val value:            Seq[Json]   = jsonLdsFlattened.map(_.toJson)
+            val json:             Json        = Json.arr(value: _*)
+            val spaces:           String      = json.noSpaces
+            val asdfasdf:         Array[Byte] = spaces.getBytes(UTF_8)
             RDFDataMgr.read(
               model,
-              new ByteArrayInputStream(Json.arr(jsonLDs.map(_.unsafeFlatten.toJson): _*).noSpaces.getBytes(UTF_8)),
+              new ByteArrayInputStream(asdfasdf),
               null,
               Lang.JSONLD
             )
             model
           }
+
         }
       }
       .unsafeRunSync()
