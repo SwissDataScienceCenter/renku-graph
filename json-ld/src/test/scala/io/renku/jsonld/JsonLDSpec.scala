@@ -21,19 +21,16 @@ package io.renku.jsonld
 import java.time.{Instant, LocalDate}
 
 import cats.data.NonEmptyList
-import cats.syntax.all._
-import io.renku.jsonld.syntax._
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.literal._
 import io.circe.parser._
 import io.circe.syntax._
-import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId, MalformedJsonLD}
+import io.renku.jsonld.JsonLD.JsonLDEntity
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
 import io.renku.jsonld.generators.JsonLDGenerators._
 import org.scalacheck.Gen
-import org.scalacheck.Gen.nonEmptyMap
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -462,26 +459,26 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
   }
 
   "asArray" should {
-    "return None when there is a single JsonLDValue" in {
+    "return vector with single JsonLDValue" in {
       forAll(jsonLDValues) { json =>
-        json.asArray shouldBe None
+        json.asArray shouldBe Some(Vector(json))
       }
     }
 
-    "return None when there is a single JsonLDEntityID" in {
+    "return vector with single JsonLDEntityID" in {
       forAll { entityId: EntityId =>
         val idAsJson = JsonLD.fromEntityId(entityId)
-        idAsJson.asArray shouldBe None
+        idAsJson.asArray shouldBe Some(Vector(idAsJson))
       }
     }
 
-    "return None when there is a single null" in {
+    "return None on a JsonLDNull" in {
       JsonLD.Null.asArray shouldBe None
     }
 
-    "return None when there is a single entity" in {
+    "return vector containing the entity" in {
       forAll(jsonLDEntities) { entity =>
-        entity.asArray shouldBe None
+        entity.asArray shouldBe Some(Vector(entity))
       }
     }
 

@@ -49,7 +49,7 @@ object CurationGenerators {
   )(implicit ME: MonadError[Interpretation, Throwable]): Gen[CuratedTriples[Interpretation]] =
     for {
       updates <- nonEmptyList(curationUpdatesGroups[Interpretation])
-    } yield CuratedTriples(JsonLDTriples(triples.flatten.fold(throw _, identity).map(_.toJson)), updates.toList)
+    } yield CuratedTriples(JsonLDTriples(triples.flatten.fold(throw _, identity).toJson), updates.toList)
 
   implicit def curationUpdatesGroups[Interpretation[_]](implicit
       ME: MonadError[Interpretation, Throwable]

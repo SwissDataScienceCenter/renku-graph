@@ -24,7 +24,7 @@ import cats.syntax.all._
 
 trait JsonLDArrayFlatten extends Flatten {
   self: JsonLDArray =>
-  override lazy val flatten: Either[MalformedJsonLD, List[JsonLD]] =
+  override lazy val flatten: Either[MalformedJsonLD, JsonLD] =
     for {
       flattenedJsons <- this.jsons
                           .foldLeft(Either.right[MalformedJsonLD, List[JsonLD]](List.empty[JsonLD])) {
@@ -36,5 +36,5 @@ trait JsonLDArrayFlatten extends Flatten {
                             case (acc, other) => acc.map(other +: _)
                           }
       flattenedArray <- checkForUniqueIds(flattenedJsons.distinct)
-    } yield flattenedArray
+    } yield JsonLD.arr(flattenedArray: _*)
 }

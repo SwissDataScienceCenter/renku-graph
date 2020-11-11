@@ -144,7 +144,9 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
         IO {
           connection.load {
             val model = ModelFactory.createDefaultModel()
-            val flattenedJsonLDs: Seq[JsonLD] = jsonLDs.flatMap(_.flatten.fold(throw _, identity))
+
+            val flattenedJsonLDs: Seq[JsonLD] =
+              jsonLDs.flatMap(_.flatten.toOption.flatMap(_.asArray).getOrElse(List.empty[JsonLD]))
             RDFDataMgr.read(
               model,
               new ByteArrayInputStream(Json.arr(flattenedJsonLDs.map(_.toJson): _*).noSpaces.getBytes(UTF_8)),
