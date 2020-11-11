@@ -462,26 +462,26 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
   }
 
   "asArray" should {
-    "return vector with single JsonLDValue" in {
+    "return None when there is a single JsonLDValue" in {
       forAll(jsonLDValues) { json =>
-        json.asArray shouldBe Some(Vector(json))
+        json.asArray shouldBe None
       }
     }
 
-    "return vector with single JsonLDEntityID" in {
+    "return None when there is a single JsonLDEntityID" in {
       forAll { entityId: EntityId =>
         val idAsJson = JsonLD.fromEntityId(entityId)
-        idAsJson.asArray shouldBe Some(Vector(idAsJson))
+        idAsJson.asArray shouldBe None
       }
     }
 
-    "return vector containing a null" in {
-      JsonLD.Null.asArray shouldBe Some(Vector(JsonLD.Null))
+    "return None when there is a single null" in {
+      JsonLD.Null.asArray shouldBe None
     }
 
-    "return vector containing the entity" in {
+    "return None when there is a single entity" in {
       forAll(jsonLDEntities) { entity =>
-        entity.asArray shouldBe Some(Vector(entity))
+        entity.asArray shouldBe None
       }
     }
 
