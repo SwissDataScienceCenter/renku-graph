@@ -19,8 +19,8 @@
 package io.renku.jsonld.flatten
 
 import cats.syntax.all._
-import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId, MalformedJsonLD}
-import io.renku.jsonld.{JsonLD, Property, Reverse}
+import io.renku.jsonld.JsonLD.{JsonLDArray, JsonLDEntity, JsonLDEntityId, JsonLDValue, MalformedJsonLD}
+import io.renku.jsonld.{EntityId, JsonLD, Property, Reverse}
 
 import scala.annotation.tailrec
 
@@ -32,9 +32,9 @@ private[jsonld] trait Flatten extends IDValidation {
   ): Either[MalformedJsonLD, List[JsonLD]] =
     toProcess match {
       case (entity: JsonLDEntity) :: entities =>
-        val processNext: List[JsonLDEntity] =
+        val processNext =
           extractEntityProperties(entity.properties) ++ extractReverseProperties(entity.reverse.properties)
-        val currentEntityDeNested: JsonLDEntity = transformEntityProperties(entity)
+        val currentEntityDeNested = transformEntityProperties(entity)
         deNest(processNext ++ entities, currentEntityDeNested +: topLevelEntities)
       case _ :: xs => deNest(xs, topLevelEntities)
       case Nil     => topLevelEntities.asRight
@@ -49,12 +49,12 @@ private[jsonld] trait Flatten extends IDValidation {
     }
 
   private def extractReverseProperties(properties: Map[Property, JsonLD]): List[JsonLDEntity] =
-    properties
-      .collect { case (_, entities: JsonLDArray) =>
-        entities.asArray.toList.flatten.collect { case entity: JsonLDEntity => entity }
-      }
-      .flatten
-      .toList
+    properties.foldLeft(List.empty[JsonLDEntity]) {
+      case (acc, (_, nestedEntity: JsonLDEntity)) => (nestedEntity +: acc)
+      case (acc, (_, array: JsonLDArray)) =>
+        (array.jsons.collect { case entity: JsonLDEntity => entity }.toList ++ acc)
+      case (acc, (_, _)) => acc
+    }
 
   private def transformEntityProperties(entity: JsonLDEntity): JsonLDEntity = {
     val cleanedProperties        = cleanProperties(entity.properties)
