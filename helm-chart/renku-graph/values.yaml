@@ -34,7 +34,7 @@ triplesGenerator:
     limits:
       memory: 5000Mi
   jvmXmx: 2g
-  renkuLogTimeout: 60 minutes
+  renkuLogTimeout: 180 minutes
   reProvisioningRemovalBatchSize: 1000
   gitlab:
     rateLimit: 30/sec
