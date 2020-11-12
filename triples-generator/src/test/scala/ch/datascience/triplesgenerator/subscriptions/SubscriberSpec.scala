@@ -150,6 +150,9 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .returning(exception.raiseError[IO, Unit])
       (subscriptionSender.postToEventLog _)
         .expects(subscriberUrl)
+        .returning(exception.raiseError[IO, Unit])
+      (subscriptionSender.postToEventLog _)
+        .expects(subscriberUrl)
         .returning(IO.unit)
         .atLeastOnce()
 
@@ -157,6 +160,7 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
 
       eventually {
         logger.loggedOnly(
+          Error("Subscribing for events failed", exception),
           Error("Subscribing for events failed", exception),
           Info(s"Subscribed for events with $subscriberUrl")
         )
