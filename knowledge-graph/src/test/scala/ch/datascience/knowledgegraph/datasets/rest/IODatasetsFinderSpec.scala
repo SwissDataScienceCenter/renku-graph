@@ -356,10 +356,15 @@ class IODatasetsFinderSpec
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
             .unsafeRunSync()
 
-          result.results should contain theSameElementsAs List(
+          val actual = result.results
+          val expected = List(
             datasetModification.toDatasetSearchResult(projectsCount = 1),
             datasetModificationOnFork.toDatasetSearchResult(projectsCount = 1)
           ).sortBy(_.title.value)
+          actual should contain theSameElementsAs expected
+
+          print(s"\n\n ###### \n\nactual: ${actual}")
+          print(s"\n\n ###### \n\nexpected: ${expected}")
 
           result.pagingInfo.total shouldBe Total(2)
         }
@@ -383,9 +388,12 @@ class IODatasetsFinderSpec
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
             .unsafeRunSync()
 
-          result.results should contain theSameElementsAs List(
-            dataset0.toDatasetSearchResult(projectsCount = 1)
-          )
+          result.results should contain theSameElementsAs List(dataset0.toDatasetSearchResult(projectsCount = 1))
+
+          print(s"\n\n ############## \n\ndataset0: ${dataset0}")
+          print(s"\n\n ############## \n\nentityWithInvalidation: ${entityWithInvalidation}")
+          print(s"\n\n ############## \n\nactual: ${result.results}")
+          print(s"\n\n ############## \n\nexpected: ${List(dataset0.toDatasetSearchResult(projectsCount = 1))}")
 
           result.pagingInfo.total shouldBe Total(1)
         }
