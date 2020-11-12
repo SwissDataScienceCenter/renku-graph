@@ -191,7 +191,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         }
       }
 
-    "continue dispatching if one dispatch attempt fails" in new TestCase {
+    "continue dispatching if a dispatch attempt fails" in new TestCase {
 
       val exception  = exceptions.generateOne
       val event      = events.generateOne
@@ -231,6 +231,10 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
           .expects()
           .returning(exception.raiseError[IO, Option[(CompoundEventId, EventBody)]])
 
+        (eventsFinder.popEvent _)
+          .expects()
+          .returning(exception.raiseError[IO, Option[(CompoundEventId, EventBody)]])
+
         // retry fetching some new event
         givenEventLog(has = Some(event))
         givenThereIs(freeSubscriber = subscriber)
@@ -243,6 +247,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
       eventually {
         logger.loggedOnly(
+          Error("Finding events to dispatch failed", exception),
           Error("Finding events to dispatch failed", exception),
           Info(s"Event ${event.compoundEventId}, url = $subscriber -> $Delivered")
         )
