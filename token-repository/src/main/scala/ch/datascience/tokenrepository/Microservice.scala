@@ -19,6 +19,7 @@
 package ch.datascience.tokenrepository
 
 import cats.effect._
+import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.http.server.HttpServer
@@ -44,6 +45,7 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, ProjectsTokensDB], args: List[String]) =
     transactorResource.use { transactor =>
       for {
+        certificateLoader      <- CertificateLoader[IO](ApplicationLogger)
         sentryInitializer      <- SentryInitializer[IO]()
         fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, ApplicationLogger)
         associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, ApplicationLogger)
@@ -60,25 +62,27 @@ object Microservice extends IOMicroservice {
                       val httpServer = new HttpServer[IO](serverPort = 9003, routes)
 
                       new MicroserviceRunner(
+                        certificateLoader,
                         sentryInitializer,
                         dbInitializer,
                         httpServer
-                      ) run args
+                      ).run()
                     }
       } yield exitcode
     }
 }
 
 private class MicroserviceRunner(
+    certificateLoader: CertificateLoader[IO],
     sentryInitializer: SentryInitializer[IO],
     dbInitializer:     DbInitializer[IO],
     httpServer:        HttpServer[IO]
 ) {
 
-  def run(args: List[String]): IO[ExitCode] =
-    for {
-      _      <- sentryInitializer.run()
-      _      <- dbInitializer.run()
-      result <- httpServer.run()
-    } yield result
+  def run(): IO[ExitCode] = for {
+    _      <- certificateLoader.run()
+    _      <- sentryInitializer.run()
+    _      <- dbInitializer.run()
+    result <- httpServer.run()
+  } yield result
 }

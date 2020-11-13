@@ -53,7 +53,7 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
         .expects()
         .returning(IO.unit)
 
-      dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
+      dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
       tableExists() shouldBe true
 
@@ -75,7 +75,7 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
         .expects()
         .returning(IO.unit)
 
-      dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
+      dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
       tableExists() shouldBe true
 
@@ -98,7 +98,7 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
         .expects()
         .returning(IO.unit)
 
-      dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
+      dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
       verifyTrue(sql"DROP INDEX idx_project_id;")
       verifyTrue(sql"DROP INDEX idx_event_id;")
@@ -132,7 +132,7 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
         sql"select count(*) from event_log where status = 'TRIPLES_STORE_FAILURE';".query[Int].unique
       } shouldBe 1
 
-      dbInitializer.run.unsafeRunSync() shouldBe ((): Unit)
+      dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
       execute {
         sql"select count(*) from event_log where status = 'TRIPLES_STORE_FAILURE';".query[Int].unique
@@ -151,7 +151,7 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
         .returning(IO.raiseError(exception))
 
       intercept[Exception] {
-        dbInitializer.run.unsafeRunSync()
+        dbInitializer.run().unsafeRunSync()
       } shouldBe exception
     }
 
@@ -170,7 +170,7 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
         .returning(IO.raiseError(exception))
 
       intercept[Exception] {
-        dbInitializer.run.unsafeRunSync()
+        dbInitializer.run().unsafeRunSync()
       } shouldBe exception
     }
 
@@ -192,7 +192,7 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
         .returning(IO.raiseError(exception))
 
       intercept[Exception] {
-        dbInitializer.run.unsafeRunSync()
+        dbInitializer.run().unsafeRunSync()
       } shouldBe exception
     }
   }
@@ -202,7 +202,7 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
     val batchDateAdder   = mock[IOBatchDateAdder]
     val viewCreator      = mock[LatestEventDatesViewCreator[IO]]
     val logger           = TestLogger[IO]()
-    val dbInitializer    = new DbInitializer[IO](projectPathAdder, batchDateAdder, viewCreator, transactor, logger)
+    val dbInitializer    = new DbInitializerImpl[IO](projectPathAdder, batchDateAdder, viewCreator, transactor, logger)
   }
 
   private class IOProjectPathAdder(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO])

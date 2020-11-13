@@ -22,19 +22,17 @@ import java.nio.file.Files
 
 import cats.effect.concurrent.MVar
 import cats.effect.{ContextShift, Fiber, IO}
-import ch.datascience.logging.IOLogger
 import ch.datascience.rdfstore.FusekiBaseUrl
 import org.apache.jena.fuseki.main.FusekiServer
 import org.apache.jena.rdfconnection.RDFConnectionFactory
 import org.apache.lucene.store.MMapDirectory
-import org.slf4j.LoggerFactory
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
+import scala.jdk.CollectionConverters._
 
 object RDFStore {
 
-  private val logger = new IOLogger(LoggerFactory.getLogger("test"))
+  private val logger = TestLogger()
 
   private val jenaPort: Int           = 3030
   val fusekiBaseUrl:    FusekiBaseUrl = FusekiBaseUrl(s"http://localhost:$jenaPort")
@@ -81,7 +79,7 @@ object RDFStore {
                      .start()
                  }.start
         _ <- jenaFiber.put(fiber)
-        _ <- logger.info(s"RDF store started")
+        _ <- logger.info("RDF store started")
       } yield ()
 
     def stop(): IO[Unit] = {
@@ -93,7 +91,7 @@ object RDFStore {
           for {
             _           <- fiber.join.map(_.stop())
             cancelToken <- fiber.cancel
-            _           <- logger.info(s"RDF store stopped")
+            _           <- logger.info("RDF store stopped")
           } yield cancelToken
       }
     }

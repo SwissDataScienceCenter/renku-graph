@@ -19,15 +19,17 @@
 package io.renku.eventlog.metrics
 
 import cats.MonadError
-import ch.datascience.config.{ConfigLoader, MetricsConfigProvider}
+import ch.datascience.config.MetricsConfigProvider
 import com.typesafe.config.{Config, ConfigFactory}
 
 import scala.concurrent.duration.FiniteDuration
 
-class MetricsConfigProviderImpl[Interpretation[_]](
-    configuration: Config = ConfigFactory.load()
-)(implicit ME:     MonadError[Interpretation, Throwable])
-    extends MetricsConfigProvider[Interpretation] {
-  def getInterval(): Interpretation[FiniteDuration] =
-    find[FiniteDuration]("event-log.metrics.scheduler-reset-interval", configuration)
+object MetricsConfigProvider {
+
+  def apply[Interpretation[_]](
+      configuration: Config = ConfigFactory.load()
+  )(implicit ME:     MonadError[Interpretation, Throwable]): MetricsConfigProvider[Interpretation] =
+    new MetricsConfigProvider[Interpretation] {
+      override def getInterval() = find[FiniteDuration]("event-log.metrics.scheduler-reset-interval", configuration)
+    }
 }
