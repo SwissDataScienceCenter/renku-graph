@@ -27,7 +27,7 @@ trait IDValidation {
   )
     Right(flattenedJsons)
   else
-    Left(MalformedJsonLD("Some entities share an ID even though they're not the same"))
+    Left(MalformedJsonLD(s"Some entities share an ID even though they're not the same"))
 
   private def areIdsUnique(jsons: List[JsonLD]): Boolean =
     jsons

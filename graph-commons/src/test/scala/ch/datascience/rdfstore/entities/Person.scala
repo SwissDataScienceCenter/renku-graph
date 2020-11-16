@@ -18,6 +18,8 @@
 
 package ch.datascience.rdfstore.entities
 
+import java.util.UUID
+
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name}
@@ -36,14 +38,12 @@ object Person {
       email: Email
   ): Person = Person(name, Some(email))
 
-  import java.util.UUID.randomUUID
-
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Person] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
-      entityId(entity.maybeEmail),
+      entityId(entity),
       EntityTypes.of(prov / "Person", schema / "Person"),
       schema / "email"       -> entity.maybeEmail.asJsonLD,
       schema / "name"        -> entity.name.asJsonLD,
@@ -52,9 +52,9 @@ object Person {
     )
   }
 
-  private def entityId(maybeEmail: Option[Email])(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = maybeEmail match {
+  private def entityId(entity: Person)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = entity.maybeEmail match {
     case Some(email) => EntityId of s"mailto:$email"
-    case None        => EntityId of (renkuBaseUrl / "persons" / randomUUID().toString)
+    case None        => EntityId of (renkuBaseUrl / "persons" / UUID.nameUUIDFromBytes(entity.name.value.getBytes()).toString)
   }
 
   val persons: Gen[Person] = for {

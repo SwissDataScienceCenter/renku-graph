@@ -45,25 +45,22 @@ class IOProjectDatasetsFinderSpec
   "findProjectDatasets" should {
 
     "return the very last modification of a dataset in the given project" in new TestCase {
-      forAll(datasetProjects, addedToProjectObjects) { (project, addedToProject) =>
-        val originalDataset = nonModifiedDatasets(
-          projects = project.copy(created = addedToProject).toGenerator
-        ).generateOne
-        val datasetModification1Creation = project.copy(created = addedToProject) shiftDateAfter project
-        val datasetModification1 = modifiedDatasetsOnFirstProject(
-          originalDataset.copy(projects = List(datasetModification1Creation))
-        ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
-        val datasetModification2 = modifiedDatasetsOnFirstProject(
-          datasetModification1.copy(
-            projects = List(project.copy(created = addedToProject) shiftDateAfter datasetModification1Creation)
-          )
-        ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
+      forAll(projects) { project =>
+        val originalDataset = nonModifiedDatasets().generateOne.copy(projects = List(project.toDatasetProject))
+        val datasetModification1 = modifiedDatasetsOnFirstProject(originalDataset).generateOne
+          .copy(maybeDescription = datasetDescriptions.generateSome)
+        val datasetModification2 = modifiedDatasetsOnFirstProject(datasetModification1).generateOne
+          .copy(maybeDescription = datasetDescriptions.generateSome)
 
         loadToStore(
           randomDataSetCommit,
-          originalDataset.toJsonLD()(),
-          datasetModification1.toJsonLD(topmostDerivedFrom = originalDataset.entityId.asTopmostDerivedFrom),
-          datasetModification2.toJsonLD(topmostDerivedFrom = originalDataset.entityId.asTopmostDerivedFrom)
+          originalDataset.toJsonLD()(projects = List(project)),
+          datasetModification1.toJsonLD(topmostDerivedFrom = originalDataset.entityId.asTopmostDerivedFrom,
+                                        projects = List(project)
+          ),
+          datasetModification2.toJsonLD(topmostDerivedFrom = originalDataset.entityId.asTopmostDerivedFrom,
+                                        projects = List(project)
+          )
         )
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
@@ -78,19 +75,16 @@ class IOProjectDatasetsFinderSpec
     }
 
     "return non-modified datasets and the very last modifications of project's datasets" in new TestCase {
-      forAll(datasetProjects, addedToProjectObjects) { (project, addedToProject) =>
-        val dataset1 = nonModifiedDatasets(projects = project.toGenerator).generateOne
-        val dataset2 = nonModifiedDatasets(
-          projects = project.copy(created = addedToProject).toGenerator
-        ).generateOne
-        val dataset2Modification = modifiedDatasetsOnFirstProject(
-          dataset2.copy(projects = List(project.copy(created = addedToProject) shiftDateAfter project))
-        ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
+      forAll(projects) { project =>
+        val dataset1 = nonModifiedDatasets().generateOne.copy(projects = List(project.toDatasetProject))
+        val dataset2 = nonModifiedDatasets().generateOne.copy(projects = List(project.toDatasetProject))
+        val dataset2Modification =
+          modifiedDatasetsOnFirstProject(dataset2).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
 
         loadToStore(
-          dataset1.toJsonLD()(),
-          dataset2.toJsonLD()(),
-          dataset2Modification.toJsonLD()
+          dataset1.toJsonLD()(projects = List(project)),
+          dataset2.toJsonLD()(projects = List(project)),
+          dataset2Modification.toJsonLD(projects = List(project))
         )
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
@@ -106,19 +100,17 @@ class IOProjectDatasetsFinderSpec
     }
 
     "return all datasets of the given project without merging datasets having the same sameAs" in new TestCase {
-      forAll(datasetProjects) { project =>
+      forAll(projects) { project =>
         val sharedSameAs = datasetSameAs.generateOne
-        val dataset1 = nonModifiedDatasets(
-          projects = project.toGenerator
-        ).generateOne.copy(sameAs = sharedSameAs)
-        val dataset2 = nonModifiedDatasets(
-          projects = project.copy(created = addedToProjectObjects.generateOne).toGenerator
-        ).generateOne.copy(sameAs = sharedSameAs)
+        val dataset1 =
+          nonModifiedDatasets().generateOne.copy(sameAs = sharedSameAs, projects = List(project.toDatasetProject))
+        val dataset2 =
+          nonModifiedDatasets().generateOne.copy(sameAs = sharedSameAs, projects = List(project.toDatasetProject))
 
         loadToStore(
           randomDataSetCommit,
-          dataset1.toJsonLD()(),
-          dataset2.toJsonLD()()
+          dataset1.toJsonLD()(projects = List(project)),
+          dataset2.toJsonLD()(projects = List(project))
         )
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
@@ -134,17 +126,16 @@ class IOProjectDatasetsFinderSpec
     }
 
     "not returned deleted dataset" in new TestCase {
-      forAll(projects, addedToProjectObjects) { (project, addedToProject) =>
+      forAll(projects) { project =>
         val datasetProject = project.toDatasetProject
-        val dataset1       = nonModifiedDatasets(projects = datasetProject.toGenerator).generateOne
+        val dataset1       = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
         val datasetToBeInvalidated = nonModifiedDatasets(
-          projects = datasetProject.copy(created = addedToProject).toGenerator
-        ).generateOne
+        ).generateOne.copy(projects = List(datasetProject))
 
         val entityWithInvalidation = invalidationEntity(datasetToBeInvalidated.id, project).generateOne
         loadToStore(
-          dataset1.toJsonLD()(),
-          datasetToBeInvalidated.toJsonLD()(),
+          dataset1.toJsonLD()(projects = List(project)),
+          datasetToBeInvalidated.toJsonLD()(projects = List(project)),
           entityWithInvalidation.asJsonLD
         )
 
@@ -155,23 +146,25 @@ class IOProjectDatasetsFinderSpec
     }
 
     "not returned deleted dataset when its latest version was deleted" in new TestCase {
-      forAll(projects, addedToProjectObjects) { (project, addedToProject) =>
+      forAll(projects) { project =>
         val datasetProject = project.toDatasetProject
-        val dataset1       = nonModifiedDatasets(projects = datasetProject.toGenerator).generateOne
+        val dataset1       = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
         val dataset2 = nonModifiedDatasets(
-          projects = datasetProject.copy(created = addedToProject).toGenerator
-        ).generateOne
+        ).generateOne.copy(projects = List(datasetProject))
 
-        val dataset2Modification = modifiedDatasetsOnFirstProject(
-          dataset2.copy(projects = List(datasetProject.copy(created = addedToProject) shiftDateAfter datasetProject))
-        ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
+        val dataset2Modification =
+          modifiedDatasetsOnFirstProject(dataset2).generateOne.copy(maybeDescription = datasetDescriptions.generateSome,
+                                                                    projects = List(datasetProject)
+          )
 
         val entityWithInvalidation =
           invalidationEntity(dataset2Modification.id, project, dataset2.entityId.asTopmostDerivedFrom.some).generateOne
         loadToStore(
-          dataset1.toJsonLD()(),
-          dataset2.toJsonLD()(),
-          dataset2Modification.toJsonLD(topmostDerivedFrom = dataset2.entityId.asTopmostDerivedFrom),
+          dataset1.toJsonLD()(projects = List(project)),
+          dataset2.toJsonLD()(projects = List(project)),
+          dataset2Modification.toJsonLD(topmostDerivedFrom = dataset2.entityId.asTopmostDerivedFrom,
+                                        projects = List(project)
+          ),
           entityWithInvalidation.asJsonLD
         )
 
