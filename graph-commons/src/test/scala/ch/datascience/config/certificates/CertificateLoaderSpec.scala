@@ -18,6 +18,7 @@
 
 package ch.datascience.config.certificates
 
+import cats.MonadError
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, nonBlankStrings}
@@ -49,25 +50,18 @@ class CertificateLoaderSpec extends AnyWordSpec with MockFactory with should.Mat
         val sslContext = sslContexts.generateOne
         createSslContext.expects(keystore).returning(sslContext.pure[Try])
 
-        SSLContext.getDefault should not be sslContext.toJavaSSLContext
+        makeSslContextDefault.expects(sslContext, *).returning(().pure[Try])
 
         certificateLoader.run() shouldBe ().pure[Try]
-
-        SSLContext.getDefault shouldBe sslContext.toJavaSSLContext
 
         logger.loggedOnly(Info("Client certificate added"))
       }
 
     "log a relevant info when no client certificate is found" in new TestCase {
 
-      val initialSSLContext = SSLContext.getInstance("TLS")
-      SSLContext.setDefault(initialSSLContext)
-
       findCertificate.expects().returning(None.pure[Try])
 
       certificateLoader.run() shouldBe ().pure[Try]
-
-      SSLContext.getDefault shouldBe initialSSLContext
 
       logger.loggedOnly(Info("No client certificate found"))
     }
@@ -109,14 +103,39 @@ class CertificateLoaderSpec extends AnyWordSpec with MockFactory with should.Mat
 
       logger.loggedOnly(Error("Loading client certificate failed", exception))
     }
+
+    "fail and log an error if making the created SslContext default fails" in new TestCase {
+
+      val certificate = certificates.generateOne
+      findCertificate.expects().returning(certificate.some.pure[Try])
+
+      (keystore.load(_: Certificate)).expects(certificate).returning(().pure[Try])
+
+      val sslContext = sslContexts.generateOne
+      createSslContext.expects(keystore).returning(sslContext.pure[Try])
+
+      val exception = exceptions.generateOne
+      makeSslContextDefault.expects(sslContext, *).returning(exception.raiseError[Try, Unit])
+
+      certificateLoader.run() shouldBe Failure(exception)
+
+      logger.loggedOnly(Error("Loading client certificate failed", exception))
+    }
   }
 
   private trait TestCase {
-    val keystore          = mock[Keystore[Try]]
-    val findCertificate   = mockFunction[Try[Option[Certificate]]]
-    val createSslContext  = mockFunction[Keystore[Try], Try[SslContext]]
-    val logger            = TestLogger[Try]()
-    val certificateLoader = new CertificateLoaderImpl[Try](keystore, findCertificate, createSslContext, logger)
+    val keystore              = mock[Keystore[Try]]
+    val findCertificate       = mockFunction[Try[Option[Certificate]]]
+    val createSslContext      = mockFunction[Keystore[Try], Try[SslContext]]
+    val makeSslContextDefault = mockFunction[SslContext, MonadError[Try, Throwable], Try[Unit]]
+    val logger                = TestLogger[Try]()
+    val certificateLoader = new CertificateLoaderImpl[Try](
+      keystore,
+      findCertificate,
+      createSslContext,
+      makeSslContextDefault,
+      logger
+    )
   }
 
   private lazy val certificates: Gen[Certificate] = nonBlankStrings().map(v => Certificate(v.value))

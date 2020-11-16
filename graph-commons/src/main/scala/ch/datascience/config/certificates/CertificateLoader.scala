@@ -46,8 +46,11 @@ class CertificateLoaderImpl[Interpretation[_]] private[certificates] (
     keystore:         Keystore[Interpretation],
     findCertificate:  () => Interpretation[Option[Certificate]],
     createSslContext: Keystore[Interpretation] => Interpretation[SslContext],
-    logger:           Logger[Interpretation]
-)(implicit ME:        MonadError[Interpretation, Throwable])
+    makeSslContextDefault: (SslContext, MonadError[Interpretation, Throwable]) => Interpretation[Unit] =
+      (context: SslContext, ME: MonadError[Interpretation, Throwable]) =>
+        SslContext.makeDefault[Interpretation](context)(ME),
+    logger:    Logger[Interpretation]
+)(implicit ME: MonadError[Interpretation, Throwable])
     extends CertificateLoader[Interpretation] {
 
   import cats.syntax.all._
@@ -64,7 +67,7 @@ class CertificateLoaderImpl[Interpretation[_]] private[certificates] (
   private def addCertificate(certificate: Certificate): Interpretation[Unit] = for {
     _          <- keystore load certificate
     sslContext <- createSslContext(keystore)
-    _          <- SslContext.makeDefault[Interpretation](sslContext)
+    _          <- makeSslContextDefault(sslContext, ME)
     _          <- logger.info("Client certificate added")
   } yield ()
 
