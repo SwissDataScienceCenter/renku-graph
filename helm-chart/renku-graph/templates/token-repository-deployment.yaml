@@ -26,6 +26,11 @@ spec:
           image: "{{ .Values.tokenRepository.image.repository }}:{{ .Values.tokenRepository.image.tag }}"
           imagePullPolicy: {{ .Values.tokenRepository.image.pullPolicy }}
           env:
+            - name: RENKU_CLIENT_CERTIFICATE
+              valueFrom:
+                secretKeyRef:
+                  name: client-certificate-secret
+                  key: client-certificate
             - name: TOKEN_ENCRYPTION_SECRET
               valueFrom:
                 secretKeyRef:

@@ -20,6 +20,7 @@ package ch.datascience.config.certificates
 
 import cats.MonadError
 import cats.syntax.all._
+import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 

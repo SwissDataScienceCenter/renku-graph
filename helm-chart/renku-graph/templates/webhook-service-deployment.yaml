@@ -26,6 +26,11 @@ spec:
           image: "{{ .Values.webhookService.image.repository }}:{{ .Values.webhookService.image.tag }}"
           imagePullPolicy: {{ .Values.webhookService.image.pullPolicy }}
           env:
+            - name: RENKU_CLIENT_CERTIFICATE
+              valueFrom:
+                secretKeyRef:
+                  name: client-certificate-secret
+                  key: client-certificate
             - name: HOOK_TOKEN_SECRET
               valueFrom:
                 secretKeyRef:
