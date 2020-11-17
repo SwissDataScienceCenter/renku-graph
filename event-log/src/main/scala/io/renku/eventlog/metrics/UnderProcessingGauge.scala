@@ -33,15 +33,11 @@ object UnderProcessingGauge {
       statsFinder:     StatsFinder[IO],
       logger:          Logger[IO]
   ): IO[LabeledGauge[IO, projects.Path]] =
-    for {
-      gauge <- Gauge[IO, projects.Path](
-                 name = "events_processing_count",
-                 help = "Number of Events under processing by project path.",
-                 labelName = "project",
-                 resetDataFetch =
-                   () => statsFinder.countEvents(Set(Processing: EventStatus)).map(_.view.mapValues(_.toDouble).toMap)
-               )(metricsRegistry)
-      _ <- gauge.reset()
-    } yield gauge
-
+    Gauge[IO, projects.Path](
+      name = "events_processing_count",
+      help = "Number of Events under processing by project path.",
+      labelName = "project",
+      resetDataFetch =
+        () => statsFinder.countEvents(Set(Processing: EventStatus)).map(_.view.mapValues(_.toDouble).toMap)
+    )(metricsRegistry)
 }

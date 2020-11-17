@@ -26,6 +26,11 @@ spec:
           image: "{{ .Values.triplesGenerator.image.repository }}:{{ .Values.triplesGenerator.image.tag }}"
           imagePullPolicy: {{ .Values.triplesGenerator.image.pullPolicy }}
           env:
+            - name: RENKU_CLIENT_CERTIFICATE
+              valueFrom:
+                secretKeyRef:
+                  name: client-certificate-secret
+                  key: client-certificate
             - name: RENKU_DOMAIN
               value: {{ .Values.global.renku.domain }}
             - name: RENKU_BASE_URL

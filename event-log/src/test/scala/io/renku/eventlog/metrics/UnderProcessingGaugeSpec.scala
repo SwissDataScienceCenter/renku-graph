@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{exceptions, nonEmptySet, nonNegativeLongs}
+import ch.datascience.generators.Generators.{nonEmptySet, nonNegativeLongs}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
@@ -43,56 +43,45 @@ class UnderProcessingGaugeSpec extends AnyWordSpec with MockFactory with should.
 
   "apply" should {
 
-    "create a events_processing_count named gauge " +
-      "and provision it with values from the Event Log" in new TestCase {
-
-        (metricsRegistry
-          .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
-          .expects(*, *)
-          .onCall { (builder: LibGauge.Builder, _: MonadError[IO, Throwable]) =>
-            val actual = builder.create()
-            actual.describe().asScala.head.name shouldBe underlying.describe().asScala.head.name
-            actual.describe().asScala.head.help shouldBe underlying.describe().asScala.head.help
-
-            underlying.pure[IO]
-          }
-
-        val processingEvents = processingEventsGen.generateOne
-        (statsFinder.countEvents _)
-          .expects(Set(Processing: EventStatus), None)
-          .returning(processingEvents.pure[IO])
-
-        val gauge = UnderProcessingGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
-
-        gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
-
-        underlying.collectAllSamples should contain theSameElementsAs processingEvents.map { case (project, count) =>
-          ("project", project.value, count.toDouble)
-        }
-      }
-
-    "fail if finding values for initial provisioning fails" in new TestCase {
+    "create and register events_processing_count named gauge" in new TestCase {
 
       (metricsRegistry
         .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
         .expects(*, *)
-        .onCall { (_: LibGauge.Builder, _: MonadError[IO, Throwable]) =>
-          underlying.pure[IO]
+        .onCall { (builder: LibGauge.Builder, _: MonadError[IO, Throwable]) =>
+          val actual = builder.create()
+          actual.describe().asScala.head.name shouldBe underlying.describe().asScala.head.name
+          actual.describe().asScala.head.help shouldBe underlying.describe().asScala.head.help
+          actual.pure[IO]
         }
 
-      val exception = exceptions.generateOne
+      val gauge = UnderProcessingGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
+
+      gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
+    }
+
+    "return a gauge with reset method provisioning it with values from the Event Log" in new TestCase {
+
+      (metricsRegistry
+        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
+        .expects(*, *)
+        .onCall((_: LibGauge.Builder, _: MonadError[IO, Throwable]) => underlying.pure[IO])
+
+      val processingEvents = processingEventsGen.generateOne
       (statsFinder.countEvents _)
         .expects(Set(Processing: EventStatus), None)
-        .returning(exception.raiseError[IO, Map[projects.Path, Long]])
+        .returning(processingEvents.pure[IO])
 
-      intercept[Exception] {
-        UnderProcessingGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
-      } shouldBe exception
+      UnderProcessingGauge(metricsRegistry, statsFinder, TestLogger()).flatMap(_.reset()).unsafeRunSync()
+
+      underlying.collectAllSamples should contain theSameElementsAs processingEvents.map { case (project, count) =>
+        ("project", project.value, count.toDouble)
+      }
     }
   }
 
   private trait TestCase {
-    var underlying = LibGauge
+    val underlying = LibGauge
       .build("events_processing_count", "Number of Events under processing by project path.")
       .labelNames("project")
       .create()

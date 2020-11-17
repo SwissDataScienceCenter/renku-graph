@@ -27,18 +27,23 @@ import io.renku.eventlog.EventStatus.RecoverableFailure
 
 import scala.util.control.NonFatal
 
-class DbInitializer[Interpretation[_]](
+trait DbInitializer[Interpretation[_]] {
+  def run(): Interpretation[Unit]
+}
+
+class DbInitializerImpl[Interpretation[_]](
     projectPathAdder:            ProjectPathAdder[Interpretation],
     batchDateAdder:              BatchDateAdder[Interpretation],
     latestEventDatesViewCreator: LatestEventDatesViewCreator[Interpretation],
     transactor:                  DbTransactor[Interpretation, EventLogDB],
     logger:                      Logger[Interpretation]
-)(implicit ME:                   Bracket[Interpretation, Throwable]) {
+)(implicit ME:                   Bracket[Interpretation, Throwable])
+    extends DbInitializer[Interpretation] {
 
   import doobie.implicits._
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
-  def run: Interpretation[Unit] = {
+  override def run(): Interpretation[Unit] = {
     for {
       _ <- createTable()
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)")
@@ -78,14 +83,17 @@ class DbInitializer[Interpretation[_]](
   }
 }
 
-class IODbInitializer(
-    transactor:          DbTransactor[IO, EventLogDB],
-    logger:              Logger[IO]
-)(implicit contextShift: ContextShift[IO])
-    extends DbInitializer[IO](
+object IODbInitializer {
+  def apply(
+      transactor:          DbTransactor[IO, EventLogDB],
+      logger:              Logger[IO]
+  )(implicit contextShift: ContextShift[IO]): IO[DbInitializer[IO]] = IO {
+    new DbInitializerImpl[IO](
       new ProjectPathAdder[IO](transactor, logger),
       new BatchDateAdder[IO](transactor, logger),
       LatestEventDatesViewCreator[IO](transactor, logger),
       transactor,
       logger
     )
+  }
+}

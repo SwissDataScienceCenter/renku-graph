@@ -22,6 +22,7 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
+import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{Id, Path, Visibility}
@@ -30,7 +31,6 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model.{ParentProject, Permissions, Project}
-import ch.datascience.logging.IOLogger
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
@@ -40,11 +40,10 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.Json
 import io.circe.literal._
-import org.slf4j.LoggerFactory
 
 object GitLab {
 
-  private val logger = new IOLogger(LoggerFactory.getLogger("test"))
+  private val logger = TestLogger()
   private val port: Int Refined Positive = 2048
   import ch.datascience.graph.model.GraphModelGenerators._
   def `GET <gitlab>/api/v4/projects/:id returning OK`(

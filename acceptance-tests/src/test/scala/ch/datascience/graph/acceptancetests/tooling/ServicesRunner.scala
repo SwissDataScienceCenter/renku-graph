@@ -22,19 +22,17 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.effect._
 import cats.effect.concurrent.Semaphore
-import ch.datascience.logging.IOLogger
 import ch.datascience.microservices.IOMicroservice
-import org.slf4j.LoggerFactory
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
+import scala.jdk.CollectionConverters._
 
 final case class ServiceRun(name:             String,
                             service:          IOMicroservice,
                             serviceClient:    ServiceClient,
                             preServiceStart:  List[IO[Unit]] = List.empty,
                             postServiceStart: List[IO[Unit]] = List.empty,
-                            serviceArgsList:  List[String] = List.empty
+                            serviceArgsList:  List[() => String] = List.empty
 )
 
 class ServicesRunner(
@@ -47,7 +45,7 @@ class ServicesRunner(
   import scala.concurrent.duration._
   import scala.language.postfixOps
 
-  private val logger = new IOLogger(LoggerFactory.getLogger("test"))
+  private val logger = TestLogger()
 
   def run(services: ServiceRun*): IO[Unit] =
     for {
@@ -69,7 +67,7 @@ class ServicesRunner(
           _ <- logger.info(s"Service ${serviceRun.name} starting")
           _ <- preServiceStart.sequence
           _ = service
-                .run(serviceRun.serviceArgsList)
+                .run(serviceRun.serviceArgsList.map(_()))
                 .start
                 .map(fiber => cancelTokens.put(serviceRun, fiber.cancel))
                 .unsafeRunAsyncAndForget()

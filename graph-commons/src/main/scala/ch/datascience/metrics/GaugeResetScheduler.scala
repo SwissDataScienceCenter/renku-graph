@@ -25,6 +25,7 @@ import ch.datascience.config.MetricsConfigProvider
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
+import scala.util.control.NonFatal
 
 trait GaugeResetScheduler[Interpretation[_]] {
   def run(): Interpretation[Unit]
@@ -36,19 +37,25 @@ class GaugeResetSchedulerImpl[Interpretation[_], LabelValue](
     logger:                 Logger[Interpretation]
 )(implicit ME:              MonadError[Interpretation, Throwable], timer: Timer[Interpretation])
     extends GaugeResetScheduler[Interpretation] {
-  override def run(): Interpretation[Unit] = (for {
-    interval <- metricsSchedulerConfig.getInterval()
-    _        <- resetGaugesEvery(interval)
-  } yield ()) recoverWith logError
 
-  private def resetGaugesEvery(interval: FiniteDuration): Interpretation[Unit] = for {
-    _ <- timer sleep interval
-    _ <- gauges.map(_.reset()).sequence
-    _ <- resetGaugesEvery(interval)
+  override def run(): Interpretation[Unit] = for {
+    interval <- metricsSchedulerConfig.getInterval()
+    _        <- resetGauges recoverWith logError
+    _        <- resetGaugesEvery(interval).foreverM[Unit]
   } yield ()
 
-  private lazy val logError: PartialFunction[Throwable, Interpretation[Unit]] = { case e: Throwable =>
-    logger.error(s"Clearing event gauge metrics failed with - ${e.getMessage}")
+  private def resetGaugesEvery(interval: FiniteDuration): Interpretation[Unit] = {
+    for {
+      _ <- timer sleep interval
+      _ <- resetGauges
+    } yield ()
+  } recoverWith logError
+
+  private def resetGauges: Interpretation[Unit] =
+    gauges.map(_.reset()).sequence.void
+
+  private lazy val logError: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)(s"Clearing event gauge metrics failed")
   }
 }
 
@@ -57,7 +64,7 @@ object IOGaugeResetScheduler {
       gauges:    List[LabeledGauge[IO, LabelValue]],
       config:    MetricsConfigProvider[IO],
       logger:    Logger[IO]
-  )(implicit ME: MonadError[IO, Throwable], timer: Timer[IO]): IO[GaugeResetSchedulerImpl[IO, LabelValue]] = IO(
+  )(implicit ME: MonadError[IO, Throwable], timer: Timer[IO]): IO[GaugeResetScheduler[IO]] = IO(
     new GaugeResetSchedulerImpl[IO, LabelValue](gauges, config, logger)
   )
 }

@@ -23,7 +23,7 @@ import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.IORestClient._
-import ch.datascience.http.client.RestClientError.{BadRequestException, ConnectivityException, MappingException, UnexpectedResponseException}
+import ch.datascience.http.client.RestClientError._
 import ch.datascience.logging.ExecutionTimeRecorder
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty

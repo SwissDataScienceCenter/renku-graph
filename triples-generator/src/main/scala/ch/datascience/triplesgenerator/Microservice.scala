@@ -23,6 +23,7 @@ import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
 import ch.datascience.config.GitLab
+import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.http.server.HttpServer
@@ -55,6 +56,7 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
+      certificateLoader        <- CertificateLoader[IO](ApplicationLogger)
       sentryInitializer        <- SentryInitializer[IO]()
       fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
       subscriber               <- Subscriber(ApplicationLogger)
@@ -75,21 +77,22 @@ object Microservice extends IOMicroservice {
                                  )
       microserviceRoutes =
         new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry)).routes
-      exitcode <- microserviceRoutes.use { routes =>
+      exitCode <- microserviceRoutes.use { routes =>
                     new MicroserviceRunner(
+                      certificateLoader,
                       sentryInitializer,
                       fusekiDatasetInitializer,
                       subscriber,
                       reProvisioning,
                       new HttpServer[IO](serverPort = ServicePort.value, routes),
                       subProcessesCancelTokens
-                    ) run args
+                    ).run()
                   }
-
-    } yield exitcode
+    } yield exitCode
 }
 
 private class MicroserviceRunner(
+    certificateLoader:        CertificateLoader[IO],
     sentryInitializer:        SentryInitializer[IO],
     datasetInitializer:       FusekiDatasetInitializer[IO],
     subscriber:               Subscriber[IO],
@@ -98,14 +101,14 @@ private class MicroserviceRunner(
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
 )(implicit contextShift:      ContextShift[IO]) {
 
-  def run(args: List[String]): IO[ExitCode] =
-    for {
-      _        <- sentryInitializer.run()
-      _        <- datasetInitializer.run()
-      _        <- subscriber.run().start.map(gatherCancelToken)
-      _        <- reProvisioning.run().start.map(gatherCancelToken)
-      exitCode <- httpServer.run()
-    } yield exitCode
+  def run(): IO[ExitCode] = for {
+    _        <- certificateLoader.run()
+    _        <- sentryInitializer.run()
+    _        <- datasetInitializer.run()
+    _        <- subscriber.run().start.map(gatherCancelToken)
+    _        <- reProvisioning.run().start.map(gatherCancelToken)
+    exitCode <- httpServer.run()
+  } yield exitCode
 
   private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
     subProcessesCancelTokens.put(fiber.cancel, ())

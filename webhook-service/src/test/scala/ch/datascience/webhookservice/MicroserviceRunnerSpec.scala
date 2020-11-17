@@ -18,12 +18,16 @@
 
 package ch.datascience.webhookservice
 
-import cats.MonadError
+import java.util.concurrent.ConcurrentHashMap
+
 import cats.effect._
+import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.exceptions
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
+import ch.datascience.microservices.AnyMicroserviceRunnerSpec
 import ch.datascience.webhookservice.missedevents._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -31,7 +35,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec with MockFactory with should.Matchers {
 
   "run" should {
 
@@ -39,84 +43,73 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
       "Sentry initialisation is fine and " +
       "Events Synchronization Scheduler and Http Server start up" in new TestCase {
 
-        (sentryInitializer.run _)
-          .expects()
-          .returning(IO.unit)
+        given(certificateLoader).succeeds(returning = ())
+        given(sentryInitializer).succeeds(returning = ())
+        given(eventsSynchronizationScheduler).succeeds(returning = ())
+        given(httpServer).succeeds(returning = ExitCode.Success)
 
-        (eventsSynchronizationScheduler.run _)
-          .expects()
-          .returning(IO.unit)
-
-        (httpServer.run _)
-          .expects()
-          .returning(context.pure(ExitCode.Success))
-
-        runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
+        runner.run().unsafeRunSync() shouldBe ExitCode.Success
       }
+
+    "fail if Certificate loading fails" in new TestCase {
+
+      val exception = exceptions.generateOne
+      given(certificateLoader).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        runner.run().unsafeRunSync()
+      } shouldBe exception
+    }
 
     "fail if Sentry initialization fails" in new TestCase {
 
+      given(certificateLoader).succeeds(returning = ())
       val exception = Generators.exceptions.generateOne
-      (sentryInitializer.run _)
-        .expects()
-        .returning(context.raiseError(exception))
+      given(sentryInitializer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run(Nil).unsafeRunSync()
+        runner.run().unsafeRunSync()
       } shouldBe exception
     }
 
-    "fail if starting the Events Synchronization Scheduler fails" in new TestCase {
+    "return Success Exit Code even if starting the Events Synchronization Scheduler fails" in new TestCase {
 
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (httpServer.run _)
-        .expects()
-        .returning(context.pure(ExitCode.Success))
-
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
       val exception = Generators.exceptions.generateOne
-      (eventsSynchronizationScheduler.run _)
-        .expects()
-        .returning(context.raiseError(exception))
+      given(eventsSynchronizationScheduler).fails(becauseOf = exception)
+      given(httpServer).succeeds(returning = ExitCode.Success)
 
-      intercept[Exception] {
-        runner.run(Nil).unsafeRunSync()
-      } shouldBe exception
+      runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
 
-    "return Success ExitCode even if the Http Server fails to start" in new TestCase {
+    "fail if starting Http Server fails" in new TestCase {
 
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      given(eventsSynchronizationScheduler).succeeds(returning = ())
       val exception = Generators.exceptions.generateOne
-      (httpServer.run _)
-        .expects()
-        .returning(context.raiseError(exception))
+      given(httpServer).fails(becauseOf = exception)
 
-      (eventsSynchronizationScheduler.run _)
-        .expects()
-        .returning(context.unit)
-
-      runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
+      intercept[Exception] {
+        runner.run().unsafeRunSync()
+      } shouldBe exception
     }
   }
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
-
+    val certificateLoader              = mock[CertificateLoader[IO]]
     val sentryInitializer              = mock[IOSentryInitializer]
     val eventsSynchronizationScheduler = mock[TestIOEventsSynchronizationScheduler]
     val httpServer                     = mock[IOHttpServer]
     val runner = new MicroserviceRunner(
+      certificateLoader,
       sentryInitializer,
       eventsSynchronizationScheduler,
-      httpServer
+      httpServer,
+      new ConcurrentHashMap[CancelToken[IO], Unit]()
     )
   }
 }

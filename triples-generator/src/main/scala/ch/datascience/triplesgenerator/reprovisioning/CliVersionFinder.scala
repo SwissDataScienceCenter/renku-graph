@@ -25,8 +25,6 @@ import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
-import scala.util.Try
-
 private object CliVersionFinder {
 
   import ch.datascience.config.ConfigLoader._
@@ -55,7 +53,7 @@ private object CliVersionFinder {
     import cats.syntax.all._
 
     for {
-      versionAsString <- ME.fromTry(Try(%%("renku", "--version")(pwd).out.string.trim))
+      versionAsString <- ME.catchNonFatal(%%("renku", "--version")(pwd).out.string.trim)
       version         <- ME.fromEither(CliVersion.from(versionAsString))
     } yield version
   }

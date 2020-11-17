@@ -22,12 +22,15 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.MonadError
 import cats.effect._
+import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.metrics.{GaugeResetScheduler, LabeledGauge, SingleValueGauge}
+import ch.datascience.microservices.AnyMicroserviceRunnerSpec
 import io.chrisdavenport.log4cats.Logger
+import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics.{EventLogMetrics, StatsFinder}
 import io.renku.eventlog.subscriptions.EventsDispatcher
 import org.scalamock.scalatest.MockFactory
@@ -37,7 +40,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
 
-class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec with MockFactory with should.Matchers {
 
   "run" should {
 
@@ -45,35 +48,44 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
       "if Sentry, Events Dispatcher and metrics initialisation are fine " +
       "and http server starts up" in new TestCase {
 
-        (sentryInitializer.run _)
-          .expects()
-          .returning(IO.unit)
-
-        (metrics.run _)
-          .expects()
-          .returning(IO.unit)
-
-        (eventsDispatcher.run _)
-          .expects()
-          .returning(IO.unit)
-
-        (gaugeScheduler.run _)
-          .expects()
-          .returning(IO.unit)
-
-        (httpServer.run _)
-          .expects()
-          .returning(context.pure(ExitCode.Success))
+        given(certificateLoader).succeeds(returning = ())
+        given(sentryInitializer).succeeds(returning = ())
+        given(dbInitializer).succeeds(returning = ())
+        given(metrics).succeeds(returning = ())
+        given(eventsDispatcher).succeeds(returning = ())
+        given(gaugeScheduler).succeeds(returning = ())
+        given(httpServer).succeeds(returning = ExitCode.Success)
 
         runner.run().unsafeRunSync() shouldBe ExitCode.Success
       }
 
-    "fail if Sentry initialisation fails" in new TestCase {
+    "fail if Certificate loading fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      (sentryInitializer.run _)
-        .expects()
-        .returning(context.raiseError(exception))
+      given(certificateLoader).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        runner.run().unsafeRunSync()
+      } shouldBe exception
+    }
+
+    "fail if Sentry initialisation fails" in new TestCase {
+
+      given(certificateLoader).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(sentryInitializer).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        runner.run().unsafeRunSync()
+      } shouldBe exception
+    }
+
+    "fail if db initialisation fails" in new TestCase {
+
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(dbInitializer).fails(becauseOf = exception)
 
       intercept[Exception] {
         runner.run().unsafeRunSync()
@@ -82,26 +94,14 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "fail if starting the http server fails" in new TestCase {
 
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (metrics.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (eventsDispatcher.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (gaugeScheduler.run _)
-        .expects()
-        .returning(IO.unit)
-
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      given(dbInitializer).succeeds(returning = ())
+      given(metrics).succeeds(returning = ())
+      given(eventsDispatcher).succeeds(returning = ())
+      given(gaugeScheduler).succeeds(returning = ())
       val exception = exceptions.generateOne
-      (httpServer.run _)
-        .expects()
-        .returning(context.raiseError(exception))
+      given(httpServer).fails(becauseOf = exception)
 
       intercept[Exception] {
         runner.run().unsafeRunSync()
@@ -109,76 +109,40 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     "return Success ExitCode even if Events Dispatcher initialisation fails" in new TestCase {
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
 
-      val exception = exceptions.generateOne
-      (eventsDispatcher.run _)
-        .expects()
-        .returning(IO.raiseError(exception))
-
-      (metrics.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (gaugeScheduler.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (httpServer.run _)
-        .expects()
-        .returning(context.pure(ExitCode.Success))
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      given(dbInitializer).succeeds(returning = ())
+      given(metrics).succeeds(returning = ())
+      given(eventsDispatcher).fails(becauseOf = exceptions.generateOne)
+      given(gaugeScheduler).succeeds(returning = ())
+      given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
 
     "return Success ExitCode even if Event Log Metrics initialisation fails" in new TestCase {
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
 
-      (eventsDispatcher.run _)
-        .expects()
-        .returning(IO.unit)
-
-      val exception = exceptions.generateOne
-      (metrics.run _)
-        .expects()
-        .returning(IO.raiseError(exception))
-
-      (gaugeScheduler.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (httpServer.run _)
-        .expects()
-        .returning(context.pure(ExitCode.Success))
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      given(dbInitializer).succeeds(returning = ())
+      given(metrics).fails(becauseOf = exceptions.generateOne)
+      given(eventsDispatcher).succeeds(returning = ())
+      given(gaugeScheduler).succeeds(returning = ())
+      given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
 
     "return Success ExitCode even if Event Log Metrics scheduler initialisation fails" in new TestCase {
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
 
-      (eventsDispatcher.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (metrics.run _)
-        .expects()
-        .returning(IO.unit)
-
-      val exception = exceptions.generateOne
-      (gaugeScheduler.run _)
-        .expects()
-        .returning(IO.raiseError(exception))
-
-      (httpServer.run _)
-        .expects()
-        .returning(context.pure(ExitCode.Success))
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      given(dbInitializer).succeeds(returning = ())
+      given(metrics).succeeds(returning = ())
+      given(eventsDispatcher).succeeds(returning = ())
+      given(gaugeScheduler).fails(becauseOf = exceptions.generateOne)
+      given(httpServer).succeeds(returning = ExitCode.Success)
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
@@ -188,14 +152,16 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
-
+    val certificateLoader = mock[CertificateLoader[IO]]
     val sentryInitializer = mock[IOSentryInitializer]
+    val dbInitializer     = mock[DbInitializer[IO]]
     val eventsDispatcher  = mock[EventsDispatcher]
     val metrics           = mock[TestEventLogMetrics]
     val httpServer        = mock[IOHttpServer]
     val gaugeScheduler    = mock[GaugeResetScheduler[IO]]
-    val runner = new MicroserviceRunner(sentryInitializer,
+    val runner = new MicroserviceRunner(certificateLoader,
+                                        sentryInitializer,
+                                        dbInitializer,
                                         metrics,
                                         eventsDispatcher,
                                         gaugeScheduler,
@@ -204,20 +170,18 @@ class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Ma
     )
 
     class TestEventLogMetrics(
-        statsFinder:      StatsFinder[IO],
-        logger:           Logger[IO],
-        statusesGauge:    LabeledGauge[IO, EventStatus],
-        totalGauge:       SingleValueGauge[IO],
-        interval:         FiniteDuration,
-        statusesInterval: FiniteDuration
-    )(implicit ME:        MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
+        statsFinder:   StatsFinder[IO],
+        logger:        Logger[IO],
+        statusesGauge: LabeledGauge[IO, EventStatus],
+        totalGauge:    SingleValueGauge[IO],
+        interval:      FiniteDuration
+    )(implicit ME:     MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
         extends EventLogMetrics(
           statsFinder,
           logger,
           statusesGauge,
           totalGauge,
-          interval,
-          statusesInterval
+          interval
         )
   }
 }

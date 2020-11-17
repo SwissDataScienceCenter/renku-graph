@@ -43,56 +43,45 @@ class WaitingEventsGaugeSpec extends AnyWordSpec with MockFactory with should.Ma
 
   "apply" should {
 
-    "create a events_waiting_count named gauge " +
-      "and provision it with values from the Event Log" in new TestCase {
-
-        (metricsRegistry
-          .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
-          .expects(*, *)
-          .onCall { (builder: LibGauge.Builder, _: MonadError[IO, Throwable]) =>
-            val actual = builder.create()
-            actual.describe().asScala.head.name shouldBe underlying.describe().asScala.head.name
-            actual.describe().asScala.head.help shouldBe underlying.describe().asScala.head.help
-
-            underlying.pure[IO]
-          }
-
-        val waitingEvents = waitingEventsGen.generateOne
-        (statsFinder.countEvents _)
-          .expects(Set(New, RecoverableFailure), Some(NumberOfProjects))
-          .returning(waitingEvents.pure[IO])
-
-        val gauge = WaitingEventsGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
-
-        gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
-
-        underlying.collectAllSamples should contain theSameElementsAs waitingEvents.map { case (project, count) =>
-          ("project", project.value, count.toDouble)
-        }
-      }
-
-    "fail if finding values for initial provisioning fails" in new TestCase {
+    "create and register an events_waiting_count named gauge" in new TestCase {
 
       (metricsRegistry
         .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
         .expects(*, *)
-        .onCall { (_: LibGauge.Builder, _: MonadError[IO, Throwable]) =>
-          underlying.pure[IO]
+        .onCall { (builder: LibGauge.Builder, _: MonadError[IO, Throwable]) =>
+          val actual = builder.create()
+          actual.describe().asScala.head.name shouldBe underlying.describe().asScala.head.name
+          actual.describe().asScala.head.help shouldBe underlying.describe().asScala.head.help
+          actual.pure[IO]
         }
 
-      val exception = exceptions.generateOne
+      val gauge = WaitingEventsGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
+
+      gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
+    }
+
+    "return a gauge with reset method provisioning it with values from the Event Log" in new TestCase {
+
+      (metricsRegistry
+        .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
+        .expects(*, *)
+        .onCall((_: LibGauge.Builder, _: MonadError[IO, Throwable]) => underlying.pure[IO])
+
+      val waitingEvents = waitingEventsGen.generateOne
       (statsFinder.countEvents _)
         .expects(Set(New, RecoverableFailure), Some(NumberOfProjects))
-        .returning(exception.raiseError[IO, Map[projects.Path, Long]])
+        .returning(waitingEvents.pure[IO])
 
-      intercept[Exception] {
-        WaitingEventsGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
-      } shouldBe exception
+      WaitingEventsGauge(metricsRegistry, statsFinder, TestLogger()).flatMap(_.reset()).unsafeRunSync()
+
+      underlying.collectAllSamples should contain theSameElementsAs waitingEvents.map { case (project, count) =>
+        ("project", project.value, count.toDouble)
+      }
     }
   }
 
   private trait TestCase {
-    var underlying = LibGauge
+    val underlying = LibGauge
       .build("events_waiting_count", "Number of waiting Events by project path.")
       .labelNames("project")
       .create()

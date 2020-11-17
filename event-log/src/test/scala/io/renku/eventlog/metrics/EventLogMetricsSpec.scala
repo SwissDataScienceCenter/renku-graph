@@ -76,10 +76,11 @@ class EventLogMetricsSpec
     }
 
     "log an eventual error and continue collecting the metrics" in new TestCase {
-      val exception1 = exceptions.generateOne
+
+      val exception = exceptions.generateOne
       (statsFinder.statuses _)
         .expects()
-        .returning(exception1.raiseError[IO, Map[EventStatus, Long]])
+        .returning(exception.raiseError[IO, Map[EventStatus, Long]])
 
       val statuses = statuesGen.generateOne
       (statsFinder.statuses _)
@@ -99,12 +100,12 @@ class EventLogMetricsSpec
         .returning(IO.unit)
         .atLeastOnce()
 
-      metrics.run().start.unsafeRunAsyncAndForget()
+      metrics.run().unsafeRunAsyncAndForget()
 
       sleep(1000)
 
       eventually {
-        logger.loggedOnly(Error("Problem with gathering metrics", exception1))
+        logger.loggedOnly(Error("Problem with gathering metrics", exception))
       }
     }
   }
@@ -118,15 +119,14 @@ class EventLogMetricsSpec
   }
 
   private trait TestCase extends TestGauges {
-    lazy val statsFinder: StatsFinder[IO] = mock[StatsFinder[IO]]
-    lazy val logger = TestLogger[IO]()
+    lazy val statsFinder = mock[StatsFinder[IO]]
+    lazy val logger      = TestLogger[IO]()
     lazy val metrics = new EventLogMetrics(
       statsFinder,
       logger,
       statusesGauge,
       totalGauge,
-      interval = 100 millis,
-      statusesInterval = 500 millis
+      interval = 100 millis
     )
   }
 

@@ -21,6 +21,7 @@ package ch.datascience.graph.acceptancetests.db
 import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO}
 import ch.datascience.db.{DBConfigProvider, DbTransactor}
+import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.events.{CommitId, EventId}
 import ch.datascience.graph.model.projects.Id
 import com.dimafeng.testcontainers.{Container, JdbcDatabaseContainer, PostgreSQLContainer}
@@ -36,6 +37,7 @@ import scala.language.postfixOps
 object EventLog extends TypesSerializers {
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+  private val logger = TestLogger()
 
   def findEvents(projectId: Id, status: EventStatus*): List[CommitId] = execute {
     (fr"""
@@ -58,12 +60,19 @@ object EventLog extends TypesSerializers {
   private val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
     new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
-  val postgresContainer: Container with JdbcDatabaseContainer = PostgreSQLContainer(
+  private val postgresContainer: Container with JdbcDatabaseContainer = PostgreSQLContainer(
     dockerImageNameOverride = "postgres:9.6.19-alpine",
     databaseName = "event_log",
     username = dbConfig.user.value,
     password = dbConfig.pass
   )
+
+  lazy val jdbcUrl: String = postgresContainer.jdbcUrl
+
+  def startDB(): IO[Unit] = for {
+    _ <- IO(postgresContainer.start())
+    _ <- logger.info("event_log DB started")
+  } yield ()
 
   private lazy val transactor: DbTransactor[IO, EventLogDB] = DbTransactor[IO, EventLogDB] {
     Transactor.fromDriverManager[IO](
