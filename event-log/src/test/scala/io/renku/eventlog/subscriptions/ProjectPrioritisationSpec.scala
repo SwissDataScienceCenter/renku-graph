@@ -43,13 +43,13 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
       projectPrioritisation.prioritise(Nil) shouldBe Nil
     }
 
-    "put priority 1 if the list contains only one project" in {
+    "put priority MaxPriority if the list contains only one project" in {
       val project = projectInfos.generateOne
 
       projectPrioritisation.prioritise(List(project)) shouldBe List((project.toIdAndPath, MaxPriority))
     }
 
-    "put priority 1 if projects event dates are within and hour and currentOccupancy is 0" in {
+    "put priority MaxPriority if projects' event dates are within and hour and currentOccupancy is 0" in {
       val project1 = projectInfos.generateOne.copy(currentOccupancy = 0)
       val project2 = projectInfos.generateOne.copy(
         latestEventDate = project1.latestEventDate.plus(durations(max = 59 minutes).generateOne),
@@ -62,7 +62,7 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
       )
     }
 
-    "put the lowest priority to the project with the older events" +
+    "put the MinPriority to the project with the older events" +
       "if projects event dates are not within an hour and currentOccupancy is 0" in {
         val project1 = projectInfos.generateOne.copy(currentOccupancy = 0)
         val project2 = projectInfos.generateOne.copy(
@@ -77,7 +77,7 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
       }
 
     "compute the priority using the event date only " +
-      "if projects event dates are not within an hour and currentOccupancy is 0" in {
+      "if projects' event dates are not within an hour and currentOccupancy is 0" in {
         val project1 = projectInfos.generateOne.copy(currentOccupancy = 0)
         val project2 = projectInfos.generateOne.copy(
           latestEventDate = project1.latestEventDate.plus(durations(min = 61 minutes, max = 5 hours).generateOne),
@@ -100,8 +100,8 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
         priority3.value shouldBe BigDecimal(0.1)
       }
 
-    "put priority 1 to all projects " +
-      "if projects event dates are within an hour and they have the same currentOccupancy" in {
+    "put MinPriority to one of the projects " +
+      "if projects' event dates are within an hour and they have the same currentOccupancy > 0" in {
         val currentOccupancy: Int Refined NonNegative = 1
         val project1 = projectInfos.generateOne.copy(currentOccupancy = currentOccupancy)
         val project2 = projectInfos.generateOne.copy(
@@ -113,42 +113,76 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
           currentOccupancy = currentOccupancy
         )
 
-        val (projectIdAndPath1, priority1) :: (projectIdAndPath2, priority2) :: (projectIdAndPath3, priority3) :: Nil =
+        val (projectIdAndPath, priority) :: Nil = projectPrioritisation.prioritise(List(project1, project2, project3))
+
+        List(projectIdAndPath.id) should contain atLeastOneElementOf List(project1.id, project2.id, project3.id)
+        priority                shouldBe MinPriority
+      }
+
+    "put MaxPriority to the project with current occupancy 0 while other has > 0" in {
+      val currentOccupancy: Int Refined NonNegative = 1
+      val project1 = projectInfos.generateOne.copy(currentOccupancy = currentOccupancy)
+      val project2 = projectInfos.generateOne.copy(
+        latestEventDate = project1.latestEventDate.plus(durations(max = 30 minutes).generateOne),
+        currentOccupancy = 0
+      )
+      val project3 = projectInfos.generateOne.copy(
+        latestEventDate = project2.latestEventDate.plus(durations(max = 29 minutes).generateOne),
+        currentOccupancy = currentOccupancy
+      )
+
+      val (projectIdAndPath, priority) :: Nil = projectPrioritisation.prioritise(List(project1, project2, project3))
+
+      projectIdAndPath.id shouldBe project2.id
+      priority            shouldBe MaxPriority
+    }
+
+    "discard project with too high occupancy " +
+      "- case when projects' event dates are within an hour" in {
+        val project1 = projectInfos.generateOne.copy(
+          currentOccupancy = 5
+        )
+        val project2 = projectInfos.generateOne.copy(
+          latestEventDate = project1.latestEventDate.plus(durations(max = 30 minutes).generateOne),
+          currentOccupancy = 0
+        )
+        val project3 = projectInfos.generateOne.copy(
+          latestEventDate = project2.latestEventDate.plus(durations(max = 29 minutes).generateOne),
+          currentOccupancy = 1
+        )
+
+        val (projectIdAndPath2, priority2) :: (projectIdAndPath3, priority3) :: Nil =
           projectPrioritisation.prioritise(List(project1, project2, project3))
 
-        projectIdAndPath1.id shouldBe project1.id
         projectIdAndPath2.id shouldBe project2.id
         projectIdAndPath3.id shouldBe project3.id
 
-        priority1 shouldBe MaxPriority
-        priority2 shouldBe MaxPriority
-        priority3 shouldBe MaxPriority
+        priority2.value should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
+        priority3.value should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
       }
 
-    "correct priorities based on event dates using the currentOccupancy " +
-      "if projects occupancy are different" in {
+    "discard project with too high occupancy " +
+      "- case when projects' event dates are not within an hour" in {
         val project1 = projectInfos.generateOne.copy(
           currentOccupancy = 1
         )
         val project2 = projectInfos.generateOne.copy(
-          latestEventDate = project1.latestEventDate.plus(durations(max = 59 minutes).generateOne),
-          currentOccupancy = 0
-        )
-        val project3 = projectInfos.generateOne.copy(
-          latestEventDate = project2.latestEventDate.plus(durations(max = 59 minutes).generateOne),
+          latestEventDate = project1.latestEventDate.plus(durations(min = 61 minutes, max = 5 hours).generateOne),
           currentOccupancy = 5
         )
+        val project3 = projectInfos.generateOne.copy(
+          latestEventDate = project2.latestEventDate.plus(durations(min = 61 minutes, max = 5 hours).generateOne),
+          currentOccupancy = 0
+        )
 
-        val (projectIdAndPath1, priority1) :: (projectIdAndPath2, priority2) :: (projectIdAndPath3, priority3) :: Nil =
+        val (projectIdAndPath1, priority1) :: (projectIdAndPath3, priority3) :: Nil =
           projectPrioritisation.prioritise(List(project1, project2, project3))
 
         projectIdAndPath1.id shouldBe project1.id
-        projectIdAndPath2.id shouldBe project2.id
         projectIdAndPath3.id shouldBe project3.id
 
-        priority1.value shouldBe BigDecimal(1.0)
-        priority2.value   should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
-        priority3.value   should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
+        priority1     shouldBe MaxPriority
+        priority3.value should (be <= BigDecimal(1.0) and be >= BigDecimal(0.1))
       }
   }
 
