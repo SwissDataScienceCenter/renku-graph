@@ -66,7 +66,7 @@ class EventPersisterSpec
         )
 
         // storeNewEvent 2 - different event id and different project
-        val event2 = events.generateOne
+        val event2 = newEvents.generateOne
         (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
 
         val nowForEvent2 = Instant.now()
@@ -118,7 +118,7 @@ class EventPersisterSpec
       save1Event1 shouldBe (event.compoundEventId, ExecutionDate(now), event.batchDate)
 
       // Save 2 - the same event id but different project
-      val event2 = events.generateOne.copy(id = event.id)
+      val event2 = newEvents.generateOne.copy(id = event.id)
       (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
 
       val nowForEvent2 = Instant.now()
@@ -155,7 +155,7 @@ class EventPersisterSpec
 
   private trait TestCase {
 
-    val event = events.generateOne
+    val event = newEvents.generateOne
 
     val currentTime        = mockFunction[Instant]
     val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]

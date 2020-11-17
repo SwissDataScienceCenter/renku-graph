@@ -29,6 +29,8 @@ import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
+import io.circe.DecodingFailure
+import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog._
 import io.renku.eventlog.creation.EventPersister.Result
 import org.http4s.dsl.Http4sDsl
@@ -101,20 +103,34 @@ object EventCreationEndpoint {
   import io.circe.{Decoder, HCursor}
 
   private implicit val eventDecoder: Decoder[Event] = (cursor: HCursor) =>
-    for {
-      id        <- cursor.downField("id").as[EventId]
-      project   <- cursor.downField("project").as[EventProject]
-      date      <- cursor.downField("date").as[EventDate]
-      batchDate <- cursor.downField("batchDate").as[BatchDate]
-      body      <- cursor.downField("body").as[EventBody]
-      status    <- cursor.downField("status").as[EventStatus]
-    } yield Event(id, project, date, batchDate, body, status)
+    cursor.downField("status").as[Option[EventStatus]] flatMap {
+      case None | Some(EventStatus.New) =>
+        for {
+          id        <- cursor.downField("id").as[EventId]
+          project   <- cursor.downField("project").as[EventProject]
+          date      <- cursor.downField("date").as[EventDate]
+          batchDate <- cursor.downField("batchDate").as[BatchDate]
+          body      <- cursor.downField("body").as[EventBody]
+        } yield NewEvent(id, project, date, batchDate, body)
+      case Some(EventStatus.Skipped) =>
+        for {
+          id        <- cursor.downField("id").as[EventId]
+          project   <- cursor.downField("project").as[EventProject]
+          date      <- cursor.downField("date").as[EventDate]
+          batchDate <- cursor.downField("batchDate").as[BatchDate]
+          body      <- cursor.downField("body").as[EventBody]
+          message   <- cursor.downField("message").as[EventMessage]
+        } yield SkippedEvent(id, project, date, batchDate, body, message)
+      case Some(invalidStatus) =>
+        Left(DecodingFailure(s"Status $invalidStatus is not valid. Only NEW or SKIPPED are accepted", Nil))
+    }
 
   implicit val projectDecoder: Decoder[EventProject] = (cursor: HCursor) =>
     for {
       id   <- cursor.downField("id").as[projects.Id]
       path <- cursor.downField("path").as[projects.Path]
     } yield EventProject(id, path)
+
 }
 
 object IOEventCreationEndpoint {

@@ -29,19 +29,49 @@ import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactor
 import io.circe.Decoder
 import io.circe.Decoder.decodeString
 
-final case class Event(
-    id:        EventId,
-    project:   EventProject,
-    date:      EventDate,
-    batchDate: BatchDate,
-    body:      EventBody,
-    status:    EventStatus
-)
+sealed trait Event {
+  def id:        EventId
+  def project:   EventProject
+  def date:      EventDate
+  def batchDate: BatchDate
+  def body:      EventBody
+  def status:    EventStatus
+}
 
 object Event {
   implicit class CommitEventOps(event: Event) {
     lazy val compoundEventId: CompoundEventId = CompoundEventId(event.id, event.project.id)
   }
+
+  final case class NewEvent(
+      id:        EventId,
+      project:   EventProject,
+      date:      EventDate,
+      batchDate: BatchDate,
+      body:      EventBody
+  ) extends Event {
+    val status: EventStatus = EventStatus.New
+  }
+
+  final case class SkippedEvent(
+      id:        EventId,
+      project:   EventProject,
+      date:      EventDate,
+      batchDate: BatchDate,
+      body:      EventBody,
+      message:   EventMessage
+  ) extends Event {
+    val status: EventStatus = EventStatus.Skipped
+  }
+
+  final case class InvalidEvent(
+      id:        EventId,
+      project:   EventProject,
+      date:      EventDate,
+      batchDate: BatchDate,
+      body:      EventBody,
+      status:    EventStatus
+  ) extends Event
 }
 
 final case class EventProject(id: projects.Id, path: projects.Path)

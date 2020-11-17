@@ -32,8 +32,9 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.Event.{InvalidEvent, NewEvent, SkippedEvent}
 import io.renku.eventlog.creation.EventPersister.Result
-import io.renku.eventlog.{Event, EventProject, EventStatus}
+import io.renku.eventlog.{Event, EventMessage, EventProject, EventStatus}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -52,7 +53,7 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
       s"and return $Created " +
       "if there's no such an event in the Log yet" in new TestCase {
 
-        val event = events.generateOne
+        val event = newEvents.generateOne
         (persister.storeNewEvent _)
           .expects(event)
           .returning(Result.Created.pure[IO])
@@ -73,7 +74,7 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
       s"and return $Ok " +
       "if such an event was already in the Log" in new TestCase {
 
-        val event = events.generateOne
+        val event = newEvents.generateOne
         (persister.storeNewEvent _)
           .expects(event)
           .returning(Result.Existed.pure[IO])
@@ -89,39 +90,67 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
         logger.expectNoLogs()
       }
 
-    s"return $Ok if status was SKIPPED or NEW" in new TestCase {
+    s"return $Ok if status was SKIPPED *and* the message is not blank" in new TestCase {
+      val event = skippedEvents.generateOne
+      (persister.storeNewEvent _)
+        .expects(event)
+        .returning(Result.Existed.pure[IO])
+      val request  = Request(Method.POST, uri"events").withEntity(event.asJson)
+      val response = addEvent(request).unsafeRunSync()
+      response.status                          shouldBe Ok
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
 
-      def verifyAccepted(status: EventStatus) = {
-        val randomEvent = events.generateOne
-        val event       = randomEvent.copy(status = status)
-        (persister.storeNewEvent _)
-          .expects(event)
-          .returning(Result.Existed.pure[IO])
-        val request  = Request(Method.POST, uri"events").withEntity(event.asJson)
-        val response = addEvent(request).unsafeRunSync()
-        response.status                          shouldBe Ok
-        response.contentType                     shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
-
-        logger.expectNoLogs()
-      }
-
-      val acceptableStatues = List(EventStatus.New, EventStatus.Skipped)
-      acceptableStatues.map { status =>
-        status match {
-          case EventStatus.New                   => verifyAccepted(EventStatus.New)
-          case EventStatus.Skipped               => verifyAccepted(EventStatus.Skipped)
-          case EventStatus.TriplesStore          => ()
-          case EventStatus.Processing            => ()
-          case EventStatus.RecoverableFailure    => ()
-          case EventStatus.NonRecoverableFailure => ()
-        }
-      }
+      logger.expectNoLogs()
     }
 
-    s"return $BadRequest if status was *not* SKIPPED or NEW" in new TestCase {
-      def verifyBadRequest(status: EventStatus) = {
-        val randomEvent = events.generateOne
+    s"return $BadRequest if status was SKIPPED *but* the message is blank" in new TestCase {
+      val invalidSkippedEvent = skippedEvents.generateOne.copy(message = EventMessage(""))
+      (persister.storeNewEvent _)
+        .expects(invalidSkippedEvent)
+        .returning(Result.Existed.pure[IO])
+      val request  = Request(Method.POST, uri"events").withEntity(invalidSkippedEvent.asJson)
+      val response = addEvent(request).unsafeRunSync()
+      response.status                          shouldBe BadRequest
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("???????????")
+
+      logger.expectNoLogs()
+    }
+
+    s"return $Ok if status was NEW" in new TestCase {
+      val newEvent = newEvents.generateOne
+      (persister.storeNewEvent _)
+        .expects(newEvent)
+        .returning(Result.Existed.pure[IO])
+      val request  = Request(Method.POST, uri"events").withEntity(newEvent.asJson)
+      val response = addEvent(request).unsafeRunSync()
+      response.status                          shouldBe Ok
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
+
+      logger.expectNoLogs()
+
+    }
+
+    s"set default status to NEW if no status is provided" in new TestCase {
+      val oldStyleEvent = newEvents.generateOne // TODO: Figure out how to get an old style event
+      (persister.storeNewEvent _)
+        .expects(oldStyleEvent)
+        .returning(Result.Existed.pure[IO])
+      val request  = Request(Method.POST, uri"events").withEntity(oldStyleEvent.asJson)
+      val response = addEvent(request).unsafeRunSync()
+      response.status                          shouldBe Ok
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
+
+      logger.expectNoLogs()
+    }
+
+    unacceptableStatuses.foreach { status =>
+      s"return $BadRequest if status was $status" in new TestCase {
+
+        val randomEvent = invalidEvents.generateOne
         val event       = randomEvent.copy(status = status)
         (persister.storeNewEvent _)
           .expects(event)
@@ -136,16 +165,6 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
         logger.expectNoLogs()
       }
 
-      EventStatus.all.map { status =>
-        status match {
-          case EventStatus.New                   => ()
-          case EventStatus.Skipped               => ()
-          case EventStatus.TriplesStore          => verifyBadRequest(EventStatus.TriplesStore)
-          case EventStatus.Processing            => verifyBadRequest(EventStatus.Processing)
-          case EventStatus.RecoverableFailure    => verifyBadRequest(EventStatus.RecoverableFailure)
-          case EventStatus.NonRecoverableFailure => verifyBadRequest(EventStatus.NonRecoverableFailure)
-        }
-      }
     }
 
     s"return $BadRequest if decoding Event from the request fails" in new TestCase {
@@ -166,7 +185,7 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
 
     s"return $InternalServerError when storing Event in the Log fails" in new TestCase {
 
-      val event     = events.generateOne
+      val event     = newEvents.generateOne
       val exception = exceptions.generateOne
       (persister.storeNewEvent _)
         .expects(event)
@@ -184,13 +203,30 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
     }
   }
 
+  private lazy val unacceptableStatuses = EventStatus.all.diff(Set(EventStatus.New, EventStatus.Skipped))
+
   private trait TestCase {
+
     val persister = mock[EventPersister[IO]]
     val logger    = TestLogger[IO]()
     val addEvent  = new EventCreationEndpoint[IO](persister, logger).addEvent _
   }
 
-  private implicit lazy val eventEncoder: Encoder[Event] = Encoder.instance[Event] { event =>
+  private implicit lazy val newEventEncoder: Encoder[NewEvent] = Encoder.instance[NewEvent](event => encode(event))
+  private implicit lazy val skippedEventEncoder: Encoder[SkippedEvent] =
+    Encoder.instance[SkippedEvent](event => encode(event))
+  private implicit lazy val invalidEventEncoder: Encoder[InvalidEvent] =
+    Encoder.instance[InvalidEvent](event => encode(event))
+
+  private def encode(event: Event) = {
+    val messageLine =
+      event match {
+        case SkippedEvent(_, _, _, _, _, message) =>
+          s""",
+             |message: ${message.value}
+             |""".stripMargin
+        case _ => ""
+      }
     json"""{
       "id":         ${event.id.value},
       "project":    ${event.project},
@@ -198,7 +234,9 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
       "batchDate":  ${event.batchDate.value},
       "body":       ${event.body.value},
       "status":     ${event.status.value}
+      $messageLine
     }"""
+
   }
 
   private implicit lazy val projectEncoder: Encoder[EventProject] = Encoder.instance[EventProject] { project =>

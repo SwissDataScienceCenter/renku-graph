@@ -100,7 +100,7 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with sho
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val event         = events.generateOne
+    val event         = newEvents.generateOne
     val subscriberUrl = SubscriberUrl(externalServiceBaseUrl)
 
     val sender = new IOEventsSender(TestLogger())

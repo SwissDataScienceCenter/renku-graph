@@ -49,7 +49,7 @@ class LatestEventsEndpointSpec extends AnyWordSpec with MockFactory with should.
 
     "return a list of event id, project and body found in the Log" in new TestCase {
 
-      val idProjectBodyList = nonEmptyList(events).generateOne.toList.map(toIdProjectBody)
+      val idProjectBodyList = nonEmptyList(newEvents).generateOne.toList.map(toIdProjectBody)
       (eventsFinder.findAllLatestEvents _)
         .expects()
         .returning(idProjectBodyList.pure[IO])
