@@ -83,11 +83,13 @@ jobs:
       HELM_TGZ: helm-v2.8.2-linux-amd64.tar.gz
     steps:
       - uses: actions/checkout@v2
+      - name: set up environment variables
+        run: |
+          echo "GIT_USER=Renku Bot" >> $GITHUB_ENV
+          echo "GIT_EMAIL=renku@datascience.ch" >> $GITHUB_ENV
       - name: Build and push chart and images
         uses: SwissDataScienceCenter/renku/actions/publish-chart@master
         env:
-          GIT_USER: "Renku Bot"
-          GIT_EMAIL: renku@datascience.ch
           CHART_PATH: helm-chart/renku-graph
           GITHUB_TOKEN: ${{ secrets.RENKU_CI_TOKEN }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
