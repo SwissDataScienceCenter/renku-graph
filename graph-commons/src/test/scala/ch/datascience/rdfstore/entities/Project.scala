@@ -60,19 +60,17 @@ object Project {
     }
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Project] =
-    JsonLDEncoder.instance {
-      case a: Project => a.asPartialJsonLD[Project] getOrFail
-      case a => throw new Exception(s"Cannot serialize ${a.getClass} Project")
+    JsonLDEncoder.instance { entity =>
+      entity.asPartialJsonLD[Project].getOrFail
     }
 
   implicit def entityIdEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): EntityIdEncoder[Project] =
-    EntityIdEncoder.instance {
-      case a: Project =>
-        converter.toEntityId(a).getOrElse(throw new IllegalStateException(s"No EntityId found for $a"))
-      case a => throw new Exception(s"Cannot serialize ${a.getClass} Project")
+    EntityIdEncoder.instance { entity =>
+      converter.toEntityId(entity).getOrElse(throw new IllegalStateException(s"No EntityId found for $entity"))
+
     }
 
   private implicit val projectResourceToEntityId: ResourceId => EntityId =
