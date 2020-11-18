@@ -43,7 +43,7 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
 import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.{Artifact, Entity, Project}
+import ch.datascience.rdfstore.entities.{Artifact, Entity, InvalidationEntity, Project}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -361,21 +361,17 @@ class IODatasetsFinderSpec
             datasetModification.toDatasetSearchResult(projectsCount = 1),
             datasetModificationOnFork.toDatasetSearchResult(projectsCount = 1)
           ).sortBy(_.title.value)
-          actual should contain theSameElementsAs expected
-
-          print(s"\n\n ###### \n\nactual: ${actual}")
-          print(s"\n\n ###### \n\nexpected: ${expected}")
-
+          actual                    should contain theSameElementsAs expected
           result.pagingInfo.total shouldBe Total(2)
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with unrelated datasets" in new TestCase {
           val project                = projects.generateOne
-          val datasetProject         = NonEmptyList(project.toDatasetProject, Nil)
-          val dataset0               = nonModifiedDatasets(projects = datasetProject).generateOne
-          val datasetToBeInvalidated = nonModifiedDatasets(projects = datasetProject).generateOne
-          val entityWithInvalidation: Entity with Artifact =
+          val datasetProject         = project.toDatasetProject
+          val dataset0               = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
+          val datasetToBeInvalidated = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
+          val entityWithInvalidation: InvalidationEntity =
             invalidationEntity(datasetToBeInvalidated.id, project).generateOne
 
           loadToStore(
@@ -388,23 +384,17 @@ class IODatasetsFinderSpec
             .findDatasets(maybePhrase, Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
             .unsafeRunSync()
 
-          result.results should contain theSameElementsAs List(dataset0.toDatasetSearchResult(projectsCount = 1))
-
-          print(s"\n\n ############## \n\ndataset0: ${dataset0}")
-          print(s"\n\n ############## \n\nentityWithInvalidation: ${entityWithInvalidation}")
-          print(s"\n\n ############## \n\nactual: ${result.results}")
-          print(s"\n\n ############## \n\nexpected: ${List(dataset0.toDatasetSearchResult(projectsCount = 1))}")
-
+          result.results            should contain theSameElementsAs List(dataset0.toDatasetSearchResult(projectsCount = 1))
           result.pagingInfo.total shouldBe Total(1)
         }
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets and the fork dataset is deleted" in new TestCase {
           val project        = projects.generateOne
-          val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
-          val dataset        = nonModifiedDatasets(projects = datasetProject).generateOne
+          val datasetProject = project.toDatasetProject
+          val dataset        = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
           val datasetFork    = dataset.copy(projects = List(datasetProjects.generateOne))
-          val entityWithInvalidation: Entity with Artifact = invalidationEntity(datasetFork.id, project).generateOne
+          val entityWithInvalidation: InvalidationEntity = invalidationEntity(datasetFork.id, project).generateOne
 
           loadToStore(
             dataset.toJsonLD(noSameAs = true)(),
@@ -425,10 +415,10 @@ class IODatasetsFinderSpec
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets and original dataset is deleted" in new TestCase {
           val project        = projects.generateOne
-          val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
-          val dataset        = nonModifiedDatasets(projects = datasetProject).generateOne
+          val datasetProject = project.toDatasetProject
+          val dataset        = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
           val datasetFork    = dataset.copy(projects = List(datasetProjects.generateOne))
-          val entityWithInvalidation: Entity with Artifact = invalidationEntity(dataset.id, project).generateOne
+          val entityWithInvalidation: InvalidationEntity = invalidationEntity(dataset.id, project).generateOne
 
           loadToStore(
             dataset.toJsonLD(noSameAs = true)(),
@@ -449,13 +439,13 @@ class IODatasetsFinderSpec
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with modification on renku created datasets" in new TestCase {
           val project        = projects.generateOne
-          val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
-          val dataset0       = nonModifiedDatasets(projects = datasetProject).generateOne
-          val dataset1       = nonModifiedDatasets(projects = datasetProject).generateOne
+          val datasetProject = project.toDatasetProject
+          val dataset0       = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
+          val dataset1       = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
           val dataset0Modification = modifiedDatasetsOnFirstProject(dataset0).generateOne
             .copy(name = datasetNames.generateOne)
 
-          val entityWithInvalidation: Entity with Artifact =
+          val entityWithInvalidation: InvalidationEntity =
             invalidationEntity(dataset0Modification.id,
                                project,
                                dataset0.entityId.asTopmostDerivedFrom.some

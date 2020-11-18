@@ -153,8 +153,6 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
               null,
               Lang.JSONLD
             )
-            println(s"JsonLDs: $jsonLDs")
-            println(s"\n\n\n\n ####################### \n\n $flattenedJsonLDs")
             model
           }
         }
