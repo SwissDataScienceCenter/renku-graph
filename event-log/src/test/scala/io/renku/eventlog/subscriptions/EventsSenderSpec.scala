@@ -27,7 +27,7 @@ import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.Event
+import io.renku.eventlog.Event.NewEvent
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult.{Delivered, Misdelivered, ServiceBusy}
 import org.http4s.Status._
 import org.scalatest.matchers.should
@@ -106,7 +106,8 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with sho
     val sender = new IOEventsSender(TestLogger())
   }
 
-  private implicit val eventEncoder: Encoder[Event] = Encoder.instance[Event] { event =>
+  // TODO: event sender should work with New, Recoverable, and UnderProcessing events
+  private implicit val eventEncoder: Encoder[NewEvent] = Encoder.instance[NewEvent] { event =>
     json"""{
       "id":      ${event.id.value},
       "project": {

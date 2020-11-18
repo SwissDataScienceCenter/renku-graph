@@ -70,7 +70,7 @@ class EventPersisterImpl(
     } yield Created
 
   private def eventuallyAddToExistingBatch(event: Event) = measureExecutionTime(findBatchInQueue(event)) map {
-    case Some(batchDateUnderProcessing) => event.copy(batchDate = batchDateUnderProcessing)
+    case Some(batchDateUnderProcessing) => event.setBatchDate(batchDateUnderProcessing)
     case _                              => event
   }
 

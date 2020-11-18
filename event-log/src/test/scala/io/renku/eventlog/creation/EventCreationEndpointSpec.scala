@@ -32,9 +32,9 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.Event.{InvalidEvent, NewEvent, SkippedEvent}
+import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.creation.EventPersister.Result
-import io.renku.eventlog.{Event, EventMessage, EventProject, EventStatus}
+import io.renku.eventlog.{Event, EventProject, EventStatus}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -105,62 +105,51 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
     }
 
     s"return $BadRequest if status was SKIPPED *but* the message is blank" in new TestCase {
-      val invalidSkippedEvent = skippedEvents.generateOne.copy(message = EventMessage(""))
-      (persister.storeNewEvent _)
-        .expects(invalidSkippedEvent)
-        .returning(Result.Existed.pure[IO])
-      val request  = Request(Method.POST, uri"events").withEntity(invalidSkippedEvent.asJson)
+
+      val invalidwPayload: Json = skippedEvents.generateOne.asJson.hcursor
+        .downField("status")
+        .delete
+        .as[Json]
+        .fold(throw _, identity)
+        .deepMerge(json"""{"status": ${blankStrings().generateOne}}""")
+      val request  = Request(Method.POST, uri"events").withEntity(invalidPayload)
       val response = addEvent(request).unsafeRunSync()
-      response.status                          shouldBe BadRequest
-      response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("???????????")
+      response.status      shouldBe BadRequest
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
+        s"Invalid message body: Could not decode JSON: ${invalidPayload.toString}"
+      )
 
       logger.expectNoLogs()
     }
 
-    s"return $Ok if status was NEW" in new TestCase {
+    s"set default status to NEW if no status is provided" in new TestCase {
       val newEvent = newEvents.generateOne
       (persister.storeNewEvent _)
         .expects(newEvent)
         .returning(Result.Existed.pure[IO])
-      val request  = Request(Method.POST, uri"events").withEntity(newEvent.asJson)
-      val response = addEvent(request).unsafeRunSync()
-      response.status                          shouldBe Ok
-      response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
-
-      logger.expectNoLogs()
-
-    }
-
-    s"set default status to NEW if no status is provided" in new TestCase {
-      val oldStyleEvent = newEvents.generateOne // TODO: Figure out how to get an old style event
-      (persister.storeNewEvent _)
-        .expects(oldStyleEvent)
-        .returning(Result.Existed.pure[IO])
-      val request  = Request(Method.POST, uri"events").withEntity(oldStyleEvent.asJson)
-      val response = addEvent(request).unsafeRunSync()
-      response.status                          shouldBe Ok
-      response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
+      val payloadWithoutStatus = newEvent.asJson.hcursor.downField("status").delete.as[Json].fold(throw _, identity)
+      val request              = Request(Method.POST, uri"events").withEntity(payloadWithoutStatus)
+      val response             = addEvent(request).unsafeRunSync()
+      response.status                           shouldBe Ok
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Event existed")
 
       logger.expectNoLogs()
     }
 
-    unacceptableStatuses.foreach { status =>
-      s"return $BadRequest if status was $status" in new TestCase {
+    unacceptableStatuses.foreach { invalidStatus =>
+      s"return $BadRequest if status was $invalidStatus" in new TestCase {
 
-        val randomEvent = invalidEvents.generateOne
-        val event       = randomEvent.copy(status = status)
-        (persister.storeNewEvent _)
-          .expects(event)
-          .returning(Result.Existed.pure[IO])
-        val request  = Request(Method.POST, uri"events").withEntity(event.asJson)
+        val randomEvent          = events.generateOne
+        val payloadInvalidStatus = randomEvent.asJson.deepMerge(json"""{"status": ${invalidStatus.value} }""")
+
+        val request  = Request(Method.POST, uri"events").withEntity(payloadInvalidStatus)
         val response = addEvent(request).unsafeRunSync()
         response.status      shouldBe BadRequest
         response.contentType shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage(
-          "Unacceptable status. Only NEW and SKIPPED are accepted."
+        response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
+          s"Invalid message body: Could not decode JSON: $payloadInvalidStatus"
         )
         logger.expectNoLogs()
       }
@@ -212,21 +201,12 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
     val addEvent  = new EventCreationEndpoint[IO](persister, logger).addEvent _
   }
 
-  private implicit lazy val newEventEncoder: Encoder[NewEvent] = Encoder.instance[NewEvent](event => encode(event))
-  private implicit lazy val skippedEventEncoder: Encoder[SkippedEvent] =
-    Encoder.instance[SkippedEvent](event => encode(event))
-  private implicit lazy val invalidEventEncoder: Encoder[InvalidEvent] =
-    Encoder.instance[InvalidEvent](event => encode(event))
+  private implicit def eventEncoder[T <: Event]: Encoder[T] = Encoder.instance[T] {
+    case event: NewEvent     => toJson(event)
+    case event: SkippedEvent => toJson(event) deepMerge json"""{ "message":    ${event.message.value} }"""
+  }
 
-  private def encode(event: Event) = {
-    val messageLine =
-      event match {
-        case SkippedEvent(_, _, _, _, _, message) =>
-          s""",
-             |message: ${message.value}
-             |""".stripMargin
-        case _ => ""
-      }
+  private def toJson(event: Event): Json =
     json"""{
       "id":         ${event.id.value},
       "project":    ${event.project},
@@ -234,10 +214,7 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
       "batchDate":  ${event.batchDate.value},
       "body":       ${event.body.value},
       "status":     ${event.status.value}
-      $messageLine
-    }"""
-
-  }
+  }"""
 
   private implicit lazy val projectEncoder: Encoder[EventProject] = Encoder.instance[EventProject] { project =>
     json"""{
