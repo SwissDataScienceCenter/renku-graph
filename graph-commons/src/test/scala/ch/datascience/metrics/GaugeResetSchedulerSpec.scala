@@ -21,7 +21,7 @@ package ch.datascience.metrics
 import java.lang.Thread.sleep
 
 import cats.MonadError
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.config.MetricsConfigProvider
 import ch.datascience.generators.Generators.Implicits._
@@ -34,7 +34,8 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.ExecutionContext.global
+import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class GaugeResetSchedulerSpec
@@ -43,56 +44,60 @@ class GaugeResetSchedulerSpec
     with Eventually
     with IntegrationPatience
     with should.Matchers {
+
   "run" should {
 
     "kick off the gauge synchronization process and " +
       "continues endlessly with interval periods" in new TestCase {
-        val gaugeScheduler =
-          new GaugeResetSchedulerImpl[IO, Double](List(gauge1, gauge2), metricsConfigProvider, logger)(context, timer)
-        (metricsConfigProvider.getInterval _).expects().returning(interval.pure[IO])
-        (timer
-          .sleep(_: FiniteDuration))
-          .expects(interval)
-          .returning(context.unit)
-          .atLeastTwice()
+
+        val gaugeScheduler = newGaugeScheduler(refreshing = gauge1, gauge2)
+
         (gauge1.reset _).expects().returning(context.unit).atLeastTwice()
         (gauge2.reset _).expects().returning(context.unit).atLeastTwice()
+
         gaugeScheduler.run().start.unsafeRunAsyncAndForget()
 
         sleep(2 * interval.toMillis + 1000)
+
         logger.expectNoLogs()
       }
 
-    "log an error in case of failure" in new TestCase {
+    "log an error and continue refreshing in case of failures" in new TestCase {
 
-      val gaugeScheduler =
-        new GaugeResetSchedulerImpl[IO, Double](List(gauge1), metricsConfigProvider, logger)(context, timer)
-      val exception = new Exception(exceptions.generateOne)
+      val gaugeScheduler = newGaugeScheduler(refreshing = gauge1)
 
-      (metricsConfigProvider.getInterval _).expects().returning(interval.pure[IO]).once()
-      (timer
-        .sleep(_: FiniteDuration))
-        .expects(interval)
-        .returning(context.unit)
-        .atLeastOnce()
-      (gauge1.reset _).expects().returning(context.raiseError(exception))
+      val exception1 = exceptions.generateOne
+      (gauge1.reset _).expects().returning(context.raiseError(exception1))
+      val exception2 = exceptions.generateOne
+      (gauge1.reset _).expects().returning(context.raiseError(exception2))
+      (gauge1.reset _).expects().returning(context.unit).atLeastTwice()
+
       gaugeScheduler.run().start.unsafeRunAsyncAndForget()
 
+      sleep(3 * interval.toMillis + 1000)
+
       eventually {
-        logger.loggedOnly(Error(s"Clearing event gauge metrics failed with - ${exception.getMessage}"))
+        logger.loggedOnly(Error(s"Clearing event gauge metrics failed", exception1),
+                          Error(s"Clearing event gauge metrics failed", exception2)
+        )
       }
     }
   }
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+
   private trait TestCase {
     val logger                = TestLogger[IO]()
+    val timer                 = IO.timer(global)
     val context               = MonadError[IO, Throwable]
     val gauge1                = mock[LabeledGauge[IO, Double]]
     val gauge2                = mock[LabeledGauge[IO, Double]]
-    val timer                 = mock[Timer[IO]]
-    val interval              = 1 seconds
+    val interval              = 100 millis
     val metricsConfigProvider = mock[MetricsConfigProvider[IO]]
 
+    def newGaugeScheduler(refreshing: LabeledGauge[IO, Double]*) =
+      new GaugeResetSchedulerImpl[IO, Double](refreshing.toList, metricsConfigProvider, logger)(context, timer)
+
+    (metricsConfigProvider.getInterval _).expects().returning(interval.pure[IO]).once()
   }
 }

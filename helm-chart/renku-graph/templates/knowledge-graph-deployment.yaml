@@ -26,6 +26,11 @@ spec:
           image: "{{ .Values.knowledgeGraph.image.repository }}:{{ .Values.knowledgeGraph.image.tag }}"
           imagePullPolicy: {{ .Values.knowledgeGraph.image.pullPolicy }}
           env:
+            - name: RENKU_CLIENT_CERTIFICATE
+              valueFrom:
+                secretKeyRef:
+                  name: client-certificate-secret
+                  key: client-certificate
             - name: RENKU_BASE_URL
               value: https://{{ .Values.global.renku.domain }}
             - name: RENKU_RESOURCES_URL

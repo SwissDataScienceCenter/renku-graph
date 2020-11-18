@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
+import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
 import ch.datascience.http.server.HttpServer
@@ -30,7 +31,7 @@ import ch.datascience.metrics._
 import ch.datascience.microservices.IOMicroservice
 import io.renku.eventlog.creation.IOEventCreationEndpoint
 import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
-import io.renku.eventlog.init.IODbInitializer
+import io.renku.eventlog.init.{DbInitializer, IODbInitializer}
 import io.renku.eventlog.latestevents.IOLatestEventsEndpoint
 import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
@@ -58,21 +59,25 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB]) =
     transactorResource.use { transactor =>
       for {
-        _                    <- new IODbInitializer(transactor, ApplicationLogger).run
+        certificateLoader    <- CertificateLoader[IO](ApplicationLogger)
         sentryInitializer    <- SentryInitializer[IO]()
+        dbInitializer        <- IODbInitializer(transactor, ApplicationLogger)
         metricsRegistry      <- MetricsRegistry()
         queriesExecTimes     <- QueriesExecutionTimes(metricsRegistry)
         statsFinder          <- IOStatsFinder(transactor, queriesExecTimes)
         eventLogMetrics      <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
         waitingEventsGauge   <- WaitingEventsGauge(metricsRegistry, statsFinder, ApplicationLogger)
         underProcessingGauge <- UnderProcessingGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        gaugeScheduler <- IOGaugeResetScheduler(
-                            List(waitingEventsGauge, underProcessingGauge),
-                            new MetricsConfigProviderImpl[IO](),
-                            ApplicationLogger
-                          )
-        eventCreationEndpoint <-
-          IOEventCreationEndpoint(transactor, waitingEventsGauge, queriesExecTimes, ApplicationLogger)
+        metricsResetScheduler <- IOGaugeResetScheduler(List(waitingEventsGauge, underProcessingGauge),
+                                                       MetricsConfigProvider(),
+                                                       ApplicationLogger
+                                 )
+        eventCreationEndpoint <- IOEventCreationEndpoint(
+                                   transactor,
+                                   waitingEventsGauge,
+                                   queriesExecTimes,
+                                   ApplicationLogger
+                                 )
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
@@ -105,41 +110,44 @@ object Microservice extends IOMicroservice {
                                subscriptionsEndpoint,
                                new RoutesMetrics[IO](metricsRegistry)
                              ).routes
-        exitcode <- microserviceRoutes.use { routes =>
+        exitCode <- microserviceRoutes.use { routes =>
                       val httpServer = new HttpServer[IO](serverPort = 9005, routes)
 
                       new MicroserviceRunner(
+                        certificateLoader,
                         sentryInitializer,
+                        dbInitializer,
                         eventLogMetrics,
                         eventsDispatcher,
-                        gaugeScheduler,
+                        metricsResetScheduler,
                         httpServer,
                         subProcessesCancelTokens
                       ).run()
                     }
-      } yield exitcode
-
+      } yield exitCode
     }
-
 }
 
 private class MicroserviceRunner(
+    certificateLoader:        CertificateLoader[IO],
     sentryInitializer:        SentryInitializer[IO],
+    dbInitializer:            DbInitializer[IO],
     metrics:                  EventLogMetrics,
     eventsDispatcher:         EventsDispatcher,
-    gaugeScheduler:           GaugeResetScheduler[IO],
+    metricsResetScheduler:    GaugeResetScheduler[IO],
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
 )(implicit contextShift:      ContextShift[IO]) {
 
-  def run(): IO[ExitCode] =
-    for {
-      _      <- sentryInitializer.run()
-      _      <- metrics.run().start map gatherCancelToken
-      _      <- eventsDispatcher.run().start map gatherCancelToken
-      _      <- gaugeScheduler.run().start map gatherCancelToken
-      result <- httpServer.run()
-    } yield result
+  def run(): IO[ExitCode] = for {
+    _      <- certificateLoader.run()
+    _      <- sentryInitializer.run()
+    _      <- dbInitializer.run()
+    _      <- metrics.run().start map gatherCancelToken
+    _      <- metricsResetScheduler.run().start map gatherCancelToken
+    _      <- eventsDispatcher.run().start map gatherCancelToken
+    result <- httpServer.run()
+  } yield result
 
   private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
     subProcessesCancelTokens.put(fiber.cancel, ())

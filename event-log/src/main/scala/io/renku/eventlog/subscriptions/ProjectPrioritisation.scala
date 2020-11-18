@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions
 
 import java.time.Duration
 
+import cats.data.NonEmptyList
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
@@ -57,25 +58,51 @@ private class ProjectPrioritisation {
 
   private lazy val correctPrioritiesUsingOccupancyPerProject
       : List[(ProjectIdAndPath, Priority, Int Refined NonNegative)] => List[(ProjectIdAndPath, Priority)] = {
-    case Nil => Nil
-    case prioritiesList @ _ :: Nil =>
-      prioritiesList.map { case (projectIdAndPath, priority, _) => (projectIdAndPath, priority) }
+    case Nil                           => Nil
+    case (project, priority, _) :: Nil => List(project -> priority)
     case prioritiesList =>
-      val totalPriority      = prioritiesList.map(_._2.value).sum
-      val processingCapacity = prioritiesList.map(_._3.value).sum
-      prioritiesList.map(correctPriority(processingCapacity, totalPriority))
+      val prioritiesCorrectedByOccupancy = prioritiesList.map(
+        correctPriority(
+          processingCapacity = (prioritiesList map toOccupancy).sum,
+          totalPriority = (prioritiesList map toPriority).sum
+        )
+      )
+      val maybePrioritiesAboveMinPriority = NonEmptyList.fromList {
+        prioritiesCorrectedByOccupancy filter projectsAbove(MinPriority)
+      }
+      maybePrioritiesAboveMinPriority
+        .getOrElse(NonEmptyList.of(prioritiesCorrectedByOccupancy.maxBy { case (_, priority) => priority }))
+        .toList
+        .map(alignItemType)
   }
 
   private def correctPriority(processingCapacity: Int,
                               totalPriority:      BigDecimal
-  ): ((ProjectIdAndPath, Priority, Int Refined NonNegative)) => (ProjectIdAndPath, Priority) = {
+  ): ((ProjectIdAndPath, Priority, Int Refined NonNegative)) => (ProjectIdAndPath, BigDecimal) = {
     case (project, currentPriority, currentOccupancy) if currentOccupancy.value == 0 =>
-      project -> currentPriority
+      project -> currentPriority.value
     case (project, currentPriority, currentOccupancy) =>
-      val maxOccupancy      = currentPriority.value * processingCapacity / totalPriority
-      val correction        = maxOccupancy / currentOccupancy.value
-      val correctedPriority = Priority.safeApply(currentPriority.value * correction)
+      val maxOccupancy = currentPriority.value * processingCapacity / totalPriority
+      val correctedPriority =
+        if (currentOccupancy.value >= maxOccupancy) BigDecimal(0d)
+        else currentPriority.value * (maxOccupancy / currentOccupancy.value)
       project -> correctedPriority
+  }
+
+  private def projectsAbove(min: Priority): ((ProjectIdAndPath, BigDecimal)) => Boolean = { case (_, priority) =>
+    priority >= min.value
+  }
+
+  private lazy val alignItemType: ((ProjectIdAndPath, BigDecimal)) => (ProjectIdAndPath, Priority) = {
+    case (projectIdAndPath, priority) => projectIdAndPath -> Priority.safeApply(priority)
+  }
+
+  private lazy val toPriority: ((ProjectIdAndPath, Priority, Int Refined NonNegative)) => BigDecimal = {
+    case (_, priority, _) => priority.value
+  }
+
+  private lazy val toOccupancy: ((ProjectIdAndPath, Priority, Int Refined NonNegative)) => Int = {
+    case (_, _, occupancy) => occupancy.value
   }
 
   private implicit class EventDateOps(eventDate: EventDate) {

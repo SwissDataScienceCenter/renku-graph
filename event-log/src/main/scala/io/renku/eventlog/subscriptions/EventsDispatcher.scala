@@ -61,7 +61,7 @@ class EventsDispatcher(
   private def popEvent: IO[(CompoundEventId, EventBody)] =
     eventsFinder
       .popEvent()
-      .recoverWith(loggingError(retry = eventsFinder.popEvent()))
+      .recoverWith(loggingErrorAndRetry(retry = eventsFinder.popEvent))
       .flatMap {
         case None            => (timer sleep noEventSleep) flatMap (_ => popEvent)
         case Some(idAndBody) => idAndBody.pure[IO]
@@ -109,12 +109,13 @@ class EventsDispatcher(
     } yield ()
   }
 
-  private def loggingError[O](retry: => IO[O]): PartialFunction[Throwable, IO[O]] = { case NonFatal(exception) =>
-    for {
-      _      <- logger.error(exception)("Finding events to dispatch failed")
-      _      <- timer sleep onErrorSleep
-      result <- retry
-    } yield result
+  private def loggingErrorAndRetry[O](retry: () => IO[O]): PartialFunction[Throwable, IO[O]] = {
+    case NonFatal(exception) =>
+      for {
+        _      <- logger.error(exception)("Finding events to dispatch failed")
+        _      <- timer sleep onErrorSleep
+        result <- retry() recoverWith loggingErrorAndRetry(retry)
+      } yield result
   }
 
   private def retry(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {

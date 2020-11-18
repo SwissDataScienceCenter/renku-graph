@@ -25,55 +25,40 @@ import ch.datascience.metrics._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventStatus
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 class EventLogMetrics(
-    statsFinder:      StatsFinder[IO],
-    logger:           Logger[IO],
-    statusesGauge:    LabeledGauge[IO, EventStatus],
-    totalGauge:       SingleValueGauge[IO],
-    interval:         FiniteDuration = EventLogMetrics.interval,
-    statusesInterval: FiniteDuration = EventLogMetrics.statusesInterval
-)(implicit ME:        MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO]) {
+    statsFinder:   StatsFinder[IO],
+    logger:        Logger[IO],
+    statusesGauge: LabeledGauge[IO, EventStatus],
+    totalGauge:    SingleValueGauge[IO],
+    interval:      FiniteDuration = EventLogMetrics.interval
+)(implicit ME:     MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO]) {
 
-  def run(): IO[Unit] =
-    for {
-      _ <- timer sleep interval
-      _ <- updateStatuses()
-    } yield ()
+  def run(): IO[Unit] = updateStatuses().foreverM[Unit]
 
   private def updateStatuses(): IO[Unit] = {
     for {
+      _        <- timer sleep interval
       statuses <- statsFinder.statuses()
       _        <- (statuses map toStatusesGauge).toList.sequence
       _        <- totalGauge set statuses.values.sum.toDouble
-      _        <- timer sleep statusesInterval
-      _        <- updateStatuses()
     } yield ()
-  } recoverWith logAndRetry(continueWith = updateStatuses())
+  } recoverWith logError
 
   private lazy val toStatusesGauge: ((EventStatus, Long)) => IO[Unit] = { case (status, count) =>
     statusesGauge set status -> count.toDouble
   }
 
-  private def logAndRetry(continueWith: => IO[Unit]): PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) =>
-      for {
-        _ <- logger.error(exception)("Problem with gathering metrics")
-        _ <- timer sleep interval
-        _ <- continueWith
-      } yield ()
+  private lazy val logError: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)("Problem with gathering metrics")
   }
 }
 
 object EventLogMetrics {
-
-  import scala.concurrent.duration._
-
-  private val interval:         FiniteDuration = 10 seconds
-  private val statusesInterval: FiniteDuration = 5 seconds
+  private val interval: FiniteDuration = 10 seconds
 }
 
 object IOEventLogMetrics {

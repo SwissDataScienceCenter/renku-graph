@@ -18,11 +18,12 @@
 
 package ch.datascience.webhookservice
 
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
-import cats.syntax.all._
 import ch.datascience.config.GitLab
+import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.http.server.HttpServer
@@ -52,6 +53,7 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
+      certificateLoader     <- CertificateLoader[IO](ApplicationLogger)
       sentryInitializer     <- SentryInitializer[IO]()
       projectHookUrl        <- ProjectHookUrl.fromConfig[IO]()
       gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
@@ -85,22 +87,32 @@ object Microservice extends IOMicroservice {
                     val httpServer = new HttpServer[IO](serverPort = 9001, routes)
 
                     new MicroserviceRunner(
+                      certificateLoader,
                       sentryInitializer,
                       eventsSynchronizationScheduler,
-                      httpServer
-                    ) run args
+                      httpServer,
+                      subProcessesCancelTokens
+                    ).run()
                   }
     } yield exitcode
 }
 
-class MicroserviceRunner(sentryInitializer:              SentryInitializer[IO],
+class MicroserviceRunner(certificateLoader:              CertificateLoader[IO],
+                         sentryInitializer:              SentryInitializer[IO],
                          eventsSynchronizationScheduler: EventsSynchronizationScheduler[IO],
-                         httpServer:                     HttpServer[IO]
+                         httpServer:                     HttpServer[IO],
+                         subProcessesCancelTokens:       ConcurrentHashMap[CancelToken[IO], Unit]
 )(implicit contextShift:                                 ContextShift[IO]) {
 
-  def run(args: List[String]): IO[ExitCode] =
-    for {
-      _ <- sentryInitializer.run()
-      _ <- List(httpServer.run().start, eventsSynchronizationScheduler.run()).sequence
-    } yield ExitCode.Success
+  def run(): IO[ExitCode] = for {
+    _      <- certificateLoader.run()
+    _      <- sentryInitializer.run()
+    _      <- eventsSynchronizationScheduler.run().start.map(gatherCancelToken)
+    result <- httpServer.run()
+  } yield result
+
+  private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
+    subProcessesCancelTokens.put(fiber.cancel, ())
+    fiber
+  }
 }

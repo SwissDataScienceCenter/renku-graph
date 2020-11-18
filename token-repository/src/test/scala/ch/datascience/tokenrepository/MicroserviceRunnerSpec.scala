@@ -18,93 +18,84 @@
 
 package ch.datascience.tokenrepository
 
-import cats.MonadError
 import cats.effect._
+import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
+import ch.datascience.microservices.AnyMicroserviceRunnerSpec
 import ch.datascience.tokenrepository.repository.init.IODbInitializer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class MicroserviceRunnerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec with MockFactory with should.Matchers {
 
   "run" should {
 
     "return Success Exit Code if Sentry and the db initialize fine and http server starts up" in new TestCase {
 
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      given(dbInitializer).succeeds(returning = ())
+      given(httpServer).succeeds(returning = ExitCode.Success)
 
-      (dbInitializer.run _)
-        .expects()
-        .returning(context.unit)
+      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+    }
 
-      (httpServer.run _)
-        .expects()
-        .returning(context.pure(ExitCode.Success))
+    "fail if Certificate loading fails" in new TestCase {
 
-      runner.run(Nil).unsafeRunSync() shouldBe ExitCode.Success
+      val exception = exceptions.generateOne
+      given(certificateLoader).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        runner.run().unsafeRunSync()
+      } shouldBe exception
     }
 
     "fail if Sentry initialization fails" in new TestCase {
 
+      given(certificateLoader).succeeds(returning = ())
       val exception = exceptions.generateOne
-      (sentryInitializer.run _)
-        .expects()
-        .returning(context.raiseError(exception))
+      given(sentryInitializer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run(Nil).unsafeRunSync()
+        runner.run().unsafeRunSync()
       } shouldBe exception
     }
 
     "fail if db creation fails" in new TestCase {
 
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
-      (dbInitializer.run _)
-        .expects()
-        .returning(context.raiseError(exception))
+      given(dbInitializer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run(Nil).unsafeRunSync()
+        runner.run().unsafeRunSync()
       } shouldBe exception
     }
 
     "fail if starting the http server fails" in new TestCase {
 
-      (sentryInitializer.run _)
-        .expects()
-        .returning(IO.unit)
-
-      (dbInitializer.run _)
-        .expects()
-        .returning(context.unit)
-
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      given(dbInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
-      (httpServer.run _)
-        .expects()
-        .returning(context.raiseError(exception))
+      given(httpServer).fails(becauseOf = exception)
 
       intercept[Exception] {
-        runner.run(Nil).unsafeRunSync()
+        runner.run().unsafeRunSync()
       } shouldBe exception
     }
   }
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
-
+    val certificateLoader = mock[CertificateLoader[IO]]
     val sentryInitializer = mock[IOSentryInitializer]
     val dbInitializer     = mock[IODbInitializer]
     val httpServer        = mock[IOHttpServer]
-    val runner            = new MicroserviceRunner(sentryInitializer, dbInitializer, httpServer)
+    val runner            = new MicroserviceRunner(certificateLoader, sentryInitializer, dbInitializer, httpServer)
   }
 }

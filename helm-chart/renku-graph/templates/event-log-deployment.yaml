@@ -26,6 +26,11 @@ spec:
           image: "{{ .Values.eventLog.image.repository }}:{{ .Values.eventLog.image.tag }}"
           imagePullPolicy: {{ .Values.eventLog.image.pullPolicy }}
           env:
+            - name: RENKU_CLIENT_CERTIFICATE
+              valueFrom:
+                secretKeyRef:
+                  name: client-certificate-secret
+                  key: client-certificate
             - name: EVENT_LOG_POSTGRES_HOST
               value: "{{ template "postgresql.fullname" . }}:5432"
             - name: EVENT_LOG_POSTGRES_USER

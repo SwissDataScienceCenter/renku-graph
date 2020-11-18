@@ -22,6 +22,7 @@ import java.util.concurrent.Executors.newFixedThreadPool
 
 import cats.effect._
 import ch.datascience.config.GitLab
+import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.http.server.HttpServer
@@ -50,6 +51,7 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
+      certificateLoader       <- CertificateLoader[IO](ApplicationLogger)
       sentryInitializer       <- SentryInitializer[IO]()
       gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
@@ -72,7 +74,7 @@ object Microservice extends IOMicroservice {
                              ).routes
       exicode <- microServiceResource.use { routes =>
                    val httpServer = new HttpServer[IO](serverPort = 9004, routes)
-                   new MicroserviceRunner(sentryInitializer, httpServer, kgMetrics).run(args)
+                   new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer, kgMetrics).run()
                  }
 
     } yield exicode
@@ -80,15 +82,16 @@ object Microservice extends IOMicroservice {
 }
 
 private class MicroserviceRunner(
+    certificateLoader:   CertificateLoader[IO],
     sentryInitializer:   SentryInitializer[IO],
     httpServer:          HttpServer[IO],
     kgMetrics:           KGMetrics[IO]
 )(implicit contextShift: ContextShift[IO]) {
 
-  def run(args: List[String]): IO[ExitCode] =
-    for {
-      _        <- sentryInitializer.run()
-      _        <- kgMetrics.run().start
-      exitCode <- httpServer.run()
-    } yield exitCode
+  def run(): IO[ExitCode] = for {
+    _        <- certificateLoader.run()
+    _        <- sentryInitializer.run()
+    _        <- kgMetrics.run().start
+    exitCode <- httpServer.run()
+  } yield exitCode
 }
