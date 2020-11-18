@@ -29,19 +29,19 @@ import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators.{datasetIdentifiers, userAffiliations, userEmails}
 import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, DerivedFrom, Description, Name, PublishedDate, SameAs, Title, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
-import ch.datascience.graph.model.projects.{DateCreated => ProjectCreatedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.{addedToProjectObjects, datasetProjects}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.bundles.{modifiedDataSetCommit, nonModifiedDataSetCommit}
-import ch.datascience.rdfstore.entities.{DataSet, Person, Project, ProjectsGenerators}
+import ch.datascience.rdfstore.entities.{DataSet, Person, Project}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.renku.jsonld.{EntityId, JsonLD}
 import org.scalacheck.Gen
 
+import scala.concurrent.duration._
 import scala.language.postfixOps
 
 package object rest {
@@ -72,14 +72,13 @@ package object rest {
         noSameAs: Boolean = false,
         commitId: CommitId = commitIds.generateOne
     )(
-        topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs),
-        projects:      List[Project] = List(ProjectsGenerators.projects.generateOne)
+        topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs)
     ): JsonLD =
       toJsonLDsAndDatasets(
         firstDatasetDateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
         noSameAs = noSameAs,
         commitId = commitId
-      )(topmostSameAs, projects) match {
+      )(topmostSameAs) match {
         case (json, _) +: Nil => json
         case _                => throw new Exception("Not prepared to work datasets having multiple projects")
       }
@@ -89,18 +88,18 @@ package object rest {
         noSameAs:                Boolean,
         commitId:                CommitId = commitIds.generateOne
     )(
-        topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs),
-        projects:      List[Project] = List(ProjectsGenerators.projects.generateOne)
+        topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs)
     ): List[(JsonLD, Dataset)] =
-      projects match {
+      dataSet.projects match {
         case firstProject +: otherProjects =>
           val firstTuple = nonModifiedDataSetCommit(
             commitId = commitId,
             committedDate = CommittedDate(firstDatasetDateCreated.value),
-            committer = Person(firstProject.toDatasetProject.created.agent.name,
-                               firstProject.toDatasetProject.created.agent.maybeEmail
-            )
-          )(firstProject)(
+            committer = Person(firstProject.created.agent.name, firstProject.created.agent.maybeEmail)
+          )(
+            projectPath = firstProject.path,
+            projectName = firstProject.name
+          )(
             datasetIdentifier = dataSet.id,
             datasetTitle = dataSet.title,
             datasetName = dataSet.name,
@@ -113,7 +112,7 @@ package object rest {
             datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
             datasetKeywords = dataSet.keywords,
             overrideTopmostSameAs = topmostSameAs.some
-          ) -> dataSet.copy(projects = List(firstProject.toDatasetProject))
+          ) -> dataSet
 
           val sameAs =
             if (noSameAs) DataSet.entityId(dataSet.id).asSameAs
@@ -123,7 +122,10 @@ package object rest {
             val dataSetId          = datasetIdentifiers.generateOne
             nonModifiedDataSetCommit(
               committedDate = CommittedDate(projectDateCreated.value)
-            )(project)(
+            )(
+              projectPath = project.path,
+              projectName = project.name
+            )(
               datasetIdentifier = dataSetId,
               datasetTitle = dataSet.title,
               datasetName = dataSet.name,
@@ -140,7 +142,7 @@ package object rest {
               id = dataSetId,
               sameAs = sameAs,
               projects = List(
-                project.copy(dateCreated = ProjectCreatedDate(projectDateCreated.value)).toDatasetProject
+                project.copy(created = project.created.copy(date = DateCreatedInProject(projectDateCreated.value)))
               )
             )
           }
@@ -200,13 +202,11 @@ package object rest {
 
     lazy val entityId: EntityId = DataSet.entityId(dataSet.id)
 
-    def toJsonLD(
-        firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
-        commitId:                CommitId = commitIds.generateOne,
-        topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(DataSet.entityId(dataSet.versions.initial)),
-        projects:                List[Project] = List(ProjectsGenerators.projects.generateOne)
+    def toJsonLD(firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
+                 commitId:                CommitId = commitIds.generateOne,
+                 topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(DataSet.entityId(dataSet.versions.initial))
     ): JsonLD =
-      toJsonLDs(firstDatasetDateCreated, commitId, topmostDerivedFrom, projects) match {
+      toJsonLDs(firstDatasetDateCreated, commitId, topmostDerivedFrom) match {
         case first +: Nil => first
         case _ =>
           throw new IllegalStateException(
@@ -216,18 +216,18 @@ package object rest {
 
     def toJsonLDs(firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
                   commitId:                CommitId = commitIds.generateOne,
-                  topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(dataSet.derivedFrom),
-                  projects:                List[Project] = List(ProjectsGenerators.projects.generateOne)
+                  topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(dataSet.derivedFrom)
     ): List[JsonLD] =
-      projects match {
+      dataSet.projects match {
         case firstProject +: otherProjects =>
           val firstJsonLd = modifiedDataSetCommit(
             commitId = commitId,
             committedDate = CommittedDate(firstDatasetDateCreated.value),
-            committer = Person(firstProject.toDatasetProject.created.agent.name,
-                               firstProject.toDatasetProject.created.agent.maybeEmail
-            )
-          )(firstProject)(
+            committer = Person(firstProject.created.agent.name, firstProject.created.agent.maybeEmail)
+          )(
+            projectPath = firstProject.path,
+            projectName = firstProject.name
+          )(
             datasetIdentifier = dataSet.id,
             datasetTitle = dataSet.title,
             datasetName = dataSet.name,
@@ -250,7 +250,8 @@ package object rest {
             modifiedDataSetCommit(
               committedDate = CommittedDate(projectDateCreated.value)
             )(
-              project
+              projectPath = project.path,
+              projectName = project.name
             )(
               datasetTitle = dataSet.title,
               datasetName = dataSet.name,

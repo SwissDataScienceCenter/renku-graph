@@ -26,6 +26,6 @@ trait JsonLDEntityFlatten extends Flatten {
 
   lazy val flatten: Either[MalformedJsonLD, JsonLD] =
     deNest(List(this), Nil)
-      .flatMap(jsonLDEntities => checkForUniqueIds(jsonLDEntities.distinct))
+      .flatMap(checkForUniqueIds)
       .map(flattenedJsonLDs => JsonLD.arr(flattenedJsonLDs: _*))
 }

@@ -27,7 +27,6 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Affiliation, Email, Name, ResourceId}
-import ch.datascience.rdfstore.entities.ProjectsGenerators._
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples, entities}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -65,10 +64,14 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
           .toList
           .toSet
         val jsonTriples = JsonLDTriples {
-          nonModifiedDataSetCommit(committer = entities.Person(committerName, committerEmail))(
-            project =
-              projects.generateOne.copy(maybeCreator = entities.Person(projectCreatorName, projectCreatorEmail).some)
-          )(datasetCreators = datasetCreatorsSet).toJson
+          nonModifiedDataSetCommit(
+            committer = entities.Person(committerName, committerEmail)
+          )(
+            projectPath = projectPaths.generateOne,
+            maybeProjectCreator = entities.Person(projectCreatorName, projectCreatorEmail).some
+          )(
+            datasetCreators = datasetCreatorsSet
+          ).toJson
         }
 
         val allPersons = jsonTriples.collectAllPersons

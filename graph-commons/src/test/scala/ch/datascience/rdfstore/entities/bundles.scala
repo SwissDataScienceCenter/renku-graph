@@ -86,19 +86,21 @@ object bundles extends Schemas {
     randomDataSetActivity.asJsonLD
 
   def randomDataSetActivity: Activity =
-    Gen
-      .oneOf(
-        nonModifiedDataSetActivity()(project = ProjectsGenerators.projects.generateOne)(),
-        modifiedDataSetActivity()(project = ProjectsGenerators.projects.generateOne)()
-      )
-      .generateOne
+    Gen.oneOf(nonModifiedDataSetActivity()()(), modifiedDataSetActivity()()()).generateOne
 
   def nonModifiedDataSetCommit(
-      commitId:                   CommitId = commitIds.generateOne,
-      committedDate:              CommittedDate = committedDates.generateOne,
-      committer:                  Person = Person(userNames.generateOne, userEmails.generateOne),
-      cliVersion:                 CliVersion = cliVersions.generateOne
-  )(project:                      Project = ProjectsGenerators.projects.generateOne)(
+      commitId:      CommitId = commitIds.generateOne,
+      committedDate: CommittedDate = committedDates.generateOne,
+      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion:    CliVersion = cliVersions.generateOne
+  )(
+      projectPath:         Path = projectPaths.generateOne,
+      projectName:         projects.Name = projectNames.generateOne,
+      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
+      maybeParent:         Option[Project] = None,
+      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
+  )(
       datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
       datasetTitle:               Title = datasetTitles.generateOne,
       datasetName:                Name = datasetNames.generateOne,
@@ -118,7 +120,7 @@ object bundles extends Schemas {
       committedDate,
       committer,
       cliVersion
-    )(project)(
+    )(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion)(
       datasetIdentifier,
       datasetTitle,
       datasetName,
@@ -135,11 +137,18 @@ object bundles extends Schemas {
     ).asJsonLD
 
   def nonModifiedDataSetActivity(
-      commitId:                   CommitId = commitIds.generateOne,
-      committedDate:              CommittedDate = committedDates.generateOne,
-      committer:                  Person = Person(userNames.generateOne, userEmails.generateOne),
-      cliVersion:                 CliVersion = cliVersions.generateOne
-  )(project:                      Project)(
+      commitId:      CommitId = commitIds.generateOne,
+      committedDate: CommittedDate = committedDates.generateOne,
+      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion:    CliVersion = cliVersions.generateOne
+  )(
+      projectPath:         Path = projectPaths.generateOne,
+      projectName:         projects.Name = projectNames.generateOne,
+      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
+      maybeParent:         Option[Project] = None,
+      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
+  )(
       datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
       datasetTitle:               Title = datasetTitles.generateOne,
       datasetName:                Name = datasetNames.generateOne,
@@ -157,7 +166,7 @@ object bundles extends Schemas {
     commitId,
     committedDate,
     committer,
-    project,
+    Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion),
     Agent(cliVersion),
     maybeGenerationFactories = List(
       Generation.factory(
@@ -183,11 +192,18 @@ object bundles extends Schemas {
   )
 
   def modifiedDataSetCommit(
-      commitId:                   CommitId = commitIds.generateOne,
-      committedDate:              CommittedDate = committedDates.generateOne,
-      committer:                  Person = Person(userNames.generateOne, userEmails.generateOne),
-      cliVersion:                 CliVersion = cliVersions.generateOne
-  )(project:                      Project = ProjectsGenerators.projects.generateOne)(
+      commitId:      CommitId = commitIds.generateOne,
+      committedDate: CommittedDate = committedDates.generateOne,
+      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion:    CliVersion = cliVersions.generateOne
+  )(
+      projectPath:         Path = projectPaths.generateOne,
+      projectName:         projects.Name = projectNames.generateOne,
+      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
+      maybeParent:         Option[Project] = None,
+      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
+  )(
       datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
       datasetTitle:               Title = datasetTitles.generateOne,
       datasetName:                Name = datasetNames.generateOne,
@@ -207,7 +223,7 @@ object bundles extends Schemas {
       committedDate,
       committer,
       cliVersion
-    )(project)(
+    )(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion)(
       datasetIdentifier,
       datasetTitle,
       datasetName,
@@ -229,7 +245,12 @@ object bundles extends Schemas {
       committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
       cliVersion:    CliVersion = cliVersions.generateOne
   )(
-      project: Project
+      projectPath:         Path = projectPaths.generateOne,
+      projectName:         projects.Name = projectNames.generateOne,
+      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      maybeProjectCreator: Option[Person] = projectCreators.generateOption,
+      maybeParent:         Option[Project] = None,
+      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
   )(
       datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
       datasetTitle:               Title = datasetTitles.generateOne,
@@ -248,7 +269,7 @@ object bundles extends Schemas {
     commitId,
     committedDate,
     committer,
-    project,
+    Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion),
     Agent(cliVersion),
     maybeGenerationFactories = List(
       Generation.factory(
