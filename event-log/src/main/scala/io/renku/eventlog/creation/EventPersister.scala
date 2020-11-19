@@ -22,6 +22,7 @@ import java.time.Instant
 
 import EventPersister.Result
 import Result._
+import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, IO}
 import cats.free.Free
@@ -33,7 +34,8 @@ import doobie.free.connection.ConnectionOp
 import doobie.implicits._
 import doobie.util.fragments.in
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventStatus.{New, Processing, RecoverableFailure}
+import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
+import io.renku.eventlog.EventStatus.{New, Processing, RecoverableFailure, Skipped}
 import io.renku.eventlog.{Event, EventLogDB, EventStatus}
 
 trait EventPersister[Interpretation[_]] {
@@ -54,7 +56,9 @@ class EventPersisterImpl(
   override def storeNewEvent(event: Event): IO[Result] =
     for {
       result <- insertIfNotDuplicate(event) transact transactor.get
-      _      <- if (result == Created) waitingEventsGauge.increment(event.project.path) else ME.unit
+      _ <- Applicative[IO].whenA(result == Created && event.status == New)(
+             waitingEventsGauge.increment(event.project.path)
+           )
     } yield result
 
   private def insertIfNotDuplicate(event: Event) =
@@ -69,10 +73,8 @@ class EventPersisterImpl(
       _                  <- measureExecutionTime(insert(updatedCommitEvent))
     } yield Created
 
-  private def eventuallyAddToExistingBatch(event: Event) = measureExecutionTime(findBatchInQueue(event)) map {
-    case Some(batchDateUnderProcessing) => event.copy(batchDate = batchDateUnderProcessing)
-    case _                              => event
-  }
+  private def eventuallyAddToExistingBatch(event: Event) =
+    measureExecutionTime(findBatchInQueue(event)).map(_.map(event.setBatchDate).getOrElse(event))
 
   private def checkIfInLog(event: Event) = SqlQuery(
     sql"""|select event_id
@@ -95,16 +97,25 @@ class EventPersisterImpl(
   )
   // format: on
 
-  private def insert(event: Event) = {
-    import event._
-    val currentTime = now()
-    SqlQuery(
-      sql"""insert into
+  private lazy val insert: Event => SqlQuery[Unit] = {
+    case NewEvent(id, project, date, batchDate, body) =>
+      val currentTime = now()
+      SqlQuery(
+        sql"""insert into
           event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
-          values ($id, ${project.id}, ${project.path}, ${EventStatus.New: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body)
+          values ($id, ${project.id}, ${project.path}, ${New: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body)
       """.update.run.map(_ => ()),
-      name = "new - create"
-    )
+        name = "new - create (NEW)"
+      )
+    case SkippedEvent(id, project, date, batchDate, body, message) =>
+      val currentTime = now()
+      SqlQuery(
+        sql"""insert into
+          event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body, message)
+          values ($id, ${project.id}, ${project.path}, ${Skipped: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body, $message)
+      """.update.run.map(_ => ()),
+        name = "new - create (SKIPPED)"
+      )
   }
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =

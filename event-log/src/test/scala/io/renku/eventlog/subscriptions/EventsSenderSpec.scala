@@ -20,16 +20,20 @@ package io.renku.eventlog.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators.{eventBodies, eventIds}
+import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventId}
+import ch.datascience.graph.model.{events, projects}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.Event
+import io.renku.eventlog.CompoundId
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult.{Delivered, Misdelivered, ServiceBusy}
 import org.http4s.Status._
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -100,19 +104,30 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with sho
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val event         = events.generateOne
+    val event         = readyEvents.generateOne
     val subscriberUrl = SubscriberUrl(externalServiceBaseUrl)
 
     val sender = new IOEventsSender(TestLogger())
   }
 
-  private implicit val eventEncoder: Encoder[Event] = Encoder.instance[Event] { event =>
+  private implicit val eventEncoder: Encoder[ReadyEvent] = Encoder.instance[ReadyEvent] { event =>
     json"""{
       "id":      ${event.id.value},
       "project": {
-        "id":    ${event.project.id.value}
+        "id":    ${event.projectId.value}
       },
       "body":    ${event.body.value}
     }"""
   }
+
+  private case class ReadyEvent(id: EventId, projectId: projects.Id, body: EventBody) extends CompoundId {
+    override lazy val compoundEventId: events.CompoundEventId = CompoundEventId(id, projectId)
+  }
+
+  private implicit val readyEvents: Gen[ReadyEvent] = for {
+    eventId   <- eventIds
+    projectId <- projectIds
+    body      <- eventBodies
+  } yield ReadyEvent(eventId, projectId, body)
+
 }

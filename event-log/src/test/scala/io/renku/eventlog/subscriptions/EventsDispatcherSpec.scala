@@ -57,9 +57,9 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
     "continue dispatching events from the queue to some free subscribers" in new TestCase {
 
-      val event           = events.generateOne
+      val event           = newEvents.generateOne
       val subscriber      = subscriberUrls.generateOne
-      val otherEvent      = events.generateOne
+      val otherEvent      = newEvents.generateOne
       val otherSubscriber = subscriberUrls.generateOne
 
       inSequence {
@@ -88,7 +88,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
     "mark subscriber busy and dispatch an event to some other subscriber " +
       s"if delivery to the first one resulted in $ServiceBusy" in new TestCase {
 
-        val event           = events.generateOne
+        val event           = newEvents.generateOne
         val subscriber      = subscriberUrls.generateOne
         val otherSubscriber = subscriberUrls.generateOne
 
@@ -116,7 +116,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
     s"remove subscriber which returned $Misdelivered on event dispatching " +
       "and use another subscriber if exists" in new TestCase {
 
-        val event                = events.generateOne
+        val event                = newEvents.generateOne
         val subscriber           = subscriberUrls.generateOne
         val otherSubscriber      = subscriberUrls.generateOne
         val yetAnotherSubscriber = subscriberUrls.generateOne
@@ -152,9 +152,9 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       "and continue processing next event" in new TestCase {
 
         val subscriber   = subscriberUrls.generateOne
-        val failingEvent = events.generateOne
+        val failingEvent = newEvents.generateOne
         val exception    = exceptions.generateOne
-        val event        = events.generateOne
+        val event        = newEvents.generateOne
 
         val nonRecoverableStatusUpdate = CaptureAll[ToNonRecoverableFailure[IO]]()
 
@@ -194,7 +194,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
     "continue dispatching if a dispatch attempt fails" in new TestCase {
 
       val exception  = exceptions.generateOne
-      val event      = events.generateOne
+      val event      = newEvents.generateOne
       val subscriber = subscriberUrls.generateOne
 
       inSequence {
@@ -223,7 +223,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
     "continue dispatching if finding event to process fails" in new TestCase {
 
       val exception  = exceptions.generateOne
-      val event      = events.generateOne
+      val event      = newEvents.generateOne
       val subscriber = subscriberUrls.generateOne
 
       inSequence {
@@ -256,7 +256,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
     "re-dispatch the event if marking a subscription busy fails" in new TestCase {
 
-      val event      = events.generateOne
+      val event      = newEvents.generateOne
       val exception  = exceptions.generateOne
       val subscriber = subscriberUrls.generateOne
 
@@ -287,7 +287,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
     "re-dispatch the event if removing a subscription fails" in new TestCase {
 
-      val event           = events.generateOne
+      val event           = newEvents.generateOne
       val exception       = exceptions.generateOne
       val subscriber      = subscriberUrls.generateOne
       val otherSubscriber = subscriberUrls.generateOne
@@ -320,9 +320,9 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
 
     "retry changing event status if status update failed initially" in new TestCase {
 
-      val failingEvent = events.generateOne
+      val failingEvent = newEvents.generateOne
       val exception    = exceptions.generateOne
-      val nextEvent    = events.generateOne
+      val nextEvent    = newEvents.generateOne
       val subscriber   = subscriberUrls.generateOne
 
       val nonRecoverableStatusUpdate = CaptureAll[ToNonRecoverableFailure[IO]]()
