@@ -167,11 +167,11 @@ object JsonLD {
 
   private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD with JsonLDArrayFlatten {
 
-    override def hashCode(): Int = jsons.sortBy(_.hashCode()).hashCode()
+    override def hashCode(): Int = jsons.size.hashCode() + jsons.toSet.hashCode()
 
     override def equals(that: Any): Boolean = that match {
-      case JsonLDArray(thatJsons) => thatJsons.sortBy(_.hashCode()) == this.jsons.sortBy(_.hashCode())
-      case _                      => false
+      case JsonLDArray(otherJsons) => (otherJsons.size == jsons.size) && (otherJsons.toSet == jsons.toSet)
+      case _                       => false
     }
 
     override lazy val toJson:      Json                   = Json.arr(jsons.map(_.toJson): _*)
