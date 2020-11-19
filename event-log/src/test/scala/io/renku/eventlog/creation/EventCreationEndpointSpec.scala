@@ -106,7 +106,7 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
 
     s"return $BadRequest if status was SKIPPED *but* the message is blank" in new TestCase {
 
-      val invalidwPayload: Json = skippedEvents.generateOne.asJson.hcursor
+      val invalidPayload: Json = skippedEvents.generateOne.asJson.hcursor
         .downField("status")
         .delete
         .as[Json]
@@ -131,9 +131,9 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
       val payloadWithoutStatus = newEvent.asJson.hcursor.downField("status").delete.as[Json].fold(throw _, identity)
       val request              = Request(Method.POST, uri"events").withEntity(payloadWithoutStatus)
       val response             = addEvent(request).unsafeRunSync()
-      response.status                           shouldBe Ok
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Event existed")
+      response.status                          shouldBe Ok
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
 
       logger.expectNoLogs()
     }

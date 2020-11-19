@@ -28,7 +28,6 @@ import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
 import io.circe.Decoder.decodeString
-import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 
 sealed trait Event {
   def id:        EventId
@@ -38,10 +37,7 @@ sealed trait Event {
   def body:      EventBody
   def status:    EventStatus
 
-  def setBatchDate(batchDate: BatchDate): Event = this match {
-    case event: NewEvent     => event.copy(batchDate = batchDate)
-    case event: SkippedEvent => event.copy(batchDate = batchDate)
-  }
+  def setBatchDate(batchDate: BatchDate): Event
 }
 
 object Event {
@@ -57,6 +53,9 @@ object Event {
       body:      EventBody
   ) extends Event {
     val status: EventStatus = EventStatus.New
+
+    override def setBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
+
   }
 
   final case class SkippedEvent(
@@ -68,6 +67,9 @@ object Event {
       message:   EventMessage
   ) extends Event {
     val status: EventStatus = EventStatus.Skipped
+
+    override def setBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
+
   }
 }
 

@@ -19,16 +19,15 @@
 package ch.datascience.controllers
 
 import cats.Applicative
-import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
-import eu.timepit.refined.string.MatchesRegex
+import eu.timepit.refined.collection.NonEmpty
 import io.circe._
 import org.http4s.EntityEncoder
 import org.http4s.circe.jsonEncoderOf
 
 object ErrorMessage {
 
-  type ErrorMessage = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+  type ErrorMessage = String Refined NonEmpty
 
   def apply(errorMessage: String): ErrorMessage = toErrorMessage {
     blankToNone(errorMessage)
@@ -68,7 +67,7 @@ object ErrorMessage {
 
 object InfoMessage {
 
-  type InfoMessage = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+  type InfoMessage = String Refined NonEmpty
 
   def apply(message: String): InfoMessage =
     RefType
