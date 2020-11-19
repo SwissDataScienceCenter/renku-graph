@@ -60,9 +60,9 @@ class ProjectPathAdderSpec
       }
       checkColumnExists shouldBe false
 
-      val event1 = newEvents.generateOne
+      val event1 = events.generateOne
       storeEvent(event1)
-      val event2 = newEvents.generateOne
+      val event2 = events.generateOne
       storeEvent(event2)
 
       projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)

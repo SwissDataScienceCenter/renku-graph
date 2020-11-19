@@ -56,10 +56,10 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
       }
       checkColumnExists shouldBe false
 
-      val event1            = newEvents.generateOne
+      val event1            = events.generateOne
       val event1CreatedDate = createdDates.generateOne
       storeEvent(event1, event1CreatedDate)
-      val event2            = newEvents.generateOne
+      val event2            = events.generateOne
       val event2CreatedDate = createdDates.generateOne
       storeEvent(event2, event2CreatedDate)
 

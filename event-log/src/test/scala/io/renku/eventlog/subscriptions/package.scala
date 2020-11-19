@@ -23,5 +23,4 @@ import org.scalacheck.Gen
 
 package object subscriptions {
   implicit val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
-
 }
