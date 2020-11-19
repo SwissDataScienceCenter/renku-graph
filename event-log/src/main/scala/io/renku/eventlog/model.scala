@@ -29,7 +29,7 @@ import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactor
 import io.circe.Decoder
 import io.circe.Decoder.decodeString
 
-sealed trait Event {
+sealed trait Event extends CompoundId {
   def id:        EventId
   def project:   EventProject
   def date:      EventDate
@@ -38,12 +38,15 @@ sealed trait Event {
   def status:    EventStatus
 
   def setBatchDate(batchDate: BatchDate): Event
+  lazy val compoundEventId: CompoundEventId = CompoundEventId(id, project.id)
+
+}
+
+trait CompoundId {
+  def compoundEventId: CompoundEventId
 }
 
 object Event {
-  implicit class CommitEventOps(event: Event) {
-    lazy val compoundEventId: CompoundEventId = CompoundEventId(event.id, event.project.id)
-  }
 
   final case class NewEvent(
       id:        EventId,
