@@ -18,10 +18,11 @@
 
 package io.renku.eventlog
 
-import EventStatus._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.EventStatus._
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import org.scalacheck.Gen
 

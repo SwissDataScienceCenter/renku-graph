@@ -23,7 +23,7 @@ import java.time.Instant
 import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody}
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus}
 import ch.datascience.graph.model.projects.Path
 import doobie.implicits._
 import doobie.util.fragment.Fragment

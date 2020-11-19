@@ -33,6 +33,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.webhookservice.eventprocessing.CommitEvent.NewCommitEvent
 import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender.EventSendingResult.{EventCreated, EventExisted}
 import ch.datascience.webhookservice.eventprocessing.commitevent._
 import ch.datascience.webhookservice.eventprocessing.{CommitEvent, Project, StartCommit}
@@ -305,7 +306,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
         author        <- authors
         committer     <- committers
         parentsIds    <- parentsIdsLists()
-      } yield CommitEvent(
+      } yield NewCommitEvent(
         id = commitId,
         message = message,
         committedDate = committedDate,

@@ -25,6 +25,7 @@ import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
@@ -34,7 +35,7 @@ import io.circe.{Encoder, Json}
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.creation.EventPersister.Result
-import io.renku.eventlog.{Event, EventProject, EventStatus}
+import io.renku.eventlog.{Event, EventProject}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._

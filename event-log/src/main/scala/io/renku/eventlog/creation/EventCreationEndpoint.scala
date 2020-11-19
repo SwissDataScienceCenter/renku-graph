@@ -24,7 +24,7 @@ import cats.syntax.all._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.{BatchDate, EventBody, EventId}
+import ch.datascience.graph.model.events.{BatchDate, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}

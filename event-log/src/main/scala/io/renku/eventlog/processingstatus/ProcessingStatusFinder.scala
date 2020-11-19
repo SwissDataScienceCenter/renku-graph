@@ -23,14 +23,15 @@ import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
 import eu.timepit.refined.api.RefType.applyRef
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import io.renku.eventlog.EventStatus._
-import io.renku.eventlog.{EventLogDB, EventStatus}
+import io.renku.eventlog.EventLogDB
 
 import scala.math.BigDecimal.RoundingMode
 

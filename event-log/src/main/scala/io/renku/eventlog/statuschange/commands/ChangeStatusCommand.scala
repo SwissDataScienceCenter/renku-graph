@@ -19,10 +19,10 @@
 package io.renku.eventlog.statuschange.commands
 
 import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.eventlog.{EventLogDB, EventStatus, TypesSerializers}
+import io.renku.eventlog.{EventLogDB, TypesSerializers}
 
 trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable with TypesSerializers {
   def eventId: CompoundEventId

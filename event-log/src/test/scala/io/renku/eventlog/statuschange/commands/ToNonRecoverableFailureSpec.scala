@@ -25,14 +25,14 @@ import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
-import io.renku.eventlog.EventStatus.{NonRecoverableFailure, Processing}
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import org.scalacheck.Gen

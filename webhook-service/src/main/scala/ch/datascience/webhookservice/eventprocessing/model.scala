@@ -27,21 +27,34 @@ final case class StartCommit(
     project: Project
 )
 
-final case class CommitEvent(
-    id:            CommitId,
-    project:       Project,
-    message:       CommitMessage,
-    committedDate: CommittedDate,
-    author:        Author,
-    committer:     Committer,
-    parents:       List[CommitId],
-    batchDate:     BatchDate
-)
+sealed trait CommitEvent {
+  def id:            CommitId
+  def project:       Project
+  def message:       CommitMessage
+  def committedDate: CommittedDate
+  def author:        Author
+  def committer:     Committer
+  def parents:       List[CommitId]
+  def batchDate:     BatchDate
+}
+
+// TODO: implement classes
 
 object CommitEvent {
   implicit class CommitEventOps(commitEvent: CommitEvent) {
     lazy val compoundEventId: CompoundEventId = CompoundEventId(EventId(commitEvent.id.value), commitEvent.project.id)
   }
+
+  final case class NewCommitEvent(
+      id:            CommitId,
+      project:       Project,
+      message:       CommitMessage,
+      committedDate: CommittedDate,
+      author:        Author,
+      committer:     Committer,
+      parents:       List[CommitId],
+      batchDate:     BatchDate
+  ) extends CommitEvent
 }
 
 final case class Project(id: projects.Id, path: projects.Path)

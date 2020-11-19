@@ -20,7 +20,7 @@ package io.renku.eventlog
 
 import java.time.Instant
 
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId}
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import doobie.util.meta.{LegacyInstantMetaInstance, LegacyLocalDateMetaInstance}
 import doobie.util.{Get, Put, Read}

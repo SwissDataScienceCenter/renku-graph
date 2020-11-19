@@ -25,14 +25,15 @@ import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators.{eventDates, executionDates}
-import io.renku.eventlog.EventStatus.{Processing, TriplesStore}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
-import io.renku.eventlog.{EventStatus, ExecutionDate, InMemoryEventLogDbSpec}
+import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

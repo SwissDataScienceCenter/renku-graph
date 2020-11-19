@@ -28,50 +28,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
-
-  import EventStatus._
-
-  "EventStatus" should {
-
-    val scenarios = Table(
-      "String Value"            -> "Expected EventStatus",
-      "NEW"                     -> New,
-      "PROCESSING"              -> Processing,
-      "TRIPLES_STORE"           -> TriplesStore,
-      "SKIPPED"                 -> Skipped,
-      "RECOVERABLE_FAILURE"     -> RecoverableFailure,
-      "NON_RECOVERABLE_FAILURE" -> NonRecoverableFailure
-    )
-
-    forAll(scenarios) { (stringValue, expectedStatus) =>
-      s"be instantiatable from '$stringValue'" in {
-        EventStatus.from(stringValue) shouldBe Right(expectedStatus)
-      }
-
-      s"be deserializable from $stringValue" in {
-        Json.fromString(stringValue).as[EventStatus] shouldBe Right(expectedStatus)
-      }
-    }
-
-    "fail instantiation for unknown value" in {
-      val unknown = nonEmptyStrings().generateOne
-
-      val Left(exception) = EventStatus.from(unknown)
-
-      exception.getMessage shouldBe s"'$unknown' unknown EventStatus"
-    }
-
-    "fail deserialization for unknown value" in {
-      val unknown = nonEmptyStrings().generateOne
-
-      val Left(exception) = Json.fromString(unknown).as[EventStatus]
-
-      exception.getMessage shouldBe s"'$unknown' unknown EventStatus"
-    }
-  }
-}
-
 class CreatedDateSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "CreatedDate" should {

@@ -24,16 +24,14 @@ import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.Event.SkippedEvent
-import io.renku.eventlog.EventStatus.{New, Skipped}
 import io.renku.eventlog._
-import io.renku.eventlog.creation.EventPersister.Result
 import io.renku.eventlog.creation.EventPersister.Result._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

@@ -27,12 +27,12 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody}
+import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.ProjectPrioritisation.Priority.MaxPriority
 import io.renku.eventlog.subscriptions.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}

@@ -27,6 +27,7 @@ import cats.data.NonEmptyList
 import cats.effect.{Bracket, IO}
 import cats.free.Free
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -35,8 +36,7 @@ import doobie.implicits._
 import doobie.util.fragments.in
 import eu.timepit.refined.auto._
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
-import io.renku.eventlog.EventStatus.{New, Processing, RecoverableFailure, Skipped}
-import io.renku.eventlog.{Event, EventLogDB, EventStatus}
+import io.renku.eventlog.{Event, EventLogDB}
 
 trait EventPersister[Interpretation[_]] {
   def storeNewEvent(event: Event): Interpretation[Result]

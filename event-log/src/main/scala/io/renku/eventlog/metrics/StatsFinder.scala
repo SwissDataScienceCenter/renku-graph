@@ -22,6 +22,7 @@ import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._

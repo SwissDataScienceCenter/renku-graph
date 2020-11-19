@@ -24,11 +24,11 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.metrics.{LabeledGauge, SingleValueGauge}
-import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.EventStatus
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}

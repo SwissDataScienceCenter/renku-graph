@@ -24,6 +24,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.webhookservice.commits.CommitInfo
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
+import ch.datascience.webhookservice.eventprocessing.CommitEvent.NewCommitEvent
 import ch.datascience.webhookservice.eventprocessing._
 import ch.datascience.webhookservice.model._
 import ch.datascience.webhookservice.project._
@@ -71,7 +72,7 @@ object WebhookServiceGenerators {
     committer     <- committers
     parentsIds    <- parentsIdsLists()
     batchDate     <- batchDates
-  } yield CommitEvent(commitId, project, message, committedDate, author, committer, parentsIds, batchDate)
+  } yield NewCommitEvent(commitId, project, message, committedDate, author, committer, parentsIds, batchDate)
 
   implicit lazy val authors: Gen[Author] = Gen.oneOf(
     userNames map Author.withName,

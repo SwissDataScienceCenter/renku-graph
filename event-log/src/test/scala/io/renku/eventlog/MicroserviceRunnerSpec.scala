@@ -25,6 +25,7 @@ import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.metrics.{GaugeResetScheduler, LabeledGauge, SingleValueGauge}

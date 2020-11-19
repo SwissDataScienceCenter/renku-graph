@@ -24,14 +24,14 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{nonEmptySet, nonNegativeLongs}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.MetricsTools._
 import ch.datascience.metrics.{LabeledGauge, MetricsRegistry}
 import io.prometheus.client.{Gauge => LibGauge}
-import io.renku.eventlog.EventStatus
-import io.renku.eventlog.EventStatus.Processing
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
