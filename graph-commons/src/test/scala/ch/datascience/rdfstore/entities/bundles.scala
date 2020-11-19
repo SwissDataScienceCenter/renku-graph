@@ -70,20 +70,16 @@ object bundles extends Schemas {
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeParent:         Option[Project] = None,
       projectVersion:      SchemaVersion
-  )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = {
-    val a = Activity(
-      commitId,
-      committedDate,
-      committer,
-      Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion),
-      Agent(cliVersion),
-      maybeGenerationFactories = List(
-        Generation.factory(Entity.factory(location))
-      )
+  )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = Activity(
+    commitId,
+    committedDate,
+    committer,
+    Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion),
+    Agent(cliVersion),
+    maybeGenerationFactories = List(
+      Generation.factory(Entity.factory(location))
     )
-    val d = a.asJsonLD
-    d
-  }
+  ).asJsonLD
 
   def randomDataSetCommit(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
     randomDataSetActivity.asJsonLD

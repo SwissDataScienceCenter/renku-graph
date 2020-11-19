@@ -26,14 +26,14 @@ import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, JsonLDEncoder}
 
 final case class InvalidationEntity(
-    override val commitId:                  CommitId,
-    entityIdToInvalidate:                   String,
-    override val project:                   Project,
-    override val maybeInvalidationActivity: Option[Activity]
+    override val commitId: CommitId,
+    entityIdToInvalidate:  String,
+    override val project:  Project,
+    invalidationActivity:  Activity
 ) extends Entity(commitId,
                  Location(".renku") / "datasets" / entityIdToInvalidate / "metadata.yml",
                  project,
-                 maybeInvalidationActivity,
+                 Some(invalidationActivity),
                  None
     )
     with Artifact

@@ -63,6 +63,6 @@ object EntityGenerators {
     activity.commitId,
     topmostDerivedFrom.map(_.value).getOrElse(datasetId.value),
     project,
-    Some(activity)
+    activity
   )
 }
