@@ -153,6 +153,7 @@ object DataSet {
           EntityTypes of schema / "Dataset",
           rdfs / "label"               -> entity.datasetId.asJsonLD,
           schema / "identifier"        -> entity.datasetId.asJsonLD,
+          schema / "isPartOf"          -> entity.project.asEntityId.asJsonLD,
           schema / "name"              -> entity.datasetTitle.asJsonLD,
           schema / "alternateName"     -> entity.datasetName.asJsonLD,
           schema / "url"               -> entity.datasetUrl.asJsonLD,

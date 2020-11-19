@@ -19,14 +19,14 @@
 package ch.datascience.knowledgegraph.datasets
 
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
-import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.datasets.{Identifier, TopmostDerivedFrom}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.addedToProjectObjects
 import ch.datascience.knowledgegraph.datasets.model.DatasetProject
 import ch.datascience.rdfstore.entities.Person.persons
-import ch.datascience.rdfstore.entities.{Activity, Agent, Artifact, Entity, Location, Project}
+import ch.datascience.rdfstore.entities.{Activity, Agent, InvalidationEntity, Project}
 import org.scalacheck.Gen
 
 object EntityGenerators {
@@ -57,13 +57,12 @@ object EntityGenerators {
   def invalidationEntity(datasetId:          Identifier,
                          project:            Project,
                          topmostDerivedFrom: Option[TopmostDerivedFrom] = None
-  ): Gen[Entity with Artifact] = for {
+  ): Gen[InvalidationEntity] = for {
     activity <- activities(project)
-  } yield new Entity(
+  } yield InvalidationEntity(
     activity.commitId,
-    Location(".renku") / "datasets" / topmostDerivedFrom.map(_.value).getOrElse(datasetId.value) / "metadata.yml",
+    topmostDerivedFrom.map(_.value).getOrElse(datasetId.value),
     project,
-    Some(activity),
-    None
-  ) with Artifact
+    activity
+  )
 }

@@ -18,14 +18,13 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.data.NonEmptyList
 import cats.kernel.Semigroup
 import cats.syntax.all._
 import io.renku.jsonld._
 
 final case class PartialEntity(maybeId:      Option[EntityId],
                                maybeTypes:   Option[EntityTypes],
-                               properties:   List[(Property, JsonLD)],
+                               properties:   Map[Property, JsonLD],
                                maybeReverse: Option[Reverse]
 )
 
@@ -35,7 +34,7 @@ object PartialEntity {
     PartialEntity(
       id.some,
       types.some,
-      (first +: other).toList,
+      other.toMap + first,
       maybeReverse = None
     )
 
@@ -43,7 +42,7 @@ object PartialEntity {
     PartialEntity(
       maybeId = None,
       maybeTypes = types.some,
-      properties = (first +: other).toList,
+      properties = other.toMap + first,
       maybeReverse = None
     )
 
@@ -55,21 +54,21 @@ object PartialEntity {
     PartialEntity(
       maybeId = None,
       maybeTypes = types.some,
-      properties = (first +: other).toList,
+      properties = other.toMap + first,
       maybeReverse = Some(reverse)
     )
 
   def apply(types: EntityTypes): PartialEntity =
-    new PartialEntity(maybeId = None, Some(types), properties = Nil, maybeReverse = None)
+    new PartialEntity(maybeId = None, Some(types), properties = Map.empty, maybeReverse = None)
 
   def apply(first: (Property, JsonLD), other: (Property, JsonLD)*): PartialEntity =
-    new PartialEntity(maybeId = None, maybeTypes = None, properties = (first +: other).toList, maybeReverse = None)
+    new PartialEntity(maybeId = None, maybeTypes = None, properties = other.toMap + first, maybeReverse = None)
 
   implicit val semigroup: Semigroup[PartialEntity] = (x: PartialEntity, y: PartialEntity) =>
     x.copy(
       maybeId = y.maybeId orElse x.maybeId,
       maybeTypes = y.maybeTypes.map(_.list) |+| x.maybeTypes.map(_.list) map EntityTypes.apply,
-      properties = x.properties merge y.properties,
+      properties = x.properties ++ y.properties,
       maybeReverse = x.maybeReverse |+| y.maybeReverse
     )
 
@@ -82,7 +81,7 @@ object PartialEntity {
         entityId   <- partialEntity.maybeId.toEither(s"No entityId in $partialEntity")
         types      <- partialEntity.maybeTypes.toEither(s"No entityTypes in $partialEntity")
         reverse    <- partialEntity.maybeReverse.getOrElse(Reverse.empty).asRight[Exception]
-        properties <- NonEmptyList.fromList(partialEntity.properties).toEither(s"No properties in $partialEntity")
+        properties <- partialEntity.properties.asRight[Exception]
       } yield JsonLD.entity(entityId, types, reverse, properties)
 
     private implicit class OptionOps[T](maybeValue: Option[T]) {

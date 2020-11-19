@@ -18,7 +18,6 @@
 
 package io.renku.jsonld
 
-import cats.data.NonEmptyList
 import io.renku.jsonld.JsonLD.JsonLDEntity
 
 abstract class Cursor {
@@ -66,13 +65,7 @@ object Cursor {
     override lazy val delete: Cursor = this
     override lazy val top: Option[JsonLD] = parent.jsonLD match {
       case json @ JsonLDEntity(_, _, properties, _) =>
-        properties.filterNot {
-          case (`property`, _) => true
-          case _               => false
-        } match {
-          case Nil            => None
-          case first +: other => Some(json.copy(properties = NonEmptyList.of(first, other: _*)))
-        }
+        Some(json.copy(properties = properties.removed(property)))
     }
   }
 

@@ -26,6 +26,7 @@ import io.circe.Json
 import io.circe.literal._
 import io.circe.parser._
 import io.circe.syntax._
+import io.renku.jsonld.JsonLD.JsonLDEntity
 import io.renku.jsonld.generators.Generators.Implicits._
 import io.renku.jsonld.generators.Generators._
 import io.renku.jsonld.generators.JsonLDGenerators._
@@ -33,6 +34,8 @@ import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import scala.util.Random
 
 class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -455,6 +458,54 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
     }
   }
 
+  "asArray" should {
+    "return vector with single JsonLDValue" in {
+      forAll(jsonLDValues) { json =>
+        json.asArray shouldBe Some(Vector(json))
+      }
+    }
+
+    "return vector with single JsonLDEntityID" in {
+      forAll { entityId: EntityId =>
+        val idAsJson = JsonLD.fromEntityId(entityId)
+        idAsJson.asArray shouldBe Some(Vector(idAsJson))
+      }
+    }
+
+    "return None on a JsonLDNull" in {
+      JsonLD.Null.asArray shouldBe None
+    }
+
+    "return vector containing the entity" in {
+      forAll(jsonLDEntities) { entity =>
+        entity.asArray shouldBe Some(Vector(entity))
+      }
+    }
+
+    "return a vector with the same elements as the array" in {
+      forAll(nonEmptyList(jsonLDEntities)) { entities =>
+        JsonLD.arr(entities.toList: _*).asArray shouldBe Some(entities.toList.toVector)
+      }
+    }
+  }
+
+  "equals & hashCode" should {
+    "return true for two JsonLDArrays with the same elements in the same order" in {
+      forAll(nonEmptyList(jsonLDEntities)) { entities =>
+        JsonLD.arr(entities.toList: _*) shouldBe JsonLD.arr(entities.toList: _*)
+        JsonLD.arr(entities.toList: _*).hashCode() shouldBe JsonLD.arr(entities.toList: _*).hashCode()
+      }
+    }
+
+    "return true for two JsonLDArrays with the same elements in *different* order" in {
+      forAll(nonEmptyList(jsonLDEntities)) { entities =>
+        JsonLD.arr(entities.toList: _*) shouldBe JsonLD.arr(Random.shuffle(entities.toList): _*)
+        JsonLD.arr(entities.toList: _*).hashCode() shouldBe JsonLD.arr(Random.shuffle(entities.toList): _*).hashCode()
+      }
+    }
+
+  }
+
   private def listValueProperties(schema: Schema): Gen[(Property, NonEmptyList[JsonLD])] =
     for {
       property <- nonBlankStrings() map (p => schema / p.value)
@@ -468,5 +519,25 @@ class JsonLDSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.M
       value    <- nonBlankStrings() map (v => JsonLD.fromString(v.value))
     } yield property -> value
 
+  private lazy val entityProperties: Gen[(Property, JsonLDEntity)] = for {
+    property <- properties
+    entity   <- jsonLDEntities
+  } yield property -> entity
+
   private case class Object(value: String)
+
+  private implicit class JsonLDEntityOps(entity: JsonLDEntity) {
+
+    def add(properties: List[(Property, JsonLD)]): JsonLDEntity =
+      properties.foldLeft(entity) { case (entity, (property, entityValue)) =>
+        entity.add(property -> entityValue)
+      }
+
+    def add(property: (Property, JsonLD)): JsonLDEntity = entity.copy(properties = entity.properties + property)
+  }
+
+  private implicit class EitherJsonLDOps[T <: Exception, U](either: Either[T, U]) {
+    lazy val unsafeGetRight: U = either.fold(throw _, identity)
+  }
+
 }
