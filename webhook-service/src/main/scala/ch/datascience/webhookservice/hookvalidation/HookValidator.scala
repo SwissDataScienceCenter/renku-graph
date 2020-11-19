@@ -59,25 +59,14 @@ class HookValidator[Interpretation[_]](
   import projectInfoFinder._
 
   def validateHook(projectId: Id, maybeAccessToken: Option[AccessToken]): Interpretation[HookValidationResult] =
-    findVisibilityAndToken(projectId, maybeAccessToken) flatMap {
-      case (Public, token) =>
-        for {
-          hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token.value)
-          validationResult <- toValidationResult(hookPresent, projectId)
-        } yield validationResult
-      case (_: TokenProtected, GivenToken(token)) =>
-        for {
-          hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token)
-          _                <- if (hookPresent) associate(projectId, token) else ME.unit
-          _                <- if (!hookPresent) removeAccessToken(projectId) else ME.unit
-          validationResult <- toValidationResult(hookPresent, projectId)
-        } yield validationResult
-      case (_: TokenProtected, StoredToken(token)) =>
-        for {
-          hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token)
-          _                <- if (!hookPresent) removeAccessToken(projectId) else ME.unit
-          validationResult <- toValidationResult(hookPresent, projectId)
-        } yield validationResult
+    findVisibilityAndToken(projectId, maybeAccessToken) flatMap { case (_, token) =>
+      for {
+        hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token.value)
+        _                <- if (hookPresent) associate(projectId, token.value) else ME.unit
+        _                <- if (!hookPresent) removeAccessToken(projectId) else ME.unit
+        validationResult <- toValidationResult(hookPresent)
+      } yield validationResult
+
     } recoverWith loggingError(projectId)
 
   private def findVisibilityAndToken(
@@ -117,7 +106,7 @@ class HookValidator[Interpretation[_]](
     ME.raiseError(new Exception(s"Stored access token for $projectId is invalid"))
   }
 
-  private def toValidationResult(projectHookPresent: Boolean, projectId: Id): Interpretation[HookValidationResult] =
+  private def toValidationResult(projectHookPresent: Boolean): Interpretation[HookValidationResult] =
     if (projectHookPresent)
       ME.pure(HookExists)
     else

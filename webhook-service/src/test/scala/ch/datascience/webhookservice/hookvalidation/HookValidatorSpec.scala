@@ -194,73 +194,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
       logger.loggedOnly(Info(s"Hook validation failed: ${exception.getMessage}"))
     }
   }
-
-  "validateHook - Public project" should {
-
-    "succeed with HookExists if there's a hook" in new TestCase {
-
-      val projectInfo = projectInfos.generateOne.copy(visibility = Public)
-      val projectId   = projectInfo.id
-
-      (projectInfoFinder
-        .findProjectInfo(_: Id, _: Option[AccessToken]))
-        .expects(projectId, Some(givenAccessToken))
-        .returning(context.pure(projectInfo))
-
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(context.pure(true))
-
-      validator.validateHook(projectId, Some(givenAccessToken)) shouldBe context.pure(HookExists)
-
-      logger.expectNoLogs()
-    }
-
-    "succeed with HookMissing if there's no hook" in new TestCase {
-
-      val projectInfo = projectInfos.generateOne.copy(visibility = Public)
-      val projectId   = projectInfo.id
-
-      (projectInfoFinder
-        .findProjectInfo(_: Id, _: Option[AccessToken]))
-        .expects(projectId, Some(givenAccessToken))
-        .returning(context.pure(projectInfo))
-
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(context.pure(false))
-
-      validator.validateHook(projectId, Some(givenAccessToken)) shouldBe context.pure(HookMissing)
-
-      logger.expectNoLogs()
-    }
-
-    "fail if finding hook verification fails" in new TestCase {
-
-      val projectInfo = projectInfos.generateOne.copy(visibility = Public)
-      val projectId   = projectInfo.id
-
-      (projectInfoFinder
-        .findProjectInfo(_: Id, _: Option[AccessToken]))
-        .expects(projectId, Some(givenAccessToken))
-        .returning(context.pure(projectInfo))
-
-      val exception: Exception    = exceptions.generateOne
-      val error:     Try[Nothing] = context.raiseError(exception)
-      (projectHookVerifier
-        .checkHookPresence(_: HookIdentifier, _: AccessToken))
-        .expects(HookIdentifier(projectId, projectHookUrl), givenAccessToken)
-        .returning(error)
-
-      validator.validateHook(projectId, Some(givenAccessToken)) shouldBe error
-
-      logger.loggedOnly(Error(s"Hook validation failed for project with id $projectId", exception))
-    }
-  }
-
-  Private +: Internal +: Nil foreach { visibility =>
+  Public +: Private +: Internal +: Nil foreach { visibility =>
     s"validateHook - $visibility project and valid given access token" should {
 
       "succeed with HookExists and re-associate access token if there's a hook" in new TestCase {
@@ -414,6 +348,11 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
           .checkHookPresence(_: HookIdentifier, _: AccessToken))
           .expects(HookIdentifier(projectId, projectHookUrl), storedAccessToken)
           .returning(context.pure(true))
+
+        (accessTokenAssociator
+          .associate(_: Id, _: AccessToken))
+          .expects(projectId, storedAccessToken)
+          .returning(context.unit)
 
         validator.validateHook(projectId, Some(givenAccessToken)) shouldBe context.pure(HookExists)
 
