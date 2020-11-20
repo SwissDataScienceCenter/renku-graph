@@ -35,7 +35,7 @@ sealed trait Event extends CompoundId {
   def body:      EventBody
   def status:    EventStatus
 
-  def setBatchDate(batchDate: BatchDate): Event
+  def withBatchDate(batchDate: BatchDate): Event
   lazy val compoundEventId: CompoundEventId = CompoundEventId(id, project.id)
 
 }
@@ -55,7 +55,7 @@ object Event {
   ) extends Event {
     val status: EventStatus = EventStatus.New
 
-    override def setBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
+    override def withBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
 
   }
 
@@ -69,7 +69,7 @@ object Event {
   ) extends Event {
     val status: EventStatus = EventStatus.Skipped
 
-    override def setBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
+    override def withBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
 
   }
 }

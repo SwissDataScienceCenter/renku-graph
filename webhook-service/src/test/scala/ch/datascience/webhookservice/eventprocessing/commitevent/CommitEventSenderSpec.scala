@@ -26,6 +26,7 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.eventprocessing.CommitEvent
+import ch.datascience.webhookservice.eventprocessing.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender.EventSendingResult._
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -33,6 +34,7 @@ import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status._
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -45,55 +47,75 @@ class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalSe
 
     s"return $EventCreated when delivering the event to the Event Log got $Created" in new TestCase {
 
-      val eventBody = serialize(commitEvent)
+      val eventBody = serialize(newCommitEvent)
       (eventSerializer
         .serialiseToJsonString(_: CommitEvent))
-        .expects(commitEvent)
+        .expects(newCommitEvent)
         .returning(context.pure(eventBody))
 
       stubFor {
         post("/events")
-          .withRequestBody(equalToJson(commitEvent.asJson(commitEventEncoder(eventBody)).spaces2))
+          .withRequestBody(equalToJson(newCommitEvent.asJson(commitEventEncoder(eventBody)).spaces2))
           .willReturn(aResponse().withStatus(Created.code))
       }
 
-      eventSender.send(commitEvent).unsafeRunSync() shouldBe EventCreated
+      eventSender.send(newCommitEvent).unsafeRunSync() shouldBe EventCreated
     }
 
     s"return $EventExisted when delivering the event to the Event Log got $Ok" in new TestCase {
 
-      val eventBody = serialize(commitEvent)
+      val eventBody = serialize(newCommitEvent)
       (eventSerializer
         .serialiseToJsonString(_: CommitEvent))
-        .expects(commitEvent)
+        .expects(newCommitEvent)
         .returning(context.pure(eventBody))
 
       stubFor {
         post("/events")
-          .withRequestBody(equalToJson(commitEvent.asJson(commitEventEncoder(eventBody)).spaces2))
+          .withRequestBody(equalToJson(newCommitEvent.asJson(commitEventEncoder(eventBody)).spaces2))
           .willReturn(aResponse().withStatus(Ok.code))
       }
 
-      eventSender.send(commitEvent).unsafeRunSync() shouldBe EventExisted
+      eventSender.send(newCommitEvent).unsafeRunSync() shouldBe EventExisted
+    }
+
+    s"return successfully for a SkippedCommitEvent" in new TestCase {
+      val skippedCommitEvent = skippedCommitEvents.generateOne
+      val eventBody          = serialize(newCommitEvent)
+      (eventSerializer
+        .serialiseToJsonString(_: CommitEvent))
+        .expects(skippedCommitEvent)
+        .returning(context.pure(eventBody))
+
+      val returnStatus = Gen.oneOf(Created.code, Ok.code).generateOne
+
+      stubFor {
+        post("/events")
+          .withRequestBody(equalToJson(skippedCommitEvent.asJson(commitEventEncoder(eventBody)).spaces2))
+          .willReturn(aResponse().withStatus(returnStatus))
+      }
+
+      val expectedEventSendingResult = if (returnStatus == Ok.code) EventExisted else EventCreated
+      eventSender.send(skippedCommitEvent).unsafeRunSync() shouldBe expectedEventSendingResult
     }
 
     s"fail when delivering the event to the Event Log got $BadRequest" in new TestCase {
 
-      val eventBody = serialize(commitEvent)
+      val eventBody = serialize(newCommitEvent)
       (eventSerializer
         .serialiseToJsonString(_: CommitEvent))
-        .expects(commitEvent)
+        .expects(newCommitEvent)
         .returning(context.pure(eventBody))
 
       val status = BadRequest
       stubFor {
         post("/events")
-          .withRequestBody(equalToJson(commitEvent.asJson(commitEventEncoder(eventBody)).spaces2))
+          .withRequestBody(equalToJson(newCommitEvent.asJson(commitEventEncoder(eventBody)).spaces2))
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
-        eventSender.send(commitEvent).unsafeRunSync()
+        eventSender.send(newCommitEvent).unsafeRunSync()
       }.getMessage shouldBe s"POST $eventLogUrl/events returned $status; body: "
     }
 
@@ -102,11 +124,11 @@ class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalSe
       val exception = exceptions.generateOne
       (eventSerializer
         .serialiseToJsonString(_: CommitEvent))
-        .expects(commitEvent)
+        .expects(newCommitEvent)
         .returning(context.raiseError(exception))
 
       intercept[Exception] {
-        eventSender.send(commitEvent).unsafeRunSync()
+        eventSender.send(newCommitEvent).unsafeRunSync()
       } shouldBe exception
     }
   }
@@ -117,7 +139,7 @@ class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalSe
   private trait TestCase {
     val context = MonadError[IO, Throwable]
 
-    val commitEvent = commitEvents.generateOne
+    val newCommitEvent = newCommitEvents.generateOne
 
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
     class TestCommitEventSerializer extends CommitEventSerializer[IO]
@@ -125,8 +147,9 @@ class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalSe
     val eventSender     = new IOCommitEventSender(eventLogUrl, eventSerializer, TestLogger())
   }
 
-  private def commitEventEncoder(eventBody: String): Encoder[CommitEvent] = Encoder.instance[CommitEvent] { event =>
-    json"""{
+  private def commitEventEncoder[T <: CommitEvent](eventBody: String): Encoder[T] = Encoder.instance[T] {
+    case event: NewCommitEvent =>
+      json"""{
       "id":        ${event.id.value},
       "project": {
         "id":      ${event.project.id.value},
@@ -134,7 +157,21 @@ class CommitEventSenderSpec extends AnyWordSpec with MockFactory with ExternalSe
       },
       "date":      ${event.committedDate.value},
       "batchDate": ${event.batchDate.value},
-      "body":      $eventBody
+      "body":      $eventBody,
+      "status":    ${event.status.value}
+    }"""
+    case event: SkippedCommitEvent =>
+      json"""{
+      "id":        ${event.id.value},
+      "project": {
+        "id":      ${event.project.id.value},
+        "path":    ${event.project.path.value}
+      },
+      "date":      ${event.committedDate.value},
+      "batchDate": ${event.batchDate.value},
+      "body":      $eventBody,
+      "status":    ${event.status.value},
+      "message":   ${event.message.value}
     }"""
   }
   private def serialize(commitEvent: CommitEvent): String = s"""{id: "${commitEvent.id.toString}"}"""

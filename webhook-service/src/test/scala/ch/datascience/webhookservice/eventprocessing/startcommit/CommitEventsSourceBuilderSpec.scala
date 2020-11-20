@@ -84,10 +84,6 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
           commitInfos(parentId, singleParent).generateOne
         }
 
-        val level3Infos = level2Infos.flatMap(_.parents) map { parentId =>
-          commitInfos(parentId, noParents).generateOne
-        }
-
         givenFindingCommitInfoReturns(level1Info, level2Infos)
 
         source.transformEventsWith(

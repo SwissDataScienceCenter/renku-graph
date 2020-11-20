@@ -74,7 +74,7 @@ class EventPersisterImpl(
     } yield Created
 
   private def eventuallyAddToExistingBatch(event: Event) =
-    measureExecutionTime(findBatchInQueue(event)).map(_.map(event.setBatchDate).getOrElse(event))
+    measureExecutionTime(findBatchInQueue(event)).map(_.map(event.withBatchDate).getOrElse(event))
 
   private def checkIfInLog(event: Event) = SqlQuery(
     sql"""|select event_id

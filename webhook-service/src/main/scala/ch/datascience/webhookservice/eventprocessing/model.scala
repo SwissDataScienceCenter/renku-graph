@@ -18,7 +18,8 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
-import ch.datascience.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId}
+import ch.datascience.graph.model.events.EventStatus.{New, Skipped}
+import ch.datascience.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.users.Email
 import ch.datascience.graph.model.{projects, users}
 
@@ -36,9 +37,8 @@ sealed trait CommitEvent {
   def committer:     Committer
   def parents:       List[CommitId]
   def batchDate:     BatchDate
+  def status:        EventStatus
 }
-
-// TODO: implement classes
 
 object CommitEvent {
   implicit class CommitEventOps(commitEvent: CommitEvent) {
@@ -54,7 +54,22 @@ object CommitEvent {
       committer:     Committer,
       parents:       List[CommitId],
       batchDate:     BatchDate
-  ) extends CommitEvent
+  ) extends CommitEvent {
+    override def status: EventStatus = New
+  }
+
+  final case class SkippedCommitEvent(
+      id:            CommitId,
+      project:       Project,
+      message:       CommitMessage,
+      committedDate: CommittedDate,
+      author:        Author,
+      committer:     Committer,
+      parents:       List[CommitId],
+      batchDate:     BatchDate
+  ) extends CommitEvent {
+    override def status: EventStatus = Skipped
+  }
 }
 
 final case class Project(id: projects.Id, path: projects.Path)
