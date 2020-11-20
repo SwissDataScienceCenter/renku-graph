@@ -23,6 +23,7 @@ import java.time.Instant
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.BatchDate
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
@@ -32,7 +33,6 @@ import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.{CreatedDate, Event}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import io.renku.eventlog.DbEventLogGenerators._
 
 class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 

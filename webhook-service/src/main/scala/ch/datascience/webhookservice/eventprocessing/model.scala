@@ -28,7 +28,7 @@ final case class StartCommit(
     project: Project
 )
 
-sealed trait CommitEvent {
+sealed trait CommitEvent extends Product with Serializable {
   def id:            CommitId
   def project:       Project
   def message:       CommitMessage
