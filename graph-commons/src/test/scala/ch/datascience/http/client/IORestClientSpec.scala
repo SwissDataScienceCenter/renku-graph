@@ -18,7 +18,10 @@
 
 package ch.datascience.http.client
 
+import java.util.concurrent.TimeoutException
+
 import cats.effect.{ContextShift, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.config.ServiceUrl
 import ch.datascience.control.Throttler
 import ch.datascience.generators.Generators.Implicits._
@@ -41,9 +44,9 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.language.postfixOps
 
 class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
@@ -217,6 +220,29 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
         Warn(s"GET http://localhost:1024/resource timed out -> retrying attempt 2 error: $exceptionMessage")
       )
     }
+
+    "use the overridden request timeout" in new TestCase {
+
+      val requestTimeout = 500 millis
+
+      stubFor {
+        get("/resource")
+          .willReturn(ok("1").withFixedDelay((requestTimeout.toMillis + 200).toInt))
+      }
+
+      val exception = intercept[ConnectivityException] {
+        new TestRestClient(hostUrl,
+                           Throttler.noThrottling,
+                           logger,
+                           maybeTimeRecorder = None,
+                           requestTimeout.some
+        ).callRemote.unsafeRunSync()
+      }
+
+      exception          shouldBe a[ConnectivityException]
+      exception.getCause shouldBe a[TimeoutException]
+      exception.getMessage should not be empty
+    }
   }
 
   private trait TestCase {
@@ -235,13 +261,20 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
 
   private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
   private implicit val timer: Timer[IO]        = IO.timer(global)
-  private val hostUrl = ServiceUrl(externalServiceBaseUrl)
+  private lazy val hostUrl = ServiceUrl(externalServiceBaseUrl)
 
-  private class TestRestClient(hostUrl:           ServiceUrl,
-                               throttler:         Throttler[IO, Any],
-                               logger:            Logger[IO],
-                               maybeTimeRecorder: Option[ExecutionTimeRecorder[IO]]
-  ) extends IORestClient(throttler, logger, maybeTimeRecorder, retryInterval = 1 millisecond, maxRetries = 2) {
+  private class TestRestClient(hostUrl:                     ServiceUrl,
+                               throttler:                   Throttler[IO, Any],
+                               logger:                      Logger[IO],
+                               maybeTimeRecorder:           Option[ExecutionTimeRecorder[IO]],
+                               maybeRequestTimeoutOverride: Option[Duration] = None
+  ) extends IORestClient(throttler,
+                         logger,
+                         maybeTimeRecorder,
+                         retryInterval = 1 millisecond,
+                         maxRetries = 2,
+                         maybeRequestTimeoutOverride
+      ) {
 
     def callRemote: IO[Int] =
       for {

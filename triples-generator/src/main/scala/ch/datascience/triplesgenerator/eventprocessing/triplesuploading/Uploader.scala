@@ -100,7 +100,7 @@ private[eventprocessing] object IOUploader {
     for {
       rdfStoreConfig <- RdfStoreConfig[IO]()
     } yield new Uploader[IO](
-      new IOTriplesUploader(rdfStoreConfig, logger),
+      new IOTriplesUploader(rdfStoreConfig, logger, timeRecorder),
       new IOUpdatesUploader(rdfStoreConfig, logger, timeRecorder)
     )
 }
