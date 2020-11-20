@@ -45,6 +45,7 @@ private class IOTriplesUploader(
     timeRecorder:            SparqlQueryTimeRecorder[IO],
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:             Duration = 6 minutes,
     requestTimeout:          Duration = 5 minutes
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient[Any](Throttler.noThrottling,
@@ -52,6 +53,7 @@ private class IOTriplesUploader(
                               maybeTimeRecorder = timeRecorder.instance.some,
                               retryInterval = retryInterval,
                               maxRetries = maxRetries,
+                              idleTimeoutOverride = idleTimeout.some,
                               requestTimeoutOverride = requestTimeout.some
     )
     with TriplesUploader[IO] {

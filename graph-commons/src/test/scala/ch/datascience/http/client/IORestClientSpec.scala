@@ -221,6 +221,29 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
       )
     }
 
+    "use the overridden idle timeout" in new TestCase {
+
+      val idleTimeout = 500 millis
+
+      stubFor {
+        get("/resource")
+          .willReturn(ok("1").withFixedDelay((idleTimeout.toMillis + 200).toInt))
+      }
+
+      val exception = intercept[ConnectivityException] {
+        new TestRestClient(hostUrl,
+                           Throttler.noThrottling,
+                           logger,
+                           maybeTimeRecorder = None,
+                           idleTimeoutOverride = idleTimeout.some
+        ).callRemote.unsafeRunSync()
+      }
+
+      exception          shouldBe a[ConnectivityException]
+      exception.getCause shouldBe a[TimeoutException]
+      exception.getMessage should not be empty
+    }
+
     "use the overridden request timeout" in new TestCase {
 
       val requestTimeout = 500 millis
@@ -235,7 +258,7 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
                            Throttler.noThrottling,
                            logger,
                            maybeTimeRecorder = None,
-                           requestTimeout.some
+                           maybeRequestTimeoutOverride = requestTimeout.some
         ).callRemote.unsafeRunSync()
       }
 
@@ -267,12 +290,14 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
                                throttler:                   Throttler[IO, Any],
                                logger:                      Logger[IO],
                                maybeTimeRecorder:           Option[ExecutionTimeRecorder[IO]],
+                               idleTimeoutOverride:         Option[Duration] = None,
                                maybeRequestTimeoutOverride: Option[Duration] = None
   ) extends IORestClient(throttler,
                          logger,
                          maybeTimeRecorder,
                          retryInterval = 1 millisecond,
                          maxRetries = 2,
+                         idleTimeoutOverride,
                          maybeRequestTimeoutOverride
       ) {
 
