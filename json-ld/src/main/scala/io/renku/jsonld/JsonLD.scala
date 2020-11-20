@@ -21,14 +21,24 @@ package io.renku.jsonld
 import java.io.Serializable
 import java.time.{Instant, LocalDate}
 
-import cats.data.NonEmptyList
+import cats.implicits.catsSyntaxEitherId
 import io.circe.{Encoder, Json}
+import io.renku.jsonld.JsonLD.MalformedJsonLD
+import io.renku.jsonld.flatten.{JsonLDArrayFlatten, JsonLDEntityFlatten}
 
 abstract class JsonLD extends Product with Serializable {
-  def toJson:      Json
-  def entityId:    Option[EntityId]
+  def toJson: Json
+
+  def entityId: Option[EntityId]
+
   def entityTypes: Option[EntityTypes]
+
   def cursor: Cursor = Cursor.from(this)
+
+  def asArray: Option[Vector[JsonLD]]
+
+  def flatten: Either[MalformedJsonLD, JsonLD]
+
 }
 
 object JsonLD {
@@ -37,15 +47,23 @@ object JsonLD {
 
   val Null: JsonLD = JsonLDNull
 
-  def fromString(value:    String):    JsonLD = JsonLDValue(value)
-  def fromInt(value:       Int):       JsonLD = JsonLDValue(value)
-  def fromLong(value:      Long):      JsonLD = JsonLDValue(value)
-  def fromInstant(value:   Instant):   JsonLD = JsonLDValue(value, "http://www.w3.org/2001/XMLSchema#dateTime")
+  def fromString(value: String): JsonLD = JsonLDValue(value)
+
+  def fromInt(value: Int): JsonLD = JsonLDValue(value)
+
+  def fromLong(value: Long): JsonLD = JsonLDValue(value)
+
+  def fromInstant(value: Instant): JsonLD = JsonLDValue(value, "http://www.w3.org/2001/XMLSchema#dateTime")
+
   def fromLocalDate(value: LocalDate): JsonLD = JsonLDValue(value, "http://schema.org/Date")
-  def fromBoolean(value:   Boolean): JsonLD = JsonLDValue(value)
+
+  def fromBoolean(value: Boolean): JsonLD = JsonLDValue(value)
+
   def fromOption[V](value: Option[V])(implicit encoder: JsonLDEncoder[V]): JsonLD = JsonLDOptionValue(value)
-  def fromEntityId(id:     EntityId):  JsonLD = JsonLDEntityId(id)
-  def arr(jsons:           JsonLD*):   JsonLD = JsonLDArray(jsons)
+
+  def fromEntityId(id: EntityId): JsonLD = JsonLDEntityId(id)
+
+  def arr(jsons: JsonLD*): JsonLD = JsonLDArray(jsons)
 
   def entity(
       id:            EntityId,
@@ -57,7 +75,7 @@ object JsonLD {
   def entity(
       id:         EntityId,
       types:      EntityTypes,
-      properties: NonEmptyList[(Property, JsonLD)],
+      properties: Map[Property, JsonLD],
       other:      (Property, JsonLD)*
   ): JsonLDEntity = JsonLDEntity(id, types, properties ++ other.toList, Reverse.empty)
 
@@ -67,20 +85,21 @@ object JsonLD {
       reverse:       Reverse,
       firstProperty: (Property, JsonLD),
       other:         (Property, JsonLD)*
-  ): JsonLDEntity = JsonLDEntity(id, types, properties = NonEmptyList.of(firstProperty, other: _*), reverse)
+  ): JsonLDEntity = JsonLDEntity(id, types, properties = other.toMap + firstProperty, reverse)
 
   def entity(
       id:         EntityId,
       types:      EntityTypes,
       reverse:    Reverse,
-      properties: NonEmptyList[(Property, JsonLD)]
+      properties: Map[Property, JsonLD]
   ): JsonLDEntity = JsonLDEntity(id, types, properties, reverse)
 
   private[jsonld] final case class JsonLDEntity(id:         EntityId,
                                                 types:      EntityTypes,
-                                                properties: NonEmptyList[(Property, JsonLD)],
+                                                properties: Map[Property, JsonLD],
                                                 reverse:    Reverse
-  ) extends JsonLD {
+  ) extends JsonLD
+      with JsonLDEntityFlatten {
 
     override lazy val toJson: Json = Json.obj(
       List(
@@ -101,8 +120,10 @@ object JsonLD {
       }
     }
 
-    override lazy val entityId:    Option[EntityId]    = Some(id)
-    override lazy val entityTypes: Option[EntityTypes] = Some(types)
+    override lazy val entityId:    Option[EntityId]       = Some(id)
+    override lazy val entityTypes: Option[EntityTypes]    = Some(types)
+    override lazy val asArray:     Option[Vector[JsonLD]] = Some(Vector(this))
+
   }
 
   private[jsonld] final case class JsonLDValue[V](
@@ -117,6 +138,10 @@ object JsonLD {
 
     override lazy val entityId:    Option[EntityId]    = None
     override lazy val entityTypes: Option[EntityTypes] = None
+
+    override lazy val asArray: Option[Vector[JsonLD]] = Some(Vector(this))
+
+    override lazy val flatten: Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] object JsonLDValue {
@@ -125,9 +150,11 @@ object JsonLD {
   }
 
   private[jsonld] final case object JsonLDNull extends JsonLD {
-    override lazy val toJson:      Json                = Json.Null
-    override lazy val entityId:    Option[EntityId]    = None
-    override lazy val entityTypes: Option[EntityTypes] = None
+    override lazy val toJson:      Json                            = Json.Null
+    override lazy val entityId:    Option[EntityId]                = None
+    override lazy val entityTypes: Option[EntityTypes]             = None
+    override lazy val asArray:     Option[Vector[JsonLD]]          = None
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
   }
 
   private[jsonld] final case object JsonLDOptionValue {
@@ -138,15 +165,28 @@ object JsonLD {
       }
   }
 
-  private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD {
-    override lazy val toJson:      Json                = Json.arr(jsons.map(_.toJson): _*)
-    override lazy val entityId:    Option[EntityId]    = None
-    override lazy val entityTypes: Option[EntityTypes] = None
+  private[jsonld] final case class JsonLDArray(jsons: Seq[JsonLD]) extends JsonLD with JsonLDArrayFlatten {
+
+    override def hashCode(): Int = jsons.size.hashCode() + jsons.toSet.hashCode()
+
+    override def equals(that: Any): Boolean = that match {
+      case JsonLDArray(otherJsons) => (otherJsons.size == jsons.size) && (otherJsons.toSet == jsons.toSet)
+      case _                       => false
+    }
+
+    override lazy val toJson:      Json                   = Json.arr(jsons.map(_.toJson): _*)
+    override lazy val entityId:    Option[EntityId]       = None
+    override lazy val entityTypes: Option[EntityTypes]    = None
+    override lazy val asArray:     Option[Vector[JsonLD]] = Some(jsons.toVector)
   }
 
   private[jsonld] final case class JsonLDEntityId[V <: EntityId](id: V)(implicit encoder: Encoder[V]) extends JsonLD {
-    override lazy val toJson:      Json                = Json.obj("@id" -> id.asJson)
-    override lazy val entityId:    Option[EntityId]    = None
-    override lazy val entityTypes: Option[EntityTypes] = None
+    override lazy val toJson:      Json                            = Json.obj("@id" -> id.asJson)
+    override lazy val entityId:    Option[EntityId]                = None
+    override lazy val entityTypes: Option[EntityTypes]             = None
+    override lazy val asArray:     Option[Vector[JsonLD]]          = Some(Vector(this))
+    override lazy val flatten:     Either[MalformedJsonLD, JsonLD] = this.asRight
   }
+
+  final case class MalformedJsonLD(message: String) extends RuntimeException(message)
 }

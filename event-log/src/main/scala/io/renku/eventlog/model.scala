@@ -29,17 +29,50 @@ import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactor
 import io.circe.Decoder
 import io.circe.Decoder.decodeString
 
-final case class Event(
-    id:        EventId,
-    project:   EventProject,
-    date:      EventDate,
-    batchDate: BatchDate,
-    body:      EventBody
-)
+sealed trait Event extends CompoundId {
+  def id:        EventId
+  def project:   EventProject
+  def date:      EventDate
+  def batchDate: BatchDate
+  def body:      EventBody
+  def status:    EventStatus
+
+  def setBatchDate(batchDate: BatchDate): Event
+  lazy val compoundEventId: CompoundEventId = CompoundEventId(id, project.id)
+
+}
+
+trait CompoundId {
+  def compoundEventId: CompoundEventId
+}
 
 object Event {
-  implicit class CommitEventOps(event: Event) {
-    lazy val compoundEventId: CompoundEventId = CompoundEventId(event.id, event.project.id)
+
+  final case class NewEvent(
+      id:        EventId,
+      project:   EventProject,
+      date:      EventDate,
+      batchDate: BatchDate,
+      body:      EventBody
+  ) extends Event {
+    val status: EventStatus = EventStatus.New
+
+    override def setBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
+
+  }
+
+  final case class SkippedEvent(
+      id:        EventId,
+      project:   EventProject,
+      date:      EventDate,
+      batchDate: BatchDate,
+      body:      EventBody,
+      message:   EventMessage
+  ) extends Event {
+    val status: EventStatus = EventStatus.Skipped
+
+    override def setBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
+
   }
 }
 

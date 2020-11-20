@@ -23,7 +23,8 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.{FusekiBaseUrl, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -109,12 +110,15 @@ class TriplesUploaderSpec extends AnyWordSpec with MockFactory with ExternalServ
 
     val triples = jsonLDTriples.generateOne
 
+    val logger               = TestLogger[IO]()
+    private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     val rdfStoreConfig = rdfStoreConfigs.generateOne.copy(
       fusekiBaseUrl = FusekiBaseUrl(externalServiceBaseUrl)
     )
     lazy val triplesUploader = new IOTriplesUploader(
       rdfStoreConfig,
-      TestLogger(),
+      logger,
+      timeRecorder,
       retryInterval = 100 millis,
       maxRetries = 1
     )

@@ -96,8 +96,5 @@ package object entities extends Schemas with EntitiesGenerators {
       }
   }
 
-  implicit val reverseSemigroup: Semigroup[Reverse] = (x: Reverse, y: Reverse) =>
-    Reverse.fromListUnsafe {
-      x.properties merge y.properties
-    }
+  implicit val reverseSemigroup: Semigroup[Reverse] = (x: Reverse, y: Reverse) => Reverse(x.properties ++ y.properties)
 }

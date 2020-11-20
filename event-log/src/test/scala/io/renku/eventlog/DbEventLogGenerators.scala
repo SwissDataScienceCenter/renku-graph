@@ -22,6 +22,7 @@ import EventStatus._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import org.scalacheck.Gen
 
 import scala.language.postfixOps
@@ -39,15 +40,28 @@ object DbEventLogGenerators {
     RecoverableFailure,
     NonRecoverableFailure
   )
+
   implicit val eventMessages: Gen[EventMessage] = nonEmptyStrings() map EventMessage.apply
 
-  implicit lazy val events: Gen[Event] = for {
+  lazy val newEvents: Gen[NewEvent] = for {
     eventId   <- eventIds
     project   <- eventProjects
     date      <- eventDates
     batchDate <- batchDates
     body      <- eventBodies
-  } yield Event(eventId, project, date, batchDate, body)
+  } yield NewEvent(eventId, project, date, batchDate, body)
+
+  lazy val skippedEvents: Gen[SkippedEvent] = for {
+    eventId   <- eventIds
+    project   <- eventProjects
+    date      <- eventDates
+    batchDate <- batchDates
+    body      <- eventBodies
+    message   <- eventMessages
+  } yield SkippedEvent(eventId, project, date, batchDate, body, message)
+
+  implicit lazy val events: Gen[Event] =
+    Gen.oneOf(newEvents, skippedEvents)
 
   implicit lazy val eventProjects: Gen[EventProject] = for {
     id   <- projectIds

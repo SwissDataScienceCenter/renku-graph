@@ -32,8 +32,9 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.creation.EventPersister.Result
-import io.renku.eventlog.{Event, EventProject}
+import io.renku.eventlog.{Event, EventProject, EventStatus}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -52,7 +53,7 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
       s"and return $Created " +
       "if there's no such an event in the Log yet" in new TestCase {
 
-        val event = events.generateOne
+        val event = newEvents.generateOne
         (persister.storeNewEvent _)
           .expects(event)
           .returning(Result.Created.pure[IO])
@@ -73,7 +74,7 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
       s"and return $Ok " +
       "if such an event was already in the Log" in new TestCase {
 
-        val event = events.generateOne
+        val event = newEvents.generateOne
         (persister.storeNewEvent _)
           .expects(event)
           .returning(Result.Existed.pure[IO])
@@ -88,6 +89,72 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
 
         logger.expectNoLogs()
       }
+
+    s"return $Ok if status was SKIPPED *and* the message is not blank" in new TestCase {
+      val event = skippedEvents.generateOne
+      (persister.storeNewEvent _)
+        .expects(event)
+        .returning(Result.Existed.pure[IO])
+      val request  = Request(Method.POST, uri"events").withEntity(event.asJson)
+      val response = addEvent(request).unsafeRunSync()
+      response.status                          shouldBe Ok
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
+
+      logger.expectNoLogs()
+    }
+
+    s"return $BadRequest if status was SKIPPED *but* the message is blank" in new TestCase {
+
+      val invalidPayload: Json = skippedEvents.generateOne.asJson.hcursor
+        .downField("status")
+        .delete
+        .as[Json]
+        .fold(throw _, identity)
+        .deepMerge(json"""{"status": ${blankStrings().generateOne}}""")
+      val request  = Request(Method.POST, uri"events").withEntity(invalidPayload)
+      val response = addEvent(request).unsafeRunSync()
+      response.status      shouldBe BadRequest
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
+        s"Invalid message body: Could not decode JSON: ${invalidPayload.toString}"
+      )
+
+      logger.expectNoLogs()
+    }
+
+    s"set default status to NEW if no status is provided" in new TestCase {
+      val newEvent = newEvents.generateOne
+      (persister.storeNewEvent _)
+        .expects(newEvent)
+        .returning(Result.Existed.pure[IO])
+      val payloadWithoutStatus = newEvent.asJson.hcursor.downField("status").delete.as[Json].fold(throw _, identity)
+      val request              = Request(Method.POST, uri"events").withEntity(payloadWithoutStatus)
+      val response             = addEvent(request).unsafeRunSync()
+      response.status                          shouldBe Ok
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
+
+      logger.expectNoLogs()
+    }
+
+    unacceptableStatuses.foreach { invalidStatus =>
+      s"return $BadRequest if status was $invalidStatus" in new TestCase {
+
+        val randomEvent          = events.generateOne
+        val payloadInvalidStatus = randomEvent.asJson.deepMerge(json"""{"status": ${invalidStatus.value} }""")
+
+        val request  = Request(Method.POST, uri"events").withEntity(payloadInvalidStatus)
+        val response = addEvent(request).unsafeRunSync()
+        response.status      shouldBe BadRequest
+        response.contentType shouldBe Some(`Content-Type`(application.json))
+        response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
+          s"Invalid message body: Could not decode JSON: $payloadInvalidStatus"
+        )
+        logger.expectNoLogs()
+      }
+
+    }
 
     s"return $BadRequest if decoding Event from the request fails" in new TestCase {
 
@@ -107,7 +174,7 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
 
     s"return $InternalServerError when storing Event in the Log fails" in new TestCase {
 
-      val event     = events.generateOne
+      val event     = newEvents.generateOne
       val exception = exceptions.generateOne
       (persister.storeNewEvent _)
         .expects(event)
@@ -125,21 +192,29 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
     }
   }
 
+  private lazy val unacceptableStatuses = EventStatus.all.diff(Set(EventStatus.New, EventStatus.Skipped))
+
   private trait TestCase {
+
     val persister = mock[EventPersister[IO]]
     val logger    = TestLogger[IO]()
     val addEvent  = new EventCreationEndpoint[IO](persister, logger).addEvent _
   }
 
-  private implicit lazy val eventEncoder: Encoder[Event] = Encoder.instance[Event] { event =>
+  private implicit def eventEncoder[T <: Event]: Encoder[T] = Encoder.instance[T] {
+    case event: NewEvent     => toJson(event)
+    case event: SkippedEvent => toJson(event) deepMerge json"""{ "message":    ${event.message.value} }"""
+  }
+
+  private def toJson(event: Event): Json =
     json"""{
       "id":         ${event.id.value},
       "project":    ${event.project},
       "date":       ${event.date.value},
       "batchDate":  ${event.batchDate.value},
-      "body":       ${event.body.value}
-    }"""
-  }
+      "body":       ${event.body.value},
+      "status":     ${event.status.value}
+  }"""
 
   private implicit lazy val projectEncoder: Encoder[EventProject] = Encoder.instance[EventProject] { project =>
     json"""{

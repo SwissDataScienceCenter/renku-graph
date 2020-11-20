@@ -8,7 +8,7 @@ This is a microservice which provides CRUD operations for Event Log DB.
 |--------|-----------------------------------------|----------------------------------------------------------------|
 |  GET   | ```/events?latest_per_project=true```   | Finds events for all the projects with the latest `event_date` |
 |  PATCH | ```/events```                           | Changes events' data by applying the given patch               |
-|  POST  | ```/events```                           | Creates an event with a `NEW` status                           |
+|  POST  | ```/events```                           | Creates an event with either a `NEW` or `SKIPPED` status       |
 |  PATCH | ```/events/:event-id/:project-id```     | Updates chosen event's data                                    |
 |  GET   | ```/metrics```                          | Returns Prometheus metrics of the service                      |
 |  GET   | ```/ping```                             | Verifies service health                                        |
@@ -67,9 +67,25 @@ Be aware that the given patch affects all the events in the Event Log.
 
 #### POST /events
 
-Creates an event with the `NEW` status.
+Creates an event with either the `NEW` or `SKIPPED` status.
 
 **Request**
+In the case of a *NEW* event
+```json
+{
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id":   123,
+    "path": "namespace/project-name"
+  },
+  "date":    "2001-09-04T10:48:29.457Z",
+  "batchDate": "2001-09-04T11:00:00.000Z",
+  "body":      "JSON payload",
+  "status": "NEW"
+}
+```
+
+In the case of a *SKIPPED* event. Note that a non-blank `message` is required.
 
 ```json
 {
@@ -80,7 +96,9 @@ Creates an event with the `NEW` status.
   },
   "date":    "2001-09-04T10:48:29.457Z",
   "batchDate": "2001-09-04T11:00:00.000Z",
-  "body":      "JSON payload"
+  "body":      "JSON payload",
+  "status": "SKIPPED",
+  "message": "reason for skipping"
 }
 ```
 

@@ -123,7 +123,7 @@ object GraphModelGenerators {
   implicit val datasetTopmostDerivedFroms: Gen[TopmostDerivedFrom] = datasetDerivedFroms.map(TopmostDerivedFrom.apply)
   implicit val datasetPublishedDates:      Gen[PublishedDate]      = localDatesNotInTheFuture map PublishedDate.apply
   implicit val datasetCreatedDates:        Gen[DateCreated]        = timestampsNotInTheFuture map DateCreated.apply
-  implicit val datasetKeywords:            Gen[Keyword]            = nonBlankStrings() map (_.value) map Keyword.apply
+  implicit val datasetKeywords:            Gen[Keyword]            = nonBlankStrings(minLength = 5) map (_.value) map Keyword.apply
   implicit val datasetPartNames:           Gen[PartName]           = nonBlankStrings(minLength = 5) map (v => PartName(v.value))
   implicit val datasetPartLocations: Gen[PartLocation] =
     relativePaths(minSegments = 2, maxSegments = 2)
