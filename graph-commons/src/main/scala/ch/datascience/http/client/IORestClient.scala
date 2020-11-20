@@ -47,6 +47,7 @@ abstract class IORestClient[ThrottlingTarget](
     maybeTimeRecorder:       Option[ExecutionTimeRecorder[IO]] = None,
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeoutOverride:     Option[Duration] = None,
     requestTimeoutOverride:  Option[Duration] = None
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) {
 
@@ -101,8 +102,9 @@ abstract class IORestClient[ThrottlingTarget](
     }
 
   private def httpClientBuilder: BlazeClientBuilder[IO] = {
-    val clientBuilder = BlazeClientBuilder[IO](executionContext)
-    requestTimeoutOverride map clientBuilder.withRequestTimeout getOrElse clientBuilder
+    val clientBuilder      = BlazeClientBuilder[IO](executionContext)
+    val updatedIdleTimeout = idleTimeoutOverride map clientBuilder.withIdleTimeout getOrElse clientBuilder
+    requestTimeoutOverride map updatedIdleTimeout.withRequestTimeout getOrElse updatedIdleTimeout
   }
 
   private def measureExecutionTime[ResultType](block: => IO[ResultType], request: HttpRequest): IO[ResultType] =
