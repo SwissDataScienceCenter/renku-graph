@@ -21,16 +21,18 @@ package ch.datascience.triplesgenerator.eventprocessing.triplesuploading
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
-import ch.datascience.rdfstore.{JsonLDTriples, RdfStoreConfig}
+import ch.datascience.http.client.{HttpRequest, IORestClient}
+import ch.datascience.rdfstore.{JsonLDTriples, RdfStoreConfig, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Uri
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 private trait TriplesUploader[Interpretation[_]] {
@@ -40,14 +42,17 @@ private trait TriplesUploader[Interpretation[_]] {
 private class IOTriplesUploader(
     rdfStoreConfig:          RdfStoreConfig,
     logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO],
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
+    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    requestTimeout:          Duration = 5 minutes
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient[Any](Throttler.noThrottling,
                               logger,
-                              maybeTimeRecorder = None,
+                              maybeTimeRecorder = timeRecorder.instance.some,
                               retryInterval = retryInterval,
-                              maxRetries = maxRetries
+                              maxRetries = maxRetries,
+                              requestTimeoutOverride = requestTimeout.some
     )
     with TriplesUploader[IO] {
 
@@ -68,10 +73,12 @@ private class IOTriplesUploader(
     } yield uploadResult
   } recover withUploadingError
 
-  private def uploadRequest(uploadUri: Uri, triples: JsonLDTriples) =
+  private def uploadRequest(uploadUri: Uri, triples: JsonLDTriples) = HttpRequest(
     request(POST, uploadUri, rdfStoreConfig.authCredentials)
       .withEntity(triples.value)
-      .putHeaders(`Content-Type`(`ld+json`))
+      .putHeaders(`Content-Type`(`ld+json`)),
+    name = "json-ld upload"
+  )
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[TriplesUploadResult]] = {
     case (Ok, _, _)                         => IO.pure(DeliverySuccess)
