@@ -18,7 +18,8 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
-import ch.datascience.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId}
+import ch.datascience.graph.model.events.EventStatus.{New, Skipped}
+import ch.datascience.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.users.Email
 import ch.datascience.graph.model.{projects, users}
 
@@ -27,20 +28,47 @@ final case class StartCommit(
     project: Project
 )
 
-final case class CommitEvent(
-    id:            CommitId,
-    project:       Project,
-    message:       CommitMessage,
-    committedDate: CommittedDate,
-    author:        Author,
-    committer:     Committer,
-    parents:       List[CommitId],
-    batchDate:     BatchDate
-)
+sealed trait CommitEvent extends Product with Serializable {
+  def id:            CommitId
+  def project:       Project
+  def message:       CommitMessage
+  def committedDate: CommittedDate
+  def author:        Author
+  def committer:     Committer
+  def parents:       List[CommitId]
+  def batchDate:     BatchDate
+  def status:        EventStatus
+}
 
 object CommitEvent {
   implicit class CommitEventOps(commitEvent: CommitEvent) {
     lazy val compoundEventId: CompoundEventId = CompoundEventId(EventId(commitEvent.id.value), commitEvent.project.id)
+  }
+
+  final case class NewCommitEvent(
+      id:            CommitId,
+      project:       Project,
+      message:       CommitMessage,
+      committedDate: CommittedDate,
+      author:        Author,
+      committer:     Committer,
+      parents:       List[CommitId],
+      batchDate:     BatchDate
+  ) extends CommitEvent {
+    override def status: EventStatus = New
+  }
+
+  final case class SkippedCommitEvent(
+      id:            CommitId,
+      project:       Project,
+      message:       CommitMessage,
+      committedDate: CommittedDate,
+      author:        Author,
+      committer:     Committer,
+      parents:       List[CommitId],
+      batchDate:     BatchDate
+  ) extends CommitEvent {
+    override def status: EventStatus = Skipped
   }
 }
 

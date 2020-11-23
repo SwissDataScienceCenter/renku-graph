@@ -30,6 +30,7 @@ import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects.Visibility.Public
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
@@ -39,7 +40,6 @@ import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.renku.eventlog.EventStatus.New
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
@@ -129,7 +129,8 @@ class EventsProcessingStatusSpec
 
     `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
                                                                                             allCommitIds.head,
-                                                                                            allCommitIds.tail.toSet)
+                                                                                            allCommitIds.tail.toSet
+    )
     // assuring there's project info in GitLab for the triples curation process
     `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
 

@@ -22,7 +22,7 @@ import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO}
 import ch.datascience.db.{DBConfigProvider, DbTransactor}
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
-import ch.datascience.graph.model.events.{CommitId, EventId}
+import ch.datascience.graph.model.events.{CommitId, EventId, EventStatus}
 import ch.datascience.graph.model.projects.Id
 import com.dimafeng.testcontainers.{Container, JdbcDatabaseContainer, PostgreSQLContainer}
 import doobie.Transactor

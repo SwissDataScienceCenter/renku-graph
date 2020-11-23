@@ -20,8 +20,9 @@ package io.renku.eventlog.subscriptions
 
 import cats.MonadError
 import cats.effect.Effect
+import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.EventStatus._
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.EventStatus
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal

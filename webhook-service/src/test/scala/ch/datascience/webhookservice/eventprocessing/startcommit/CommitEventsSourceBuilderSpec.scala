@@ -31,14 +31,17 @@ import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.commits.{CommitInfo, CommitInfoFinder}
 import ch.datascience.webhookservice.eventprocessing.CommitEvent
+import ch.datascience.webhookservice.eventprocessing.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.webhookservice.eventprocessing.startcommit.SendingResult._
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
+import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.reflect.ClassTag
 import scala.util.{Success, Try}
 
 class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with should.Matchers {
@@ -52,7 +55,9 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
         val commitInfo = commitInfos(startCommit.id, noParents).generateOne
         givenFindingCommitInfoReturns(commitInfo)
 
-        source.transformEventsWith(send(returning = startCommit.id -> Created)) shouldBe List(Created).pure[Try]
+        source.transformEventsWith(
+          send(returning = SendExpectations[NewCommitEvent](startCommit.id, Created))
+        ) shouldBe List(Created).pure[Try]
       }
 
     "map a single commit event with the transform function " +
@@ -62,7 +67,9 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
         val commitInfo = commitInfos(startCommit.id, noParents).generateOne
         givenFindingCommitInfoReturns(commitInfo)
 
-        source.transformEventsWith(send(returning = startCommit.id -> Existed)) shouldBe List(Existed).pure[Try]
+        source.transformEventsWith(
+          send(returning = SendExpectations[NewCommitEvent](startCommit.id, Existed))
+        ) shouldBe List(Existed).pure[Try]
       }
 
     "map a single commit event with the transform function " +
@@ -72,7 +79,9 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
         val commitInfo = commitInfos(startCommit.id, someParents).generateOne
         givenFindingCommitInfoReturns(commitInfo)
 
-        source.transformEventsWith(send(returning = startCommit.id -> Existed)) shouldBe List(Existed).pure[Try]
+        source.transformEventsWith(
+          send(returning = SendExpectations[NewCommitEvent](startCommit.id, Existed))
+        ) shouldBe List(Existed).pure[Try]
       }
 
     "map commit events with the transform function " +
@@ -84,14 +93,12 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
           commitInfos(parentId, singleParent).generateOne
         }
 
-        val level3Infos = level2Infos.flatMap(_.parents) map { parentId =>
-          commitInfos(parentId, noParents).generateOne
-        }
-
         givenFindingCommitInfoReturns(level1Info, level2Infos)
 
         source.transformEventsWith(
-          send(returning = startCommit.id -> Created, level2Infos.head.id -> Existed)
+          send(returning = SendExpectations[NewCommitEvent](startCommit.id, Created),
+               SendExpectations[NewCommitEvent](level2Infos.head.id, Existed)
+          )
         ) shouldBe List(Created, Existed).pure[Try]
       }
 
@@ -114,7 +121,11 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
         givenFindingCommitInfoReturns(level1Info, level2Infos, level3Infos)
 
         source.transformEventsWith(
-          send(returning = startCommit.id -> Created, level1Parent -> Created, level2Parent -> Created)
+          send(
+            returning = SendExpectations[NewCommitEvent](startCommit.id, Created),
+            SendExpectations[NewCommitEvent](level1Parent, Created),
+            SendExpectations[NewCommitEvent](level2Parent, Created)
+          )
         ) shouldBe List(Created, Created, Created).pure[Try]
       }
 
@@ -137,10 +148,10 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
 
         source.transformEventsWith(
           send(
-            startCommit.id -> Created,
-            level1Parent1  -> Existed,
-            level1Parent2  -> Created,
-            level2Parent   -> Created
+            SendExpectations[NewCommitEvent](startCommit.id, Created),
+            SendExpectations[NewCommitEvent](level1Parent1, Existed),
+            SendExpectations[NewCommitEvent](level1Parent2, Created),
+            SendExpectations[NewCommitEvent](level2Parent, Created)
           )
         ) shouldBe List(Created, Existed, Created, Created).pure[Try]
       }
@@ -158,8 +169,27 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
 
         source.transformEventsWith(
           send(
-            startCommit.id -> Created,
-            level1Parent2  -> Created
+            SendExpectations[NewCommitEvent](startCommit.id, Created),
+            SendExpectations[NewCommitEvent](level1Parent2, Created)
+          )
+        ) shouldBe List(Created, Created).pure[Try]
+      }
+
+    "map commit events with the transform function " +
+      "starting from given start commit to the oldest ancestor " +
+      "creating SkippedCommitEvents for commits with a message containing 'renku migrate'" in new TestCase {
+
+        val level1CommitMessage = CommitMessage(sentenceContaining("renku migrate").generateOne)
+        val level1Parent        = commitIds.generateOne
+        val level1Info          = commitInfos(startCommit.id, level1Parent).generateOne.copy(message = level1CommitMessage)
+        val level2Info          = commitInfos(level1Parent, noParents).generateOne
+
+        givenFindingCommitInfoReturns(level1Info, level2Info)
+
+        source.transformEventsWith(
+          send(
+            SendExpectations[SkippedCommitEvent](startCommit.id, Created),
+            SendExpectations[NewCommitEvent](level1Parent, Created)
           )
         ) shouldBe List(Created, Created).pure[Try]
       }
@@ -168,7 +198,7 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
       "if finding commit info fails" in new TestCase {
 
         val level1Info = commitInfos(startCommit.id, parentsIdsLists(minNumber = 2, maxNumber = 2)).generateOne
-        val level2Infos @ level2Info1 +: level2Info2 +: Nil = level1Info.parents map { parentId =>
+        val level2Info1 +: level2Info2 +: Nil = level1Info.parents map { parentId =>
           commitInfos(parentId, noParents).generateOne
         }
 
@@ -182,8 +212,8 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
 
         source.transformEventsWith(
           send(
-            startCommit.id -> Created,
-            level2Info2.id -> Created
+            SendExpectations[NewCommitEvent](startCommit.id, Created),
+            SendExpectations[NewCommitEvent](level2Info2.id, Created)
           )
         ) shouldBe exception.raiseError[Try, List[SendingResult]]
       }
@@ -209,6 +239,11 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
       }
   }
 
+  private case class SendExpectations[E <: CommitEvent](
+      commitId:             CommitId,
+      sendingResult:        SendingResult
+  )(implicit val eventType: ClassTag[E])
+
   private trait TestCase {
     val context = MonadError[Try, Throwable]
 
@@ -217,10 +252,16 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
     val fixedNow         = Instant.now
     private val clock    = Clock.fixed(fixedNow, ZoneId.systemDefault)
 
-    def send(returning: (CommitId, SendingResult)*): CommitEvent => Try[SendingResult] = event => {
-      event.batchDate.value shouldBe fixedNow
-      Try(returning.toMap.getOrElse(event.id, fail(s"Cannot find expected sending result for commitId ${event.id}")))
-    }
+    def send(returning: SendExpectations[_ <: CommitEvent]*): CommitEvent => Try[SendingResult] =
+      event => {
+        val sendExpectations = returning
+          .find { case SendExpectations(id, _) => id == event.id }
+          .getOrElse(fail(s"Cannot find expected sending result for commitId ${event.id}"))
+
+        event.getClass        shouldBe sendExpectations.eventType.runtimeClass
+        event.batchDate.value shouldBe fixedNow
+        sendExpectations.sendingResult.pure[Try]
+      }
 
     val commitInfoFinder      = mock[CommitInfoFinder[Try]]
     private val sourceBuilder = new CommitEventsSourceBuilder[Try](commitInfoFinder)

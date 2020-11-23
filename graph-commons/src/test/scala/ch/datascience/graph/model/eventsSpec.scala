@@ -23,11 +23,55 @@ import java.time.{Clock, Instant, ZoneId}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events._
 import ch.datascience.tinytypes.constraints.NonBlank
+import io.circe.Json
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+
+  "EventStatus" should {
+
+    val scenarios = Table(
+      "String Value"            -> "Expected EventStatus",
+      "NEW"                     -> New,
+      "PROCESSING"              -> Processing,
+      "TRIPLES_STORE"           -> TriplesStore,
+      "SKIPPED"                 -> Skipped,
+      "RECOVERABLE_FAILURE"     -> RecoverableFailure,
+      "NON_RECOVERABLE_FAILURE" -> NonRecoverableFailure
+    )
+
+    forAll(scenarios) { (stringValue, expectedStatus) =>
+      s"be instantiatable from '$stringValue'" in {
+        EventStatus.from(stringValue) shouldBe Right(expectedStatus)
+      }
+
+      s"be deserializable from $stringValue" in {
+        Json.fromString(stringValue).as[EventStatus] shouldBe Right(expectedStatus)
+      }
+    }
+
+    "fail instantiation for unknown value" in {
+      val unknown = nonEmptyStrings().generateOne
+
+      val Left(exception) = EventStatus.from(unknown)
+
+      exception.getMessage shouldBe s"'$unknown' unknown EventStatus"
+    }
+
+    "fail deserialization for unknown value" in {
+      val unknown = nonEmptyStrings().generateOne
+
+      val Left(exception) = Json.fromString(unknown).as[EventStatus]
+
+      exception.getMessage shouldBe s"'$unknown' unknown EventStatus"
+    }
+  }
+}
 
 class CompoundEventIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 

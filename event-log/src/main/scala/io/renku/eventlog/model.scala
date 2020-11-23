@@ -20,14 +20,12 @@ package io.renku.eventlog
 
 import java.time.Instant
 
-import cats.syntax.all._
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId}
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
-import io.circe.Decoder.decodeString
 
 sealed trait Event extends CompoundId {
   def id:        EventId
@@ -37,7 +35,7 @@ sealed trait Event extends CompoundId {
   def body:      EventBody
   def status:    EventStatus
 
-  def setBatchDate(batchDate: BatchDate): Event
+  def withBatchDate(batchDate: BatchDate): Event
   lazy val compoundEventId: CompoundEventId = CompoundEventId(id, project.id)
 
 }
@@ -57,7 +55,7 @@ object Event {
   ) extends Event {
     val status: EventStatus = EventStatus.New
 
-    override def setBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
+    override def withBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
 
   }
 
@@ -71,7 +69,7 @@ object Event {
   ) extends Event {
     val status: EventStatus = EventStatus.Skipped
 
-    override def setBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
+    override def withBatchDate(batchDate: BatchDate): Event = this.copy(batchDate = batchDate)
 
   }
 }
@@ -105,52 +103,5 @@ object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) w
       _ => None,
       Option.apply
     )
-  }
-}
-
-sealed trait EventStatus extends StringTinyType with Product with Serializable
-object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator) {
-
-  val all: Set[EventStatus] = Set(New, Processing, TriplesStore, Skipped, RecoverableFailure, NonRecoverableFailure)
-
-  final case object New extends EventStatus {
-    override val value: String = "NEW"
-  }
-  final case object Processing extends EventStatus {
-    override val value: String = "PROCESSING"
-  }
-
-  sealed trait FinalStatus extends EventStatus
-
-  final case object TriplesStore extends EventStatus with FinalStatus {
-    override val value: String = "TRIPLES_STORE"
-  }
-  final case object Skipped extends EventStatus with FinalStatus {
-    override val value: String = "SKIPPED"
-  }
-
-  sealed trait FailureStatus extends EventStatus
-
-  final case object RecoverableFailure extends FailureStatus {
-    override val value: String = "RECOVERABLE_FAILURE"
-  }
-  type RecoverableFailure = RecoverableFailure.type
-
-  final case object NonRecoverableFailure extends FailureStatus with FinalStatus {
-    override val value: String = "NON_RECOVERABLE_FAILURE"
-  }
-  type NonRecoverableFailure = NonRecoverableFailure.type
-
-  implicit val eventStatusDecoder: Decoder[EventStatus] = decodeString.emap { value =>
-    Either.fromOption(
-      EventStatus.all.find(_.value == value),
-      ifNone = s"'$value' unknown EventStatus"
-    )
-  }
-}
-
-private object EventStatusInstantiator extends (String => EventStatus) {
-  override def apply(value: String): EventStatus = EventStatus.all.find(_.value == value).getOrElse {
-    throw new IllegalArgumentException(s"'$value' unknown EventStatus")
   }
 }

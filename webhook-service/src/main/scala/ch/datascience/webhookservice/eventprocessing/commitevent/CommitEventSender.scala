@@ -26,6 +26,7 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.EventBody
 import ch.datascience.http.client.IORestClient
 import ch.datascience.webhookservice.eventprocessing.CommitEvent
+import ch.datascience.webhookservice.eventprocessing.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender.EventSendingResult
 import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender.EventSendingResult.{EventCreated, EventExisted}
 import io.chrisdavenport.log4cats.Logger
@@ -76,8 +77,9 @@ class IOCommitEventSender(
     } yield sendingResult
 
   private implicit lazy val entityEncoder: Encoder[(CommitEvent, EventBody)] =
-    Encoder.instance[(CommitEvent, EventBody)] { case (event, body) =>
-      json"""{
+    Encoder.instance[(CommitEvent, EventBody)] {
+      case (event: NewCommitEvent, body) =>
+        json"""{
         "id":        ${event.id.value},
         "project": {
           "id":      ${event.project.id.value},
@@ -85,7 +87,21 @@ class IOCommitEventSender(
         },
         "date":      ${event.committedDate.value},
         "batchDate": ${event.batchDate.value},
-        "body":      ${body.value}
+        "body":      ${body.value},
+        "status":    ${event.status.value}
+      }"""
+      case (event: SkippedCommitEvent, body) =>
+        json"""{
+        "id":        ${event.id.value},
+        "project": {
+          "id":      ${event.project.id.value},
+          "path":    ${event.project.path.value}
+        },
+        "date":      ${event.committedDate.value},
+        "batchDate": ${event.batchDate.value},
+        "body":      ${body.value},
+        "status":    ${event.status.value},
+        "message":   ${event.message.value}
       }"""
     }
 

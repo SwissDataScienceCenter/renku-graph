@@ -26,13 +26,13 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.events.BatchDate
+import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{BatchDate, EventStatus}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.EventStatus._
-import io.renku.eventlog.{EventStatus, InMemoryEventLogDbSpec}
+import io.renku.eventlog.InMemoryEventLogDbSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

@@ -26,6 +26,7 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
@@ -36,7 +37,6 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.prometheus.client.Gauge
 import io.renku.eventlog.DbEventLogGenerators.eventMessages
-import io.renku.eventlog.EventStatus._
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
 import org.http4s.MediaType._

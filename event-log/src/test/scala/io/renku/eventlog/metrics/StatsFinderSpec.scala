@@ -23,14 +23,14 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyList
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.{CompoundEventId, EventId}
+import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

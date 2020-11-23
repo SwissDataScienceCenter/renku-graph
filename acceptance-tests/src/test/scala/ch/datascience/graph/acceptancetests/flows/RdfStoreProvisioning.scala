@@ -18,29 +18,28 @@
 
 package ch.datascience.graph.acceptancetests.flows
 
-import AccessTokenPresence._
 import ch.datascience.graph.acceptancetests.data
 import ch.datascience.graph.acceptancetests.data._
 import ch.datascience.graph.acceptancetests.db.EventLog
+import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence._
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
 import ch.datascience.graph.model.CliVersion
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.{CommitId, EventStatus}
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.users.Email
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.webhookservice.model.HookToken
-import io.renku.eventlog.EventStatus
-import io.renku.eventlog.EventStatus.{New, TriplesStore}
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
 import org.scalatest.Assertion
-import org.scalatest.matchers.should
 import org.scalatest.concurrent.Eventually
+import org.scalatest.matchers.should
 
 object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience with should.Matchers {
 

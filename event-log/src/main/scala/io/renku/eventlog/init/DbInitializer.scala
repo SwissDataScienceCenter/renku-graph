@@ -21,9 +21,9 @@ package io.renku.eventlog.init
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.DbTransactor
+import ch.datascience.graph.model.events.EventStatus.RecoverableFailure
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.EventStatus.RecoverableFailure
 
 import scala.util.control.NonFatal
 

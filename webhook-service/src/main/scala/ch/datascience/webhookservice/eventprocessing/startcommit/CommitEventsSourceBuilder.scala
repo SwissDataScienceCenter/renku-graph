@@ -30,6 +30,7 @@ import ch.datascience.graph.model.events.{BatchDate, CommitId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.webhookservice.commits.{CommitInfo, CommitInfoFinder, IOCommitInfoFinder}
+import ch.datascience.webhookservice.eventprocessing.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.webhookservice.eventprocessing.startcommit.CommitEventsSourceBuilder.EventsFlowBuilder
 import ch.datascience.webhookservice.eventprocessing.{CommitEvent, StartCommit}
 
@@ -81,16 +82,30 @@ private class CommitEventsSourceBuilder[Interpretation[_]](
     private def findCommitEvent(commitId: CommitId, batchDate: BatchDate): Interpretation[CommitEvent] =
       findCommitInfo(startCommit.project.id, commitId, maybeAccessToken) map toCommitEvent(batchDate)
 
-    private def toCommitEvent(batchDate: BatchDate)(commitInfo: CommitInfo) = CommitEvent(
-      id = commitInfo.id,
-      message = commitInfo.message,
-      committedDate = commitInfo.committedDate,
-      author = commitInfo.author,
-      committer = commitInfo.committer,
-      parents = commitInfo.parents.filterNot(_ == DontCareCommitId),
-      project = startCommit.project,
-      batchDate = batchDate
-    )
+    private def toCommitEvent(batchDate: BatchDate)(commitInfo: CommitInfo) = commitInfo.message.value match {
+      case message if message contains "renku migrate" =>
+        SkippedCommitEvent(
+          id = commitInfo.id,
+          message = commitInfo.message,
+          committedDate = commitInfo.committedDate,
+          author = commitInfo.author,
+          committer = commitInfo.committer,
+          parents = commitInfo.parents.filterNot(_ == DontCareCommitId),
+          project = startCommit.project,
+          batchDate = batchDate
+        )
+      case _ =>
+        NewCommitEvent(
+          id = commitInfo.id,
+          message = commitInfo.message,
+          committedDate = commitInfo.committedDate,
+          author = commitInfo.author,
+          committer = commitInfo.committer,
+          parents = commitInfo.parents.filterNot(_ == DontCareCommitId),
+          project = startCommit.project,
+          batchDate = batchDate
+        )
+    }
 
     private def transformParents(commitEvent: CommitEvent, batchDate: BatchDate) =
       for {
