@@ -186,7 +186,7 @@ private class EventFetcherImpl(
 
 private object IOEventFetcher {
 
-  private val MaxProcessingTime:     Duration             = Duration.ofHours(5)
+  private val MaxProcessingTime:     Duration             = Duration ofHours 12
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
   def apply(
