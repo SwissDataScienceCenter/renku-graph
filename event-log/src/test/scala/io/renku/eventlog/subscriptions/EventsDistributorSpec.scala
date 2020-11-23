@@ -200,7 +200,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       inSequence {
         givenEventLog(has = Some(event))
 
-        (subscriptions.runOnSubscriber _)
+        (subscribers.runOnSubscriber _)
           .expects(*)
           .returning(exception.raiseError[IO, Unit])
 
@@ -266,7 +266,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenThereIs(freeSubscriber = subscriber)
         givenSending(event, to = subscriber, got = ServiceBusy)
 
-        (subscriptions.markBusy _)
+        (subscribers.markBusy _)
           .expects(subscriber)
           .returning(exception.raiseError[IO, Unit])
 
@@ -298,7 +298,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenThereIs(freeSubscriber = subscriber)
         givenSending(event, to = subscriber, got = Misdelivered)
 
-        (subscriptions.delete _)
+        (subscribers.delete _)
           .expects(subscriber)
           .returning(exception.raiseError[IO, Unit])
 
@@ -373,13 +373,13 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
   private trait TestCase {
 
     val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val subscriptions        = mock[Subscriptions[IO]]
+    val subscribers          = mock[Subscribers[IO]]
     val eventsFinder         = mock[EventFetcher[IO]]
     val statusUpdatesRunner  = mock[StatusUpdatesRunner[IO]]
     val eventsSender         = mock[EventsSender[IO]]
     val logger               = TestLogger[IO]()
     val distributor = new EventsDistributor(
-      subscriptions,
+      subscribers,
       eventsFinder,
       statusUpdatesRunner,
       eventsSender,
@@ -396,17 +396,17 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         .anyNumberOfTimes()
 
     def givenThereIs(freeSubscriber: SubscriberUrl) =
-      (subscriptions.runOnSubscriber _).expects(*).onCall { f: (SubscriberUrl => IO[Unit]) =>
+      (subscribers.runOnSubscriber _).expects(*).onCall { f: (SubscriberUrl => IO[Unit]) =>
         f(freeSubscriber)
       }
 
     def expectRemoval(of: SubscriberUrl) =
-      (subscriptions.delete _)
+      (subscribers.delete _)
         .expects(of)
         .returning(IO.unit)
 
     def expectMarkedBusy(subscriberUrl: SubscriberUrl) =
-      (subscriptions.markBusy _)
+      (subscribers.markBusy _)
         .expects(subscriberUrl)
         .returning(IO.unit)
 

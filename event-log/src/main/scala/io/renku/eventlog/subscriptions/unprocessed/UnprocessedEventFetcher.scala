@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.newEvent
+package io.renku.eventlog.subscriptions.unprocessed
 
 import java.time.{Duration, Instant}
 
@@ -37,13 +37,13 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.EventFetcher
-import io.renku.eventlog.subscriptions.newEvent.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
+import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
 
 import scala.language.postfixOps
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private[subscriptions] class NewEventFetcherImpl(
+private[subscriptions] class UnprocessedEventFetcherImpl(
     transactor:            DbTransactor[IO, EventLogDB],
     waitingEventsGauge:    LabeledGauge[IO, projects.Path],
     underProcessingGauge:  LabeledGauge[IO, projects.Path],
@@ -192,13 +192,13 @@ private[subscriptions] object IONewEventFetcher {
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift:  ContextShift[IO]): IO[EventFetcher[IO]] = IO {
-    new NewEventFetcherImpl(transactor,
-                            waitingEventsGauge,
-                            underProcessingGauge,
-                            queriesExecTimes,
-                            maxProcessingTime = MaxProcessingTime,
-                            projectsFetchingLimit = ProjectsFetchingLimit,
-                            projectPrioritisation = new ProjectPrioritisation()
+    new UnprocessedEventFetcherImpl(transactor,
+                                    waitingEventsGauge,
+                                    underProcessingGauge,
+                                    queriesExecTimes,
+                                    maxProcessingTime = MaxProcessingTime,
+                                    projectsFetchingLimit = ProjectsFetchingLimit,
+                                    projectPrioritisation = new ProjectPrioritisation()
     )
   }
 }

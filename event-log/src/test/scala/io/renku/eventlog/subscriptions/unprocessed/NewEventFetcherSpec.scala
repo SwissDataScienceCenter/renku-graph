@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.newEvent
+package io.renku.eventlog.subscriptions.unprocessed
 
 import java.time.temporal.ChronoUnit.{HOURS => H, MINUTES => MIN}
 import java.time.{Duration, Instant}
@@ -34,8 +34,8 @@ import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog._
-import io.renku.eventlog.subscriptions.newEvent.ProjectPrioritisation.Priority.MaxPriority
-import io.renku.eventlog.subscriptions.newEvent.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
+import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.Priority.MaxPriority
+import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -224,7 +224,7 @@ class NewEventFetcherSpec
 
     "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
-      val eventLogFetch = new NewEventFetcherImpl(
+      val eventLogFetch = new UnprocessedEventFetcherImpl(
         transactor,
         waitingEventsGauge,
         underProcessingGauge,
@@ -303,7 +303,7 @@ class NewEventFetcherSpec
 
   private trait TestCase extends TestCaseCommons {
 
-    val eventLogFetch = new NewEventFetcherImpl(
+    val eventLogFetch = new UnprocessedEventFetcherImpl(
       transactor,
       waitingEventsGauge,
       underProcessingGauge,

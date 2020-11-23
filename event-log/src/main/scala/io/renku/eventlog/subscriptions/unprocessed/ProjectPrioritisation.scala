@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.newEvent
+package io.renku.eventlog.subscriptions.unprocessed
 
 import java.time.Duration
 
@@ -26,9 +26,9 @@ import ch.datascience.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventDate
-import io.renku.eventlog.subscriptions.newEvent.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
+import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
 
-private[subscriptions] class ProjectPrioritisation {
+private class ProjectPrioritisation {
   import ProjectPrioritisation.Priority._
 
   def prioritise(projects: List[ProjectInfo]): List[(ProjectIdAndPath, Priority)] =
@@ -110,7 +110,7 @@ private[subscriptions] class ProjectPrioritisation {
   }
 }
 
-private[subscriptions] object ProjectPrioritisation {
+private object ProjectPrioritisation {
 
   final case class ProjectIdAndPath(id: projects.Id, path: projects.Path)
   final case class ProjectInfo(id:               projects.Id,
