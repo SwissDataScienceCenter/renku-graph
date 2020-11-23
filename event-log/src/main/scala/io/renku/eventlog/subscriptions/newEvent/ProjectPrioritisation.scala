@@ -28,7 +28,7 @@ import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventDate
 import io.renku.eventlog.subscriptions.newEvent.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
 
-private class ProjectPrioritisation {
+private[subscriptions] class ProjectPrioritisation {
   import ProjectPrioritisation.Priority._
 
   def prioritise(projects: List[ProjectInfo]): List[(ProjectIdAndPath, Priority)] =
@@ -110,7 +110,7 @@ private class ProjectPrioritisation {
   }
 }
 
-private object ProjectPrioritisation {
+private[subscriptions] object ProjectPrioritisation {
 
   final case class ProjectIdAndPath(id: projects.Id, path: projects.Path)
   final case class ProjectInfo(id:               projects.Id,
