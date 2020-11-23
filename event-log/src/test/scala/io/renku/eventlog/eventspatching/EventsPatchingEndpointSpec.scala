@@ -25,14 +25,13 @@ import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.LabeledGauge
 import io.circe.literal._
-import io.renku.eventlog.DbEventLogGenerators.eventStatuses
-import io.renku.eventlog.EventStatus
-import io.renku.eventlog.EventStatus.New
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -42,6 +41,7 @@ import org.scalamock.matchers.ArgCapture.CaptureAll
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.graph.model.EventsGenerators._
 
 class EventsPatchingEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
 

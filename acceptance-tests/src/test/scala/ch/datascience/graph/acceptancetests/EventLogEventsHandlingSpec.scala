@@ -17,8 +17,6 @@
  */
 
 package ch.datascience.graph.acceptancetests
-
-import io.renku.eventlog.EventStatus.{New, TriplesStore}
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.db.EventLog
@@ -28,14 +26,15 @@ import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, RDFStore}
 import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.webhookservice.model.HookToken
 import org.http4s.Status._
-import org.scalatest.matchers.should
-import org.scalatest.concurrent.Eventually
 import org.scalatest.GivenWhenThen
+import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should
 
 class EventLogEventsHandlingSpec
     extends AnyFeatureSpec

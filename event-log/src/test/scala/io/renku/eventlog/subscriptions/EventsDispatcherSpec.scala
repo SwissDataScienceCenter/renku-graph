@@ -22,13 +22,13 @@ import cats.effect.{IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.metrics.LabeledGauge
 import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.EventStatus.NonRecoverableFailure
 import io.renku.eventlog.statuschange.StatusUpdatesRunner
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._

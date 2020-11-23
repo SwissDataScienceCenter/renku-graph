@@ -23,13 +23,14 @@ import cats.syntax.all._
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.metrics.{SingleValueGauge, TestLabeledHistogram}
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

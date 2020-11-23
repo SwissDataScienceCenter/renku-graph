@@ -20,6 +20,7 @@ package ch.datascience.graph.model
 
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events._
 import org.scalacheck.Gen
 
@@ -31,6 +32,14 @@ object EventsGenerators {
   implicit val eventIds:       Gen[EventId]       = shas map EventId.apply
   implicit val batchDates:     Gen[BatchDate]     = timestampsNotInTheFuture map BatchDate.apply
   implicit val eventBodies:    Gen[EventBody]     = jsons.map(_.noSpaces).map(EventBody.apply)
+  implicit val eventStatuses: Gen[EventStatus] = Gen.oneOf(
+    New,
+    Processing,
+    TriplesStore,
+    Skipped,
+    RecoverableFailure,
+    NonRecoverableFailure
+  )
 
   implicit val compoundEventIds: Gen[CompoundEventId] = for {
     eventId   <- eventIds

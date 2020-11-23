@@ -25,19 +25,19 @@ import ch.datascience.controllers.InfoMessage.InfoMessage
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import io.renku.eventlog.EventStatus
-import io.renku.eventlog.EventStatus.{New, RecoverableFailure}
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._
-import org.http4s.implicits._
 import org.http4s.headers.`Content-Type`
+import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

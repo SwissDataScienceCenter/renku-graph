@@ -19,13 +19,13 @@
 package io.renku.eventlog.metrics
 
 import cats.effect.IO
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.EventStatus.{New, RecoverableFailure}
 
 object WaitingEventsGauge {
 

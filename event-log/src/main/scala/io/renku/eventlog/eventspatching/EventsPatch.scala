@@ -23,14 +23,15 @@ import java.time.Instant
 import cats.MonadError
 import cats.syntax.all._
 import ch.datascience.db.SqlQuery
+import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.eventlog.EventStatus.New
-import io.renku.eventlog.{EventStatus, TypesSerializers}
+import io.renku.eventlog.TypesSerializers
 
 private trait EventsPatch[Interpretation[_]] extends Product with Serializable with TypesSerializers {
   def name:               String Refined NonEmpty

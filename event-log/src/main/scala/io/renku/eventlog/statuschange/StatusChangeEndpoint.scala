@@ -83,10 +83,10 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
   private def findDecoder(
       eventId: CompoundEventId
   ): EntityDecoder[Interpretation, ChangeStatusCommand[Interpretation]] = {
+    import ch.datascience.graph.model.events.EventStatus
+    import ch.datascience.graph.model.events.EventStatus._
     import commands._
     import io.circe.{Decoder, HCursor}
-    import io.renku.eventlog.EventStatus
-    import io.renku.eventlog.EventStatus._
 
     implicit val commandDecoder: Decoder[ChangeStatusCommand[Interpretation]] = (cursor: HCursor) =>
       for {
