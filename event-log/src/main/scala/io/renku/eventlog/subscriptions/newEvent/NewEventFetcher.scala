@@ -181,7 +181,7 @@ private class NewEventFetcherImpl(
     } getOrElse ME.unit
 }
 
-private object IONewEventFetcher {
+object IONewEventFetcher {
 
   private val MaxProcessingTime:     Duration             = Duration.ofHours(5)
   private val ProjectsFetchingLimit: Int Refined Positive = 10
