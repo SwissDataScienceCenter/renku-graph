@@ -38,7 +38,7 @@ import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.headers.Authorization
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{Duration, FiniteDuration}
 import scala.util.control.NonFatal
 
 abstract class IORestClient[ThrottlingTarget](
@@ -46,7 +46,9 @@ abstract class IORestClient[ThrottlingTarget](
     logger:                  Logger[IO],
     maybeTimeRecorder:       Option[ExecutionTimeRecorder[IO]] = None,
     retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
+    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeoutOverride:     Option[Duration] = None,
+    requestTimeoutOverride:  Option[Duration] = None
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) {
 
   import HttpRequest._
@@ -91,13 +93,19 @@ abstract class IORestClient[ThrottlingTarget](
     send(HttpRequest(request))(mapResponse)
 
   protected def send[ResultType](request: HttpRequest)(mapResponse: ResponseMapping[ResultType]): IO[ResultType] =
-    BlazeClientBuilder[IO](executionContext).resource.use { httpClient =>
+    httpClientBuilder.resource.use { httpClient =>
       for {
         _          <- throttler.acquire()
         callResult <- measureExecutionTime(callRemote(httpClient, request, mapResponse, attempt = 1), request)
         _          <- throttler.release()
       } yield callResult
     }
+
+  private def httpClientBuilder: BlazeClientBuilder[IO] = {
+    val clientBuilder      = BlazeClientBuilder[IO](executionContext)
+    val updatedIdleTimeout = idleTimeoutOverride map clientBuilder.withIdleTimeout getOrElse clientBuilder
+    requestTimeoutOverride map updatedIdleTimeout.withRequestTimeout getOrElse updatedIdleTimeout
+  }
 
   private def measureExecutionTime[ResultType](block: => IO[ResultType], request: HttpRequest): IO[ResultType] =
     maybeTimeRecorder match {

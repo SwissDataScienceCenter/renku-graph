@@ -26,7 +26,6 @@ import io.chrisdavenport.log4cats.Logger
 
 class IOHookValidator(
     projectHookUrl:        ProjectHookUrl,
-    projectInfoFinder:     ProjectInfoFinder[IO],
     projectHookVerifier:   ProjectHookVerifier[IO],
     accessTokenFinder:     AccessTokenFinder[IO],
     accessTokenAssociator: AccessTokenAssociator[IO],
@@ -34,7 +33,6 @@ class IOHookValidator(
     logger:                Logger[IO]
 ) extends HookValidator[IO](
       projectHookUrl,
-      projectInfoFinder,
       projectHookVerifier,
       accessTokenFinder,
       accessTokenAssociator,
