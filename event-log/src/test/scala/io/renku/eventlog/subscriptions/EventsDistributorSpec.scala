@@ -75,7 +75,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      dispatcher.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -104,7 +104,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
           givenNoMoreEvents()
         }
 
-        dispatcher.run().unsafeRunAsyncAndForget()
+        distributor.run().unsafeRunAsyncAndForget()
 
         eventually {
           logger.loggedOnly(
@@ -137,7 +137,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
           givenNoMoreEvents()
         }
 
-        dispatcher.run().unsafeRunAsyncAndForget()
+        distributor.run().unsafeRunAsyncAndForget()
 
         eventually {
           logger.loggedOnly(
@@ -177,7 +177,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
           givenNoMoreEvents()
         }
 
-        dispatcher.run().unsafeRunAsyncAndForget()
+        distributor.run().unsafeRunAsyncAndForget()
 
         nonRecoverableStatusUpdate.value.eventId              shouldBe failingEvent.compoundEventId
         nonRecoverableStatusUpdate.value.underProcessingGauge shouldBe underProcessingGauge
@@ -210,7 +210,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      dispatcher.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -243,7 +243,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      dispatcher.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -276,7 +276,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      dispatcher.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -308,7 +308,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      dispatcher.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -352,7 +352,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenNoMoreEvents()
       }
 
-      dispatcher.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAsyncAndForget()
 
       nonRecoverableStatusUpdate.value.eventId              shouldBe failingEvent.compoundEventId
       nonRecoverableStatusUpdate.value.underProcessingGauge shouldBe underProcessingGauge
@@ -378,7 +378,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
     val statusUpdatesRunner  = mock[StatusUpdatesRunner[IO]]
     val eventsSender         = mock[EventsSender[IO]]
     val logger               = TestLogger[IO]()
-    val dispatcher = new EventsDistributor(
+    val distributor = new EventsDistributor(
       subscriptions,
       eventsFinder,
       statusUpdatesRunner,

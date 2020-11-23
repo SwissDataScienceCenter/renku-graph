@@ -93,13 +93,13 @@ object Microservice extends IOMicroservice {
                                                        ApplicationLogger
                                 )
         subscriptions <- Subscriptions(ApplicationLogger)
-        eventsDispatcher <- EventsDistributor(transactor,
-                                              subscriptions,
-                                              waitingEventsGauge,
-                                              underProcessingGauge,
-                                              queriesExecTimes,
-                                              ApplicationLogger
-                            )
+        eventsDistributor <- EventsDistributor(transactor,
+                                               subscriptions,
+                                               waitingEventsGauge,
+                                               underProcessingGauge,
+                                               queriesExecTimes,
+                                               ApplicationLogger
+                             )
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptions, ApplicationLogger)
         microserviceRoutes = new MicroserviceRoutes[IO](
                                eventCreationEndpoint,
@@ -118,7 +118,7 @@ object Microservice extends IOMicroservice {
                         sentryInitializer,
                         dbInitializer,
                         eventLogMetrics,
-                        eventsDispatcher,
+                        eventsDistributor,
                         metricsResetScheduler,
                         httpServer,
                         subProcessesCancelTokens
@@ -133,7 +133,7 @@ private class MicroserviceRunner(
     sentryInitializer:        SentryInitializer[IO],
     dbInitializer:            DbInitializer[IO],
     metrics:                  EventLogMetrics,
-    eventsDispatcher:         EventsDistributor,
+    eventsDistributor:        EventsDistributor,
     metricsResetScheduler:    GaugeResetScheduler[IO],
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
@@ -145,7 +145,7 @@ private class MicroserviceRunner(
     _      <- dbInitializer.run()
     _      <- metrics.run().start map gatherCancelToken
     _      <- metricsResetScheduler.run().start map gatherCancelToken
-    _      <- eventsDispatcher.run().start map gatherCancelToken
+    _      <- eventsDistributor.run().start map gatherCancelToken
     result <- httpServer.run()
   } yield result
 
