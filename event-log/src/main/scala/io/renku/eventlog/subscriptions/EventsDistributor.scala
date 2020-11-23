@@ -35,7 +35,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-class EventsDispatcher(
+class EventsDistributor(
     subscriptions:        Subscriptions[IO],
     eventsFinder:         EventFetcher[IO],
     statusUpdatesRunner:  StatusUpdatesRunner[IO],
@@ -130,7 +130,7 @@ class EventsDispatcher(
   }
 }
 
-object EventsDispatcher {
+object EventsDistributor {
   private val NoEventSleep: FiniteDuration = 1 seconds
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
@@ -145,18 +145,18 @@ object EventsDispatcher {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[EventsDispatcher] =
+  ): IO[EventsDistributor] =
     for {
       eventsFinder        <- IOEventFetcher(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
       eventsSender        <- IOEventsSender(logger)
       updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
-    } yield new EventsDispatcher(subscriptions,
-                                 eventsFinder,
-                                 updateCommandRunner,
-                                 eventsSender,
-                                 underProcessingGauge,
-                                 logger,
-                                 noEventSleep = NoEventSleep,
-                                 onErrorSleep = OnErrorSleep
+    } yield new EventsDistributor(subscriptions,
+                                  eventsFinder,
+                                  updateCommandRunner,
+                                  eventsSender,
+                                  underProcessingGauge,
+                                  logger,
+                                  noEventSleep = NoEventSleep,
+                                  onErrorSleep = OnErrorSleep
     )
 }

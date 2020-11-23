@@ -36,7 +36,7 @@ import io.renku.eventlog.latestevents.IOLatestEventsEndpoint
 import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
-import io.renku.eventlog.subscriptions.{EventsDispatcher, IOSubscriptionsEndpoint, Subscriptions}
+import io.renku.eventlog.subscriptions.{EventsDistributor, IOSubscriptionsEndpoint, Subscriptions}
 import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
@@ -93,12 +93,12 @@ object Microservice extends IOMicroservice {
                                                        ApplicationLogger
                                 )
         subscriptions <- Subscriptions(ApplicationLogger)
-        eventsDispatcher <- EventsDispatcher(transactor,
-                                             subscriptions,
-                                             waitingEventsGauge,
-                                             underProcessingGauge,
-                                             queriesExecTimes,
-                                             ApplicationLogger
+        eventsDispatcher <- EventsDistributor(transactor,
+                                              subscriptions,
+                                              waitingEventsGauge,
+                                              underProcessingGauge,
+                                              queriesExecTimes,
+                                              ApplicationLogger
                             )
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptions, ApplicationLogger)
         microserviceRoutes = new MicroserviceRoutes[IO](
@@ -133,7 +133,7 @@ private class MicroserviceRunner(
     sentryInitializer:        SentryInitializer[IO],
     dbInitializer:            DbInitializer[IO],
     metrics:                  EventLogMetrics,
-    eventsDispatcher:         EventsDispatcher,
+    eventsDispatcher:         EventsDistributor,
     metricsResetScheduler:    GaugeResetScheduler[IO],
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]

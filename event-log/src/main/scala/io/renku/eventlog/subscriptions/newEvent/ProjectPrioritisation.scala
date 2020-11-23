@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package io.renku.eventlog.subscriptions.newEvent
 
 import java.time.Duration
 
@@ -26,10 +26,10 @@ import ch.datascience.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventDate
-import io.renku.eventlog.subscriptions.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
+import io.renku.eventlog.subscriptions.newEvent.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
 
 private class ProjectPrioritisation {
-  import Priority._
+  import ProjectPrioritisation.Priority._
 
   def prioritise(projects: List[ProjectInfo]): List[(ProjectIdAndPath, Priority)] =
     correctPrioritiesUsingOccupancyPerProject(findPrioritiesBasedOnMostRecentActivity(projects))

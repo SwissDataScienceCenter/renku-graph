@@ -46,7 +46,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually with should.Matchers {
+class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually with should.Matchers {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(5, Seconds)),
@@ -378,7 +378,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
     val statusUpdatesRunner  = mock[StatusUpdatesRunner[IO]]
     val eventsSender         = mock[EventsSender[IO]]
     val logger               = TestLogger[IO]()
-    val dispatcher = new EventsDispatcher(
+    val dispatcher = new EventsDistributor(
       subscriptions,
       eventsFinder,
       statusUpdatesRunner,

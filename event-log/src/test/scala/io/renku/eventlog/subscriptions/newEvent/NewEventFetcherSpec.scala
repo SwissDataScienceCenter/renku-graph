@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package io.renku.eventlog.subscriptions.newEvent
 
 import java.time.temporal.ChronoUnit.{HOURS => H, MINUTES => MIN}
 import java.time.{Duration, Instant}
@@ -34,8 +34,8 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventStatus._
 import io.renku.eventlog._
-import io.renku.eventlog.subscriptions.ProjectPrioritisation.Priority.MaxPriority
-import io.renku.eventlog.subscriptions.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
+import io.renku.eventlog.subscriptions.newEvent.ProjectPrioritisation.Priority.MaxPriority
+import io.renku.eventlog.subscriptions.newEvent.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -44,7 +44,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class EventFetcherSpec
+class NewEventFetcherSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with LatestEventDatesViewPresence
@@ -224,7 +224,7 @@ class EventFetcherSpec
 
     "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
-      val eventLogFetch = new EventFetcherImpl(
+      val eventLogFetch = new NewEventFetcherImpl(
         transactor,
         waitingEventsGauge,
         underProcessingGauge,
@@ -303,7 +303,7 @@ class EventFetcherSpec
 
   private trait TestCase extends TestCaseCommons {
 
-    val eventLogFetch = new EventFetcherImpl(
+    val eventLogFetch = new NewEventFetcherImpl(
       transactor,
       waitingEventsGauge,
       underProcessingGauge,

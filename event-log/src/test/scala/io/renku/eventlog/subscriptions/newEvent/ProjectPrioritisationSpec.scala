@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package io.renku.eventlog.subscriptions.newEvent
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._

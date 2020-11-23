@@ -32,7 +32,7 @@ import ch.datascience.microservices.AnyMicroserviceRunnerSpec
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics.{EventLogMetrics, StatsFinder}
-import io.renku.eventlog.subscriptions.EventsDispatcher
+import io.renku.eventlog.subscriptions.EventsDistributor
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -155,7 +155,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec 
     val certificateLoader = mock[CertificateLoader[IO]]
     val sentryInitializer = mock[IOSentryInitializer]
     val dbInitializer     = mock[DbInitializer[IO]]
-    val eventsDispatcher  = mock[EventsDispatcher]
+    val eventsDispatcher  = mock[EventsDistributor]
     val metrics           = mock[TestEventLogMetrics]
     val httpServer        = mock[IOHttpServer]
     val gaugeScheduler    = mock[GaugeResetScheduler[IO]]
