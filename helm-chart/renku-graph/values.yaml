@@ -54,7 +54,7 @@ webhookService:
     port: 80
   resources:
     limits:
-      memory: 2100Mi
+      memory: 2500Mi
   jvmXmx: 300M
   eventsSynchronization:
     initialDelay: 2 minutes
