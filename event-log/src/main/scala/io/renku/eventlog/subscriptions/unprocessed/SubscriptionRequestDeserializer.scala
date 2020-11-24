@@ -19,30 +19,35 @@
 package io.renku.eventlog.subscriptions.unprocessed
 
 import cats.MonadError
-import cats.data.OptionT
-import cats.implicits.{catsSyntaxApplicativeErrorId, catsSyntaxApplicativeId}
+import cats.implicits.catsSyntaxApplicativeId
+import cats.syntax.all._
 import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.EventStatus.{New, RecoverableFailure}
 import io.circe
 import io.circe.Decoder
 import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.unprocessed.SubscriptionRequestDeserializer.UrlAndStatuses
-import io.renku.eventlog.subscriptions.SubscriptionRequest
 import io.renku.eventlog.subscriptions.SubscriberUrl
+import io.renku.eventlog.subscriptions.unprocessed.SubscriptionRequestDeserializer.UrlAndStatuses
 
 // TODO: make this private[unprocessed]
 private[eventlog] case class SubscriptionRequestDeserializer[Interpretation[_]]()(implicit
     monadError: MonadError[Interpretation, Throwable]
-) extends subscriptions.SubscriptionRequestDeserializer[Interpretation, UrlAndStatuses] {
-  override def deserialize(payload: circe.Json): Interpretation[UrlAndStatuses] =
+) extends subscriptions.SubscriptionRequestDeserializer[Interpretation, SubscriberUrl] {
+  override def deserialize(payload: circe.Json): Interpretation[Option[SubscriberUrl]] =
     payload
       .as[UrlAndStatuses]
-      .fold(_.raiseError[Interpretation, UrlAndStatuses], _.pure[Interpretation])
+      .fold(_ => Option.empty[SubscriberUrl], maybeSubscriptionUrl)
+      .pure[Interpretation]
 
+  private val acceptedStatuses = Set(New, RecoverableFailure)
+  private def maybeSubscriptionUrl(urlAndStatuses: UrlAndStatuses): Option[SubscriberUrl] =
+    if (urlAndStatuses.eventStatuses != acceptedStatuses) Option.empty[SubscriberUrl]
+    else urlAndStatuses.subscriberUrl.some
 }
 
-object SubscriptionRequestDeserializer {
+private[eventlog] object SubscriptionRequestDeserializer {
 
-  case class UrlAndStatuses(subscriberUrl: SubscriberUrl, eventStatuses: Set[EventStatus]) extends SubscriptionRequest
+  case class UrlAndStatuses(subscriberUrl: SubscriberUrl, eventStatuses: Set[EventStatus])
 
   private implicit val payloadDecoder: Decoder[UrlAndStatuses] = { cursor =>
     for {

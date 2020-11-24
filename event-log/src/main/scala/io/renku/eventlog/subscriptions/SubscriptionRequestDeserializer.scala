@@ -20,9 +20,7 @@ package io.renku.eventlog.subscriptions
 
 import io.circe.Json
 
-trait SubscriptionRequestDeserializer[Interpretation[_], T <: SubscriptionRequest] {
+trait SubscriptionRequestDeserializer[Interpretation[_], T] {
 
-  def deserialize(payload: Json): Interpretation[T]
+  def deserialize(payload: Json): Interpretation[Option[T]]
 }
-
-trait SubscriptionRequest

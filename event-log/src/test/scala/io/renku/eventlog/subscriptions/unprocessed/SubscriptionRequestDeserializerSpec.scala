@@ -18,28 +18,44 @@
 
 package io.renku.eventlog.subscriptions.unprocessed
 
+import cats.data.NonEmptyList
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import io.circe.DecodingFailure
+import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.EventStatus.{New, NonRecoverableFailure, Processing, RecoverableFailure, Skipped, TriplesStore}
+import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.Generators._
-import io.renku.eventlog.subscriptions.unprocessed.SubscriptionRequestDeserializer.UrlAndStatuses
+import io.renku.eventlog.subscriptions.SubscriberUrl
 import io.renku.jsonld.generators.Generators.Implicits.GenOps
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 
 class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "deserialize" should {
-    "deserialize a payload" in new TestCase {
-
-      deserializer.deserialize(payload) shouldBe Success(UrlAndStatuses(subscriberUrl, eventStatusez))
+    "return the subscriber URL if the statuses are valid" in new TestCase {
+      val subscriberUrl = subscriberUrls.generateOne
+      val payload       = jsonPayload(acceptedStatuses, subscriberUrl)
+      deserializer.deserialize(payload) shouldBe Success(Some(subscriberUrl))
     }
 
-    "fail with DecodingFailure if deserialization fails" in new TestCase {
+    "return None if the payload does not contain the right supported statuses" in new TestCase {
+
+      val payload = jsonPayload(eventStatuses)
+      deserializer.deserialize(payload) shouldBe Success(Option.empty[SubscriberUrl])
+    }
+
+    "return None if the payload does not contain all the supported statuses" in new TestCase {
+
+      val payload = jsonPayload(singleStatus)
+      deserializer.deserialize(payload) shouldBe Success(Option.empty[SubscriberUrl])
+    }
+
+    "return None if the payload does not contain the right fields" in new TestCase {
 
       val unsupportedPayload = json"""
           {
@@ -47,23 +63,48 @@ class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockFactory w
           }
             """
 
-      val Failure(error) = deserializer.deserialize(unsupportedPayload)
-      error shouldBe a[DecodingFailure]
+      deserializer.deserialize(unsupportedPayload) shouldBe Success(Option.empty[SubscriberUrl])
     }
   }
 
   class TestCase {
-    val subscriberUrl = subscriberUrls.generateOne
-    val eventStatusez = eventStatuses.generateNonEmptyList().toList.toSet
-
     val deserializer = SubscriptionRequestDeserializer[Try]()
+    val acceptedStatuses: Gen[NonEmptyList[EventStatus]] = Gen.const(
+      NonEmptyList(
+        New,
+        List(RecoverableFailure)
+      )
+    )
 
-    val payload =
+    implicit val rejectedStatuses: Gen[NonEmptyList[EventStatus]] = nonEmptyList(
+      Gen.oneOf(
+        Processing,
+        TriplesStore,
+        Skipped,
+        NonRecoverableFailure
+      )
+    )
+
+    implicit val singleStatus: Gen[NonEmptyList[EventStatus]] = nonEmptyList(
+      Gen.oneOf(
+        New,
+        RecoverableFailure
+      ),
+      maxElements = 1
+    )
+
+    val eventStatuses: Gen[NonEmptyList[EventStatus]] = for {
+      accepted <- acceptedStatuses
+      rejected <- rejectedStatuses
+    } yield accepted ++ rejected.toList
+
+    def jsonPayload(from: Gen[NonEmptyList[EventStatus]], subscriberUrl: SubscriberUrl = subscriberUrls.generateOne) =
       json"""
              {
                "subscriberUrl": ${subscriberUrl.value},
-               "statuses": ${eventStatusez.map(_.value)}
+               "statuses": ${from.generateOne.map(_.value)}
              }
           """
+
   }
 }
