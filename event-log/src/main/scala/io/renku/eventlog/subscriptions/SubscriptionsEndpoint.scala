@@ -21,8 +21,10 @@ package io.renku.eventlog.subscriptions
 import cats.MonadError
 import cats.effect.Effect
 import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus._
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Json
+import io.renku.eventlog.subscriptions.unprocessed.UnprocessedSubscriptionRequestDeserializer
+import io.renku.eventlog.subscriptions.unprocessed.UnprocessedSubscriptionRequestDeserializer.UrlAndStatuses
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal
@@ -39,20 +41,28 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
   import ch.datascience.controllers.InfoMessage._
   import ch.datascience.controllers.{ErrorMessage, InfoMessage}
   import org.http4s.circe._
-  import org.http4s.{EntityDecoder, Request, Response}
+  import org.http4s.{Request, Response}
+
+  private val deserializer = UnprocessedSubscriptionRequestDeserializer[Interpretation]()
 
   def addSubscription(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
-      urlAndStatuses <- request.as[UrlAndStatuses] recoverWith badRequest
-      (subscriberUrl, statuses) = urlAndStatuses
-      _        <- badRequestIf(statuses, not = New, RecoverableFailure)
+      json           <- request.asJson recoverWith badRequest
+      urlAndStatuses <- deserializer.deserialize(json) recoverWith unsupportedData
+      UrlAndStatuses(subscriberUrl, eventStatuses) = urlAndStatuses
+      _        <- badRequestIf(eventStatuses, not = New, RecoverableFailure)
       _        <- subscribers add subscriberUrl
       response <- Accepted(InfoMessage("Subscription added"))
     } yield response
   } recoverWith httpResponse
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[UrlAndStatuses]] = {
-    case NonFatal(exception) => ME.raiseError(BadRequestError(exception))
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[Json]] = { case NonFatal(exception) =>
+    ME.raiseError(BadRequestError(exception))
+  }
+
+  private lazy val unsupportedData: PartialFunction[Throwable, Interpretation[UrlAndStatuses]] = {
+    case NonFatal(exception) =>
+      ME.raiseError(BadRequestError(exception))
   }
 
   private def badRequestIf(statuses: Set[EventStatus], not: EventStatus*): Interpretation[Unit] =
@@ -72,13 +82,9 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
       InternalServerError(errorMessage)
   }
 
-  private implicit lazy val eventEntityDecoder: EntityDecoder[Interpretation, UrlAndStatuses] =
-    jsonOf[Interpretation, UrlAndStatuses]
 }
 
 object SubscriptionsEndpoint {
-  import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
-  import io.circe.Decoder
 
   sealed trait BadRequestError extends Throwable
 
@@ -87,13 +93,6 @@ object SubscriptionsEndpoint {
     def apply(cause:   Throwable): BadRequestError = new Exception(cause) with BadRequestError
   }
 
-  type UrlAndStatuses = (SubscriberUrl, Set[EventStatus])
-
-  implicit val payloadDecoder: Decoder[UrlAndStatuses] = cursor =>
-    for {
-      subscriberUrl <- cursor.downField("subscriberUrl").as[SubscriberUrl](stringDecoder(SubscriberUrl))
-      statuses      <- cursor.downField("statuses").as[List[EventStatus]]
-    } yield subscriberUrl -> statuses.toSet
 }
 
 object IOSubscriptionsEndpoint {
