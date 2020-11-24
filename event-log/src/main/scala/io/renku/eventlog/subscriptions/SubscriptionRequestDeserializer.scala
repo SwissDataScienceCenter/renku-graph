@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import io.circe.{DecodingFailure, Json}
+import io.circe.Json
 
 trait SubscriptionRequestDeserializer[Interpretation[_], T <: SubscriptionRequest] {
 

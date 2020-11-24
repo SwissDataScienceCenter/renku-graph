@@ -23,8 +23,8 @@ import cats.effect.Effect
 import ch.datascience.graph.model.events.EventStatus
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
-import io.renku.eventlog.subscriptions.unprocessed.UnprocessedSubscriptionRequestDeserializer
-import io.renku.eventlog.subscriptions.unprocessed.UnprocessedSubscriptionRequestDeserializer.UrlAndStatuses
+import io.renku.eventlog.subscriptions.unprocessed.SubscriptionRequestDeserializer
+import io.renku.eventlog.subscriptions.unprocessed.SubscriptionRequestDeserializer.UrlAndStatuses
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal
@@ -43,7 +43,7 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  private val deserializer = UnprocessedSubscriptionRequestDeserializer[Interpretation]()
+  private val deserializer = SubscriptionRequestDeserializer[Interpretation]()
 
   def addSubscription(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {

@@ -20,6 +20,10 @@ package io.renku.eventlog.subscriptions
 
 import ch.datascience.tinytypes.constraints.Url
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.json.TinyTypeDecoders._
+import io.circe.Decoder
 
 final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
-object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url
+object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url {
+  implicit val subscriberUrlDecoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
+}

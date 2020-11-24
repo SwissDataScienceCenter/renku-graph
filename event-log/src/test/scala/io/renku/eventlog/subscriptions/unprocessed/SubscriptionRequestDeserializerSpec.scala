@@ -23,7 +23,7 @@ import ch.datascience.graph.model.EventsGenerators._
 import io.circe.DecodingFailure
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.Generators._
-import io.renku.eventlog.subscriptions.unprocessed.UnprocessedSubscriptionRequestDeserializer.UrlAndStatuses
+import io.renku.eventlog.subscriptions.unprocessed.SubscriptionRequestDeserializer.UrlAndStatuses
 import io.renku.jsonld.generators.Generators.Implicits.GenOps
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -31,7 +31,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Failure, Success, Try}
 
-class UnprocessedSubscriptionRequestDeserializerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "deserialize" should {
     "deserialize a payload" in new TestCase {
@@ -56,7 +56,7 @@ class UnprocessedSubscriptionRequestDeserializerSpec extends AnyWordSpec with Mo
     val subscriberUrl = subscriberUrls.generateOne
     val eventStatusez = eventStatuses.generateNonEmptyList().toList.toSet
 
-    val deserializer = UnprocessedSubscriptionRequestDeserializer[Try]()
+    val deserializer = SubscriptionRequestDeserializer[Try]()
 
     val payload =
       json"""
