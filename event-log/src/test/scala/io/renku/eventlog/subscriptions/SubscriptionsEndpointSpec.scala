@@ -33,6 +33,7 @@ import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.eventlog.subscriptions.Generators._
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._
@@ -49,7 +50,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
     s"return $Accepted when there are NEW and RECOVERABLE_FAILURE statuses in the payload " +
       "and subscriber URL was added to the pool" in new TestCase {
 
-        (subscriptions.add _)
+        (subscribers.add _)
           .expects(subscriberUrl)
           .returning(IO.unit)
 
@@ -101,7 +102,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
     s"return $InternalServerError when adding subscriber URL to the pool fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      (subscriptions.add _)
+      (subscribers.add _)
         .expects(subscriberUrl)
         .returning(exception.raiseError[IO, Unit])
 
@@ -122,9 +123,9 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
   private trait TestCase {
     val subscriberUrl = subscriberUrls.generateOne
 
-    val subscriptions   = mock[Subscriptions[IO]]
+    val subscribers     = mock[Subscribers[IO]]
     val logger          = TestLogger[IO]()
-    val addSubscription = new SubscriptionsEndpoint[IO](subscriptions, logger).addSubscription _
+    val addSubscription = new SubscriptionsEndpoint[IO](subscribers, logger).addSubscription _
   }
 
   private implicit lazy val payloadEncoder: Encoder[(SubscriberUrl, Set[EventStatus])] =

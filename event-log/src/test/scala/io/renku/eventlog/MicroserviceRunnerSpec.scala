@@ -33,7 +33,7 @@ import ch.datascience.microservices.AnyMicroserviceRunnerSpec
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics.{EventLogMetrics, StatsFinder}
-import io.renku.eventlog.subscriptions.EventsDispatcher
+import io.renku.eventlog.subscriptions.EventsDistributor
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -46,14 +46,14 @@ class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec 
   "run" should {
 
     "return Success Exit Code " +
-      "if Sentry, Events Dispatcher and metrics initialisation are fine " +
+      "if Sentry, Events Distributor and metrics initialisation are fine " +
       "and http server starts up" in new TestCase {
 
         given(certificateLoader).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
         given(dbInitializer).succeeds(returning = ())
         given(metrics).succeeds(returning = ())
-        given(eventsDispatcher).succeeds(returning = ())
+        given(eventsDistributor).succeeds(returning = ())
         given(gaugeScheduler).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -99,7 +99,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec 
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).succeeds(returning = ())
-      given(eventsDispatcher).succeeds(returning = ())
+      given(eventsDistributor).succeeds(returning = ())
       given(gaugeScheduler).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(httpServer).fails(becauseOf = exception)
@@ -109,13 +109,13 @@ class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec 
       } shouldBe exception
     }
 
-    "return Success ExitCode even if Events Dispatcher initialisation fails" in new TestCase {
+    "return Success ExitCode even if Events Distributor initialisation fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).succeeds(returning = ())
-      given(eventsDispatcher).fails(becauseOf = exceptions.generateOne)
+      given(eventsDistributor).fails(becauseOf = exceptions.generateOne)
       given(gaugeScheduler).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -128,7 +128,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec 
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).fails(becauseOf = exceptions.generateOne)
-      given(eventsDispatcher).succeeds(returning = ())
+      given(eventsDistributor).succeeds(returning = ())
       given(gaugeScheduler).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -141,7 +141,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec 
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).succeeds(returning = ())
-      given(eventsDispatcher).succeeds(returning = ())
+      given(eventsDistributor).succeeds(returning = ())
       given(gaugeScheduler).fails(becauseOf = exceptions.generateOne)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -156,7 +156,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec 
     val certificateLoader = mock[CertificateLoader[IO]]
     val sentryInitializer = mock[IOSentryInitializer]
     val dbInitializer     = mock[DbInitializer[IO]]
-    val eventsDispatcher  = mock[EventsDispatcher]
+    val eventsDistributor = mock[EventsDistributor]
     val metrics           = mock[TestEventLogMetrics]
     val httpServer        = mock[IOHttpServer]
     val gaugeScheduler    = mock[GaugeResetScheduler[IO]]
@@ -164,7 +164,7 @@ class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec 
                                         sentryInitializer,
                                         dbInitializer,
                                         metrics,
-                                        eventsDispatcher,
+                                        eventsDistributor,
                                         gaugeScheduler,
                                         httpServer,
                                         new ConcurrentHashMap[CancelToken[IO], Unit]()

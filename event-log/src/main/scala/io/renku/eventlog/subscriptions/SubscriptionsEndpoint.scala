@@ -28,9 +28,9 @@ import org.http4s.dsl.Http4sDsl
 import scala.util.control.NonFatal
 
 class SubscriptionsEndpoint[Interpretation[_]: Effect](
-    subscriptions: Subscriptions[Interpretation],
-    logger:        Logger[Interpretation]
-)(implicit ME:     MonadError[Interpretation, Throwable])
+    subscribers: Subscribers[Interpretation],
+    logger:      Logger[Interpretation]
+)(implicit ME:   MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
   import EventStatus.{New, RecoverableFailure}
@@ -46,7 +46,7 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
       urlAndStatuses <- request.as[UrlAndStatuses] recoverWith badRequest
       (subscriberUrl, statuses) = urlAndStatuses
       _        <- badRequestIf(statuses, not = New, RecoverableFailure)
-      _        <- subscriptions add subscriberUrl
+      _        <- subscribers add subscriberUrl
       response <- Accepted(InfoMessage("Subscription added"))
     } yield response
   } recoverWith httpResponse
@@ -100,9 +100,9 @@ object IOSubscriptionsEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply(
-      subscriptions:       Subscriptions[IO],
+      subscribers:         Subscribers[IO],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[SubscriptionsEndpoint[IO]] = IO {
-    new SubscriptionsEndpoint[IO](subscriptions, logger)
+    new SubscriptionsEndpoint[IO](subscribers, logger)
   }
 }

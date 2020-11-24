@@ -28,6 +28,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
+import io.renku.eventlog.subscriptions.unprocessed.IONewEventFetcher
 import io.renku.eventlog.{EventLogDB, EventMessage}
 
 import scala.concurrent.ExecutionContext
@@ -35,8 +36,8 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-class EventsDispatcher(
-    subscriptions:        Subscriptions[IO],
+class EventsDistributor(
+    subscribers:          Subscribers[IO],
     eventsFinder:         EventFetcher[IO],
     statusUpdatesRunner:  StatusUpdatesRunner[IO],
     eventsSender:         EventsSender[IO],
@@ -48,7 +49,7 @@ class EventsDispatcher(
 
   import eventsSender._
   import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
-  import subscriptions._
+  import subscribers._
 
   def run(): IO[Unit] =
     for {
@@ -130,13 +131,13 @@ class EventsDispatcher(
   }
 }
 
-object EventsDispatcher {
+object EventsDistributor {
   private val NoEventSleep: FiniteDuration = 1 seconds
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
   def apply(
       transactor:           DbTransactor[IO, EventLogDB],
-      subscriptions:        Subscriptions[IO],
+      subscribers:          Subscribers[IO],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
@@ -145,18 +146,18 @@ object EventsDispatcher {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[EventsDispatcher] =
+  ): IO[EventsDistributor] =
     for {
-      eventsFinder        <- IOEventFetcher(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
+      eventsFinder        <- IONewEventFetcher(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
       eventsSender        <- IOEventsSender(logger)
       updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
-    } yield new EventsDispatcher(subscriptions,
-                                 eventsFinder,
-                                 updateCommandRunner,
-                                 eventsSender,
-                                 underProcessingGauge,
-                                 logger,
-                                 noEventSleep = NoEventSleep,
-                                 onErrorSleep = OnErrorSleep
+    } yield new EventsDistributor(subscribers,
+                                  eventsFinder,
+                                  updateCommandRunner,
+                                  eventsSender,
+                                  underProcessingGauge,
+                                  logger,
+                                  noEventSleep = NoEventSleep,
+                                  onErrorSleep = OnErrorSleep
     )
 }

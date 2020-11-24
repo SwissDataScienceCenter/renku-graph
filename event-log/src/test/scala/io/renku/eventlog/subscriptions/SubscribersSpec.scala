@@ -25,6 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
+import io.renku.eventlog.subscriptions.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -32,7 +33,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
 
-class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "add" should {
 
@@ -42,7 +43,7 @@ class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matcher
         .expects(subscriberUrl)
         .returning(true.pure[IO])
 
-      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscribers.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info(s"$subscriberUrl added"))
     }
@@ -53,7 +54,7 @@ class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matcher
         .expects(subscriberUrl)
         .returning(false.pure[IO])
 
-      subscriptions.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscribers.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
       logger.expectNoLogs()
     }
@@ -76,7 +77,7 @@ class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matcher
       val function = mockFunction[SubscriberUrl, IO[Unit]]
       function.expects(subscriberUrl).returning(IO.unit)
 
-      subscriptions.runOnSubscriber(function).unsafeRunSync() shouldBe ((): Unit)
+      subscribers.runOnSubscriber(function).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "fail if the given function fails when run on available subscriber" in new TestCase {
@@ -96,7 +97,7 @@ class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matcher
       function.expects(subscriberUrl).returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
-        subscriptions.runOnSubscriber(function).unsafeRunSync()
+        subscribers.runOnSubscriber(function).unsafeRunSync()
       } shouldBe exception
     }
   }
@@ -108,7 +109,7 @@ class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matcher
         .expects(subscriberUrl)
         .returning(true.pure[IO])
 
-      subscriptions.delete(subscriberUrl = subscriberUrl).unsafeRunSync()
+      subscribers.delete(subscriberUrl = subscriberUrl).unsafeRunSync()
 
       logger.loggedOnly(Info(s"$subscriberUrl gone - deleting"))
     }
@@ -118,7 +119,7 @@ class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matcher
         .expects(subscriberUrl)
         .returning(false.pure[IO])
 
-      subscriptions.delete(subscriberUrl = subscriberUrl).unsafeRunSync()
+      subscribers.delete(subscriberUrl = subscriberUrl).unsafeRunSync()
 
       logger.expectNoLogs()
     }
@@ -130,7 +131,7 @@ class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matcher
         .expects(subscriberUrl)
         .returning(IO.unit)
 
-      subscriptions.markBusy(subscriberUrl).unsafeRunSync()
+      subscribers.markBusy(subscriberUrl).unsafeRunSync()
 
       logger.loggedOnly(Info(s"$subscriberUrl busy - putting on hold"))
     }
@@ -144,6 +145,6 @@ class SubscriptionsSpec extends AnyWordSpec with MockFactory with should.Matcher
 
     val subscribersRegistry = mock[SubscribersRegistry]
     val logger              = TestLogger[IO]()
-    val subscriptions       = new SubscriptionsImpl(subscribersRegistry, logger)
+    val subscribers         = new SubscribersImpl(subscribersRegistry, logger)
   }
 }

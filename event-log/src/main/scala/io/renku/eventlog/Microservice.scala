@@ -36,7 +36,7 @@ import io.renku.eventlog.latestevents.IOLatestEventsEndpoint
 import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
-import io.renku.eventlog.subscriptions.{EventsDispatcher, IOSubscriptionsEndpoint, Subscriptions}
+import io.renku.eventlog.subscriptions.{EventsDistributor, IOSubscriptionsEndpoint, Subscribers}
 import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
@@ -92,15 +92,15 @@ object Microservice extends IOMicroservice {
                                                        queriesExecTimes,
                                                        ApplicationLogger
                                 )
-        subscriptions <- Subscriptions(ApplicationLogger)
-        eventsDispatcher <- EventsDispatcher(transactor,
-                                             subscriptions,
-                                             waitingEventsGauge,
-                                             underProcessingGauge,
-                                             queriesExecTimes,
-                                             ApplicationLogger
-                            )
-        subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptions, ApplicationLogger)
+        subscribers <- Subscribers(ApplicationLogger)
+        eventsDistributor <- EventsDistributor(transactor,
+                                               subscribers,
+                                               waitingEventsGauge,
+                                               underProcessingGauge,
+                                               queriesExecTimes,
+                                               ApplicationLogger
+                             )
+        subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscribers, ApplicationLogger)
         microserviceRoutes = new MicroserviceRoutes[IO](
                                eventCreationEndpoint,
                                latestEventsEndpoint,
@@ -118,7 +118,7 @@ object Microservice extends IOMicroservice {
                         sentryInitializer,
                         dbInitializer,
                         eventLogMetrics,
-                        eventsDispatcher,
+                        eventsDistributor,
                         metricsResetScheduler,
                         httpServer,
                         subProcessesCancelTokens
@@ -133,7 +133,7 @@ private class MicroserviceRunner(
     sentryInitializer:        SentryInitializer[IO],
     dbInitializer:            DbInitializer[IO],
     metrics:                  EventLogMetrics,
-    eventsDispatcher:         EventsDispatcher,
+    eventsDistributor:        EventsDistributor,
     metricsResetScheduler:    GaugeResetScheduler[IO],
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
@@ -145,7 +145,7 @@ private class MicroserviceRunner(
     _      <- dbInitializer.run()
     _      <- metrics.run().start map gatherCancelToken
     _      <- metricsResetScheduler.run().start map gatherCancelToken
-    _      <- eventsDispatcher.run().start map gatherCancelToken
+    _      <- eventsDistributor.run().start map gatherCancelToken
     result <- httpServer.run()
   } yield result
 

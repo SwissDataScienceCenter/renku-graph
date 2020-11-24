@@ -34,6 +34,7 @@ import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult.{Delivered, Misdelivered, ServiceBusy}
+import io.renku.eventlog.subscriptions.Generators._
 import io.renku.eventlog.{Event, EventMessage}
 import org.scalamock.matchers.ArgCapture.CaptureAll
 import org.scalamock.scalatest.MockFactory
@@ -46,7 +47,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually with should.Matchers {
+class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually with should.Matchers {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(5, Seconds)),
@@ -75,7 +76,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenNoMoreEvents()
       }
 
-      dispatcher.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -104,7 +105,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
           givenNoMoreEvents()
         }
 
-        dispatcher.run().unsafeRunAsyncAndForget()
+        distributor.run().unsafeRunAsyncAndForget()
 
         eventually {
           logger.loggedOnly(
@@ -137,7 +138,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
           givenNoMoreEvents()
         }
 
-        dispatcher.run().unsafeRunAsyncAndForget()
+        distributor.run().unsafeRunAsyncAndForget()
 
         eventually {
           logger.loggedOnly(
@@ -177,7 +178,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
           givenNoMoreEvents()
         }
 
-        dispatcher.run().unsafeRunAsyncAndForget()
+        distributor.run().unsafeRunAsyncAndForget()
 
         nonRecoverableStatusUpdate.value.eventId              shouldBe failingEvent.compoundEventId
         nonRecoverableStatusUpdate.value.underProcessingGauge shouldBe underProcessingGauge
@@ -200,7 +201,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
       inSequence {
         givenEventLog(has = Some(event))
 
-        (subscriptions.runOnSubscriber _)
+        (subscribers.runOnSubscriber _)
           .expects(*)
           .returning(exception.raiseError[IO, Unit])
 
@@ -210,7 +211,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenNoMoreEvents()
       }
 
-      dispatcher.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -243,7 +244,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenNoMoreEvents()
       }
 
-      dispatcher.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -266,7 +267,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenThereIs(freeSubscriber = subscriber)
         givenSending(event, to = subscriber, got = ServiceBusy)
 
-        (subscriptions.markBusy _)
+        (subscribers.markBusy _)
           .expects(subscriber)
           .returning(exception.raiseError[IO, Unit])
 
@@ -276,7 +277,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenNoMoreEvents()
       }
 
-      dispatcher.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -298,7 +299,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenThereIs(freeSubscriber = subscriber)
         givenSending(event, to = subscriber, got = Misdelivered)
 
-        (subscriptions.delete _)
+        (subscribers.delete _)
           .expects(subscriber)
           .returning(exception.raiseError[IO, Unit])
 
@@ -308,7 +309,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenNoMoreEvents()
       }
 
-      dispatcher.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
@@ -352,7 +353,7 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         givenNoMoreEvents()
       }
 
-      dispatcher.run().unsafeRunAsyncAndForget()
+      distributor.run().unsafeRunAsyncAndForget()
 
       nonRecoverableStatusUpdate.value.eventId              shouldBe failingEvent.compoundEventId
       nonRecoverableStatusUpdate.value.underProcessingGauge shouldBe underProcessingGauge
@@ -373,13 +374,13 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
   private trait TestCase {
 
     val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val subscriptions        = mock[Subscriptions[IO]]
+    val subscribers          = mock[Subscribers[IO]]
     val eventsFinder         = mock[EventFetcher[IO]]
     val statusUpdatesRunner  = mock[StatusUpdatesRunner[IO]]
     val eventsSender         = mock[EventsSender[IO]]
     val logger               = TestLogger[IO]()
-    val dispatcher = new EventsDispatcher(
-      subscriptions,
+    val distributor = new EventsDistributor(
+      subscribers,
       eventsFinder,
       statusUpdatesRunner,
       eventsSender,
@@ -396,17 +397,17 @@ class EventsDispatcherSpec extends AnyWordSpec with MockFactory with Eventually 
         .anyNumberOfTimes()
 
     def givenThereIs(freeSubscriber: SubscriberUrl) =
-      (subscriptions.runOnSubscriber _).expects(*).onCall { f: (SubscriberUrl => IO[Unit]) =>
+      (subscribers.runOnSubscriber _).expects(*).onCall { f: (SubscriberUrl => IO[Unit]) =>
         f(freeSubscriber)
       }
 
     def expectRemoval(of: SubscriberUrl) =
-      (subscriptions.delete _)
+      (subscribers.delete _)
         .expects(of)
         .returning(IO.unit)
 
     def expectMarkedBusy(subscriberUrl: SubscriberUrl) =
-      (subscriptions.markBusy _)
+      (subscribers.markBusy _)
         .expects(subscriberUrl)
         .returning(IO.unit)
 
