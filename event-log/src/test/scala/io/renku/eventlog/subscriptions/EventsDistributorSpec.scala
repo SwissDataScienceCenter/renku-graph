@@ -34,6 +34,7 @@ import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult.{Delivered, Misdelivered, ServiceBusy}
+import io.renku.eventlog.subscriptions.Generators._
 import io.renku.eventlog.{Event, EventMessage}
 import org.scalamock.matchers.ArgCapture.CaptureAll
 import org.scalamock.scalatest.MockFactory

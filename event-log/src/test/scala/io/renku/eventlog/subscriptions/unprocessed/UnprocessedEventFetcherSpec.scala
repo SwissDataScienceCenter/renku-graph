@@ -34,6 +34,7 @@ import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog._
+import io.renku.eventlog.subscriptions.ProjectIds
 import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.Priority.MaxPriority
 import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectInfo}
 import org.scalacheck.Gen
@@ -81,7 +82,7 @@ class UnprocessedEventFetcherSpec
 
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
-          returns = List(ProjectIdAndPath(projectId, projectPath) -> MaxPriority)
+          returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event2Id -> event2Body)
@@ -93,7 +94,7 @@ class UnprocessedEventFetcherSpec
 
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 1)),
-          returns = List(ProjectIdAndPath(projectId, projectPath) -> MaxPriority)
+          returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
@@ -146,7 +147,7 @@ class UnprocessedEventFetcherSpec
         val latestEventDate = List(event1Date, event2Date, event3Date).maxBy(_.value)
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
-          returns = List(ProjectIdAndPath(projectId, projectPath) -> MaxPriority)
+          returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
@@ -176,7 +177,7 @@ class UnprocessedEventFetcherSpec
 
         givenPrioritisation(
           takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 1)),
-          returns = List(ProjectIdAndPath(eventId.projectId, projectPath) -> MaxPriority)
+          returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
         )
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(eventId -> eventBody)
@@ -211,7 +212,7 @@ class UnprocessedEventFetcherSpec
       events foreach { case (eventId, _, eventDate, projectPath) =>
         givenPrioritisation(
           takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 0)),
-          returns = List(ProjectIdAndPath(eventId.projectId, projectPath) -> MaxPriority)
+          returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
         )
       }
 
@@ -253,7 +254,7 @@ class UnprocessedEventFetcherSpec
       events foreach { case (eventId, _, _, projectPath) =>
         (projectPrioritisation.prioritise _)
           .expects(*)
-          .returning(List(ProjectIdAndPath(eventId.projectId, projectPath) -> MaxPriority))
+          .returning(List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority))
       }
 
       events foreach { _ =>
@@ -295,7 +296,7 @@ class UnprocessedEventFetcherSpec
       (underProcessingGauge.increment _).expects(*).returning(IO.unit).repeat(times)
     }
 
-    def givenPrioritisation(takes: List[ProjectInfo], returns: List[(ProjectIdAndPath, Priority)]) =
+    def givenPrioritisation(takes: List[ProjectInfo], returns: List[(ProjectIds, Priority)]) =
       (projectPrioritisation.prioritise _)
         .expects(takes)
         .returning(returns)

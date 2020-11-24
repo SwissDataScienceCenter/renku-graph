@@ -33,6 +33,7 @@ import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import io.renku.eventlog.subscriptions.Generators._
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._

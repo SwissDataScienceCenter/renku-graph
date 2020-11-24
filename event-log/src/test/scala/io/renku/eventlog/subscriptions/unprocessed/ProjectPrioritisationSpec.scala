@@ -26,6 +26,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog.EventDate
+import io.renku.eventlog.subscriptions.ProjectIds
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -46,7 +47,7 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
     "put priority MaxPriority if the list contains only one project" in {
       val project = projectInfos.generateOne
 
-      projectPrioritisation.prioritise(List(project)) shouldBe List((project.toIdAndPath, MaxPriority))
+      projectPrioritisation.prioritise(List(project)) shouldBe List((project.toIdsAndPath, MaxPriority))
     }
 
     "put priority MaxPriority if projects' event dates are within and hour and currentOccupancy is 0" in {
@@ -57,8 +58,8 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
       )
 
       projectPrioritisation.prioritise(List(project1, project2)) shouldBe List(
-        (project1.toIdAndPath, MaxPriority),
-        (project2.toIdAndPath, MaxPriority)
+        (project1.toIdsAndPath, MaxPriority),
+        (project2.toIdsAndPath, MaxPriority)
       )
     }
 
@@ -71,8 +72,8 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
         )
 
         projectPrioritisation.prioritise(List(project1, project2)) shouldBe List(
-          (project1.toIdAndPath, MaxPriority),
-          (project2.toIdAndPath, MinPriority)
+          (project1.toIdsAndPath, MaxPriority),
+          (project2.toIdsAndPath, MinPriority)
         )
       }
 
@@ -201,6 +202,6 @@ class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
   }
 
   private implicit class ProjectInfoOps(projectInfo: ProjectInfo) {
-    lazy val toIdAndPath = ProjectIdAndPath(projectInfo.id, projectInfo.path)
+    lazy val toIdsAndPath = ProjectIds(projectInfo.id, projectInfo.path)
   }
 }
