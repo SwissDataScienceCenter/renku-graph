@@ -37,7 +37,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.EventFetcher
-import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
+import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectInfo}
 
 import scala.language.postfixOps
 import scala.math.BigDecimal.RoundingMode

@@ -35,7 +35,7 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.Priority.MaxPriority
-import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
+import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectInfo}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -44,7 +44,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class NewEventFetcherSpec
+class UnprocessedEventFetcherSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with LatestEventDatesViewPresence
