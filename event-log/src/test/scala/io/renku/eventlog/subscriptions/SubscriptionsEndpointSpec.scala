@@ -66,18 +66,16 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
         logger.expectNoLogs()
       }
 
-    s"return $BadRequest when subscriber URL cannot be decoded from the request" in new TestCase {
+    s"return $BadRequest when the body of the request is malformed" in new TestCase {
 
-      val payload = json"""{}"""
-      val request = Request(Method.POST, uri"subscriptions")
-        .withEntity(payload)
+      val request = Request[IO](Method.POST, uri"subscriptions").withEntity("malformedJson")
 
       val response = addSubscription(request).unsafeRunSync()
 
       response.status      shouldBe BadRequest
       response.contentType shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
-        s"Invalid message body: Could not decode JSON: $payload"
+        s"Malformed message body: Invalid JSON"
       )
 
       logger.expectNoLogs()
