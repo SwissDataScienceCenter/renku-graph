@@ -26,19 +26,20 @@ import ch.datascience.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventDate
-import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
+import io.renku.eventlog.subscriptions.ProjectIds
+import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectInfo}
 
-private[unprocessed] class ProjectPrioritisation {
+private class ProjectPrioritisation {
   import ProjectPrioritisation.Priority._
 
-  def prioritise(projects: List[ProjectInfo]): List[(ProjectIdAndPath, Priority)] =
+  def prioritise(projects: List[ProjectInfo]): List[(ProjectIds, Priority)] =
     correctPrioritiesUsingOccupancyPerProject(findPrioritiesBasedOnMostRecentActivity(projects))
 
   private lazy val findPrioritiesBasedOnMostRecentActivity
-      : List[ProjectInfo] => List[(ProjectIdAndPath, Priority, Int Refined NonNegative)] = {
+      : List[ProjectInfo] => List[(ProjectIds, Priority, Int Refined NonNegative)] = {
     case Nil => Nil
     case ProjectInfo(projectId, projectPath, _, currentOccupancy) :: Nil =>
-      List((ProjectIdAndPath(projectId, projectPath), MaxPriority, currentOccupancy))
+      List((ProjectIds(projectId, projectPath), MaxPriority, currentOccupancy))
     case projects =>
       val ProjectInfo(_, _, latestEventDate, _) = projects.head
       val ProjectInfo(_, _, oldestEventDate, _) = projects.last
@@ -52,12 +53,12 @@ private[unprocessed] class ProjectPrioritisation {
           )
       }
       projects.map { case ProjectInfo(projectId, projectPath, eventDate, currentOccupancy) =>
-        (ProjectIdAndPath(projectId, projectPath), findPriority(eventDate), currentOccupancy)
+        (ProjectIds(projectId, projectPath), findPriority(eventDate), currentOccupancy)
       }
   }
 
   private lazy val correctPrioritiesUsingOccupancyPerProject
-      : List[(ProjectIdAndPath, Priority, Int Refined NonNegative)] => List[(ProjectIdAndPath, Priority)] = {
+      : List[(ProjectIds, Priority, Int Refined NonNegative)] => List[(ProjectIds, Priority)] = {
     case Nil                           => Nil
     case (project, priority, _) :: Nil => List(project -> priority)
     case prioritiesList =>
@@ -78,7 +79,7 @@ private[unprocessed] class ProjectPrioritisation {
 
   private def correctPriority(processingCapacity: Int,
                               totalPriority:      BigDecimal
-  ): ((ProjectIdAndPath, Priority, Int Refined NonNegative)) => (ProjectIdAndPath, BigDecimal) = {
+  ): ((ProjectIds, Priority, Int Refined NonNegative)) => (ProjectIds, BigDecimal) = {
     case (project, currentPriority, currentOccupancy) if currentOccupancy.value == 0 =>
       project -> currentPriority.value
     case (project, currentPriority, currentOccupancy) =>
@@ -89,20 +90,20 @@ private[unprocessed] class ProjectPrioritisation {
       project -> correctedPriority
   }
 
-  private def projectsAbove(min: Priority): ((ProjectIdAndPath, BigDecimal)) => Boolean = { case (_, priority) =>
+  private def projectsAbove(min: Priority): ((ProjectIds, BigDecimal)) => Boolean = { case (_, priority) =>
     priority >= min.value
   }
 
-  private lazy val alignItemType: ((ProjectIdAndPath, BigDecimal)) => (ProjectIdAndPath, Priority) = {
+  private lazy val alignItemType: ((ProjectIds, BigDecimal)) => (ProjectIds, Priority) = {
     case (projectIdAndPath, priority) => projectIdAndPath -> Priority.safeApply(priority)
   }
 
-  private lazy val toPriority: ((ProjectIdAndPath, Priority, Int Refined NonNegative)) => BigDecimal = {
+  private lazy val toPriority: ((ProjectIds, Priority, Int Refined NonNegative)) => BigDecimal = {
     case (_, priority, _) => priority.value
   }
 
-  private lazy val toOccupancy: ((ProjectIdAndPath, Priority, Int Refined NonNegative)) => Int = {
-    case (_, _, occupancy) => occupancy.value
+  private lazy val toOccupancy: ((ProjectIds, Priority, Int Refined NonNegative)) => Int = { case (_, _, occupancy) =>
+    occupancy.value
   }
 
   private implicit class EventDateOps(eventDate: EventDate) {
@@ -110,9 +111,8 @@ private[unprocessed] class ProjectPrioritisation {
   }
 }
 
-private[unprocessed] object ProjectPrioritisation {
+private object ProjectPrioritisation {
 
-  final case class ProjectIdAndPath(id: projects.Id, path: projects.Path)
   final case class ProjectInfo(id:               projects.Id,
                                path:             projects.Path,
                                latestEventDate:  EventDate,

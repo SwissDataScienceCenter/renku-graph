@@ -28,6 +28,7 @@ import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import eu.timepit.refined.auto._
+import io.renku.eventlog.subscriptions.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should

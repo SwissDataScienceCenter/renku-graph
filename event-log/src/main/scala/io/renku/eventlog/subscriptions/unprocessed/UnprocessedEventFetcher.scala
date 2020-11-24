@@ -36,8 +36,8 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
-import io.renku.eventlog.subscriptions.EventFetcher
-import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectIdAndPath, ProjectInfo}
+import io.renku.eventlog.subscriptions.{EventFetcher, ProjectIds}
+import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectInfo}
 
 import scala.language.postfixOps
 import scala.math.BigDecimal.RoundingMode
@@ -52,7 +52,7 @@ private[subscriptions] class UnprocessedEventFetcherImpl(
     maxProcessingTime:     Duration,
     projectsFetchingLimit: Int Refined Positive,
     projectPrioritisation: ProjectPrioritisation,
-    pickRandomlyFrom:      List[ProjectIdAndPath] => Option[ProjectIdAndPath] = ids => ids.get(Random nextInt ids.size),
+    pickRandomlyFrom:      List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size),
     waitForViewRefresh:    Boolean = false
 )(implicit ME:             Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
@@ -116,7 +116,7 @@ private[subscriptions] class UnprocessedEventFetcherImpl(
   // format: on
 
   // format: off
-  private def findOldestEvent(idAndPath: ProjectIdAndPath) = SqlQuery({
+  private def findOldestEvent(idAndPath: ProjectIds) = SqlQuery({
     fr"""select el.event_id, el.project_id, el.event_body
            from (
              select project_id, min(event_date) as min_event_date
@@ -140,14 +140,14 @@ private[subscriptions] class UnprocessedEventFetcherImpl(
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
     in(fr"status", NonEmptyList.of(status, otherStatuses: _*))
 
-  private lazy val selectProject: List[(ProjectIdAndPath, Priority)] => Option[ProjectIdAndPath] = {
+  private lazy val selectProject: List[(ProjectIds, Priority)] => Option[ProjectIds] = {
     case Nil                          => None
     case (projectIdAndPath, _) +: Nil => Some(projectIdAndPath)
     case many                         => pickRandomlyFrom(prioritiesList(from = many))
   }
 
-  private def prioritiesList(from: List[(ProjectIdAndPath, Priority)]): List[ProjectIdAndPath] =
-    from.foldLeft(List.empty[ProjectIdAndPath]) { case (acc, (projectIdAndPath, priority)) =>
+  private def prioritiesList(from: List[(ProjectIds, Priority)]): List[ProjectIds] =
+    from.foldLeft(List.empty[ProjectIds]) { case (acc, (projectIdAndPath, priority)) =>
       acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
     }
 
@@ -172,8 +172,8 @@ private[subscriptions] class UnprocessedEventFetcherImpl(
     case 1 => Some(idAndBody)
   }
 
-  private def maybeUpdateMetrics(maybeProject: Option[ProjectIdAndPath], maybeBody: Option[EventIdAndBody]) =
-    (maybeBody, maybeProject) mapN { case (_, ProjectIdAndPath(_, projectPath)) =>
+  private def maybeUpdateMetrics(maybeProject: Option[ProjectIds], maybeBody: Option[EventIdAndBody]) =
+    (maybeBody, maybeProject) mapN { case (_, ProjectIds(_, projectPath)) =>
       for {
         _ <- waitingEventsGauge decrement projectPath
         _ <- underProcessingGauge increment projectPath
