@@ -30,7 +30,7 @@ import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
-import io.circe.Encoder
+import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.eventlog.subscriptions.Generators._
@@ -50,12 +50,13 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
     s"return $Accepted when there are NEW and RECOVERABLE_FAILURE statuses in the payload " +
       "and subscriber URL was added to the pool" in new TestCase {
 
-        (subscribers.add _)
-          .expects(subscriberUrl)
-          .returning(IO.unit)
-
+        val payload = (subscriberUrl -> Set(New, RecoverableFailure)).asJson
         val request = Request(Method.POST, uri"subscriptions")
-          .withEntity((subscriberUrl -> Set(New, RecoverableFailure)).asJson)
+          .withEntity(payload)
+
+        (subscriptionCategory.register _)
+          .expects(payload)
+          .returning(subscriberUrl.some.pure[IO])
 
         val response = addSubscription(request).unsafeRunSync()
 
@@ -67,7 +68,6 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
       }
 
     s"return $BadRequest when the body of the request is malformed" in new TestCase {
-
       val request = Request[IO](Method.POST, uri"subscriptions").withEntity("malformedJson")
 
       val response = addSubscription(request).unsafeRunSync()
@@ -82,9 +82,13 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
     }
 
     s"return $BadRequest when statuses in the request are other than NEW and RECOVERABLE_FAILURE" in new TestCase {
-
+      val payload = (subscriberUrl -> Set(New: EventStatus)).asJson
       val request = Request(Method.POST, uri"subscriptions")
-        .withEntity((subscriberUrl -> Set(New: EventStatus)).asJson)
+        .withEntity(payload)
+
+      (subscriptionCategory.register _)
+        .expects(payload)
+        .returning(none.pure[IO])
 
       val response = addSubscription(request).unsafeRunSync()
 
@@ -100,12 +104,14 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
     s"return $InternalServerError when adding subscriber URL to the pool fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      (subscribers.add _)
-        .expects(subscriberUrl)
-        .returning(exception.raiseError[IO, Unit])
 
+      private val payload = (subscriberUrl -> Set(New, RecoverableFailure)).asJson
       val request = Request(Method.POST, uri"subscriptions")
-        .withEntity((subscriberUrl -> Set(New, RecoverableFailure)).asJson)
+        .withEntity(payload)
+
+      (subscriptionCategory.register _)
+        .expects(payload)
+        .returning(exception.raiseError[IO, Option[SubscriberUrl]])
 
       val response = addSubscription(request).unsafeRunSync()
 
@@ -121,9 +127,9 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
   private trait TestCase {
     val subscriberUrl = subscriberUrls.generateOne
 
-    val subscribers     = mock[Subscribers[IO]]
-    val logger          = TestLogger[IO]()
-    val addSubscription = new SubscriptionsEndpoint[IO](subscribers, logger).addSubscription _
+    val subscriptionCategory = mock[SubscriptionCategory[IO, SubscriberUrl]]
+    val logger               = TestLogger[IO]()
+    val addSubscription      = new SubscriptionsEndpoint[IO](subscriptionCategory, logger).addSubscription _
   }
 
   private implicit lazy val payloadEncoder: Encoder[(SubscriberUrl, Set[EventStatus])] =

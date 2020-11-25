@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
@@ -36,22 +36,27 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-class EventsDistributor(
-    subscribers:          Subscribers[IO],
-    eventsFinder:         EventFetcher[IO],
-    statusUpdatesRunner:  StatusUpdatesRunner[IO],
-    eventsSender:         EventsSender[IO],
-    underProcessingGauge: LabeledGauge[IO, projects.Path],
-    logger:               Logger[IO],
+trait EventsDistributor[Interpretation[_]] {
+  def run(): Interpretation[Unit]
+}
+
+class EventsDistributorImpl[Interpretation[_]: Effect](
+    subscribers:          Subscribers[Interpretation],
+    eventsFinder:         EventFetcher[Interpretation],
+    statusUpdatesRunner:  StatusUpdatesRunner[Interpretation],
+    eventsSender:         EventsSender[Interpretation],
+    underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
+    logger:               Logger[Interpretation],
     noEventSleep:         FiniteDuration,
     onErrorSleep:         FiniteDuration
-)(implicit timer:         Timer[IO]) {
+)(implicit timer:         Timer[Interpretation])
+    extends EventsDistributor[Interpretation] {
 
   import eventsSender._
   import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
   import subscribers._
 
-  def run(): IO[Unit] =
+  def run(): Interpretation[Unit] =
     for {
       _ <- popEvent flatMap { case (eventId, eventBody) =>
              runOnSubscriber(dispatch(eventId, eventBody)) recoverWith tryReDispatch(eventId, eventBody)
@@ -59,21 +64,21 @@ class EventsDistributor(
       _ <- run()
     } yield ()
 
-  private def popEvent: IO[(CompoundEventId, EventBody)] =
+  private def popEvent: Interpretation[(CompoundEventId, EventBody)] =
     eventsFinder
       .popEvent()
       .recoverWith(loggingErrorAndRetry(retry = eventsFinder.popEvent))
       .flatMap {
         case None            => (timer sleep noEventSleep) flatMap (_ => popEvent)
-        case Some(idAndBody) => idAndBody.pure[IO]
+        case Some(idAndBody) => idAndBody.pure[Interpretation]
       }
 
-  private def dispatch(id: CompoundEventId, body: EventBody)(subscriber: SubscriberUrl): IO[Unit] = {
+  private def dispatch(id: CompoundEventId, body: EventBody)(subscriber: SubscriberUrl): Interpretation[Unit] = {
     for {
       result <- sendEvent(subscriber, id, body)
       _      <- logStatement(result, subscriber, id)
       _ <- result match {
-             case Delivered => IO.unit
+             case Delivered => ().pure[Interpretation]
              case ServiceBusy =>
                markBusy(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(id, body)))
              case Misdelivered =>
@@ -82,35 +87,37 @@ class EventsDistributor(
     } yield ()
   } recoverWith markEventAsNonRecoverable(subscriber, id)
 
-  private def tryReDispatch(eventId: CompoundEventId, eventBody: EventBody): PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) =>
-      for {
-        _ <- logger.error(exception)("Dispatching an event failed")
-        _ <- timer sleep onErrorSleep
-        _ <- runOnSubscriber(dispatch(eventId, eventBody))
-      } yield ()
+  private def tryReDispatch(eventId:   CompoundEventId,
+                            eventBody: EventBody
+  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    for {
+      _ <- logger.error(exception)("Dispatching an event failed")
+      _ <- timer sleep onErrorSleep
+      _ <- runOnSubscriber(dispatch(eventId, eventBody))
+    } yield ()
   }
 
-  private def logStatement(result: SendingResult, url: SubscriberUrl, id: CompoundEventId): IO[Unit] = result match {
-    case result @ Delivered    => logger.info(s"Event $id, url = $url -> $result")
-    case ServiceBusy           => IO.unit
-    case result @ Misdelivered => logger.error(s"Event $id, url = $url -> $result")
-  }
+  private def logStatement(result: SendingResult, url: SubscriberUrl, id: CompoundEventId): Interpretation[Unit] =
+    result match {
+      case result @ Delivered    => logger.info(s"Event $id, url = $url -> $result")
+      case ServiceBusy           => ().pure[Interpretation]
+      case result @ Misdelivered => logger.error(s"Event $id, url = $url -> $result")
+    }
 
   private lazy val withNothing: PartialFunction[Throwable, Unit] = { case NonFatal(_) => () }
 
   private def markEventAsNonRecoverable(
       url: SubscriberUrl,
       id:  CompoundEventId
-  ): PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
-    val markEventFailed = ToNonRecoverableFailure[IO](id, EventMessage(exception), underProcessingGauge)
+  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    val markEventFailed = ToNonRecoverableFailure[Interpretation](id, EventMessage(exception), underProcessingGauge)
     for {
       _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
       _ <- logger.error(exception)(s"Event $id, url = $url -> ${markEventFailed.status}")
     } yield ()
   }
 
-  private def loggingErrorAndRetry[O](retry: () => IO[O]): PartialFunction[Throwable, IO[O]] = {
+  private def loggingErrorAndRetry[O](retry: () => Interpretation[O]): PartialFunction[Throwable, Interpretation[O]] = {
     case NonFatal(exception) =>
       for {
         _      <- logger.error(exception)("Finding events to dispatch failed")
@@ -119,19 +126,20 @@ class EventsDistributor(
       } yield result
   }
 
-  private def retry(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
-    case NonFatal(exception) =>
-      {
-        for {
-          _      <- logger.error(exception)(s"Marking event as ${command.status} failed")
-          _      <- timer sleep onErrorSleep
-          result <- statusUpdatesRunner run command
-        } yield result
-      } recoverWith retry(command)
+  private def retry(
+      command: ChangeStatusCommand[Interpretation]
+  ): PartialFunction[Throwable, Interpretation[UpdateResult]] = { case NonFatal(exception) =>
+    {
+      for {
+        _      <- logger.error(exception)(s"Marking event as ${command.status} failed")
+        _      <- timer sleep onErrorSleep
+        result <- statusUpdatesRunner run command
+      } yield result
+    } recoverWith retry(command)
   }
 }
 
-object EventsDistributor {
+object IOEventsDistributor {
   private val NoEventSleep: FiniteDuration = 1 seconds
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
@@ -146,18 +154,18 @@ object EventsDistributor {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[EventsDistributor] =
+  ): IO[EventsDistributor[IO]] =
     for {
       eventsFinder        <- IONewEventFetcher(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
       eventsSender        <- IOEventsSender(logger)
       updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
-    } yield new EventsDistributor(subscribers,
-                                  eventsFinder,
-                                  updateCommandRunner,
-                                  eventsSender,
-                                  underProcessingGauge,
-                                  logger,
-                                  noEventSleep = NoEventSleep,
-                                  onErrorSleep = OnErrorSleep
+    } yield new EventsDistributorImpl(subscribers,
+                                      eventsFinder,
+                                      updateCommandRunner,
+                                      eventsSender,
+                                      underProcessingGauge,
+                                      logger,
+                                      noEventSleep = NoEventSleep,
+                                      onErrorSleep = OnErrorSleep
     )
 }

@@ -35,21 +35,21 @@ trait Subscribers[Interpretation[_]] {
   def runOnSubscriber(f: SubscriberUrl => Interpretation[Unit]): Interpretation[Unit]
 }
 
-class SubscribersImpl private[subscriptions] (
-    subscribersRegistry: SubscribersRegistry,
-    logger:              Logger[IO]
-)(implicit contextShift: ContextShift[IO])
-    extends Subscribers[IO] {
+class SubscribersImpl private[subscriptions](
+                                              subscribersRegistry: SubscribersRegistry,
+                                              logger: Logger[IO]
+                                            )(implicit contextShift: ContextShift[IO])
+  extends Subscribers[IO] {
 
   override def add(subscriberUrl: SubscriberUrl): IO[Unit] = for {
     wasAdded <- subscribersRegistry add subscriberUrl
-    _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$subscriberUrl added"))
+    _ <- Applicative[IO].whenA(wasAdded)(logger.info(s"$subscriberUrl added"))
   } yield ()
 
   override def delete(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
       removed <- subscribersRegistry delete subscriberUrl
-      _       <- Applicative[IO].whenA(removed)(logger.info(s"$subscriberUrl gone - deleting"))
+      _ <- Applicative[IO].whenA(removed)(logger.info(s"$subscriberUrl gone - deleting"))
     } yield ()
 
   override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =
@@ -61,8 +61,8 @@ class SubscribersImpl private[subscriptions] (
   override def runOnSubscriber(f: SubscriberUrl => IO[Unit]): IO[Unit] =
     for {
       subscriberUrlReference <- subscribersRegistry.findAvailableSubscriber()
-      subscriberUrl          <- subscriberUrlReference.get
-      _                      <- f(subscriberUrl)
+      subscriberUrl <- subscriberUrlReference.get
+      _ <- f(subscriberUrl)
     } yield ()
 }
 
@@ -71,13 +71,13 @@ object Subscribers {
   import cats.effect.IO
 
   def apply(
-      logger: Logger[IO]
-  )(implicit
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO],
-      executionContext: ExecutionContext
-  ): IO[Subscribers[IO]] = for {
+             logger: Logger[IO]
+           )(implicit
+             contextShift: ContextShift[IO],
+             timer: Timer[IO],
+             executionContext: ExecutionContext
+           ): IO[Subscribers[IO]] = for {
     subscribersRegistry <- SubscribersRegistry(logger)
-    subscribers         <- IO(new SubscribersImpl(subscribersRegistry, logger))
+    subscribers <- IO(new SubscribersImpl(subscribersRegistry, logger))
   } yield subscribers
 }

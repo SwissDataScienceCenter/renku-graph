@@ -36,7 +36,7 @@ import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
-import io.renku.eventlog.subscriptions.{Subscribers, SubscriptionsEndpoint}
+import io.renku.eventlog.subscriptions.{SubscriberUrl, Subscribers, SubscriptionCategory, SubscriptionsEndpoint}
 import org.http4s.MediaType.application
 import org.http4s.Method.{GET, PATCH, POST}
 import org.http4s.Status._
@@ -212,8 +212,8 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       extends LatestEventsEndpoint[IO](latestEventsFinder, logger)
   class TestProcessingStatusEndpoint(processingStatusFinder: ProcessingStatusFinder[IO], logger: Logger[IO])
       extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
-  class TestSubscriptionEndpoint(subscribers: Subscribers[IO], logger: Logger[IO])
-      extends SubscriptionsEndpoint[IO](subscribers, logger)
+  class TestSubscriptionEndpoint(subscriptionCategory: SubscriptionCategory[IO, SubscriberUrl], logger: Logger[IO])
+      extends SubscriptionsEndpoint[IO](subscriptionCategory, logger)
   class TestStatusChangeEndpoint(updateCommandsRunner: StatusUpdatesRunner[IO],
                                  waitingEventsGauge:   LabeledGauge[IO, projects.Path],
                                  underProcessingGauge: LabeledGauge[IO, projects.Path],

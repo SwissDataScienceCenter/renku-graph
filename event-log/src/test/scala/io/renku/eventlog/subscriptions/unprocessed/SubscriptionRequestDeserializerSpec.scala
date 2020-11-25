@@ -20,13 +20,13 @@ package io.renku.eventlog.subscriptions.unprocessed
 
 import cats.data.NonEmptyList
 import ch.datascience.generators.Generators._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus.{New, NonRecoverableFailure, Processing, RecoverableFailure, Skipped, TriplesStore}
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.Generators._
 import io.renku.eventlog.subscriptions.SubscriberUrl
-import io.renku.jsonld.generators.Generators.Implicits.GenOps
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
