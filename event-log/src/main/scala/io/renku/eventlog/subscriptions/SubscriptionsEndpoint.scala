@@ -23,8 +23,7 @@ import cats.effect.Effect
 import ch.datascience.graph.model.events.EventStatus
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
-import io.renku.eventlog.subscriptions.unprocessed.UnprocessedSubscriptionRequestDeserializer
-import io.renku.eventlog.subscriptions.unprocessed.UnprocessedSubscriptionRequestDeserializer.UrlAndStatuses
+import io.renku.eventlog.subscriptions.unprocessed.SubscriptionRequestDeserializer
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal
@@ -43,33 +42,25 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  private val deserializer = UnprocessedSubscriptionRequestDeserializer[Interpretation]()
+  private val deserializer = SubscriptionRequestDeserializer[Interpretation]()
 
   def addSubscription(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
-      json           <- request.asJson recoverWith badRequest
-      urlAndStatuses <- deserializer.deserialize(json) recoverWith unsupportedData
-      UrlAndStatuses(subscriberUrl, eventStatuses) = urlAndStatuses
-      _        <- badRequestIf(eventStatuses, not = New, RecoverableFailure)
-      _        <- subscribers add subscriberUrl
-      response <- Accepted(InfoMessage("Subscription added"))
+      json               <- request.asJson recoverWith badRequest
+      maybeSubscriberUrl <- deserializer.deserialize(json)
+      subscriberUrl      <- badRequestIfNone(maybeSubscriberUrl)
+      _                  <- subscribers add subscriberUrl
+      response           <- Accepted(InfoMessage("Subscription added"))
     } yield response
   } recoverWith httpResponse
 
   private lazy val badRequest: PartialFunction[Throwable, Interpretation[Json]] = { case NonFatal(exception) =>
     ME.raiseError(BadRequestError(exception))
   }
-
-  private lazy val unsupportedData: PartialFunction[Throwable, Interpretation[UrlAndStatuses]] = {
-    case NonFatal(exception) =>
-      ME.raiseError(BadRequestError(exception))
-  }
-
-  private def badRequestIf(statuses: Set[EventStatus], not: EventStatus*): Interpretation[Unit] =
-    if (statuses != not.toSet) ME.raiseError {
+  private def badRequestIfNone(maybeSubscriberUrl: Option[SubscriberUrl]): Interpretation[SubscriberUrl] =
+    maybeSubscriberUrl.fold(ME.raiseError[SubscriberUrl] {
       BadRequestError(s"Subscriptions to $New and $RecoverableFailure status supported only")
-    }
-    else ME.unit
+    })(url => url.pure[Interpretation])
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case exception: BadRequestError =>
