@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions
 
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 
-private trait EventFetcher[Interpretation[_]] {
+//TODO make private
+private[eventlog] trait EventFetcher[Interpretation[_]] {
   def popEvent(): Interpretation[Option[(CompoundEventId, EventBody)]]
 }

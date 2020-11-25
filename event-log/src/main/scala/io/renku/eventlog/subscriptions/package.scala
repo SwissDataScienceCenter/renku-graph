@@ -20,8 +20,8 @@ package io.renku.eventlog
 
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.constraints.Url
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
 
 package object subscriptions {
@@ -32,4 +32,7 @@ package object subscriptions {
     implicit val subscriberUrlDecoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
   }
 
+  trait SubscriptionCategoryPayload {
+    def subscriberUrl: SubscriberUrl
+  }
 }

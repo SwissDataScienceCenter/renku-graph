@@ -20,12 +20,7 @@ package io.renku.eventlog.subscriptions
 
 import cats.data.OptionT
 import cats.effect.{ContextShift, Effect, IO, Timer}
-import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
-import io.renku.eventlog.EventLogDB
 
 import scala.concurrent.ExecutionContext
 
@@ -35,36 +30,30 @@ trait SubscriptionCategory[Interpretation[_], T] {
   def register(payload: Json): Interpretation[Option[T]]
 }
 
-class SubscriptionCategoryUnprocessed[Interpretation[_]: Effect](
+class SubscriptionCategoryImpl[Interpretation[_]: Effect, T <: SubscriptionCategoryPayload](
     subscribers:       Subscribers[Interpretation],
     eventsDistributor: EventsDistributor[Interpretation],
-    deserializer:      SubscriptionRequestDeserializer[Interpretation, SubscriberUrl]
-) extends SubscriptionCategory[Interpretation, SubscriberUrl] {
+    deserializer:      SubscriptionRequestDeserializer[Interpretation, T]
+) extends SubscriptionCategory[Interpretation, T] {
   override def run(): Interpretation[Unit] = eventsDistributor.run()
 
-  override def register(payload: Json): Interpretation[Option[SubscriberUrl]] = (for {
-    subscriberUrl <- OptionT(deserializer.deserialize(payload))
-    _             <- OptionT.liftF(subscribers.add(subscriberUrl))
-  } yield subscriberUrl).value
+  override def register(payload: Json): Interpretation[Option[T]] = (for {
+    subscriptionPayload <- OptionT(deserializer.deserialize(payload))
+    _                   <- OptionT.liftF(subscribers.add(subscriptionPayload.subscriberUrl))
+  } yield subscriptionPayload).value
 }
 
-object IOSubscriptionCategoryUnprocessed {
-  def apply(transactor:           DbTransactor[IO, EventLogDB],
-            waitingEventsGauge:   LabeledGauge[IO, projects.Path],
-            underProcessingGauge: LabeledGauge[IO, projects.Path],
-            queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
-            logger:               Logger[IO]
+object IOSubscriptionCategory {
+  def apply[T <: SubscriptionCategoryPayload](
+      subscribers:       Subscribers[IO],
+      eventsDistributor: EventsDistributor[IO],
+      deserializer:      SubscriptionRequestDeserializer[IO, T]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[SubscriptionCategory[IO, SubscriberUrl]] = for {
-    subscribers <- Subscribers(logger)
-    eventsDistributor <-
-      IOEventsDistributor(transactor, subscribers, waitingEventsGauge, underProcessingGauge, queriesExecTimes, logger)
-  } yield {
-    val deserializer = new unprocessed.SubscriptionRequestDeserializer[IO]()
-    new SubscriptionCategoryUnprocessed[IO](subscribers, eventsDistributor, deserializer)
-  }
+  ): IO[SubscriptionCategory[IO, T]] = IO(
+    new SubscriptionCategoryImpl[IO, T](subscribers, eventsDistributor, deserializer)
+  )
 
 }

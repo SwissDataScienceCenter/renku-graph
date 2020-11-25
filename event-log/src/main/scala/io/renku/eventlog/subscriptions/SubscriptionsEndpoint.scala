@@ -27,8 +27,8 @@ import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal
 
-class SubscriptionsEndpoint[Interpretation[_]: Effect](
-    subscriptionCategory: SubscriptionCategory[Interpretation, SubscriberUrl],
+class SubscriptionsEndpoint[Interpretation[_]: Effect, T <: SubscriptionCategoryPayload](
+    subscriptionCategory: SubscriptionCategory[Interpretation, T],
     logger:               Logger[Interpretation]
 )(implicit ME:            MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
@@ -54,7 +54,7 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
     ME.raiseError(BadRequestError(exception))
   }
 
-  private def badRequestIfNone(maybeSubscriberUrl: Option[SubscriberUrl]): Interpretation[Unit] =
+  private def badRequestIfNone(maybeSubscriberUrl: Option[T]): Interpretation[Unit] =
     maybeSubscriberUrl.fold(ME.raiseError[Unit] {
       BadRequestError(s"Subscriptions to $New and $RecoverableFailure status supported only")
     })(_ => ME.unit)
@@ -88,10 +88,10 @@ object IOSubscriptionsEndpoint {
 
   import cats.effect.{ContextShift, IO}
 
-  def apply(
-      subscriptionCategory: SubscriptionCategory[IO, SubscriberUrl],
+  def apply[T <: SubscriptionCategoryPayload](
+      subscriptionCategory: SubscriptionCategory[IO, T],
       logger:               Logger[IO]
-  )(implicit contextShift:  ContextShift[IO]): IO[SubscriptionsEndpoint[IO]] = IO {
-    new SubscriptionsEndpoint[IO](subscriptionCategory, logger)
+  )(implicit contextShift:  ContextShift[IO]): IO[SubscriptionsEndpoint[IO, T]] = IO {
+    new SubscriptionsEndpoint[IO, T](subscriptionCategory, logger)
   }
 }

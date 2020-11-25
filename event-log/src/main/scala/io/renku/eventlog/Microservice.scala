@@ -37,6 +37,7 @@ import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
 import io.renku.eventlog.subscriptions._
+import io.renku.eventlog.subscriptions.unprocessed.IOUnprocessedEventFetcher
 import pureconfig.ConfigSource
 
 import scala.concurrent.ExecutionContext
@@ -92,49 +93,57 @@ object Microservice extends IOMicroservice {
                                                        queriesExecTimes,
                                                        ApplicationLogger
                                 )
-
-        subscriptionCategory <- IOSubscriptionCategoryUnprocessed(transactor,
-                                                                  waitingEventsGauge,
-                                                                  underProcessingGauge,
-                                                                  queriesExecTimes,
-                                                                  ApplicationLogger
-                                )
+        subscribers <- Subscribers(ApplicationLogger)
+        eventFetcher <-
+          IOUnprocessedEventFetcher(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
+        eventDistributor <-
+          IOEventsDistributor(transactor,
+                              subscribers,
+                              eventFetcher,
+                              underProcessingGauge,
+                              queriesExecTimes,
+                              ApplicationLogger
+          )
+        subscriptionCategory <-
+          IOSubscriptionCategory(subscribers, eventDistributor, new unprocessed.SubscriptionRequestDeserializer[IO]())
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptionCategory, ApplicationLogger)
-        microserviceRoutes = new MicroserviceRoutes[IO](
-                               eventCreationEndpoint,
-                               latestEventsEndpoint,
-                               processingStatusEndpoint,
-                               eventsPatchingEndpoint,
-                               statusChangeEndpoint,
-                               subscriptionsEndpoint,
-                               new RoutesMetrics[IO](metricsRegistry)
+        microserviceRoutes = new MicroserviceRoutes[IO,
+                                                    unprocessed.SubscriptionCategoryPayload
+                             ]( // TODO fix with Subscriptions category registry
+                                eventCreationEndpoint,
+                                latestEventsEndpoint,
+                                processingStatusEndpoint,
+                                eventsPatchingEndpoint,
+                                statusChangeEndpoint,
+                                subscriptionsEndpoint,
+                                new RoutesMetrics[IO](metricsRegistry)
                              ).routes
         exitCode <- microserviceRoutes.use { routes =>
                       val httpServer = new HttpServer[IO](serverPort = 9005, routes)
 
-                      new MicroserviceRunner(
-                        certificateLoader,
-                        sentryInitializer,
-                        dbInitializer,
-                        eventLogMetrics,
-                        subscriptionCategory,
-                        metricsResetScheduler,
-                        httpServer,
-                        subProcessesCancelTokens
+                      new MicroserviceRunner[
+                        unprocessed.SubscriptionCategoryPayload
+                      ]( // TODO fix with Subscriptions category registry
+                         certificateLoader,
+                         sentryInitializer,
+                         dbInitializer,
+                         eventLogMetrics,
+                         subscriptionCategory,
+                         metricsResetScheduler,
+                         httpServer,
+                         subProcessesCancelTokens
                       ).run()
                     }
       } yield exitCode
     }
 }
 
-private class MicroserviceRunner(
-    certificateLoader: CertificateLoader[IO],
-    sentryInitializer: SentryInitializer[IO],
-    dbInitializer:     DbInitializer[IO],
-    metrics:           EventLogMetrics,
-    subscriptionCategory: SubscriptionCategory[IO,
-                                               SubscriberUrl
-    ], // WILL be fixed with the Subscription Category Registry
+private class MicroserviceRunner[T <: SubscriptionCategoryPayload](
+    certificateLoader:        CertificateLoader[IO],
+    sentryInitializer:        SentryInitializer[IO],
+    dbInitializer:            DbInitializer[IO],
+    metrics:                  EventLogMetrics,
+    subscriptionCategory:     SubscriptionCategory[IO, T],
     metricsResetScheduler:    GaugeResetScheduler[IO],
     httpServer:               HttpServer[IO],
     subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]

@@ -32,19 +32,19 @@ import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.LatestEventsEndpoint
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.StatusChangeEndpoint
-import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
+import io.renku.eventlog.subscriptions.{SubscriptionCategoryPayload, SubscriptionsEndpoint}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Response}
 
 import scala.util.Try
 
-private class MicroserviceRoutes[F[_]: ConcurrentEffect](
+private class MicroserviceRoutes[F[_]: ConcurrentEffect, T <: SubscriptionCategoryPayload](
     eventCreationEndpoint:    EventCreationEndpoint[F],
     latestEventsEndpoint:     LatestEventsEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
     eventsPatchingEndpoint:   EventsPatchingEndpoint[F],
     statusChangeEndpoint:     StatusChangeEndpoint[F],
-    subscriptionsEndpoint:    SubscriptionsEndpoint[F],
+    subscriptionsEndpoint:    SubscriptionsEndpoint[F, T],
     routesMetrics:            RoutesMetrics[F]
 )(implicit clock:             Clock[F], contextShift: ContextShift[F])
     extends Http4sDsl[F] {

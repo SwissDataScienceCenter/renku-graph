@@ -28,7 +28,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
-import io.renku.eventlog.subscriptions.unprocessed.IONewEventFetcher
 import io.renku.eventlog.{EventLogDB, EventMessage}
 
 import scala.concurrent.ExecutionContext
@@ -146,7 +145,7 @@ object IOEventsDistributor {
   def apply(
       transactor:           DbTransactor[IO, EventLogDB],
       subscribers:          Subscribers[IO],
-      waitingEventsGauge:   LabeledGauge[IO, projects.Path],
+      eventsFinder:         EventFetcher[IO],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
       logger:               Logger[IO]
@@ -156,7 +155,6 @@ object IOEventsDistributor {
       timer:            Timer[IO]
   ): IO[EventsDistributor[IO]] =
     for {
-      eventsFinder        <- IONewEventFetcher(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
       eventsSender        <- IOEventsSender(logger)
       updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
     } yield new EventsDistributorImpl(subscribers,

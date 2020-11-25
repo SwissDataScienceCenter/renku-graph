@@ -55,17 +55,17 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
 
   "register" should {
     "return the subscriber URL if the statuses are valid" in new TestCase {
-      val subscriberUrl = subscriberUrls.generateOne
-      val payload       = jsonPayloads.generateOne
+      val subscriptionCategoryPayload = subscriptionCategoryPayloads.generateOne
+      val payload                     = jsonPayloads.generateOne
       (deserializer.deserialize _)
         .expects(payload)
-        .returning(subscriberUrl.some.pure[IO])
+        .returning(subscriptionCategoryPayload.some.pure[IO])
 
       (subscribers.add _)
-        .expects(subscriberUrl)
+        .expects(subscriptionCategoryPayload.subscriberUrl)
         .returning(().pure[IO])
 
-      subscriptionCategory.register(payload).unsafeRunSync() shouldBe subscriberUrl.some
+      subscriptionCategory.register(payload).unsafeRunSync() shouldBe subscriptionCategoryPayload.some
     }
 
     "return None if the payload does not contain the right supported statuses" in new TestCase {
@@ -78,15 +78,15 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
     }
 
     "fail if adding the subscriber url fails" in new TestCase {
-      val subscriberUrl = subscriberUrls.generateOne
-      val exception     = exceptions.generateOne
-      val payload       = jsonPayloads.generateOne
+      val subscriptionCategoryPayload = subscriptionCategoryPayloads.generateOne
+      val exception                   = exceptions.generateOne
+      val payload                     = jsonPayloads.generateOne
       (deserializer.deserialize _)
         .expects(payload)
-        .returning(subscriberUrl.some.pure[IO])
+        .returning(subscriptionCategoryPayload.some.pure[IO])
 
       (subscribers.add _)
-        .expects(subscriberUrl)
+        .expects(subscriptionCategoryPayload.subscriberUrl)
         .returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
@@ -98,10 +98,10 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
   trait TestCase {
     val eventsDistributor = mock[EventsDistributor[IO]]
     val subscribers       = mock[Subscribers[IO]]
-    val deserializer      = mock[SubscriptionRequestDeserializer[IO, SubscriberUrl]]
+    val deserializer      = mock[SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload]]
 
     val subscriptionCategory =
-      new SubscriptionCategoryUnprocessed[IO](subscribers, eventsDistributor, deserializer)
+      new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](subscribers, eventsDistributor, deserializer)
 
     val jsonPayloads = for {
       properties <- nonEmptyList(nonEmptyStrings())
