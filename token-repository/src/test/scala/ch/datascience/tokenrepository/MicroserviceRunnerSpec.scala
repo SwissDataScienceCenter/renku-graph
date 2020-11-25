@@ -24,13 +24,17 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
-import ch.datascience.microservices.AnyMicroserviceRunnerSpec
+import ch.datascience.testtools.MockedRunnableCollaborators
 import ch.datascience.tokenrepository.repository.init.IODbInitializer
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec with MockFactory with should.Matchers {
+class MicroserviceRunnerSpec
+    extends AnyWordSpec
+    with MockedRunnableCollaborators
+    with MockFactory
+    with should.Matchers {
 
   "run" should {
 

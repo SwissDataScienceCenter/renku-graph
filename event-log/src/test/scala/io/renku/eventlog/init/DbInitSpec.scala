@@ -18,41 +18,25 @@
 
 package io.renku.eventlog.init
 
-import cats.syntax.all._
 import doobie.implicits._
-import doobie.util.fragment.Fragment
 import io.renku.eventlog.InMemoryEventLogDb
 import org.scalatest.Suite
 
 trait DbInitSpec extends InMemoryEventLogDb {
   self: Suite =>
 
-  protected def tableExists(): Boolean =
-    sql"""select exists (select * from event_log);"""
-      .query[Boolean]
-      .option
-      .transact(transactor.get)
-      .recover { case _ => None }
-      .unsafeRunSync()
-      .isDefined
-
-  protected def createTable(): Unit = execute {
-    sql"""
-         |CREATE TABLE event_log(
-         | event_id varchar NOT NULL,
-         | project_id int4 NOT NULL,
-         | status varchar NOT NULL,
-         | created_date timestamp NOT NULL,
-         | execution_date timestamp NOT NULL,
-         | event_date timestamp NOT NULL,
-         | event_body text NOT NULL,
-         | message varchar,
-         | PRIMARY KEY (event_id, project_id)
-         |);
+  protected def createEventLogTable(): Unit = execute {
+    sql"""|CREATE TABLE event_log(
+          | event_id varchar NOT NULL,
+          | project_id int4 NOT NULL,
+          | status varchar NOT NULL,
+          | created_date timestamp NOT NULL,
+          | execution_date timestamp NOT NULL,
+          | event_date timestamp NOT NULL,
+          | event_body text NOT NULL,
+          | message varchar,
+          | PRIMARY KEY (event_id, project_id)
+          |);
        """.stripMargin.update.run.map(_ => ())
-  }
-
-  protected def dropTable(): Unit = execute {
-    sql"DROP TABLE IF EXISTS event_log".update.run.map(_ => ())
   }
 }

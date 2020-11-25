@@ -35,6 +35,7 @@ class DbInitializerImpl[Interpretation[_]](
     projectPathAdder:            ProjectPathAdder[Interpretation],
     batchDateAdder:              BatchDateAdder[Interpretation],
     latestEventDatesViewCreator: LatestEventDatesViewCreator[Interpretation],
+    projectTableCreator:         ProjectTableCreator[Interpretation],
     transactor:                  DbTransactor[Interpretation, EventLogDB],
     logger:                      Logger[Interpretation]
 )(implicit ME:                   Bracket[Interpretation, Throwable])
@@ -57,6 +58,7 @@ class DbInitializerImpl[Interpretation[_]](
       _ <- projectPathAdder.run()
       _ <- batchDateAdder.run()
       _ <- latestEventDatesViewCreator.run()
+      _ <- projectTableCreator.run()
     } yield ()
   } recoverWith logging
 
@@ -92,6 +94,7 @@ object IODbInitializer {
       new ProjectPathAdder[IO](transactor, logger),
       new BatchDateAdder[IO](transactor, logger),
       LatestEventDatesViewCreator[IO](transactor, logger),
+      ProjectTableCreator(transactor, logger),
       transactor,
       logger
     )

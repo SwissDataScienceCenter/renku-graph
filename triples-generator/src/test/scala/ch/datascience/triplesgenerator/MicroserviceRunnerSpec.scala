@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
-import ch.datascience.microservices.AnyMicroserviceRunnerSpec
+import ch.datascience.testtools.MockedRunnableCollaborators
 import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioning
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
@@ -36,7 +36,11 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext
 
-class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec with MockFactory with should.Matchers {
+class MicroserviceRunnerSpec
+    extends AnyWordSpec
+    with MockedRunnableCollaborators
+    with MockFactory
+    with should.Matchers {
 
   "run" should {
 

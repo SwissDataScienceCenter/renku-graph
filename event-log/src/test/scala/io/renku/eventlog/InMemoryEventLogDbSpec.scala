@@ -32,26 +32,38 @@ import org.scalatest.TestSuite
 trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
   self: TestSuite =>
 
-  protected def initDb(): Unit = execute {
-    sql"""
-         |CREATE TABLE IF NOT EXISTS event_log(
-         | event_id varchar NOT NULL,
-         | project_id int4 NOT NULL,
-         | project_path varchar NOT NULL,
-         | status varchar NOT NULL,
-         | created_date timestamp NOT NULL,
-         | execution_date timestamp NOT NULL,
-         | event_date timestamp NOT NULL,
-         | batch_date timestamp NOT NULL,
-         | event_body text NOT NULL,
-         | message varchar,
-         | PRIMARY KEY (event_id, project_id)
-         |);
-      """.stripMargin.update.run.map(_ => ())
+  protected def initDb(): Unit = {
+    execute {
+      sql"""|CREATE TABLE IF NOT EXISTS event_log(
+            | event_id varchar NOT NULL,
+            | project_id int4 NOT NULL,
+            | project_path varchar NOT NULL,
+            | status varchar NOT NULL,
+            | created_date timestamp NOT NULL,
+            | execution_date timestamp NOT NULL,
+            | event_date timestamp NOT NULL,
+            | batch_date timestamp NOT NULL,
+            | event_body text NOT NULL,
+            | message varchar,
+            | PRIMARY KEY (event_id, project_id)
+            |);
+       """.stripMargin.update.run.map(_ => ())
+    }
+    execute {
+      sql"""|CREATE TABLE IF NOT EXISTS project(
+            |project_id        int4      NOT NULL,
+            |project_path      VARCHAR   NOT NULL,
+            |latest_event_date timestamp NOT NULL,
+            |PRIMARY KEY (project_id)
+            |);
+    """.stripMargin.update.run.map(_ => ())
+    }
   }
 
-  protected def prepareDbForTest(): Unit = execute {
-    sql"TRUNCATE TABLE event_log".update.run.map(_ => ())
+  protected def prepareDbForTest(): Unit = Tables.all.foreach { tableName =>
+    execute {
+      Fragment.const(s"TRUNCATE TABLE $tableName").update.run.map(_ => ())
+    }
   }
 
   protected def storeEvent(compoundEventId: CompoundEventId,

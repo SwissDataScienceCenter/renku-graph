@@ -29,7 +29,7 @@ import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.metrics.{GaugeResetScheduler, LabeledGauge, SingleValueGauge}
-import ch.datascience.microservices.AnyMicroserviceRunnerSpec
+import ch.datascience.testtools.MockedRunnableCollaborators
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics.{EventLogMetrics, StatsFinder}
@@ -41,7 +41,11 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.FiniteDuration
 
-class MicroserviceRunnerSpec extends AnyWordSpec with AnyMicroserviceRunnerSpec with MockFactory with should.Matchers {
+class MicroserviceRunnerSpec
+    extends AnyWordSpec
+    with MockedRunnableCollaborators
+    with MockFactory
+    with should.Matchers {
 
   "run" should {
 

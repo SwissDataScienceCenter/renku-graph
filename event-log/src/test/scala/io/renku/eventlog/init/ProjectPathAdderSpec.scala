@@ -41,10 +41,12 @@ class ProjectPathAdderSpec
     with Eventually
     with IntegrationPatience {
 
+  import Tables._
+
   "run" should {
 
     "do nothing if the 'project_path' column already exists" in new TestCase {
-      if (!tableExists()) createTable()
+      if (!tableExists(event_log)) createEventLogTable()
       addProjectPath()
       checkColumnExists shouldBe true
 
@@ -56,9 +58,9 @@ class ProjectPathAdderSpec
     }
 
     "add the 'project_path' column if does not exist and migrate the data for it" in new TestCase {
-      if (tableExists()) {
-        dropTable()
-        createTable()
+      if (tableExists(event_log)) {
+        dropTable(event_log)
+        createEventLogTable()
       }
       checkColumnExists shouldBe false
 
@@ -100,16 +102,16 @@ class ProjectPathAdderSpec
       .unsafeRunSync()
 
   private def storeEvent(event: Event): Unit = execute {
-    sql"""insert into 
-         |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
-         |values (
-         |${event.id}, 
-         |${event.project.id}, 
-         |${eventStatuses.generateOne}, 
-         |${createdDates.generateOne}, 
-         |${executionDates.generateOne}, 
-         |${eventDates.generateOne}, 
-         |${toJson(event)})
+    sql"""|insert into 
+          |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
+          |values (
+          |${event.id}, 
+          |${event.project.id}, 
+          |${eventStatuses.generateOne}, 
+          |${createdDates.generateOne}, 
+          |${executionDates.generateOne}, 
+          |${eventDates.generateOne}, 
+          |${toJson(event)})
       """.stripMargin.update.run.map(_ => ())
   }
 

@@ -36,10 +36,12 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
+  import Tables._
+
   "run" should {
 
     "do nothing if the 'batch_date' column already exists" in new TestCase {
-      if (!tableExists()) createTable()
+      if (!tableExists(event_log)) createEventLogTable()
       addBatchDate()
       checkColumnExists shouldBe true
 
@@ -51,9 +53,9 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
     }
 
     "add the 'batch_date' column if does not exist and migrate the data for it" in new TestCase {
-      if (tableExists()) {
-        dropTable()
-        createTable()
+      if (tableExists(event_log)) {
+        dropTable(event_log)
+        createEventLogTable()
       }
       checkColumnExists shouldBe false
 
@@ -80,9 +82,8 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
   }
 
   private def addBatchDate(): Unit = execute {
-    sql"""
-         |ALTER TABLE event_log 
-         |ADD COLUMN batch_date timestamp;
+    sql"""|ALTER TABLE event_log 
+          |ADD COLUMN batch_date timestamp;
        """.stripMargin.update.run.map(_ => ())
   }
 
@@ -96,16 +97,16 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
       .unsafeRunSync()
 
   private def storeEvent(event: Event, createdDate: CreatedDate): Unit = execute {
-    sql"""insert into 
-         |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
-         |values (
-         |${event.id}, 
-         |${event.project.id}, 
-         |${eventStatuses.generateOne}, 
-         |$createdDate,
-         |${executionDates.generateOne}, 
-         |${event.date}, 
-         |${toJsonBody(event)})
+    sql"""|insert into 
+          |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
+          |values (
+          |${event.id}, 
+          |${event.project.id}, 
+          |${eventStatuses.generateOne}, 
+          |$createdDate,
+          |${executionDates.generateOne}, 
+          |${event.date}, 
+          |${toJsonBody(event)})
       """.stripMargin.update.run.map(_ => ())
   }
 

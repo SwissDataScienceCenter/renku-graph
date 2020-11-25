@@ -31,6 +31,5 @@ package object init {
   )(implicit
       transactor: DbTransactor[Interpretation, EventLogDB],
       ME:         Bracket[Interpretation, Throwable]
-  ): Interpretation[Unit] =
-    sql.update.run.transact(transactor.get).map(_ => ())
+  ): Interpretation[Unit] = sql.update.run.transact(transactor.get).void
 }

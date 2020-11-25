@@ -26,6 +26,7 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
+import ch.datascience.testtools.MockedRunnableCollaborators
 import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.DbEventLogGenerators._
@@ -34,69 +35,62 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory with should.Matchers {
+class DbInitializerSpec
+    extends AnyWordSpec
+    with DbInitSpec
+    with MockedRunnableCollaborators
+    with MockFactory
+    with should.Matchers {
+
+  import Tables._
 
   "run" should {
 
-    "do nothing if event_log table already exists" in new TestCase {
-      if (!tableExists()) createTable()
+    "run the migration processes only if event_log table already exists" in new TestCase {
+      if (!tableExists(event_log)) createEventLogTable()
 
-      tableExists() shouldBe true
+      tableExists(event_log) shouldBe true
 
-      (projectPathAdder.run _)
-        .expects()
-        .returning(IO.unit)
-      (batchDateAdder.run _)
-        .expects()
-        .returning(IO.unit)
-      (viewCreator.run _)
-        .expects()
-        .returning(IO.unit)
+      given(projectPathAdder).succeeds(returning = ())
+      given(batchDateAdder).succeeds(returning = ())
+      given(viewCreator).succeeds(returning = ())
+      given(projectTableCreator).succeeds(returning = ())
 
       dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
-      tableExists() shouldBe true
+      tableExists(event_log) shouldBe true
 
       logger.loggedOnly(Info("Event Log database initialization success"))
     }
 
-    "create the event_log table if it does not exist" in new TestCase {
-      if (tableExists()) dropTable()
+    "create the event_log table and run all the migrations " +
+      "if it does not exist" in new TestCase {
+        if (tableExists(event_log)) dropTable(event_log)
 
-      tableExists() shouldBe false
+        tableExists(event_log) shouldBe false
 
-      (projectPathAdder.run _)
-        .expects()
-        .returning(IO.unit)
-      (batchDateAdder.run _)
-        .expects()
-        .returning(IO.unit)
-      (viewCreator.run _)
-        .expects()
-        .returning(IO.unit)
+        given(projectPathAdder).succeeds(returning = ())
+        given(batchDateAdder).succeeds(returning = ())
+        given(viewCreator).succeeds(returning = ())
+        given(projectTableCreator).succeeds(returning = ())
 
-      dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
+        dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
-      tableExists() shouldBe true
+        tableExists(event_log) shouldBe true
 
-      logger.loggedOnly(Info("Event Log database initialization success"))
-    }
+        logger.loggedOnly(Info("Event Log database initialization success"))
+      }
 
     "ensure indexes are created for project_id, status and execution_date" in new TestCase {
 
-      if (!tableExists()) createTable()
+      if (!tableExists(event_log)) createEventLogTable()
 
-      tableExists() shouldBe true
+      tableExists(event_log) shouldBe true
 
-      (projectPathAdder.run _)
-        .expects()
-        .returning(IO.unit)
-      (batchDateAdder.run _)
-        .expects()
-        .returning(IO.unit)
-      (viewCreator.run _)
-        .expects()
-        .returning(IO.unit)
+      given(projectPathAdder).succeeds(returning = ())
+      given(batchDateAdder).succeeds(returning = ())
+      given(viewCreator).succeeds(returning = ())
+      given(projectTableCreator).succeeds(returning = ())
 
       dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
@@ -110,19 +104,14 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
 
     "ensure TRIPLES_STORE_FAILURE to RECOVERABLE_FAILURE update is run" in new TestCase {
 
-      if (!tableExists()) createTable()
+      if (!tableExists(event_log)) createEventLogTable()
 
-      tableExists() shouldBe true
+      tableExists(event_log) shouldBe true
 
-      (projectPathAdder.run _)
-        .expects()
-        .returning(IO.unit)
-      (batchDateAdder.run _)
-        .expects()
-        .returning(IO.unit)
-      (viewCreator.run _)
-        .expects()
-        .returning(IO.unit)
+      given(projectPathAdder).succeeds(returning = ())
+      given(batchDateAdder).succeeds(returning = ())
+      given(viewCreator).succeeds(returning = ())
+      given(projectTableCreator).succeeds(returning = ())
 
       storeEvent()
       storeEvent(eventStatus = "TRIPLES_STORE_FAILURE")
@@ -141,14 +130,12 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
 
     "fails if adding the project_path column fails" in new TestCase {
 
-      if (!tableExists()) createTable()
+      if (!tableExists(event_log)) createEventLogTable()
 
-      tableExists() shouldBe true
+      tableExists(event_log) shouldBe true
 
       val exception = exceptions.generateOne
-      (projectPathAdder.run _)
-        .expects()
-        .returning(IO.raiseError(exception))
+      given(projectPathAdder).fails(becauseOf = exception)
 
       intercept[Exception] {
         dbInitializer.run().unsafeRunSync()
@@ -157,17 +144,13 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
 
     "fails if adding the batch_date column fails" in new TestCase {
 
-      if (!tableExists()) createTable()
+      if (!tableExists(event_log)) createEventLogTable()
 
-      tableExists() shouldBe true
+      tableExists(event_log) shouldBe true
 
-      (projectPathAdder.run _)
-        .expects()
-        .returning(IO.unit)
+      given(projectPathAdder).succeeds(returning = ())
       val exception = exceptions.generateOne
-      (batchDateAdder.run _)
-        .expects()
-        .returning(IO.raiseError(exception))
+      given(batchDateAdder).fails(becauseOf = exception)
 
       intercept[Exception] {
         dbInitializer.run().unsafeRunSync()
@@ -176,20 +159,31 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
 
     "fails if creating the latest event dates view fails" in new TestCase {
 
-      if (!tableExists()) createTable()
+      if (!tableExists(event_log)) createEventLogTable()
 
-      tableExists() shouldBe true
+      tableExists(event_log) shouldBe true
 
-      (projectPathAdder.run _)
-        .expects()
-        .returning(IO.unit)
-      (batchDateAdder.run _)
-        .expects()
-        .returning(IO.unit)
+      given(projectPathAdder).succeeds(returning = ())
+      given(batchDateAdder).succeeds(returning = ())
       val exception = exceptions.generateOne
-      (viewCreator.run _)
-        .expects()
-        .returning(IO.raiseError(exception))
+      given(viewCreator).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        dbInitializer.run().unsafeRunSync()
+      } shouldBe exception
+    }
+
+    "fails if creating the project table fails" in new TestCase {
+
+      if (!tableExists(event_log)) createEventLogTable()
+
+      tableExists(event_log) shouldBe true
+
+      val exception = exceptions.generateOne
+      given(projectPathAdder).succeeds(returning = ())
+      given(batchDateAdder).succeeds(returning = ())
+      given(viewCreator).succeeds(returning = ())
+      given(projectTableCreator).fails(becauseOf = exception)
 
       intercept[Exception] {
         dbInitializer.run().unsafeRunSync()
@@ -198,11 +192,19 @@ class DbInitializerSpec extends AnyWordSpec with DbInitSpec with MockFactory wit
   }
 
   private trait TestCase {
-    val projectPathAdder = mock[IOProjectPathAdder]
-    val batchDateAdder   = mock[IOBatchDateAdder]
-    val viewCreator      = mock[LatestEventDatesViewCreator[IO]]
-    val logger           = TestLogger[IO]()
-    val dbInitializer    = new DbInitializerImpl[IO](projectPathAdder, batchDateAdder, viewCreator, transactor, logger)
+    val projectPathAdder    = mock[IOProjectPathAdder]
+    val batchDateAdder      = mock[IOBatchDateAdder]
+    val viewCreator         = mock[LatestEventDatesViewCreator[IO]]
+    val projectTableCreator = mock[ProjectTableCreator[IO]]
+    val logger              = TestLogger[IO]()
+    val dbInitializer = new DbInitializerImpl[IO](
+      projectPathAdder,
+      batchDateAdder,
+      viewCreator,
+      projectTableCreator,
+      transactor,
+      logger
+    )
   }
 
   private class IOProjectPathAdder(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO])

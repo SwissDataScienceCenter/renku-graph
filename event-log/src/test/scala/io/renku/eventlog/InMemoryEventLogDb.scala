@@ -19,6 +19,7 @@
 package io.renku.eventlog
 
 import cats.effect.{ContextShift, IO}
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import com.dimafeng.testcontainers._
 import doobie.Transactor
@@ -31,6 +32,12 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 trait InMemoryEventLogDb extends ForAllTestContainer with TypesSerializers {
   self: Suite =>
+
+  object Tables {
+    val event_log = "event_log"
+    val project   = "project"
+    lazy val all  = Set(event_log, project)
+  }
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 
@@ -59,5 +66,19 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypesSerializers {
 
   def verifyTrue(sql: Fragment): Unit = execute {
     sql.update.run.map(_ => ())
+  }
+
+  def tableExists(tableName: String): Boolean =
+    Fragment
+      .const(s"select exists (select * from $tableName);")
+      .query[Boolean]
+      .option
+      .transact(transactor.get)
+      .recover { case _ => None }
+      .unsafeRunSync()
+      .isDefined
+
+  def dropTable(tableName: String): Unit = execute {
+    Fragment.const(s"DROP TABLE IF EXISTS $tableName").update.run.map(_ => ())
   }
 }
