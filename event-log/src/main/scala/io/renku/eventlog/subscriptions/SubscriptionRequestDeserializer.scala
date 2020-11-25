@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.tinytypes.constraints.Url
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import io.circe.Json
 
-final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
-object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url
+trait SubscriptionRequestDeserializer[Interpretation[_], T] {
+
+  def deserialize(payload: Json): Interpretation[Option[T]]
+}
