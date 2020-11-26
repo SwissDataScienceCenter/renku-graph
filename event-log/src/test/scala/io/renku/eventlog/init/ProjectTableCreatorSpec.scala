@@ -19,7 +19,6 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
-import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -62,7 +61,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
 
-      checkTableExists shouldBe true
+      tableExists(project) shouldBe true
 
       verifyTrue(sql"DROP INDEX idx_project_id;")
       verifyTrue(sql"DROP INDEX idx_project_path;")
@@ -70,7 +69,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     }
 
     "do nothing if the 'project' table already exists" in new TestCase {
-      checkTableExists shouldBe false
+      tableExists(project) shouldBe false
 
       createEvent()
 
@@ -95,15 +94,6 @@ class ProjectTableCreatorSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     val logger       = TestLogger[IO]()
     val tableCreator = new ProjectTableCreatorImpl[IO](transactor, logger)
   }
-
-  private def checkTableExists: Boolean =
-    sql"select project_path from project limit 1"
-      .query[String]
-      .option
-      .transact(transactor.get)
-      .map(_ => true)
-      .recover { case _ => false }
-      .unsafeRunSync()
 
   private def fetchProjectData: List[(Id, Path, EventDate)] = execute {
     sql"""select project_id, project_path, latest_event_date from project"""

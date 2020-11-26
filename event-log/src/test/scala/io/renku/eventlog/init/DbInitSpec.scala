@@ -18,25 +18,16 @@
 
 package io.renku.eventlog.init
 
-import doobie.implicits._
+import cats.effect.IO
+import ch.datascience.interpreters.TestLogger
 import io.renku.eventlog.InMemoryEventLogDb
 import org.scalatest.Suite
 
 trait DbInitSpec extends InMemoryEventLogDb {
   self: Suite =>
 
-  protected def createEventLogTable(): Unit = execute {
-    sql"""|CREATE TABLE event_log(
-          | event_id varchar NOT NULL,
-          | project_id int4 NOT NULL,
-          | status varchar NOT NULL,
-          | created_date timestamp NOT NULL,
-          | execution_date timestamp NOT NULL,
-          | event_date timestamp NOT NULL,
-          | event_body text NOT NULL,
-          | message varchar,
-          | PRIMARY KEY (event_id, project_id)
-          |);
-       """.stripMargin.update.run.map(_ => ())
-  }
+  protected def createEventLogTable(): Unit =
+    new EventLogTableCreatorImpl[IO](transactor, TestLogger())
+      .run()
+      .unsafeRunSync()
 }
