@@ -23,7 +23,6 @@ import cats.implicits.{catsSyntaxApplicativeErrorId, catsSyntaxApplicativeId}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import io.circe.literal.JsonStringContext
 import io.renku.eventlog.subscriptions.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -56,7 +55,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
   "register" should {
     "return the subscriber URL if the statuses are valid" in new TestCase {
       val subscriptionCategoryPayload = subscriptionCategoryPayloads.generateOne
-      val payload                     = jsonPayloads.generateOne
+      val payload                     = jsons.generateOne
       (deserializer.deserialize _)
         .expects(payload)
         .returning(subscriptionCategoryPayload.some.pure[IO])
@@ -69,7 +68,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
     }
 
     "return None if the payload does not contain the right supported statuses" in new TestCase {
-      val payload = jsonPayloads.generateOne
+      val payload = jsons.generateOne
       (deserializer.deserialize _)
         .expects(payload)
         .returning(none.pure[IO])
@@ -80,7 +79,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
     "fail if adding the subscriber url fails" in new TestCase {
       val subscriptionCategoryPayload = subscriptionCategoryPayloads.generateOne
       val exception                   = exceptions.generateOne
-      val payload                     = jsonPayloads.generateOne
+      val payload                     = jsons.generateOne
       (deserializer.deserialize _)
         .expects(payload)
         .returning(subscriptionCategoryPayload.some.pure[IO])
@@ -102,14 +101,5 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
 
     val subscriptionCategory =
       new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](subscribers, eventsDistributor, deserializer)
-
-    val jsonPayloads = for {
-      properties <- nonEmptyList(nonEmptyStrings())
-    } yield {
-      val payload =
-        properties.map(props => s""" "$props": "${nonEmptyStrings().generateOne}"""").toList.mkString(",\n")
-      val content = s"{$payload}"
-      json"""$content"""
-    }
   }
 }
