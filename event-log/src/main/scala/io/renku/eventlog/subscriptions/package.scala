@@ -35,4 +35,8 @@ package object subscriptions {
   trait SubscriptionCategoryPayload {
     def subscriberUrl: SubscriberUrl
   }
+
+  sealed trait RequestError extends Exception
+  final case class UnsupportedPayloadError(message: String) extends Exception(message) with RequestError
+
 }

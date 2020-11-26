@@ -20,20 +20,18 @@ package io.renku.eventlog.subscriptions
 
 import cats.MonadError
 import cats.effect.Effect
-import ch.datascience.graph.model.events.EventStatus
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal
 
-class SubscriptionsEndpoint[Interpretation[_]: Effect, T <: SubscriptionCategoryPayload](
-    subscriptionCategory: SubscriptionCategory[Interpretation, T],
-    logger:               Logger[Interpretation]
-)(implicit ME:            MonadError[Interpretation, Throwable])
+class SubscriptionsEndpoint[Interpretation[_]: Effect](
+    subscriptionCategoryRegistry: SubscriptionCategoryRegistry[Interpretation],
+    logger:                       Logger[Interpretation]
+)(implicit ME:                    MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
-  import EventStatus.{New, RecoverableFailure}
   import SubscriptionsEndpoint._
   import cats.syntax.all._
   import ch.datascience.controllers.InfoMessage._
@@ -43,10 +41,10 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect, T <: SubscriptionCategory
 
   def addSubscription(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
-      json               <- request.asJson recoverWith badRequest
-      maybeSubscriberUrl <- subscriptionCategory.register(json)
-      _                  <- badRequestIfNone(maybeSubscriberUrl)
-      response           <- Accepted(InfoMessage("Subscription added"))
+      json         <- request.asJson recoverWith badRequest
+      eitherResult <- subscriptionCategoryRegistry.register(json)
+      _            <- badRequestIfError(eitherResult)
+      response     <- Accepted(InfoMessage("Subscription added"))
     } yield response
   } recoverWith httpResponse
 
@@ -54,10 +52,8 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect, T <: SubscriptionCategory
     ME.raiseError(BadRequestError(exception))
   }
 
-  private def badRequestIfNone(maybeSubscriberUrl: Option[T]): Interpretation[Unit] =
-    maybeSubscriberUrl.fold(ME.raiseError[Unit] {
-      BadRequestError(s"Subscriptions to $New and $RecoverableFailure status supported only")
-    })(_ => ME.unit)
+  private def badRequestIfError(eitherErrorSuccess: Either[RequestError, Unit]): Interpretation[Unit] =
+    eitherErrorSuccess.fold(error => ME.raiseError[Unit](BadRequestError(error.getMessage)), _ => ME.unit)
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case exception: BadRequestError =>
@@ -89,9 +85,9 @@ object IOSubscriptionsEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply[T <: SubscriptionCategoryPayload](
-      subscriptionCategory: SubscriptionCategory[IO, T],
-      logger:               Logger[IO]
-  )(implicit contextShift:  ContextShift[IO]): IO[SubscriptionsEndpoint[IO, T]] = IO {
-    new SubscriptionsEndpoint[IO, T](subscriptionCategory, logger)
+      subscriptionCategoryRegistry: SubscriptionCategoryRegistry[IO],
+      logger:                       Logger[IO]
+  )(implicit contextShift:          ContextShift[IO]): IO[SubscriptionsEndpoint[IO]] = IO {
+    new SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
   }
 }

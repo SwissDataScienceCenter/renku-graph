@@ -47,16 +47,16 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
 
   "addSubscription" should {
 
-    s"return $Accepted when there are NEW and RECOVERABLE_FAILURE statuses in the payload " +
+    s"return $Accepted when the payload is acceptable" +
       "and subscriber URL was added to the pool" in new TestCase {
 
         val payload = (subscriptionCategoryPayload.subscriberUrl -> Set(New, RecoverableFailure)).asJson
         val request = Request(Method.POST, uri"subscriptions")
           .withEntity(payload)
 
-        (subscriptionCategory.register _)
+        (subscriptionCategoryRegistry.register _)
           .expects(payload)
-          .returning(subscriptionCategoryPayload.some.pure[IO])
+          .returning(Right(()).pure[IO])
 
         val response = addSubscription(request).unsafeRunSync()
 
@@ -81,27 +81,26 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
       logger.expectNoLogs()
     }
 
-    s"return $BadRequest when statuses in the request are other than NEW and RECOVERABLE_FAILURE" in new TestCase {
+    s"return $BadRequest when the payload in the request is not supported" in new TestCase {
       val payload = (subscriptionCategoryPayload.subscriberUrl -> Set(New: EventStatus)).asJson
       val request = Request(Method.POST, uri"subscriptions")
         .withEntity(payload)
+      val errorMessage = nonEmptyStrings().generateOne
 
-      (subscriptionCategory.register _)
+      (subscriptionCategoryRegistry.register _)
         .expects(payload)
-        .returning(none.pure[IO])
+        .returning(Left(UnsupportedPayloadError(errorMessage)).pure[IO])
 
       val response = addSubscription(request).unsafeRunSync()
 
-      response.status      shouldBe BadRequest
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
-        s"Subscriptions to $New and $RecoverableFailure status supported only"
-      )
+      response.status                           shouldBe BadRequest
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage)
 
       logger.expectNoLogs()
     }
 
-    s"return $InternalServerError when adding subscriber URL to the pool fails" in new TestCase {
+    s"return $InternalServerError when registration fails" in new TestCase {
 
       val exception = exceptions.generateOne
 
@@ -109,13 +108,13 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
       val request = Request(Method.POST, uri"subscriptions")
         .withEntity(payload)
 
-      (subscriptionCategory.register _)
+      (subscriptionCategoryRegistry.register _)
         .expects(payload)
-        .returning(exception.raiseError[IO, Option[SubscriptionCategoryPayload]])
+        .returning(exception.raiseError[IO, Either[RequestError, Unit]])
 
       val response = addSubscription(request).unsafeRunSync()
 
-      val expectedMessage = "Adding subscriber URL failed"
+      val expectedMessage = "Registering subscriber failed"
       response.status                           shouldBe InternalServerError
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(expectedMessage)
@@ -127,10 +126,10 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
   private trait TestCase {
     val subscriptionCategoryPayload = subscriptionCategoryPayloads.generateOne
 
-    val subscriptionCategory = mock[SubscriptionCategory[IO, SubscriptionCategoryPayload]]
-    val logger               = TestLogger[IO]()
+    val subscriptionCategoryRegistry = mock[SubscriptionCategoryRegistry[IO]]
+    val logger                       = TestLogger[IO]()
     val addSubscription =
-      new SubscriptionsEndpoint[IO, SubscriptionCategoryPayload](subscriptionCategory, logger).addSubscription _
+      new SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger).addSubscription _
   }
 
   private implicit lazy val payloadEncoder: Encoder[(SubscriberUrl, Set[EventStatus])] =

@@ -44,7 +44,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect, T <: SubscriptionCatego
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
     eventsPatchingEndpoint:   EventsPatchingEndpoint[F],
     statusChangeEndpoint:     StatusChangeEndpoint[F],
-    subscriptionsEndpoint:    SubscriptionsEndpoint[F, T],
+    subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     routesMetrics:            RoutesMetrics[F]
 )(implicit clock:             Clock[F], contextShift: ContextShift[F])
     extends Http4sDsl[F] {

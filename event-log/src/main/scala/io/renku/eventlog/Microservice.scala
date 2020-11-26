@@ -104,9 +104,8 @@ object Microservice extends IOMicroservice {
                               queriesExecTimes,
                               ApplicationLogger
           )
-        subscriptionCategory <-
-          IOSubscriptionCategory(subscribers, eventDistributor, new unprocessed.SubscriptionRequestDeserializer[IO]())
-        subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptionCategory, ApplicationLogger)
+        subscriptionCategoryRegistry <- IOSubscriptionCategoryRegistry()
+        subscriptionsEndpoint        <- IOSubscriptionsEndpoint(subscriptionCategoryRegistry, ApplicationLogger)
         microserviceRoutes = new MicroserviceRoutes[IO,
                                                     unprocessed.SubscriptionCategoryPayload
                              ]( // TODO fix with Subscriptions category registry
@@ -121,33 +120,31 @@ object Microservice extends IOMicroservice {
         exitCode <- microserviceRoutes.use { routes =>
                       val httpServer = new HttpServer[IO](serverPort = 9005, routes)
 
-                      new MicroserviceRunner[
-                        unprocessed.SubscriptionCategoryPayload
-                      ]( // TODO fix with Subscriptions category registry
-                         certificateLoader,
-                         sentryInitializer,
-                         dbInitializer,
-                         eventLogMetrics,
-                         subscriptionCategory,
-                         metricsResetScheduler,
-                         httpServer,
-                         subProcessesCancelTokens
+                      new MicroserviceRunner(
+                        certificateLoader,
+                        sentryInitializer,
+                        dbInitializer,
+                        eventLogMetrics,
+                        subscriptionCategoryRegistry,
+                        metricsResetScheduler,
+                        httpServer,
+                        subProcessesCancelTokens
                       ).run()
                     }
       } yield exitCode
     }
 }
 
-private class MicroserviceRunner[T <: SubscriptionCategoryPayload](
-    certificateLoader:        CertificateLoader[IO],
-    sentryInitializer:        SentryInitializer[IO],
-    dbInitializer:            DbInitializer[IO],
-    metrics:                  EventLogMetrics,
-    subscriptionCategory:     SubscriptionCategory[IO, T],
-    metricsResetScheduler:    GaugeResetScheduler[IO],
-    httpServer:               HttpServer[IO],
-    subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
-)(implicit contextShift:      ContextShift[IO]) {
+private class MicroserviceRunner(
+    certificateLoader:            CertificateLoader[IO],
+    sentryInitializer:            SentryInitializer[IO],
+    dbInitializer:                DbInitializer[IO],
+    metrics:                      EventLogMetrics,
+    subscriptionCategoryRegistry: SubscriptionCategoryRegistry[IO],
+    metricsResetScheduler:        GaugeResetScheduler[IO],
+    httpServer:                   HttpServer[IO],
+    subProcessesCancelTokens:     ConcurrentHashMap[CancelToken[IO], Unit]
+)(implicit contextShift:          ContextShift[IO]) {
 
   def run(): IO[ExitCode] = for {
     _      <- certificateLoader.run()
@@ -155,7 +152,7 @@ private class MicroserviceRunner[T <: SubscriptionCategoryPayload](
     _      <- dbInitializer.run()
     _      <- metrics.run().start map gatherCancelToken
     _      <- metricsResetScheduler.run().start map gatherCancelToken
-    _      <- subscriptionCategory.run().start map gatherCancelToken
+    _      <- subscriptionCategoryRegistry.run().start map gatherCancelToken
     result <- httpServer.run()
   } yield result
 
