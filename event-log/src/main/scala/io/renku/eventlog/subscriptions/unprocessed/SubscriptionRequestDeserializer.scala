@@ -32,17 +32,17 @@ import io.renku.eventlog.subscriptions.unprocessed.SubscriptionRequestDeserializ
 // TODO: make this private[unprocessed]
 private[eventlog] case class SubscriptionRequestDeserializer[Interpretation[_]]()(implicit
     monadError: MonadError[Interpretation, Throwable]
-) extends subscriptions.SubscriptionRequestDeserializer[Interpretation, SubscriberUrl] {
-  override def deserialize(payload: circe.Json): Interpretation[Option[SubscriberUrl]] =
+) extends subscriptions.SubscriptionRequestDeserializer[Interpretation, SubscriptionCategoryPayload] {
+  override def deserialize(payload: circe.Json): Interpretation[Option[SubscriptionCategoryPayload]] =
     payload
       .as[UrlAndStatuses]
-      .fold(_ => Option.empty[SubscriberUrl], maybeSubscriptionUrl)
+      .fold(_ => Option.empty[SubscriptionCategoryPayload], maybeSubscriptionUrl)
       .pure[Interpretation]
 
   private val acceptedStatuses = Set(New, RecoverableFailure)
-  private def maybeSubscriptionUrl(urlAndStatuses: UrlAndStatuses): Option[SubscriberUrl] =
-    if (urlAndStatuses.eventStatuses != acceptedStatuses) Option.empty[SubscriberUrl]
-    else urlAndStatuses.subscriberUrl.some
+  private def maybeSubscriptionUrl(urlAndStatuses: UrlAndStatuses): Option[SubscriptionCategoryPayload] =
+    if (urlAndStatuses.eventStatuses != acceptedStatuses) Option.empty[SubscriptionCategoryPayload]
+    else SubscriptionCategoryPayload(urlAndStatuses.subscriberUrl).some
 }
 
 private[eventlog] object SubscriptionRequestDeserializer {
