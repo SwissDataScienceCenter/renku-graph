@@ -35,11 +35,11 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-trait EventsDistributor[Interpretation[_]] {
+private[subscriptions] trait EventsDistributor[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-class EventsDistributorImpl[Interpretation[_]: Effect](
+private[subscriptions] class EventsDistributorImpl[Interpretation[_]: Effect](
     subscribers:          Subscribers[Interpretation],
     eventsFinder:         EventFetcher[Interpretation],
     statusUpdatesRunner:  StatusUpdatesRunner[Interpretation],
@@ -138,7 +138,7 @@ class EventsDistributorImpl[Interpretation[_]: Effect](
   }
 }
 
-object IOEventsDistributor {
+private[subscriptions] object IOEventsDistributor {
   private val NoEventSleep: FiniteDuration = 1 seconds
   private val OnErrorSleep: FiniteDuration = 1 seconds
 

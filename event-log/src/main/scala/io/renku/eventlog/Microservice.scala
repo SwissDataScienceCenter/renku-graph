@@ -93,30 +93,23 @@ object Microservice extends IOMicroservice {
                                                        queriesExecTimes,
                                                        ApplicationLogger
                                 )
-        subscribers <- Subscribers(ApplicationLogger)
-        eventFetcher <-
-          IOUnprocessedEventFetcher(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
-        eventDistributor <-
-          IOEventsDistributor(transactor,
-                              subscribers,
-                              eventFetcher,
-                              underProcessingGauge,
-                              queriesExecTimes,
-                              ApplicationLogger
-          )
-        subscriptionCategoryRegistry <- IOSubscriptionCategoryRegistry()
-        subscriptionsEndpoint        <- IOSubscriptionsEndpoint(subscriptionCategoryRegistry, ApplicationLogger)
-        microserviceRoutes = new MicroserviceRoutes[IO,
-                                                    unprocessed.SubscriptionCategoryPayload
-                             ]( // TODO fix with Subscriptions category registry
-                                eventCreationEndpoint,
-                                latestEventsEndpoint,
-                                processingStatusEndpoint,
-                                eventsPatchingEndpoint,
-                                statusChangeEndpoint,
-                                subscriptionsEndpoint,
-                                new RoutesMetrics[IO](metricsRegistry)
-                             ).routes
+        subscriptionCategoryRegistry <- IOSubscriptionCategoryRegistry(transactor,
+                                                                       waitingEventsGauge,
+                                                                       underProcessingGauge,
+                                                                       queriesExecTimes,
+                                                                       ApplicationLogger
+                                        )
+        subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptionCategoryRegistry, ApplicationLogger)
+        microserviceRoutes =
+          new MicroserviceRoutes[IO](
+            eventCreationEndpoint,
+            latestEventsEndpoint,
+            processingStatusEndpoint,
+            eventsPatchingEndpoint,
+            statusChangeEndpoint,
+            subscriptionsEndpoint,
+            new RoutesMetrics[IO](metricsRegistry)
+          ).routes
         exitCode <- microserviceRoutes.use { routes =>
                       val httpServer = new HttpServer[IO](serverPort = 9005, routes)
 

@@ -195,7 +195,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     val routesMetrics            = TestRoutesMetrics()
     val statusChangeEndpoint     = mock[TestStatusChangeEndpoint]
     val subscriptionsEndpoint    = mock[TestSubscriptionEndpoint]
-    val routes = new MicroserviceRoutes[IO, SubscriptionCategoryPayload](
+    val routes = new MicroserviceRoutes[IO](
       eventCreationEndpoint,
       latestEventsEndpoint,
       processingStatusEndpoint,

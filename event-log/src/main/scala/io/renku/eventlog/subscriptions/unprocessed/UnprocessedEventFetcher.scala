@@ -43,8 +43,7 @@ import scala.language.postfixOps
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-//TODO make  it private[subscriptions]
-private[eventlog] class UnprocessedEventFetcherImpl(
+private[subscriptions] class UnprocessedEventFetcherImpl(
     transactor:            DbTransactor[IO, EventLogDB],
     waitingEventsGauge:    LabeledGauge[IO, projects.Path],
     underProcessingGauge:  LabeledGauge[IO, projects.Path],
@@ -182,8 +181,7 @@ private[eventlog] class UnprocessedEventFetcherImpl(
     } getOrElse ME.unit
 }
 
-//TODO make it private[subscriptions]
-private[eventlog] object IOUnprocessedEventFetcher {
+private[subscriptions] object IOUnprocessedEventFetcher {
 
   private val MaxProcessingTime:     Duration             = Duration.ofHours(5)
   private val ProjectsFetchingLimit: Int Refined Positive = 10

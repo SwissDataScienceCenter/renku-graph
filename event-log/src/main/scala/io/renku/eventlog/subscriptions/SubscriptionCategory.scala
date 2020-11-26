@@ -24,17 +24,23 @@ import io.circe.Json
 
 import scala.concurrent.ExecutionContext
 
-trait SubscriptionCategory[Interpretation[_], T] {
+private[subscriptions] trait SubscriptionCategory[Interpretation[_]] {
+
+  type T <: SubscriptionCategoryPayload
+
   def run(): Interpretation[Unit]
 
   def register(payload: Json): Interpretation[Option[T]]
 }
 
-class SubscriptionCategoryImpl[Interpretation[_]: Effect, T <: SubscriptionCategoryPayload](
+private[subscriptions] class SubscriptionCategoryImpl[Interpretation[_]: Effect](
     subscribers:       Subscribers[Interpretation],
     eventsDistributor: EventsDistributor[Interpretation],
-    deserializer:      SubscriptionRequestDeserializer[Interpretation, T]
-) extends SubscriptionCategory[Interpretation, T] {
+    deserializer:      SubscriptionRequestDeserializer[Interpretation]
+) extends SubscriptionCategory[Interpretation] {
+
+  override type T = deserializer.T
+
   override def run(): Interpretation[Unit] = eventsDistributor.run()
 
   override def register(payload: Json): Interpretation[Option[T]] = (for {
@@ -43,17 +49,17 @@ class SubscriptionCategoryImpl[Interpretation[_]: Effect, T <: SubscriptionCateg
   } yield subscriptionPayload).value
 }
 
-object IOSubscriptionCategory {
-  def apply[T <: SubscriptionCategoryPayload](
+private[subscriptions] object IOSubscriptionCategory {
+  def apply(
       subscribers:       Subscribers[IO],
       eventsDistributor: EventsDistributor[IO],
-      deserializer:      SubscriptionRequestDeserializer[IO, T]
+      deserializer:      SubscriptionRequestDeserializer[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[SubscriptionCategory[IO, T]] = IO(
-    new SubscriptionCategoryImpl[IO, T](subscribers, eventsDistributor, deserializer)
+  ): IO[SubscriptionCategory[IO]] = IO(
+    new SubscriptionCategoryImpl[IO](subscribers, eventsDistributor, deserializer)
   )
 
 }

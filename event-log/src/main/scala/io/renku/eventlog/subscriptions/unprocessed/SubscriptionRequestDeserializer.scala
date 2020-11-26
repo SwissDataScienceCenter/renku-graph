@@ -26,13 +26,15 @@ import ch.datascience.graph.model.events.EventStatus.{New, RecoverableFailure}
 import io.circe
 import io.circe.Decoder
 import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.SubscriberUrl
+import io.renku.eventlog.subscriptions.{SubscriberUrl}
 import io.renku.eventlog.subscriptions.unprocessed.SubscriptionRequestDeserializer.UrlAndStatuses
 
-// TODO: make this private[unprocessed]
-private[eventlog] case class SubscriptionRequestDeserializer[Interpretation[_]]()(implicit
+private[subscriptions] case class SubscriptionRequestDeserializer[Interpretation[_]]()(implicit
     monadError: MonadError[Interpretation, Throwable]
-) extends subscriptions.SubscriptionRequestDeserializer[Interpretation, SubscriptionCategoryPayload] {
+) extends subscriptions.SubscriptionRequestDeserializer[Interpretation] {
+
+  override type T = SubscriptionCategoryPayload
+
   override def deserialize(payload: circe.Json): Interpretation[Option[SubscriptionCategoryPayload]] =
     payload
       .as[UrlAndStatuses]
@@ -45,7 +47,7 @@ private[eventlog] case class SubscriptionRequestDeserializer[Interpretation[_]](
     else SubscriptionCategoryPayload(urlAndStatuses.subscriberUrl).some
 }
 
-private[eventlog] object SubscriptionRequestDeserializer {
+private[subscriptions] object SubscriptionRequestDeserializer {
 
   case class UrlAndStatuses(subscriberUrl: SubscriberUrl, eventStatuses: Set[EventStatus])
 

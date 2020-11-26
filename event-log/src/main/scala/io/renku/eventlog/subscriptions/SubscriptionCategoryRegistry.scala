@@ -18,8 +18,17 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.graph.model.projects
+import ch.datascience.logging.ApplicationLogger
+import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
+import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
+import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.subscriptions.unprocessed.IOUnprocessedEventFetcher
+
+import scala.concurrent.ExecutionContext
 
 trait SubscriptionCategoryRegistry[Interpretation[_]] {
 
@@ -29,16 +38,43 @@ trait SubscriptionCategoryRegistry[Interpretation[_]] {
 }
 
 private[subscriptions] class SubscriptionCategoryRegistryImpl[Interpretation[_]](
-    categories: Set[SubscriptionCategory[Interpretation, SubscriptionCategoryPayload]]
+    categories: Set[SubscriptionCategory[Interpretation]]
 ) extends SubscriptionCategoryRegistry[Interpretation] {
   override def run(): Interpretation[Unit] = ??? // inst
 
   override def register(subscriptionRequest: Json): Interpretation[Either[RequestError, Unit]] = ???
 }
 
-object IOSubscriptionCategoryRegistry {
-  def apply(): IO[SubscriptionCategoryRegistry[IO]] = {
-    val categories = ???
-    IO(new SubscriptionCategoryRegistryImpl[IO](categories))
-  }
+private[eventlog] object IOSubscriptionCategoryRegistry {
+  def apply(
+      transactor:           DbTransactor[IO, EventLogDB],
+      waitingEventsGauge:   LabeledGauge[IO, projects.Path],
+      underProcessingGauge: LabeledGauge[IO, projects.Path],
+      queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
+      logger:               Logger[IO]
+  )(implicit
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO],
+      executionContext: ExecutionContext
+  ): IO[SubscriptionCategoryRegistry[IO]] =
+    for {
+
+      subscribers <- Subscribers(ApplicationLogger)
+      eventFetcher <-
+        IOUnprocessedEventFetcher(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
+      eventDistributor <-
+        IOEventsDistributor(transactor,
+                            subscribers,
+                            eventFetcher,
+                            underProcessingGauge,
+                            queriesExecTimes,
+                            ApplicationLogger
+        )
+      deserializer = unprocessed.SubscriptionRequestDeserializer[IO]()
+      unprocessedCategory <-
+        IOSubscriptionCategory(subscribers, eventDistributor, deserializer)
+      otherCategory <-
+        IOSubscriptionCategory(subscribers, eventDistributor, deserializer)
+    } yield new SubscriptionCategoryRegistryImpl(Set(unprocessedCategory))
+
 }

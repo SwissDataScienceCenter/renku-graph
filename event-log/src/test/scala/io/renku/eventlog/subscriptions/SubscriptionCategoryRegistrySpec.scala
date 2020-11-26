@@ -27,6 +27,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import io.circe.Json
+import io.renku.eventlog.subscriptions.Generators.subscriberUrls
 
 class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers {
 
@@ -58,27 +59,44 @@ class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFactory with
 
       (shuffledCategories.head.register _)
         .expects(payload)
-        .returning(Some(???))
+        .returning(subscriptionCategoryPayloads.generateSome.pure[Try])
 
-      //      categories.foreach {category =>
-      //        (category.run _)
-      //          .expects(payload)
-      //          .returning()
+      shuffledCategories.tail.foreach { category =>
+        (category.register _)
+          .expects(payload)
+          .returning(None.pure[Try])
+      }
 
+      registry.register(payload) shouldBe Success(Right(()))
     }
 
     "return Left when all of the components return None" in new TestCase {
-
       categories.foreach { category =>
         (category.register _)
           .expects(payload)
-          .returning(Success(None))
+          .returning(None.pure[Try])
       }
+      val Success(Left(error)) = registry.register(payload)
+      error shouldBe a[RequestError]
+    }
 
+    "fail when one of the categories fails" in new TestCase {
+      val exception = exceptions.generateOne
+      (categories.head.register _)
+        .expects(payload)
+        .returning(exception.raiseError[Try, Option[SubscriptionCategoryPayload]])
+
+      registry.register(payload) shouldBe Failure(exception)
     }
   }
 
   trait TestCase {
+
+    val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
+      url <- subscriberUrls
+    } yield new SubscriptionCategoryPayload {
+      override def subscriberUrl: SubscriberUrl = url
+    }
 
     val categories: Set[SubscriptionCategory[Try, SubscriptionCategoryPayload]] = Gen
       .nonEmptyListOf(
@@ -87,7 +105,7 @@ class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFactory with
       .generateOne
       .toSet
 
-    val payload: Json = ???
+    val payload: Json = jsons.generateOne
     val registry = new SubscriptionCategoryRegistryImpl[Try](categories)
   }
 }
