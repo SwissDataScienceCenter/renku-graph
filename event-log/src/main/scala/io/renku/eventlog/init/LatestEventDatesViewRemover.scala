@@ -25,47 +25,32 @@ import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
-private[eventlog] trait LatestEventDatesViewCreator[Interpretation[_]] {
+private[eventlog] trait LatestEventDatesViewRemover[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private[eventlog] object LatestEventDatesViewCreator {
+private[eventlog] object LatestEventDatesViewRemover {
   def apply[Interpretation[_]](
       transactor: DbTransactor[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): LatestEventDatesViewCreator[Interpretation] =
-    new LatestEventDatesViewCreatorImpl(transactor, logger)
+  )(implicit ME:  Bracket[Interpretation, Throwable]): LatestEventDatesViewRemover[Interpretation] =
+    new LatestEventDatesViewRemoverImpl(transactor, logger)
 }
 
-private[eventlog] class LatestEventDatesViewCreatorImpl[Interpretation[_]](
+private[eventlog] class LatestEventDatesViewRemoverImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends DbClient(maybeHistogram = None)
-    with LatestEventDatesViewCreator[Interpretation] {
+    with LatestEventDatesViewRemover[Interpretation] {
 
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
-  override def run(): Interpretation[Unit] =
-    for {
-      _ <- createView.update.run transact transactor.get
-      _ <- createViewIndex.update.run transact transactor.get
-      _ <- logger.info("'project_latest_event_date' view created")
-    } yield ()
+  override def run(): Interpretation[Unit] = for {
+    _ <- dropView.run transact transactor.get
+    _ <- logger.info("'project_latest_event_date' view dropped")
+  } yield ()
 
-  private lazy val createView = sql"""
-    CREATE MATERIALIZED VIEW IF NOT EXISTS project_latest_event_date AS
-      select
-        project_id,
-        project_path,
-        MAX(event_date) latest_event_date
-      from event_log
-      group by project_id, project_path
-      order by latest_event_date desc;
-    """
-
-  private lazy val createViewIndex = sql"""
-    CREATE UNIQUE INDEX IF NOT EXISTS project_latest_event_date_project_idx 
-    ON project_latest_event_date (project_id, project_path)
-    """
+  private lazy val dropView =
+    sql""" DROP MATERIALIZED VIEW IF EXISTS project_latest_event_date""".update
 }

@@ -24,6 +24,7 @@ import ch.datascience.db.DbSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus}
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
 import doobie.implicits._
 import doobie.util.fragment.Fragment
@@ -75,6 +76,29 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
                            batchDate:       BatchDate = BatchDate(Instant.now),
                            projectPath:     Path = projectPaths.generateOne,
                            maybeMessage:    Option[EventMessage] = None
+  ): Unit = {
+    insertEvent(compoundEventId,
+                eventStatus,
+                executionDate,
+                eventDate,
+                eventBody,
+                createdDate,
+                batchDate,
+                projectPath,
+                maybeMessage
+    )
+    upsertProject(compoundEventId, projectPath, eventDate)
+  }
+
+  protected def insertEvent(compoundEventId: CompoundEventId,
+                            eventStatus:     EventStatus,
+                            executionDate:   ExecutionDate,
+                            eventDate:       EventDate,
+                            eventBody:       EventBody,
+                            createdDate:     CreatedDate,
+                            batchDate:       BatchDate,
+                            projectPath:     Path,
+                            maybeMessage:    Option[EventMessage]
   ): Unit = execute {
     maybeMessage match {
       case None =>
@@ -90,6 +114,15 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
     }
   }
 
+  private def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit = execute {
+    sql"""|insert into
+          |project (project_id, project_path, latest_event_date)
+          |values (${compoundEventId.projectId}, $projectPath, $eventDate)
+          |on conflict (project_id)
+          |do update set latest_event_date = excluded.latest_event_dat where excluded.latest_event_date > project.latest_event_date
+      """.stripMargin.update.run.map(_ => ())
+  }
+
   // format: off
   protected def findEvents(status:  EventStatus,
                            orderBy: Fragment = fr"created_date asc"): List[(CompoundEventId, ExecutionDate, BatchDate)] =
@@ -102,6 +135,12 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
         .to[List]
     }
   // format: on
+
+  protected def findProjects(): List[(projects.Id, projects.Path, EventDate)] = execute {
+    sql"""select * from project"""
+      .query[(projects.Id, projects.Path, EventDate)]
+      .to[List]
+  }
 
   protected implicit class FoundEventsOps(events: List[(CompoundEventId, ExecutionDate, BatchDate)]) {
     lazy val noBatchDate: List[(CompoundEventId, ExecutionDate)] = events.map { case (id, executionDate, _) =>

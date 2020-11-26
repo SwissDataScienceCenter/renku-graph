@@ -47,7 +47,11 @@ class ProjectTableCreatorSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
         val (_, _, project1EventDate2)                    = createEvent(project1Id, project1Path)
         val (project2Id, project2Path, project2EventDate) = createEvent()
 
+        tableExists(project) shouldBe false
+
         tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+
+        tableExists(project) shouldBe true
 
         logger.loggedOnly(Info("'project' table created"), Info("'project' table filled in"))
 
@@ -105,14 +109,16 @@ class ProjectTableCreatorSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
                           projectPath: Path = projectPaths.generateOne,
                           eventDate:   EventDate = eventDates.generateOne
   ): (Id, Path, EventDate) = {
-    storeEvent(
+    insertEvent(
       compoundEventIds.generateOne.copy(projectId = projectId),
       eventStatuses.generateOne,
       executionDates.generateOne,
       eventDate,
       eventBodies.generateOne,
-      batchDate = batchDates.generateOne,
-      projectPath = projectPath
+      createdDates.generateOne,
+      batchDates.generateOne,
+      projectPath,
+      maybeMessage = None
     )
 
     (projectId, projectPath, eventDate)

@@ -63,18 +63,10 @@ private[subscriptions] class UnprocessedEventFetcherImpl(
 
   override def popEvent(): IO[Option[EventIdAndBody]] =
     for {
-      _                          <- refreshProjectsView
       maybeProjectEventIdAndBody <- findEventAndUpdateForProcessing() transact transactor.get
       (maybeProject, maybeEventIdAndBody) = maybeProjectEventIdAndBody
       _ <- maybeUpdateMetrics(maybeProject, maybeEventIdAndBody)
     } yield maybeEventIdAndBody
-
-  private lazy val refreshProjectsView: IO[Unit] = {
-    val refreshUpdate = sql"""
-      REFRESH MATERIALIZED VIEW CONCURRENTLY project_latest_event_date
-    """.update.run transact transactor.get
-    if (waitForViewRefresh) refreshUpdate.void else refreshUpdate.start.void
-  }
 
   private def findEventAndUpdateForProcessing() =
     for {
@@ -90,17 +82,17 @@ private[subscriptions] class UnprocessedEventFetcherImpl(
   // format: off
   private def findProjectsWithEventsInQueue = SqlQuery({fr"""
       select 
-        pled.project_id,
-        pled.project_path,
-        pled.latest_event_date,
-        (select count(event_id) from event_log el_int where el_int.project_id = pled.project_id and el_int.status = ${Processing: EventStatus}) as current_occupancy 
+        proj.project_id,
+        proj.project_path,
+        proj.latest_event_date,
+        (select count(event_id) from event_log el_int where el_int.project_id = proj.project_id and el_int.status = ${Processing: EventStatus}) as current_occupancy 
       from (select project_id, project_path, latest_event_date 
-            from project_latest_event_date 
-            order by latest_event_date desc) pled
+            from project 
+            order by latest_event_date desc) proj
       where exists (
         select project_id
         from event_log el
-        where el.project_id = pled.project_id
+        where el.project_id = proj.project_id
           and ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
             or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
           )

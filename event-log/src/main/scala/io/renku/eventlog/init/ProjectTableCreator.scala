@@ -61,12 +61,12 @@ private class ProjectTableCreatorImpl[Interpretation[_]](
       .recover { case _ => false }
 
   private def createTable = for {
-    _ <- createTableSql.update.run transact transactor.get
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON project(project_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON project(project_path)")
+    _ <- createTableSql.run transact transactor.get
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id        ON project(project_id)")
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path      ON project(project_path)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_latest_event_date ON project(latest_event_date)")
     _ <- logger info "'project' table created"
-    _ <- fillInTableSql.update.run transact transactor.get
+    _ <- fillInTableSql.run transact transactor.get
     _ <- logger info "'project' table filled in"
   } yield ()
 
@@ -77,7 +77,7 @@ private class ProjectTableCreatorImpl[Interpretation[_]](
       latest_event_date timestamp NOT NULL,
       PRIMARY KEY (project_id)
     );
-    """
+    """.update
 
   private lazy val fillInTableSql = sql"""
     INSERT INTO project
@@ -87,5 +87,5 @@ private class ProjectTableCreatorImpl[Interpretation[_]](
         MAX(event_date) latest_event_date
       FROM event_log
       GROUP BY project_id, project_path;
-    """
+    """.update
 }

@@ -39,7 +39,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 class StatsFinderSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
-    with LatestEventDatesViewPresence
     with ScalaCheckPropertyChecks
     with should.Matchers {
 
@@ -74,7 +73,6 @@ class StatsFinderSpec
         val events = generateEventsFor(projectPaths.toList)
 
         events foreach store
-        refreshView()
 
         stats.countEvents(Set(New, RecoverableFailure)).unsafeRunSync() shouldBe events
           .groupBy(_._1)
@@ -94,7 +92,6 @@ class StatsFinderSpec
       val events           = generateEventsFor(projectPathsList.toList)
 
       events foreach store
-      refreshView()
 
       val limit: Int Refined Positive = 2
 
