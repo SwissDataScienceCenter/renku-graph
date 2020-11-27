@@ -61,7 +61,7 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
         Option(exception.getCause) map ErrorMessage.apply getOrElse ErrorMessage(exception.getMessage)
       }
     case NonFatal(exception) =>
-      val errorMessage = ErrorMessage("Adding subscriber URL failed")
+      val errorMessage = ErrorMessage("Registering subscriber failed")
       logger.error(exception)(errorMessage.value)
       InternalServerError(errorMessage)
   }

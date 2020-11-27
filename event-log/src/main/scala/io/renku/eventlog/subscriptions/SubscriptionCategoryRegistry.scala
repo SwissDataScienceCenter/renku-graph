@@ -47,7 +47,10 @@ private[subscriptions] class SubscriptionCategoryRegistryImpl[Interpretation[_]:
       Either.left[RequestError, Unit](NoCategoriesAvailable).pure[Interpretation]
     } else {
       categories.toList
-        .map(_.register(subscriptionRequest))
+        .map(_.register(subscriptionRequest).map {
+          case Some(_) => Some(())
+          case None    => None
+        })
         .sequence
         .map(results =>
           if (results.exists(_.isDefined)) {
