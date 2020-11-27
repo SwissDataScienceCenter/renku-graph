@@ -29,11 +29,11 @@ import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions.{SubscriberUrl}
 import io.renku.eventlog.subscriptions.unprocessed.SubscriptionRequestDeserializer.UrlAndStatuses
 
-private[subscriptions] case class SubscriptionRequestDeserializer[Interpretation[_]]()(implicit
+private case class SubscriptionRequestDeserializer[Interpretation[_]]()(implicit
     monadError: MonadError[Interpretation, Throwable]
 ) extends subscriptions.SubscriptionRequestDeserializer[Interpretation] {
 
-  override type T = SubscriptionCategoryPayload
+  override type PayloadType = SubscriptionCategoryPayload
 
   override def deserialize(payload: circe.Json): Interpretation[Option[SubscriptionCategoryPayload]] =
     payload
@@ -47,7 +47,7 @@ private[subscriptions] case class SubscriptionRequestDeserializer[Interpretation
     else SubscriptionCategoryPayload(urlAndStatuses.subscriberUrl).some
 }
 
-private[subscriptions] object SubscriptionRequestDeserializer {
+private object SubscriptionRequestDeserializer {
 
   case class UrlAndStatuses(subscriberUrl: SubscriberUrl, eventStatuses: Set[EventStatus])
 

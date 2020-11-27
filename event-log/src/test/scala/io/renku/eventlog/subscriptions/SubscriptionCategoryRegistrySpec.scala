@@ -18,18 +18,19 @@
 
 package io.renku.eventlog.subscriptions
 
-import scala.util.{Failure, Random, Success, Try}
 import cats.syntax.all._
-import org.scalacheck.Gen
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import io.circe.Json
 import io.renku.eventlog.subscriptions.Generators.subscriberUrls
+import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers {
+import scala.util.{Failure, Random, Success, Try}
+
+private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
     "return unit when all of the categories return Unit" in new TestCase {
@@ -54,9 +55,7 @@ class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFactory with
 
   "register" should {
     "return Right when at least one of the categories returns Some" in new TestCase {
-      val shuffledCategories: List[SubscriptionCategory[Try, SubscriptionCategoryPayload]] =
-        Random.shuffle(categories.toList)
-
+      val shuffledCategories = Random.shuffle(categories.toList)
       (shuffledCategories.head.register _)
         .expects(payload)
         .returning(subscriptionCategoryPayloads.generateSome.pure[Try])
@@ -84,7 +83,7 @@ class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFactory with
       val exception = exceptions.generateOne
       (categories.head.register _)
         .expects(payload)
-        .returning(exception.raiseError[Try, Option[SubscriptionCategoryPayload]])
+        .returning(exception.raiseError[Try, Option[SubscriptionCategory[Try]#PayloadType]])
 
       registry.register(payload) shouldBe Failure(exception)
     }
@@ -98,9 +97,9 @@ class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFactory with
       override def subscriberUrl: SubscriberUrl = url
     }
 
-    val categories: Set[SubscriptionCategory[Try, SubscriptionCategoryPayload]] = Gen
+    val categories: Set[SubscriptionCategory[Try]] = Gen
       .nonEmptyListOf(
-        Gen.const(mock[SubscriptionCategory[Try, SubscriptionCategoryPayload]])
+        Gen.const(mock[SubscriptionCategory[Try]])
       )
       .generateOne
       .toSet

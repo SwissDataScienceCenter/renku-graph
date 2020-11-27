@@ -19,47 +19,31 @@
 package io.renku.eventlog.subscriptions
 
 import cats.data.OptionT
-import cats.effect.{ContextShift, Effect, IO, Timer}
+import cats.effect.Effect
 import io.circe.Json
 
-import scala.concurrent.ExecutionContext
+private trait SubscriptionCategory[Interpretation[_]] {
+  self =>
 
-private[subscriptions] trait SubscriptionCategory[Interpretation[_]] {
-
-  type T <: SubscriptionCategoryPayload
+  protected type PayloadType <: SubscriptionCategoryPayload
 
   def run(): Interpretation[Unit]
 
-  def register(payload: Json): Interpretation[Option[T]]
+  def register(payload: Json): Interpretation[Option[PayloadType]]
+
 }
 
-private[subscriptions] class SubscriptionCategoryImpl[Interpretation[_]: Effect](
+private[subscriptions] class SubscriptionCategoryImpl[Interpretation[_]: Effect, T <: SubscriptionCategoryPayload](
     subscribers:       Subscribers[Interpretation],
     eventsDistributor: EventsDistributor[Interpretation],
-    deserializer:      SubscriptionRequestDeserializer[Interpretation]
+    deserializer:      SubscriptionRequestDeserializer[Interpretation] { type PayloadType = T }
 ) extends SubscriptionCategory[Interpretation] {
-
-  override type T = deserializer.T
+  override type PayloadType = T
 
   override def run(): Interpretation[Unit] = eventsDistributor.run()
 
-  override def register(payload: Json): Interpretation[Option[T]] = (for {
+  override def register(payload: Json): Interpretation[Option[PayloadType]] = (for {
     subscriptionPayload <- OptionT(deserializer.deserialize(payload))
     _                   <- OptionT.liftF(subscribers.add(subscriptionPayload.subscriberUrl))
   } yield subscriptionPayload).value
-}
-
-private[subscriptions] object IOSubscriptionCategory {
-  def apply(
-      subscribers:       Subscribers[IO],
-      eventsDistributor: EventsDistributor[IO],
-      deserializer:      SubscriptionRequestDeserializer[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[SubscriptionCategory[IO]] = IO(
-    new SubscriptionCategoryImpl[IO](subscribers, eventsDistributor, deserializer)
-  )
-
 }

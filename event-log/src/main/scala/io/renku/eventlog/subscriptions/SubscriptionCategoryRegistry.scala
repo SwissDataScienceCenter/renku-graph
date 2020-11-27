@@ -46,6 +46,7 @@ private[subscriptions] class SubscriptionCategoryRegistryImpl[Interpretation[_]]
 }
 
 private[eventlog] object IOSubscriptionCategoryRegistry {
+
   def apply(
       transactor:           DbTransactor[IO, EventLogDB],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
@@ -58,23 +59,8 @@ private[eventlog] object IOSubscriptionCategoryRegistry {
       executionContext: ExecutionContext
   ): IO[SubscriptionCategoryRegistry[IO]] =
     for {
-
-      subscribers <- Subscribers(ApplicationLogger)
-      eventFetcher <-
-        IOUnprocessedEventFetcher(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
-      eventDistributor <-
-        IOEventsDistributor(transactor,
-                            subscribers,
-                            eventFetcher,
-                            underProcessingGauge,
-                            queriesExecTimes,
-                            ApplicationLogger
-        )
-      deserializer = unprocessed.SubscriptionRequestDeserializer[IO]()
       unprocessedCategory <-
-        IOSubscriptionCategory(subscribers, eventDistributor, deserializer)
-      otherCategory <-
-        IOSubscriptionCategory(subscribers, eventDistributor, deserializer)
-    } yield new SubscriptionCategoryRegistryImpl(Set(unprocessedCategory))
+        unprocessed.SubscriptionCategory(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes, logger)
+    } yield new SubscriptionCategoryRegistryImpl(Set[SubscriptionCategory[IO]](unprocessedCategory))
 
 }

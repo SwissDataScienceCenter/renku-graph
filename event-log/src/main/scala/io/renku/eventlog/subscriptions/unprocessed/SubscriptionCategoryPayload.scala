@@ -20,6 +20,5 @@ package io.renku.eventlog.subscriptions.unprocessed
 
 import io.renku.eventlog.subscriptions
 
-// TODO: make private[unprocessed]
-private[subscriptions] case class SubscriptionCategoryPayload(override val subscriberUrl: subscriptions.SubscriberUrl)
+private case class SubscriptionCategoryPayload(override val subscriberUrl: subscriptions.SubscriberUrl)
     extends subscriptions.SubscriptionCategoryPayload

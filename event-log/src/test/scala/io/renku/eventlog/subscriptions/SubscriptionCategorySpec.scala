@@ -80,6 +80,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
       val subscriptionCategoryPayload = subscriptionCategoryPayloads.generateOne
       val exception                   = exceptions.generateOne
       val payload                     = jsons.generateOne
+
       (deserializer.deserialize _)
         .expects(payload)
         .returning(subscriptionCategoryPayload.some.pure[IO])
@@ -97,7 +98,11 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
   trait TestCase {
     val eventsDistributor = mock[EventsDistributor[IO]]
     val subscribers       = mock[Subscribers[IO]]
-    val deserializer      = mock[SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload]]
+
+    trait Deserializer extends SubscriptionRequestDeserializer[IO] {
+      override type PayloadType = SubscriptionCategoryPayload
+    }
+    val deserializer = mock[Deserializer]
 
     val subscriptionCategory =
       new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](subscribers, eventsDistributor, deserializer)
