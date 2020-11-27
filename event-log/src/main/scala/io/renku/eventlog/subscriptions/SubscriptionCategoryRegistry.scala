@@ -18,15 +18,15 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{ContextShift, Effect, IO, Timer}
+import cats.syntax.all._
+import cats._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects
-import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.subscriptions.unprocessed.IOUnprocessedEventFetcher
 
 import scala.concurrent.ExecutionContext
 
@@ -37,12 +37,26 @@ trait SubscriptionCategoryRegistry[Interpretation[_]] {
   def register(subscriptionRequest: Json): Interpretation[Either[RequestError, Unit]]
 }
 
-private[subscriptions] class SubscriptionCategoryRegistryImpl[Interpretation[_]](
+private[subscriptions] class SubscriptionCategoryRegistryImpl[Interpretation[_]: Effect: Applicative](
     categories: Set[SubscriptionCategory[Interpretation]]
 ) extends SubscriptionCategoryRegistry[Interpretation] {
-  override def run(): Interpretation[Unit] = ??? // inst
+  override def run(): Interpretation[Unit] = categories.toList.traverse_(_.run())
 
-  override def register(subscriptionRequest: Json): Interpretation[Either[RequestError, Unit]] = ???
+  override def register(subscriptionRequest: Json): Interpretation[Either[RequestError, Unit]] =
+    if (categories.isEmpty) {
+      Either.left[RequestError, Unit](NoCategoriesAvailable).pure[Interpretation]
+    } else {
+      categories.toList
+        .map(_.register(subscriptionRequest))
+        .sequence
+        .map(results =>
+          if (results.exists(_.isDefined)) {
+            Right(())
+          } else {
+            Left(UnsupportedPayloadError("No category supports this payload"))
+          }
+        )
+    }
 }
 
 private[eventlog] object IOSubscriptionCategoryRegistry {

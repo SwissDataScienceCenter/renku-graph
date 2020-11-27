@@ -38,5 +38,8 @@ package object subscriptions {
 
   sealed trait RequestError extends Exception
   final case class UnsupportedPayloadError(message: String) extends Exception(message) with RequestError
+  final case object NoCategoriesAvailable
+      extends Exception("No subscription categories are registered")
+      with RequestError
 
 }

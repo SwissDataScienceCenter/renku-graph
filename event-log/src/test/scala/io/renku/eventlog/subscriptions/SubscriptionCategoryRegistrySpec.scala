@@ -18,93 +18,112 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import io.circe.Json
-import io.renku.eventlog.subscriptions.Generators.subscriberUrls
+import io.renku.eventlog.subscriptions.Generators.subscriptionCategoryPayloads
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Failure, Random, Success, Try}
+import scala.util.Random
 
 private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
     "return unit when all of the categories return Unit" in new TestCase {
-      categories.foreach { category =>
-        (category.run _)
-          .expects()
-          .returning(().pure[Try])
-      }
-
-      registry.run() shouldBe Success(())
+      val categories = noRegistrationCategories
+      val registry   = new SubscriptionCategoryRegistryImpl[IO](categories)
+      registry.run().unsafeRunSync() shouldBe ()
     }
 
     "throw an error when one of the categories throws an error" in new TestCase {
-      val exception = exceptions.generateOne
-      (categories.head.run _)
-        .expects()
-        .returning(exception.raiseError[Try, Unit])
-
-      registry.run() shouldBe Failure(exception)
+      val exception  = exceptions.generateOne
+      val categories = generateCategories(withError = exception)
+      println(categories)
+      val registry = new SubscriptionCategoryRegistryImpl[IO](categories)
+      intercept[Exception] {
+        registry.run().unsafeRunSync()
+      } shouldBe exception
     }
   }
 
   "register" should {
     "return Right when at least one of the categories returns Some" in new TestCase {
-      val shuffledCategories = Random.shuffle(categories.toList)
-      (shuffledCategories.head.register _)
-        .expects(payload)
-        .returning(subscriptionCategoryPayloads.generateSome.pure[Try])
+      val categories = generateCategoriesWithOneRegistration()
+      val registry   = new SubscriptionCategoryRegistryImpl[IO](categories)
+      registry.register(payload).unsafeRunSync() shouldBe Right(())
+    }
 
-      shuffledCategories.tail.foreach { category =>
-        (category.register _)
-          .expects(payload)
-          .returning(None.pure[Try])
-      }
-
-      registry.register(payload) shouldBe Success(Right(()))
+    "return Left there are no categories" in new TestCase {
+      val registry    = new SubscriptionCategoryRegistryImpl[IO](Set.empty)
+      val Left(error) = registry.register(payload).unsafeRunSync()
+      error shouldBe a[RequestError]
     }
 
     "return Left when all of the components return None" in new TestCase {
-      categories.foreach { category =>
-        (category.register _)
-          .expects(payload)
-          .returning(None.pure[Try])
-      }
-      val Success(Left(error)) = registry.register(payload)
+      val categories  = noRegistrationCategories
+      val registry    = new SubscriptionCategoryRegistryImpl[IO](categories)
+      val Left(error) = registry.register(payload).unsafeRunSync()
       error shouldBe a[RequestError]
     }
 
     "fail when one of the categories fails" in new TestCase {
-      val exception = exceptions.generateOne
-      (categories.head.register _)
-        .expects(payload)
-        .returning(exception.raiseError[Try, Option[SubscriptionCategory[Try]#PayloadType]])
-
-      registry.register(payload) shouldBe Failure(exception)
+      val exception  = exceptions.generateOne
+      val categories = generateCategories(withError = exception)
+      val registry   = new SubscriptionCategoryRegistryImpl[IO](categories)
+      intercept[Exception] {
+        registry.register(payload).unsafeRunSync()
+      } shouldBe exception
     }
   }
 
   trait TestCase {
 
-    val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
-      url <- subscriberUrls
-    } yield new SubscriptionCategoryPayload {
-      override def subscriberUrl: SubscriberUrl = url
+    private case class SuccessSubscriptionCategory() extends SubscriptionCategory[IO] {
+      protected override type PayloadType = SubscriptionCategoryPayload
+
+      override def run(): IO[Unit] = ().pure[IO]
+
+      override def register(payload: Json): IO[Option[SubscriptionCategoryPayload]] =
+        subscriptionCategoryPayloads.generateOne.some.pure[IO]
+
     }
 
-    val categories: Set[SubscriptionCategory[Try]] = Gen
-      .nonEmptyListOf(
-        Gen.const(mock[SubscriptionCategory[Try]])
+    private case class NoRegistrationSubscriptionCategory() extends SubscriptionCategory[IO] {
+      protected override type PayloadType = SubscriptionCategoryPayload
+
+      override def run(): IO[Unit] = ().pure[IO]
+
+      override def register(payload: Json): IO[Option[SubscriptionCategoryPayload]] =
+        none.pure[IO]
+
+    }
+
+    private case class ErrorSubscriptionCategory(exception: Exception) extends SubscriptionCategory[IO] {
+      protected override type PayloadType = SubscriptionCategoryPayload
+
+      override def run(): IO[Unit] = exception.raiseError[IO, Unit]
+
+      override def register(payload: Json): IO[Option[SubscriptionCategoryPayload]] =
+        exception.raiseError[IO, Option[SubscriptionCategoryPayload]]
+
+    }
+
+    val noRegistrationCategories = Set[SubscriptionCategory[IO]](NoRegistrationSubscriptionCategory())
+
+    def generateCategories(withError: Exception): Set[SubscriptionCategory[IO]] =
+      Random.shuffle(
+        Set[SubscriptionCategory[IO]](ErrorSubscriptionCategory(withError), NoRegistrationSubscriptionCategory())
       )
-      .generateOne
-      .toSet
+
+    def generateCategoriesWithOneRegistration(): Set[SubscriptionCategory[IO]] =
+      Random.shuffle(Set[SubscriptionCategory[IO]](NoRegistrationSubscriptionCategory(), SuccessSubscriptionCategory()))
 
     val payload: Json = jsons.generateOne
-    val registry = new SubscriptionCategoryRegistryImpl[Try](categories)
+
   }
 }
