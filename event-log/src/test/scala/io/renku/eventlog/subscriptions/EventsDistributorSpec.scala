@@ -379,7 +379,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
     val statusUpdatesRunner  = mock[StatusUpdatesRunner[IO]]
     val eventsSender         = mock[EventsSender[IO]]
     val logger               = TestLogger[IO]()
-    val distributor = new EventsDistributor(
+    val distributor = new EventsDistributorImpl[IO](
       subscribers,
       eventsFinder,
       statusUpdatesRunner,
@@ -421,4 +421,5 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         .expects(to, event.compoundEventId, event.body)
         .returning(got.pure[IO])
   }
+
 }
