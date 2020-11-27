@@ -81,9 +81,9 @@ class EventPersisterImpl(
 
   private def checkIfPersisted(event: Event) = measureExecutionTime {
     SqlQuery(
-      sql"""|select event_id
-            |from event_log
-            |where event_id = ${event.id} and project_id = ${event.project.id}""".stripMargin
+      sql"""|SELECT event_id
+            |FROM event_log
+            |WHERE event_id = ${event.id} AND project_id = ${event.project.id}""".stripMargin
         .query[String]
         .option
         .map(_.isDefined),
@@ -94,11 +94,11 @@ class EventPersisterImpl(
   // format: off
   private def findBatchInQueue(event: Event) = measureExecutionTime {
     SqlQuery({ fr"""
-        select batch_date
-        from event_log
-        where project_id = ${event.project.id} and """ ++ `status IN`(New, RecoverableFailure, Processing) ++ fr"""
-        order by batch_date desc
-        limit 1"""
+        SELECT batch_date
+        FROM event_log
+        WHERE project_id = ${event.project.id} AND """ ++ `status IN`(New, RecoverableFailure, Processing) ++ fr"""
+        ORDER BY batch_date DESC
+        LIMIT 1"""
       }.query[BatchDate].option,
       name = "new - find batch"
     )
@@ -111,8 +111,8 @@ class EventPersisterImpl(
       measureExecutionTime(
         SqlQuery(
           sql"""|INSERT INTO
-                |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
-                |VALUES ($id, ${project.id}, ${project.path}, ${New: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body)
+                |event_log (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
+                |VALUES ($id, ${project.id}, ${New: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body)
                 |""".stripMargin.update.run.map(_ => ()),
           name = "new - create (NEW)"
         )
@@ -122,8 +122,8 @@ class EventPersisterImpl(
       measureExecutionTime(
         SqlQuery(
           sql"""|INSERT INTO
-                |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body, message)
-                |VALUES ($id, ${project.id}, ${project.path}, ${Skipped: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body, $message)
+                |event_log (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
+                |VALUES ($id, ${project.id}, ${Skipped: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body, $message)
                 |""".stripMargin.update.run.map(_ => ()),
           name = "new - create (SKIPPED)"
         )

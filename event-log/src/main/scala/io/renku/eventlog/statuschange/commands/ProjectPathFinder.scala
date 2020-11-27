@@ -32,9 +32,9 @@ private object ProjectPathFinder {
   def findProjectPath[Interpretation[_]](
       eventId:           CompoundEventId
   )(implicit transactor: DbTransactor[Interpretation, EventLogDB], ME: Bracket[Interpretation, Throwable]) =
-    sql"""|select project_path
-          |from event_log 
-          |where event_id = ${eventId.id} and project_id = ${eventId.projectId}
+    sql"""|SELECT project_path
+          |FROM project 
+          |WHERE project_id = ${eventId.projectId}
           |""".stripMargin
       .query[projects.Path]
       .unique

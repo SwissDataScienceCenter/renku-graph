@@ -39,6 +39,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       given(batchDateAdder).succeeds(returning = ())
       given(viewRemover).succeeds(returning = ())
       given(projectTableCreator).succeeds(returning = ())
+      given(projectPathRemover).succeeds(returning = ())
 
       dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
@@ -104,6 +105,21 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
         dbInitializer.run().unsafeRunSync()
       } shouldBe exception
     }
+
+    "fail if dropping the project_path column fails" in new TestCase {
+
+      given(eventLogTableCreator).succeeds(returning = ())
+      given(projectPathAdder).succeeds(returning = ())
+      given(batchDateAdder).succeeds(returning = ())
+      given(viewRemover).succeeds(returning = ())
+      given(projectTableCreator).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(projectPathRemover).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        dbInitializer.run().unsafeRunSync()
+      } shouldBe exception
+    }
   }
 
   private trait TestCase {
@@ -112,6 +128,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
     val batchDateAdder       = mock[BatchDateAdder[IO]]
     val viewRemover          = mock[LatestEventDatesViewRemover[IO]]
     val projectTableCreator  = mock[ProjectTableCreator[IO]]
+    val projectPathRemover   = mock[ProjectPathRemover[IO]]
     val logger               = TestLogger[IO]()
     val dbInitializer = new DbInitializerImpl[IO](
       eventLogTableCreator,
@@ -119,6 +136,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       batchDateAdder,
       viewRemover,
       projectTableCreator,
+      projectPathRemover,
       logger
     )
   }

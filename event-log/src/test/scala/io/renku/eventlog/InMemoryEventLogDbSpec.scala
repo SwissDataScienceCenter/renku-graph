@@ -38,7 +38,6 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
       sql"""|CREATE TABLE IF NOT EXISTS event_log(
             | event_id varchar NOT NULL,
             | project_id int4 NOT NULL,
-            | project_path varchar NOT NULL,
             | status varchar NOT NULL,
             | created_date timestamp NOT NULL,
             | execution_date timestamp NOT NULL,
@@ -77,16 +76,7 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
                            projectPath:     Path = projectPaths.generateOne,
                            maybeMessage:    Option[EventMessage] = None
   ): Unit = {
-    insertEvent(compoundEventId,
-                eventStatus,
-                executionDate,
-                eventDate,
-                eventBody,
-                createdDate,
-                batchDate,
-                projectPath,
-                maybeMessage
-    )
+    insertEvent(compoundEventId, eventStatus, executionDate, eventDate, eventBody, createdDate, batchDate, maybeMessage)
     upsertProject(compoundEventId, projectPath, eventDate)
   }
 
@@ -97,29 +87,28 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
                             eventBody:       EventBody,
                             createdDate:     CreatedDate,
                             batchDate:       BatchDate,
-                            projectPath:     Path,
                             maybeMessage:    Option[EventMessage]
   ): Unit = execute {
     maybeMessage match {
       case None =>
-        sql"""|insert into
-              |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
-              |values (${compoundEventId.id}, ${compoundEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody)
+        sql"""|INSERT INTO
+              |event_log (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
+              |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody)
       """.stripMargin.update.run.map(_ => ())
       case Some(message) =>
-        sql"""|insert into
-              |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body, message)
-              |values (${compoundEventId.id}, ${compoundEventId.projectId}, $projectPath, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody, $message)
+        sql"""|INSERT INTO
+              |event_log (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
+              |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody, $message)
       """.stripMargin.update.run.map(_ => ())
     }
   }
 
   private def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit = execute {
-    sql"""|insert into
+    sql"""|INSERT INTO
           |project (project_id, project_path, latest_event_date)
-          |values (${compoundEventId.projectId}, $projectPath, $eventDate)
-          |on conflict (project_id)
-          |do update set latest_event_date = excluded.latest_event_dat where excluded.latest_event_date > project.latest_event_date
+          |VALUES (${compoundEventId.projectId}, $projectPath, $eventDate)
+          |ON CONFLICT (project_id)
+          |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
       """.stripMargin.update.run.map(_ => ())
   }
 
@@ -127,17 +116,17 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
   protected def findEvents(status:  EventStatus,
                            orderBy: Fragment = fr"created_date asc"): List[(CompoundEventId, ExecutionDate, BatchDate)] =
     execute {
-      (fr"""select event_id, project_id, execution_date, batch_date
-            from event_log
-            where status = $status
-            order by """ ++ orderBy)
+      (fr"""SELECT event_id, project_id, execution_date, batch_date
+            FROM event_log
+            WHERE status = $status
+            ORDER BY """ ++ orderBy)
         .query[(CompoundEventId, ExecutionDate, BatchDate)]
         .to[List]
     }
   // format: on
 
   protected def findProjects(): List[(projects.Id, projects.Path, EventDate)] = execute {
-    sql"""select * from project"""
+    sql"""SELECT * FROM project"""
       .query[(projects.Id, projects.Path, EventDate)]
       .to[List]
   }
@@ -151,9 +140,9 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
 
   protected def findEventMessage(eventId: CompoundEventId): Option[EventMessage] =
     execute {
-      sql"""select message
-            from event_log 
-            where event_id = ${eventId.id} and project_id = ${eventId.projectId}"""
+      sql"""SELECT message
+            FROM event_log 
+            WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}"""
         .query[Option[EventMessage]]
         .unique
     }

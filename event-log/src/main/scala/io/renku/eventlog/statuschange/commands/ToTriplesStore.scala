@@ -42,9 +42,9 @@ final case class ToTriplesStore[Interpretation[_]](
   override val status: EventStatus = TriplesStore
 
   override def query: SqlQuery[Int] = SqlQuery(
-    sql"""|update event_log
-          |set status = $status, execution_date = ${now()}
-          |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${Processing: EventStatus}
+    sql"""|UPDATE event_log
+          |SET status = $status, execution_date = ${now()}
+          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${Processing: EventStatus}
           |""".stripMargin.update.run,
     name = "processing->triples_store"
   )
