@@ -25,6 +25,7 @@ import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventStatus}
 import ch.datascience.graph.model.projects
@@ -144,6 +145,56 @@ class EventPersisterSpec
         savedEvent2    shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2))
         savedEvent3    shouldBe (event3.compoundEventId, ExecutionDate(nowForEvent3))
         storedProjects shouldBe List((event1.project.id, event1.project.path, event2.date))
+      }
+
+    "update latest_event_date and project_path for a project " +
+      "only if there's an event with more recent Event Date added" in new TestCase {
+        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
+
+        // storing event 1
+        (waitingEventsGauge.increment _).expects(event1.project.path).returning(IO.unit)
+
+        persister.storeNewEvent(event1).unsafeRunSync() shouldBe Created
+
+        // storing event 2 for the same project but with different project_path and more recent Event Date
+        val event2 = newEvents.generateOne.copy(project = event1.project.copy(path = projectPaths.generateOne),
+                                                date = EventDate(now.minus(1, HOURS))
+        )
+        (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+        val nowForEvent2 = Instant.now()
+        currentTime.expects().returning(nowForEvent2)
+
+        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
+
+        val savedEvent1 +: savedEvent2 +: Nil = findEvents(status = New).noBatchDate
+        savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
+        savedEvent2    shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2))
+        storedProjects shouldBe List((event1.project.id, event2.project.path, event2.date))
+      }
+
+    "do not update latest_event_date and project_path for a project " +
+      "only if there's an event with less recent Event Date added" in new TestCase {
+        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
+
+        // storing event 1
+        (waitingEventsGauge.increment _).expects(event1.project.path).returning(IO.unit)
+
+        persister.storeNewEvent(event1).unsafeRunSync() shouldBe Created
+
+        // storing event 2 for the same project but with different project_path and less recent Event Date
+        val event2 = newEvents.generateOne.copy(project = event1.project.copy(path = projectPaths.generateOne),
+                                                date = EventDate(now.minus(3, HOURS))
+        )
+        (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+        val nowForEvent2 = Instant.now()
+        currentTime.expects().returning(nowForEvent2)
+
+        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
+
+        val savedEvent1 +: savedEvent2 +: Nil = findEvents(status = New).noBatchDate
+        savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
+        savedEvent2    shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2))
+        storedProjects shouldBe List((event1.project.id, event1.project.path, event1.date))
       }
 
     "add a *skipped* event if there is no event with the given id for the given project " in new TestCase {

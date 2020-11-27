@@ -136,7 +136,9 @@ class EventPersisterImpl(
             |project (project_id, project_path, latest_event_date)
             |VALUES (${event.project.id}, ${event.project.path}, ${event.date})
             |ON CONFLICT (project_id)
-            |DO UPDATE SET latest_event_date = EXCLUDED.latest_event_date WHERE EXCLUDED.latest_event_date > project.latest_event_date
+            |DO 
+            |  UPDATE SET latest_event_date = EXCLUDED.latest_event_date, project_path = EXCLUDED.project_path 
+            |  WHERE EXCLUDED.latest_event_date > project.latest_event_date
       """.stripMargin.update.run.map(_ => ()),
       name = "new - upsert project"
     )

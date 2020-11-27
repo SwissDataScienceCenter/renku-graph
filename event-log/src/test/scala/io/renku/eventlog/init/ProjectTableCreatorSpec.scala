@@ -54,12 +54,17 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
     "create the 'project' table, " +
       "fill it in with data fetched from the 'event_log' about project and the most recent event_date of all project's events" in new TestCase {
 
-        val project1Id   = projectIds.generateOne
-        val project1Path = projectPaths.generateOne
+        val project1Id    = projectIds.generateOne
+        val project1Path  = projectPaths.generateOne
+        val project2Id    = projectIds.generateOne
+        val project2Path1 = projectPaths.generateOne
+        val project2Path2 = projectPaths.generateOne
 
         val (_, _, project1EventDate1)                    = createEvent(project1Id, project1Path)
         val (_, _, project1EventDate2)                    = createEvent(project1Id, project1Path)
-        val (project2Id, project2Path, project2EventDate) = createEvent()
+        val (_, _, project2EventDate1)                    = createEvent(project2Id, project2Path1)
+        val (_, _, project2EventDate2)                    = createEvent(project2Id, project2Path2)
+        val (project3Id, project3Path, project3EventDate) = createEvent()
 
         tableExists("project") shouldBe false
 
@@ -69,9 +74,13 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
 
         logger.loggedOnly(Info("'project' table created"), Info("'project' table filled in"))
 
+        val project2Path =
+          if ((project2EventDate1.value compareTo project2EventDate2.value) < 0) project2Path2
+          else project2Path1
         fetchProjectData should contain theSameElementsAs List(
           (project1Id, project1Path, Set(project1EventDate1, project1EventDate2).maxBy(_.value)),
-          (project2Id, project2Path, project2EventDate)
+          (project2Id, project2Path, Set(project2EventDate1, project2EventDate2).maxBy(_.value)),
+          (project3Id, project3Path, project3EventDate)
         )
       }
 

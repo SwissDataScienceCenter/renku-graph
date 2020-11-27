@@ -84,11 +84,17 @@ private class ProjectTableCreatorImpl[Interpretation[_]](
 
   private lazy val fillInTableSql = sql"""
     INSERT INTO project
-    SELECT
+    SELECT DISTINCT
+      log.project_id,
+      log.project_path,
+      project_event_date.latest_event_date
+    FROM (
+      SELECT
         project_id,
-        project_path,
         MAX(event_date) latest_event_date
       FROM event_log
-      GROUP BY project_id, project_path;
+      GROUP BY project_id
+    ) project_event_date
+    JOIN event_log log ON log.project_id = project_event_date.project_id AND log.event_date = project_event_date.latest_event_date
     """.update
 }
