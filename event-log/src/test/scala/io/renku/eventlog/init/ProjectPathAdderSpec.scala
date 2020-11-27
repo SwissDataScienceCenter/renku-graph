@@ -46,6 +46,15 @@ class ProjectPathAdderSpec
 
   "run" should {
 
+    "do nothing if the 'event' table already exists" in new TestCase {
+
+      createEventTable()
+
+      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
+
+      logger.loggedOnly(Info("'project_path' column adding skipped"))
+    }
+
     "do nothing if the 'project_path' column already exists" in new TestCase {
 
       checkColumnExists shouldBe false

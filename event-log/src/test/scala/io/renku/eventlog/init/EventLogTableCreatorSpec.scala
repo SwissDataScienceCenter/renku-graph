@@ -31,9 +31,20 @@ class EventLogTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.M
 
   "run" should {
 
-    "create the 'event_log' table if it doesn't exist" in new TestCase {
+    "do nothing if the 'event' table already exists" in new TestCase {
 
-      dropTable("event_log")
+      createEventTable()
+      tableExists("event")     shouldBe true
+      tableExists("event_log") shouldBe false
+
+      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+
+      tableExists("event_log") shouldBe false
+
+      logger.loggedOnly(Info("'event_log' table creation skipped"))
+    }
+
+    "create the 'event_log' table if it doesn't exist" in new TestCase {
 
       tableExists("event_log") shouldBe false
 
@@ -45,8 +56,6 @@ class EventLogTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.M
     }
 
     "do nothing if the 'event_log' table already exists" in new TestCase {
-
-      dropTable("event_log")
 
       tableExists("event_log") shouldBe false
 

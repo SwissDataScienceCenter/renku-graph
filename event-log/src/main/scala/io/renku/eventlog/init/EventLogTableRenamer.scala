@@ -25,58 +25,42 @@ import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
-import scala.util.control.NonFatal
-
-private trait BatchDateAdder[Interpretation[_]] {
+private trait EventLogTableRenamer[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private object BatchDateAdder {
+private object EventLogTableRenamer {
   def apply[Interpretation[_]](
       transactor: DbTransactor[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): BatchDateAdder[Interpretation] =
-    new BatchDateAdderImpl(transactor, logger)
+  )(implicit ME:  Bracket[Interpretation, Throwable]): EventLogTableRenamer[Interpretation] =
+    new EventLogTableRenamerImpl(transactor, logger)
 }
 
-private class BatchDateAdderImpl[Interpretation[_]](
+private class EventLogTableRenamerImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
-    extends BatchDateAdder[Interpretation]
-    with EventTableCheck[Interpretation] {
+    extends EventLogTableRenamer[Interpretation] {
 
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
-    whenEventTableExists(
-      logger info "'batch_date' column adding skipped",
-      otherwise = checkColumnExists flatMap {
-        case true  => logger info "'batch_date' column exists"
-        case false => addColumn()
-      }
-    )
+    checkOldTableExists flatMap {
+      case false => logger info "'event' table already exists"
+      case true  => renameTable()
+    }
 
-  private def checkColumnExists: Interpretation[Boolean] =
-    sql"SELECT batch_date FROM event_log limit 1"
+  private def checkOldTableExists: Interpretation[Boolean] =
+    sql"select event_id from event_log limit 1"
       .query[String]
       .option
       .transact(transactor.get)
       .map(_ => true)
       .recover { case _ => false }
 
-  private def addColumn() = {
-    for {
-      _ <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS batch_date timestamp")
-      _ <- execute(sql"update event_log set batch_date = created_date")
-      _ <- execute(sql"ALTER TABLE event_log ALTER COLUMN batch_date SET NOT NULL")
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_batch_date ON event_log(batch_date)")
-      _ <- logger.info("'batch_date' column added")
-    } yield ()
-  } recoverWith logging
-
-  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)("'batch_date' column adding failure")
-    ME.raiseError(exception)
-  }
+  private def renameTable() = for {
+    _ <- execute(sql"ALTER TABLE event_log RENAME TO event")
+    _ <- logger info "'event_log' table renamed to 'event'"
+  } yield ()
 }

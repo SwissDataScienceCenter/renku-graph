@@ -244,9 +244,9 @@ class EventPersisterSpec
         compoundEventId: CompoundEventId
     ): (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage]) =
       execute {
-        sql"""|select event_id, project_id, status, created_date, execution_date, event_date, event_body, message
-              |from event_log  
-              |where event_id = ${compoundEventId.id} and project_id = ${compoundEventId.projectId}
+        sql"""|SELECT event_id, project_id, status, created_date, execution_date, event_date, event_body, message
+              |FROM event  
+              |WHERE event_id = ${compoundEventId.id} AND project_id = ${compoundEventId.projectId}
               |""".stripMargin
           .query[
             (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage])
@@ -256,8 +256,8 @@ class EventPersisterSpec
   }
 
   private def storedProjects: List[(projects.Id, projects.Path, EventDate)] = execute {
-    sql"""|select project_id, project_path, latest_event_date
-          |from project
+    sql"""|SELECT project_id, project_path, latest_event_date
+          |FROM project
           |""".stripMargin
       .query[(projects.Id, projects.Path, EventDate)]
       .to[List]

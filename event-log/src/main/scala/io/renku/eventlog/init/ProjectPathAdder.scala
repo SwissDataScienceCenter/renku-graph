@@ -47,15 +47,19 @@ private class ProjectPathAdderImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
-    extends ProjectPathAdder[Interpretation] {
+    extends ProjectPathAdder[Interpretation]
+    with EventTableCheck[Interpretation] {
 
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
-    checkColumnExists flatMap {
-      case true  => logger.info("'project_path' column exists")
-      case false => addColumn()
-    }
+    whenEventTableExists(
+      logger info "'project_path' column adding skipped",
+      otherwise = checkColumnExists flatMap {
+        case true  => logger info "'project_path' column exists"
+        case false => addColumn()
+      }
+    )
 
   private def checkColumnExists: Interpretation[Boolean] =
     sql"select project_path from event_log limit 1"

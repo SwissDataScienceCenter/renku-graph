@@ -40,9 +40,16 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
     latestEventDatesViewRemover
   )
 
-  import Tables._
-
   "run" should {
+
+    "do nothing if the 'event' table already exists" in new TestCase {
+
+      createEventTable()
+
+      tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
+
+      logger.loggedOnly(Info("'project' table creation skipped"))
+    }
 
     "create the 'project' table, " +
       "fill it in with data fetched from the 'event_log' about project and the most recent event_date of all project's events" in new TestCase {
@@ -54,11 +61,11 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
         val (_, _, project1EventDate2)                    = createEvent(project1Id, project1Path)
         val (project2Id, project2Path, project2EventDate) = createEvent()
 
-        tableExists(project) shouldBe false
+        tableExists("project") shouldBe false
 
         tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
 
-        tableExists(project) shouldBe true
+        tableExists("project") shouldBe true
 
         logger.loggedOnly(Info("'project' table created"), Info("'project' table filled in"))
 
@@ -72,7 +79,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
 
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
 
-      tableExists(project) shouldBe true
+      tableExists("project") shouldBe true
 
       verifyTrue(sql"DROP INDEX idx_project_id;")
       verifyTrue(sql"DROP INDEX idx_project_path;")
@@ -81,7 +88,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
 
     "do nothing if the 'project' table already exists" in new TestCase {
 
-      tableExists(project) shouldBe false
+      tableExists("project") shouldBe false
 
       createEvent()
 

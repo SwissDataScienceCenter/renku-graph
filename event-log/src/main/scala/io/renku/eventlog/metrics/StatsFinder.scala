@@ -54,7 +54,7 @@ class StatsFinderImpl(
       .map(addMissingStatues)
 
   private lazy val findStatuses = SqlQuery(
-    sql"""select status, count(event_id) from event_log group by status;""".stripMargin
+    sql"""SELECT status, count(event_id) FROM event GROUP BY status;""".stripMargin
       .query[(EventStatus, Long)]
       .to[List],
     name = "statuses count"
@@ -84,14 +84,14 @@ class StatsFinderImpl(
   private def prepareQuery(statuses: NonEmptyList[EventStatus]) = SqlQuery(
     query = Fragment
       .const {
-        s"""|select
+        s"""|SELECT
             |  project_path,
-            |  (select count(event_id) from event_log el_int where el_int.project_id = prj.project_id and status IN (${statuses.toSql})) as count
-            |from project prj
-            |where exists (
-            |        select project_id
-            |        from event_log el
-            |        where el.project_id = prj.project_id and status IN (${statuses.toSql})
+            |  (SELECT count(event_id) FROM event evt_int WHERE evt_int.project_id = prj.project_id AND status IN (${statuses.toSql})) AS count
+            |FROM project prj
+            |WHERE EXISTS (
+            |        SELECT project_id
+            |        FROM event evt
+            |        WHERE evt.project_id = prj.project_id AND status IN (${statuses.toSql})
             |      )
             |""".stripMargin
       }
@@ -103,18 +103,18 @@ class StatsFinderImpl(
   private def prepareQuery(statuses: NonEmptyList[EventStatus], limit: Int Refined Positive) = SqlQuery(
     query = Fragment
       .const {
-        s"""|select
+        s"""|SELECT
             |  project_path,
-            |  (select count(event_id) from event_log el_int where el_int.project_id = prj.project_id and status IN (${statuses.toSql})) as count
-            |from (select project_id, project_path, latest_event_date
-            |      from project
-            |      order by latest_event_date desc) prj
-            |where exists (
-            |        select project_id
-            |        from event_log el
-            |        where el.project_id = prj.project_id and status IN (${statuses.toSql})
+            |  (select count(event_id) FROM event evt_int WHERE evt_int.project_id = prj.project_id AND status IN (${statuses.toSql})) AS count
+            |FROM (select project_id, project_path, latest_event_date
+            |      FROM project
+            |      ORDER BY latest_event_date desc) prj
+            |WHERE EXISTS (
+            |        SELECT project_id
+            |        FROM event evt
+            |        WHERE evt.project_id = prj.project_id AND status IN (${statuses.toSql})
             |      )
-            |limit $limit;
+            |LIMIT $limit;
             |""".stripMargin
       }
       .query[(Path, Long)]

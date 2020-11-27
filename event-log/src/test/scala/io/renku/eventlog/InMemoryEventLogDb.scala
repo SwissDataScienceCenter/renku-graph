@@ -34,9 +34,9 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypesSerializers {
   self: Suite =>
 
   object Tables {
-    val event_log = "event_log"
-    val project   = "project"
-    lazy val all  = Set(event_log, project)
+    val event    = "event"
+    val project  = "project"
+    lazy val all = Set(event, project)
   }
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(global)

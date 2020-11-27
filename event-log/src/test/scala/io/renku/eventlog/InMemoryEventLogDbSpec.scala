@@ -35,7 +35,7 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
 
   protected def initDb(): Unit = {
     execute {
-      sql"""|CREATE TABLE IF NOT EXISTS event_log(
+      sql"""|CREATE TABLE IF NOT EXISTS event(
             | event_id varchar NOT NULL,
             | project_id int4 NOT NULL,
             | status varchar NOT NULL,
@@ -92,12 +92,12 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
     maybeMessage match {
       case None =>
         sql"""|INSERT INTO
-              |event_log (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
+              |event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
               |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody)
       """.stripMargin.update.run.map(_ => ())
       case Some(message) =>
         sql"""|INSERT INTO
-              |event_log (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
+              |event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
               |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody, $message)
       """.stripMargin.update.run.map(_ => ())
     }
@@ -117,7 +117,7 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
                            orderBy: Fragment = fr"created_date asc"): List[(CompoundEventId, ExecutionDate, BatchDate)] =
     execute {
       (fr"""SELECT event_id, project_id, execution_date, batch_date
-            FROM event_log
+            FROM event
             WHERE status = $status
             ORDER BY """ ++ orderBy)
         .query[(CompoundEventId, ExecutionDate, BatchDate)]
@@ -141,7 +141,7 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
   protected def findEventMessage(eventId: CompoundEventId): Option[EventMessage] =
     execute {
       sql"""SELECT message
-            FROM event_log 
+            FROM event 
             WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}"""
         .query[Option[EventMessage]]
         .unique

@@ -41,15 +41,19 @@ private class ProjectPathRemoverImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
-    extends ProjectPathRemover[Interpretation] {
+    extends ProjectPathRemover[Interpretation]
+    with EventTableCheck[Interpretation] {
 
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
-    checkColumnExists flatMap {
-      case false => logger.info("'project_path' column already removed")
-      case true  => removeColumn()
-    }
+    whenEventTableExists(
+      logger info "'project_path' column dropping skipped",
+      otherwise = checkColumnExists flatMap {
+        case false => logger info "'project_path' column already removed"
+        case true  => removeColumn()
+      }
+    )
 
   private def checkColumnExists: Interpretation[Boolean] =
     sql"select project_path from event_log limit 1"

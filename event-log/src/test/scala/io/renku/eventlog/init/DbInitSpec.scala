@@ -29,7 +29,7 @@ import scala.language.reflectiveCalls
 trait DbInitSpec extends InMemoryEventLogDb with BeforeAndAfter {
   self: Suite =>
 
-  private val tablesToDropBeforeEachTest = Set("event_log", "project")
+  private val tablesToDropBeforeEachTest = Set("event_log", "project", "event")
 
   private val logger = TestLogger[IO]()
 
@@ -38,6 +38,8 @@ trait DbInitSpec extends InMemoryEventLogDb with BeforeAndAfter {
   protected lazy val batchDateAdder:              Migration = BatchDateAdder(transactor, logger)
   protected lazy val latestEventDatesViewRemover: Migration = LatestEventDatesViewRemover(transactor, logger)
   protected lazy val projectTableCreator:         Migration = ProjectTableCreator(transactor, logger)
+  protected lazy val projectPathRemover:          Migration = ProjectPathRemover(transactor, logger)
+  protected lazy val eventLogTableRenamer:        Migration = EventLogTableRenamer(transactor, logger)
 
   protected type Migration = { def run(): IO[Unit] }
 
@@ -47,4 +49,11 @@ trait DbInitSpec extends InMemoryEventLogDb with BeforeAndAfter {
     tablesToDropBeforeEachTest foreach dropTable
     migrationsToRun.map(_.run()).sequence.unsafeRunSync()
   }
+
+  protected def createEventTable(): Unit =
+    List(eventLogTableCreator, batchDateAdder, eventLogTableRenamer)
+      .map(_.run())
+      .sequence
+      .void
+      .unsafeRunSync()
 }

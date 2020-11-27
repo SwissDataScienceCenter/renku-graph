@@ -39,18 +39,21 @@ private class ProjectTableCreatorImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
-    extends DbClient(maybeHistogram = None)
-    with ProjectTableCreator[Interpretation] {
+    extends ProjectTableCreator[Interpretation]
+    with EventTableCheck[Interpretation] {
 
   import cats.syntax.all._
   import doobie.implicits._
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
-    checkTableExists flatMap {
-      case true  => logger info "'project' table exists"
-      case false => createTable
-    }
+    whenEventTableExists(
+      logger info "'project' table creation skipped",
+      otherwise = checkTableExists flatMap {
+        case true  => logger info "'project' table exists"
+        case false => createTable
+      }
+    )
 
   private def checkTableExists: Interpretation[Boolean] =
     sql"select project_path from project limit 1"

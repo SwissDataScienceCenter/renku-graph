@@ -45,9 +45,9 @@ class LatestEventsFinderImpl(
     measureExecutionTime(findEvents) transact transactor.get
 
   private def findEvents = SqlQuery(
-    sql"""|SELECT log.event_id, log.project_id, prj.project_path, log.event_body
-          |FROM event_log log
-          |JOIN project prj ON log.project_id = prj.project_id AND log.event_date = prj.latest_event_date
+    sql"""|SELECT evt.event_id, evt.project_id, prj.project_path, evt.event_body
+          |FROM event evt
+          |JOIN project prj ON evt.project_id = prj.project_id AND evt.event_date = prj.latest_event_date
           |""".stripMargin
       .query[(EventId, EventProject, EventBody)]
       .to[List],

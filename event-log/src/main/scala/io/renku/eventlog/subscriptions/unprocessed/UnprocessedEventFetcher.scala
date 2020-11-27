@@ -81,24 +81,24 @@ private[subscriptions] class UnprocessedEventFetcherImpl(
 
   // format: off
   private def findProjectsWithEventsInQueue = SqlQuery({fr"""
-      select 
+      SELECT 
         proj.project_id,
         proj.project_path,
         proj.latest_event_date,
-        (select count(event_id) from event_log el_int where el_int.project_id = proj.project_id and el_int.status = ${Processing: EventStatus}) as current_occupancy 
-      from (select project_id, project_path, latest_event_date 
-            from project 
-            order by latest_event_date desc) proj
-      where exists (
-        select project_id
-        from event_log el
-        where el.project_id = proj.project_id
-          and ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
-            or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
+        (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = ${Processing: EventStatus}) as current_occupancy 
+      FROM (SELECT project_id, project_path, latest_event_date 
+            FROM project 
+            ORDER BY latest_event_date desc) proj
+      WHERE EXISTS (
+        SELECT project_id
+        FROM event evt
+        WHERE evt.project_id = proj.project_id
+          AND ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" AND execution_date < ${now()})
+            OR (status = ${Processing: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
           )
       )
-      order by latest_event_date desc
-      limit ${projectsFetchingLimit.value}  
+      ORDER BY latest_event_date DESC
+      LIMIT ${projectsFetchingLimit.value}  
       """ 
     }.query[(projects.Id, projects.Path, EventDate, Int)]
     .map { case (projectId, projectPath, eventDate, currentOccupancy) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy)) }
@@ -109,21 +109,21 @@ private[subscriptions] class UnprocessedEventFetcherImpl(
 
   // format: off
   private def findOldestEvent(idAndPath: ProjectIds) = SqlQuery({
-    fr"""select el.event_id, el.project_id, el.event_body
-           from (
-             select project_id, min(event_date) as min_event_date
-             from event_log
-             where project_id = ${idAndPath.id}
-               and ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
-                 or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime}))
-             group by project_id
-           ) oldest_event_date
-           join event_log el on oldest_event_date.project_id = el.project_id 
-             and oldest_event_date.min_event_date = el.event_date
-             and ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" and execution_date < ${now()})
-                 or (status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})) 
-           limit 1
-           """
+    fr"""SELECT evt.event_id, evt.project_id, evt.event_body
+         FROM (
+           SELECT project_id, min(event_date) as min_event_date
+           FROM event
+           WHERE project_id = ${idAndPath.id}
+             AND ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" AND execution_date < ${now()})
+               OR (status = ${Processing: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
+           GROUP BY project_id
+         ) oldest_event_date
+         JOIN event evt ON oldest_event_date.project_id = evt.project_id 
+           AND oldest_event_date.min_event_date = evt.event_date
+           AND ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" AND execution_date < ${now()})
+               OR (status = ${Processing: EventStatus} AND execution_date < ${now() minus maxProcessingTime})) 
+         LIMIT 1
+         """
     }.query[EventIdAndBody].option,
     name = "pop event - oldest"
   )
@@ -151,10 +151,10 @@ private[subscriptions] class UnprocessedEventFetcherImpl(
   }
 
   private def updateStatus(commitEventId: CompoundEventId) = SqlQuery(
-    sql"""|update event_log 
-          |set status = ${EventStatus.Processing: EventStatus}, execution_date = ${now()}
-          |where (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status <> ${Processing: EventStatus})
-          |  or (event_id = ${commitEventId.id} and project_id = ${commitEventId.projectId} and status = ${Processing: EventStatus} and execution_date < ${now() minus maxProcessingTime})
+    sql"""|UPDATE event 
+          |SET status = ${EventStatus.Processing: EventStatus}, execution_date = ${now()}
+          |WHERE (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status <> ${Processing: EventStatus})
+          |  OR (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status = ${Processing: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
           |""".stripMargin.update.run,
     name = "pop event - status update"
   )

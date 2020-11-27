@@ -51,8 +51,8 @@ private case class StatusNewPatch[Interpretation[_]](
   val name:   String Refined NonEmpty = Refined.unsafeApply(s"status $status patch")
 
   protected override def sqlQuery: ConnectionIO[Int] =
-    sql"""|update event_log
-          |set status = $status, execution_date = event_date, batch_date = ${now()}, message = NULL
+    sql"""|UPDATE event
+          |SET status = $status, execution_date = event_date, batch_date = ${now()}, message = NULL
           |""".stripMargin.update.run
 
   override def updateGauges(): Interpretation[Unit] =

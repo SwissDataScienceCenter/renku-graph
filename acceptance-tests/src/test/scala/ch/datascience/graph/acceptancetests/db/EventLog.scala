@@ -41,9 +41,9 @@ object EventLog extends TypesSerializers {
 
   def findEvents(projectId: Id, status: EventStatus*): List[CommitId] = execute {
     (fr"""
-     select event_id
-     from event_log
-     where project_id = $projectId and """ ++ `status IN`(status.toList))
+     SELECT event_id
+     FROM event
+     WHERE project_id = $projectId AND """ ++ `status IN`(status.toList))
       .query[EventId]
       .to[List]
       .map(_.map(eventId => CommitId(eventId.value)))

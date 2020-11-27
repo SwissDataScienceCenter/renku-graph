@@ -43,6 +43,15 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
   "run" should {
 
+    "do nothing if the 'event' table already exists" in new TestCase {
+
+      createEventTable()
+
+      batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
+
+      logger.loggedOnly(Info("'batch_date' column adding skipped"))
+    }
+
     "do nothing if the 'batch_date' column already exists" in new TestCase {
 
       checkColumnExists shouldBe false

@@ -44,6 +44,15 @@ class ProjectPathRemoverSpec
 
   "run" should {
 
+    "do nothing if the 'event' table already exists" in new TestCase {
+
+      createEventTable()
+
+      projectPathRemover.run().unsafeRunSync() shouldBe ((): Unit)
+
+      logger.loggedOnly(Info("'project_path' column dropping skipped"))
+    }
+
     "remove the 'project_path' column if it exists on the 'event_log' table" in new TestCase {
 
       checkColumnExists shouldBe true

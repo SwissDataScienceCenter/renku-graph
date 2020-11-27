@@ -82,7 +82,7 @@ class EventPersisterImpl(
   private def checkIfPersisted(event: Event) = measureExecutionTime {
     SqlQuery(
       sql"""|SELECT event_id
-            |FROM event_log
+            |FROM event
             |WHERE event_id = ${event.id} AND project_id = ${event.project.id}""".stripMargin
         .query[String]
         .option
@@ -95,7 +95,7 @@ class EventPersisterImpl(
   private def findBatchInQueue(event: Event) = measureExecutionTime {
     SqlQuery({ fr"""
         SELECT batch_date
-        FROM event_log
+        FROM event
         WHERE project_id = ${event.project.id} AND """ ++ `status IN`(New, RecoverableFailure, Processing) ++ fr"""
         ORDER BY batch_date DESC
         LIMIT 1"""
@@ -111,7 +111,7 @@ class EventPersisterImpl(
       measureExecutionTime(
         SqlQuery(
           sql"""|INSERT INTO
-                |event_log (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
+                |event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
                 |VALUES ($id, ${project.id}, ${New: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body)
                 |""".stripMargin.update.run.map(_ => ()),
           name = "new - create (NEW)"
@@ -122,7 +122,7 @@ class EventPersisterImpl(
       measureExecutionTime(
         SqlQuery(
           sql"""|INSERT INTO
-                |event_log (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
+                |event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
                 |VALUES ($id, ${project.id}, ${Skipped: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body, $message)
                 |""".stripMargin.update.run.map(_ => ()),
           name = "new - create (SKIPPED)"

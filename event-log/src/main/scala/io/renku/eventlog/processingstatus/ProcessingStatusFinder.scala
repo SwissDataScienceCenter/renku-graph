@@ -54,16 +54,16 @@ class ProcessingStatusFinderImpl(
   }
 
   private def latestBatchStatues(projectId: Id) = SqlQuery(
-    query = sql"""|SELECT log.status
-                  |FROM event_log log
+    query = sql"""|SELECT evt.status
+                  |FROM event evt
                   |INNER JOIN (
                   |    SELECT batch_date
-                  |    FROM event_log
+                  |    FROM event
                   |    WHERE project_id = $projectId
-                  |    ORDER BY batch_date desc
+                  |    ORDER BY batch_date DESC
                   |    LIMIT 1
-                  |  ) max_batch_date ON log.batch_date = max_batch_date.batch_date
-                  |WHERE log.project_id = $projectId
+                  |  ) max_batch_date ON evt.batch_date = max_batch_date.batch_date
+                  |WHERE evt.project_id = $projectId
                   |""".stripMargin.query[EventStatus].to[List],
     name = "processing status"
   )
