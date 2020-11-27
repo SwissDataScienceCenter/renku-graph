@@ -18,26 +18,36 @@
 
 package io.renku.eventlog.init
 
-import java.time.Instant
-
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import doobie.implicits._
-import doobie.implicits.javatime._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
 import scala.util.control.NonFatal
 
-private class BatchDateAdder[Interpretation[_]](
+private trait BatchDateAdder[Interpretation[_]] {
+  def run(): Interpretation[Unit]
+}
+
+private object BatchDateAdder {
+  def apply[Interpretation[_]](
+      transactor: DbTransactor[Interpretation, EventLogDB],
+      logger:     Logger[Interpretation]
+  )(implicit ME:  Bracket[Interpretation, Throwable]): BatchDateAdder[Interpretation] =
+    new BatchDateAdderImpl(transactor, logger)
+}
+
+private class BatchDateAdderImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+)(implicit ME:  Bracket[Interpretation, Throwable])
+    extends BatchDateAdder[Interpretation] {
 
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
-  def run(): Interpretation[Unit] =
+  override def run(): Interpretation[Unit] =
     checkColumnExists flatMap {
       case true  => logger.info("'batch_date' column exists")
       case false => addColumn()

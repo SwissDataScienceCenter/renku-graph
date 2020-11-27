@@ -36,27 +36,32 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
-  import Tables._
+  protected override lazy val migrationsToRun: List[Migration] = List(
+    eventLogTableCreator,
+    projectPathAdder
+  )
 
   "run" should {
 
     "do nothing if the 'batch_date' column already exists" in new TestCase {
-      if (!tableExists(event_log)) createEventLogTable()
-      addBatchDate()
-      checkColumnExists shouldBe true
+
+      checkColumnExists shouldBe false
 
       batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
 
       checkColumnExists shouldBe true
 
+      logger.loggedOnly(Info("'batch_date' column added"))
+
+      logger.reset()
+
+      batchDateAdder.run().unsafeRunSync() shouldBe ((): Unit)
+
       logger.loggedOnly(Info("'batch_date' column exists"))
     }
 
     "add the 'batch_date' column if does not exist and migrate the data for it" in new TestCase {
-      if (tableExists(event_log)) {
-        dropTable(event_log)
-        createEventLogTable()
-      }
+
       checkColumnExists shouldBe false
 
       val event1            = events.generateOne
@@ -78,13 +83,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
   private trait TestCase {
     val logger         = TestLogger[IO]()
-    val batchDateAdder = new BatchDateAdder[IO](transactor, logger)
-  }
-
-  private def addBatchDate(): Unit = execute {
-    sql"""|ALTER TABLE event_log 
-          |ADD COLUMN batch_date timestamp;
-       """.stripMargin.update.run.map(_ => ())
+    val batchDateAdder = new BatchDateAdderImpl[IO](transactor, logger)
   }
 
   private def checkColumnExists: Boolean =
@@ -98,10 +97,11 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
   private def storeEvent(event: Event, createdDate: CreatedDate): Unit = execute {
     sql"""|insert into 
-          |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
+          |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 
           |values (
           |${event.id}, 
           |${event.project.id}, 
+          |${event.project.path}, 
           |${eventStatuses.generateOne}, 
           |$createdDate,
           |${executionDates.generateOne}, 

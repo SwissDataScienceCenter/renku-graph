@@ -64,8 +64,8 @@ object IODbInitializer {
   )(implicit contextShift: ContextShift[IO]): IO[DbInitializer[IO]] = IO {
     new DbInitializerImpl[IO](
       EventLogTableCreator(transactor, logger),
-      new ProjectPathAdder[IO](transactor, logger),
-      new BatchDateAdder[IO](transactor, logger),
+      ProjectPathAdder(transactor, logger),
+      BatchDateAdder(transactor, logger),
       LatestEventDatesViewRemover[IO](transactor, logger),
       ProjectTableCreator(transactor, logger),
       logger

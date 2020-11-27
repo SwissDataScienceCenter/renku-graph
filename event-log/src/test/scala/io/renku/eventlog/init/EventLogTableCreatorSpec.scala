@@ -22,11 +22,12 @@ import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
-import io.renku.eventlog.InMemoryEventLogDb
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventLogTableCreatorSpec extends AnyWordSpec with InMemoryEventLogDb with should.Matchers {
+class EventLogTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
+
+  protected override val migrationsToRun: List[Migration] = Nil
 
   "run" should {
 

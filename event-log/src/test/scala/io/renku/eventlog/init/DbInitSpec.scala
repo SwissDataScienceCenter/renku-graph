@@ -19,15 +19,32 @@
 package io.renku.eventlog.init
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.interpreters.TestLogger
 import io.renku.eventlog.InMemoryEventLogDb
-import org.scalatest.Suite
+import org.scalatest.{BeforeAndAfter, Suite}
 
-trait DbInitSpec extends InMemoryEventLogDb {
+import scala.language.reflectiveCalls
+
+trait DbInitSpec extends InMemoryEventLogDb with BeforeAndAfter {
   self: Suite =>
 
-  protected def createEventLogTable(): Unit =
-    new EventLogTableCreatorImpl[IO](transactor, TestLogger())
-      .run()
-      .unsafeRunSync()
+  private val tablesToDropBeforeEachTest = Set("event_log", "project")
+
+  private val logger = TestLogger[IO]()
+
+  protected lazy val eventLogTableCreator:        Migration = EventLogTableCreator(transactor, logger)
+  protected lazy val projectPathAdder:            Migration = ProjectPathAdder(transactor, logger)
+  protected lazy val batchDateAdder:              Migration = BatchDateAdder(transactor, logger)
+  protected lazy val latestEventDatesViewRemover: Migration = LatestEventDatesViewRemover(transactor, logger)
+  protected lazy val projectTableCreator:         Migration = ProjectTableCreator(transactor, logger)
+
+  protected type Migration = { def run(): IO[Unit] }
+
+  protected val migrationsToRun: List[Migration]
+
+  before {
+    tablesToDropBeforeEachTest foreach dropTable
+    migrationsToRun.map(_.run()).sequence.unsafeRunSync()
+  }
 }

@@ -22,11 +22,12 @@ import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
-import io.renku.eventlog.InMemoryEventLogDbSpec
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class LatestEventDatesViewRemoverSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
+class LatestEventDatesViewRemoverSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
+
+  protected override val migrationsToRun: List[Migration] = Nil
 
   "run" should {
 
@@ -61,12 +62,7 @@ class LatestEventDatesViewRemoverSpec extends AnyWordSpec with InMemoryEventLogD
   private def createView(): Unit = execute {
     sql"""
     CREATE MATERIALIZED VIEW IF NOT EXISTS project_latest_event_date AS
-    select
-      project_id,
-      project_path,
-      MAX(event_date) latest_event_date
-    from event_log
-    group by project_id, project_path;
+    select 1;
     """.update.run.map(_ => ())
   }
 }

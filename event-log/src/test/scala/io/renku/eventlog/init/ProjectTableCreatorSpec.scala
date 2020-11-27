@@ -27,11 +27,18 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
 import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec}
+import io.renku.eventlog.EventDate
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ProjectTableCreatorSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
+class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
+
+  protected override lazy val migrationsToRun: List[Migration] = List(
+    eventLogTableCreator,
+    projectPathAdder,
+    batchDateAdder,
+    latestEventDatesViewRemover
+  )
 
   import Tables._
 
@@ -73,6 +80,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     }
 
     "do nothing if the 'project' table already exists" in new TestCase {
+
       tableExists(project) shouldBe false
 
       createEvent()
@@ -109,23 +117,13 @@ class ProjectTableCreatorSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
                           projectPath: Path = projectPaths.generateOne,
                           eventDate:   EventDate = eventDates.generateOne
   ): (Id, Path, EventDate) = {
-    insertEvent(
-      compoundEventIds.generateOne.copy(projectId = projectId),
-      eventStatuses.generateOne,
-      executionDates.generateOne,
-      eventDate,
-      eventBodies.generateOne,
-      createdDates.generateOne,
-      batchDates.generateOne,
-      projectPath,
-      maybeMessage = None
-    )
+    execute {
+      sql"""|insert into
+            |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
+            |values (${eventIds.generateOne}, $projectId, $projectPath, ${eventStatuses.generateOne}, ${createdDates.generateOne}, ${executionDates.generateOne}, $eventDate, ${batchDates.generateOne}, ${eventBodies.generateOne})
+      """.stripMargin.update.run.map(_ => ())
+    }
 
     (projectId, projectPath, eventDate)
-  }
-
-  protected override def prepareDbForTest(): Unit = {
-    super.prepareDbForTest()
-    dropTable(project)
   }
 }

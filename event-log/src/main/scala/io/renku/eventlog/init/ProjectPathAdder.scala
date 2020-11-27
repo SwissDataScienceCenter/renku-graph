@@ -31,14 +31,27 @@ import io.renku.eventlog.EventLogDB
 
 import scala.util.control.NonFatal
 
-private class ProjectPathAdder[Interpretation[_]](
+private trait ProjectPathAdder[Interpretation[_]] {
+  def run(): Interpretation[Unit]
+}
+
+private object ProjectPathAdder {
+  def apply[Interpretation[_]](
+      transactor: DbTransactor[Interpretation, EventLogDB],
+      logger:     Logger[Interpretation]
+  )(implicit ME:  Bracket[Interpretation, Throwable]): ProjectPathAdder[Interpretation] =
+    new ProjectPathAdderImpl(transactor, logger)
+}
+
+private class ProjectPathAdderImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+)(implicit ME:  Bracket[Interpretation, Throwable])
+    extends ProjectPathAdder[Interpretation] {
 
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
-  def run(): Interpretation[Unit] =
+  override def run(): Interpretation[Unit] =
     checkColumnExists flatMap {
       case true  => logger.info("'project_path' column exists")
       case false => addColumn()

@@ -19,14 +19,11 @@
 package io.renku.eventlog.init
 
 import cats.effect._
-import ch.datascience.db.DbTransactor
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.testtools.MockedRunnableCollaborators
-import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -111,8 +108,8 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
 
   private trait TestCase {
     val eventLogTableCreator = mock[EventLogTableCreator[IO]]
-    val projectPathAdder     = mock[IOProjectPathAdder]
-    val batchDateAdder       = mock[IOBatchDateAdder]
+    val projectPathAdder     = mock[ProjectPathAdder[IO]]
+    val batchDateAdder       = mock[BatchDateAdder[IO]]
     val viewRemover          = mock[LatestEventDatesViewRemover[IO]]
     val projectTableCreator  = mock[ProjectTableCreator[IO]]
     val logger               = TestLogger[IO]()
@@ -125,9 +122,4 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       logger
     )
   }
-
-  private class IOProjectPathAdder(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO])
-      extends ProjectPathAdder[IO](transactor, logger)
-  private class IOBatchDateAdder(transactor: DbTransactor[IO, EventLogDB], logger: Logger[IO])
-      extends BatchDateAdder[IO](transactor, logger)
 }
