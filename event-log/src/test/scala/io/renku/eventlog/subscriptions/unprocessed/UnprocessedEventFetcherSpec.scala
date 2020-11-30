@@ -45,7 +45,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class UnprocessedEventFetcherSpec
+private class UnprocessedEventFetcherSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with LatestEventDatesViewPresence

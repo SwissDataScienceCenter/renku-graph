@@ -34,7 +34,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}
 
-class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "deserialize" should {
     "return the subscriber URL if the statuses are valid" in new TestCase {
@@ -67,7 +67,7 @@ class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockFactory w
     }
   }
 
-  class TestCase {
+  trait TestCase {
     val deserializer = SubscriptionRequestDeserializer[Try]()
 
     val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {

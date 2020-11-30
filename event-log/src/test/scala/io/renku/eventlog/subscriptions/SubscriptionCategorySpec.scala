@@ -24,6 +24,7 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import io.renku.eventlog.subscriptions.Generators._
+import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RejectedRegistration}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -64,7 +65,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
         .expects(subscriptionCategoryPayload.subscriberUrl)
         .returning(().pure[IO])
 
-      subscriptionCategory.register(payload).unsafeRunSync() shouldBe subscriptionCategoryPayload.some
+      subscriptionCategory.register(payload).unsafeRunSync() shouldBe AcceptedRegistration
     }
 
     "return None if the payload does not contain the right supported statuses" in new TestCase {
@@ -73,13 +74,14 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
         .expects(payload)
         .returning(none.pure[IO])
 
-      subscriptionCategory.register(payload).unsafeRunSync() shouldBe None
+      subscriptionCategory.register(payload).unsafeRunSync() shouldBe RejectedRegistration
     }
 
     "fail if adding the subscriber url fails" in new TestCase {
       val subscriptionCategoryPayload = subscriptionCategoryPayloads.generateOne
       val exception                   = exceptions.generateOne
       val payload                     = jsons.generateOne
+
       (deserializer.deserialize _)
         .expects(payload)
         .returning(subscriptionCategoryPayload.some.pure[IO])
@@ -94,10 +96,14 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
     }
   }
 
-  trait TestCase {
+  private trait TestCase {
     val eventsDistributor = mock[EventsDistributor[IO]]
     val subscribers       = mock[Subscribers[IO]]
-    val deserializer      = mock[SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload]]
+
+    trait Deserializer extends SubscriptionRequestDeserializer[IO] {
+      override type PayloadType = SubscriptionCategoryPayload
+    }
+    val deserializer = mock[Deserializer]
 
     val subscriptionCategory =
       new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](subscribers, eventsDistributor, deserializer)

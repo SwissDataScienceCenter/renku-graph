@@ -38,13 +38,13 @@ import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Respons
 
 import scala.util.Try
 
-private class MicroserviceRoutes[F[_]: ConcurrentEffect, T <: SubscriptionCategoryPayload](
+private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     eventCreationEndpoint:    EventCreationEndpoint[F],
     latestEventsEndpoint:     LatestEventsEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
     eventsPatchingEndpoint:   EventsPatchingEndpoint[F],
     statusChangeEndpoint:     StatusChangeEndpoint[F],
-    subscriptionsEndpoint:    SubscriptionsEndpoint[F, T],
+    subscriptionsEndpoint:    SubscriptionsEndpoint[F],
     routesMetrics:            RoutesMetrics[F]
 )(implicit clock:             Clock[F], contextShift: ContextShift[F])
     extends Http4sDsl[F] {
