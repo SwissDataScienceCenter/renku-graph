@@ -18,7 +18,7 @@
 
 organization := "io.renku"
 name := "json-ld"
-scalaVersion := "2.13.3"
+scalaVersion := "2.13.4"
 
 val circeVersion = "0.13.0"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion

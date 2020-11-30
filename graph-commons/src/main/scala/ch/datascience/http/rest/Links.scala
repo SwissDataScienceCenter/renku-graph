@@ -82,7 +82,7 @@ object Links {
 
     decodeList(link).emap {
       case Nil          => Left("No links found")
-      case head +: tail => Right(Links(NonEmptyList.of(head, tail: _*)))
+      case head :: tail => Right(Links(NonEmptyList.of(head, tail: _*)))
     }
   }
 

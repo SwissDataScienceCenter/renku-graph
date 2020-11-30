@@ -89,7 +89,7 @@ private[triplescuration] class PersonDetailsUpdater[Interpretation[_]](
           ME.raiseError {
             new Exception(s"No names for person with '$entityId' id found in generated JSON-LD")
           }
-        case first +: other =>
+        case first :: other =>
           NonEmptyList.of(first, other: _*).pure[Interpretation]
       }
     }
