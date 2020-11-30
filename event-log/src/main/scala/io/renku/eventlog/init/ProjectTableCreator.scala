@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.Bracket
-import ch.datascience.db.{DbClient, DbTransactor}
+import ch.datascience.db.DbTransactor
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
@@ -71,9 +71,7 @@ private class ProjectTableCreatorImpl[Interpretation[_]](
     _ <- logger info "'project' table created"
     _ <- fillInTableSql.run transact transactor.get
     _ <- logger info "'project' table filled in"
-    _ <- execute {
-           sql"ALTER TABLE event ADD CONSTRAINT fk_project FOREIGN KEY (project_id) REFERENCES project (project_id)"
-         }
+    _ <- foreignKeySql.run transact transactor.get
   } yield ()
 
   private lazy val createTableSql = sql"""
@@ -100,4 +98,11 @@ private class ProjectTableCreatorImpl[Interpretation[_]](
     ) project_event_date
     JOIN event_log log ON log.project_id = project_event_date.project_id AND log.event_date = project_event_date.latest_event_date
     """.update
+
+  private lazy val foreignKeySql = sql"""
+    ALTER TABLE event_log
+    ADD CONSTRAINT fk_project
+    FOREIGN KEY (project_id) 
+    REFERENCES project (project_id)
+  """.update
 }

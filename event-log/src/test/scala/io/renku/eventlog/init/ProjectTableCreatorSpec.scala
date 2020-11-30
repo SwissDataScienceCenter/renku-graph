@@ -106,9 +106,8 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
       fetchProjectData should have size 1
 
       logger.loggedOnly(Info("'project' table created"), Info("'project' table filled in"))
-      logger.reset()
 
-      createEvent()
+      logger.reset()
 
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
 
