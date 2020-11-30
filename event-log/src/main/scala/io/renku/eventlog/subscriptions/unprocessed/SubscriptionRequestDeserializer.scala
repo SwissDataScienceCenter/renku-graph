@@ -26,7 +26,7 @@ import ch.datascience.graph.model.events.EventStatus.{New, RecoverableFailure}
 import io.circe
 import io.circe.Decoder
 import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.{SubscriberUrl}
+import io.renku.eventlog.subscriptions.SubscriberUrl
 import io.renku.eventlog.subscriptions.unprocessed.SubscriptionRequestDeserializer.UrlAndStatuses
 
 private case class SubscriptionRequestDeserializer[Interpretation[_]]()(implicit

@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.effect.Effect
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
+import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry.{NoCategoriesAvailable, SubscriptionResult, UnsupportedPayload}
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal

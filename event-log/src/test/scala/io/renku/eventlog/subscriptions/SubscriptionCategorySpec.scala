@@ -24,6 +24,7 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import io.renku.eventlog.subscriptions.Generators._
+import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RejectedRegistration}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -95,7 +96,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
     }
   }
 
-  trait TestCase {
+  private trait TestCase {
     val eventsDistributor = mock[EventsDistributor[IO]]
     val subscribers       = mock[Subscribers[IO]]
 

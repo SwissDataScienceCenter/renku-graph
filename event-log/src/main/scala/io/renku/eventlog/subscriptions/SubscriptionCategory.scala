@@ -18,9 +18,11 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.Semigroup
 import cats.data.OptionT
 import cats.effect.Effect
 import io.circe.Json
+import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RegistrationResult, RejectedRegistration}
 
 private trait SubscriptionCategory[Interpretation[_]] {
   def run(): Interpretation[Unit]
@@ -29,7 +31,19 @@ private trait SubscriptionCategory[Interpretation[_]] {
 
 }
 
-private[subscriptions] class SubscriptionCategoryImpl[Interpretation[_]: Effect, T <: SubscriptionCategoryPayload](
+private[subscriptions] object SubscriptionCategory {
+  sealed trait RegistrationResult
+  final case object AcceptedRegistration extends RegistrationResult
+  final case object RejectedRegistration extends RegistrationResult
+
+  implicit val registrationResultSemigroup: Semigroup[RegistrationResult] = {
+    case (RejectedRegistration, RejectedRegistration) => RejectedRegistration
+    case _                                            => AcceptedRegistration
+
+  }
+}
+
+private class SubscriptionCategoryImpl[Interpretation[_]: Effect, T <: SubscriptionCategoryPayload](
     subscribers:       Subscribers[Interpretation],
     eventsDistributor: EventsDistributor[Interpretation],
     deserializer:      SubscriptionRequestDeserializer[Interpretation] { type PayloadType = T }

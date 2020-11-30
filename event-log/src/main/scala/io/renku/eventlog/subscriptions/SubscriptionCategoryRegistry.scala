@@ -27,6 +27,8 @@ import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RejectedRegistration}
+import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry.{NoCategoriesAvailable, SubscriptionResult, SuccesfulSubscription, UnsupportedPayload}
 
 import scala.concurrent.ExecutionContext
 
@@ -35,6 +37,13 @@ trait SubscriptionCategoryRegistry[Interpretation[_]] {
   def run(): Interpretation[Unit]
 
   def register(subscriptionRequest: Json): Interpretation[SubscriptionResult]
+}
+
+private[subscriptions] object SubscriptionCategoryRegistry {
+  sealed trait SubscriptionResult
+  final case object SuccesfulSubscription extends SubscriptionResult
+  final case class UnsupportedPayload(message: String) extends SubscriptionResult
+  final case object NoCategoriesAvailable extends SubscriptionResult
 }
 
 private[subscriptions] class SubscriptionCategoryRegistryImpl[Interpretation[_]: Effect: Applicative](

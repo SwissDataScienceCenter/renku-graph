@@ -34,6 +34,7 @@ import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import io.renku.eventlog.subscriptions.Generators._
+import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry.{SubscriptionResult, SuccesfulSubscription, UnsupportedPayload}
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._
