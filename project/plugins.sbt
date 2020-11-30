@@ -20,6 +20,6 @@ addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.2")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.7.5")
 
-addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.5.0")
+addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.6.0")
 
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.12")
+addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.13")

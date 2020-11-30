@@ -18,11 +18,11 @@
 
 name := "graph-commons"
 
-val pureConfigVersion = "0.13.0"
+val pureConfigVersion = "0.14.0"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
-val refinedVersion = "0.9.15"
+val refinedVersion = "0.9.18"
 libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 
@@ -34,7 +34,7 @@ libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
 
-libraryDependencies += "io.sentry" % "sentry-logback" % "1.7.30"
+libraryDependencies += "io.sentry" % "sentry-logback" % "3.2.0"
 
 val doobieVersion = "0.9.2"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
