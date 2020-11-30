@@ -51,6 +51,7 @@ class EventPersisterImpl(
     extends DbClient(Some(queriesExecTimes))
     with EventPersister[IO] {
 
+  import doobie.ConnectionIO
   import io.renku.eventlog.TypesSerializers._
 
   override def storeNewEvent(event: Event): IO[Result] =
@@ -62,60 +63,85 @@ class EventPersisterImpl(
     } yield result
 
   private def insertIfNotDuplicate(event: Event) =
-    measureExecutionTime(checkIfInLog(event)) flatMap {
-      case Some(_) => Free.pure[ConnectionOp, Result](Existed)
-      case None    => addToLog(event)
+    checkIfPersisted(event) flatMap {
+      case true  => Free.pure[ConnectionOp, Result](Existed)
+      case false => persist(event)
     }
 
-  private def addToLog(event: Event): Free[ConnectionOp, Result] =
+  private def persist(event: Event): Free[ConnectionOp, Result] =
     for {
       updatedCommitEvent <- eventuallyAddToExistingBatch(event)
-      _                  <- measureExecutionTime(insert(updatedCommitEvent))
+      _                  <- upsertProject(updatedCommitEvent)
+      _                  <- insert(updatedCommitEvent)
     } yield Created
 
   private def eventuallyAddToExistingBatch(event: Event) =
-    measureExecutionTime(findBatchInQueue(event)).map(_.map(event.withBatchDate).getOrElse(event))
+    findBatchInQueue(event)
+      .map(_.map(event.withBatchDate).getOrElse(event))
 
-  private def checkIfInLog(event: Event) = SqlQuery(
-    sql"""|select event_id
-          |from event_log
-          |where event_id = ${event.id} and project_id = ${event.project.id}""".stripMargin
-      .query[String]
-      .option,
-    name = "new - check existence"
-  )
+  private def checkIfPersisted(event: Event) = measureExecutionTime {
+    SqlQuery(
+      sql"""|SELECT event_id
+            |FROM event
+            |WHERE event_id = ${event.id} AND project_id = ${event.project.id}""".stripMargin
+        .query[String]
+        .option
+        .map(_.isDefined),
+      name = "new - check existence"
+    )
+  }
 
   // format: off
-  private def findBatchInQueue(event: Event) = SqlQuery({ fr"""
-      select batch_date
-      from event_log
-      where project_id = ${event.project.id} and """ ++ `status IN`(New, RecoverableFailure, Processing) ++ fr"""
-      order by batch_date desc
-      limit 1"""
-    }.query[BatchDate].option,
-    name = "new - find batch"
-  )
+  private def findBatchInQueue(event: Event) = measureExecutionTime {
+    SqlQuery({ fr"""
+        SELECT batch_date
+        FROM event
+        WHERE project_id = ${event.project.id} AND """ ++ `status IN`(New, RecoverableFailure, Processing) ++ fr"""
+        ORDER BY batch_date DESC
+        LIMIT 1"""
+      }.query[BatchDate].option,
+      name = "new - find batch"
+    )
+  }
   // format: on
 
-  private lazy val insert: Event => SqlQuery[Unit] = {
+  private lazy val insert: Event => ConnectionIO[Unit] = {
     case NewEvent(id, project, date, batchDate, body) =>
       val currentTime = now()
-      SqlQuery(
-        sql"""insert into
-          event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
-          values ($id, ${project.id}, ${project.path}, ${New: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body)
-      """.update.run.map(_ => ()),
-        name = "new - create (NEW)"
+      measureExecutionTime(
+        SqlQuery(
+          sql"""|INSERT INTO
+                |event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
+                |VALUES ($id, ${project.id}, ${New: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body)
+                |""".stripMargin.update.run.map(_ => ()),
+          name = "new - create (NEW)"
+        )
       )
     case SkippedEvent(id, project, date, batchDate, body, message) =>
       val currentTime = now()
-      SqlQuery(
-        sql"""insert into
-          event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body, message)
-          values ($id, ${project.id}, ${project.path}, ${Skipped: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body, $message)
-      """.update.run.map(_ => ()),
-        name = "new - create (SKIPPED)"
+      measureExecutionTime(
+        SqlQuery(
+          sql"""|INSERT INTO
+                |event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
+                |VALUES ($id, ${project.id}, ${Skipped: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body, $message)
+                |""".stripMargin.update.run.map(_ => ()),
+          name = "new - create (SKIPPED)"
+        )
       )
+  }
+
+  private def upsertProject(event: Event) = measureExecutionTime {
+    SqlQuery(
+      sql"""|INSERT INTO
+            |project (project_id, project_path, latest_event_date)
+            |VALUES (${event.project.id}, ${event.project.path}, ${event.date})
+            |ON CONFLICT (project_id)
+            |DO 
+            |  UPDATE SET latest_event_date = EXCLUDED.latest_event_date, project_path = EXCLUDED.project_path 
+            |  WHERE EXCLUDED.latest_event_date > project.latest_event_date
+      """.stripMargin.update.run.map(_ => ()),
+      name = "new - upsert project"
+    )
   }
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
@@ -137,7 +163,7 @@ object IOEventPersister {
       transactor:         DbTransactor[IO, EventLogDB],
       waitingEventsGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name]
-  ) = IO {
+  ): IO[EventPersisterImpl] = IO {
     new EventPersisterImpl(transactor, waitingEventsGauge, queriesExecTimes)
   }
 }

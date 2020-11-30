@@ -20,52 +20,51 @@ package io.renku.eventlog.init
 
 import cats.effect.Bracket
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor}
+import ch.datascience.db.DbTransactor
 import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
-private[eventlog] trait LatestEventDatesViewCreator[Interpretation[_]] {
+private trait ProjectPathRemover[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private[eventlog] object LatestEventDatesViewCreator {
+private object ProjectPathRemover {
   def apply[Interpretation[_]](
       transactor: DbTransactor[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): LatestEventDatesViewCreator[Interpretation] =
-    new LatestEventDatesViewCreatorImpl(transactor, logger)
+  )(implicit ME:  Bracket[Interpretation, Throwable]): ProjectPathRemover[Interpretation] =
+    new ProjectPathRemoverImpl(transactor, logger)
 }
 
-private[eventlog] class LatestEventDatesViewCreatorImpl[Interpretation[_]](
+private class ProjectPathRemoverImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
-    extends DbClient(maybeHistogram = None)
-    with LatestEventDatesViewCreator[Interpretation] {
+    extends ProjectPathRemover[Interpretation]
+    with EventTableCheck[Interpretation] {
 
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
-    for {
-      _ <- createView.update.run transact transactor.get
-      _ <- createViewIndex.update.run transact transactor.get
-      _ <- logger.info("'project_latest_event_date' view created")
-    } yield ()
+    whenEventTableExists(
+      logger info "'project_path' column dropping skipped",
+      otherwise = checkColumnExists flatMap {
+        case false => logger info "'project_path' column already removed"
+        case true  => removeColumn()
+      }
+    )
 
-  private lazy val createView = sql"""
-    CREATE MATERIALIZED VIEW IF NOT EXISTS project_latest_event_date AS
-      select
-        project_id,
-        project_path,
-        MAX(event_date) latest_event_date
-      from event_log
-      group by project_id, project_path
-      order by latest_event_date desc;
-    """
+  private def checkColumnExists: Interpretation[Boolean] =
+    sql"select project_path from event_log limit 1"
+      .query[String]
+      .option
+      .transact(transactor.get)
+      .map(_ => true)
+      .recover { case _ => false }
 
-  private lazy val createViewIndex = sql"""
-    CREATE UNIQUE INDEX IF NOT EXISTS project_latest_event_date_project_idx 
-    ON project_latest_event_date (project_id, project_path)
-    """
+  private def removeColumn() = for {
+    _ <- execute(sql"ALTER TABLE event_log DROP COLUMN IF EXISTS project_path")
+    _ <- logger info "'project_path' column removed"
+  } yield ()
 }

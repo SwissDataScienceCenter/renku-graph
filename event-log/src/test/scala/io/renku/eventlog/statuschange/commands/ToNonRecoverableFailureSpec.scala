@@ -130,9 +130,9 @@ class ToNonRecoverableFailureSpec
 
   private def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
     execute {
-      sql"""select execution_date, status, message
-           |from event_log 
-           |where event_id = ${eventId.id} and project_id = ${eventId.projectId}
+      sql"""|SELECT execution_date, status, message
+            |FROM event 
+            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
          """.stripMargin
         .query[(ExecutionDate, EventStatus, Option[EventMessage])]
         .option

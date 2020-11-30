@@ -16,27 +16,35 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.statuschange.commands
+package io.renku.eventlog.init
 
 import cats.effect.Bracket
+import cats.syntax.all._
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.projects
 import doobie.implicits._
 import io.renku.eventlog.EventLogDB
 
-private object ProjectPathFinder {
+private trait EventTableCheck[Interpretation[_]] {
 
-  import io.renku.eventlog.TypesSerializers._
+  def whenEventTableExists(
+      eventTableExistsMessage: => Interpretation[Unit],
+      otherwise:               => Interpretation[Unit]
+  )(implicit
+      transactor: DbTransactor[Interpretation, EventLogDB],
+      ME:         Bracket[Interpretation, Throwable]
+  ): Interpretation[Unit] = checkTableExists flatMap {
+    case true  => eventTableExistsMessage
+    case false => otherwise
+  }
 
-  def findProjectPath[Interpretation[_]](
-      eventId:           CompoundEventId
-  )(implicit transactor: DbTransactor[Interpretation, EventLogDB], ME: Bracket[Interpretation, Throwable]) =
-    sql"""|SELECT project_path
-          |FROM project 
-          |WHERE project_id = ${eventId.projectId}
-          |""".stripMargin
-      .query[projects.Path]
-      .unique
+  private def checkTableExists(implicit
+      transactor: DbTransactor[Interpretation, EventLogDB],
+      ME:         Bracket[Interpretation, Throwable]
+  ): Interpretation[Boolean] =
+    sql"select event_id from event limit 1"
+      .query[String]
+      .option
       .transact(transactor.get)
+      .map(_ => true)
+      .recover { case _ => false }
 }

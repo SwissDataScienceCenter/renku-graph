@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.microservices
+package ch.datascience.testtools
 
 import cats.effect.IO
 import org.scalamock.handlers.CallHandler0
@@ -25,7 +25,7 @@ import org.scalatest.Suite
 
 import scala.language.reflectiveCalls
 
-trait AnyMicroserviceRunnerSpec {
+trait MockedRunnableCollaborators {
   self: Suite with MockFactory =>
 
   private type Runnable[R] = { def run(): IO[R] }

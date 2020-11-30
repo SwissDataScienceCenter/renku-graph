@@ -21,7 +21,6 @@ package io.renku.eventlog.init
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.events.EventStatus.RecoverableFailure
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
@@ -32,54 +31,33 @@ trait DbInitializer[Interpretation[_]] {
 }
 
 class DbInitializerImpl[Interpretation[_]](
+    eventLogTableCreator:        EventLogTableCreator[Interpretation],
     projectPathAdder:            ProjectPathAdder[Interpretation],
     batchDateAdder:              BatchDateAdder[Interpretation],
-    latestEventDatesViewCreator: LatestEventDatesViewCreator[Interpretation],
-    transactor:                  DbTransactor[Interpretation, EventLogDB],
+    latestEventDatesViewRemover: LatestEventDatesViewRemover[Interpretation],
+    projectTableCreator:         ProjectTableCreator[Interpretation],
+    projectPathRemover:          ProjectPathRemover[Interpretation],
+    eventLogTableRenamer:        EventLogTableRenamer[Interpretation],
     logger:                      Logger[Interpretation]
 )(implicit ME:                   Bracket[Interpretation, Throwable])
     extends DbInitializer[Interpretation] {
 
-  import doobie.implicits._
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
-
   override def run(): Interpretation[Unit] = {
     for {
-      _ <- createTable()
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)")
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_log(event_id)")
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)")
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)")
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)")
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)")
-      _ <- execute(sql"UPDATE event_log set status=${RecoverableFailure.value} where status='TRIPLES_STORE_FAILURE'")
-      _ <- logger.info("Event Log database initialization success")
+      _ <- eventLogTableCreator.run()
       _ <- projectPathAdder.run()
       _ <- batchDateAdder.run()
-      _ <- latestEventDatesViewCreator.run()
+      _ <- latestEventDatesViewRemover.run()
+      _ <- projectTableCreator.run()
+      _ <- projectPathRemover.run()
+      _ <- eventLogTableRenamer.run()
+      _ <- logger info "Event Log database initialization success"
     } yield ()
   } recoverWith logging
 
-  private def createTable(): Interpretation[Unit] =
-    sql"""
-         |CREATE TABLE IF NOT EXISTS event_log(
-         | event_id varchar NOT NULL,
-         | project_id int4 NOT NULL,
-         | status varchar NOT NULL,
-         | created_date timestamp NOT NULL,
-         | execution_date timestamp NOT NULL,
-         | event_date timestamp NOT NULL,
-         | event_body text NOT NULL,
-         | message varchar,
-         | PRIMARY KEY (event_id, project_id)
-         |);
-       """.stripMargin.update.run
-      .transact(transactor.get)
-      .map(_ => ())
-
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     logger.error(exception)("Event Log database initialization failure")
-    ME.raiseError(exception)
+    exception.raiseError[Interpretation, Unit]
   }
 }
 
@@ -89,10 +67,13 @@ object IODbInitializer {
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[DbInitializer[IO]] = IO {
     new DbInitializerImpl[IO](
-      new ProjectPathAdder[IO](transactor, logger),
-      new BatchDateAdder[IO](transactor, logger),
-      LatestEventDatesViewCreator[IO](transactor, logger),
-      transactor,
+      EventLogTableCreator(transactor, logger),
+      ProjectPathAdder(transactor, logger),
+      BatchDateAdder(transactor, logger),
+      LatestEventDatesViewRemover[IO](transactor, logger),
+      ProjectTableCreator(transactor, logger),
+      ProjectPathRemover(transactor, logger),
+      EventLogTableRenamer(transactor, logger),
       logger
     )
   }

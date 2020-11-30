@@ -55,7 +55,7 @@ class EventsPatcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
 
     "log a failure when running the update fails" in new TestCase {
 
-      val patch = TestEventsPatch(gauge, sql"update event_log".update.run)
+      val patch = TestEventsPatch(gauge, sql"UPDATE event".update.run)
 
       val exception = intercept[Exception] {
         patcher.applyToAllEvents(patch).unsafeRunSync()
@@ -101,8 +101,8 @@ class EventsPatcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
 
   private case class TestEventsPatch(
       gauge:                  SingleValueGauge[IO],
-      protected val sqlQuery: ConnectionIO[Int] = sql"""|update event_log
-                                                        |set status = ${New: EventStatus}
+      protected val sqlQuery: ConnectionIO[Int] = sql"""|UPDATE event
+                                                        |SET status = ${New: EventStatus}
                                                         |""".stripMargin.update.run
   ) extends EventsPatch[IO] {
     override val name           = "test events patch"

@@ -48,7 +48,6 @@ import scala.language.postfixOps
 private class UnprocessedEventFetcherSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
-    with LatestEventDatesViewPresence
     with MockFactory
     with should.Matchers {
 

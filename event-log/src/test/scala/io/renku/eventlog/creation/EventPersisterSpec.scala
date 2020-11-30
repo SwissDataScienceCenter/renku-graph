@@ -19,11 +19,13 @@
 package io.renku.eventlog.creation
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit.HOURS
 
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventStatus}
 import ch.datascience.graph.model.projects
@@ -64,6 +66,7 @@ class EventPersisterSpec
           newEvent.body,
           None
         )
+        storedProjects shouldBe List((newEvent.project.id, newEvent.project.path, newEvent.date))
 
         // storeNewEvent 2 - different event id and different project
         val event2 = newEvents.generateOne
@@ -78,7 +81,11 @@ class EventPersisterSpec
         save2Event1 shouldBe (newEvent.compoundEventId, ExecutionDate(now), newEvent.batchDate)
         save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event2.batchDate)
 
-        queriesExecTimes.verifyExecutionTimeMeasured("new - check existence", "new - find batch", "new - create (NEW)")
+        queriesExecTimes.verifyExecutionTimeMeasured("new - check existence",
+                                                     "new - find batch",
+                                                     "new - create (NEW)",
+                                                     "new - upsert project"
+        )
       }
 
     "add a new event if there is no event with the given id for the given project " +
@@ -108,6 +115,88 @@ class EventPersisterSpec
         save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), newEvent.batchDate)
       }
 
+    "update latest_event_date for a project " +
+      "only if there's an event with more recent Event Date added" in new TestCase {
+        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
+
+        // storing event 1
+        (waitingEventsGauge.increment _).expects(event1.project.path).returning(IO.unit)
+
+        persister.storeNewEvent(event1).unsafeRunSync() shouldBe Created
+
+        // storing event 2 for the same project but more recent Event Date
+        val event2 = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(1, HOURS)))
+        (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+        val nowForEvent2 = Instant.now()
+        currentTime.expects().returning(nowForEvent2)
+
+        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
+
+        // storing event 3 for the same project but less recent Event Date
+        val event3 = newEvents.generateOne.copy(project = event1.project, date = EventDate(now.minus(3, HOURS)))
+        (waitingEventsGauge.increment _).expects(event3.project.path).returning(IO.unit)
+        val nowForEvent3 = Instant.now()
+        currentTime.expects().returning(nowForEvent3)
+
+        persister.storeNewEvent(event3).unsafeRunSync() shouldBe Created
+
+        val savedEvent1 +: savedEvent2 +: savedEvent3 +: Nil = findEvents(status = New).noBatchDate
+        savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
+        savedEvent2    shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2))
+        savedEvent3    shouldBe (event3.compoundEventId, ExecutionDate(nowForEvent3))
+        storedProjects shouldBe List((event1.project.id, event1.project.path, event2.date))
+      }
+
+    "update latest_event_date and project_path for a project " +
+      "only if there's an event with more recent Event Date added" in new TestCase {
+        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
+
+        // storing event 1
+        (waitingEventsGauge.increment _).expects(event1.project.path).returning(IO.unit)
+
+        persister.storeNewEvent(event1).unsafeRunSync() shouldBe Created
+
+        // storing event 2 for the same project but with different project_path and more recent Event Date
+        val event2 = newEvents.generateOne.copy(project = event1.project.copy(path = projectPaths.generateOne),
+                                                date = EventDate(now.minus(1, HOURS))
+        )
+        (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+        val nowForEvent2 = Instant.now()
+        currentTime.expects().returning(nowForEvent2)
+
+        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
+
+        val savedEvent1 +: savedEvent2 +: Nil = findEvents(status = New).noBatchDate
+        savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
+        savedEvent2    shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2))
+        storedProjects shouldBe List((event1.project.id, event2.project.path, event2.date))
+      }
+
+    "do not update latest_event_date and project_path for a project " +
+      "only if there's an event with less recent Event Date added" in new TestCase {
+        val event1 = newEvents.generateOne.copy(date = EventDate(now.minus(2, HOURS)))
+
+        // storing event 1
+        (waitingEventsGauge.increment _).expects(event1.project.path).returning(IO.unit)
+
+        persister.storeNewEvent(event1).unsafeRunSync() shouldBe Created
+
+        // storing event 2 for the same project but with different project_path and less recent Event Date
+        val event2 = newEvents.generateOne.copy(project = event1.project.copy(path = projectPaths.generateOne),
+                                                date = EventDate(now.minus(3, HOURS))
+        )
+        (waitingEventsGauge.increment _).expects(event2.project.path).returning(IO.unit)
+        val nowForEvent2 = Instant.now()
+        currentTime.expects().returning(nowForEvent2)
+
+        persister.storeNewEvent(event2).unsafeRunSync() shouldBe Created
+
+        val savedEvent1 +: savedEvent2 +: Nil = findEvents(status = New).noBatchDate
+        savedEvent1    shouldBe (event1.compoundEventId, ExecutionDate(now))
+        savedEvent2    shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2))
+        storedProjects shouldBe List((event1.project.id, event1.project.path, event1.date))
+      }
+
     "add a *skipped* event if there is no event with the given id for the given project " in new TestCase {
       val skippedEvent = skippedEvents.generateOne
 
@@ -123,6 +212,7 @@ class EventPersisterSpec
         skippedEvent.body,
         Some(skippedEvent.message)
       )
+      storedProjects shouldBe List((skippedEvent.project.id, skippedEvent.project.path, skippedEvent.date))
 
       // storeNewEvent 2 - different event id and different project
       val skippedEvent2 = skippedEvents.generateOne
@@ -138,7 +228,8 @@ class EventPersisterSpec
 
       queriesExecTimes.verifyExecutionTimeMeasured("new - check existence",
                                                    "new - find batch",
-                                                   "new - create (SKIPPED)"
+                                                   "new - create (SKIPPED)",
+                                                   "new - upsert project"
       )
     }
 
@@ -167,7 +258,7 @@ class EventPersisterSpec
       save2Event2 shouldBe (event2.compoundEventId, ExecutionDate(nowForEvent2), event2.batchDate)
     }
 
-    "do nothing if there is an event with the same id and project in the db already" in new TestCase {
+    "do nothing if there is an event with the same id and project in the DB already" in new TestCase {
       val newEvent = newEvents.generateOne
 
       (waitingEventsGauge.increment _).expects(newEvent.project.path).returning(IO.unit)
@@ -204,14 +295,22 @@ class EventPersisterSpec
         compoundEventId: CompoundEventId
     ): (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage]) =
       execute {
-        sql"""select event_id, project_id, status, created_date, execution_date, event_date, event_body, message
-             |from event_log  
-             |where event_id = ${compoundEventId.id} and project_id = ${compoundEventId.projectId}
-         """.stripMargin
+        sql"""|SELECT event_id, project_id, status, created_date, execution_date, event_date, event_body, message
+              |FROM event  
+              |WHERE event_id = ${compoundEventId.id} AND project_id = ${compoundEventId.projectId}
+              |""".stripMargin
           .query[
             (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage])
           ]
           .unique
       }
+  }
+
+  private def storedProjects: List[(projects.Id, projects.Path, EventDate)] = execute {
+    sql"""|SELECT project_id, project_path, latest_event_date
+          |FROM project
+          |""".stripMargin
+      .query[(projects.Id, projects.Path, EventDate)]
+      .to[List]
   }
 }

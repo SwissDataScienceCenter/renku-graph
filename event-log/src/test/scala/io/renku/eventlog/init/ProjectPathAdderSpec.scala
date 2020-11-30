@@ -21,14 +21,13 @@ package io.renku.eventlog.init
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
 import io.circe.literal._
 import io.renku.eventlog.DbEventLogGenerators._
-import ch.datascience.graph.model.EventsGenerators._
-
 import io.renku.eventlog.Event
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -41,25 +40,40 @@ class ProjectPathAdderSpec
     with Eventually
     with IntegrationPatience {
 
+  protected override lazy val migrationsToRun: List[Migration] = List(
+    eventLogTableCreator
+  )
+
   "run" should {
 
+    "do nothing if the 'event' table already exists" in new TestCase {
+
+      createEventTable()
+
+      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
+
+      logger.loggedOnly(Info("'project_path' column adding skipped"))
+    }
+
     "do nothing if the 'project_path' column already exists" in new TestCase {
-      if (!tableExists()) createTable()
-      addProjectPath()
-      checkColumnExists shouldBe true
+
+      checkColumnExists shouldBe false
 
       projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
 
       checkColumnExists shouldBe true
 
+      logger.loggedOnly(Info("'project_path' column added"))
+
+      logger.reset()
+
+      projectPathAdder.run().unsafeRunSync() shouldBe ((): Unit)
+
       logger.loggedOnly(Info("'project_path' column exists"))
     }
 
     "add the 'project_path' column if does not exist and migrate the data for it" in new TestCase {
-      if (tableExists()) {
-        dropTable()
-        createTable()
-      }
+
       checkColumnExists shouldBe false
 
       val event1 = events.generateOne
@@ -81,13 +95,7 @@ class ProjectPathAdderSpec
 
   private trait TestCase {
     val logger           = TestLogger[IO]()
-    val projectPathAdder = new ProjectPathAdder[IO](transactor, logger)
-  }
-
-  private def addProjectPath(): Unit = execute {
-    sql"""|ALTER TABLE event_log 
-          |ADD COLUMN project_path VARCHAR;
-       """.stripMargin.update.run.map(_ => ())
+    val projectPathAdder = new ProjectPathAdderImpl[IO](transactor, logger)
   }
 
   private def checkColumnExists: Boolean =
@@ -100,16 +108,16 @@ class ProjectPathAdderSpec
       .unsafeRunSync()
 
   private def storeEvent(event: Event): Unit = execute {
-    sql"""insert into 
-         |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
-         |values (
-         |${event.id}, 
-         |${event.project.id}, 
-         |${eventStatuses.generateOne}, 
-         |${createdDates.generateOne}, 
-         |${executionDates.generateOne}, 
-         |${eventDates.generateOne}, 
-         |${toJson(event)})
+    sql"""|insert into 
+          |event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
+          |values (
+          |${event.id}, 
+          |${event.project.id}, 
+          |${eventStatuses.generateOne}, 
+          |${createdDates.generateOne}, 
+          |${executionDates.generateOne}, 
+          |${eventDates.generateOne}, 
+          |${toJson(event)})
       """.stripMargin.update.run.map(_ => ())
   }
 

@@ -81,9 +81,9 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     override val status: EventStatus = Processing
 
     override def query = SqlQuery(
-      sql"""|update event_log 
-            |set status = $status
-            |where event_id = ${eventId.id} and project_id = ${eventId.projectId} and status = ${New: EventStatus}
+      sql"""|UPDATE event 
+            |SET status = $status
+            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${New: EventStatus}
             |""".stripMargin.update.run,
       name = "test_status_update"
     )

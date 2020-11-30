@@ -18,41 +18,42 @@
 
 package io.renku.eventlog.init
 
+import cats.effect.IO
 import cats.syntax.all._
-import doobie.implicits._
-import doobie.util.fragment.Fragment
+import ch.datascience.interpreters.TestLogger
 import io.renku.eventlog.InMemoryEventLogDb
-import org.scalatest.Suite
+import org.scalatest.{BeforeAndAfter, Suite}
 
-trait DbInitSpec extends InMemoryEventLogDb {
+import scala.language.reflectiveCalls
+
+trait DbInitSpec extends InMemoryEventLogDb with BeforeAndAfter {
   self: Suite =>
 
-  protected def tableExists(): Boolean =
-    sql"""select exists (select * from event_log);"""
-      .query[Boolean]
-      .option
-      .transact(transactor.get)
-      .recover { case _ => None }
+  private val tablesToDropBeforeEachTest = List("event_log", "event", "project")
+
+  private val logger = TestLogger[IO]()
+
+  protected lazy val eventLogTableCreator:        Migration = EventLogTableCreator(transactor, logger)
+  protected lazy val projectPathAdder:            Migration = ProjectPathAdder(transactor, logger)
+  protected lazy val batchDateAdder:              Migration = BatchDateAdder(transactor, logger)
+  protected lazy val latestEventDatesViewRemover: Migration = LatestEventDatesViewRemover(transactor, logger)
+  protected lazy val projectTableCreator:         Migration = ProjectTableCreator(transactor, logger)
+  protected lazy val projectPathRemover:          Migration = ProjectPathRemover(transactor, logger)
+  protected lazy val eventLogTableRenamer:        Migration = EventLogTableRenamer(transactor, logger)
+
+  protected type Migration = { def run(): IO[Unit] }
+
+  protected val migrationsToRun: List[Migration]
+
+  before {
+    tablesToDropBeforeEachTest foreach dropTable
+    migrationsToRun.map(_.run()).sequence.unsafeRunSync()
+  }
+
+  protected def createEventTable(): Unit =
+    List(eventLogTableCreator, batchDateAdder, eventLogTableRenamer)
+      .map(_.run())
+      .sequence
+      .void
       .unsafeRunSync()
-      .isDefined
-
-  protected def createTable(): Unit = execute {
-    sql"""
-         |CREATE TABLE event_log(
-         | event_id varchar NOT NULL,
-         | project_id int4 NOT NULL,
-         | status varchar NOT NULL,
-         | created_date timestamp NOT NULL,
-         | execution_date timestamp NOT NULL,
-         | event_date timestamp NOT NULL,
-         | event_body text NOT NULL,
-         | message varchar,
-         | PRIMARY KEY (event_id, project_id)
-         |);
-       """.stripMargin.update.run.map(_ => ())
-  }
-
-  protected def dropTable(): Unit = execute {
-    sql"DROP TABLE IF EXISTS event_log".update.run.map(_ => ())
-  }
 }
