@@ -270,6 +270,29 @@ As a good practice, the subscription should be renewed periodically in case of r
 | BAD_REQUEST (400)          | When there payload is invalid e.g. no `statuses` are different than `NEW` and `RECOVERABLE_FAILURE` |
 | INTERNAL SERVER ERROR (500)| When there were problems with processing the request                                                |
 
+## DB schema
+
+Event-log uses relational database as an internal storage. The DB has the following schema:
+
+| event                                |
+|--------------------------------------|
+| event_id   VARCHAR    PK    NOT NULL |
+| project_id INT4       PK FK NOT NULL |
+| status     VARCHAR          NOT NULL |
+| created_date TIMESTAMP      NOT NULL |
+| execution_date TIMESTAMP    NOT NULL |
+| event_date TIMESTAMP        NOT NULL |
+| event_body TEXT             NOT NULL |
+| message TEXT                NOT NULL |
+| message TEXT                         |
+                                        
+| project                              |
+|--------------------------------------|
+| project_id INT4          PK NOT NULL |
+| project_path VARCHAR        NOT NULL |
+| latest_event_date TIMESTAMP NOT NULL |
+
+
 ## Trying out
 
 The event-log is a part of multi-module sbt project thus it has to be built from the root level.
