@@ -25,7 +25,7 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
 
-trait Subscribers[Interpretation[_]] {
+private trait Subscribers[Interpretation[_]] {
   def add(subscriberUrl: SubscriberUrl): Interpretation[Unit]
 
   def delete(subscriberUrl: SubscriberUrl): Interpretation[Unit]
@@ -35,7 +35,7 @@ trait Subscribers[Interpretation[_]] {
   def runOnSubscriber(f: SubscriberUrl => Interpretation[Unit]): Interpretation[Unit]
 }
 
-class SubscribersImpl private[subscriptions] (
+private class SubscribersImpl private[subscriptions] (
     subscribersRegistry: SubscribersRegistry,
     logger:              Logger[IO]
 )(implicit contextShift: ContextShift[IO])
@@ -66,7 +66,7 @@ class SubscribersImpl private[subscriptions] (
     } yield ()
 }
 
-object Subscribers {
+private object Subscribers {
 
   import cats.effect.IO
 

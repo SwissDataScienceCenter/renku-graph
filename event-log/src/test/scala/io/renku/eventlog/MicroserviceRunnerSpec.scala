@@ -33,7 +33,7 @@ import ch.datascience.testtools.MockedRunnableCollaborators
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics.{EventLogMetrics, StatsFinder}
-import io.renku.eventlog.subscriptions.{SubscriptionCategory, SubscriptionCategoryPayload}
+import io.renku.eventlog.subscriptions.{SubscriptionCategory, SubscriptionCategoryPayload, SubscriptionCategoryRegistry}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -57,7 +57,7 @@ class MicroserviceRunnerSpec
         given(sentryInitializer).succeeds(returning = ())
         given(dbInitializer).succeeds(returning = ())
         given(metrics).succeeds(returning = ())
-        given(subscriptionCategory).succeeds(returning = ())
+        given(subscriptionCategoryRegistry).succeeds(returning = ())
         given(gaugeScheduler).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -103,7 +103,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).succeeds(returning = ())
-      given(subscriptionCategory).succeeds(returning = ())
+      given(subscriptionCategoryRegistry).succeeds(returning = ())
       given(gaugeScheduler).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(httpServer).fails(becauseOf = exception)
@@ -119,7 +119,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).succeeds(returning = ())
-      given(subscriptionCategory).fails(becauseOf = exceptions.generateOne)
+      given(subscriptionCategoryRegistry).fails(becauseOf = exceptions.generateOne)
       given(gaugeScheduler).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -132,7 +132,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).fails(becauseOf = exceptions.generateOne)
-      given(subscriptionCategory).succeeds(returning = ())
+      given(subscriptionCategoryRegistry).succeeds(returning = ())
       given(gaugeScheduler).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -145,7 +145,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).succeeds(returning = ())
-      given(subscriptionCategory).succeeds(returning = ())
+      given(subscriptionCategoryRegistry).succeeds(returning = ())
       given(gaugeScheduler).fails(becauseOf = exceptions.generateOne)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -157,19 +157,19 @@ class MicroserviceRunnerSpec
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val certificateLoader    = mock[CertificateLoader[IO]]
-    val sentryInitializer    = mock[IOSentryInitializer]
-    val dbInitializer        = mock[DbInitializer[IO]]
-    val subscriptionCategory = mock[SubscriptionCategory[IO, SubscriptionCategoryPayload]]
-    val metrics              = mock[TestEventLogMetrics]
-    val httpServer           = mock[IOHttpServer]
-    val gaugeScheduler       = mock[GaugeResetScheduler[IO]]
-    val runner = new MicroserviceRunner[SubscriptionCategoryPayload](
+    val certificateLoader            = mock[CertificateLoader[IO]]
+    val sentryInitializer            = mock[IOSentryInitializer]
+    val dbInitializer                = mock[DbInitializer[IO]]
+    val subscriptionCategoryRegistry = mock[SubscriptionCategoryRegistry[IO]]
+    val metrics                      = mock[TestEventLogMetrics]
+    val httpServer                   = mock[IOHttpServer]
+    val gaugeScheduler               = mock[GaugeResetScheduler[IO]]
+    val runner = new MicroserviceRunner(
       certificateLoader,
       sentryInitializer,
       dbInitializer,
       metrics,
-      subscriptionCategory,
+      subscriptionCategoryRegistry,
       gaugeScheduler,
       httpServer,
       new ConcurrentHashMap[CancelToken[IO], Unit]()

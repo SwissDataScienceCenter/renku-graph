@@ -36,7 +36,7 @@ import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
-import io.renku.eventlog.subscriptions.{SubscriptionCategory, SubscriptionCategoryPayload, SubscriptionsEndpoint}
+import io.renku.eventlog.subscriptions.{SubscriptionCategory, SubscriptionCategoryPayload, SubscriptionCategoryRegistry, SubscriptionsEndpoint}
 import org.http4s.MediaType.application
 import org.http4s.Method.{GET, PATCH, POST}
 import org.http4s.Status._
@@ -195,7 +195,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     val routesMetrics            = TestRoutesMetrics()
     val statusChangeEndpoint     = mock[TestStatusChangeEndpoint]
     val subscriptionsEndpoint    = mock[TestSubscriptionEndpoint]
-    val routes = new MicroserviceRoutes[IO, SubscriptionCategoryPayload](
+    val routes = new MicroserviceRoutes[IO](
       eventCreationEndpoint,
       latestEventsEndpoint,
       processingStatusEndpoint,
@@ -213,9 +213,9 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
   class TestProcessingStatusEndpoint(processingStatusFinder: ProcessingStatusFinder[IO], logger: Logger[IO])
       extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
   class TestSubscriptionEndpoint(
-      subscriptionCategory: SubscriptionCategory[IO, SubscriptionCategoryPayload],
-      logger:               Logger[IO]
-  ) extends SubscriptionsEndpoint[IO, SubscriptionCategoryPayload](subscriptionCategory, logger)
+      subscriptionCategoryRegistry: SubscriptionCategoryRegistry[IO],
+      logger:                       Logger[IO]
+  ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
   class TestStatusChangeEndpoint(updateCommandsRunner: StatusUpdatesRunner[IO],
                                  waitingEventsGauge:   LabeledGauge[IO, projects.Path],
                                  underProcessingGauge: LabeledGauge[IO, projects.Path],

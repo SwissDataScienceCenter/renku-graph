@@ -18,42 +18,42 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.Semigroup
 import cats.data.OptionT
-import cats.effect.{ContextShift, Effect, IO, Timer}
+import cats.effect.Effect
 import io.circe.Json
+import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RegistrationResult, RejectedRegistration}
 
-import scala.concurrent.ExecutionContext
-
-trait SubscriptionCategory[Interpretation[_], T] {
+private trait SubscriptionCategory[Interpretation[_]] {
   def run(): Interpretation[Unit]
 
-  def register(payload: Json): Interpretation[Option[T]]
+  def register(payload: Json): Interpretation[RegistrationResult]
+
 }
 
-class SubscriptionCategoryImpl[Interpretation[_]: Effect, T <: SubscriptionCategoryPayload](
+private[subscriptions] object SubscriptionCategory {
+  sealed trait RegistrationResult
+  final case object AcceptedRegistration extends RegistrationResult
+  final case object RejectedRegistration extends RegistrationResult
+
+  implicit val registrationResultSemigroup: Semigroup[RegistrationResult] = {
+    case (RejectedRegistration, RejectedRegistration) => RejectedRegistration
+    case _                                            => AcceptedRegistration
+
+  }
+}
+
+private class SubscriptionCategoryImpl[Interpretation[_]: Effect, T <: SubscriptionCategoryPayload](
     subscribers:       Subscribers[Interpretation],
     eventsDistributor: EventsDistributor[Interpretation],
-    deserializer:      SubscriptionRequestDeserializer[Interpretation, T]
-) extends SubscriptionCategory[Interpretation, T] {
+    deserializer:      SubscriptionRequestDeserializer[Interpretation] { type PayloadType = T }
+) extends SubscriptionCategory[Interpretation] {
+
   override def run(): Interpretation[Unit] = eventsDistributor.run()
 
-  override def register(payload: Json): Interpretation[Option[T]] = (for {
+  override def register(payload: Json): Interpretation[RegistrationResult] = (for {
     subscriptionPayload <- OptionT(deserializer.deserialize(payload))
     _                   <- OptionT.liftF(subscribers.add(subscriptionPayload.subscriberUrl))
-  } yield subscriptionPayload).value
-}
-
-object IOSubscriptionCategory {
-  def apply[T <: SubscriptionCategoryPayload](
-      subscribers:       Subscribers[IO],
-      eventsDistributor: EventsDistributor[IO],
-      deserializer:      SubscriptionRequestDeserializer[IO, T]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[SubscriptionCategory[IO, T]] = IO(
-    new SubscriptionCategoryImpl[IO, T](subscribers, eventsDistributor, deserializer)
-  )
+  } yield subscriptionPayload).map(_ => AcceptedRegistration).getOrElse(RejectedRegistration)
 
 }
