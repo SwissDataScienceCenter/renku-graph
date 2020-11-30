@@ -64,7 +64,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
         .expects(subscriptionCategoryPayload.subscriberUrl)
         .returning(().pure[IO])
 
-      subscriptionCategory.register(payload).unsafeRunSync() shouldBe subscriptionCategoryPayload.some
+      subscriptionCategory.register(payload).unsafeRunSync() shouldBe AcceptedRegistration
     }
 
     "return None if the payload does not contain the right supported statuses" in new TestCase {
@@ -73,7 +73,7 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
         .expects(payload)
         .returning(none.pure[IO])
 
-      subscriptionCategory.register(payload).unsafeRunSync() shouldBe None
+      subscriptionCategory.register(payload).unsafeRunSync() shouldBe RejectedRegistration
     }
 
     "fail if adding the subscriber url fails" in new TestCase {

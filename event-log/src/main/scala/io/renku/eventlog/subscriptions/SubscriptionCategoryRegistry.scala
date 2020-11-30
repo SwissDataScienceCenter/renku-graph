@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats._
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
-import cats._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -34,7 +34,7 @@ trait SubscriptionCategoryRegistry[Interpretation[_]] {
 
   def run(): Interpretation[Unit]
 
-  def register(subscriptionRequest: Json): Interpretation[Either[RequestError, Unit]]
+  def register(subscriptionRequest: Json): Interpretation[SubscriptionResult]
 }
 
 private[subscriptions] class SubscriptionCategoryRegistryImpl[Interpretation[_]: Effect: Applicative](
@@ -42,28 +42,20 @@ private[subscriptions] class SubscriptionCategoryRegistryImpl[Interpretation[_]:
 ) extends SubscriptionCategoryRegistry[Interpretation] {
   override def run(): Interpretation[Unit] = categories.toList.traverse_(_.run())
 
-  override def register(subscriptionRequest: Json): Interpretation[Either[RequestError, Unit]] =
-    if (categories.isEmpty) {
-      Either.left[RequestError, Unit](NoCategoriesAvailable).pure[Interpretation]
-    } else {
+  override def register(subscriptionRequest: Json): Interpretation[SubscriptionResult] =
+    if (categories.isEmpty) { (NoCategoriesAvailable: SubscriptionResult).pure[Interpretation] }
+    else {
       categories.toList
-        .map(_.register(subscriptionRequest).map {
-          case Some(_) => Some(())
-          case None    => None
-        })
-        .sequence
-        .map(results =>
-          if (results.exists(_.isDefined)) {
-            Right(())
-          } else {
-            Left(UnsupportedPayloadError("No category supports this payload"))
-          }
-        )
+        .traverse(_.register(subscriptionRequest))
+        .map(registrationRequests => registrationRequests.reduce(_ |+| _))
+        .map {
+          case AcceptedRegistration => SuccesfulSubscription
+          case RejectedRegistration => UnsupportedPayload("No category supports this payload")
+        }
     }
 }
 
-private[eventlog] object IOSubscriptionCategoryRegistry {
-
+object IOSubscriptionCategoryRegistry {
   def apply(
       transactor:           DbTransactor[IO, EventLogDB],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],

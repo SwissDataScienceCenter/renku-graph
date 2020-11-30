@@ -23,13 +23,9 @@ import cats.effect.Effect
 import io.circe.Json
 
 private trait SubscriptionCategory[Interpretation[_]] {
-  self =>
-
-  protected type PayloadType <: SubscriptionCategoryPayload
-
   def run(): Interpretation[Unit]
 
-  def register(payload: Json): Interpretation[Option[PayloadType]]
+  def register(payload: Json): Interpretation[RegistrationResult]
 
 }
 
@@ -38,12 +34,12 @@ private[subscriptions] class SubscriptionCategoryImpl[Interpretation[_]: Effect,
     eventsDistributor: EventsDistributor[Interpretation],
     deserializer:      SubscriptionRequestDeserializer[Interpretation] { type PayloadType = T }
 ) extends SubscriptionCategory[Interpretation] {
-  override type PayloadType = T
 
   override def run(): Interpretation[Unit] = eventsDistributor.run()
 
-  override def register(payload: Json): Interpretation[Option[PayloadType]] = (for {
+  override def register(payload: Json): Interpretation[RegistrationResult] = (for {
     subscriptionPayload <- OptionT(deserializer.deserialize(payload))
     _                   <- OptionT.liftF(subscribers.add(subscriptionPayload.subscriberUrl))
-  } yield subscriptionPayload).value
+  } yield subscriptionPayload).map(_ => AcceptedRegistration).getOrElse(RejectedRegistration)
+
 }

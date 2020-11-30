@@ -23,28 +23,26 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import io.circe.Json
-import io.renku.eventlog.subscriptions.Generators.subscriptionCategoryPayloads
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
-import scala.util.Random
 
 private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
     "return unit when all of the categories return Unit" in new TestCase {
-      val categories = noRegistrationCategories
+      val categories = Set[SubscriptionCategory[IO]](SubscriptionCategoryWithoutRegistration)
       val registry   = new SubscriptionCategoryRegistryImpl[IO](categories)
       registry.run().unsafeRunSync() shouldBe ()
     }
 
     "throw an error when one of the categories throws an error" in new TestCase {
-      val exception  = exceptions.generateOne
-      val categories = generateCategories(withError = exception)
-      println(categories)
-      val registry = new SubscriptionCategoryRegistryImpl[IO](categories)
+      val exception = exceptions.generateOne
+      val failingRun = new FailingRun {
+        override def raisedException: Exception = exception
+      }
+      val categories = Set[SubscriptionCategory[IO]](SubscriptionCategoryWithoutRegistration, failingRun)
+      val registry   = new SubscriptionCategoryRegistryImpl[IO](categories)
       intercept[Exception] {
         registry.run().unsafeRunSync()
       } shouldBe exception
@@ -52,28 +50,31 @@ private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFact
   }
 
   "register" should {
-    "return Right when at least one of the categories returns Some" in new TestCase {
-      val categories = generateCategoriesWithOneRegistration()
+
+    "return SuccessfulSubscription when at least one of the categories returns Some" in new TestCase {
+      val categories =
+        Set[SubscriptionCategory[IO]](new SuccessfulRegistration {}, SubscriptionCategoryWithoutRegistration)
+      val registry = new SubscriptionCategoryRegistryImpl[IO](categories)
+      registry.register(payload).unsafeRunSync() shouldBe SuccesfulSubscription
+    }
+
+    "return a request error when there are no categories" in new TestCase {
+      val registry = new SubscriptionCategoryRegistryImpl[IO](Set.empty)
+      registry.register(payload).unsafeRunSync() shouldBe NoCategoriesAvailable
+    }
+
+    "return a request error when no category can handle the payload" in new TestCase {
+      val categories = Set[SubscriptionCategory[IO]](SubscriptionCategoryWithoutRegistration)
       val registry   = new SubscriptionCategoryRegistryImpl[IO](categories)
-      registry.register(payload).unsafeRunSync() shouldBe Right(())
-    }
-
-    "return Left there are no categories" in new TestCase {
-      val registry    = new SubscriptionCategoryRegistryImpl[IO](Set.empty)
-      val Left(error) = registry.register(payload).unsafeRunSync()
-      error shouldBe a[RequestError]
-    }
-
-    "return Left when all of the components return None" in new TestCase {
-      val categories  = noRegistrationCategories
-      val registry    = new SubscriptionCategoryRegistryImpl[IO](categories)
-      val Left(error) = registry.register(payload).unsafeRunSync()
-      error shouldBe a[RequestError]
+      registry.register(payload).unsafeRunSync() shouldBe UnsupportedPayload("No category supports this payload")
     }
 
     "fail when one of the categories fails" in new TestCase {
-      val exception  = exceptions.generateOne
-      val categories = generateCategories(withError = exception)
+      val exception = exceptions.generateOne
+      val failingRegistration = new FailingRegistration {
+        override def raisedException: Exception = exception
+      }
+      val categories = Set[SubscriptionCategory[IO]](failingRegistration, SubscriptionCategoryWithoutRegistration)
       val registry   = new SubscriptionCategoryRegistryImpl[IO](categories)
       intercept[Exception] {
         registry.register(payload).unsafeRunSync()
@@ -82,48 +83,33 @@ private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFact
   }
 
   trait TestCase {
-
-    private case class SuccessSubscriptionCategory() extends SubscriptionCategory[IO] {
-      protected override type PayloadType = SubscriptionCategoryPayload
-
+    trait TestSubscriptionCategory extends SubscriptionCategory[IO] {
       override def run(): IO[Unit] = ().pure[IO]
 
-      override def register(payload: Json): IO[Option[SubscriptionCategoryPayload]] =
-        subscriptionCategoryPayloads.generateOne.some.pure[IO]
-
+      override def register(payload: Json): IO[RegistrationResult] =
+        RejectedRegistration.pure[IO]
     }
 
-    private case class NoRegistrationSubscriptionCategory() extends SubscriptionCategory[IO] {
-      protected override type PayloadType = SubscriptionCategoryPayload
+    object SubscriptionCategoryWithoutRegistration extends TestSubscriptionCategory {}
 
-      override def run(): IO[Unit] = ().pure[IO]
-
-      override def register(payload: Json): IO[Option[SubscriptionCategoryPayload]] =
-        none.pure[IO]
-
+    trait RaisingException {
+      def raisedException: Exception
     }
 
-    private case class ErrorSubscriptionCategory(exception: Exception) extends SubscriptionCategory[IO] {
-      protected override type PayloadType = SubscriptionCategoryPayload
-
-      override def run(): IO[Unit] = exception.raiseError[IO, Unit]
-
-      override def register(payload: Json): IO[Option[SubscriptionCategoryPayload]] =
-        exception.raiseError[IO, Option[SubscriptionCategoryPayload]]
-
+    trait FailingRun extends TestSubscriptionCategory with RaisingException {
+      override def run(): IO[Unit] = raisedException.raiseError[IO, Unit]
     }
 
-    val noRegistrationCategories = Set[SubscriptionCategory[IO]](NoRegistrationSubscriptionCategory())
+    trait SuccessfulRegistration extends TestSubscriptionCategory {
+      override def register(payload: Json): IO[RegistrationResult] =
+        AcceptedRegistration.pure[IO]
+    }
 
-    def generateCategories(withError: Exception): Set[SubscriptionCategory[IO]] =
-      Random.shuffle(
-        Set[SubscriptionCategory[IO]](ErrorSubscriptionCategory(withError), NoRegistrationSubscriptionCategory())
-      )
-
-    def generateCategoriesWithOneRegistration(): Set[SubscriptionCategory[IO]] =
-      Random.shuffle(Set[SubscriptionCategory[IO]](NoRegistrationSubscriptionCategory(), SuccessSubscriptionCategory()))
+    trait FailingRegistration extends TestSubscriptionCategory with RaisingException {
+      override def register(payload: Json): IO[RegistrationResult] =
+        raisedException.raiseError[IO, RegistrationResult]
+    }
 
     val payload: Json = jsons.generateOne
-
   }
 }

@@ -56,7 +56,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
 
         (subscriptionCategoryRegistry.register _)
           .expects(payload)
-          .returning(Right(()).pure[IO])
+          .returning(SuccesfulSubscription.pure[IO])
 
         val response = addSubscription(request).unsafeRunSync()
 
@@ -89,7 +89,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
 
       (subscriptionCategoryRegistry.register _)
         .expects(payload)
-        .returning(Left(UnsupportedPayloadError(errorMessage)).pure[IO])
+        .returning(UnsupportedPayload(errorMessage).pure[IO])
 
       val response = addSubscription(request).unsafeRunSync()
 
@@ -110,7 +110,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
 
       (subscriptionCategoryRegistry.register _)
         .expects(payload)
-        .returning(exception.raiseError[IO, Either[RequestError, Unit]])
+        .returning(exception.raiseError[IO, SubscriptionResult])
 
       val response = addSubscription(request).unsafeRunSync()
 

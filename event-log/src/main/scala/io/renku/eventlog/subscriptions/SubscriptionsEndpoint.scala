@@ -52,8 +52,12 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
     ME.raiseError(BadRequestError(exception))
   }
 
-  private def badRequestIfError(eitherErrorSuccess: Either[RequestError, Unit]): Interpretation[Unit] =
-    eitherErrorSuccess.fold(error => ME.raiseError[Unit](BadRequestError(error.getMessage)), _ => ME.unit)
+  private def badRequestIfError(eitherErrorSuccess: SubscriptionResult): Interpretation[Unit] =
+    eitherErrorSuccess match {
+      case NoCategoriesAvailable       => ME.raiseError[Unit](new Exception("No subscription categories found"))
+      case UnsupportedPayload(message) => ME.raiseError[Unit](BadRequestError(message))
+      case _                           => ME.unit
+    }
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case exception: BadRequestError =>

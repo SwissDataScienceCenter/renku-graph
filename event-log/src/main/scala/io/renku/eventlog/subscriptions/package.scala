@@ -18,6 +18,7 @@
 
 package io.renku.eventlog
 
+import cats.Semigroup
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.constraints.Url
 import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
@@ -36,10 +37,18 @@ package object subscriptions {
     def subscriberUrl: SubscriberUrl
   }
 
-  sealed trait RequestError extends Exception
-  final case class UnsupportedPayloadError(message: String) extends Exception(message) with RequestError
-  final case object NoCategoriesAvailable
-      extends Exception("No subscription categories are registered")
-      with RequestError
+  sealed trait SubscriptionResult
+  final case object SuccesfulSubscription extends SubscriptionResult
+  final case class UnsupportedPayload(message: String) extends SubscriptionResult
+  final case object NoCategoriesAvailable extends SubscriptionResult
 
+  sealed trait RegistrationResult
+  final case object AcceptedRegistration extends RegistrationResult
+  final case object RejectedRegistration extends RegistrationResult
+
+  implicit val registrationResultSemigroup: Semigroup[RegistrationResult] = {
+    case (RejectedRegistration, RejectedRegistration) => RejectedRegistration
+    case _                                            => AcceptedRegistration
+
+  }
 }
