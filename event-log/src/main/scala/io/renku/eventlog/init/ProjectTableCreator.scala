@@ -71,6 +71,9 @@ private class ProjectTableCreatorImpl[Interpretation[_]](
     _ <- logger info "'project' table created"
     _ <- fillInTableSql.run transact transactor.get
     _ <- logger info "'project' table filled in"
+    _ <- execute {
+           sql"ALTER TABLE event ADD CONSTRAINT fk_project FOREIGN KEY (project_id) REFERENCES project (project_id)"
+         }
   } yield ()
 
   private lazy val createTableSql = sql"""

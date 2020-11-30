@@ -71,8 +71,8 @@ class EventPersisterImpl(
   private def persist(event: Event): Free[ConnectionOp, Result] =
     for {
       updatedCommitEvent <- eventuallyAddToExistingBatch(event)
-      _                  <- insert(updatedCommitEvent)
       _                  <- upsertProject(updatedCommitEvent)
+      _                  <- insert(updatedCommitEvent)
     } yield Created
 
   private def eventuallyAddToExistingBatch(event: Event) =
