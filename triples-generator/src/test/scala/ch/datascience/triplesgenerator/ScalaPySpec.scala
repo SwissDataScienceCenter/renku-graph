@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Swiss Data Science Center (SDSC)
+ * Copyright 2020 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,13 +16,19 @@
  * limitations under the License.
  */
 
-name := "triples-generator"
+package ch.datascience.triplesgenerator
 
-fork := true
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-import scala.sys.process._
-javaOptions += s"-Djava.library.path=${"python3-config --prefix".!!.trim}/lib"
+class ScalaPySpec extends AnyWordSpec with should.Matchers {
 
-libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
-libraryDependencies += "com.lihaoyi"   %% "ammonite-ops"    % "2.3.8"
-libraryDependencies += "me.shadaj"     %% "scalapy-core"    % "0.4.0"
+  "test" in {
+    import me.shadaj.scalapy.py
+    import me.shadaj.scalapy.py.SeqConverters
+
+    val listLengthPython = py.Dynamic.global.len(List(1, 2, 3).toPythonProxy).as[Int]
+
+    println(listLengthPython)
+  }
+}
