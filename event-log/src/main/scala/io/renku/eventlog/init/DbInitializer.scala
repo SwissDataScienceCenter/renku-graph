@@ -38,6 +38,7 @@ class DbInitializerImpl[Interpretation[_]](
     projectTableCreator:         ProjectTableCreator[Interpretation],
     projectPathRemover:          ProjectPathRemover[Interpretation],
     eventLogTableRenamer:        EventLogTableRenamer[Interpretation],
+    eventStatusRenamer:          EventStatusRenamer[Interpretation],
     logger:                      Logger[Interpretation]
 )(implicit ME:                   Bracket[Interpretation, Throwable])
     extends DbInitializer[Interpretation] {
@@ -51,6 +52,7 @@ class DbInitializerImpl[Interpretation[_]](
       _ <- projectTableCreator.run()
       _ <- projectPathRemover.run()
       _ <- eventLogTableRenamer.run()
+      _ <- eventStatusRenamer.run()
       _ <- logger info "Event Log database initialization success"
     } yield ()
   } recoverWith logging
@@ -74,6 +76,7 @@ object IODbInitializer {
       ProjectTableCreator(transactor, logger),
       ProjectPathRemover(transactor, logger),
       EventLogTableRenamer(transactor, logger),
+      EventStatusRenamer(transactor, logger),
       logger
     )
   }

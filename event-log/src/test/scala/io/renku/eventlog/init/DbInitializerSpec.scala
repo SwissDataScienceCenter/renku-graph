@@ -41,6 +41,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       given(projectTableCreator).succeeds(returning = ())
       given(projectPathRemover).succeeds(returning = ())
       given(eventLogTableRenamer).succeeds(returning = ())
+      given(eventStatusRenamer).succeeds(returning = ())
 
       dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
@@ -137,6 +138,24 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
         dbInitializer.run().unsafeRunSync()
       } shouldBe exception
     }
+
+    "fail if renaming the processing status fails" in new TestCase {
+
+      given(eventLogTableCreator).succeeds(returning = ())
+      given(projectPathAdder).succeeds(returning = ())
+      given(batchDateAdder).succeeds(returning = ())
+      given(viewRemover).succeeds(returning = ())
+      given(projectTableCreator).succeeds(returning = ())
+      given(projectPathRemover).succeeds(returning = ())
+      given(eventLogTableRenamer).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(eventStatusRenamer).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        dbInitializer.run().unsafeRunSync()
+      } shouldBe exception
+    }
+
   }
 
   private trait TestCase {
@@ -147,6 +166,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
     val projectTableCreator  = mock[ProjectTableCreator[IO]]
     val projectPathRemover   = mock[ProjectPathRemover[IO]]
     val eventLogTableRenamer = mock[EventLogTableRenamer[IO]]
+    val eventStatusRenamer   = mock[EventStatusRenamer[IO]]
     val logger               = TestLogger[IO]()
     val dbInitializer = new DbInitializerImpl[IO](
       eventLogTableCreator,
@@ -156,6 +176,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       projectTableCreator,
       projectPathRemover,
       eventLogTableRenamer,
+      eventStatusRenamer,
       logger
     )
   }
