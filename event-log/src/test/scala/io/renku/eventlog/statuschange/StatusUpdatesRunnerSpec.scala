@@ -54,7 +54,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
         runner.run(command).unsafeRunSync() shouldBe Updated
 
-        findEvents(status = Processing).map(_._1) shouldBe List(eventId)
+        findEvents(status = GeneratingTriples).map(_._1) shouldBe List(eventId)
 
         logger.loggedOnly(Info(s"Event $eventId got ${command.status}"))
 
@@ -78,7 +78,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
   ) extends ChangeStatusCommand[IO] {
     import doobie.implicits._
 
-    override val status: EventStatus = Processing
+    override val status: EventStatus = GeneratingTriples
 
     override def query = SqlQuery(
       sql"""|UPDATE event 

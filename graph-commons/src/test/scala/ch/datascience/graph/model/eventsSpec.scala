@@ -38,7 +38,7 @@ class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
     val scenarios = Table(
       "String Value"            -> "Expected EventStatus",
       "NEW"                     -> New,
-      "PROCESSING"              -> Processing,
+      "GENERATING_TRIPLES"      -> GeneratingTriples,
       "TRIPLES_STORE"           -> TriplesStore,
       "SKIPPED"                 -> Skipped,
       "RECOVERABLE_FAILURE"     -> RecoverableFailure,

@@ -48,10 +48,10 @@ class StatusNewPatchSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
       val event1Id   = compoundEventIds.generateOne
       val event1Date = eventDates.generateOne
-      addEvent(event1Id, EventStatus.Processing, timestampsNotInTheFuture.map(ExecutionDate.apply), event1Date)
+      addEvent(event1Id, EventStatus.GeneratingTriples, timestampsNotInTheFuture.map(ExecutionDate.apply), event1Date)
       val event2Id   = compoundEventIds.generateOne
       val event2Date = eventDates.generateOne
-      addEvent(event2Id, EventStatus.Processing, timestampsInTheFuture.map(ExecutionDate.apply), event2Date)
+      addEvent(event2Id, EventStatus.GeneratingTriples, timestampsInTheFuture.map(ExecutionDate.apply), event2Date)
       val event3Id   = compoundEventIds.generateOne
       val event3Date = eventDates.generateOne
       addEvent(event3Id, EventStatus.TriplesStore, timestampsNotInTheFuture.map(ExecutionDate.apply), event3Date)

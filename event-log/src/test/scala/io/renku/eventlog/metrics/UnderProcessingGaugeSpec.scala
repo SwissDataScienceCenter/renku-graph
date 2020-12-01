@@ -69,7 +69,7 @@ class UnderProcessingGaugeSpec extends AnyWordSpec with MockFactory with should.
 
       val processingEvents = processingEventsGen.generateOne
       (statsFinder.countEvents _)
-        .expects(Set(Processing: EventStatus), None)
+        .expects(Set(GeneratingTriples: EventStatus), None)
         .returning(processingEvents.pure[IO])
 
       UnderProcessingGauge(metricsRegistry, statsFinder, TestLogger()).flatMap(_.reset()).unsafeRunSync()

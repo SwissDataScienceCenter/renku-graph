@@ -45,13 +45,13 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
 
   "command" should {
 
-    s"set status $RecoverableFailure on the event with the given id and $Processing status, " +
+    s"set status $RecoverableFailure on the event with the given id and $GeneratingTriples status, " +
       "increment waiting events gauge and decrement under processing gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         storeEvent(
           compoundEventIds.generateOne.copy(id = eventId.id),
-          EventStatus.Processing,
+          EventStatus.GeneratingTriples,
           executionDates.generateOne,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -61,7 +61,7 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
         val projectPath   = projectPaths.generateOne
         storeEvent(
           eventId,
-          EventStatus.Processing,
+          EventStatus.GeneratingTriples,
           executionDate,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -69,7 +69,7 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
           projectPath = projectPath
         )
 
-        findEvent(eventId) shouldBe Some((executionDate, Processing, None))
+        findEvent(eventId) shouldBe Some((executionDate, GeneratingTriples, None))
 
         (waitingEventsGauge.increment _).expects(projectPath).returning(IO.unit)
         (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
@@ -85,7 +85,7 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
 
-    EventStatus.all.filterNot(_ == Processing) foreach { eventStatus =>
+    EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
         s"and return ${UpdateResult.Conflict}" in new TestCase {
 

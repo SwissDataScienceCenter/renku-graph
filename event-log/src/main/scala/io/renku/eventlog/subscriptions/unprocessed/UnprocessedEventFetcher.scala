@@ -85,7 +85,7 @@ private class UnprocessedEventFetcherImpl(
         proj.project_id,
         proj.project_path,
         proj.latest_event_date,
-        (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = ${Processing: EventStatus}) as current_occupancy 
+        (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = ${GeneratingTriples: EventStatus}) as current_occupancy 
       FROM (SELECT project_id, project_path, latest_event_date 
             FROM project 
             ORDER BY latest_event_date desc) proj
@@ -94,7 +94,7 @@ private class UnprocessedEventFetcherImpl(
         FROM event evt
         WHERE evt.project_id = proj.project_id
           AND ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" AND execution_date < ${now()})
-            OR (status = ${Processing: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
+            OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
           )
       )
       ORDER BY latest_event_date DESC
@@ -115,13 +115,13 @@ private class UnprocessedEventFetcherImpl(
            FROM event
            WHERE project_id = ${idAndPath.id}
              AND ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" AND execution_date < ${now()})
-               OR (status = ${Processing: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
+               OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
            GROUP BY project_id
          ) oldest_event_date
          JOIN event evt ON oldest_event_date.project_id = evt.project_id 
            AND oldest_event_date.min_event_date = evt.event_date
            AND ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" AND execution_date < ${now()})
-               OR (status = ${Processing: EventStatus} AND execution_date < ${now() minus maxProcessingTime})) 
+               OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})) 
          LIMIT 1
          """
     }.query[EventIdAndBody].option,
@@ -152,9 +152,9 @@ private class UnprocessedEventFetcherImpl(
 
   private def updateStatus(commitEventId: CompoundEventId) = SqlQuery(
     sql"""|UPDATE event 
-          |SET status = ${EventStatus.Processing: EventStatus}, execution_date = ${now()}
-          |WHERE (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status <> ${Processing: EventStatus})
-          |  OR (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status = ${Processing: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
+          |SET status = ${EventStatus.GeneratingTriples: EventStatus}, execution_date = ${now()}
+          |WHERE (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status <> ${GeneratingTriples: EventStatus})
+          |  OR (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
           |""".stripMargin.update.run,
     name = "pop event - status update"
   )

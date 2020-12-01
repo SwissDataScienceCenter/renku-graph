@@ -47,9 +47,9 @@ final case class ToRecoverableFailure[Interpretation[_]](
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event
           |SET status = $status, execution_date = ${now().plus(10, MINUTES)}, message = $maybeMessage
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${Processing: EventStatus}
+          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
           |""".stripMargin.update.run,
-    name = "processing->recoverable_fail"
+    name = "generating_triples->recoverable_fail"
   )
 
   override def updateGauges(

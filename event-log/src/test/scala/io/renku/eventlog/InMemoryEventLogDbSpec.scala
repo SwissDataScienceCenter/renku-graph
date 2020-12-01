@@ -30,7 +30,7 @@ import doobie.implicits._
 import doobie.util.fragment.Fragment
 import org.scalatest.TestSuite
 
-trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
+trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb with EventLogDataProvisioning {
   self: TestSuite =>
 
   protected def initDb(): Unit = {
@@ -101,15 +101,6 @@ trait InMemoryEventLogDbSpec extends DbSpec with InMemoryEventLogDb {
               |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody, $message)
       """.stripMargin.update.run.map(_ => ())
     }
-  }
-
-  private def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit = execute {
-    sql"""|INSERT INTO
-          |project (project_id, project_path, latest_event_date)
-          |VALUES (${compoundEventId.projectId}, $projectPath, $eventDate)
-          |ON CONFLICT (project_id)
-          |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
-      """.stripMargin.update.run.map(_ => ())
   }
 
   // format: off
