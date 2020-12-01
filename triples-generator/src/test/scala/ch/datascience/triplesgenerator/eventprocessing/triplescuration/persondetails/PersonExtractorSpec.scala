@@ -18,7 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
-import cats.MonadError
 import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
@@ -31,8 +30,6 @@ import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples, entities}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.{Person => UpdatePerson}
 import eu.timepit.refined.auto._
 import io.circe.optics.JsonOptics._
@@ -47,13 +44,12 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
-  "curate" should {
+  "extractPersons" should {
 
     "remove name and email properties from all the Person entities found in the given Json " +
-      "except those which id starts with '_' (blank nodes) " +
-      "and create SPARQL updates for them" in new TestCase {
+      "except those which id starts with '_' (blank nodes)" in new TestCase {
         val projectCreatorName  = userNames.generateOne
         val projectCreatorEmail = userEmails.generateOne
         val committerName       = userNames.generateOne
@@ -74,42 +70,24 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
           ).toJson
         }
 
-        val allPersons = jsonTriples.collectAllPersons
-        allPersons.filter(blankIds)    should not be empty
-        allPersons.filterNot(blankIds) should not be empty
+        val originalPersons = jsonTriples.collectAllPersons
+        originalPersons.exists(blankIds)  shouldBe true
+        !originalPersons.forall(blankIds) shouldBe true
 
-        val allPersonsInPayload = datasetCreatorsSet +
-          entities.Person(projectCreatorName, projectCreatorEmail) +
-          entities.Person(committerName, committerEmail)
+        val Success((updatedTriples, foundPersons)) = personExtractor extractPersons jsonTriples
 
-        val expectedUpdatesGroups = allPersonsInPayload
-          .map(maybeUpdatedPerson)
-          .flatten
-          .map { person =>
-            val updatesGroup = curationUpdatesGroups[Try].generateOne
-            (updatesCreator
-              .prepareUpdates[Try](_: UpdatePerson)(_: MonadError[Try, Throwable]))
-              .expects(person, *)
-              .returning(updatesGroup)
-            updatesGroup
-          }
+        foundPersons shouldBe originalPersons
 
-        val Success(curatedTriples) = curator curate CuratedTriples(jsonTriples, updatesGroups = Nil)
-
-        val curatedPersons = curatedTriples.triples.collectAllPersons
-        curatedPersons.filter(blankIds)    shouldBe allPersons.filter(blankIds)
-        curatedPersons.filterNot(blankIds) shouldBe allPersons.filterNot(blankIds).map(noEmailAndName)
-
-        curatedTriples.updatesGroups shouldBe expectedUpdatesGroups.toList
+        val updatedPersons = updatedTriples.collectAllPersons
+        updatedPersons.filter(blankIds)    shouldBe originalPersons.filter(blankIds)
+        updatedPersons.filterNot(blankIds) shouldBe originalPersons.filterNot(blankIds).map(noEmailAndName)
       }
 
     "fail if there's a Person entity without a name" in new TestCase {
 
-      val jsonTriples = JsonLDTriples(randomDataSetCommit.toJson)
+      val noNamesJson = JsonLDTriples(randomDataSetCommit.toJson.removePersonsNames)
 
-      val noNamesJson = JsonLDTriples(jsonTriples.removePersonsNames)
-
-      val result = curator curate CuratedTriples(noNamesJson, updatesGroups = Nil)
+      val result = personExtractor extractPersons noNamesJson
 
       result                     shouldBe a[Failure[_]]
       result.failed.get.getMessage should include regex "No names for person with '(.*)' id found in generated JSON-LD".r
@@ -120,11 +98,10 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
     implicit val renkuBaseUrl:  RenkuBaseUrl  = renkuBaseUrls.generateOne
     implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 
-    val updatesCreator = mock[UpdatesCreator]
-    val curator        = new PersonDetailsUpdater[Try](updatesCreator)
+    val personExtractor = new PersonExtractor[Try]()
   }
 
-  private implicit class TriplesOps(triples: JsonLDTriples) {
+  private implicit class JsonOps(json: Json) {
 
     lazy val removePersonsNames: Json = Plated.transform[Json] { json =>
       root.`@type`.each.string.getAll(json) match {
@@ -132,7 +109,10 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
           root.obj.modify(_.remove("http://schema.org/name"))(json)
         case _ => json
       }
-    }(triples.value)
+    }(json)
+  }
+
+  private implicit class TriplesOps(triples: JsonLDTriples) {
 
     lazy val collectAllPersons: Set[Person] = {
       val collected = mutable.HashSet.empty[Person]

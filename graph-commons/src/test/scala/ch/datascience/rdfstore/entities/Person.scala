@@ -38,8 +38,6 @@ object Person {
       email: Email
   ): Person = Person(name, Some(email))
 
-  import java.util.UUID.randomUUID
-
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
