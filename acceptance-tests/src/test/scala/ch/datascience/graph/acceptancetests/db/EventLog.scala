@@ -30,6 +30,7 @@ import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import doobie.util.fragments.in
 import io.renku.eventlog._
+import org.testcontainers.utility.DockerImageName
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
@@ -61,7 +62,7 @@ object EventLog extends TypesSerializers {
     new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
   private val postgresContainer: Container with JdbcDatabaseContainer = PostgreSQLContainer(
-    dockerImageNameOverride = "postgres:9.6.19-alpine",
+    dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
     databaseName = "event_log",
     username = dbConfig.user.value,
     password = dbConfig.pass
