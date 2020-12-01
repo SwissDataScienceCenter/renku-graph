@@ -79,7 +79,7 @@ package object rest {
         noSameAs = noSameAs,
         commitId = commitId
       )(topmostSameAs) match {
-        case (json, _) +: Nil => json
+        case (json, _) :: Nil => json
         case _                => throw new Exception("Not prepared to work datasets having multiple projects")
       }
 
@@ -91,7 +91,7 @@ package object rest {
         topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs)
     ): List[(JsonLD, Dataset)] =
       dataSet.projects match {
-        case firstProject +: otherProjects =>
+        case firstProject :: otherProjects =>
           val firstTuple = nonModifiedDataSetCommit(
             commitId = commitId,
             committedDate = CommittedDate(firstDatasetDateCreated.value),
@@ -148,6 +148,7 @@ package object rest {
           }
 
           firstTuple +: otherTuples
+        case Nil => throw new Exception("No projects on the dataset")
       }
 
     def changePublishedDateTo(maybeDate: Option[PublishedDate]): NonModifiedDataset =
@@ -207,7 +208,7 @@ package object rest {
                  topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(DataSet.entityId(dataSet.versions.initial))
     ): JsonLD =
       toJsonLDs(firstDatasetDateCreated, commitId, topmostDerivedFrom) match {
-        case first +: Nil => first
+        case first :: Nil => first
         case _ =>
           throw new IllegalStateException(
             "Modified dataset contains more than one project; are you working with forks?"
@@ -219,7 +220,7 @@ package object rest {
                   topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(dataSet.derivedFrom)
     ): List[JsonLD] =
       dataSet.projects match {
-        case firstProject +: otherProjects =>
+        case firstProject :: otherProjects =>
           val firstJsonLd = modifiedDataSetCommit(
             commitId = commitId,
             committedDate = CommittedDate(firstDatasetDateCreated.value),
@@ -267,6 +268,7 @@ package object rest {
             )
           }
           firstJsonLd +: otherJsonLds
+        case Nil => throw new Exception("No projects on the dataset")
       }
 
     def makeTitleContaining(phrase: Phrase): ModifiedDataset = {

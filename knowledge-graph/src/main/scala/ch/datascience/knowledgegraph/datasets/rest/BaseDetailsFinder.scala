@@ -101,8 +101,8 @@ private class BaseDetailsFinder(
 
   private lazy val toSingleDataset: List[Dataset] => IO[Option[Dataset]] = {
     case Nil            => Option.empty[Dataset].pure[IO]
-    case dataset +: Nil => Option(dataset).pure[IO]
-    case dataset +: _   => new Exception(s"More than one dataset with ${dataset.id} id").raiseError[IO, Option[Dataset]]
+    case dataset :: Nil => Option(dataset).pure[IO]
+    case dataset :: _   => new Exception(s"More than one dataset with ${dataset.id} id").raiseError[IO, Option[Dataset]]
   }
 }
 

@@ -43,7 +43,7 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
 import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.entities.{Artifact, Entity, InvalidationEntity, Project}
+import ch.datascience.rdfstore.entities.{Artifact, Entity, InvalidationEntity}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._

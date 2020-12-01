@@ -128,6 +128,7 @@ private class IOEdgesFinder(
             case None             => locations + (runPlanId -> (Set.empty, Set(target)))
             case Some((from, to)) => locations + (runPlanId -> (from, to + target))
           }
+        case (locations, _) => locations
       }
   }
 }

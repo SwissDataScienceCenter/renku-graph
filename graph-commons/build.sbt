@@ -18,11 +18,11 @@
 
 name := "graph-commons"
 
-val pureConfigVersion = "0.13.0"
+val pureConfigVersion = "0.14.0"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
-val refinedVersion = "0.9.15"
+val refinedVersion = "0.9.18"
 libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 
@@ -34,19 +34,19 @@ libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
 
-libraryDependencies += "io.sentry" % "sentry-logback" % "1.7.30"
+libraryDependencies += "io.sentry" % "sentry-logback" % "3.2.0"
 
-val doobieVersion = "0.9.2"
+val doobieVersion = "0.9.4"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 
-val catsVersion = "2.2.0"
+val catsVersion = "2.3.0"
 libraryDependencies += "org.typelevel" %% "cats-core"   % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-effect" % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-free"   % catsVersion
 
-val http4sVersion = "0.21.7"
+val http4sVersion = "0.21.13"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
@@ -63,14 +63,11 @@ libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % 
 libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % Test
 
 libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.0.0"   % Test
-libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test
+libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.1 is broken
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
 libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.2"   % Test
 
-val testContainersVersion = "1.15.0-rc2"
-libraryDependencies += "org.testcontainers" % "testcontainers" % testContainersVersion % Test
-libraryDependencies += "org.testcontainers" % "postgresql"     % testContainersVersion % Test
-val testContainersScalaVersion = "0.38.4"
+val testContainersScalaVersion = "0.38.7"
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
 

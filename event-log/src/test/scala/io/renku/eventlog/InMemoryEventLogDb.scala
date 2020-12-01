@@ -27,6 +27,7 @@ import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import doobie.util.fragment.Fragment
 import org.scalatest.Suite
+import org.testcontainers.utility.DockerImageName
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -44,7 +45,7 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypesSerializers {
   private val dbConfig = new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
   override val container: Container with JdbcDatabaseContainer = PostgreSQLContainer(
-    dockerImageNameOverride = "postgres:9.6.19-alpine",
+    dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
     databaseName = "event_log",
     username = dbConfig.user.value,
     password = dbConfig.pass

@@ -23,6 +23,7 @@ import ch.datascience.db.DBConfigProvider
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 import com.dimafeng.testcontainers.{Container, JdbcDatabaseContainer, PostgreSQLContainer}
+import org.testcontainers.utility.DockerImageName
 
 object TokenRepository {
 
@@ -32,7 +33,7 @@ object TokenRepository {
     new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
   private val postgresContainer: Container with JdbcDatabaseContainer = PostgreSQLContainer(
-    dockerImageNameOverride = "postgres:9.6.19-alpine",
+    dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
     databaseName = "projects_tokens",
     username = dbConfig.user.value,
     password = dbConfig.pass
