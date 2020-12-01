@@ -32,7 +32,8 @@ import scala.util.control.NonFatal
 
 class EventsSynchronizationScheduler[Interpretation[_]](
     schedulerConfigProvider: SchedulerConfigProvider[Interpretation],
-    eventsLoader:            MissedEventsLoader[Interpretation]
+    eventsLoader:            MissedEventsLoader[Interpretation],
+    logger:                  Logger[Interpretation]
 )(implicit ME:               MonadError[Interpretation, Throwable], timer: Timer[Interpretation]) {
 
   import eventsLoader._
@@ -43,23 +44,18 @@ class EventsSynchronizationScheduler[Interpretation[_]](
       initialDelay <- getInitialDelay()
       interval     <- getInterval()
       _            <- timer sleep initialDelay
-      _            <- loadEvents(interval)
+      _            <- loadEvents(interval).foreverM[Unit]
     } yield ()
 
   private def loadEvents(interval: FiniteDuration): Interpretation[Unit] = {
     for {
-      _ <- loadMissedEvents
       _ <- timer sleep interval
-      _ <- loadEvents(interval)
+      _ <- loadMissedEvents
     } yield ()
-  } recoverWith sleepAndRetry(interval)
+  } recoverWith sleepAndRetry
 
-  private def sleepAndRetry(interval: FiniteDuration): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(_) =>
-      for {
-        _ <- timer sleep interval
-        _ <- loadEvents(interval)
-      } yield ()
+  private lazy val sleepAndRetry: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)("Event synchronization failed to synchronize events")
   }
 }
 
@@ -75,5 +71,5 @@ object IOEventsSynchronizationScheduler {
   ): IO[EventsSynchronizationScheduler[IO]] =
     for {
       missedEventsLoader <- IOMissedEventsLoader(gitLabThrottler, executionTimeRecorder, logger)
-    } yield new EventsSynchronizationScheduler[IO](new SchedulerConfigProvider[IO](), missedEventsLoader)
+    } yield new EventsSynchronizationScheduler[IO](new SchedulerConfigProvider[IO](), missedEventsLoader, logger)
 }

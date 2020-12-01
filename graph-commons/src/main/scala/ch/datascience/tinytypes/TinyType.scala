@@ -77,7 +77,7 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     identity
   )
 
-  final def unapply(tinyType: TT): Option[TT#V] = Some(tinyType.value)
+  final def unapply(tinyType: TT): Some[TT#V] = Some(tinyType.value)
 
   final def from(value: TT#V): Either[IllegalArgumentException, TT] =
     for {

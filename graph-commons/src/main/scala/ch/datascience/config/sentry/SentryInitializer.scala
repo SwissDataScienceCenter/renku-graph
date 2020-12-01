@@ -17,10 +17,10 @@
  */
 
 package ch.datascience.config.sentry
-
 import cats.MonadError
 import cats.syntax.all._
 import ch.datascience.config.sentry.SentryConfig.SentryBaseUrl
+import io.sentry.SentryOptions
 
 import scala.util.Try
 
@@ -51,6 +51,6 @@ object SentryInitializer {
       maybeSentryConfig <- SentryConfig[Interpretation]()
     } yield new SentryInitializer(
       maybeSentryConfig,
-      dns => { Sentry.init(dns); () }
+      dsn => { Sentry.init((options: SentryOptions) => options.setDsn(dsn)); () }
     )
 }

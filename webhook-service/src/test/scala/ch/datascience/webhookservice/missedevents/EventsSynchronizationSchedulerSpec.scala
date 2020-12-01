@@ -20,11 +20,11 @@ package ch.datascience.webhookservice.missedevents
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.interpreters.TestLogger
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -33,7 +33,6 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.{postfixOps, reflectiveCalls}
-import scala.util.Try
 
 class EventsSynchronizationSchedulerSpec
     extends AnyWordSpec
@@ -48,18 +47,7 @@ class EventsSynchronizationSchedulerSpec
       "with initial delay read from config and " +
       "continues endlessly with interval periods" in new TestCase {
 
-        (timer
-          .sleep(_: FiniteDuration))
-          .expects(5 minutes)
-          .returning(context.unit)
-
-        (timer
-          .sleep(_: FiniteDuration))
-          .expects(1 hour)
-          .returning(context.unit)
-          .atLeastOnce()
-
-        IO.suspend(scheduler.run().pure[IO]).start.unsafeRunAsyncAndForget()
+        scheduler.run().start.unsafeRunAsyncAndForget()
 
         eventually {
           eventsLoader.callCounter.get() should be > 5
@@ -68,32 +56,31 @@ class EventsSynchronizationSchedulerSpec
   }
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
-    val context = MonadError[Try, Throwable]
 
-    val eventsLoader = new MissedEventsLoader[Try] {
+    val eventsLoader = new MissedEventsLoader[IO] {
       val callCounter = new AtomicInteger(0)
 
-      override def loadMissedEvents = {
+      override def loadMissedEvents: IO[Unit] = {
         Thread.sleep(5)
         callCounter.incrementAndGet()
-        if (callCounter.get() == 5) context.raiseError(exceptions.generateOne)
-        else context.unit
+        if (callCounter.get() == 2) exceptions.generateOne.raiseError[IO, Unit]
+        else ().pure[IO]
       }
     }
 
-    val configProvider = mock[TrySchedulerConfigProvider]
-    val timer          = mock[Timer[Try]]
-    val scheduler      = new EventsSynchronizationScheduler[Try](configProvider, eventsLoader)(context, timer)
+    val configProvider = mock[IOSchedulerConfigProvider]
+    val scheduler      = new EventsSynchronizationScheduler[IO](configProvider, eventsLoader, TestLogger())
 
     (configProvider.getInitialDelay _)
       .expects()
-      .returning(context.pure(5 minutes))
+      .returning((100 milliseconds).pure[IO])
     (configProvider.getInterval _)
       .expects()
-      .returning(context.pure(1 hour))
+      .returning((500 milliseconds).pure[IO])
   }
 
-  private class TrySchedulerConfigProvider extends SchedulerConfigProvider[Try]
+  private class IOSchedulerConfigProvider extends SchedulerConfigProvider[IO]
 }

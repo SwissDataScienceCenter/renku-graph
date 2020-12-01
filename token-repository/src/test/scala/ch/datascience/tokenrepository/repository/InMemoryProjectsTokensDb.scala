@@ -27,6 +27,7 @@ import doobie.implicits._
 import doobie.util.fragment.Fragment
 import doobie.util.transactor.Transactor
 import org.scalatest.Suite
+import org.testcontainers.utility.DockerImageName
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -38,7 +39,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
   private val dbConfig = new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
   override val container: Container with JdbcDatabaseContainer = PostgreSQLContainer(
-    dockerImageNameOverride = "postgres:9.6.19-alpine",
+    dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
     databaseName = "projects_tokens",
     username = dbConfig.user.value,
     password = dbConfig.pass

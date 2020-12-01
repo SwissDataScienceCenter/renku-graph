@@ -166,10 +166,11 @@ private class IOLineageDataFinder(
 
     lazy val maybeToNode: List[(Node.Location, Node.Type, Node.Label)] => Option[Node] = {
       case Nil => None
-      case (location, typ, label) +: tail =>
+      case (location, typ, label) :: tail =>
         Some {
-          tail.foldLeft(Node(location, label, Set(typ))) { case (node, (`location`, t, `label`)) =>
-            node.copy(types = node.types + t)
+          tail.foldLeft(Node(location, label, Set(typ))) {
+            case (node, (`location`, t, `label`)) => node.copy(types = node.types + t)
+            case (node, _)                        => node
           }
         }
     }

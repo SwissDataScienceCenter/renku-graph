@@ -20,9 +20,11 @@ package ch.datascience.webhookservice.missedevents
 
 import cats.MonadError
 import cats.effect.{IO, Timer}
+import io.chrisdavenport.log4cats.Logger
 
 class TestIOEventsSynchronizationScheduler(
     schedulerConfigProvider: SchedulerConfigProvider[IO],
-    eventsLoader:            MissedEventsLoader[IO]
+    eventsLoader:            MissedEventsLoader[IO],
+    logger:                  Logger[IO]
 )(implicit ME:               MonadError[IO, Throwable], timer: Timer[IO])
-    extends EventsSynchronizationScheduler[IO](schedulerConfigProvider, eventsLoader)
+    extends EventsSynchronizationScheduler[IO](schedulerConfigProvider, eventsLoader, logger)
