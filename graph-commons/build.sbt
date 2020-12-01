@@ -63,13 +63,10 @@ libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % 
 libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % Test
 
 libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.0.0"   % Test
-libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.15.1"  % Test
+libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.1 is broken
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
 libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.2"   % Test
 
-val testContainersVersion = "1.15.0"
-libraryDependencies += "org.testcontainers" % "testcontainers" % testContainersVersion % Test
-libraryDependencies += "org.testcontainers" % "postgresql"     % testContainersVersion % Test
 val testContainersScalaVersion = "0.38.7"
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
