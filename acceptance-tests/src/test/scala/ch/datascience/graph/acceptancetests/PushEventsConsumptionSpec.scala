@@ -88,8 +88,8 @@ class PushEventsConsumptionSpec
 
       // wait for the Event Log to be emptied
       eventually {
-        EventLog.findEvents(projectId, status = New)                    shouldBe empty
-        EventLog.findEvents(projectId, status = EventStatus.Processing) shouldBe empty
+        EventLog.findEvents(projectId, status = New)                           shouldBe empty
+        EventLog.findEvents(projectId, status = EventStatus.GeneratingTriples) shouldBe empty
       }
     }
   }

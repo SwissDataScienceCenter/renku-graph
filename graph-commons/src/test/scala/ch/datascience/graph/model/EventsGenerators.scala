@@ -34,7 +34,7 @@ object EventsGenerators {
   implicit val eventBodies:    Gen[EventBody]     = jsons.map(_.noSpaces).map(EventBody.apply)
   implicit val eventStatuses: Gen[EventStatus] = Gen.oneOf(
     New,
-    Processing,
+    GeneratingTriples,
     TriplesStore,
     Skipped,
     RecoverableFailure,

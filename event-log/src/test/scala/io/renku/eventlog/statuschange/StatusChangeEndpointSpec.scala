@@ -193,7 +193,7 @@ class StatusChangeEndpointSpec
 
       val eventId = compoundEventIds.generateOne
 
-      val payload = json"""{"status": "PROCESSING"}"""
+      val payload = json"""{"status": "GENERATING_TRIPLES"}"""
       val request = Request(
         Method.PATCH,
         uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
@@ -201,9 +201,11 @@ class StatusChangeEndpointSpec
 
       val response = changeStatus(eventId, request).unsafeRunSync()
 
-      response.status                           shouldBe BadRequest
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Transition to 'PROCESSING' status unsupported")
+      response.status      shouldBe BadRequest
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
+        "Transition to 'GENERATING_TRIPLES' status unsupported"
+      )
 
       logger.expectNoLogs()
     }

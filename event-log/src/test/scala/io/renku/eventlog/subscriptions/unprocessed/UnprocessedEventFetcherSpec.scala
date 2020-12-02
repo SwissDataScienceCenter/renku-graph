@@ -55,7 +55,7 @@ private class UnprocessedEventFetcherSpec
 
     "return an event with event date farthest in the past " +
       s"and status $New or $RecoverableFailure " +
-      s"and mark it as $Processing" in new TestCase {
+      s"and mark it as $GeneratingTriples" in new TestCase {
 
         val projectId   = projectIds.generateOne
         val projectPath = projectPaths.generateOne
@@ -74,7 +74,7 @@ private class UnprocessedEventFetcherSpec
           projectPath = projectPath
         )
 
-        findEvents(EventStatus.Processing) shouldBe List.empty
+        findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
 
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
@@ -86,7 +86,7 @@ private class UnprocessedEventFetcherSpec
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event2Id -> event2Body)
 
-        findEvents(EventStatus.Processing).noBatchDate shouldBe List((event2Id, executionDate))
+        findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event2Id, executionDate))
 
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
@@ -98,8 +98,8 @@ private class UnprocessedEventFetcherSpec
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
 
-        findEvents(EventStatus.Processing).noBatchDate shouldBe List((event1Id, executionDate),
-                                                                     (event2Id, executionDate)
+        findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event1Id, executionDate),
+                                                                            (event2Id, executionDate)
         )
 
         givenPrioritisation(takes = Nil, returns = Nil)
@@ -138,7 +138,7 @@ private class UnprocessedEventFetcherSpec
           projectPath = projectPath
         )
 
-        findEvents(EventStatus.Processing) shouldBe List.empty
+        findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
 
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
@@ -151,7 +151,7 @@ private class UnprocessedEventFetcherSpec
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
 
-        findEvents(EventStatus.Processing).noBatchDate shouldBe List((event1Id, executionDate))
+        findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event1Id, executionDate))
 
         givenPrioritisation(takes = Nil, returns = Nil)
 
@@ -163,11 +163,11 @@ private class UnprocessedEventFetcherSpec
         )
       }
 
-    s"return an event with the $Processing status " +
+    s"return an event with the $GeneratingTriples status " +
       "if execution date is longer than MaxProcessingTime" in new TestCase {
 
         val (eventId, eventBody, eventDate, projectPath) = createEvent(
-          status = Processing,
+          status = GeneratingTriples,
           executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes + 1, MIN))
         )
 
@@ -181,14 +181,14 @@ private class UnprocessedEventFetcherSpec
 
         eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(eventId -> eventBody)
 
-        findEvents(EventStatus.Processing).noBatchDate shouldBe List((eventId, executionDate))
+        findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((eventId, executionDate))
       }
 
-    s"return no event when there's one with $Processing status " +
+    s"return no event when there's one with $GeneratingTriples status " +
       "if execution date is shorter than MaxProcessingTime" in new TestCase {
 
         createEvent(
-          status = Processing,
+          status = GeneratingTriples,
           executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes - 1, MIN))
         )
 
@@ -204,7 +204,7 @@ private class UnprocessedEventFetcherSpec
         .map(status => createEvent(status))
         .toList
 
-      findEvents(EventStatus.Processing) shouldBe List.empty
+      findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
 
       expectGaugeUpdated(times = events.size)
 
@@ -219,7 +219,7 @@ private class UnprocessedEventFetcherSpec
         eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
       }
 
-      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs events.map(_._1)
+      findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
     }
 
     "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
@@ -246,7 +246,7 @@ private class UnprocessedEventFetcherSpec
             .map(_ => createEvent(status, projectId = projectId, projectPath = projectPath))
         }
 
-      findEvents(EventStatus.Processing) shouldBe List.empty
+      findEvents(EventStatus.GeneratingTriples) shouldBe List.empty
 
       expectGaugeUpdated(times = events.size)
 
@@ -260,7 +260,7 @@ private class UnprocessedEventFetcherSpec
         eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
       }
 
-      findEvents(status = Processing).eventIdsOnly should contain theSameElementsAs events.map(_._1)
+      findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
 
       givenPrioritisation(takes = Nil, returns = Nil)
 

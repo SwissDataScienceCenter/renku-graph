@@ -97,7 +97,7 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience with 
     }
 
     eventually {
-      EventLog.findEvents(projectId, status = EventStatus.Processing) shouldBe empty
+      EventLog.findEvents(projectId, status = EventStatus.GeneratingTriples) shouldBe empty
     }
   }
 

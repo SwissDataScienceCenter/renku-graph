@@ -40,6 +40,7 @@ trait DbInitSpec extends InMemoryEventLogDb with BeforeAndAfter {
   protected lazy val projectTableCreator:         Migration = ProjectTableCreator(transactor, logger)
   protected lazy val projectPathRemover:          Migration = ProjectPathRemover(transactor, logger)
   protected lazy val eventLogTableRenamer:        Migration = EventLogTableRenamer(transactor, logger)
+  protected lazy val eventStatusRenamer:          Migration = EventStatusRenamer(transactor, logger)
 
   protected type Migration = { def run(): IO[Unit] }
 

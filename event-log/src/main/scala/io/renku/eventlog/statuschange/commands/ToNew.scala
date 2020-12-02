@@ -45,9 +45,9 @@ final case class ToNew[Interpretation[_]](
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event 
           |SET status = $status, execution_date = ${now()}
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${Processing: EventStatus}
+          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
           |""".stripMargin.update.run,
-    name = "processing->new"
+    name = "generating_triples->new"
   )
 
   override def updateGauges(

@@ -43,13 +43,13 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
 
   "command" should {
 
-    s"set status $Skipped on the event with the given id and $Processing status, " +
+    s"set status $Skipped on the event with the given id and $GeneratingTriples status, " +
       "decrement under processing gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         storeEvent(
           compoundEventIds.generateOne.copy(id = eventId.id),
-          EventStatus.Processing,
+          EventStatus.GeneratingTriples,
           executionDates.generateOne,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -59,7 +59,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
         val projectPath   = projectPaths.generateOne
         storeEvent(
           eventId,
-          EventStatus.Processing,
+          EventStatus.GeneratingTriples,
           executionDate,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -67,7 +67,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
           projectPath = projectPath
         )
 
-        findEvent(eventId) shouldBe Some((executionDate, Processing, None))
+        findEvent(eventId) shouldBe Some((executionDate, GeneratingTriples, None))
 
         (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
 
@@ -81,7 +81,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
 
-    EventStatus.all.filterNot(_ == Processing) foreach { eventStatus =>
+    EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
         s"and return ${UpdateResult.Conflict}" in new TestCase {
 

@@ -68,13 +68,15 @@ object events {
   sealed trait EventStatus extends StringTinyType with Product with Serializable
   object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator) {
 
-    val all: Set[EventStatus] = Set(New, Processing, TriplesStore, Skipped, RecoverableFailure, NonRecoverableFailure)
+    val all: Set[EventStatus] =
+      Set(New, GeneratingTriples, TriplesStore, Skipped, RecoverableFailure, NonRecoverableFailure)
 
     final case object New extends EventStatus {
       override val value: String = "NEW"
     }
-    final case object Processing extends EventStatus {
-      override val value: String = "PROCESSING"
+
+    final case object GeneratingTriples extends EventStatus {
+      override val value: String = "GENERATING_TRIPLES"
     }
 
     sealed trait FinalStatus extends EventStatus
