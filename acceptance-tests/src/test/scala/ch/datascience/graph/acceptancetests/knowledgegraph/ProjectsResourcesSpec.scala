@@ -66,7 +66,8 @@ class ProjectsResourcesSpec
     fullParentProject.path,
     fullParentProject.name,
     Creation(fullParentProject.created.date,
-             fullParentProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name)))
+             fullParentProject.created.maybeCreator.map(creator => Creator(creator.maybeEmail, creator.name))
+    )
   )
 
   private val project = {
@@ -82,8 +83,8 @@ class ProjectsResourcesSpec
   private val parentProjectCommit = commitIds.generateOne
   private val dataset = nonModifiedDatasets().generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
-    published        = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
-    projects         = List(DatasetProject(project.path, project.name, addedToProjectObjects.generateOne))
+    published = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
+    projects = List(DatasetProject(project.path, project.name, addedToProjectObjects.generateOne))
   )
 
   Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
@@ -103,8 +104,8 @@ class ProjectsResourcesSpec
 
       val jsonLDParentProjectTriples = JsonLD.arr(
         nonModifiedDataSetCommit(commitId = parentProjectCommit)(
-          projectPath        = parentProject.path,
-          projectName        = parentProject.name,
+          projectPath = parentProject.path,
+          projectName = parentProject.name,
           projectDateCreated = parentProject.created.date,
           maybeProjectCreator =
             parentProject.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
@@ -115,19 +116,19 @@ class ProjectsResourcesSpec
 
       val jsonLDTriples = JsonLD.arr(
         nonModifiedDataSetCommit(
-          commitId   = dataset1CommitId,
+          commitId = dataset1CommitId,
           cliVersion = currentCliVersion
         )(
-          projectPath         = project.path,
-          projectName         = project.name,
-          projectDateCreated  = project.created.date,
+          projectPath = project.path,
+          projectName = project.name,
+          projectDateCreated = project.created.date,
           maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-          maybeParent         = parentProjectEntity.some,
-          projectVersion      = project.version
+          maybeParent = parentProjectEntity.some,
+          projectVersion = project.version
         )(
-          datasetIdentifier  = dataset.id,
-          datasetTitle       = dataset.title,
-          datasetName        = dataset.name,
+          datasetIdentifier = dataset.id,
+          datasetTitle = dataset.title,
+          datasetName = dataset.name,
           maybeDatasetSameAs = dataset.sameAs.some
         )
       )
@@ -135,7 +136,8 @@ class ProjectsResourcesSpec
 
       `triples updates run`(
         Set(project.created.maybeCreator.flatMap(_.maybeEmail),
-            parentProject.created.maybeCreator.flatMap(_.maybeEmail)).flatten
+            parentProject.created.maybeCreator.flatMap(_.maybeEmail)
+        ).flatten
       )
 
       And("the project exists in GitLab")

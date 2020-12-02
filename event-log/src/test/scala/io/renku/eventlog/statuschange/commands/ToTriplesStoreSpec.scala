@@ -18,8 +18,6 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import java.time.Instant
-
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
@@ -37,6 +35,8 @@ import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import java.time.Instant
 
 class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 

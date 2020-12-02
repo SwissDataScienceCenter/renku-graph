@@ -23,8 +23,8 @@ import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
@@ -54,7 +54,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
         runner.run(command).unsafeRunSync() shouldBe Updated
 
-        findEvents(status = GeneratingTriples).map(_._1) shouldBe List(eventId)
+        findEvents(status = GeneratingTriples).eventIdsOnly shouldBe List(eventId)
 
         logger.loggedOnly(Info(s"Event $eventId got ${command.status}"))
 

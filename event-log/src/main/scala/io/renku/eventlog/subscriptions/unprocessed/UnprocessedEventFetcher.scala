@@ -152,7 +152,7 @@ private class UnprocessedEventFetcherImpl(
 
   private def updateStatus(commitEventId: CompoundEventId) = SqlQuery(
     sql"""|UPDATE event 
-          |SET status = ${EventStatus.GeneratingTriples: EventStatus}, execution_date = ${now()}
+          |SET status = ${GeneratingTriples: EventStatus}, execution_date = ${now()}
           |WHERE (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status <> ${GeneratingTriples: EventStatus})
           |  OR (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
           |""".stripMargin.update.run,

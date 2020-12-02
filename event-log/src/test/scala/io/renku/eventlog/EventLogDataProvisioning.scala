@@ -18,19 +18,60 @@
 
 package io.renku.eventlog
 
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus}
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.generators.Generators.Implicits._
 import doobie.implicits._
+
+import java.time.Instant
 
 trait EventLogDataProvisioning {
   self: InMemoryEventLogDb =>
 
-  def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit = execute {
-    sql"""|INSERT INTO
-          |project (project_id, project_path, latest_event_date)
-          |VALUES (${compoundEventId.projectId}, $projectPath, $eventDate)
-          |ON CONFLICT (project_id)
-          |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
-      """.stripMargin.update.run.map(_ => ())
+  protected def storeEvent(compoundEventId: CompoundEventId,
+                           eventStatus:     EventStatus,
+                           executionDate:   ExecutionDate,
+                           eventDate:       EventDate,
+                           eventBody:       EventBody,
+                           createdDate:     CreatedDate = CreatedDate(Instant.now),
+                           batchDate:       BatchDate = BatchDate(Instant.now),
+                           projectPath:     Path = projectPaths.generateOne,
+                           maybeMessage:    Option[EventMessage] = None
+  ): Unit = {
+    upsertProject(compoundEventId, projectPath, eventDate)
+    insertEvent(compoundEventId, eventStatus, executionDate, eventDate, eventBody, createdDate, batchDate, maybeMessage)
   }
+
+  protected def insertEvent(compoundEventId: CompoundEventId,
+                            eventStatus:     EventStatus,
+                            executionDate:   ExecutionDate,
+                            eventDate:       EventDate,
+                            eventBody:       EventBody,
+                            createdDate:     CreatedDate,
+                            batchDate:       BatchDate,
+                            maybeMessage:    Option[EventMessage]
+  ): Unit = execute {
+    maybeMessage match {
+      case None =>
+        sql"""|INSERT INTO
+              |event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
+              |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody)
+      """.stripMargin.update.run.map(_ => ())
+      case Some(message) =>
+        sql"""|INSERT INTO
+              |event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
+              |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $eventStatus, $createdDate, $executionDate, $eventDate, $batchDate, $eventBody, $message)
+      """.stripMargin.update.run.map(_ => ())
+    }
+  }
+  protected def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit =
+    execute {
+      sql"""|INSERT INTO
+            |project (project_id, project_path, latest_event_date)
+            |VALUES (${compoundEventId.projectId}, $projectPath, $eventDate)
+            |ON CONFLICT (project_id)
+            |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
+      """.stripMargin.update.run.map(_ => ())
+    }
 }

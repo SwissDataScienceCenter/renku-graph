@@ -75,10 +75,6 @@ object events {
       override val value: String = "NEW"
     }
 
-    final case object Processing extends EventStatus {
-      override val value: String = "PROCESSING"
-    }
-
     final case object GeneratingTriples extends EventStatus {
       override val value: String = "GENERATING_TRIPLES"
     }

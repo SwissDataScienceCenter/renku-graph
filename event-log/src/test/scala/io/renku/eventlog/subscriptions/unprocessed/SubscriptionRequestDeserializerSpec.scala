@@ -22,7 +22,7 @@ import cats.data.NonEmptyList
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New, NonRecoverableFailure, Processing, RecoverableFailure, Skipped, TriplesStore}
+import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New, NonRecoverableFailure, RecoverableFailure, Skipped, TriplesStore}
 import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.Generators._

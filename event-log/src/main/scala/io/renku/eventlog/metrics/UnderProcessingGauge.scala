@@ -20,7 +20,7 @@ package io.renku.eventlog.metrics
 
 import cats.effect.IO
 import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, Processing}
+import ch.datascience.graph.model.events.EventStatus.GeneratingTriples
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{Gauge, LabeledGauge, MetricsRegistry}
 import eu.timepit.refined.auto._

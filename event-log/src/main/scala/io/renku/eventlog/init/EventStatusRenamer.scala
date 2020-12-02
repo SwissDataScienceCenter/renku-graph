@@ -21,8 +21,6 @@ package io.renku.eventlog.init
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, Processing}
 import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -40,18 +38,18 @@ private case class EventStatusRenamerImpl[Interpretation[_]](
     extends EventStatusRenamer[Interpretation] {
   override def run(): Interpretation[Unit] = {
     for {
-      _ <- renameAllStatuses(from = Processing, to = GeneratingTriples)
-      _ <- logger.info(s"'$Processing' event status renamed to '$GeneratingTriples'")
+      _ <- renameAllStatuses(from = "PROCESSING", to = "GENERATING_TRIPLES")
+      _ <- logger.info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'")
     } yield ()
   } recoverWith logging
 
-  private def renameAllStatuses(from: EventStatus, to: EventStatus) =
-    sql"""UPDATE event SET status = ${to.toString} WHERE status = ${from.toString}""".update.run
+  private def renameAllStatuses(from: String, to: String) =
+    sql"""UPDATE event SET status = $to WHERE status = $from""".update.run
       .transact(transactor.get)
       .void
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)(s"Renaming of $Processing event failed")
+    logger.error(exception)(s"Renaming of PROCESSING events failed")
     ME.raiseError(exception)
   }
 }

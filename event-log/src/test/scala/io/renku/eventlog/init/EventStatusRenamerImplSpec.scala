@@ -20,7 +20,7 @@ package io.renku.eventlog.init
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.{EventId, EventStatus}
+import ch.datascience.graph.model.events.{EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
@@ -28,7 +28,7 @@ import doobie.implicits._
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.DbEventLogGenerators._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.{Event, EventLogDataProvisioning, InMemoryEventLogDb}
+import io.renku.eventlog.{CompoundId, Event, EventLogDataFetching, EventLogDataProvisioning, InMemoryEventLogDb}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -36,7 +36,8 @@ class EventStatusRenamerImplSpec
     extends AnyWordSpec
     with DbInitSpec
     with should.Matchers
-    with EventLogDataProvisioning {
+    with EventLogDataProvisioning
+    with EventLogDataFetching {
   protected override lazy val migrationsToRun: List[Migration] = List(
     eventLogTableCreator,
     projectPathAdder,
@@ -48,30 +49,33 @@ class EventStatusRenamerImplSpec
   )
 
   "run" should {
-    s"rename all the events from $Processing to $GeneratingTriples " in new TestCase {
+    s"rename all the events from PROCESSING to GENERATING_TRIPLES " in new TestCase {
       val processingEvents = events.generateNonEmptyList(minElements = 2)
-      processingEvents.map(event => store(event, withStatus = Processing))
+      processingEvents.map(event => store(event, withStatus = "PROCESSING"))
       val otherEvents = events.generateNonEmptyList()
-      otherEvents.map(event => store(event, withStatus = event.status))
+      otherEvents.map(event => store(event, withStatus = event.status.toString))
 
       eventStatusRenamer.run().unsafeRunSync() shouldBe ((): Unit)
 
-      findGeneratingTriplesEventsId shouldBe processingEvents.map(_.id).toList.toSet
+      findEvents(status = GeneratingTriples).eventIdsOnly.toSet shouldBe processingEvents
+        .map(_.compoundEventId)
+        .toList
+        .toSet
 
-      logger.loggedOnly(Info(s"'$Processing' event status renamed to '$GeneratingTriples'"))
+      logger.loggedOnly(Info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'"))
     }
 
     s"Not to anything if there are no events with the status PROCESSING" in new TestCase {
       val otherEvents = events.generateNonEmptyList()
-      otherEvents.map(event => store(event, withStatus = event.status))
+      otherEvents.map(event => store(event, withStatus = event.status.toString))
 
       eventStatusRenamer.run().unsafeRunSync() shouldBe ((): Unit)
 
-      findGeneratingTriplesEventsId shouldBe Set.empty[EventId]
+      findEvents(status = GeneratingTriples).eventIdsOnly.toSet shouldBe Set.empty[CompoundId]
 
       findEventsId shouldBe otherEvents.map(_.id).toList.toSet
 
-      logger.loggedOnly(Info(s"'$Processing' event status renamed to '$GeneratingTriples'"))
+      logger.loggedOnly(Info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'"))
     }
 
   }
@@ -81,7 +85,7 @@ class EventStatusRenamerImplSpec
     val eventStatusRenamer = new EventStatusRenamerImpl[IO](transactor, logger)
   }
 
-  private def store(event: Event, withStatus: EventStatus): Unit = {
+  private def store(event: Event, withStatus: String): Unit = {
     upsertProject(event.compoundEventId, event.project.path, event.date)
     execute {
       sql"""|INSERT INTO 
@@ -96,23 +100,15 @@ class EventStatusRenamerImplSpec
             |${toJsonBody(event)},
             |${event.batchDate})
       """.stripMargin.update.run.map(_ => ())
-
     }
   }
+
   private def toJsonBody(event: Event): String = json"""{
     "project": {
       "id": ${event.project.id.value},
       "path": ${event.project.path.value}
      }
   }""".noSpaces
-
-  private def findGeneratingTriplesEventsId: Set[EventId] =
-    sql"SELECT event_id FROM event WHERE status = ${GeneratingTriples.toString} "
-      .query[EventId]
-      .to[List]
-      .transact(transactor.get)
-      .unsafeRunSync()
-      .toSet
 
   private def findEventsId: Set[EventId] =
     sql"SELECT event_id FROM event"
