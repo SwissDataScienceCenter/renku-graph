@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration
+package persondetails
 
 import cats.data.NonEmptyList
 import cats.syntax.all._
@@ -30,62 +31,87 @@ import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples, entities}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.{Person => UpdatePerson}
 import eu.timepit.refined.auto._
+import io.renku.jsonld.syntax._
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath.root
 import io.circe.{Decoder, Encoder, Json}
-import io.renku.jsonld.syntax._
+import io.renku.jsonld.JsonLD
 import monocle.function.Plated
 import org.scalamock.scalatest.MockFactory
+import org.scalatest.AppendedClues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
 
-class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFactory with AppendedClues {
 
   "extractPersons" should {
 
-    "remove name and email properties from all the Person entities found in the given Json " +
-      "except those which id starts with '_' (blank nodes)" in new TestCase {
-        val projectCreatorName  = userNames.generateOne
-        val projectCreatorEmail = userEmails.generateOne
-        val committerName       = userNames.generateOne
-        val committerEmail      = userEmails.generateOne
-        val datasetCreatorsSet = nonEmptyList(entities.Person.persons, minElements = 5, maxElements = 10)
-          .retryUntil(atLeastOneWithoutEmail)
-          .generateOne
-          .toList
-          .toSet
-        val jsonTriples = JsonLDTriples {
-          nonModifiedDataSetCommit(
-            committer = entities.Person(committerName, committerEmail)
-          )(
-            projectPath = projectPaths.generateOne,
-            maybeProjectCreator = entities.Person(projectCreatorName, projectCreatorEmail).some
-          )(
-            datasetCreators = datasetCreatorsSet
-          ).toJson
-        }
-
-        val originalPersons = jsonTriples.collectAllPersons
-        originalPersons.exists(blankIds)  shouldBe true
-        !originalPersons.forall(blankIds) shouldBe true
-
-        val Success((updatedTriples, foundPersons)) = personExtractor extractPersons jsonTriples
-
-        foundPersons shouldBe originalPersons
-
-        val updatedPersons = updatedTriples.collectAllPersons
-        updatedPersons.filter(blankIds)    shouldBe originalPersons.filter(blankIds)
-        updatedPersons.filterNot(blankIds) shouldBe originalPersons.filterNot(blankIds).map(noEmailAndName)
+    "remove name and email properties from all the Person entities found in the given Json " in new TestCase {
+      val jsonTriples = JsonLDTriples {
+        nonModifiedDataSetCommit(
+          committer = entities.Person(userNames.generateOne, userEmails.generateOne)
+        )(
+          projectPath = projectPaths.generateOne,
+          maybeProjectCreator = entities.Person(userNames.generateOne, userEmails.generateOne).some
+        )(
+          datasetCreators = nonEmptyList(entities.Person.persons, minElements = 5, maxElements = 10)
+            .retryUntil(atLeastOneWithoutEmail)
+            .generateOne
+            .toList
+            .toSet
+        ).toJson
       }
+
+      val Success((updatedTriples, foundPersons)) = personExtractor extractPersons jsonTriples
+
+      val originalPersons = jsonTriples.collectAllPersons
+
+      val actual = foundPersons.map(person => (person.id, person.names, person.emails))
+      val expected = originalPersons.map(person =>
+        (person.id, NonEmptyList.fromListUnsafe(person.maybeName.toList), person.maybeEmail.toSet)
+      )
+      actual shouldBe expected
+
+      val updatedPersons: Set[Person] = updatedTriples.collectAllPersons
+
+      updatedPersons.foldLeft(true) {
+        case (acc, Person(_, None, None, _)) => acc
+        case _                               => false
+      } shouldBe true withClue "One person contained a name or an email"
+    }
+
+    "do not modify person objects if there are no names and emails" in new TestCase {
+      val triples = JsonLDTriples(
+        removePersonsNames(
+          JsonLD
+            .arr(
+              entities.Person(userNames.generateOne, maybeEmail = None, maybeAffiliation = None).asJsonLD
+            )
+            .toJson
+        )
+      )
+
+      val Success((updatedTriples, foundPersons)) = personExtractor extractPersons triples
+
+      updatedTriples       shouldBe triples
+      foundPersons.isEmpty shouldBe true
+    }
 
     "fail if there's a Person entity without a name" in new TestCase {
 
-      val noNamesJson = JsonLDTriples(randomDataSetCommit.toJson.removePersonsNames)
+      val noNamesJson = JsonLDTriples(
+        removePersonsNames(
+          JsonLD
+            .arr(
+              entities.Person(userNames.generateOne, userEmails.generateOne).asJsonLD
+            )
+            .toJson
+        )
+      )
 
       val result = personExtractor extractPersons noNamesJson
 
@@ -98,19 +124,16 @@ class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFact
     implicit val renkuBaseUrl:  RenkuBaseUrl  = renkuBaseUrls.generateOne
     implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 
-    val personExtractor = new PersonExtractor[Try]()
+    val personExtractor = new PersonExtractorImpl[Try]()
   }
 
-  private implicit class JsonOps(json: Json) {
-
-    lazy val removePersonsNames: Json = Plated.transform[Json] { json =>
-      root.`@type`.each.string.getAll(json) match {
-        case types if types.contains("http://schema.org/Person") =>
-          root.obj.modify(_.remove("http://schema.org/name"))(json)
-        case _ => json
-      }
-    }(json)
-  }
+  private def removePersonsNames(json: Json): Json = Plated.transform[Json] { json =>
+    root.`@type`.each.string.getAll(json) match {
+      case types if types.contains("http://schema.org/Person") =>
+        root.obj.modify(_.remove("http://schema.org/name"))(json)
+      case _ => json
+    }
+  }(json)
 
   private implicit class TriplesOps(triples: JsonLDTriples) {
 
@@ -121,9 +144,9 @@ class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFact
           case types if types.contains("http://schema.org/Person") =>
             collected add Person(
               root.`@id`.as[ResourceId].getOption(json).getOrElse(fail("Person '@id' not found")),
-              extractValue[Name]("http://schema.org/name")(json).headOption,
-              extractValue[Email]("http://schema.org/email")(json).headOption,
-              extractValue[Affiliation]("http://schema.org/affiliation")(json).headOption
+              json.getValue[Try, Name]("http://schema.org/name").value.fold(throw _, identity),
+              json.getValue[Try, Email]("http://schema.org/email").value.fold(throw _, identity),
+              json.getValue[Try, Affiliation]("http://schema.org/affiliation").value.fold(throw _, identity)
             )
           case _ => ()
         }
@@ -131,9 +154,6 @@ class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFact
       }(triples.value)
       collected.toSet
     }
-
-    private def extractValue[T](property: String)(json: Json)(implicit decoder: Decoder[T], encoder: Encoder[T]) =
-      root.selectDynamic(property).each.`@value`.as[T].getAll(json)
   }
 
   private case class Person(id:               ResourceId,
@@ -142,15 +162,6 @@ class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFact
                             maybeAffiliation: Option[Affiliation]
   )
 
-  private lazy val maybeUpdatedPerson: entities.Person => Option[UpdatePerson] = { person =>
-    person.maybeEmail map { email =>
-      val entityId = person.asJsonLD.entityId getOrElse (throw new Exception(s"Cannot find entity id for $person"))
-      UpdatePerson(ResourceId(entityId), NonEmptyList.of(person.name), Set(email))
-    }
-  }
-
   private lazy val atLeastOneWithoutEmail: NonEmptyList[entities.Person] => Boolean = _.exists(_.maybeEmail.isEmpty)
 
-  private lazy val blankIds:       Person => Boolean = p => !(p.id.value startsWith "mailto:")
-  private lazy val noEmailAndName: Person => Person  = _.copy(maybeName = None, maybeEmail = None)
 }

@@ -52,7 +52,7 @@ private[triplescuration] object PersonDetailsUpdater {
   def apply[Interpretation[_]]()(implicit
       ME: MonadError[Interpretation, Throwable]
   ): PersonDetailsUpdater[Interpretation] = new PersonDetailsUpdaterImpl[Interpretation](
-    new PersonExtractor[Interpretation],
+    PersonExtractor[Interpretation](),
     new UpdatesCreator
   )
 

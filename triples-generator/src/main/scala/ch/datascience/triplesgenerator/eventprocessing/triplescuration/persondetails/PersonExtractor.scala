@@ -16,9 +16,14 @@ import monocle.function.Plated
 
 import scala.collection.mutable
 
-private class PersonExtractor[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable]) {
+private trait PersonExtractor[Interpretation[_]] {
+  def extractPersons(triples: JsonLDTriples): Interpretation[(JsonLDTriples, Set[Person])]
+}
 
-  def extractPersons(triples: JsonLDTriples): Interpretation[(JsonLDTriples, Set[Person])] = {
+private class PersonExtractorImpl[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable])
+    extends PersonExtractor[Interpretation] {
+
+  override def extractPersons(triples: JsonLDTriples): Interpretation[(JsonLDTriples, Set[Person])] = {
     val persons = mutable.HashSet[Person]()
     for {
       updatedJson <- Plated.transformM(toJsonWithoutPersonDetails(persons))(triples.value)
@@ -40,11 +45,14 @@ private class PersonExtractor[Interpretation[_]]()(implicit ME: MonadError[Inter
     }
 
   private def findPersonData(json: Json) =
-    for {
-      entityId <- json.get[ResourceId]("@id") flatMap skipBlankNodes
-      personNames  = json.getValues[Name]("http://schema.org/name")
-      personEmails = json.getValues[Email]("http://schema.org/email")
-    } yield (entityId, personNames, personEmails)
+    json
+      .get[ResourceId]("@id")
+      .flatMap { entityId =>
+        (json.getValues[Name]("http://schema.org/name"), json.getValues[Email]("http://schema.org/email")) match {
+          case (Nil, Nil)                  => None
+          case (personNames, personEmails) => Some(entityId, personNames, personEmails)
+        }
+      }
 
   private implicit class PersonDataOps(personData: (ResourceId, List[Name], List[Email])) {
 
@@ -70,7 +78,11 @@ private class PersonExtractor[Interpretation[_]]()(implicit ME: MonadError[Inter
       .remove("http://schema.org/email")
       .remove("http://www.w3.org/2000/01/rdf-schema#label")
 
-  private lazy val skipBlankNodes: ResourceId => Option[ResourceId] = id =>
-    if (id.value startsWith "mailto:") Some(id)
-    else None
+}
+
+private object PersonExtractor {
+  def apply[Interpretation[_]]()(implicit
+      ME: MonadError[Interpretation, Throwable]
+  ): PersonExtractor[Interpretation] =
+    new PersonExtractorImpl[Interpretation]()
 }
