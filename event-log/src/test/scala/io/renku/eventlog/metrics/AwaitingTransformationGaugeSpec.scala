@@ -85,7 +85,7 @@ class AwaitingTransformationGaugeSpec extends AnyWordSpec with MockFactory with 
   private trait TestCase {
     val underlying = LibGauge
       .build("events_awaiting_transformation_count",
-             "Number of Events waiting to have their triples to be transformed by project path."
+             "Number of Events waiting to have their triples transformed by project path."
       )
       .labelNames("project")
       .create()
