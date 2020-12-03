@@ -53,6 +53,8 @@ class StatsFinderSpec
         stats.statuses().unsafeRunSync() shouldBe Map(
           New                   -> statuses.count(_ == New),
           GeneratingTriples     -> statuses.count(_ == GeneratingTriples),
+          TriplesGenerated      -> statuses.count(_ == TriplesGenerated),
+          TransformingTriples   -> statuses.count(_ == TransformingTriples),
           TriplesStore          -> statuses.count(_ == TriplesStore),
           Skipped               -> statuses.count(_ == Skipped),
           RecoverableFailure    -> statuses.count(_ == RecoverableFailure),
