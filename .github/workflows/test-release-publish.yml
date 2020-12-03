@@ -103,7 +103,7 @@ jobs:
           git config --global user.name "Renku Bot"
           git config --global user.email "renku@datascience.ch"
           sudo rm -rf .git/index.lock
-          sbt "release skip-tests default-tag-exists-answer k with-defaults"
+          sbt "release default-tag-exists-answer k with-defaults"
   publish:
     name: Publish
     runs-on: ubuntu-latest

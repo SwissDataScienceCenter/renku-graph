@@ -195,8 +195,10 @@ releaseProcess := Seq[ReleaseStep](
   verifyTagDoesNotExist,
   log("Tagging Release"),
   tagRelease,
-  log("Pushing changes"),
-  pushChanges
+  log("Pushing Tag"),
+  pushChanges,
+  log("Setting Release Version to the Chart.yaml"),
+  setReleaseVersionToChart
 )
 
 def log(message: String): ReleaseStep = { state: State =>
@@ -227,4 +229,24 @@ def findVersion(selectVersion: Versions => String, state: State): String = {
   }
 
   selectVersion(allVersions)
+}
+
+lazy val setReleaseVersionToChart: ReleaseStep = { state: State =>
+  val version = findVersion(_._1, state)
+
+  writeChartVersion(version)
+
+  state
+}
+
+val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
+
+def writeChartVersion(version: String): Unit = {
+
+  val fileLines = IO.readLines(chartFile)
+  val updatedLines = fileLines.map {
+    case line if line.startsWith("version:") => s"version: $version"
+    case line                                => line
+  }
+  IO.writeLines(chartFile, updatedLines)
 }
