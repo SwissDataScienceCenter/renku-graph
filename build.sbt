@@ -1,4 +1,3 @@
-// format: off
 organization := "ch.datascience"
 name := "renku-graph"
 scalaVersion := "2.13.4"
@@ -79,8 +78,8 @@ lazy val triplesGenerator = Project(
 ).settings(
   commonSettings
 ).dependsOn(
-  jsonLd % "compile->compile",
-  jsonLd % "test->test",
+  jsonLd       % "compile->compile",
+  jsonLd       % "test->test",
   graphCommons % "compile->compile",
   graphCommons % "test->test"
 ).enablePlugins(
@@ -124,8 +123,8 @@ lazy val acceptanceTests = Project(
   triplesGenerator,
   tokenRepository,
   knowledgeGraph % "test->test",
-  graphCommons % "test->test",
-  eventLog % "test->test"
+  graphCommons   % "test->test",
+  eventLog       % "test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )
@@ -133,70 +132,57 @@ lazy val acceptanceTests = Project(
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
   scalaVersion := "2.13.4",
-
   skip in publish := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
-
-  publishArtifact in(Compile, packageDoc) := false,
-  publishArtifact in(Compile, packageSrc) := false,
-
+  publishArtifact in (Compile, packageDoc) := false,
+  publishArtifact in (Compile, packageSrc) := false,
   addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full),
-
   scalacOptions += "-feature",
   scalacOptions += "-unchecked",
   scalacOptions += "-deprecation",
   scalacOptions += "-Ywarn-value-discard",
   scalacOptions += "-Xfatal-warnings",
-
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),
   licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")),
-  headerLicense := Some(HeaderLicense.Custom(
-    s"""Copyright ${java.time.LocalDate.now().getYear} Swiss Data Science Center (SDSC)
-|A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
-|Eidgenössische Technische Hochschule Zürich (ETHZ).
-|
-|Licensed under the Apache License, Version 2.0 (the "License");
-|you may not use this file except in compliance with the License.
-|You may obtain a copy of the License at
-|
-|    http://www.apache.org/licenses/LICENSE-2.0
-|
-|Unless required by applicable law or agreed to in writing, software
-|distributed under the License is distributed on an "AS IS" BASIS,
-|WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-|See the License for the specific language governing permissions and
-|limitations under the License.""".stripMargin
-  ))
+  headerLicense := Some(
+    HeaderLicense.Custom(
+      s"""|Copyright ${java.time.LocalDate.now().getYear} Swiss Data Science Center (SDSC)
+          |A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+          |Eidgenössische Technische Hochschule Zürich (ETHZ).
+          |
+          |Licensed under the Apache License, Version 2.0 (the "License");
+          |you may not use this file except in compliance with the License.
+          |You may obtain a copy of the License at
+          |
+          |    http://www.apache.org/licenses/LICENSE-2.0
+          |
+          |Unless required by applicable law or agreed to in writing, software
+          |distributed under the License is distributed on an "AS IS" BASIS,
+          |WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+          |See the License for the specific language governing permissions and
+          |limitations under the License.""".stripMargin
+    )
+  )
 )
-// format: on
 
 import ReleaseTransformations._
+import sbtrelease.ReleasePlugin.autoImport.ReleaseKeys._
 import sbtrelease.ReleasePlugin.autoImport._
-import sbtrelease.Vcs
+import sbtrelease.{Vcs, Versions}
 
 releaseTagComment :=
   Vcs
     .detect(root.base)
     .map { implicit vcs =>
-      collectCommitsMessages() match {
-        case Nil => s"Releasing ${(version in ThisBuild).value}"
-        case messages =>
-          s"Release Notes for ${(version in ThisBuild).value}\n${messages.map(m => s"* $m").mkString("\n")}"
-      }
+      s"Release Notes for ${(version in ThisBuild).value}\n* $lastCommitMessage"
     }
     .getOrElse {
       sys.error("Release Tag comment cannot be calculated")
     }
 
-@scala.annotation.tailrec
-def collectCommitsMessages(commitsCounter: Int = 1, messages: List[String] = List.empty)(implicit
-    vcs:                                   Vcs
-): List[String] =
-  vcs.cmd("log", "--format=%s", "-1", s"HEAD~$commitsCounter").!!.trim match {
-    case message if message startsWith "Setting version" => messages
-    case message                                         => collectCommitsMessages(commitsCounter + 1, messages :+ message)
-  }
+def lastCommitMessage()(implicit vcs: Vcs): String =
+  vcs.cmd("log", "--format=%s", "-1", "HEAD").!!.trim
 
 releaseProcess := Seq[ReleaseStep](
   log("Checking snapshot dependencies"),
@@ -205,6 +191,8 @@ releaseProcess := Seq[ReleaseStep](
   inquireVersions,
   log("Cleaning"),
   runClean,
+  log("Checking Tag"),
+  verifyTagDoesNotExist,
   log("Tagging Release"),
   tagRelease,
   log("Pushing changes"),
@@ -214,4 +202,29 @@ releaseProcess := Seq[ReleaseStep](
 def log(message: String): ReleaseStep = { state: State =>
   println(message)
   state
+}
+
+lazy val verifyTagDoesNotExist: ReleaseStep = { state: State =>
+  val version = findVersion(_._1, state)
+
+  Vcs
+    .detect(root.base)
+    .map { implicit vcs =>
+      if (vcs.cmd("tag", "-l").!!.trim contains version)
+        sys.error(s"Tag $version already exists")
+      else Unit
+    }
+    .getOrElse {
+      sys.error("Release Tag comment cannot be calculated")
+    }
+
+  state
+}
+
+def findVersion(selectVersion: Versions => String, state: State): String = {
+  val allVersions = state.get(versions).getOrElse {
+    sys.error("No versions are set! Was this release part executed before inquireVersions?")
+  }
+
+  selectVersion(allVersions)
 }
