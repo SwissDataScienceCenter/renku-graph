@@ -12,12 +12,10 @@ import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder
-//import io.circe.Decoder.decodeList
 import org.http4s.Method.GET
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.{NotFound, Ok}
 import org.http4s.{EntityDecoder, Request, Response, Status}
-import io.circe._
 
 import scala.concurrent.ExecutionContext
 

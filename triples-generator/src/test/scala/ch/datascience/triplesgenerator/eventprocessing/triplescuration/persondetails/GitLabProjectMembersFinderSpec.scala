@@ -4,6 +4,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{accessTokens, gitLabUrls, personalAccessTokens}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.http.client.AccessToken
@@ -48,13 +49,14 @@ class GitLabProjectMembersFinderSpec
   }
 
   private trait TestCase {
-    val gitLabUrl = gitLabUrls.generateOne
+
+    val gitLabUrl = GitLabUrl(externalServiceBaseUrl)
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
     private implicit val timer: Timer[IO]        = IO.timer(global)
 
-    val projectMembersFinder = IOGitLabProjectMembersFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
+    val projectMembersFinder = new IOGitLabProjectMembersFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
   private implicit val projectMemberEncoder: Encoder[GitLabProjectMember] = Encoder.instance[GitLabProjectMember] {
