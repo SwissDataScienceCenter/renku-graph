@@ -69,7 +69,15 @@ object events {
   object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator) {
 
     val all: Set[EventStatus] =
-      Set(New, GeneratingTriples, TriplesStore, Skipped, RecoverableFailure, NonRecoverableFailure)
+      Set(New,
+          GeneratingTriples,
+          TriplesGenerated,
+          TransformingTriples,
+          TriplesStore,
+          Skipped,
+          RecoverableFailure,
+          NonRecoverableFailure
+      )
 
     final case object New extends EventStatus {
       override val value: String = "NEW"
@@ -77,6 +85,14 @@ object events {
 
     final case object GeneratingTriples extends EventStatus {
       override val value: String = "GENERATING_TRIPLES"
+    }
+
+    final case object TriplesGenerated extends EventStatus {
+      override val value: String = "TRIPLES_GENERATED"
+    }
+
+    final case object TransformingTriples extends EventStatus {
+      override val value: String = "TRANSFORMING_TRIPLES"
     }
 
     sealed trait FinalStatus extends EventStatus

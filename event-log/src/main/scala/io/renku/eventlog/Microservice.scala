@@ -60,41 +60,43 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB]) =
     transactorResource.use { transactor =>
       for {
-        certificateLoader    <- CertificateLoader[IO](ApplicationLogger)
-        sentryInitializer    <- SentryInitializer[IO]()
-        dbInitializer        <- IODbInitializer(transactor, ApplicationLogger)
-        metricsRegistry      <- MetricsRegistry()
-        queriesExecTimes     <- QueriesExecutionTimes(metricsRegistry)
-        statsFinder          <- IOStatsFinder(transactor, queriesExecTimes)
-        eventLogMetrics      <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
-        waitingEventsGauge   <- WaitingEventsGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        underProcessingGauge <- UnderProcessingGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        metricsResetScheduler <- IOGaugeResetScheduler(List(waitingEventsGauge, underProcessingGauge),
-                                                       MetricsConfigProvider(),
-                                                       ApplicationLogger
-                                 )
+        certificateLoader           <- CertificateLoader[IO](ApplicationLogger)
+        sentryInitializer           <- SentryInitializer[IO]()
+        dbInitializer               <- IODbInitializer(transactor, ApplicationLogger)
+        metricsRegistry             <- MetricsRegistry()
+        queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
+        statsFinder                 <- IOStatsFinder(transactor, queriesExecTimes)
+        eventLogMetrics             <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
+        awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        underProcessingGauge        <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        metricsResetScheduler <-
+          IOGaugeResetScheduler(List(awaitingGenerationGauge, underProcessingGauge, awaitingTransformationGauge),
+                                MetricsConfigProvider(),
+                                ApplicationLogger
+          )
         eventCreationEndpoint <- IOEventCreationEndpoint(
                                    transactor,
-                                   waitingEventsGauge,
+                                   awaitingGenerationGauge,
                                    queriesExecTimes,
                                    ApplicationLogger
                                  )
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
-                                                           waitingEventsGauge,
+                                                           awaitingGenerationGauge,
                                                            underProcessingGauge,
                                                            queriesExecTimes,
                                                            ApplicationLogger
                                   )
         statusChangeEndpoint <- IOStatusChangeEndpoint(transactor,
-                                                       waitingEventsGauge,
+                                                       awaitingGenerationGauge,
                                                        underProcessingGauge,
                                                        queriesExecTimes,
                                                        ApplicationLogger
                                 )
         subscriptionCategoryRegistry <- IOSubscriptionCategoryRegistry(transactor,
-                                                                       waitingEventsGauge,
+                                                                       awaitingGenerationGauge,
                                                                        underProcessingGauge,
                                                                        queriesExecTimes,
                                                                        ApplicationLogger
