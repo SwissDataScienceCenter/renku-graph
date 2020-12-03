@@ -180,9 +180,9 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
         distributor.run().unsafeRunAsyncAndForget()
 
-        nonRecoverableStatusUpdate.value.eventId              shouldBe failingEvent.compoundEventId
-        nonRecoverableStatusUpdate.value.underProcessingGauge shouldBe underProcessingGauge
-        nonRecoverableStatusUpdate.value.maybeMessage         shouldBe EventMessage(exception)
+        nonRecoverableStatusUpdate.value.eventId                     shouldBe failingEvent.compoundEventId
+        nonRecoverableStatusUpdate.value.underTriplesGenerationGauge shouldBe underProcessingGauge
+        nonRecoverableStatusUpdate.value.maybeMessage                shouldBe EventMessage(exception)
 
         eventually {
           logger.loggedOnly(
@@ -355,9 +355,9 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       distributor.run().unsafeRunAsyncAndForget()
 
-      nonRecoverableStatusUpdate.value.eventId              shouldBe failingEvent.compoundEventId
-      nonRecoverableStatusUpdate.value.underProcessingGauge shouldBe underProcessingGauge
-      nonRecoverableStatusUpdate.value.maybeMessage         shouldBe EventMessage(exception)
+      nonRecoverableStatusUpdate.value.eventId                     shouldBe failingEvent.compoundEventId
+      nonRecoverableStatusUpdate.value.underTriplesGenerationGauge shouldBe underProcessingGauge
+      nonRecoverableStatusUpdate.value.maybeMessage                shouldBe EventMessage(exception)
 
       eventually {
         logger.loggedOnly(

@@ -18,26 +18,26 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import java.time.Instant
-
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+
+import java.time.Instant
 
 final case class ToNew[Interpretation[_]](
-    eventId:              CompoundEventId,
-    waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
-    underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
-    now:                  () => Instant = () => Instant.now
-)(implicit ME:            Bracket[Interpretation, Throwable])
+    eventId:                        CompoundEventId,
+    awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
+    underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
+    now:                            () => Instant = () => Instant.now
+)(implicit ME:                      Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
   override val status: EventStatus = New
@@ -56,8 +56,8 @@ final case class ToNew[Interpretation[_]](
     case UpdateResult.Updated =>
       for {
         path <- findProjectPath(eventId)
-        _    <- waitingEventsGauge increment path
-        _    <- underProcessingGauge decrement path
+        _    <- awaitingTriplesGenerationGauge increment path
+        _    <- underTriplesGenerationGauge decrement path
       } yield ()
     case _ => ME.unit
   }

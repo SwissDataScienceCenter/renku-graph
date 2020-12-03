@@ -70,10 +70,14 @@ object Microservice extends IOMicroservice {
         awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
         awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
         underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        underProcessingGauge        <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        underTriplesGeneration      <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
         metricsResetScheduler <-
           IOGaugeResetScheduler(
-            List(awaitingGenerationGauge, underProcessingGauge, awaitingTransformationGauge, underTransformationGauge),
+            List(awaitingGenerationGauge,
+                 underTriplesGeneration,
+                 awaitingTransformationGauge,
+                 underTransformationGauge
+            ),
             MetricsConfigProvider(),
             ApplicationLogger
           )
@@ -87,19 +91,20 @@ object Microservice extends IOMicroservice {
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
                                                            awaitingGenerationGauge,
-                                                           underProcessingGauge,
+                                                           underTriplesGeneration,
                                                            queriesExecTimes,
                                                            ApplicationLogger
                                   )
         statusChangeEndpoint <- IOStatusChangeEndpoint(transactor,
                                                        awaitingGenerationGauge,
-                                                       underProcessingGauge,
+                                                       underTriplesGeneration,
+                                                       awaitingTransformationGauge,
                                                        queriesExecTimes,
                                                        ApplicationLogger
                                 )
         subscriptionCategoryRegistry <- IOSubscriptionCategoryRegistry(transactor,
                                                                        awaitingGenerationGauge,
-                                                                       underProcessingGauge,
+                                                                       underTriplesGeneration,
                                                                        queriesExecTimes,
                                                                        ApplicationLogger
                                         )
