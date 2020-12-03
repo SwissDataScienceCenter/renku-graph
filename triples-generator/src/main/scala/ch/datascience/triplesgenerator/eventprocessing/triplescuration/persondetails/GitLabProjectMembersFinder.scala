@@ -17,6 +17,7 @@ import org.http4s.Method.GET
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.{NotFound, Ok}
 import org.http4s.{EntityDecoder, Request, Response, Status}
+import io.circe._
 
 import scala.concurrent.ExecutionContext
 
@@ -58,7 +59,7 @@ private class IOGitLabProjectMembersFinder(gitLabUrl:       GitLabUrl,
   private implicit lazy val projectDecoder: EntityDecoder[IO, List[GitLabProjectMember]] = {
     import ch.datascience.graph.model.users
 
-    implicit val decoder: Decoder[List[GitLabProjectMember]] = { cursor =>
+    implicit val decoder: Decoder[GitLabProjectMember] = { cursor =>
       for {
         id       <- cursor.downField("id").as[GitLabId]
         username <- cursor.downField("username").as[users.Username]
@@ -76,12 +77,11 @@ private class IOGitLabProjectMembersFinder(gitLabUrl:       GitLabUrl,
 
 }
 
-object GitLabProjectMembersFinder {
-  def apply[Interpretation[_]](gitLabUrl: GitLabUrl, gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(
-      implicit
+object IOGitLabProjectMembersFinder {
+  def apply(gitLabUrl:  GitLabUrl, gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
       maybeAccessToken: Option[AccessToken],
       executionContext: ExecutionContext,
-      contextShift:     ContextShift[Interpretation],
-      timer:            Timer[Interpretation]
-  ): GitLabProjectMembersFinder[Interpretation] = new IOGitLabProjectMembersFinder(gitLabUrl, gitLabThrottler, logger)
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): GitLabProjectMembersFinder[IO] = new IOGitLabProjectMembersFinder(gitLabUrl, gitLabThrottler, logger)
 }

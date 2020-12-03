@@ -1,27 +1,26 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{accessTokens, gitLabUrls, personalAccessTokens}
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.PersonalAccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
+import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock.{equalTo, get, okJson, stubFor}
 import io.circe.Encoder
+import io.circe.literal._
 import io.circe.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import PersonDetailsGenerators._
-import ch.datascience.control.Throttler
-import ch.datascience.interpreters.TestLogger
-import io.circe.literal._
 
-import scala.util.{Success, Try}
+import scala.concurrent.ExecutionContext.Implicits.global
 
 class GitLabProjectMembersFinderSpec
     extends AnyWordSpec
@@ -42,23 +41,20 @@ class GitLabProjectMembersFinderSpec
               .willReturn(okJson(gitLabProjectMembers.asJson.noSpaces))
           }
 
-          val Success(actual) = projectMembersFinder.findProjectMembers(path)(Some(accessToken))
-          actual shouldBe gitLabProjectMembers
+          projectMembersFinder.findProjectMembers(path)(Some(accessToken)).unsafeRunSync() shouldBe gitLabProjectMembers
       }
     }
 
   }
 
   private trait TestCase {
-    val gitLabUrl                 = gitLabUrls.generateOne
-    implicit val maybeAccessToken = accessTokens.generateOption
+    val gitLabUrl = gitLabUrls.generateOne
+    implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
-    val projectMembersFinder = GitLabProjectMembersFinder[Try](gitLabUrl, Throttler.noThrottling, TestLogger())
-//    new GitLabProjectMembersFinder[IO] {
-//      override def findProjectMembers(path: projects.Path)(implicit
-//          maybeAccessToken:                 Option[AccessToken]
-//      ): IO[List[GitLabProjectMember]] = ???
-//    }
+    private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+    private implicit val timer: Timer[IO]        = IO.timer(global)
+
+    val projectMembersFinder = IOGitLabProjectMembersFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
   private implicit val projectMemberEncoder: Encoder[GitLabProjectMember] = Encoder.instance[GitLabProjectMember] {
