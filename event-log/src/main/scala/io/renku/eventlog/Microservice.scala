@@ -69,11 +69,13 @@ object Microservice extends IOMicroservice {
         eventLogMetrics             <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
         awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
         awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
         underProcessingGauge        <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
         metricsResetScheduler <-
-          IOGaugeResetScheduler(List(awaitingGenerationGauge, underProcessingGauge, awaitingTransformationGauge),
-                                MetricsConfigProvider(),
-                                ApplicationLogger
+          IOGaugeResetScheduler(
+            List(awaitingGenerationGauge, underProcessingGauge, awaitingTransformationGauge, underTransformationGauge),
+            MetricsConfigProvider(),
+            ApplicationLogger
           )
         eventCreationEndpoint <- IOEventCreationEndpoint(
                                    transactor,
