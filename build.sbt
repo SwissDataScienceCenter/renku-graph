@@ -250,3 +250,23 @@ def writeChartVersion(version: String): Unit = {
   }
   IO.writeLines(chartFile, updatedLines)
 }
+
+lazy val checkTagExists = taskKey[Unit]("Checks if tag already exists")
+
+checkTagExists := {
+  val versionFile = root.base / "version.sbt"
+  val version = IO
+    .readLines(versionFile)
+    .mkString("")
+    .trim
+    .replace("version in ThisBuild := ", "")
+    .replace("\"", "")
+
+  val tagExists = Vcs
+    .detect(root.base)
+    .map(_.cmd("tag", "-n", version).!!.trim.nonEmpty)
+    .getOrElse(sys.error("Release Tag cannot be checked"))
+
+  if (tagExists) sys.error(s"Tag '$version' already exists")
+  else ()
+}
