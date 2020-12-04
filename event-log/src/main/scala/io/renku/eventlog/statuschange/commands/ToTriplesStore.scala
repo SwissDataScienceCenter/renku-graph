@@ -39,7 +39,7 @@ final case class ToTriplesStore[Interpretation[_]](
 )(implicit ME:                   Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override val status: EventStatus = TriplesStore
+  override lazy val status: EventStatus = TriplesStore
 // TODO temporary status change from GeneratingTriples to triples store in the end only TransformingTriples can be transformed to TriplesStore
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event

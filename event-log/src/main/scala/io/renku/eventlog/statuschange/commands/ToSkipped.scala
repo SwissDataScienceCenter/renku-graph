@@ -40,7 +40,7 @@ final case class ToSkipped[Interpretation[_]](
 )(implicit ME:            Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override val status: EventStatus = Skipped
+  override lazy val status: EventStatus = Skipped
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event 

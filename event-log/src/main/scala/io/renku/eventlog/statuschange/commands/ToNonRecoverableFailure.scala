@@ -40,7 +40,7 @@ final case class ToNonRecoverableFailure[Interpretation[_]](
 )(implicit ME:                   Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override val status: EventStatus = NonRecoverableFailure
+  override lazy val status: EventStatus = NonRecoverableFailure
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event 
