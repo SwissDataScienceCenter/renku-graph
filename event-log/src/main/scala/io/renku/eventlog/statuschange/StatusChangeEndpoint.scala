@@ -99,7 +99,6 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
         case TriplesGenerated =>
           ToTriplesGenerated[Interpretation](
             eventId,
-            maybeMessage getOrElse (throw new Exception(s"$status status needs a message")),
             underTriplesGenerationGauge,
             awaitingTransformationGauge
           )

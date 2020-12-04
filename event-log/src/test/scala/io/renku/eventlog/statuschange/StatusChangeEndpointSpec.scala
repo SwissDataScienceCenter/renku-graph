@@ -63,7 +63,6 @@ class StatusChangeEndpointSpec
       Skipped      -> ToSkipped[IO](compoundEventIds.generateOne, eventMessages.generateOne, underTriplesGenerationGauge),
       New          -> ToNew[IO](compoundEventIds.generateOne, awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
       TriplesGenerated -> ToTriplesGenerated[IO](compoundEventIds.generateOne,
-                                                 eventMessages.generateOne,
                                                  underTriplesGenerationGauge,
                                                  awaitingTransformationGauge
       ),
@@ -264,8 +263,7 @@ class StatusChangeEndpointSpec
         "message": ${command.message.value}
       }"""
     case command: ToTriplesGenerated[IO]      => json"""{
-        "status": ${command.status.value},
-        "message": ${command.message.value}
+        "status": ${command.status.value}
       }"""
     case command: ToRecoverableFailure[IO]    => json"""{
         "status": ${command.status.value}
