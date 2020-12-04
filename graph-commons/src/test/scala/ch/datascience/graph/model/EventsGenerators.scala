@@ -35,6 +35,8 @@ object EventsGenerators {
   implicit val eventStatuses: Gen[EventStatus] = Gen.oneOf(
     New,
     GeneratingTriples,
+    TriplesGenerated,
+    TransformingTriples,
     TriplesStore,
     Skipped,
     RecoverableFailure,

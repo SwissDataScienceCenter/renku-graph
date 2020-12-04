@@ -48,7 +48,7 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec
         storeEvents(projectIds.generateOne, batchDates.generateOne, nonEmptyList(eventStatuses).generateOne)
 
         val toBeProcessedEvents = nonEmptyList(
-          Gen.oneOf(New, GeneratingTriples, RecoverableFailure),
+          Gen.oneOf(New, GeneratingTriples, TriplesGenerated, TransformingTriples, RecoverableFailure),
           minElements = 10,
           maxElements = 20
         ).generateOne

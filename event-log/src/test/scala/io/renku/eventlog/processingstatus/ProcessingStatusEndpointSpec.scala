@@ -56,7 +56,7 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
           .expects(projectId)
           .returning(OptionT.some[IO](processingStatus))
 
-        val request = Request(Method.GET, uri"events" / "projects" / projectId.toString / "status")
+        Request(Method.GET, uri"events" / "projects" / projectId.toString / "status")
 
         val response = findProcessingStatus(projectId).unsafeRunSync()
 
@@ -69,12 +69,11 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
     "return NOT_FOUND if there are no events for a project with the given id" in new TestCase {
 
-      val processingStatus = processingStatuses.generateOne
       (statusFinder.fetchStatus _)
         .expects(projectId)
         .returning(OptionT.none[IO, ProcessingStatus])
 
-      val request = Request(Method.GET, uri"events" / "projects" / projectId.toString / "status")
+      Request(Method.GET, uri"events" / "projects" / projectId.toString / "status")
 
       val response = findProcessingStatus(projectId).unsafeRunSync()
 
@@ -92,7 +91,7 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
         .expects(projectId)
         .returning(OptionT.liftF(exception.raiseError[IO, ProcessingStatus]))
 
-      val request = Request(Method.GET, uri"events" / "projects" / projectId.toString / "status")
+      Request(Method.GET, uri"events" / "projects" / projectId.toString / "status")
 
       val response = findProcessingStatus(projectId).unsafeRunSync()
 
