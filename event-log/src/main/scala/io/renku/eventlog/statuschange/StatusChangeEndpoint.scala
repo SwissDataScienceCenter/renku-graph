@@ -33,11 +33,12 @@ import org.http4s.dsl.Http4sDsl
 import scala.util.control.NonFatal
 
 class StatusChangeEndpoint[Interpretation[_]: Effect](
-    statusUpdatesRunner:  StatusUpdatesRunner[Interpretation],
-    waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
-    underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
-    logger:               Logger[Interpretation]
-)(implicit ME:            MonadError[Interpretation, Throwable])
+    statusUpdatesRunner:            StatusUpdatesRunner[Interpretation],
+    awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
+    underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
+    awaitingTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
+    logger:                         Logger[Interpretation]
+)(implicit ME:                      MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
   import ch.datascience.controllers.InfoMessage._
@@ -93,17 +94,27 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
         status       <- cursor.downField("status").as[EventStatus]
         maybeMessage <- cursor.downField("message").as[Option[EventMessage]]
       } yield status match {
-        case TriplesStore => ToTriplesStore[Interpretation](eventId, underProcessingGauge)
-        case New          => ToNew[Interpretation](eventId, waitingEventsGauge, underProcessingGauge)
+        case TriplesStore => ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge)
+        case New          => ToNew[Interpretation](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
+        case TriplesGenerated =>
+          ToTriplesGenerated[Interpretation](
+            eventId,
+            underTriplesGenerationGauge,
+            awaitingTransformationGauge
+          )
         case Skipped =>
           ToSkipped[Interpretation](eventId,
                                     maybeMessage getOrElse (throw new Exception(s"$status status needs a message")),
-                                    underProcessingGauge
+                                    underTriplesGenerationGauge
           )
         case RecoverableFailure =>
-          ToRecoverableFailure[Interpretation](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge)
+          ToRecoverableFailure[Interpretation](eventId,
+                                               maybeMessage,
+                                               awaitingTriplesGenerationGauge,
+                                               underTriplesGenerationGauge
+          )
         case NonRecoverableFailure =>
-          ToNonRecoverableFailure[Interpretation](eventId, maybeMessage, underProcessingGauge)
+          ToNonRecoverableFailure[Interpretation](eventId, maybeMessage, underTriplesGenerationGauge)
         case other => throw new Exception(s"Transition to '$other' status unsupported")
       }
 
@@ -115,13 +126,19 @@ object IOStatusChangeEndpoint {
   import cats.effect.IO
 
   def apply(
-      transactor:           DbTransactor[IO, EventLogDB],
-      waitingEventsGauge:   LabeledGauge[IO, projects.Path],
-      underProcessingGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
-      logger:               Logger[IO]
-  )(implicit contextShift:  ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
+      transactor:                  DbTransactor[IO, EventLogDB],
+      awaitTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+      underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+      awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
+      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
+      logger:                      Logger[IO]
+  )(implicit contextShift:         ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {
       statusUpdatesRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
-    } yield new StatusChangeEndpoint(statusUpdatesRunner, waitingEventsGauge, underProcessingGauge, logger)
+    } yield new StatusChangeEndpoint(statusUpdatesRunner,
+                                     awaitTriplesGenerationGauge,
+                                     underTriplesGenerationGauge,
+                                     awaitingTransformationGauge,
+                                     logger
+    )
 }

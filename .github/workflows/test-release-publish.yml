@@ -155,6 +155,7 @@ jobs:
         run: |
           echo "GIT_USER=Renku Bot" >> $GITHUB_ENV
           echo "GIT_EMAIL=renku@datascience.ch" >> $GITHUB_ENV
+          echo "GITHUB_REF=/refs/tags/$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
       - name: Build and push chart and images
         uses: SwissDataScienceCenter/renku/actions/publish-chart@master
         env:

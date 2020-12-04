@@ -18,14 +18,14 @@
 
 package io.renku.eventlog
 
-import java.time.Instant
-
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
+
+import java.time.Instant
 
 sealed trait Event extends CompoundId {
   def id:        EventId

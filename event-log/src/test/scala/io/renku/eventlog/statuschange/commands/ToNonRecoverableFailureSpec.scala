@@ -74,11 +74,11 @@ class ToNonRecoverableFailureSpec
 
         findEvent(eventId) shouldBe Some((executionDate, GeneratingTriples, None))
 
-        (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
+        (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
-          ToNonRecoverableFailure[IO](eventId, maybeMessage, underProcessingGauge, currentTime)
+          ToNonRecoverableFailure[IO](eventId, maybeMessage, underTriplesGenerationGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -104,7 +104,7 @@ class ToNonRecoverableFailureSpec
 
           val maybeMessage = Gen.option(eventMessages).generateOne
           val command =
-            ToNonRecoverableFailure[IO](eventId, maybeMessage, underProcessingGauge, currentTime)
+            ToNonRecoverableFailure[IO](eventId, maybeMessage, underTriplesGenerationGauge, currentTime)
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -116,25 +116,15 @@ class ToNonRecoverableFailureSpec
   }
 
   private trait TestCase {
-    val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val histogram            = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val currentTime          = mockFunction[Instant]
-    val eventId              = compoundEventIds.generateOne
-    val eventBatchDate       = batchDates.generateOne
+    val underTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val histogram                   = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val currentTime                 = mockFunction[Instant]
+    val eventId                     = compoundEventIds.generateOne
+    val eventBatchDate              = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
-
-  private def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
-    execute {
-      sql"""|SELECT execution_date, status, message
-            |FROM event 
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
-         """.stripMargin
-        .query[(ExecutionDate, EventStatus, Option[EventMessage])]
-        .option
-    }
 }

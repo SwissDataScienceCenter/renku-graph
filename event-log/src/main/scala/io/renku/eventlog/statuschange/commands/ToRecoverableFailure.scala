@@ -18,9 +18,6 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit.MINUTES
-
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
@@ -33,16 +30,19 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage}
 
+import java.time.Instant
+import java.time.temporal.ChronoUnit.MINUTES
+
 final case class ToRecoverableFailure[Interpretation[_]](
-    eventId:              CompoundEventId,
-    maybeMessage:         Option[EventMessage],
-    waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
-    underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
-    now:                  () => Instant = () => Instant.now
-)(implicit ME:            Bracket[Interpretation, Throwable])
+    eventId:                        CompoundEventId,
+    maybeMessage:                   Option[EventMessage],
+    awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
+    underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
+    now:                            () => Instant = () => Instant.now
+)(implicit ME:                      Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override val status: EventStatus = RecoverableFailure
+  override lazy val status: EventStatus = RecoverableFailure
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event
@@ -58,8 +58,8 @@ final case class ToRecoverableFailure[Interpretation[_]](
     case UpdateResult.Updated =>
       for {
         path <- findProjectPath(eventId)
-        _    <- waitingEventsGauge increment path
-        _    <- underProcessingGauge decrement path
+        _    <- awaitingTriplesGenerationGauge increment path
+        _    <- underTriplesGenerationGauge decrement path
       } yield ()
     case _ => ME.unit
   }

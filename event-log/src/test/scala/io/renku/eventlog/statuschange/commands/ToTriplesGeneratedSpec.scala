@@ -38,12 +38,12 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 
-class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
+class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
   "command" should {
 
-    s"set status $New on the event with the given id and $GeneratingTriples status, " +
-      "increment waiting events gauge and decrement under processing gauge for the project " +
+    s"set status $TriplesGenerated on the event with the given id and $GeneratingTriples status, " +
+      "increment awaiting transformation gauge and decrement under triples generation gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         val projectPath = projectPaths.generateOne
@@ -73,16 +73,16 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
           batchDate = eventBatchDate
         )
 
-        findEvents(status = New) shouldBe List.empty
+        findEvents(status = TriplesGenerated) shouldBe List.empty
 
-        (awaitingTriplesGenerationGauge.increment _).expects(projectPath).returning(IO.unit)
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
-
-        val command = ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, currentTime)
+        (awaitingTransformationGauge.increment _).expects(projectPath).returning(IO.unit)
+        val command =
+          ToTriplesGenerated[IO](eventId, underTriplesGenerationGauge, awaitingTransformationGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvents(status = New) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
+        findEvents(status = TriplesGenerated) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
@@ -101,15 +101,15 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
           )
 
           findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
-
-          val command = ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, currentTime)
+          val command =
+            ToTriplesGenerated[IO](eventId, awaitingTransformationGauge, underTriplesGenerationGauge, currentTime)
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
           val expectedEvents =
-            if (eventStatus != New) List.empty
+            if (eventStatus != TriplesGenerated) List.empty
             else List((eventId, executionDate, eventBatchDate))
-          findEvents(status = New) shouldBe expectedEvents
+          findEvents(status = TriplesGenerated) shouldBe expectedEvents
 
           histogram.verifyExecutionTimeMeasured(command.query.name)
         }
@@ -117,9 +117,9 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
   }
 
   private trait TestCase {
-    val awaitingTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
-    val underTriplesGenerationGauge    = mock[LabeledGauge[IO, projects.Path]]
-    val histogram                      = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val awaitingTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val underTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val histogram                   = TestLabeledHistogram[SqlQuery.Name]("query_id")
 
     val currentTime    = mockFunction[Instant]
     val eventId        = compoundEventIds.generateOne

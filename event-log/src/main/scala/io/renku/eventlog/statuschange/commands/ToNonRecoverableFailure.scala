@@ -18,8 +18,6 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import java.time.Instant
-
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
@@ -32,15 +30,17 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage}
 
+import java.time.Instant
+
 final case class ToNonRecoverableFailure[Interpretation[_]](
-    eventId:              CompoundEventId,
-    maybeMessage:         Option[EventMessage],
-    underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
-    now:                  () => Instant = () => Instant.now
-)(implicit ME:            Bracket[Interpretation, Throwable])
+    eventId:                     CompoundEventId,
+    maybeMessage:                Option[EventMessage],
+    underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                         () => Instant = () => Instant.now
+)(implicit ME:                   Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override val status: EventStatus = NonRecoverableFailure
+  override lazy val status: EventStatus = NonRecoverableFailure
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event 
@@ -53,7 +53,7 @@ final case class ToNonRecoverableFailure[Interpretation[_]](
   override def updateGauges(
       updateResult:      UpdateResult
   )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated => findProjectPath(eventId) flatMap underProcessingGauge.decrement
+    case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesGenerationGauge.decrement
     case _                    => ME.unit
   }
 }

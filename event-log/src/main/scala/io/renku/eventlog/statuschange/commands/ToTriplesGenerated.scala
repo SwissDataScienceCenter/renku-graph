@@ -21,9 +21,9 @@ package io.renku.eventlog.statuschange.commands
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{events, projects}
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
@@ -32,31 +32,30 @@ import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 
 import java.time.Instant
 
-final case class ToNew[Interpretation[_]](
-    eventId:                        CompoundEventId,
-    awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-    underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
-    now:                            () => Instant = () => Instant.now
-)(implicit ME:                      Bracket[Interpretation, Throwable])
+private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
+    eventId:                     CompoundEventId,
+    underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
+    awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                         () => Instant = () => Instant.now
+)(implicit ME:                   Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
-
-  override lazy val status: EventStatus = New
+  override lazy val status: events.EventStatus = TriplesGenerated
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event 
           |SET status = $status, execution_date = ${now()}
           |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
           |""".stripMargin.update.run,
-    name = "generating_triples->new"
+    name = "generating_triples->triples_generated"
   )
 
-  override def updateGauges(
-      updateResult:      UpdateResult
-  )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
+  override def updateGauges(updateResult: UpdateResult)(implicit
+      transactor:                         DbTransactor[Interpretation, EventLogDB]
+  ): Interpretation[Unit] = updateResult match {
     case UpdateResult.Updated =>
       for {
         path <- findProjectPath(eventId)
-        _    <- awaitingTriplesGenerationGauge increment path
+        _    <- awaitingTransformationGauge increment path
         _    <- underTriplesGenerationGauge decrement path
       } yield ()
     case _ => ME.unit

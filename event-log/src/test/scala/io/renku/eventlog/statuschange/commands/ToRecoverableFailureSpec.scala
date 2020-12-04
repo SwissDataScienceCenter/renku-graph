@@ -71,12 +71,17 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
 
         findEvent(eventId) shouldBe Some((executionDate, GeneratingTriples, None))
 
-        (waitingEventsGauge.increment _).expects(projectPath).returning(IO.unit)
-        (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
+        (awaitingTriplesGenerationGauge.increment _).expects(projectPath).returning(IO.unit)
+        (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
-          ToRecoverableFailure[IO](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge, currentTime)
+          ToRecoverableFailure[IO](eventId,
+                                   maybeMessage,
+                                   awaitingTriplesGenerationGauge,
+                                   underTriplesGenerationGauge,
+                                   currentTime
+          )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -102,7 +107,12 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
 
           val maybeMessage = Gen.option(eventMessages).generateOne
           val command =
-            ToRecoverableFailure[IO](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge, currentTime)
+            ToRecoverableFailure[IO](eventId,
+                                     maybeMessage,
+                                     awaitingTriplesGenerationGauge,
+                                     underTriplesGenerationGauge,
+                                     currentTime
+            )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -114,12 +124,12 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
   }
 
   private trait TestCase {
-    val waitingEventsGauge   = mock[LabeledGauge[IO, projects.Path]]
-    val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val histogram            = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val currentTime          = mockFunction[Instant]
-    val eventId              = compoundEventIds.generateOne
-    val eventBatchDate       = batchDates.generateOne
+    val awaitingTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val underTriplesGenerationGauge    = mock[LabeledGauge[IO, projects.Path]]
+    val histogram                      = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val currentTime                    = mockFunction[Instant]
+    val eventId                        = compoundEventIds.generateOne
+    val eventBatchDate                 = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
@@ -127,13 +137,4 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
 
-  private def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
-    execute {
-      sql"""|SELECT execution_date, status, message
-            |FROM event 
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
-         """.stripMargin
-        .query[(ExecutionDate, EventStatus, Option[EventMessage])]
-        .option
-    }
 }

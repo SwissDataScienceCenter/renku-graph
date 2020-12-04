@@ -69,10 +69,10 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
 
         findEvent(eventId) shouldBe Some((executionDate, GeneratingTriples, None))
 
-        (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
+        (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
         val message = eventMessages.generateOne
-        val command = ToSkipped[IO](eventId, message, underProcessingGauge, currentTime)
+        val command = ToSkipped[IO](eventId, message, underTriplesGenerationGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -97,7 +97,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
           findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
           val message = eventMessages.generateOne
-          val command = ToSkipped[IO](eventId, message, underProcessingGauge, currentTime)
+          val command = ToSkipped[IO](eventId, message, underTriplesGenerationGauge, currentTime)
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -109,25 +109,15 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
   }
 
   private trait TestCase {
-    val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val histogram            = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val currentTime          = mockFunction[Instant]
-    val eventId              = compoundEventIds.generateOne
-    val eventBatchDate       = batchDates.generateOne
+    val underTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val histogram                   = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val currentTime                 = mockFunction[Instant]
+    val eventId                     = compoundEventIds.generateOne
+    val eventBatchDate              = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
-
-  private def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
-    execute {
-      sql"""|SELECT execution_date, status, message
-            |FROM event 
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
-         """.stripMargin
-        .query[(ExecutionDate, EventStatus, Option[EventMessage])]
-        .option
-    }
 }
