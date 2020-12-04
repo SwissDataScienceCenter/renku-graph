@@ -29,7 +29,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
+import io.renku.eventlog.DbEventLogGenerators.{eventDates, executionDates}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
@@ -77,14 +77,8 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
         (awaitingTransformationGauge.increment _).expects(projectPath).returning(IO.unit)
-        val message = eventMessages.generateOne
         val command =
-          ToTriplesGenerated[IO](eventId,
-                                 message,
-                                 underTriplesGenerationGauge,
-                                 awaitingTransformationGauge,
-                                 currentTime
-          )
+          ToTriplesGenerated[IO](eventId, underTriplesGenerationGauge, awaitingTransformationGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -107,14 +101,8 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           )
 
           findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
-          val message = eventMessages.generateOne
           val command =
-            ToTriplesGenerated[IO](eventId,
-                                   message,
-                                   awaitingTransformationGauge,
-                                   underTriplesGenerationGauge,
-                                   currentTime
-            )
+            ToTriplesGenerated[IO](eventId, awaitingTransformationGauge, underTriplesGenerationGauge, currentTime)
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 

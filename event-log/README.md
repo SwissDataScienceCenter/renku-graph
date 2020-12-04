@@ -15,7 +15,6 @@ This is a microservice which provides CRUD operations for Event Log DB.
 |  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
 |  POST  | ```/subscriptions```                    | Adds a subscription for events                                 |
 
-
 #### GET /events?latest_per_project=true
 
 Finds events for all the projects with the latest `event_date`.
@@ -33,12 +32,12 @@ Response body example:
 
 ```json
 {
-  "id":     "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id":   123,
+    "id": 123,
     "path": "namespace/project-name"
   },
-  "body":   "JSON payload"
+  "body": "JSON payload"
 }
 ```
 
@@ -46,7 +45,7 @@ Response body example:
 
 Changes events' data by applying the given patch.
 
-**NOTICE:** 
+**NOTICE:**
 Be aware that the given patch affects all the events in the Event Log.
 
 **Request**
@@ -71,16 +70,17 @@ Creates an event with either the `NEW` or `SKIPPED` status.
 
 **Request**
 In the case of a *NEW* event
+
 ```json
 {
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id":   123,
+    "id": 123,
     "path": "namespace/project-name"
   },
-  "date":    "2001-09-04T10:48:29.457Z",
+  "date": "2001-09-04T10:48:29.457Z",
   "batchDate": "2001-09-04T11:00:00.000Z",
-  "body":      "JSON payload",
+  "body": "JSON payload",
   "status": "NEW"
 }
 ```
@@ -91,12 +91,12 @@ In the case of a *SKIPPED* event. Note that a non-blank `message` is required.
 {
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id":   123,
+    "id": 123,
     "path": "namespace/project-name"
   },
-  "date":    "2001-09-04T10:48:29.457Z",
+  "date": "2001-09-04T10:48:29.457Z",
   "batchDate": "2001-09-04T11:00:00.000Z",
-  "body":      "JSON payload",
+  "body": "JSON payload",
   "status": "SKIPPED",
   "message": "reason for skipping"
 }
@@ -106,22 +106,24 @@ Event Body example:
 
 ```json
 {
-  "id":            "df654c3b1bd105a29d658f78f6380a842feac879",
-  "message":       "some text",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "message": "some text",
   "committedDate": "2001-09-04T10:48:29.457Z",
   "author": {
-    "name":  "author name",
-    "email": "author@mail.com"    // optional
+    "name": "author name",
+    "email": "author@mail.com"
+    // optional
   },
   "committer": {
-    "name":  "committer name",
-    "email": "committer@mail.com" // optional
+    "name": "committer name",
+    "email": "committer@mail.com"
+    // optional
   },
   "parents": [
     "f307326be71b17b90db5caaf47bcd44710fe119f"
   ],
   "project": {
-    "id":    123,
+    "id": 123,
     "path": "namespace/project-name"
   }
 }
@@ -154,44 +156,69 @@ Updates event's data with the given payload.
 **Request**
 
 Currently, only status changing payloads are allowed:
-- for transitioning event from status `PROCESSING` to `NEW`
+
+- for transitioning event from status `GENERATING_TRIPLES` to `NEW`
+
 ```json
 {
   "status": "NEW"
 }
 ```
-**Notice** `CONFLICT (409)` returned when current event status is different from `PROCESSING`.
-- for transitioning event from status `PROCESSING` to `TRIPLES_STORE`
+
+**Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
+
+- for transitioning event from status `GENERATING_TRIPLES` to `TRIPLES_STORE`
+
 ```json
 {
   "status": "TRIPLES_STORE"
 }
 ```
-**Notice** `CONFLICT (409)` returned when current event status is different from `PROCESSING`.
-- for transitioning event from status `PROCESSING` to `RECOVERABLE_FAILURE`
+
+**Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
+
+- for transitioning event from status `GENERATING_TRIPLES` to `TRIPLES_GENERATED`
+
+```json
+{
+  "status": "TRIPLES_GENERATED"
+}
+```
+
+**Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
+
+- for transitioning event from status `GENERATING_TRIPLES` to `RECOVERABLE_FAILURE`
+
 ```json
 {
   "status": "RECOVERABLE_FAILURE",
   "message": "error message"
 }
 ```
-**Notice** `CONFLICT (409)` returned when current event status is different from `PROCESSING`.
-- for transitioning event from status `PROCESSING` to `SKIPPED`
+
+**Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
+
+- for transitioning event from status `GENERATING_TRIPLES` to `SKIPPED`
+
 ```json
 {
   "status": "SKIPPED",
   "message": "MigrationEvent"
 }
 ```
-**Notice** `CONFLICT (409)` returned when current event status is different from `PROCESSING`.
-- for transitioning event from status `PROCESSING` to `NON_RECOVERABLE_FAILURE`
+
+**Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
+
+- for transitioning event from status `GENERATING_TRIPLES` to `NON_RECOVERABLE_FAILURE`
+
 ```json
 {
   "status": "NON_RECOVERABLE_FAILURE",
   "message": "error message"
 }
 ```
-**Notice** `CONFLICT (409)` returned when current event status is different from `PROCESSING`.
+
+**Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
 
 **Response**
 
@@ -227,7 +254,9 @@ Finds processing status of events belonging to the project with the given `id` f
 | INTERNAL SERVER ERROR (500)| When some problems occurs                                                          |
 
 Response body examples:
+
 - all events from the latest batch are processed
+
 ```json
 {
   "done": 20,
@@ -235,7 +264,9 @@ Response body examples:
   "progress": 100.00
 }
 ```
+
 - some events from the latest batch are being processed
+
 ```json
 {
   "done": 10,
@@ -246,11 +277,11 @@ Response body examples:
 
 #### POST /subscriptions
 
-Adds a subscription to the events with certain statuses. Once a service gets successfully subscribed by receiving an ACCEPTED,
-event-log service will start distributing events with the given `statuses` to the URL presented in the request body. Currently, 
-event-log allows subscriptions to `NEW` and `RECOVERABLE_FAILURE` statuses only. 
+Adds a subscription to the events with certain statuses. Once a service gets successfully subscribed by receiving an
+ACCEPTED, event-log service will start distributing events with the given `statuses` to the URL presented in the request
+body. Currently, event-log allows subscriptions to `NEW` and `RECOVERABLE_FAILURE` statuses only.
 
-**NOTICE:** 
+**NOTICE:**
 As a good practice, the subscription should be renewed periodically in case of restart or URL change.
 
 **Request**
@@ -258,7 +289,10 @@ As a good practice, the subscription should be renewed periodically in case of r
 ```json
 {
   "subscriberUrl": "http://host/path",
-  "statuses": ["NEW","RECOVERABLE_FAILURE"]
+  "statuses": [
+    "NEW",
+    "RECOVERABLE_FAILURE"
+  ]
 }
 ```
 
@@ -285,13 +319,12 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | event_body TEXT             NOT NULL |
 | message TEXT                NOT NULL |
 | message TEXT                         |
-                                        
+
 | project                              |
 |--------------------------------------|
 | project_id INT4          PK NOT NULL |
 | project_path VARCHAR        NOT NULL |
 | latest_event_date TIMESTAMP NOT NULL |
-
 
 ## Trying out
 

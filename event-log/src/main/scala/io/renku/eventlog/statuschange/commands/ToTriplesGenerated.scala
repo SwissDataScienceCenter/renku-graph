@@ -27,14 +27,13 @@ import ch.datascience.graph.model.{events, projects}
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
+import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.{EventLogDB, EventMessage}
 
 import java.time.Instant
 
 final case class ToTriplesGenerated[Interpretation[_]](
     eventId:                     CompoundEventId,
-    message:                     EventMessage,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     now:                         () => Instant = () => Instant.now
@@ -44,7 +43,7 @@ final case class ToTriplesGenerated[Interpretation[_]](
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event 
-          |SET status = $status, execution_date = ${now()}, message = $message
+          |SET status = $status, execution_date = ${now()}
           |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
           |""".stripMargin.update.run,
     name = "generating_triples->triples_generated"
