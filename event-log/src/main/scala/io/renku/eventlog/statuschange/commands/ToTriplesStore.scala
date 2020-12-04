@@ -40,13 +40,13 @@ final case class ToTriplesStore[Interpretation[_]](
     extends ChangeStatusCommand[Interpretation] {
 
   override val status: EventStatus = TriplesStore
-
+// TODO temporary status change from GeneratingTriples to triples store in the end only TransformingTriples can be transformed to TriplesStore
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event
           |SET status = $status, execution_date = ${now()}
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
+          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND (status = ${GeneratingTriples: EventStatus} OR status = ${TransformingTriples: EventStatus})
           |""".stripMargin.update.run,
-    name = "generating_triples->triples_store"
+    name = "generating_triples-transforming_triples->triples_store"
   )
 
   override def updateGauges(
