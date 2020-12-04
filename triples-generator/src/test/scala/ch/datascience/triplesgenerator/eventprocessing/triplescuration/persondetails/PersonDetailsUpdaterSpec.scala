@@ -15,7 +15,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
+import PersonDetailsGenerators._
 import scala.util.{Success, Try}
 
 class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory {
@@ -68,9 +68,4 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
 
   }
 
-  private val persons: Gen[Person] = for {
-    id     <- userResourceIds
-    names  <- userNames.toGeneratorOfNonEmptyList()
-    emails <- userEmails.toGeneratorOfSet()
-  } yield Person(id, names, emails)
 }

@@ -39,15 +39,15 @@ private[triplescuration] class UpdatesCreator {
       updates(persons): _*
     )
 
-  private def updates: Person => List[SparqlQuery] = { case Person(id, names, emails) =>
+  private def updates: Person => List[SparqlQuery] = { case Person(id, _, name, maybeEmail) =>
     List(
-      namesUpdate(id, names),
-      emailsUpdate(id, emails),
+      nameUpdate(id, name),
+      emailsUpdate(id, maybeEmail),
       labelsDelete(id)
     ).flatten
   }
 
-  private def namesUpdate(id: ResourceId, names: NonEmptyList[Name]) = Some {
+  private def nameUpdate(id: ResourceId, name: Name) = Some {
     val resource = id.showAs[RdfResource]
     SparqlQuery(
       name = "upload - person name update",
@@ -56,7 +56,7 @@ private[triplescuration] class UpdatesCreator {
         "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
       ),
       s"""|DELETE { $resource schema:name ?name }
-          |${INSERT(resource, "schema:name", names.toList).getOrElse("")}
+          |${INSERT(resource, "schema:name", name)}
           |WHERE { 
           |  OPTIONAL { $resource schema:name ?maybeName }
           |  BIND (IF(BOUND(?maybeName), ?maybeName, "nonexisting") AS ?name)
@@ -65,7 +65,7 @@ private[triplescuration] class UpdatesCreator {
     )
   }
 
-  private def emailsUpdate(id: ResourceId, emails: Set[Email]) = Some {
+  private def emailsUpdate(id: ResourceId, maybeEmail: Option[Email]) = maybeEmail.map { email =>
     val resource = id.showAs[RdfResource]
     SparqlQuery(
       name = "upload - person email update",
@@ -74,7 +74,7 @@ private[triplescuration] class UpdatesCreator {
         "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
       ),
       s"""|DELETE { $resource schema:email ?email }
-          |${INSERT(resource, "schema:email", emails.toList).getOrElse("")}
+          |${INSERT(resource, "schema:email", email)}
           |WHERE  { 
           |  OPTIONAL { $resource schema:email ?maybeEmail }
           |  BIND (IF(BOUND(?maybeEmail), ?maybeEmail, "nonexisting") AS ?email)
@@ -94,19 +94,10 @@ private[triplescuration] class UpdatesCreator {
     )
   }
 
-  private def INSERT[TT <: TinyType { type V = String }](resource: String,
-                                                         property: String,
-                                                         values:   List[TT]
-  ): Option[String] =
-    values match {
-      case Nil => None
-      case list =>
-        val triples = list
-          .map(tt => s"\t$resource $property '${sparqlEncode(tt.value)}'")
-          .mkString(".\n")
-        Some(s"""|INSERT {\n
-                 |\t$resource rdf:type schema:Person.
-                 |$triples\n
-                 |}""".stripMargin)
-    }
+  private def INSERT[TT <: TinyType { type V = String }](resource: String, property: String, value: TT): String =
+    s"""|INSERT {\n
+        |\t$resource rdf:type schema:Person.
+        |\t$resource $property '${sparqlEncode(value.value)}'\n
+        |}""".stripMargin
+
 }

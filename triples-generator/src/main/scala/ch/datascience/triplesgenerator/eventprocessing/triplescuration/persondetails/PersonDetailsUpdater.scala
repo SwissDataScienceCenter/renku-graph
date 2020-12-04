@@ -22,7 +22,8 @@ package persondetails
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import ch.datascience.graph.model.users.{Email, Name, ResourceId}
+import ch.datascience.graph.model.users.{Email, GitLabId, Name, ResourceId}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.Person
 
 private[triplescuration] trait PersonDetailsUpdater[Interpretation[_]] {
   def curate(curatedTriples: CuratedTriples[Interpretation]): Interpretation[CuratedTriples[Interpretation]]
@@ -45,6 +46,7 @@ private class PersonDetailsUpdaterImpl[Interpretation[_]](
       val newUpdatesGroups          = persons map prepareUpdates[Interpretation]
       CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
     }
+
 }
 
 private[triplescuration] object PersonDetailsUpdater {
@@ -56,5 +58,9 @@ private[triplescuration] object PersonDetailsUpdater {
     new UpdatesCreator
   )
 
-  final case class Person(id: ResourceId, names: NonEmptyList[Name], emails: Set[Email])
+  final case class Person(id: ResourceId, maybeGitLabId: Option[GitLabId], name: Name, maybeEmail: Option[Email])
+
+  object Person {
+    def apply(id: ResourceId, name: Name, maybeEmail: Option[Email]): Person = Person(id, None, name, maybeEmail)
+  }
 }

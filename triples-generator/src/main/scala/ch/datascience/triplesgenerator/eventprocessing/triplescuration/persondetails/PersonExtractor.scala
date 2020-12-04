@@ -4,7 +4,7 @@ package persondetails
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.syntax.all._
-import ch.datascience.graph.model.users.{Email, Name, ResourceId}
+import ch.datascience.graph.model.users.{Email, GitLabId, Name, ResourceId}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
@@ -59,16 +59,33 @@ private class PersonExtractorImpl[Interpretation[_]]()(implicit ME: MonadError[I
     private val (entityId, personNames, personEmails) = personData
 
     lazy val toPerson: Interpretation[Person] = for {
-      nonEmptyNames <- toNonEmptyList(personNames)
-    } yield Person(entityId, nonEmptyNames, personEmails.toSet)
+      name       <- toSingleName(personNames)
+      maybeEmail <- toSingleEmail(personEmails)
 
-    private lazy val toNonEmptyList: List[Name] => Interpretation[NonEmptyList[Name]] = {
+    } yield Person(entityId, None, name, maybeEmail)
+
+    private lazy val toSingleName: List[Name] => Interpretation[Name] = {
       case Nil =>
         ME.raiseError {
           new Exception(s"No names for person with '$entityId' id found in generated JSON-LD")
         }
-      case first :: other =>
-        NonEmptyList.of(first, other: _*).pure[Interpretation]
+      case first :: Nil =>
+        first.pure[Interpretation]
+      case _ =>
+        ME.raiseError {
+          new Exception(s"Multiple names for person with '$entityId' id found in generated JSON-LD")
+        }
+
+    }
+
+    private lazy val toSingleEmail: List[Email] => Interpretation[Option[Email]] = {
+      case Nil          => Option.empty[Email].pure[Interpretation]
+      case first :: Nil => first.some.pure[Interpretation]
+      case _ =>
+        ME.raiseError {
+          new Exception(s"Multiple emails for person with '$entityId' id found in generated JSON-LD")
+        }
+
     }
   }
 

@@ -70,7 +70,7 @@ class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFact
 
       val originalPersons = jsonTriples.collectAllPersons
 
-      val actual = foundPersons.map(person => (person.id, person.names, person.emails))
+      val actual = foundPersons.map(person => (person.id, person.name, person.maybeEmail))
       val expected = originalPersons.map(person =>
         (person.id, NonEmptyList.fromListUnsafe(person.maybeName.toList), person.maybeEmail.toSet)
       )

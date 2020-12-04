@@ -131,6 +131,8 @@ object Generators {
     } yield set
   }
 
+  lazy val booleans: Gen[Boolean] = Gen.oneOf(true, false)
+
   def positiveInts(max: Int = 1000): Gen[Int Refined Positive] =
     choose(1, max) map Refined.unsafeApply
 

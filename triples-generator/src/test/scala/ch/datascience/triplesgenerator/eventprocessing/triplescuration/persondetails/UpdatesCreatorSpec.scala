@@ -45,7 +45,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         val personId = Person(name, email).asJsonLD.entityId.get
 
         val updatesGroup = updatesCreator.prepareUpdates[IO](
-          UpdatedPerson(ResourceId(personId), NonEmptyList.of(name), Set(email))
+          UpdatedPerson(ResourceId(personId), name, Some(email))
         )
 
         updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
@@ -64,7 +64,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         val personId = Person(name).asJsonLD.entityId.get
 
         val updatesGroup = updatesCreator.prepareUpdates[IO](
-          UpdatedPerson(ResourceId(personId), NonEmptyList.of(name), emails = Set.empty)
+          UpdatedPerson(ResourceId(personId), name, maybeEmail = None)
         )
 
         updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
@@ -94,7 +94,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         val name1Updated = userNames.generateOne
 
         val updatesGroup = updatesCreator.prepareUpdates[IO](
-          UpdatedPerson(ResourceId(person1Id), NonEmptyList.of(name1Updated), Set(email1))
+          UpdatedPerson(ResourceId(person1Id), name1Updated, Some(email1))
         )
 
         updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
@@ -125,7 +125,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         val name1Updated = userNames.generateOne
 
         val updatesGroup = updatesCreator.prepareUpdates[IO](
-          UpdatedPerson(ResourceId(person1Id), NonEmptyList.of(name1Updated), emails = Set.empty)
+          UpdatedPerson(ResourceId(person1Id), name1Updated, maybeEmail = None)
         )
 
         updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
@@ -139,40 +139,6 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       }
     }
 
-    "generate query updating person's details with multiple names and emails " +
-      "- case when person id is known" in new TestCase {
-        forAll { (name1: Name, email1: Email, name2: Name, email2: Email) =>
-          val person1Json = Person(name1, email1).asJsonLD
-          val person1Id   = person1Json.entityId.get
-          val person2Json = Person(name2, email2).asJsonLD
-          val person2Id   = person2Json.entityId.get
-
-          loadToStore(person1Json, person2Json)
-
-          findPersons should contain theSameElementsAs Set(
-            (person1Id.value, Some(name1.value), Some(email1.value), Some(name1.value)),
-            (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
-          )
-
-          val name1Updates  = nonEmptyList(userNames, minElements = 2).generateOne
-          val email1Updates = nonEmptySet(userEmails, minElements = 2).generateOne
-
-          val updatesGroup = updatesCreator.prepareUpdates[IO](
-            UpdatedPerson(ResourceId(person1Id), name1Updates, email1Updates)
-          )
-
-          updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
-
-          val results = findPersons
-          results.filter(_._1 == person1Id.value).map(_._2) shouldBe name1Updates.map(v => Some(v.value)).toList.toSet
-          results.filter(_._1 == person1Id.value).map(_._3) shouldBe email1Updates.map(v => Some(v.value))
-          results.filter(_._1 == person2Id.value) shouldBe Set(
-            (person2Id.value, Some(name2.value), Some(email2.value), Some(name2.value))
-          )
-
-          clearDataset()
-        }
-      }
   }
 
   private def findPersons: Set[(String, Option[String], Option[String], Option[String])] =

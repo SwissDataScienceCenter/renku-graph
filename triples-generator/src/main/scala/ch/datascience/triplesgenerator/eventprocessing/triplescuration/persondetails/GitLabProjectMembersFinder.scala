@@ -1,5 +1,4 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
-import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
@@ -22,7 +21,7 @@ import scala.concurrent.ExecutionContext
 trait GitLabProjectMembersFinder[Interpretation[_]] {
   def findProjectMembers(path: Path)(implicit
       maybeAccessToken:        Option[AccessToken]
-  ): Interpretation[List[GitLabProjectMember]]
+  ): Interpretation[Option[List[GitLabProjectMember]]]
 }
 
 private class IOGitLabProjectMembersFinder(gitLabUrl:       GitLabUrl,
@@ -38,13 +37,13 @@ private class IOGitLabProjectMembersFinder(gitLabUrl:       GitLabUrl,
 
   override def findProjectMembers(path: Path)(implicit
       maybeAccessToken:                 Option[AccessToken]
-  ): IO[List[GitLabProjectMember]] =
+  ): IO[Option[List[GitLabProjectMember]]] =
     for {
       projectsUri <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(path.value)}/users")
       users <-
         send(request(GET, projectsUri, maybeAccessToken))(
           mapTo[List[GitLabProjectMember]]
-        ).map(_.getOrElse(Nil))
+        )
     } yield users
 
   private def mapTo[OUT](implicit
@@ -69,13 +68,9 @@ private class IOGitLabProjectMembersFinder(gitLabUrl:       GitLabUrl,
     jsonOf[IO, List[GitLabProjectMember]]
   }
 
-  private implicit class IOOptionOps[T](io: IO[Option[T]]) {
-    lazy val toOptionT: OptionT[IO, T] = OptionT(io)
-  }
-
 }
 
-object IOGitLabProjectMembersFinder {
+private object IOGitLabProjectMembersFinder {
   def apply(gitLabUrl:  GitLabUrl, gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
       maybeAccessToken: Option[AccessToken],
       executionContext: ExecutionContext,
