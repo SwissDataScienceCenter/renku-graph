@@ -75,10 +75,10 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
 
         findEvents(status = New) shouldBe List.empty
 
-        (waitingEventsGauge.increment _).expects(projectPath).returning(IO.unit)
-        (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
+        (awaitingTriplesGenerationGauge.increment _).expects(projectPath).returning(IO.unit)
+        (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-        val command = ToNew[IO](eventId, waitingEventsGauge, underProcessingGauge, currentTime)
+        val command = ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -102,7 +102,7 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
 
           findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-          val command = ToNew[IO](eventId, waitingEventsGauge, underProcessingGauge, currentTime)
+          val command = ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, currentTime)
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -117,9 +117,9 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
   }
 
   private trait TestCase {
-    val waitingEventsGauge   = mock[LabeledGauge[IO, projects.Path]]
-    val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val histogram            = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val awaitingTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val underTriplesGenerationGauge    = mock[LabeledGauge[IO, projects.Path]]
+    val histogram                      = TestLabeledHistogram[SqlQuery.Name]("query_id")
 
     val currentTime    = mockFunction[Instant]
     val eventId        = compoundEventIds.generateOne

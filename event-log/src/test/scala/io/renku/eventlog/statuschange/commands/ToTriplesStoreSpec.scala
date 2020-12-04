@@ -75,9 +75,9 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
         findEvents(status = TriplesStore) shouldBe List.empty
 
-        (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
+        (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-        val command = ToTriplesStore[IO](eventId, underProcessingGauge, currentTime)
+        val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -101,7 +101,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
           findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-          val command = ToTriplesStore[IO](eventId, underProcessingGauge, currentTime)
+          val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, currentTime)
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -116,11 +116,11 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
   }
 
   private trait TestCase {
-    val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val histogram            = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val currentTime          = mockFunction[Instant]
-    val eventId              = compoundEventIds.generateOne
-    val eventBatchDate       = batchDates.generateOne
+    val underTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val histogram                   = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val currentTime                 = mockFunction[Instant]
+    val eventId                     = compoundEventIds.generateOne
+    val eventBatchDate              = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
