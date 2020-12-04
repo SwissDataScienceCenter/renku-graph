@@ -160,7 +160,7 @@ class IOProcessingStatusFetcherSpec
     }
 
     "fail if total < done" in {
-      val done  = nonNegativeInts().generateOne.value + 1
+      val done  = positiveInts().generateOne.value + 1
       val total = done - 1
       val progress = BigDecimal((done.toDouble / total) * 100)
         .setScale(2, RoundingMode.HALF_DOWN)

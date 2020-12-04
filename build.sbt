@@ -1,4 +1,3 @@
-// format: off
 organization := "ch.datascience"
 name := "renku-graph"
 scalaVersion := "2.13.4"
@@ -79,8 +78,8 @@ lazy val triplesGenerator = Project(
 ).settings(
   commonSettings
 ).dependsOn(
-  jsonLd % "compile->compile",
-  jsonLd % "test->test",
+  jsonLd       % "compile->compile",
+  jsonLd       % "test->test",
   graphCommons % "compile->compile",
   graphCommons % "test->test"
 ).enablePlugins(
@@ -124,8 +123,8 @@ lazy val acceptanceTests = Project(
   triplesGenerator,
   tokenRepository,
   knowledgeGraph % "test->test",
-  graphCommons % "test->test",
-  eventLog % "test->test"
+  graphCommons   % "test->test",
+  eventLog       % "test->test"
 ).enablePlugins(
   AutomateHeaderPlugin
 )
@@ -133,43 +132,39 @@ lazy val acceptanceTests = Project(
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
   scalaVersion := "2.13.4",
-
   skip in publish := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
-
-  publishArtifact in(Compile, packageDoc) := false,
-  publishArtifact in(Compile, packageSrc) := false,
-
+  publishArtifact in (Compile, packageDoc) := false,
+  publishArtifact in (Compile, packageSrc) := false,
   addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full),
-
   scalacOptions += "-feature",
   scalacOptions += "-unchecked",
   scalacOptions += "-deprecation",
   scalacOptions += "-Ywarn-value-discard",
   scalacOptions += "-Xfatal-warnings",
-
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),
   licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")),
-  headerLicense := Some(HeaderLicense.Custom(
-    s"""Copyright ${java.time.LocalDate.now().getYear} Swiss Data Science Center (SDSC)
-|A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
-|Eidgenössische Technische Hochschule Zürich (ETHZ).
-|
-|Licensed under the Apache License, Version 2.0 (the "License");
-|you may not use this file except in compliance with the License.
-|You may obtain a copy of the License at
-|
-|    http://www.apache.org/licenses/LICENSE-2.0
-|
-|Unless required by applicable law or agreed to in writing, software
-|distributed under the License is distributed on an "AS IS" BASIS,
-|WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-|See the License for the specific language governing permissions and
-|limitations under the License.""".stripMargin
-  ))
+  headerLicense := Some(
+    HeaderLicense.Custom(
+      s"""|Copyright ${java.time.LocalDate.now().getYear} Swiss Data Science Center (SDSC)
+          |A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+          |Eidgenössische Technische Hochschule Zürich (ETHZ).
+          |
+          |Licensed under the Apache License, Version 2.0 (the "License");
+          |you may not use this file except in compliance with the License.
+          |You may obtain a copy of the License at
+          |
+          |    http://www.apache.org/licenses/LICENSE-2.0
+          |
+          |Unless required by applicable law or agreed to in writing, software
+          |distributed under the License is distributed on an "AS IS" BASIS,
+          |WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+          |See the License for the specific language governing permissions and
+          |limitations under the License.""".stripMargin
+    )
+  )
 )
-// format: on
 
 import ReleaseTransformations._
 import sbtrelease.ReleasePlugin.autoImport.ReleaseKeys._
@@ -180,24 +175,14 @@ releaseTagComment :=
   Vcs
     .detect(root.base)
     .map { implicit vcs =>
-      collectCommitsMessages() match {
-        case Nil => s"Releasing ${(version in ThisBuild).value}"
-        case messages =>
-          s"Release Notes for ${(version in ThisBuild).value}\n${messages.map(m => s"* $m").mkString("\n")}"
-      }
+      s"Release Notes for ${(version in ThisBuild).value}\n* $lastCommitMessage"
     }
     .getOrElse {
       sys.error("Release Tag comment cannot be calculated")
     }
 
-@scala.annotation.tailrec
-def collectCommitsMessages(commitsCounter: Int = 1, messages: List[String] = List.empty)(implicit
-    vcs:                                   Vcs
-): List[String] =
-  vcs.cmd("log", "--format=%s", "-1", s"HEAD~$commitsCounter").!!.trim match {
-    case message if message startsWith "Setting version" => messages
-    case message                                         => collectCommitsMessages(commitsCounter + 1, messages :+ message)
-  }
+def lastCommitMessage()(implicit vcs: Vcs): String =
+  vcs.cmd("log", "--format=%s", "-1", "HEAD").!!.trim
 
 releaseProcess := Seq[ReleaseStep](
   log("Checking snapshot dependencies"),
@@ -206,61 +191,39 @@ releaseProcess := Seq[ReleaseStep](
   inquireVersions,
   log("Cleaning"),
   runClean,
-  log("Setting Release version"),
-  setReleaseVersion,
-  log("Setting Release version to Chart"),
-  setReleaseVersionToChart,
-  log("A brief respite"),
-  waitForVcs,
-  log("Commit Release version"),
-  commitReleaseVersion,
+  log("Checking Tag"),
+  verifyTagDoesNotExist,
   log("Tagging Release"),
   tagRelease,
-  log("Publishing artifacts"),
-  publishArtifacts,
-  log("Setting next version"),
-  setNextVersion,
-  log("Setting next version to Chart"),
-  setNextVersionToChart,
-  log("A brief respite"),
-  waitForVcs,
-  log("Commit next version"),
-  commitNextVersion,
-  log("Pushing changes"),
-  pushChanges
+  log("Pushing Tag"),
+  pushChanges,
+  log("Setting Release Version to the Chart.yaml"),
+  setReleaseVersionToChart
 )
-
-lazy val setReleaseVersionToChart: ReleaseStep = setReleaseVersionChart(_._1)
-lazy val setNextVersionToChart:    ReleaseStep = setNextReleaseVersionChart(_._2)
-lazy val waitForVcs: ReleaseStep = { state: State =>
-  Thread sleep 1000
-  state
-}
 
 def log(message: String): ReleaseStep = { state: State =>
   println(message)
   state
 }
 
-def setReleaseVersionChart(selectVersion: Versions => String): ReleaseStep = { state: State =>
-  val version = findVersion(selectVersion, state)
+lazy val verifyTagDoesNotExist: ReleaseStep = { state: State =>
+  val version = findVersion(_._1, state)
 
-  updateAndCommitChart(version)
+  Vcs
+    .detect(root.base)
+    .map { implicit vcs =>
+      if (vcs.cmd("tag", "-l").!!.trim contains version)
+        sys.error(s"Tag $version already exists")
+      else Unit
+    }
+    .getOrElse {
+      sys.error("Release Tag comment cannot be calculated")
+    }
 
   state
 }
 
-def setNextReleaseVersionChart(selectVersion: Versions => String): ReleaseStep = { state: State =>
-  val nextVersion = findVersion(selectVersion, state)
-  val currentHash = Vcs.detect(root.base).map(_.currentHash).getOrElse(sys.error("Current hash cannot be obtained"))
-  val version     = nextVersion.replace("SNAPSHOT", currentHash.take(7))
-
-  updateAndCommitChart(version)
-
-  state
-}
-
-def findVersion(selectVersion: Versions => String, state: State) = {
+def findVersion(selectVersion: Versions => String, state: State): String = {
   val allVersions = state.get(versions).getOrElse {
     sys.error("No versions are set! Was this release part executed before inquireVersions?")
   }
@@ -268,21 +231,15 @@ def findVersion(selectVersion: Versions => String, state: State) = {
   selectVersion(allVersions)
 }
 
-def updateAndCommitChart(version: String): Unit = {
-  println("Writing chart version")
+lazy val setReleaseVersionToChart: ReleaseStep = { state: State =>
+  val version = findVersion(_._1, state)
+
   writeChartVersion(version)
-  println("Adding chart to VCS")
-  addChartToVcs()
-  println("Chart added to VCS")
+
+  state
 }
 
 val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
-
-def addChartToVcs(): Unit =
-  for {
-    vcs      <- Vcs.detect(root.base)
-    filePath <- IO.relativize(root.base, chartFile)
-  } yield vcs.add(filePath).run()
 
 def writeChartVersion(version: String): Unit = {
 
@@ -292,4 +249,24 @@ def writeChartVersion(version: String): Unit = {
     case line                                => line
   }
   IO.writeLines(chartFile, updatedLines)
+}
+
+lazy val checkTagExists = taskKey[Unit]("Checks if tag already exists")
+
+checkTagExists := {
+  val versionFile = root.base / "version.sbt"
+  val version = IO
+    .readLines(versionFile)
+    .mkString("")
+    .trim
+    .replace("version in ThisBuild := ", "")
+    .replace("\"", "")
+
+  val tagExists = Vcs
+    .detect(root.base)
+    .map(_.cmd("tag", "-n", version).!!.trim.nonEmpty)
+    .getOrElse(sys.error("Release Tag cannot be checked"))
+
+  if (tagExists) sys.error(s"Tag '$version' already exists")
+  else ()
 }
