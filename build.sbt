@@ -196,9 +196,7 @@ releaseProcess := Seq[ReleaseStep](
   log("Tagging Release"),
   tagRelease,
   log("Pushing Tag"),
-  pushChanges,
-  log("Setting Release Version to the Chart.yaml"),
-  setReleaseVersionToChart
+  pushChanges
 )
 
 def log(message: String): ReleaseStep = { state: State =>
@@ -231,17 +229,12 @@ def findVersion(selectVersion: Versions => String, state: State): String = {
   selectVersion(allVersions)
 }
 
-lazy val setReleaseVersionToChart: ReleaseStep = { state: State =>
-  val version = findVersion(_._1, state)
+lazy val writeVersionToChart = taskKey[Unit]("Write release version to Chart.yaml")
 
-  writeChartVersion(version)
+writeVersionToChart := {
+  val version = readVersionFromVersionSbt
 
-  state
-}
-
-val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
-
-def writeChartVersion(version: String): Unit = {
+  val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
 
   val fileLines = IO.readLines(chartFile)
   val updatedLines = fileLines.map {
@@ -251,16 +244,19 @@ def writeChartVersion(version: String): Unit = {
   IO.writeLines(chartFile, updatedLines)
 }
 
-lazy val checkTagExists = taskKey[Unit]("Checks if tag already exists")
-
-checkTagExists := {
-  val versionFile = root.base / "version.sbt"
-  val version = IO
-    .readLines(versionFile)
+def readVersionFromVersionSbt: String =
+  IO
+    .readLines(root.base / "version.sbt")
     .mkString("")
     .trim
     .replace("version in ThisBuild := ", "")
     .replace("\"", "")
+
+lazy val checkTagExists = taskKey[Unit]("Checks if tag already exists")
+
+checkTagExists := {
+
+  val version = readVersionFromVersionSbt
 
   val tagExists = Vcs
     .detect(root.base)

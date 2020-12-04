@@ -136,7 +136,22 @@ jobs:
       HELM_TGZ: helm-v2.8.2-linux-amd64.tar.gz
     steps:
       - uses: actions/checkout@v2
-      - name: set up environment variables
+      - name: Set up JDK 1.11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.11
+      - name: Setup cache
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.ivy2
+            ~/.sbt
+          key: ${{ runner.os }}-sbt-${{ hashFiles('**/build.sbt') }}
+      - name: Write version to Chart.yaml
+        run: |
+          sudo rm -rf .git/index.lock
+          sbt writeVersionToChart
+      - name: Set environment variables
         run: |
           echo "GIT_USER=Renku Bot" >> $GITHUB_ENV
           echo "GIT_EMAIL=renku@datascience.ch" >> $GITHUB_ENV
