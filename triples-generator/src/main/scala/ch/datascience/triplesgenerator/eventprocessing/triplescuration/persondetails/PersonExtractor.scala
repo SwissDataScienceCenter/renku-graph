@@ -2,13 +2,11 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 package persondetails
 
 import cats.MonadError
-import cats.data.NonEmptyList
 import cats.syntax.all._
-import ch.datascience.graph.model.users.{Email, GitLabId, Name, ResourceId}
+import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.Person
 import io.circe.Json
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath.root

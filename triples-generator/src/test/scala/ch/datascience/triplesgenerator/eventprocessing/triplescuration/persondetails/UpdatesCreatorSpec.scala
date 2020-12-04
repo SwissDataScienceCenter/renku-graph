@@ -18,17 +18,14 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
-import cats.data.NonEmptyList
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles.renkuBaseUrl
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.{Person => UpdatedPerson}
-import eu.timepit.refined.auto._
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.{Person => UpdatedPerson}
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

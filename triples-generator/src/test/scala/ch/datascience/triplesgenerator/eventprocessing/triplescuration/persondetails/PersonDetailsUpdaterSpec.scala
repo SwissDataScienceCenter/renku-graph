@@ -1,28 +1,28 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
+import PersonDetailsGenerators._
 import cats.MonadError
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators._
 import ch.datascience.generators.Generators.Implicits.GenOps
-import ch.datascience.graph.model.GraphModelGenerators.{userEmails, userNames, userResourceIds}
+import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.projects
+import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.Person
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import PersonDetailsGenerators._
+
 import scala.util.{Success, Try}
 
 class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   "curate" should {
 
-    "extract persons and prepare updates for extracted persons" in new TestCase {
+    "extract persons, match with project members and prepare updates for extracted persons" in new TestCase {
       val curatedTriples              = curatedTriplesObjects[Try].generateOne
       val triplesWithoutPersonDetails = jsonLDTriples.generateOne
       val extractedPersons            = persons.generateSet()
@@ -31,6 +31,17 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
         .expects(curatedTriples.triples)
         .returning((triplesWithoutPersonDetails, extractedPersons).pure[Try])
 
+      //TODO: extract project path
+      //TODO: find access token
+      val projectMembers = gitLabProjectMembers.generateNonEmptyList().toList.toSet
+      (projectMembersFinder
+        .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
+        .expects(*, *)
+        .returning(projectMembers.pure[Try])
+
+      //TODO: match persons with project members
+
+      //TODO: updates to contain Sparql updates for schema:sameAs
       val newUpdatesGroups = extractedPersons.foldLeft(List.empty[CurationUpdatesGroup[Try]]) { (acc, person) =>
         val updatesGroup = curationUpdatesGroups[Try].generateOne
         (updatesCreator
@@ -61,11 +72,17 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
   }
 
   private trait TestCase {
-    val personExtractor = mock[PersonExtractor[Try]]
-    val updatesCreator  = mock[UpdatesCreator]
+    val personExtractor                 = mock[PersonExtractor[Try]]
+    val updatesCreator                  = mock[UpdatesCreator]
+    val projectMembersFinder            = mock[GitLabProjectMembersFinder[Try]]
+    val personsAndProjectMembersMatcher = mock[PersonsAndProjectMembersMatcher]
 
-    val updater = new PersonDetailsUpdaterImpl[Try](personExtractor, updatesCreator)
-
+    val updater = new PersonDetailsUpdaterImpl[Try](
+      personExtractor,
+      projectMembersFinder,
+      personsAndProjectMembersMatcher,
+      updatesCreator
+    )
   }
 
 }

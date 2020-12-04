@@ -18,39 +18,34 @@ import org.http4s.{EntityDecoder, Request, Response, Status}
 
 import scala.concurrent.ExecutionContext
 
-trait GitLabProjectMembersFinder[Interpretation[_]] {
+private trait GitLabProjectMembersFinder[Interpretation[_]] {
   def findProjectMembers(path: Path)(implicit
       maybeAccessToken:        Option[AccessToken]
-  ): Interpretation[Option[List[GitLabProjectMember]]]
+  ): Interpretation[Set[GitLabProjectMember]]
 }
 
-private class IOGitLabProjectMembersFinder(gitLabUrl:       GitLabUrl,
-                                           gitLabThrottler: Throttler[IO, GitLab],
-                                           logger:          Logger[IO]
+private class IOGitLabProjectMembersFinder(
+    gitLabUrl:       GitLabUrl,
+    gitLabThrottler: Throttler[IO, GitLab],
+    logger:          Logger[IO]
 )(implicit
-    maybeAccessToken: Option[AccessToken],
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
 ) extends IORestClient(gitLabThrottler, logger)
     with GitLabProjectMembersFinder[IO] {
 
-  override def findProjectMembers(path: Path)(implicit
-      maybeAccessToken:                 Option[AccessToken]
-  ): IO[Option[List[GitLabProjectMember]]] =
+  override def findProjectMembers(
+      path:                    Path
+  )(implicit maybeAccessToken: Option[AccessToken]): IO[Set[GitLabProjectMember]] =
     for {
       projectsUri <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(path.value)}/users")
-      users <-
-        send(request(GET, projectsUri, maybeAccessToken))(
-          mapTo[List[GitLabProjectMember]]
-        )
+      users       <- send(request(GET, projectsUri, maybeAccessToken))(mapResponse)
     } yield users
 
-  private def mapTo[OUT](implicit
-      decoder: EntityDecoder[IO, OUT]
-  ): PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[OUT]]] = {
-    case (Ok, _, response) => response.as[OUT].map(Option.apply)
-    case (NotFound, _, _)  => None.pure[IO]
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Set[GitLabProjectMember]]] = {
+    case (Ok, _, response) => response.as[List[GitLabProjectMember]].map(_.toSet)
+    case (NotFound, _, _)  => Set.empty[GitLabProjectMember].pure[IO]
   }
 
   private implicit lazy val projectDecoder: EntityDecoder[IO, List[GitLabProjectMember]] = {
@@ -62,19 +57,19 @@ private class IOGitLabProjectMembersFinder(gitLabUrl:       GitLabUrl,
         username <- cursor.downField("username").as[users.Username]
         name     <- cursor.downField("name").as[users.Name]
       } yield GitLabProjectMember(id, username, name)
-
     }
 
     jsonOf[IO, List[GitLabProjectMember]]
   }
-
 }
 
 private object IOGitLabProjectMembersFinder {
-  def apply(gitLabUrl:  GitLabUrl, gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
-      maybeAccessToken: Option[AccessToken],
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): GitLabProjectMembersFinder[IO] = new IOGitLabProjectMembersFinder(gitLabUrl, gitLabThrottler, logger)
+
+  def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
+      executionContext:      ExecutionContext,
+      contextShift:          ContextShift[IO],
+      timer:                 Timer[IO]
+  ): IO[GitLabProjectMembersFinder[IO]] = for {
+    gitLabUrl <- GitLabUrl[IO]()
+  } yield new IOGitLabProjectMembersFinder(gitLabUrl, gitLabThrottler, logger)
 }

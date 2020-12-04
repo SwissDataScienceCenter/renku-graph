@@ -20,19 +20,24 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 package persondetails
 
 import cats.MonadError
-import cats.data.NonEmptyList
+import cats.effect.{ContextShift, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.users.{Email, GitLabId, Name, ResourceId}
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.Person
+import ch.datascience.config.GitLab
+import ch.datascience.control.Throttler
+import io.chrisdavenport.log4cats.Logger
+
+import scala.concurrent.ExecutionContext
 
 private[triplescuration] trait PersonDetailsUpdater[Interpretation[_]] {
   def curate(curatedTriples: CuratedTriples[Interpretation]): Interpretation[CuratedTriples[Interpretation]]
 }
 
 private class PersonDetailsUpdaterImpl[Interpretation[_]](
-    personExtractor: PersonExtractor[Interpretation],
-    updatesCreator:  UpdatesCreator
-)(implicit ME:       MonadError[Interpretation, Throwable])
+    personExtractor:                 PersonExtractor[Interpretation],
+    projectMembersFinder:            GitLabProjectMembersFinder[Interpretation],
+    personsAndProjectMembersMatcher: PersonsAndProjectMembersMatcher,
+    updatesCreator:                  UpdatesCreator
+)(implicit ME:                       MonadError[Interpretation, Throwable])
     extends PersonDetailsUpdater[Interpretation] {
 
   import personExtractor._
@@ -46,21 +51,25 @@ private class PersonDetailsUpdaterImpl[Interpretation[_]](
       val newUpdatesGroups          = persons map prepareUpdates[Interpretation]
       CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
     }
-
 }
 
 private[triplescuration] object PersonDetailsUpdater {
 
-  def apply[Interpretation[_]]()(implicit
-      ME: MonadError[Interpretation, Throwable]
-  ): PersonDetailsUpdater[Interpretation] = new PersonDetailsUpdaterImpl[Interpretation](
-    PersonExtractor[Interpretation](),
+  import cats.effect.IO
+
+  def apply(
+      gitLabThrottler: Throttler[IO, GitLab],
+      logger:          Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[PersonDetailsUpdater[IO]] = for {
+    projectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
+  } yield new PersonDetailsUpdaterImpl[IO](
+    PersonExtractor[IO](),
+    projectMembersFinder,
+    new PersonsAndProjectMembersMatcher(),
     new UpdatesCreator
   )
-
-  final case class Person(id: ResourceId, maybeGitLabId: Option[GitLabId], name: Name, maybeEmail: Option[Email])
-
-  object Person {
-    def apply(id: ResourceId, name: Name, maybeEmail: Option[Email]): Person = Person(id, None, name, maybeEmail)
-  }
 }

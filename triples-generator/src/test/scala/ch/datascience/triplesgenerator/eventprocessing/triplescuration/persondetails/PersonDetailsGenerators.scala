@@ -1,10 +1,11 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
+
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.Person
 import org.scalacheck.Gen
 
 private object PersonDetailsGenerators {
+
   implicit val gitLabProjectMembers: Gen[GitLabProjectMember] = for {
     id       <- userGitLabIds
     username <- usernames

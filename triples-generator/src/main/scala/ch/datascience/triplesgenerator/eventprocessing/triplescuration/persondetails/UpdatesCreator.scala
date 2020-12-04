@@ -19,17 +19,15 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
 import cats.MonadError
-import cats.data.NonEmptyList
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.Person
 import eu.timepit.refined.auto._
 
-private[triplescuration] class UpdatesCreator {
+private class UpdatesCreator {
 
   def prepareUpdates[Interpretation[_]](
       persons:   Person

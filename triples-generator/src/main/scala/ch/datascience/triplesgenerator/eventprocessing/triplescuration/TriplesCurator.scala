@@ -78,11 +78,8 @@ private[eventprocessing] object IOTriplesCurator {
       timeRecorder:            SparqlQueryTimeRecorder[IO]
   )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[TriplesCurator[IO]] =
     for {
-      forkInfoUpdater     <- IOForkInfoUpdater(gitLabThrottler, logger, timeRecorder)
-      dataSetInfoEnricher <- IODataSetInfoEnricher(logger, timeRecorder)
-    } yield new TriplesCuratorImpl[IO](
-      PersonDetailsUpdater[IO](),
-      forkInfoUpdater,
-      dataSetInfoEnricher
-    )
+      personDetailsUpdater <- PersonDetailsUpdater(gitLabThrottler, logger)
+      forkInfoUpdater      <- IOForkInfoUpdater(gitLabThrottler, logger, timeRecorder)
+      dataSetInfoEnricher  <- IODataSetInfoEnricher(logger, timeRecorder)
+    } yield new TriplesCuratorImpl[IO](personDetailsUpdater, forkInfoUpdater, dataSetInfoEnricher)
 }

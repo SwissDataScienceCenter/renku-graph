@@ -1,5 +1,6 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
+import PersonDetailsGenerators._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.{accessTokens, personalAccessTokens}
@@ -12,7 +13,6 @@ import ch.datascience.http.client.AccessToken.PersonalAccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Encoder
 import io.circe.literal._
@@ -28,6 +28,7 @@ class GitLabProjectMembersFinderSpec
     with ExternalServiceStubbing
     with ScalaCheckPropertyChecks
     with should.Matchers {
+
   "findProjectMembers" should {
 
     "return a list of project members if service responds with OK and a valid body - personal access token case" in new TestCase {
@@ -42,23 +43,19 @@ class GitLabProjectMembersFinderSpec
               .willReturn(okJson(gitLabProjectMembers.asJson.noSpaces))
           }
 
-          finder.findProjectMembers(path)(Some(accessToken)).unsafeRunSync() shouldBe gitLabProjectMembers
+          finder.findProjectMembers(path)(Some(accessToken)).unsafeRunSync() shouldBe gitLabProjectMembers.toSet
       }
     }
 
-    "return no users when there's no project with the given path" in new TestCase {
+    "return an empty list when service responds with NOT_FOUND" in new TestCase {
 
-      forAll {
-        (path:                 model.projects.Path,
-         gitLabProjectMembers: List[GitLabProjectMember],
-         accessToken:          PersonalAccessToken
-        ) =>
-          stubFor {
-            get(s"/api/v4/projects/${urlEncode(path.toString)}/users")
-              .withHeader("PRIVATE-TOKEN", equalTo(accessToken.value))
-              .willReturn(notFound())
-          }
-          finder.findProjectMembers(path)(Some(accessToken)).unsafeRunSync() shouldBe Nil
+      forAll { (path: model.projects.Path, accessToken: PersonalAccessToken) =>
+        stubFor {
+          get(s"/api/v4/projects/${urlEncode(path.toString)}/users")
+            .withHeader("PRIVATE-TOKEN", equalTo(accessToken.value))
+            .willReturn(notFound())
+        }
+        finder.findProjectMembers(path)(Some(accessToken)).unsafeRunSync() shouldBe Set.empty
       }
     }
 
