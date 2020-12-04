@@ -40,7 +40,7 @@ final case class ToNew[Interpretation[_]](
 )(implicit ME:                      Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override val status: EventStatus = New
+  override lazy val status: EventStatus = New
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event 

@@ -32,14 +32,14 @@ import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 
 import java.time.Instant
 
-final case class ToTriplesGenerated[Interpretation[_]](
+private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
     eventId:                     CompoundEventId,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     now:                         () => Instant = () => Instant.now
 )(implicit ME:                   Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
-  override def status: events.EventStatus = TriplesGenerated
+  override lazy val status: events.EventStatus = TriplesGenerated
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event 
