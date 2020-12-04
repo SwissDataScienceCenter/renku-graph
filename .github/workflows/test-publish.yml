@@ -3,11 +3,6 @@ on:
   push:
     tags:
       - '*.*.*'
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
 env:
   SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
 jobs:
