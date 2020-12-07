@@ -51,14 +51,16 @@ class StatsFinderSpec
         statuses foreach store
 
         stats.statuses().unsafeRunSync() shouldBe Map(
-          New                             -> statuses.count(_ == New),
-          GeneratingTriples               -> statuses.count(_ == GeneratingTriples),
-          TriplesGenerated                -> statuses.count(_ == TriplesGenerated),
-          TransformingTriples             -> statuses.count(_ == TransformingTriples),
-          TriplesStore                    -> statuses.count(_ == TriplesStore),
-          Skipped                         -> statuses.count(_ == Skipped),
-          GenerationRecoverableFailure    -> statuses.count(_ == GenerationRecoverableFailure),
-          GenerationNonRecoverableFailure -> statuses.count(_ == GenerationNonRecoverableFailure)
+          New                                 -> statuses.count(_ == New),
+          GeneratingTriples                   -> statuses.count(_ == GeneratingTriples),
+          TriplesGenerated                    -> statuses.count(_ == TriplesGenerated),
+          TransformingTriples                 -> statuses.count(_ == TransformingTriples),
+          TriplesStore                        -> statuses.count(_ == TriplesStore),
+          Skipped                             -> statuses.count(_ == Skipped),
+          GenerationRecoverableFailure        -> statuses.count(_ == GenerationRecoverableFailure),
+          GenerationNonRecoverableFailure     -> statuses.count(_ == GenerationNonRecoverableFailure),
+          TransformationRecoverableFailure    -> statuses.count(_ == TransformationRecoverableFailure),
+          TransformationNonRecoverableFailure -> statuses.count(_ == TransformationNonRecoverableFailure)
         )
 
         queriesExecTimes.verifyExecutionTimeMeasured("statuses count")

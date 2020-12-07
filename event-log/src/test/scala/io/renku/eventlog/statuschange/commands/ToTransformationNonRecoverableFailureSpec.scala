@@ -39,7 +39,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 
-class ToGenerationNonRecoverableFailureSpec
+class ToTransformationNonRecoverableFailureSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with MockFactory
@@ -47,13 +47,13 @@ class ToGenerationNonRecoverableFailureSpec
 
   "command" should {
 
-    s"set status $GenerationNonRecoverableFailure on the event with the given id and $GeneratingTriples status" +
+    s"set status $TransformationNonRecoverableFailure on the event with the given id and $TransformingTriples status" +
       "decrement waiting events and under processing gauges for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         storeEvent(
           compoundEventIds.generateOne.copy(id = eventId.id),
-          EventStatus.GeneratingTriples,
+          EventStatus.TransformingTriples,
           executionDates.generateOne,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -63,7 +63,7 @@ class ToGenerationNonRecoverableFailureSpec
         val projectPath   = projectPaths.generateOne
         storeEvent(
           eventId,
-          EventStatus.GeneratingTriples,
+          EventStatus.TransformingTriples,
           executionDate,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -71,22 +71,22 @@ class ToGenerationNonRecoverableFailureSpec
           projectPath = projectPath
         )
 
-        findEvent(eventId) shouldBe Some((executionDate, GeneratingTriples, None))
+        findEvent(eventId) shouldBe Some((executionDate, TransformingTriples, None))
 
-        (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
+        (underTriplesTransformationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
-          ToGenerationNonRecoverableFailure[IO](eventId, maybeMessage, underTriplesGenerationGauge, currentTime)
+          ToTransformationNonRecoverableFailure[IO](eventId, maybeMessage, underTriplesTransformationGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvent(eventId) shouldBe Some((ExecutionDate(now), GenerationNonRecoverableFailure, maybeMessage))
+        findEvent(eventId) shouldBe Some((ExecutionDate(now), TransformationNonRecoverableFailure, maybeMessage))
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
 
-    EventStatus.all.filterNot(status => status == GeneratingTriples) foreach { eventStatus =>
+    EventStatus.all.filterNot(status => status == TransformingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
         s"and return ${UpdateResult.Conflict}" in new TestCase {
 
@@ -103,7 +103,11 @@ class ToGenerationNonRecoverableFailureSpec
 
           val maybeMessage = Gen.option(eventMessages).generateOne
           val command =
-            ToGenerationNonRecoverableFailure[IO](eventId, maybeMessage, underTriplesGenerationGauge, currentTime)
+            ToTransformationNonRecoverableFailure[IO](eventId,
+                                                      maybeMessage,
+                                                      underTriplesTransformationGauge,
+                                                      currentTime
+            )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -115,11 +119,11 @@ class ToGenerationNonRecoverableFailureSpec
   }
 
   private trait TestCase {
-    val underTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
-    val histogram                   = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val currentTime                 = mockFunction[Instant]
-    val eventId                     = compoundEventIds.generateOne
-    val eventBatchDate              = batchDates.generateOne
+    val underTriplesTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val histogram                       = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val currentTime                     = mockFunction[Instant]
+    val eventId                         = compoundEventIds.generateOne
+    val eventBatchDate                  = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 

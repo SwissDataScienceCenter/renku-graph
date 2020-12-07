@@ -40,16 +40,15 @@ private trait EventsDistributor[Interpretation[_]] {
 }
 
 private class EventsDistributorImpl[Interpretation[_]: Effect](
-    subscribers:                     Subscribers[Interpretation],
-    eventsFinder:                    EventFetcher[Interpretation],
-    statusUpdatesRunner:             StatusUpdatesRunner[Interpretation],
-    eventsSender:                    EventsSender[Interpretation],
-    underTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
-    underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
-    logger:                          Logger[Interpretation],
-    noEventSleep:                    FiniteDuration,
-    onErrorSleep:                    FiniteDuration
-)(implicit timer:                    Timer[Interpretation])
+    subscribers:                 Subscribers[Interpretation],
+    eventsFinder:                EventFetcher[Interpretation],
+    statusUpdatesRunner:         StatusUpdatesRunner[Interpretation],
+    eventsSender:                EventsSender[Interpretation],
+    underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
+    logger:                      Logger[Interpretation],
+    noEventSleep:                FiniteDuration,
+    onErrorSleep:                FiniteDuration
+)(implicit timer:                Timer[Interpretation])
     extends EventsDistributor[Interpretation] {
 
   import eventsSender._
@@ -110,11 +109,8 @@ private class EventsDistributorImpl[Interpretation[_]: Effect](
       url: SubscriberUrl,
       id:  CompoundEventId
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    val markEventFailed = ToNonRecoverableFailure[Interpretation](id,
-                                                                  EventMessage(exception),
-                                                                  underTriplesGenerationGauge,
-                                                                  underTriplesTransformationGauge
-    )
+    val markEventFailed =
+      ToGenerationNonRecoverableFailure[Interpretation](id, EventMessage(exception), underTriplesGenerationGauge)
     for {
       _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
       _ <- logger.error(exception)(s"Event $id, url = $url -> ${markEventFailed.status}")
@@ -148,13 +144,12 @@ private object IOEventsDistributor {
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
   def apply(
-      transactor:                      DbTransactor[IO, EventLogDB],
-      subscribers:                     Subscribers[IO],
-      eventsFinder:                    EventFetcher[IO],
-      underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
-      underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:                LabeledHistogram[IO, SqlQuery.Name],
-      logger:                          Logger[IO]
+      transactor:                  DbTransactor[IO, EventLogDB],
+      subscribers:                 Subscribers[IO],
+      eventsFinder:                EventFetcher[IO],
+      underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
+      logger:                      Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
@@ -168,7 +163,6 @@ private object IOEventsDistributor {
                                       updateCommandRunner,
                                       eventsSender,
                                       underTriplesGenerationGauge,
-                                      underTriplesTransformationGauge,
                                       logger,
                                       noEventSleep = NoEventSleep,
                                       onErrorSleep = OnErrorSleep

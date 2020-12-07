@@ -66,12 +66,11 @@ private[subscriptions] class SubscriptionCategoryRegistryImpl[Interpretation[_]:
 
 object IOSubscriptionCategoryRegistry {
   def apply(
-      transactor:                      DbTransactor[IO, EventLogDB],
-      waitingEventsGauge:              LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
-      underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:                LabeledHistogram[IO, SqlQuery.Name],
-      logger:                          Logger[IO]
+      transactor:                  DbTransactor[IO, EventLogDB],
+      waitingEventsGauge:          LabeledGauge[IO, projects.Path],
+      underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
+      logger:                      Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       timer:            Timer[IO],
@@ -82,7 +81,6 @@ object IOSubscriptionCategoryRegistry {
         unprocessed.SubscriptionCategory(transactor,
                                          waitingEventsGauge,
                                          underTriplesGenerationGauge,
-                                         underTriplesTransformationGauge,
                                          queriesExecTimes,
                                          logger
         )

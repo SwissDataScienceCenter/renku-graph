@@ -33,25 +33,23 @@ import io.renku.eventlog.{EventLogDB, EventMessage}
 import java.time.Instant
 import java.time.temporal.ChronoUnit.MINUTES
 
-final case class ToRecoverableFailure[Interpretation[_]](
+final case class ToTransformationRecoverableFailure[Interpretation[_]](
     eventId:                            CompoundEventId,
     maybeMessage:                       Option[EventMessage],
-    awaitingTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
-    underTriplesGenerationGauge:        LabeledGauge[Interpretation, projects.Path],
     awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
     now:                                () => Instant = () => Instant.now
 )(implicit ME:                          Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override lazy val status: EventStatus = GenerationRecoverableFailure
+  override lazy val status: EventStatus = TransformationRecoverableFailure
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event
           |SET status = $status, execution_date = ${now().plus(10, MINUTES)}, message = $maybeMessage
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND (status = ${GeneratingTriples: EventStatus} OR status = ${TransformingTriples: EventStatus})
+          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
           |""".stripMargin.update.run,
-    name = "generating/transforming_triples->recoverable_fail"
+    name = "transforming_triples->transformation_recoverable_fail"
   )
 
   override def updateGauges(
@@ -60,9 +58,7 @@ final case class ToRecoverableFailure[Interpretation[_]](
     case UpdateResult.Updated =>
       for {
         path <- findProjectPath(eventId)
-        _    <- awaitingTriplesGenerationGauge increment path
-        _    <- underTriplesGenerationGauge decrement path
-        _    <- awaitingTriplesTransformationGauge increment path // TODO set metrics according to status
+        _    <- awaitingTriplesTransformationGauge increment path
         _    <- underTriplesTransformationGauge decrement path
       } yield ()
     case _ => ME.unit

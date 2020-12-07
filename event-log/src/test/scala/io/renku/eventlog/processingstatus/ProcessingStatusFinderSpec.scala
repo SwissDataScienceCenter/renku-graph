@@ -18,8 +18,6 @@
 
 package io.renku.eventlog.processingstatus
 
-import java.time.temporal.ChronoUnit._
-
 import cats.data.NonEmptyList
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
@@ -37,23 +35,31 @@ import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.time.temporal.ChronoUnit._
+
 class ProcessingStatusFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
 
   "fetchStatus" should {
 
     "return ProcessingStatus for the given project " +
-      s"where $TriplesStore, $Skipped and $GenerationNonRecoverableFailure events are counted as done " +
+      s"where $TriplesStore, $Skipped, $GenerationNonRecoverableFailure, $TransformationNonRecoverableFailure events are counted as done " +
       "and all as total" in new TestCase {
 
         storeEvents(projectIds.generateOne, batchDates.generateOne, nonEmptyList(eventStatuses).generateOne)
 
         val toBeProcessedEvents = nonEmptyList(
-          Gen.oneOf(New, GeneratingTriples, TriplesGenerated, TransformingTriples, GenerationRecoverableFailure),
+          Gen.oneOf(New,
+                    GeneratingTriples,
+                    TriplesGenerated,
+                    TransformingTriples,
+                    GenerationRecoverableFailure,
+                    TransformationRecoverableFailure
+          ),
           minElements = 10,
           maxElements = 20
         ).generateOne
         val doneEvents = nonEmptyList(
-          Gen.oneOf(TriplesStore, Skipped, GenerationNonRecoverableFailure),
+          Gen.oneOf(TriplesStore, Skipped, GenerationNonRecoverableFailure, TransformationNonRecoverableFailure),
           minElements = 10,
           maxElements = 20
         ).generateOne
@@ -97,7 +103,9 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec
 
         val newerBatchDate = BatchDate(olderBatchDate.value.plus(1, MINUTES))
         val newerBatchStatuses =
-          nonEmptyList(Gen.oneOf(TriplesStore, Skipped, GenerationNonRecoverableFailure)).generateOne
+          nonEmptyList(
+            Gen.oneOf(TriplesStore, Skipped, GenerationNonRecoverableFailure, TransformationNonRecoverableFailure)
+          ).generateOne
         storeEvents(projectId, newerBatchDate, newerBatchStatuses)
 
         val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()

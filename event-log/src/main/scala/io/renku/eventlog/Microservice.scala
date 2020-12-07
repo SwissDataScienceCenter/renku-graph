@@ -105,7 +105,6 @@ object Microservice extends IOMicroservice {
         subscriptionCategoryRegistry <- IOSubscriptionCategoryRegistry(transactor,
                                                                        awaitingGenerationGauge,
                                                                        underTriplesGenerationGauge,
-                                                                       underTransformationGauge,
                                                                        queriesExecTimes,
                                                                        ApplicationLogger
                                         )

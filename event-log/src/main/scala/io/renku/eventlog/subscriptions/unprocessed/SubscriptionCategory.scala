@@ -30,12 +30,11 @@ import scala.concurrent.ExecutionContext
 
 private[subscriptions] object SubscriptionCategory {
   def apply(
-      transactor:                      DbTransactor[IO, EventLogDB],
-      waitingEventsGauge:              LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
-      underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:                LabeledHistogram[IO, SqlQuery.Name],
-      logger:                          Logger[IO]
+      transactor:                  DbTransactor[IO, EventLogDB],
+      waitingEventsGauge:          LabeledGauge[IO, projects.Path],
+      underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
+      logger:                      Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
@@ -45,14 +44,7 @@ private[subscriptions] object SubscriptionCategory {
     eventFetcher <-
       IOUnprocessedEventFetcher(transactor, waitingEventsGauge, underTriplesGenerationGauge, queriesExecTimes)
     eventsDistributor <-
-      IOEventsDistributor(transactor,
-                          subscribers,
-                          eventFetcher,
-                          underTriplesGenerationGauge,
-                          underTriplesTransformationGauge,
-                          queriesExecTimes,
-                          logger
-      )
+      IOEventsDistributor(transactor, subscribers, eventFetcher, underTriplesGenerationGauge, queriesExecTimes, logger)
     deserializer = SubscriptionRequestDeserializer[IO]()
   } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](subscribers, eventsDistributor, deserializer)
 }

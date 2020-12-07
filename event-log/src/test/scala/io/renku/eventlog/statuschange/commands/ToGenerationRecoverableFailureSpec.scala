@@ -48,7 +48,7 @@ class ToGenerationRecoverableFailureSpec
 
   "command" should {
 
-    s"set status $GenerationRecoverableFailure on the event with the given id and $GeneratingTriples status or $TransformingTriples status, " +
+    s"set status $GenerationRecoverableFailure on the event with the given id and $GeneratingTriples status, " +
       "increment waiting events gauge and decrement under processing gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
@@ -73,107 +73,68 @@ class ToGenerationRecoverableFailureSpec
           projectPath = projectPath
         )
 
-        storeEvent(
-          transformingEventId,
-          EventStatus.TransformingTriples,
-          executionDate,
-          eventDates.generateOne,
-          eventBodies.generateOne,
-          batchDate = eventBatchDate,
-          projectPath = projectPath
-        )
+        findEvent(eventId) shouldBe Some((executionDate, GeneratingTriples, None))
 
-        findEvent(eventId)             shouldBe Some((executionDate, GeneratingTriples, None))
-        findEvent(transformingEventId) shouldBe Some((executionDate, TransformingTriples, None))
-
-        (awaitingTriplesGenerationGauge.increment _).expects(projectPath).returning(IO.unit).repeated(2)
-        (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit).repeated(2)
-        (awaitingTransformationGauge.increment _)
-          .expects(projectPath)
-          .returning(IO.unit)
-          .repeated(2) // TODO should only be called once when TG implements the changes with transforming triples
-        (underTransformationGauge.decrement _).expects(projectPath).returning(IO.unit).repeated(2)
+        (awaitingTriplesGenerationGauge.increment _).expects(projectPath).returning(IO.unit)
+        (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
-          ToRecoverableFailure[IO](eventId,
-                                   maybeMessage,
-                                   awaitingTriplesGenerationGauge,
-                                   underTriplesGenerationGauge,
-                                   awaitingTransformationGauge,
-                                   underTransformationGauge,
-                                   currentTime
+          ToGenerationRecoverableFailure[IO](eventId,
+                                             maybeMessage,
+                                             awaitingTriplesGenerationGauge,
+                                             underTriplesGenerationGauge,
+                                             currentTime
           )
 
-        val transformingTriplesCommand =
-          ToRecoverableFailure[IO](
-            transformingEventId,
-            maybeMessage,
-            awaitingTriplesGenerationGauge,
-            underTriplesGenerationGauge,
-            awaitingTransformationGauge,
-            underTransformationGauge,
-            currentTime
-          )
-
-        (commandRunner run command).unsafeRunSync()                    shouldBe UpdateResult.Updated
-        (commandRunner run transformingTriplesCommand).unsafeRunSync() shouldBe UpdateResult.Updated
+        (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
         findEvent(eventId) shouldBe Some(
-          (ExecutionDate(now.plus(10, MINUTES)), GenerationRecoverableFailure, maybeMessage)
-        )
-        findEvent(transformingEventId) shouldBe Some(
           (ExecutionDate(now.plus(10, MINUTES)), GenerationRecoverableFailure, maybeMessage)
         )
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
 
-    EventStatus.all.filterNot(status => status == GeneratingTriples || status == TransformingTriples) foreach {
-      eventStatus =>
-        s"do nothing when updating event with $eventStatus status " +
-          s"and return ${UpdateResult.Conflict}" in new TestCase {
+    EventStatus.all.filterNot(status => status == GeneratingTriples) foreach { eventStatus =>
+      s"do nothing when updating event with $eventStatus status " +
+        s"and return ${UpdateResult.Conflict}" in new TestCase {
 
-            val executionDate = executionDates.generateOne
-            storeEvent(eventId,
-                       eventStatus,
-                       executionDate,
-                       eventDates.generateOne,
-                       eventBodies.generateOne,
-                       batchDate = eventBatchDate
+          val executionDate = executionDates.generateOne
+          storeEvent(eventId,
+                     eventStatus,
+                     executionDate,
+                     eventDates.generateOne,
+                     eventBodies.generateOne,
+                     batchDate = eventBatchDate
+          )
+
+          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+
+          val maybeMessage = Gen.option(eventMessages).generateOne
+          val command =
+            ToGenerationRecoverableFailure[IO](eventId,
+                                               maybeMessage,
+                                               awaitingTriplesGenerationGauge,
+                                               underTriplesGenerationGauge,
+                                               currentTime
             )
 
-            findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
-            val maybeMessage = Gen.option(eventMessages).generateOne
-            val command =
-              ToRecoverableFailure[IO](eventId,
-                                       maybeMessage,
-                                       awaitingTriplesGenerationGauge,
-                                       underTriplesGenerationGauge,
-                                       awaitingTransformationGauge,
-                                       underTransformationGauge,
-                                       currentTime
-              )
+          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
-            (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
-
-            findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
-
-            histogram.verifyExecutionTimeMeasured(command.query.name)
-          }
+          histogram.verifyExecutionTimeMeasured(command.query.name)
+        }
     }
   }
 
   private trait TestCase {
     val awaitingTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
     val underTriplesGenerationGauge    = mock[LabeledGauge[IO, projects.Path]]
-    val awaitingTransformationGauge    = mock[LabeledGauge[IO, projects.Path]]
-    val underTransformationGauge       = mock[LabeledGauge[IO, projects.Path]]
     val histogram                      = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val currentTime                    = mockFunction[Instant]
     val eventId                        = compoundEventIds.generateOne
-    val transformingEventId            = compoundEventIds.generateOne
     val eventBatchDate                 = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())

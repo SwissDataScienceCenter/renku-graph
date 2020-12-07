@@ -157,7 +157,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         val exception    = exceptions.generateOne
         val event        = newEvents.generateOne
 
-        val nonRecoverableStatusUpdate = CaptureAll[ToNonRecoverableFailure[IO]]()
+        val nonRecoverableStatusUpdate = CaptureAll[ToGenerationNonRecoverableFailure[IO]]()
 
         inSequence {
           givenEventLog(has = Some(failingEvent))
@@ -328,7 +328,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       val nextEvent    = newEvents.generateOne
       val subscriber   = subscriberUrls.generateOne
 
-      val nonRecoverableStatusUpdate = CaptureAll[ToNonRecoverableFailure[IO]]()
+      val nonRecoverableStatusUpdate = CaptureAll[ToGenerationNonRecoverableFailure[IO]]()
 
       inSequence {
         givenEventLog(has = Some(failingEvent))
@@ -390,7 +390,6 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       statusUpdatesRunner,
       eventsSender,
       underTriplesGenerationGauge,
-      underTriplesTransformationGauge,
       logger,
       noEventSleep = 250 millis,
       onErrorSleep = 250 millis

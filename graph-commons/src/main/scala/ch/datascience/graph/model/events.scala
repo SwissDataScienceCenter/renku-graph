@@ -18,13 +18,13 @@
 
 package ch.datascience.graph.model
 
-import java.time.{Clock, Instant}
-
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 import io.circe.Decoder
 import io.circe.Decoder.decodeString
+
+import java.time.{Clock, Instant}
 
 object events {
 
@@ -69,14 +69,17 @@ object events {
   object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator) {
 
     val all: Set[EventStatus] =
-      Set(New,
-          GeneratingTriples,
-          TriplesGenerated,
-          TransformingTriples,
-          TriplesStore,
-          Skipped,
-          GenerationRecoverableFailure,
-          GenerationNonRecoverableFailure
+      Set(
+        New,
+        GeneratingTriples,
+        TriplesGenerated,
+        TransformingTriples,
+        TriplesStore,
+        Skipped,
+        GenerationRecoverableFailure,
+        GenerationNonRecoverableFailure,
+        TransformationRecoverableFailure,
+        TransformationNonRecoverableFailure
       )
 
     final case object New extends EventStatus {

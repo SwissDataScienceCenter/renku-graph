@@ -33,13 +33,13 @@ import org.http4s.dsl.Http4sDsl
 import scala.util.control.NonFatal
 
 class StatusChangeEndpoint[Interpretation[_]: Effect](
-    statusUpdatesRunner:             StatusUpdatesRunner[Interpretation],
-    awaitingTriplesGenerationGauge:  LabeledGauge[Interpretation, projects.Path],
-    underTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
-    awaitingTransformationGauge:     LabeledGauge[Interpretation, projects.Path],
-    underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
-    logger:                          Logger[Interpretation]
-)(implicit ME:                       MonadError[Interpretation, Throwable])
+    statusUpdatesRunner:                StatusUpdatesRunner[Interpretation],
+    awaitingTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
+    underTriplesGenerationGauge:        LabeledGauge[Interpretation, projects.Path],
+    awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+    underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
+    logger:                             Logger[Interpretation]
+)(implicit ME:                          MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
   import ch.datascience.controllers.InfoMessage._
@@ -101,7 +101,7 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
           ToTriplesGenerated[Interpretation](
             eventId,
             underTriplesGenerationGauge,
-            awaitingTransformationGauge
+            awaitingTriplesTransformationGauge
           )
         case Skipped =>
           ToSkipped[Interpretation](eventId,
@@ -109,19 +109,21 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
                                     underTriplesGenerationGauge
           )
         case GenerationRecoverableFailure =>
-          ToRecoverableFailure[Interpretation](eventId,
-                                               maybeMessage,
-                                               awaitingTriplesGenerationGauge,
-                                               underTriplesGenerationGauge,
-                                               awaitingTransformationGauge,
-                                               underTriplesTransformationGauge
+          ToGenerationRecoverableFailure[Interpretation](eventId,
+                                                         maybeMessage,
+                                                         awaitingTriplesGenerationGauge,
+                                                         underTriplesGenerationGauge
           )
         case GenerationNonRecoverableFailure =>
-          ToNonRecoverableFailure[Interpretation](eventId,
-                                                  maybeMessage,
-                                                  underTriplesGenerationGauge,
-                                                  underTriplesTransformationGauge
+          ToGenerationNonRecoverableFailure[Interpretation](eventId, maybeMessage, underTriplesGenerationGauge)
+        case TransformationRecoverableFailure =>
+          ToTransformationRecoverableFailure[Interpretation](eventId,
+                                                             maybeMessage,
+                                                             awaitingTriplesTransformationGauge,
+                                                             underTriplesTransformationGauge
           )
+        case TransformationNonRecoverableFailure =>
+          ToTransformationNonRecoverableFailure[Interpretation](eventId, maybeMessage, underTriplesTransformationGauge)
         case other => throw new Exception(s"Transition to '$other' status unsupported")
       }
 
