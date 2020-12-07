@@ -1,4 +1,5 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
+
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
@@ -14,7 +15,8 @@ import io.circe.Decoder
 import org.http4s.Method.GET
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.io.{NotFound, Ok}
-import org.http4s.{EntityDecoder, Request, Response, Status}
+import org.http4s.util.CaseInsensitiveString
+import org.http4s._
 
 import scala.concurrent.ExecutionContext
 
@@ -37,16 +39,45 @@ private class IOGitLabProjectMembersFinder(
 
   override def findProjectMembers(
       path:                    Path
-  )(implicit maybeAccessToken: Option[AccessToken]): IO[Set[GitLabProjectMember]] =
-    for {
-      projectsUri <- validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(path.value)}/users")
-      users       <- send(request(GET, projectsUri, maybeAccessToken))(mapResponse)
-    } yield users
+  )(implicit maybeAccessToken: Option[AccessToken]): IO[Set[GitLabProjectMember]] = for {
+    users   <- fetch(s"$gitLabUrl/api/v4/projects/${urlEncode(path.value)}/users")
+    members <- fetch(s"$gitLabUrl/api/v4/projects/${urlEncode(path.value)}/members")
+  } yield users ++ members
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Set[GitLabProjectMember]]] = {
-    case (Ok, _, response) => response.as[List[GitLabProjectMember]].map(_.toSet)
-    case (NotFound, _, _)  => Set.empty[GitLabProjectMember].pure[IO]
+  private def fetch(
+      url:                     String,
+      maybePage:               Option[Int] = None,
+      allUsers:                Set[GitLabProjectMember] = Set.empty
+  )(implicit maybeAccessToken: Option[AccessToken]): IO[Set[GitLabProjectMember]] = for {
+    uri                     <- validateUri(merge(url, maybePage))
+    fetchedUsersAndNextPage <- send(request(GET, uri, maybeAccessToken))(mapResponse)
+    allUsers                <- addNextPage(url, allUsers, fetchedUsersAndNextPage)
+  } yield allUsers
+
+  private def merge(url: String, maybePage: Option[Int] = None) =
+    maybePage map (page => s"$url?page=$page") getOrElse url
+
+  private lazy val mapResponse
+      : PartialFunction[(Status, Request[IO], Response[IO]), IO[(Set[GitLabProjectMember], Option[Int])]] = {
+    case (Ok, _, response) =>
+      response
+        .as[List[GitLabProjectMember]]
+        .map(members => members.toSet -> maybeNextPage(response))
+    case (NotFound, _, _) =>
+      (Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[IO]
   }
+
+  private def addNextPage(
+      url:                          String,
+      allUsers:                     Set[GitLabProjectMember],
+      fetchedUsersAndMaybeNextPage: (Set[GitLabProjectMember], Option[Int])
+  )(implicit maybeAccessToken:      Option[AccessToken]): IO[Set[GitLabProjectMember]] = fetchedUsersAndMaybeNextPage match {
+    case (fetchedUsers, maybeNextPage @ Some(_)) => fetch(url, maybeNextPage, allUsers ++ fetchedUsers)
+    case (fetchedUsers, None)                    => (allUsers ++ fetchedUsers).pure[IO]
+  }
+
+  private def maybeNextPage(response: Response[IO]): Option[Int] =
+    response.headers.get(CaseInsensitiveString("X-Next-Page")).flatMap(_.value.toIntOption)
 
   private implicit lazy val projectDecoder: EntityDecoder[IO, List[GitLabProjectMember]] = {
     import ch.datascience.graph.model.users
