@@ -34,12 +34,14 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit.MINUTES
 
 final case class ToRecoverableFailure[Interpretation[_]](
-    eventId:                        CompoundEventId,
-    maybeMessage:                   Option[EventMessage],
-    awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-    underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
-    now:                            () => Instant = () => Instant.now
-)(implicit ME:                      Bracket[Interpretation, Throwable])
+    eventId:                            CompoundEventId,
+    maybeMessage:                       Option[EventMessage],
+    awaitingTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
+    underTriplesGenerationGauge:        LabeledGauge[Interpretation, projects.Path],
+    awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+    underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
+    now:                                () => Instant = () => Instant.now
+)(implicit ME:                          Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
   override lazy val status: EventStatus = RecoverableFailure
@@ -47,7 +49,7 @@ final case class ToRecoverableFailure[Interpretation[_]](
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event
           |SET status = $status, execution_date = ${now().plus(10, MINUTES)}, message = $maybeMessage
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
+          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND (status = ${GeneratingTriples: EventStatus} OR status = ${TransformingTriples: EventStatus})
           |""".stripMargin.update.run,
     name = "generating_triples->recoverable_fail"
   )
@@ -60,6 +62,8 @@ final case class ToRecoverableFailure[Interpretation[_]](
         path <- findProjectPath(eventId)
         _    <- awaitingTriplesGenerationGauge increment path
         _    <- underTriplesGenerationGauge decrement path
+        _    <- awaitingTriplesTransformationGauge increment path // TODO set metrics according to status
+        _    <- underTriplesTransformationGauge decrement path
       } yield ()
     case _ => ME.unit
   }

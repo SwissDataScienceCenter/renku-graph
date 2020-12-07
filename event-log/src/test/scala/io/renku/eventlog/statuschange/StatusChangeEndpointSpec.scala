@@ -66,10 +66,13 @@ class StatusChangeEndpointSpec
                                                  underTriplesGenerationGauge,
                                                  awaitingTransformationGauge
       ),
-      RecoverableFailure -> ToRecoverableFailure[IO](compoundEventIds.generateOne,
-                                                     eventMessages.generateOption,
-                                                     awaitingTriplesGenerationGauge,
-                                                     underTriplesGenerationGauge
+      RecoverableFailure -> ToRecoverableFailure[IO](
+        compoundEventIds.generateOne,
+        eventMessages.generateOption,
+        awaitingTriplesGenerationGauge,
+        underTriplesGenerationGauge,
+        awaitingTransformationGauge,
+        underTriplesTransformationGauge
       ),
       NonRecoverableFailure -> ToNonRecoverableFailure[IO](compoundEventIds.generateOne,
                                                            eventMessages.generateOption,
@@ -247,6 +250,7 @@ class StatusChangeEndpointSpec
       awaitingTriplesGenerationGauge,
       underTriplesGenerationGauge,
       awaitingTransformationGauge,
+      underTriplesTransformationGauge,
       logger
     ).changeStatus _
   }
@@ -273,9 +277,10 @@ class StatusChangeEndpointSpec
       }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
   }
 
-  private lazy val awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path] = new GaugeStub
-  private lazy val underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path] = new GaugeStub
-  private lazy val awaitingTransformationGauge:    LabeledGauge[IO, projects.Path] = new GaugeStub
+  private lazy val awaitingTriplesGenerationGauge:  LabeledGauge[IO, projects.Path] = new GaugeStub
+  private lazy val underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path] = new GaugeStub
+  private lazy val awaitingTransformationGauge:     LabeledGauge[IO, projects.Path] = new GaugeStub
+  private lazy val underTriplesTransformationGauge: LabeledGauge[IO, projects.Path] = new GaugeStub
   private class GaugeStub extends LabeledGauge[IO, projects.Path] {
     override def set(labelValue:       (projects.Path, Double)) = IO.unit
     override def increment(labelValue: projects.Path)           = IO.unit

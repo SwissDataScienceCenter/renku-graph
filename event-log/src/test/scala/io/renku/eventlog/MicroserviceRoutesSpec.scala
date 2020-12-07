@@ -213,15 +213,17 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       subscriptionCategoryRegistry: SubscriptionCategoryRegistry[IO],
       logger:                       Logger[IO]
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
-  class TestStatusChangeEndpoint(updateCommandsRunner:           StatusUpdatesRunner[IO],
-                                 awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
-                                 underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
-                                 awaitingTransformationGauge:    LabeledGauge[IO, projects.Path],
-                                 logger:                         Logger[IO]
+  class TestStatusChangeEndpoint(updateCommandsRunner:            StatusUpdatesRunner[IO],
+                                 awaitingTriplesGenerationGauge:  LabeledGauge[IO, projects.Path],
+                                 underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
+                                 awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
+                                 underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
+                                 logger:                          Logger[IO]
   ) extends StatusChangeEndpoint[IO](updateCommandsRunner,
                                      awaitingTriplesGenerationGauge,
                                      underTriplesGenerationGauge,
                                      awaitingTransformationGauge,
+                                     underTriplesTransformationGauge,
                                      logger
       )
 }

@@ -33,12 +33,13 @@ import org.http4s.dsl.Http4sDsl
 import scala.util.control.NonFatal
 
 class StatusChangeEndpoint[Interpretation[_]: Effect](
-    statusUpdatesRunner:            StatusUpdatesRunner[Interpretation],
-    awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-    underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
-    awaitingTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
-    logger:                         Logger[Interpretation]
-)(implicit ME:                      MonadError[Interpretation, Throwable])
+    statusUpdatesRunner:             StatusUpdatesRunner[Interpretation],
+    awaitingTriplesGenerationGauge:  LabeledGauge[Interpretation, projects.Path],
+    underTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
+    awaitingTransformationGauge:     LabeledGauge[Interpretation, projects.Path],
+    underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+    logger:                          Logger[Interpretation]
+)(implicit ME:                       MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
   import ch.datascience.controllers.InfoMessage._
@@ -111,7 +112,9 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
           ToRecoverableFailure[Interpretation](eventId,
                                                maybeMessage,
                                                awaitingTriplesGenerationGauge,
-                                               underTriplesGenerationGauge
+                                               underTriplesGenerationGauge,
+                                               awaitingTransformationGauge,
+                                               underTriplesTransformationGauge
           )
         case NonRecoverableFailure =>
           ToNonRecoverableFailure[Interpretation](eventId, maybeMessage, underTriplesGenerationGauge)
@@ -126,19 +129,21 @@ object IOStatusChangeEndpoint {
   import cats.effect.IO
 
   def apply(
-      transactor:                  DbTransactor[IO, EventLogDB],
-      awaitTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
-      awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
-      logger:                      Logger[IO]
-  )(implicit contextShift:         ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
+      transactor:                      DbTransactor[IO, EventLogDB],
+      awaitTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
+      underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
+      awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
+      underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
+      queriesExecTimes:                LabeledHistogram[IO, SqlQuery.Name],
+      logger:                          Logger[IO]
+  )(implicit contextShift:             ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {
       statusUpdatesRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
     } yield new StatusChangeEndpoint(statusUpdatesRunner,
                                      awaitTriplesGenerationGauge,
                                      underTriplesGenerationGauge,
                                      awaitingTransformationGauge,
+                                     underTriplesTransformationGauge,
                                      logger
     )
 }

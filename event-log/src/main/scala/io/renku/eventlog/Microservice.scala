@@ -18,9 +18,6 @@
 
 package io.renku.eventlog
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors.newFixedThreadPool
-
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
@@ -37,9 +34,10 @@ import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
 import io.renku.eventlog.subscriptions._
-import io.renku.eventlog.subscriptions.unprocessed.IOUnprocessedEventFetcher
 import pureconfig.ConfigSource
 
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors.newFixedThreadPool
 import scala.concurrent.ExecutionContext
 
 object Microservice extends IOMicroservice {
@@ -99,6 +97,7 @@ object Microservice extends IOMicroservice {
                                                        awaitingGenerationGauge,
                                                        underTriplesGeneration,
                                                        awaitingTransformationGauge,
+                                                       underTransformationGauge,
                                                        queriesExecTimes,
                                                        ApplicationLogger
                                 )
