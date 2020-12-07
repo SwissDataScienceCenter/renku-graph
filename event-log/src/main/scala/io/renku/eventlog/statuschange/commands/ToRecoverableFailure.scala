@@ -51,7 +51,7 @@ final case class ToRecoverableFailure[Interpretation[_]](
           |SET status = $status, execution_date = ${now().plus(10, MINUTES)}, message = $maybeMessage
           |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND (status = ${GeneratingTriples: EventStatus} OR status = ${TransformingTriples: EventStatus})
           |""".stripMargin.update.run,
-    name = "generating_triples->recoverable_fail"
+    name = "generating/transforming_triples->recoverable_fail"
   )
 
   override def updateGauges(

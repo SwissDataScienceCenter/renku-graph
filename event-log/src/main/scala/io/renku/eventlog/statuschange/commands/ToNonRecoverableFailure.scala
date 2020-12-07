@@ -33,11 +33,12 @@ import io.renku.eventlog.{EventLogDB, EventMessage}
 import java.time.Instant
 
 final case class ToNonRecoverableFailure[Interpretation[_]](
-    eventId:                     CompoundEventId,
-    maybeMessage:                Option[EventMessage],
-    underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-    now:                         () => Instant = () => Instant.now
-)(implicit ME:                   Bracket[Interpretation, Throwable])
+    eventId:                         CompoundEventId,
+    maybeMessage:                    Option[EventMessage],
+    underTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
+    underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                             () => Instant = () => Instant.now
+)(implicit ME:                       Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
   override lazy val status: EventStatus = NonRecoverableFailure
@@ -45,15 +46,20 @@ final case class ToNonRecoverableFailure[Interpretation[_]](
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event 
           |SET status = $status, execution_date = ${now()}, message = $maybeMessage
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
+          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND (status = ${GeneratingTriples: EventStatus} OR status = ${TransformingTriples: EventStatus})
           |""".stripMargin.update.run,
-    name = "generating_triples->non_recoverable_fail"
+    name = "generating/transforming_triples->non_recoverable_fail"
   )
 
   override def updateGauges(
       updateResult:      UpdateResult
   )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesGenerationGauge.decrement
-    case _                    => ME.unit
+    case UpdateResult.Updated =>
+      for {
+        path <- findProjectPath(eventId)
+        _    <- underTriplesGenerationGauge decrement path
+        _    <- underTriplesTransformationGauge decrement path
+      } yield ()
+    case _ => ME.unit
   }
 }

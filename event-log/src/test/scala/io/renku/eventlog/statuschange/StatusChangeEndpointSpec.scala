@@ -76,7 +76,8 @@ class StatusChangeEndpointSpec
       ),
       NonRecoverableFailure -> ToNonRecoverableFailure[IO](compoundEventIds.generateOne,
                                                            eventMessages.generateOption,
-                                                           underTriplesGenerationGauge
+                                                           underTriplesGenerationGauge,
+                                                           underTriplesTransformationGauge
       )
     )
     forAll(scenarios) { (status, command) =>

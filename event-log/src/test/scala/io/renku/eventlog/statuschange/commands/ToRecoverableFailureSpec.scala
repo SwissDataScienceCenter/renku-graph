@@ -87,7 +87,7 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
         (awaitingTransformationGauge.increment _)
           .expects(projectPath)
           .returning(IO.unit)
-          .repeated(2) // TODO should only be called once when TG implements the changes
+          .repeated(2) // TODO should only be called once when TG implements the changes with transforming triples
         (underTransformationGauge.decrement _).expects(projectPath).returning(IO.unit).repeated(2)
 
         val maybeMessage = Gen.option(eventMessages).generateOne
@@ -112,12 +112,10 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
             currentTime
           )
 
-        (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
-
-        findEvent(eventId) shouldBe Some((ExecutionDate(now.plus(10, MINUTES)), RecoverableFailure, maybeMessage))
-
+        (commandRunner run command).unsafeRunSync()                    shouldBe UpdateResult.Updated
         (commandRunner run transformingTriplesCommand).unsafeRunSync() shouldBe UpdateResult.Updated
 
+        findEvent(eventId) shouldBe Some((ExecutionDate(now.plus(10, MINUTES)), RecoverableFailure, maybeMessage))
         findEvent(transformingEventId) shouldBe Some(
           (ExecutionDate(now.plus(10, MINUTES)), RecoverableFailure, maybeMessage)
         )

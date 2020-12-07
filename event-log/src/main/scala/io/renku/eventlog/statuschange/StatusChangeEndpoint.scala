@@ -117,7 +117,11 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
                                                underTriplesTransformationGauge
           )
         case NonRecoverableFailure =>
-          ToNonRecoverableFailure[Interpretation](eventId, maybeMessage, underTriplesGenerationGauge)
+          ToNonRecoverableFailure[Interpretation](eventId,
+                                                  maybeMessage,
+                                                  underTriplesGenerationGauge,
+                                                  underTriplesTransformationGauge
+          )
         case other => throw new Exception(s"Transition to '$other' status unsupported")
       }
 

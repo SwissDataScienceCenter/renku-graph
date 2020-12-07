@@ -181,7 +181,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         distributor.run().unsafeRunAsyncAndForget()
 
         nonRecoverableStatusUpdate.value.eventId                     shouldBe failingEvent.compoundEventId
-        nonRecoverableStatusUpdate.value.underTriplesGenerationGauge shouldBe underProcessingGauge
+        nonRecoverableStatusUpdate.value.underTriplesGenerationGauge shouldBe underTriplesGenerationGauge
         nonRecoverableStatusUpdate.value.maybeMessage                shouldBe EventMessage(exception)
 
         eventually {
@@ -356,7 +356,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       distributor.run().unsafeRunAsyncAndForget()
 
       nonRecoverableStatusUpdate.value.eventId                     shouldBe failingEvent.compoundEventId
-      nonRecoverableStatusUpdate.value.underTriplesGenerationGauge shouldBe underProcessingGauge
+      nonRecoverableStatusUpdate.value.underTriplesGenerationGauge shouldBe underTriplesGenerationGauge
       nonRecoverableStatusUpdate.value.maybeMessage                shouldBe EventMessage(exception)
 
       eventually {
@@ -373,18 +373,20 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
   private trait TestCase {
 
-    val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val subscribers          = mock[Subscribers[IO]]
-    val eventsFinder         = mock[EventFetcher[IO]]
-    val statusUpdatesRunner  = mock[StatusUpdatesRunner[IO]]
-    val eventsSender         = mock[EventsSender[IO]]
-    val logger               = TestLogger[IO]()
+    val underTriplesGenerationGauge     = mock[LabeledGauge[IO, projects.Path]]
+    val underTriplesTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val subscribers                     = mock[Subscribers[IO]]
+    val eventsFinder                    = mock[EventFetcher[IO]]
+    val statusUpdatesRunner             = mock[StatusUpdatesRunner[IO]]
+    val eventsSender                    = mock[EventsSender[IO]]
+    val logger                          = TestLogger[IO]()
     val distributor = new EventsDistributorImpl[IO](
       subscribers,
       eventsFinder,
       statusUpdatesRunner,
       eventsSender,
-      underProcessingGauge,
+      underTriplesGenerationGauge,
+      underTriplesTransformationGauge,
       logger,
       noEventSleep = 250 millis,
       onErrorSleep = 250 millis
