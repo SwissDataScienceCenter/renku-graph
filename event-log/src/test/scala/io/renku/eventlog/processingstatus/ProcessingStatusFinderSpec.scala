@@ -42,18 +42,18 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec
   "fetchStatus" should {
 
     "return ProcessingStatus for the given project " +
-      s"where $TriplesStore, $Skipped and $NonRecoverableFailure events are counted as done " +
+      s"where $TriplesStore, $Skipped and $GenerationNonRecoverableFailure events are counted as done " +
       "and all as total" in new TestCase {
 
         storeEvents(projectIds.generateOne, batchDates.generateOne, nonEmptyList(eventStatuses).generateOne)
 
         val toBeProcessedEvents = nonEmptyList(
-          Gen.oneOf(New, GeneratingTriples, TriplesGenerated, TransformingTriples, RecoverableFailure),
+          Gen.oneOf(New, GeneratingTriples, TriplesGenerated, TransformingTriples, GenerationRecoverableFailure),
           minElements = 10,
           maxElements = 20
         ).generateOne
         val doneEvents = nonEmptyList(
-          Gen.oneOf(TriplesStore, Skipped, NonRecoverableFailure),
+          Gen.oneOf(TriplesStore, Skipped, GenerationNonRecoverableFailure),
           minElements = 10,
           maxElements = 20
         ).generateOne
@@ -95,8 +95,9 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec
         val olderBatchStatuses = nonEmptyList(eventStatuses).generateOne
         storeEvents(projectId, olderBatchDate, olderBatchStatuses)
 
-        val newerBatchDate     = BatchDate(olderBatchDate.value.plus(1, MINUTES))
-        val newerBatchStatuses = nonEmptyList(Gen.oneOf(TriplesStore, Skipped, NonRecoverableFailure)).generateOne
+        val newerBatchDate = BatchDate(olderBatchDate.value.plus(1, MINUTES))
+        val newerBatchStatuses =
+          nonEmptyList(Gen.oneOf(TriplesStore, Skipped, GenerationNonRecoverableFailure)).generateOne
         storeEvents(projectId, newerBatchDate, newerBatchStatuses)
 
         val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()

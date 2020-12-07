@@ -149,7 +149,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         }
       }
 
-    s"mark event with $NonRecoverableFailure status when sending it failed " +
+    s"mark event with $GenerationNonRecoverableFailure status when sending it failed " +
       "and continue processing next event" in new TestCase {
 
         val subscriber   = subscriberUrls.generateOne
@@ -186,7 +186,9 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
         eventually {
           logger.loggedOnly(
-            Error(s"Event ${failingEvent.compoundEventId}, url = $subscriber -> $NonRecoverableFailure", exception),
+            Error(s"Event ${failingEvent.compoundEventId}, url = $subscriber -> $GenerationNonRecoverableFailure",
+                  exception
+            ),
             Info(s"Event ${event.compoundEventId}, url = $subscriber -> $Delivered")
           )
         }
@@ -361,8 +363,10 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Error(s"Marking event as $NonRecoverableFailure failed", exception),
-          Error(s"Event ${failingEvent.compoundEventId}, url = $subscriber -> $NonRecoverableFailure", exception),
+          Error(s"Marking event as $GenerationNonRecoverableFailure failed", exception),
+          Error(s"Event ${failingEvent.compoundEventId}, url = $subscriber -> $GenerationNonRecoverableFailure",
+                exception
+          ),
           Info(s"Event ${nextEvent.compoundEventId}, url = $subscriber -> $Delivered")
         )
       }

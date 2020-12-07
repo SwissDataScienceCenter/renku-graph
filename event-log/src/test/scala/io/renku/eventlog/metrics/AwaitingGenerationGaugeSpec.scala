@@ -69,7 +69,7 @@ class AwaitingGenerationGaugeSpec extends AnyWordSpec with MockFactory with shou
 
       val waitingEvents = waitingEventsGen.generateOne
       (statsFinder.countEvents _)
-        .expects(Set(New, RecoverableFailure), Some(NumberOfProjects))
+        .expects(Set(New, GenerationRecoverableFailure), Some(NumberOfProjects))
         .returning(waitingEvents.pure[IO])
 
       AwaitingGenerationGauge(metricsRegistry, statsFinder, TestLogger()).flatMap(_.reset()).unsafeRunSync()

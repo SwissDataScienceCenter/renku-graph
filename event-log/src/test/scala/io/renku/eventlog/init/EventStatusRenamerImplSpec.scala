@@ -49,23 +49,44 @@ class EventStatusRenamerImplSpec
   )
 
   "run" should {
-    s"rename all the events from PROCESSING to GENERATING_TRIPLES " in new TestCase {
-      val processingEvents = events.generateNonEmptyList(minElements = 2)
-      processingEvents.map(event => store(event, withStatus = "PROCESSING"))
-      val otherEvents = events.generateNonEmptyList()
-      otherEvents.map(event => store(event, withStatus = event.status.toString))
+    s"rename all the events from PROCESSING to GENERATING_TRIPLES, " +
+      s"RECOVERABLE_FAILURE to GENERATION_RECOVERABLE_FAILURE and " +
+      s"NON_RECOVERABLE_FAILURE to GENERATION_NON_RECOVERABLE_FAILURE" in new TestCase {
+        val processingEvents = events.generateNonEmptyList(minElements = 2)
+        processingEvents.map(event => store(event, withStatus = "PROCESSING"))
 
-      eventStatusRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+        val recoverableEvents = events.generateNonEmptyList(minElements = 2)
+        recoverableEvents.map(event => store(event, withStatus = "RECOVERABLE_FAILURE"))
 
-      findEvents(status = GeneratingTriples).eventIdsOnly.toSet shouldBe processingEvents
-        .map(_.compoundEventId)
-        .toList
-        .toSet
+        val nonRecoverableEvents = events.generateNonEmptyList(minElements = 2)
+        nonRecoverableEvents.map(event => store(event, withStatus = "NON_RECOVERABLE_FAILURE"))
 
-      logger.loggedOnly(Info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'"))
-    }
+        val otherEvents = events.generateNonEmptyList()
+        otherEvents.map(event => store(event, withStatus = event.status.toString))
 
-    s"Not to anything if there are no events with the status PROCESSING" in new TestCase {
+        eventStatusRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+
+        findEvents(status = GeneratingTriples).eventIdsOnly.toSet shouldBe processingEvents
+          .map(_.compoundEventId)
+          .toList
+          .toSet
+        findEvents(status = GenerationRecoverableFailure).eventIdsOnly.toSet shouldBe recoverableEvents
+          .map(_.compoundEventId)
+          .toList
+          .toSet
+        findEvents(status = GenerationNonRecoverableFailure).eventIdsOnly.toSet shouldBe nonRecoverableEvents
+          .map(_.compoundEventId)
+          .toList
+          .toSet
+
+        logger.loggedOnly(
+          Info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'"),
+          Info(s"'RECOVERABLE_FAILURE' event status renamed to 'GENERATION_RECOVERABLE_FAILURE'"),
+          Info(s"'NON_RECOVERABLE_FAILURE' event status renamed to 'GENERATION_NON_RECOVERABLE_FAILURE'")
+        )
+      }
+
+    s"Not do anything if there are no events with the status PROCESSING" in new TestCase {
       val otherEvents = events.generateNonEmptyList()
       otherEvents.map(event => store(event, withStatus = event.status.toString))
 
@@ -75,7 +96,11 @@ class EventStatusRenamerImplSpec
 
       findEventsId shouldBe otherEvents.map(_.id).toList.toSet
 
-      logger.loggedOnly(Info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'"))
+      logger.loggedOnly(
+        Info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'"),
+        Info(s"'RECOVERABLE_FAILURE' event status renamed to 'GENERATION_RECOVERABLE_FAILURE'"),
+        Info(s"'NON_RECOVERABLE_FAILURE' event status renamed to 'GENERATION_NON_RECOVERABLE_FAILURE'")
+      )
     }
 
   }

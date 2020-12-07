@@ -75,8 +75,8 @@ object events {
           TransformingTriples,
           TriplesStore,
           Skipped,
-          RecoverableFailure,
-          NonRecoverableFailure
+          GenerationRecoverableFailure,
+          GenerationNonRecoverableFailure
       )
 
     final case object New extends EventStatus {
@@ -106,15 +106,25 @@ object events {
 
     sealed trait FailureStatus extends EventStatus
 
-    final case object RecoverableFailure extends FailureStatus {
-      override val value: String = "RECOVERABLE_FAILURE"
+    final case object GenerationRecoverableFailure extends FailureStatus {
+      override val value: String = "GENERATION_RECOVERABLE_FAILURE"
     }
-    type RecoverableFailure = RecoverableFailure.type
+    type GenerationRecoverableFailure = GenerationRecoverableFailure.type
 
-    final case object NonRecoverableFailure extends FailureStatus with FinalStatus {
-      override val value: String = "NON_RECOVERABLE_FAILURE"
+    final case object GenerationNonRecoverableFailure extends FailureStatus with FinalStatus {
+      override val value: String = "GENERATION_NON_RECOVERABLE_FAILURE"
     }
-    type NonRecoverableFailure = NonRecoverableFailure.type
+    type GenerationNonRecoverableFailure = GenerationNonRecoverableFailure.type
+
+    final case object TransformationRecoverableFailure extends FailureStatus {
+      override val value: String = "TRANSFORMATION_RECOVERABLE_FAILURE"
+    }
+    type TransformationRecoverableFailure = TransformationRecoverableFailure.type
+
+    final case object TransformationNonRecoverableFailure extends FailureStatus with FinalStatus {
+      override val value: String = "TRANSFORMATION_NON_RECOVERABLE_FAILURE"
+    }
+    type TransformationNonRecoverableFailure = TransformationNonRecoverableFailure.type
 
     implicit val eventStatusDecoder: Decoder[EventStatus] = decodeString.emap { value =>
       Either.fromOption(

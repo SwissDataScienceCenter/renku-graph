@@ -66,7 +66,7 @@ class StatusChangeEndpointSpec
                                                  underTriplesGenerationGauge,
                                                  awaitingTransformationGauge
       ),
-      RecoverableFailure -> ToRecoverableFailure[IO](
+      GenerationRecoverableFailure -> ToRecoverableFailure[IO](
         compoundEventIds.generateOne,
         eventMessages.generateOption,
         awaitingTriplesGenerationGauge,
@@ -74,10 +74,10 @@ class StatusChangeEndpointSpec
         awaitingTransformationGauge,
         underTriplesTransformationGauge
       ),
-      NonRecoverableFailure -> ToNonRecoverableFailure[IO](compoundEventIds.generateOne,
-                                                           eventMessages.generateOption,
-                                                           underTriplesGenerationGauge,
-                                                           underTriplesTransformationGauge
+      GenerationNonRecoverableFailure -> ToNonRecoverableFailure[IO](compoundEventIds.generateOne,
+                                                                     eventMessages.generateOption,
+                                                                     underTriplesGenerationGauge,
+                                                                     underTriplesTransformationGauge
       )
     )
     forAll(scenarios) { (status, command) =>

@@ -59,13 +59,13 @@ class StatusNewPatchSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
       val event4Date    = eventDates.generateOne
       val event4Message = Some(eventMessages.generateOne)
       val event4ExecutionDate: Gen[ExecutionDate] = timestampsNotInTheFuture.map(ExecutionDate.apply)
-      addEvent(event4Id, NonRecoverableFailure, event4ExecutionDate, event4Date, event4Message)
+      addEvent(event4Id, GenerationNonRecoverableFailure, event4ExecutionDate, event4Date, event4Message)
       val event5Id   = compoundEventIds.generateOne
       val event5Date = eventDates.generateOne
       addEvent(event5Id, EventStatus.New, timestampsNotInTheFuture.map(ExecutionDate.apply), event5Date)
       val event6Id   = compoundEventIds.generateOne
       val event6Date = eventDates.generateOne
-      addEvent(event6Id, RecoverableFailure, timestampsNotInTheFuture.map(ExecutionDate.apply), event6Date)
+      addEvent(event6Id, GenerationRecoverableFailure, timestampsNotInTheFuture.map(ExecutionDate.apply), event6Date)
 
       (waitingEventsGauge.reset _).expects().returning(IO.unit)
       (underProcessingGauge.reset _).expects().returning(IO.unit)

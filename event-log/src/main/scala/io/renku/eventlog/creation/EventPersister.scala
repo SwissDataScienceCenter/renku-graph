@@ -96,7 +96,7 @@ class EventPersisterImpl(
     SqlQuery({ fr"""
         SELECT batch_date
         FROM event
-        WHERE project_id = ${event.project.id} AND """ ++ `status IN`(New, RecoverableFailure, GeneratingTriples) ++ fr"""
+        WHERE project_id = ${event.project.id} AND """ ++ `status IN`(New, GenerationRecoverableFailure, GeneratingTriples) ++ fr"""
         ORDER BY batch_date DESC
         LIMIT 1"""
       }.query[BatchDate].option,

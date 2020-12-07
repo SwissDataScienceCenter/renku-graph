@@ -38,8 +38,9 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit.MINUTES
 
-class ToNonRecoverableFailureSpec
+class ToGenerationRecoverableFailureSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with MockFactory
@@ -47,8 +48,8 @@ class ToNonRecoverableFailureSpec
 
   "command" should {
 
-    s"set status $NonRecoverableFailure on the event with the given id and $GeneratingTriples status or $TransformingTriples status, " +
-      "decrement waiting events and under processing gauges for the project " +
+    s"set status $GenerationRecoverableFailure on the event with the given id and $GeneratingTriples status or $TransformingTriples status, " +
+      "increment waiting events gauge and decrement under processing gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         storeEvent(
@@ -61,6 +62,7 @@ class ToNonRecoverableFailureSpec
         )
         val executionDate = executionDates.generateOne
         val projectPath   = projectPaths.generateOne
+
         storeEvent(
           eventId,
           EventStatus.GeneratingTriples,
@@ -70,8 +72,9 @@ class ToNonRecoverableFailureSpec
           batchDate = eventBatchDate,
           projectPath = projectPath
         )
+
         storeEvent(
-          transformingTriplesEventId,
+          transformingEventId,
           EventStatus.TransformingTriples,
           executionDate,
           eventDates.generateOne,
@@ -80,36 +83,48 @@ class ToNonRecoverableFailureSpec
           projectPath = projectPath
         )
 
-        findEvent(eventId)                    shouldBe Some((executionDate, GeneratingTriples, None))
-        findEvent(transformingTriplesEventId) shouldBe Some((executionDate, TransformingTriples, None))
+        findEvent(eventId)             shouldBe Some((executionDate, GeneratingTriples, None))
+        findEvent(transformingEventId) shouldBe Some((executionDate, TransformingTriples, None))
 
+        (awaitingTriplesGenerationGauge.increment _).expects(projectPath).returning(IO.unit).repeated(2)
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit).repeated(2)
-        (underTriplesTransformationGauge.decrement _)
+        (awaitingTransformationGauge.increment _)
           .expects(projectPath)
           .returning(IO.unit)
           .repeated(2) // TODO should only be called once when TG implements the changes with transforming triples
+        (underTransformationGauge.decrement _).expects(projectPath).returning(IO.unit).repeated(2)
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
-          ToNonRecoverableFailure[IO](eventId,
-                                      maybeMessage,
-                                      underTriplesGenerationGauge,
-                                      underTriplesTransformationGauge,
-                                      currentTime
+          ToRecoverableFailure[IO](eventId,
+                                   maybeMessage,
+                                   awaitingTriplesGenerationGauge,
+                                   underTriplesGenerationGauge,
+                                   awaitingTransformationGauge,
+                                   underTransformationGauge,
+                                   currentTime
           )
+
         val transformingTriplesCommand =
-          ToNonRecoverableFailure[IO](transformingTriplesEventId,
-                                      maybeMessage,
-                                      underTriplesGenerationGauge,
-                                      underTriplesTransformationGauge,
-                                      currentTime
+          ToRecoverableFailure[IO](
+            transformingEventId,
+            maybeMessage,
+            awaitingTriplesGenerationGauge,
+            underTriplesGenerationGauge,
+            awaitingTransformationGauge,
+            underTransformationGauge,
+            currentTime
           )
 
         (commandRunner run command).unsafeRunSync()                    shouldBe UpdateResult.Updated
         (commandRunner run transformingTriplesCommand).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvent(eventId)                    shouldBe Some((ExecutionDate(now), NonRecoverableFailure, maybeMessage))
-        findEvent(transformingTriplesEventId) shouldBe Some((ExecutionDate(now), NonRecoverableFailure, maybeMessage))
+        findEvent(eventId) shouldBe Some(
+          (ExecutionDate(now.plus(10, MINUTES)), GenerationRecoverableFailure, maybeMessage)
+        )
+        findEvent(transformingEventId) shouldBe Some(
+          (ExecutionDate(now.plus(10, MINUTES)), GenerationRecoverableFailure, maybeMessage)
+        )
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
@@ -132,11 +147,13 @@ class ToNonRecoverableFailureSpec
 
             val maybeMessage = Gen.option(eventMessages).generateOne
             val command =
-              ToNonRecoverableFailure[IO](eventId,
-                                          maybeMessage,
-                                          underTriplesGenerationGauge,
-                                          underTriplesTransformationGauge,
-                                          currentTime
+              ToRecoverableFailure[IO](eventId,
+                                       maybeMessage,
+                                       awaitingTriplesGenerationGauge,
+                                       underTriplesGenerationGauge,
+                                       awaitingTransformationGauge,
+                                       underTransformationGauge,
+                                       currentTime
               )
 
             (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
@@ -149,17 +166,20 @@ class ToNonRecoverableFailureSpec
   }
 
   private trait TestCase {
-    val underTriplesGenerationGauge     = mock[LabeledGauge[IO, projects.Path]]
-    val underTriplesTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
-    val histogram                       = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val currentTime                     = mockFunction[Instant]
-    val eventId                         = compoundEventIds.generateOne
-    val transformingTriplesEventId      = compoundEventIds.generateOne
-    val eventBatchDate                  = batchDates.generateOne
+    val awaitingTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val underTriplesGenerationGauge    = mock[LabeledGauge[IO, projects.Path]]
+    val awaitingTransformationGauge    = mock[LabeledGauge[IO, projects.Path]]
+    val underTransformationGauge       = mock[LabeledGauge[IO, projects.Path]]
+    val histogram                      = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val currentTime                    = mockFunction[Instant]
+    val eventId                        = compoundEventIds.generateOne
+    val transformingEventId            = compoundEventIds.generateOne
+    val eventBatchDate                 = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
+
 }

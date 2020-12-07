@@ -41,8 +41,8 @@ class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
       "GENERATING_TRIPLES"      -> GeneratingTriples,
       "TRIPLES_STORE"           -> TriplesStore,
       "SKIPPED"                 -> Skipped,
-      "RECOVERABLE_FAILURE"     -> RecoverableFailure,
-      "NON_RECOVERABLE_FAILURE" -> NonRecoverableFailure
+      "RECOVERABLE_FAILURE"     -> GenerationRecoverableFailure,
+      "NON_RECOVERABLE_FAILURE" -> GenerationNonRecoverableFailure
     )
 
     forAll(scenarios) { (stringValue, expectedStatus) =>

@@ -54,7 +54,7 @@ private class UnprocessedEventFetcherSpec
   "popEvent" should {
 
     "return an event with event date farthest in the past " +
-      s"and status $New or $RecoverableFailure " +
+      s"and status $New or $GenerationRecoverableFailure " +
       s"and mark it as $GeneratingTriples" in new TestCase {
 
         val projectId   = projectIds.generateOne
@@ -68,7 +68,7 @@ private class UnprocessedEventFetcherSpec
         )
 
         val (event2Id, event2Body, _, _) = createEvent(
-          status = EventStatus.RecoverableFailure,
+          status = EventStatus.GenerationRecoverableFailure,
           EventDate(now.minus(5, H)),
           projectId = projectId,
           projectPath = projectPath
@@ -113,7 +113,7 @@ private class UnprocessedEventFetcherSpec
       }
 
     "return no event when execution date is in the future " +
-      s"and status $New or $RecoverableFailure " in new TestCase {
+      s"and status $New or $GenerationRecoverableFailure " in new TestCase {
 
         val projectId   = projectIds.generateOne
         val projectPath = projectPaths.generateOne
@@ -125,7 +125,7 @@ private class UnprocessedEventFetcherSpec
         )
 
         val (_, _, event2Date, _) = createEvent(
-          status = RecoverableFailure,
+          status = GenerationRecoverableFailure,
           executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
           projectId = projectId,
           projectPath = projectPath
@@ -319,7 +319,7 @@ private class UnprocessedEventFetcherSpec
   private def executionDatesInThePast: Gen[ExecutionDate] = timestampsNotInTheFuture map ExecutionDate.apply
 
   private def readyStatuses = Gen
-    .oneOf(EventStatus.New, EventStatus.RecoverableFailure)
+    .oneOf(EventStatus.New, EventStatus.GenerationRecoverableFailure)
 
   private def createEvent(status:        EventStatus,
                           eventDate:     EventDate = eventDates.generateOne,

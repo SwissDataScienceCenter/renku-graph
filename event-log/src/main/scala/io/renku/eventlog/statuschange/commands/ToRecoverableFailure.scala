@@ -44,7 +44,7 @@ final case class ToRecoverableFailure[Interpretation[_]](
 )(implicit ME:                          Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override lazy val status: EventStatus = RecoverableFailure
+  override lazy val status: EventStatus = GenerationRecoverableFailure
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event

@@ -108,7 +108,7 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
                                     maybeMessage getOrElse (throw new Exception(s"$status status needs a message")),
                                     underTriplesGenerationGauge
           )
-        case RecoverableFailure =>
+        case GenerationRecoverableFailure =>
           ToRecoverableFailure[Interpretation](eventId,
                                                maybeMessage,
                                                awaitingTriplesGenerationGauge,
@@ -116,7 +116,7 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
                                                awaitingTransformationGauge,
                                                underTriplesTransformationGauge
           )
-        case NonRecoverableFailure =>
+        case GenerationNonRecoverableFailure =>
           ToNonRecoverableFailure[Interpretation](eventId,
                                                   maybeMessage,
                                                   underTriplesGenerationGauge,
