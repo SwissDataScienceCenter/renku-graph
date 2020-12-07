@@ -23,7 +23,9 @@ class PersonsAndProjectMembersMatcherSpec extends AnyWordSpec with should.Matche
           personWithId -> member
         }
 
-        matcher.merge(personsWithoutId, personsAndMembers.map(_._2)) shouldBe personsAndMembers.map(_._1)
+        matcher.merge(personsWithoutId,
+                      personsAndMembers.map { case (_, projectMember) => projectMember }
+        ) shouldBe personsAndMembers.map { case (personWithGitlabId, _) => personWithGitlabId }
       }
     }
 
@@ -38,8 +40,8 @@ class PersonsAndProjectMembersMatcherSpec extends AnyWordSpec with should.Matche
         personWithId -> member
       }
 
-      matcher.merge(personsWithoutId, personsAndMembers.map(_._2)) shouldBe
-        (personsAndMembers.map(_._1) + personsWithoutId.head)
+      matcher.merge(personsWithoutId, personsAndMembers.map { case (_, projectMember) => projectMember }) shouldBe
+        (personsAndMembers.map { case (personWithGitlabId, _) => personWithGitlabId } + personsWithoutId.head)
     }
 
     "do nothing if no persons given" in new TestCase {

@@ -16,5 +16,5 @@ private object PersonDetailsGenerators {
     id         <- userResourceIds
     name       <- userNames
     maybeEmail <- userEmails.toGeneratorOfOptions
-  } yield Person(id, maybeGitLabId = None, name, maybeEmail)
+  } yield Person(id, name, maybeEmail)
 }

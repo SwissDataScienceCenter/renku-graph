@@ -24,6 +24,7 @@ import cats.effect.{ContextShift, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -34,23 +35,32 @@ private[triplescuration] trait PersonDetailsUpdater[Interpretation[_]] {
 
 private class PersonDetailsUpdaterImpl[Interpretation[_]](
     personExtractor:                 PersonExtractor[Interpretation],
+    projectPathExtractor:            ProjectPathExtractor[Interpretation],
+    accessTokenFinder:               AccessTokenFinder[Interpretation],
     projectMembersFinder:            GitLabProjectMembersFinder[Interpretation],
     personsAndProjectMembersMatcher: PersonsAndProjectMembersMatcher,
     updatesCreator:                  UpdatesCreator
 )(implicit ME:                       MonadError[Interpretation, Throwable])
     extends PersonDetailsUpdater[Interpretation] {
 
+  import IOAccessTokenFinder._
+  import accessTokenFinder._
   import personExtractor._
+  import personsAndProjectMembersMatcher._
+  import projectMembersFinder._
+  import projectPathExtractor._
   import updatesCreator._
 
   def curate(curatedTriples: CuratedTriples[Interpretation]): Interpretation[CuratedTriples[Interpretation]] =
     for {
       triplesAndPersons <- extractPersons(curatedTriples.triples)
-    } yield {
-      val (updatedTriples, persons) = triplesAndPersons
-      val newUpdatesGroups          = persons map prepareUpdates[Interpretation]
-      CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
-    }
+      (updatedTriples, persons) = triplesAndPersons
+      projectPath      <- extractProjectPath(updatedTriples)
+      maybeAccessToken <- findAccessToken(projectPath)
+      projectMembers   <- findProjectMembers(projectPath)(maybeAccessToken)
+      personsWithGitlabIds = merge(persons, projectMembers)
+      newUpdatesGroups     = personsWithGitlabIds map prepareUpdates[Interpretation]
+    } yield CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
 }
 
 private[triplescuration] object PersonDetailsUpdater {
@@ -66,8 +76,11 @@ private[triplescuration] object PersonDetailsUpdater {
       timer:            Timer[IO]
   ): IO[PersonDetailsUpdater[IO]] = for {
     projectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
+    accessTokenFinder    <- IOAccessTokenFinder(logger)
   } yield new PersonDetailsUpdaterImpl[IO](
     PersonExtractor[IO](),
+    ProjectPathExtractor[IO](),
+    accessTokenFinder,
     projectMembersFinder,
     new PersonsAndProjectMembersMatcher(),
     new UpdatesCreator

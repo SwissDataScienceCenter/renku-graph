@@ -20,7 +20,6 @@ package ch.datascience.rdfstore.entities
 
 import cats.implicits.catsSyntaxOptionId
 import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId, SchemaVersion}
-import ch.datascience.rdfstore.FusekiBaseUrl
 
 final case class Project(path:               Path,
                          name:               Name,
@@ -37,10 +36,7 @@ object Project {
   import JsonLDEncoder._
   import io.renku.jsonld.syntax._
 
-  private[entities] implicit def converter(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): PartialEntityConverter[Project] =
+  private[entities] implicit def converter(implicit renkuBaseUrl: RenkuBaseUrl): PartialEntityConverter[Project] =
     new PartialEntityConverter[Project] {
       override def convert[T <: Project]: T => Either[Exception, PartialEntity] =
         entity =>
@@ -59,18 +55,14 @@ object Project {
         entity => (EntityId of ResourceId(renkuBaseUrl, entity.path)).some
     }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Project] =
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Project] =
     JsonLDEncoder.instance { entity =>
       entity.asPartialJsonLD[Project].getOrFail
     }
 
-  implicit def entityIdEncoder(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): EntityIdEncoder[Project] =
+  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Project] =
     EntityIdEncoder.instance { entity =>
       converter.toEntityId(entity).getOrElse(throw new IllegalStateException(s"No EntityId found for $entity"))
-
     }
 
   private implicit val projectResourceToEntityId: ResourceId => EntityId =

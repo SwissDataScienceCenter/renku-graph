@@ -32,11 +32,11 @@ import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples, entities}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import eu.timepit.refined.auto._
-import io.renku.jsonld.syntax._
+import io.circe.Json
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath.root
-import io.circe.{Decoder, Encoder, Json}
 import io.renku.jsonld.JsonLD
+import io.renku.jsonld.syntax._
 import monocle.function.Plated
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.AppendedClues

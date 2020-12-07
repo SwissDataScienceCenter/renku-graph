@@ -15,6 +15,10 @@ import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationG
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.projects.Path
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
+import ch.datascience.graph.tokenrepository.IOAccessTokenFinder.projectPathToPath
 
 import scala.util.{Success, Try}
 
@@ -23,26 +27,37 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
   "curate" should {
 
     "extract persons, match with project members and prepare updates for extracted persons" in new TestCase {
+
       val curatedTriples              = curatedTriplesObjects[Try].generateOne
       val triplesWithoutPersonDetails = jsonLDTriples.generateOne
       val extractedPersons            = persons.generateSet()
-
       (personExtractor.extractPersons _)
         .expects(curatedTriples.triples)
         .returning((triplesWithoutPersonDetails, extractedPersons).pure[Try])
 
-      //TODO: extract project path
-      //TODO: find access token
+      val projectPath = projectPaths.generateOne
+      (projectPathExtractor.extractProjectPath _)
+        .expects(triplesWithoutPersonDetails)
+        .returning(projectPath.pure[Try])
+
+      val maybeAccessToken = accessTokens.generateOption
+      (accessTokenFinder
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
+        .returning(maybeAccessToken.pure[Try])
+
       val projectMembers = gitLabProjectMembers.generateNonEmptyList().toList.toSet
       (projectMembersFinder
         .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
-        .expects(*, *)
+        .expects(projectPath, maybeAccessToken)
         .returning(projectMembers.pure[Try])
 
-      //TODO: match persons with project members
+      val personsWithGitlabIds = persons.generateSet()
+      (personsAndProjectMembersMatcher.merge _)
+        .expects(extractedPersons, projectMembers)
+        .returning(personsWithGitlabIds)
 
-      //TODO: updates to contain Sparql updates for schema:sameAs
-      val newUpdatesGroups = extractedPersons.foldLeft(List.empty[CurationUpdatesGroup[Try]]) { (acc, person) =>
+      val newUpdatesGroups = personsWithGitlabIds.foldLeft(List.empty[CurationUpdatesGroup[Try]]) { (acc, person) =>
         val updatesGroup = curationUpdatesGroups[Try].generateOne
         (updatesCreator
           .prepareUpdates[Try](_: Person)(_: MonadError[Try, Throwable]))
@@ -59,7 +74,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
       actualUpdates.drop(curatedTriples.updatesGroups.length)   should contain theSameElementsAs newUpdatesGroups
     }
 
-    "fail if extractPersons fails" in new TestCase {
+    "fail if extracting persons fails" in new TestCase {
 
       val curatedTriples = curatedTriplesObjects[Try].generateOne
       val exception      = exceptions.generateOne
@@ -69,16 +84,89 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
 
       updater.curate(curatedTriples) shouldBe exception.raiseError[Try, (JsonLDTriples, Set[Person])]
     }
+
+    "fail if extracting project path fails" in new TestCase {
+
+      val curatedTriples              = curatedTriplesObjects[Try].generateOne
+      val triplesWithoutPersonDetails = jsonLDTriples.generateOne
+      val extractedPersons            = persons.generateSet()
+      (personExtractor.extractPersons _)
+        .expects(curatedTriples.triples)
+        .returning((triplesWithoutPersonDetails, extractedPersons).pure[Try])
+
+      val exception = exceptions.generateOne
+      (projectPathExtractor.extractProjectPath _)
+        .expects(triplesWithoutPersonDetails)
+        .returning(exception.raiseError[Try, projects.Path])
+
+      updater.curate(curatedTriples) shouldBe exception.raiseError[Try, (JsonLDTriples, Set[Person])]
+    }
+
+    "fail if finding project access token fails" in new TestCase {
+
+      val curatedTriples              = curatedTriplesObjects[Try].generateOne
+      val triplesWithoutPersonDetails = jsonLDTriples.generateOne
+      val extractedPersons            = persons.generateSet()
+      (personExtractor.extractPersons _)
+        .expects(curatedTriples.triples)
+        .returning((triplesWithoutPersonDetails, extractedPersons).pure[Try])
+
+      val projectPath = projectPaths.generateOne
+      (projectPathExtractor.extractProjectPath _)
+        .expects(triplesWithoutPersonDetails)
+        .returning(projectPath.pure[Try])
+
+      val exception = exceptions.generateOne
+      (accessTokenFinder
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
+        .returning(exception.raiseError[Try, Option[AccessToken]])
+
+      updater.curate(curatedTriples) shouldBe exception.raiseError[Try, (JsonLDTriples, Set[Person])]
+    }
+
+    "fail if finding project members fails" in new TestCase {
+
+      val curatedTriples              = curatedTriplesObjects[Try].generateOne
+      val triplesWithoutPersonDetails = jsonLDTriples.generateOne
+      val extractedPersons            = persons.generateSet()
+      (personExtractor.extractPersons _)
+        .expects(curatedTriples.triples)
+        .returning((triplesWithoutPersonDetails, extractedPersons).pure[Try])
+
+      val projectPath = projectPaths.generateOne
+      (projectPathExtractor.extractProjectPath _)
+        .expects(triplesWithoutPersonDetails)
+        .returning(projectPath.pure[Try])
+
+      val maybeAccessToken = accessTokens.generateOption
+      (accessTokenFinder
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
+        .returning(maybeAccessToken.pure[Try])
+
+      val exception = exceptions.generateOne
+      (projectMembersFinder
+        .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(exception.raiseError[Try, Set[GitLabProjectMember]])
+
+      updater.curate(curatedTriples) shouldBe exception.raiseError[Try, (JsonLDTriples, Set[Person])]
+    }
   }
 
   private trait TestCase {
     val personExtractor                 = mock[PersonExtractor[Try]]
+    val projectPathExtractor            = mock[ProjectPathExtractor[Try]]
+    val accessTokenFinder               = mock[AccessTokenFinder[Try]]
     val updatesCreator                  = mock[UpdatesCreator]
     val projectMembersFinder            = mock[GitLabProjectMembersFinder[Try]]
     val personsAndProjectMembersMatcher = mock[PersonsAndProjectMembersMatcher]
 
     val updater = new PersonDetailsUpdaterImpl[Try](
       personExtractor,
+      projectPathExtractor,
+      accessTokenFinder,
       projectMembersFinder,
       personsAndProjectMembersMatcher,
       updatesCreator
