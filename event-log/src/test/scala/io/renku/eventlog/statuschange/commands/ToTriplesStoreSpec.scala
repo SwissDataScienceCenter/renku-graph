@@ -46,7 +46,9 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
       "decrement waiting events and under processing gauges for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
-        val projectPath = projectPaths.generateOne
+        val projectPath           = projectPaths.generateOne
+        val transfromingTriplesId = compoundEventIds.generateOne
+
         storeEvent(
           eventId,
           EventStatus.GeneratingTriples,
@@ -72,46 +74,63 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
           eventBodies.generateOne,
           batchDate = eventBatchDate
         )
+        storeEvent(
+          transfromingTriplesId,
+          EventStatus.TransformingTriples,
+          executionDates.generateOne,
+          eventDates.generateOne,
+          eventBodies.generateOne,
+          batchDate = eventBatchDate,
+          projectPath = projectPath
+        )
 
         findEvents(status = TriplesStore) shouldBe List.empty
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
         val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, currentTime)
-
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvents(status = TriplesStore) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
+        (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
+
+        val transformingTriplesCommand =
+          ToTriplesStore[IO](transfromingTriplesId, underTriplesGenerationGauge, currentTime)
+        (commandRunner run transformingTriplesCommand).unsafeRunSync() shouldBe UpdateResult.Updated
+
+        findEvents(status = TriplesStore) shouldBe List((eventId, ExecutionDate(now), eventBatchDate),
+                                                        (transfromingTriplesId, ExecutionDate(now), eventBatchDate)
+        )
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
 
-    EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
-      s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.Conflict}" in new TestCase {
+    EventStatus.all.filterNot(status => status == GeneratingTriples || status == TransformingTriples) foreach {
+      eventStatus =>
+        s"do nothing when updating event with $eventStatus status " +
+          s"and return ${UpdateResult.Conflict}" in new TestCase {
 
-          val executionDate = executionDates.generateOne
-          storeEvent(eventId,
-                     eventStatus,
-                     executionDate,
-                     eventDates.generateOne,
-                     eventBodies.generateOne,
-                     batchDate = eventBatchDate
-          )
+            val executionDate = executionDates.generateOne
+            storeEvent(eventId,
+                       eventStatus,
+                       executionDate,
+                       eventDates.generateOne,
+                       eventBodies.generateOne,
+                       batchDate = eventBatchDate
+            )
 
-          findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
+            findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-          val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, currentTime)
+            val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, currentTime)
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+            (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
-          val expectedEvents =
-            if (eventStatus != TriplesStore) List.empty
-            else List((eventId, executionDate, eventBatchDate))
-          findEvents(status = TriplesStore) shouldBe expectedEvents
+            val expectedEvents =
+              if (eventStatus != TriplesStore) List.empty
+              else List((eventId, executionDate, eventBatchDate))
+            findEvents(status = TriplesStore) shouldBe expectedEvents
 
-          histogram.verifyExecutionTimeMeasured(command.query.name)
-        }
+            histogram.verifyExecutionTimeMeasured(command.query.name)
+          }
     }
   }
 
