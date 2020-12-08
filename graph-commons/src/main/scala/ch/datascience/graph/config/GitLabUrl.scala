@@ -20,12 +20,14 @@ package ch.datascience.graph.config
 
 import cats.MonadError
 import ch.datascience.config.ConfigLoader.{find, stringTinyTypeReader}
-import ch.datascience.tinytypes.constraints.{Url, UrlOps}
+import ch.datascience.tinytypes.constraints.{Url, UrlOps, UrlResourceRenderer}
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
-final class GitLabUrl private (val value: String) extends AnyVal with StringTinyType
+final class GitLabUrl private (val value: String) extends AnyVal with StringTinyType {
+  def apiV4: GitLabApiUrl = GitLabApiUrl(this)
+}
 object GitLabUrl extends TinyTypeFactory[GitLabUrl](new GitLabUrl(_)) with Url with UrlOps[GitLabUrl] {
 
   private implicit val gitLabUrlReader: ConfigReader[GitLabUrl] = stringTinyTypeReader(GitLabUrl)
@@ -34,4 +36,13 @@ object GitLabUrl extends TinyTypeFactory[GitLabUrl](new GitLabUrl(_)) with Url w
       config:    Config = ConfigFactory.load
   )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[GitLabUrl] =
     find[Interpretation, GitLabUrl]("services.gitlab.url", config)
+}
+
+final class GitLabApiUrl private (val value: String) extends AnyVal with StringTinyType
+object GitLabApiUrl
+    extends TinyTypeFactory[GitLabApiUrl](new GitLabApiUrl(_))
+    with Url
+    with UrlOps[GitLabApiUrl]
+    with UrlResourceRenderer[GitLabApiUrl] {
+  def apply(gitLabUrl: GitLabUrl): GitLabApiUrl = new GitLabApiUrl((gitLabUrl / "api" / "v4").value)
 }

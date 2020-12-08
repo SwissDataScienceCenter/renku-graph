@@ -19,15 +19,19 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
 import cats.MonadError
-import ch.datascience.graph.model.users.{Email, Name, ResourceId}
+import ch.datascience.graph.model.users.{Email, GitLabId, Name, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import eu.timepit.refined.auto._
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
+import ch.datascience.graph.Schemas._
+import ch.datascience.graph.config.GitLabApiUrl
+import cats.syntax.all._
 
-private class UpdatesCreator {
+private class UpdatesCreator(gitLabApiUrl: GitLabApiUrl) {
 
   def prepareUpdates[Interpretation[_]](
       persons:   Person
@@ -37,22 +41,40 @@ private class UpdatesCreator {
       updates(persons): _*
     )
 
-  private def updates: Person => List[SparqlQuery] = { case Person(id, _, name, maybeEmail) =>
+  private def updates: Person => List[SparqlQuery] = { case Person(id, maybeGitLabId, name, maybeEmail) =>
     List(
-      nameUpdate(id, name),
-      emailsUpdate(id, maybeEmail),
-      labelsDelete(id)
+      fixLinksForNewPersonWithSameGitLabId(id, maybeGitLabId),
+      nameUpsert(id, name),
+      maybeEmailUpsert(id, maybeEmail),
+      maybeGitLabIdUpsert(id, maybeGitLabId),
+      labelsDelete(id),
+      deleteOldPersonWithSameGitLabId(id, maybeGitLabId)
     ).flatten
   }
 
-  private def nameUpdate(id: ResourceId, name: Name) = Some {
+  private def fixLinksForNewPersonWithSameGitLabId(id: ResourceId, maybeGitLabId: Option[GitLabId]) =
+    maybeGitLabId.map { gitLabId =>
+      val resource = id.showAs[RdfResource]
+      SparqlQuery.of(
+        name = "upload - person link fixing",
+        Prefixes.of(schema -> "schema"),
+        s"""|DELETE { ?id ?property ?personId }
+            |INSERT { ?id ?property $resource }
+            |WHERE {
+            |  ?personId schema:sameAs ?maybeSameAsId.
+            |  ?maybeSameAsId schema:additionalType 'GitLab';
+            |                 schema:identifier $gitLabId.
+            |  ?id ?property ?personId
+            |}
+            |""".stripMargin
+      )
+    }
+
+  private def nameUpsert(id: ResourceId, name: Name) = Some {
     val resource = id.showAs[RdfResource]
-    SparqlQuery(
-      name = "upload - person name update",
-      Set(
-        "PREFIX schema: <http://schema.org/>",
-        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
-      ),
+    SparqlQuery.of(
+      name = "upload - person name upsert",
+      Prefixes.of(schema -> "schema", rdf -> "rdf"),
       s"""|DELETE { $resource schema:name ?name }
           |${INSERT(resource, "schema:name", name)}
           |WHERE { 
@@ -63,39 +85,127 @@ private class UpdatesCreator {
     )
   }
 
-  private def emailsUpdate(id: ResourceId, maybeEmail: Option[Email]) = maybeEmail.map { email =>
+  private def maybeEmailUpsert(id: ResourceId, maybeEmail: Option[Email]) = {
     val resource = id.showAs[RdfResource]
-    SparqlQuery(
-      name = "upload - person email update",
-      Set(
-        "PREFIX schema: <http://schema.org/>",
-        "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>"
-      ),
-      s"""|DELETE { $resource schema:email ?email }
-          |${INSERT(resource, "schema:email", email)}
-          |WHERE  { 
-          |  OPTIONAL { $resource schema:email ?maybeEmail }
-          |  BIND (IF(BOUND(?maybeEmail), ?maybeEmail, "nonexisting") AS ?email)
-          |}
-          |""".stripMargin
-    )
-  }
+
+    maybeEmail match {
+      case Some(email) =>
+        SparqlQuery.of(
+          name = "upload - person email upsert",
+          Prefixes.of(schema -> "schema", rdf -> "rdf"),
+          s"""|DELETE { $resource schema:email ?email }
+              |${INSERT(resource, "schema:email", email)}
+              |WHERE  { 
+              |  OPTIONAL { $resource schema:email ?maybeEmail }
+              |  BIND (IF(BOUND(?maybeEmail), ?maybeEmail, "nonexisting") AS ?email)
+              |}
+              |""".stripMargin
+        )
+      case None =>
+        SparqlQuery.of(
+          name = "upload - person email delete",
+          Prefixes.of(schema -> "schema", rdf -> "rdf"),
+          s"""|DELETE { $resource schema:email ?email }
+              |WHERE  { 
+              |  OPTIONAL { $resource schema:email ?maybeEmail }
+              |  BIND (IF(BOUND(?maybeEmail), ?maybeEmail, "nonexisting") AS ?email)
+              |}
+              |""".stripMargin
+        )
+    }
+  }.some
+
+  private def maybeGitLabIdUpsert(id: ResourceId, maybeGitLabId: Option[GitLabId]) = {
+    val resource = id.showAs[RdfResource]
+
+    maybeGitLabId match {
+      case Some(gitLabId) =>
+        SparqlQuery.of(
+          name = "upload - gitlab id upsert",
+          Prefixes.of(schema -> "schema", rdf -> "rdf"),
+          s"""|DELETE { 
+              |  $resource schema:sameAs ?sameAsId.
+              |  ?sameAsId rdf:type schema:URL.
+              |  ?sameAsId schema:identifier ?gitLabId.
+              |  ?sameAsId schema:additionalType 'GitLab'.
+              |}
+              |${INSERT(resource, gitLabId)}
+              |WHERE  { 
+              |  OPTIONAL { 
+              |    $resource schema:sameAs ?maybeSameAsId.
+              |    ?maybeSameAsId schema:additionalType 'GitLab';
+              |                   schema:identifier ?gitLabId.
+              |  }
+              |  BIND (IF(BOUND(?maybeSameAsId), ?maybeSameAsId, "nonexisting") AS ?sameAsId)
+              |}
+              |""".stripMargin
+        )
+      case None =>
+        SparqlQuery.of(
+          name = "upload - gitlab id delete",
+          Prefixes.of(schema -> "schema", rdf -> "rdf"),
+          s"""|DELETE { 
+              |  $resource schema:sameAs ?sameAsId.
+              |  ?sameAsId rdf:type schema:URL.
+              |  ?sameAsId schema:identifier ?gitLabId.
+              |  ?sameAsId schema:additionalType 'GitLab'.
+              |}
+              |WHERE  { 
+              |  OPTIONAL { 
+              |    $resource schema:sameAs ?maybeSameAsId.
+              |    ?maybeSameAsId schema:additionalType 'GitLab';
+              |                   schema:identifier ?gitLabId.
+              |  }
+              |  BIND (IF(BOUND(?maybeSameAsId), ?maybeSameAsId, "nonexisting") AS ?sameAsId)
+              |}
+              |""".stripMargin
+        )
+    }
+  }.some
 
   private def labelsDelete(id: ResourceId) = Some {
     val resource = id.showAs[RdfResource]
-    SparqlQuery(
+    SparqlQuery.of(
       name = "upload - person label delete",
-      Set("PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>"),
+      Prefixes.of(rdfs -> "rdfs"),
       s"""|DELETE { $resource rdfs:label ?label }
           |WHERE  { $resource rdfs:label ?label }
           |""".stripMargin
     )
   }
 
+  private def deleteOldPersonWithSameGitLabId(id: ResourceId, maybeGitLabId: Option[GitLabId]) =
+    maybeGitLabId.map { gitLabId =>
+      val resource = id.showAs[RdfResource]
+      SparqlQuery.of(
+        name = "upload - same gitLabId person delete",
+        Prefixes.of(schema -> "schema"),
+        s"""|DELETE { ?personId ?property ?value }
+            |WHERE {
+            |  ?personId schema:sameAs ?maybeSameAsId.
+            |  ?maybeSameAsId schema:additionalType 'GitLab';
+            |                 schema:identifier $gitLabId.
+            |  FILTER (?personId != $resource)
+            |  ?personId ?property ?value
+            |}
+            |""".stripMargin
+      )
+    }
+
   private def INSERT[TT <: TinyType { type V = String }](resource: String, property: String, value: TT): String =
-    s"""|INSERT {\n
+    s"""|INSERT {
         |\t$resource rdf:type schema:Person.
-        |\t$resource $property '${sparqlEncode(value.value)}'\n
+        |\t$resource $property '${sparqlEncode(value.value)}'
         |}""".stripMargin
+
+  private def INSERT(resource: String, gitLabId: GitLabId): String = {
+    val sameAsId = (gitLabApiUrl / "users" / gitLabId).showAs[RdfResource]
+    s"""|INSERT {
+        |\t$resource schema:sameAs $sameAsId.
+        |\t$sameAsId rdf:type schema:URL.
+        |\t$sameAsId schema:identifier $gitLabId.
+        |\t$sameAsId schema:additionalType 'GitLab'.
+        |}""".stripMargin
+  }
 
 }

@@ -24,6 +24,7 @@ import cats.effect.{ContextShift, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import io.chrisdavenport.log4cats.Logger
 
@@ -77,12 +78,13 @@ private[triplescuration] object PersonDetailsUpdater {
   ): IO[PersonDetailsUpdater[IO]] = for {
     projectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
     accessTokenFinder    <- IOAccessTokenFinder(logger)
+    gitLabUrl            <- GitLabUrl[IO]()
   } yield new PersonDetailsUpdaterImpl[IO](
     PersonExtractor[IO](),
     ProjectPathExtractor[IO](),
     accessTokenFinder,
     projectMembersFinder,
     new PersonsAndProjectMembersMatcher(),
-    new UpdatesCreator
+    new UpdatesCreator(gitLabUrl.apiV4)
   )
 }

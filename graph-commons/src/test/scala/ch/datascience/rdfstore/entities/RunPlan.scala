@@ -19,6 +19,7 @@
 package ch.datascience.rdfstore.entities
 
 import cats.syntax.all._
+import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Argument.ArgumentFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory._
@@ -159,6 +160,7 @@ object RunPlan {
 
   private[entities] implicit def workflowRunPlanConverter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Entity with WorkflowRunPlan] = new PartialEntityConverter[Entity with WorkflowRunPlan] {
     self =>
@@ -196,6 +198,7 @@ object RunPlan {
 
   private[entities] implicit def processRunPlanConverter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Entity with ProcessRunPlan] =
     new PartialEntityConverter[Entity with ProcessRunPlan] {
@@ -216,6 +219,7 @@ object RunPlan {
 
   private[entities] implicit def runPlanConverter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Entity with RunPlan] = new PartialEntityConverter[Entity with RunPlan] {
     override def convert[T <: Entity with RunPlan]: T => Either[Exception, PartialEntity] = {
@@ -235,6 +239,7 @@ object RunPlan {
 
   implicit def workflowRUnPlanEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[Entity with WorkflowRunPlan] =
     JsonLDEncoder.instance { entity =>
@@ -243,6 +248,7 @@ object RunPlan {
 
   implicit def processRunPlanEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[Entity with ProcessRunPlan] =
     JsonLDEncoder.instance { entity =>

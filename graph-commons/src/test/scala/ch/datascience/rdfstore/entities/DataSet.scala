@@ -19,7 +19,7 @@
 package ch.datascience.rdfstore.entities
 
 import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.datasets._
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.DataSetPart.DataSetPartArtifact
@@ -143,6 +143,7 @@ object DataSet {
 
   private implicit def converter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[DataSetEntity] =
     new PartialEntityConverter[DataSetEntity] {
@@ -175,6 +176,7 @@ object DataSet {
 
   implicit def encoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[DataSetEntity] =
     JsonLDEncoder.instance { entity =>

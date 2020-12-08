@@ -1,9 +1,9 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
+import ch.datascience.generators.CommonGraphGenerators.{gitLabUrls, renkuBaseUrls}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.rdfstore.entities.ProjectsGenerators._
@@ -47,6 +47,7 @@ class ProjectPathExtractorSpec extends AnyWordSpec with should.Matchers {
 
   private trait TestCase {
     implicit val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
+    implicit val gitLabApiUrl: GitLabApiUrl = gitLabUrls.generateOne.apiV4
 
     val extractor = new ProjectPathExtractorImpl[Try]()
   }

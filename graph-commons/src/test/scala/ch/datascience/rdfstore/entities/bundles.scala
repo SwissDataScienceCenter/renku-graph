@@ -19,11 +19,11 @@
 package ch.datascience.rdfstore.entities
 
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.cliVersions
+import ch.datascience.generators.CommonGraphGenerators.{cliVersions, gitLabUrls}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}
 import ch.datascience.graph.Schemas
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, Description, Identifier, Keyword, Name, PartLocation, PartName, PublishedDate, SameAs, Title, TopmostDerivedFrom, TopmostSameAs, Url}
@@ -46,6 +46,7 @@ import org.scalacheck.Gen
 object bundles extends Schemas {
 
   implicit lazy val renkuBaseUrl: RenkuBaseUrl = RenkuBaseUrl("https://dev.renku.ch")
+  implicit lazy val gitLabApiUrl: GitLabApiUrl = gitLabUrls.generateOne.apiV4
 
   def generateAgent: Agent = Agent(cliVersions.generateOne)
 
