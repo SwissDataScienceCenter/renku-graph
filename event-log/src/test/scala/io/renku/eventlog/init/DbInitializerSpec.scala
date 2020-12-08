@@ -35,6 +35,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
     "succeed if all the migration processes run fine" in new TestCase {
 
       given(eventLogTableCreator).succeeds(returning = ())
+      given(eventPayloadTableCreator).succeeds(returning = ())
       given(projectPathAdder).succeeds(returning = ())
       given(batchDateAdder).succeeds(returning = ())
       given(viewRemover).succeeds(returning = ())
@@ -58,9 +59,21 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       } shouldBe exception
     }
 
+    "fail if creating the event_payload table fails" in new TestCase {
+
+      given(eventLogTableCreator).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(eventPayloadTableCreator).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        dbInitializer.run().unsafeRunSync()
+      } shouldBe exception
+    }
+
     "fail if adding the project_path column fails" in new TestCase {
 
       given(eventLogTableCreator).succeeds(returning = ())
+      given(eventPayloadTableCreator).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(projectPathAdder).fails(becauseOf = exception)
 
@@ -72,6 +85,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
     "fail if adding the batch_date column fails" in new TestCase {
 
       given(eventLogTableCreator).succeeds(returning = ())
+      given(eventPayloadTableCreator).succeeds(returning = ())
       given(projectPathAdder).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(batchDateAdder).fails(becauseOf = exception)
@@ -84,6 +98,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
     "fail if dropping the latest event dates view fails" in new TestCase {
 
       given(eventLogTableCreator).succeeds(returning = ())
+      given(eventPayloadTableCreator).succeeds(returning = ())
       given(projectPathAdder).succeeds(returning = ())
       given(batchDateAdder).succeeds(returning = ())
       val exception = exceptions.generateOne
@@ -97,6 +112,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
     "fail if creating the project table fails" in new TestCase {
 
       given(eventLogTableCreator).succeeds(returning = ())
+      given(eventPayloadTableCreator).succeeds(returning = ())
       given(projectPathAdder).succeeds(returning = ())
       given(batchDateAdder).succeeds(returning = ())
       given(viewRemover).succeeds(returning = ())
@@ -111,6 +127,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
     "fail if dropping the project_path column fails" in new TestCase {
 
       given(eventLogTableCreator).succeeds(returning = ())
+      given(eventPayloadTableCreator).succeeds(returning = ())
       given(projectPathAdder).succeeds(returning = ())
       given(batchDateAdder).succeeds(returning = ())
       given(viewRemover).succeeds(returning = ())
@@ -126,6 +143,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
     "fail if renaming the event_log table fails" in new TestCase {
 
       given(eventLogTableCreator).succeeds(returning = ())
+      given(eventPayloadTableCreator).succeeds(returning = ())
       given(projectPathAdder).succeeds(returning = ())
       given(batchDateAdder).succeeds(returning = ())
       given(viewRemover).succeeds(returning = ())
@@ -142,6 +160,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
     "fail if renaming the processing status fails" in new TestCase {
 
       given(eventLogTableCreator).succeeds(returning = ())
+      given(eventPayloadTableCreator).succeeds(returning = ())
       given(projectPathAdder).succeeds(returning = ())
       given(batchDateAdder).succeeds(returning = ())
       given(viewRemover).succeeds(returning = ())
@@ -159,17 +178,19 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
   }
 
   private trait TestCase {
-    val eventLogTableCreator = mock[EventLogTableCreator[IO]]
-    val projectPathAdder     = mock[ProjectPathAdder[IO]]
-    val batchDateAdder       = mock[BatchDateAdder[IO]]
-    val viewRemover          = mock[LatestEventDatesViewRemover[IO]]
-    val projectTableCreator  = mock[ProjectTableCreator[IO]]
-    val projectPathRemover   = mock[ProjectPathRemover[IO]]
-    val eventLogTableRenamer = mock[EventLogTableRenamer[IO]]
-    val eventStatusRenamer   = mock[EventStatusRenamer[IO]]
-    val logger               = TestLogger[IO]()
+    val eventLogTableCreator     = mock[EventLogTableCreator[IO]]
+    val eventPayloadTableCreator = mock[EventPayloadTableCreator[IO]]
+    val projectPathAdder         = mock[ProjectPathAdder[IO]]
+    val batchDateAdder           = mock[BatchDateAdder[IO]]
+    val viewRemover              = mock[LatestEventDatesViewRemover[IO]]
+    val projectTableCreator      = mock[ProjectTableCreator[IO]]
+    val projectPathRemover       = mock[ProjectPathRemover[IO]]
+    val eventLogTableRenamer     = mock[EventLogTableRenamer[IO]]
+    val eventStatusRenamer       = mock[EventStatusRenamer[IO]]
+    val logger                   = TestLogger[IO]()
     val dbInitializer = new DbInitializerImpl[IO](
       eventLogTableCreator,
+      eventPayloadTableCreator,
       projectPathAdder,
       batchDateAdder,
       viewRemover,

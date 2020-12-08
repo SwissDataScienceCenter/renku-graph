@@ -32,6 +32,7 @@ trait DbInitializer[Interpretation[_]] {
 
 class DbInitializerImpl[Interpretation[_]](
     eventLogTableCreator:        EventLogTableCreator[Interpretation],
+    eventPayloadTableCreator:    EventPayloadTableCreator[Interpretation],
     projectPathAdder:            ProjectPathAdder[Interpretation],
     batchDateAdder:              BatchDateAdder[Interpretation],
     latestEventDatesViewRemover: LatestEventDatesViewRemover[Interpretation],
@@ -46,6 +47,7 @@ class DbInitializerImpl[Interpretation[_]](
   override def run(): Interpretation[Unit] = {
     for {
       _ <- eventLogTableCreator.run()
+      _ <- eventPayloadTableCreator.run()
       _ <- projectPathAdder.run()
       _ <- batchDateAdder.run()
       _ <- latestEventDatesViewRemover.run()
@@ -70,6 +72,7 @@ object IODbInitializer {
   )(implicit contextShift: ContextShift[IO]): IO[DbInitializer[IO]] = IO {
     new DbInitializerImpl[IO](
       EventLogTableCreator(transactor, logger),
+      EventPayloadTableCreator(transactor, logger),
       ProjectPathAdder(transactor, logger),
       BatchDateAdder(transactor, logger),
       LatestEventDatesViewRemover[IO](transactor, logger),
