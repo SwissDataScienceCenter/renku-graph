@@ -27,7 +27,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
-import io.renku.eventlog.{EventLogDB, EventMessage}
+import io.renku.eventlog.{EventLogDB, EventMessage, EventPayload}
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal
@@ -94,12 +94,14 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
       for {
         status       <- cursor.downField("status").as[EventStatus]
         maybeMessage <- cursor.downField("message").as[Option[EventMessage]]
+        maybePayload <- cursor.downField("payload").as[Option[EventPayload]]
       } yield status match {
         case TriplesStore => ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge)
         case New          => ToNew[Interpretation](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
         case TriplesGenerated =>
           ToTriplesGenerated[Interpretation](
             eventId,
+            maybePayload getOrElse (throw new Exception(s"$status status needs a payload")),
             underTriplesGenerationGauge,
             awaitingTriplesTransformationGauge
           )

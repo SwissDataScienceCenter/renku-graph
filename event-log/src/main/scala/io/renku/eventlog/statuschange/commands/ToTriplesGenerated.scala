@@ -27,13 +27,14 @@ import ch.datascience.graph.model.{events, projects}
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.{EventLogDB, EventPayload}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 
 import java.time.Instant
 
 private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
     eventId:                     CompoundEventId,
+    payload:                     EventPayload,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     now:                         () => Instant = () => Instant.now

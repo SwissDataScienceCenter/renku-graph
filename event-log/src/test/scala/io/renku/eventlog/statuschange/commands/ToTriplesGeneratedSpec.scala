@@ -29,7 +29,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, executionDates}
+import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventPayloads, executionDates}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
@@ -77,8 +77,14 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
         (awaitingTransformationGauge.increment _).expects(projectPath).returning(IO.unit)
+
         val command =
-          ToTriplesGenerated[IO](eventId, underTriplesGenerationGauge, awaitingTransformationGauge, currentTime)
+          ToTriplesGenerated[IO](eventId,
+                                 payload,
+                                 underTriplesGenerationGauge,
+                                 awaitingTransformationGauge,
+                                 currentTime
+          )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -102,7 +108,12 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
           findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
           val command =
-            ToTriplesGenerated[IO](eventId, awaitingTransformationGauge, underTriplesGenerationGauge, currentTime)
+            ToTriplesGenerated[IO](eventId,
+                                   payload,
+                                   awaitingTransformationGauge,
+                                   underTriplesGenerationGauge,
+                                   currentTime
+            )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -124,6 +135,8 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     val currentTime    = mockFunction[Instant]
     val eventId        = compoundEventIds.generateOne
     val eventBatchDate = batchDates.generateOne
+
+    val payload = eventPayloads.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
