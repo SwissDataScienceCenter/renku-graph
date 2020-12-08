@@ -56,10 +56,10 @@ class EventStatusRenamerImplSpec
         processingEvents.map(event => store(event, withStatus = "PROCESSING"))
 
         val recoverableEvents = events.generateNonEmptyList(minElements = 2)
-        recoverableEvents.map(event => store(event, withStatus = "RECOVERABLE_FAILURE"))
+        recoverableEvents.map(event => store(event, withStatus = "GENERATION_RECOVERABLE_FAILURE"))
 
         val nonRecoverableEvents = events.generateNonEmptyList(minElements = 2)
-        nonRecoverableEvents.map(event => store(event, withStatus = "NON_RECOVERABLE_FAILURE"))
+        nonRecoverableEvents.map(event => store(event, withStatus = "GENERATION_NON_RECOVERABLE_FAILURE"))
 
         val otherEvents = events.generateNonEmptyList()
         otherEvents.map(event => store(event, withStatus = event.status.toString))

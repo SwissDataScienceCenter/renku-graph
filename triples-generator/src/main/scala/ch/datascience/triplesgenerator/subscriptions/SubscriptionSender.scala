@@ -46,7 +46,7 @@ private class IOSubscriptionSender(
   import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
-  private val statuses = Set("NEW", "RECOVERABLE_FAILURE")
+  private val statuses = Set("NEW", "GENERATION_RECOVERABLE_FAILURE")
 
   override def postToEventLog(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {

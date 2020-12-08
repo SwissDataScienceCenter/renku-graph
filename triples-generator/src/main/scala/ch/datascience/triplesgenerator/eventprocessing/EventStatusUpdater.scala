@@ -74,14 +74,14 @@ private class IOEventStatusUpdater(
   override def markEventFailedRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
     sendStatusChange(
       eventId,
-      payload = json"""{"status": "RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+      payload = json"""{"status": "GENERATION_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
       responseMapping = okConflictAsSuccess
     )
 
   override def markEventFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
     sendStatusChange(
       eventId,
-      payload = json"""{"status": "NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+      payload = json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
       responseMapping = okConflictAsSuccess
     )
 
