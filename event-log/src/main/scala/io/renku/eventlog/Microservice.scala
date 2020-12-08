@@ -18,9 +18,6 @@
 
 package io.renku.eventlog
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors.newFixedThreadPool
-
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
@@ -37,9 +34,10 @@ import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
 import io.renku.eventlog.subscriptions._
-import io.renku.eventlog.subscriptions.unprocessed.IOUnprocessedEventFetcher
 import pureconfig.ConfigSource
 
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors.newFixedThreadPool
 import scala.concurrent.ExecutionContext
 
 object Microservice extends IOMicroservice {
@@ -70,11 +68,11 @@ object Microservice extends IOMicroservice {
         awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
         awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
         underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        underTriplesGeneration      <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        underTriplesGenerationGauge <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
         metricsResetScheduler <-
           IOGaugeResetScheduler(
             List(awaitingGenerationGauge,
-                 underTriplesGeneration,
+                 underTriplesGenerationGauge,
                  awaitingTransformationGauge,
                  underTransformationGauge
             ),
@@ -91,20 +89,22 @@ object Microservice extends IOMicroservice {
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
                                                            awaitingGenerationGauge,
-                                                           underTriplesGeneration,
+                                                           underTriplesGenerationGauge,
                                                            queriesExecTimes,
                                                            ApplicationLogger
                                   )
-        statusChangeEndpoint <- IOStatusChangeEndpoint(transactor,
-                                                       awaitingGenerationGauge,
-                                                       underTriplesGeneration,
-                                                       awaitingTransformationGauge,
-                                                       queriesExecTimes,
-                                                       ApplicationLogger
+        statusChangeEndpoint <- IOStatusChangeEndpoint(
+                                  transactor,
+                                  awaitingGenerationGauge,
+                                  underTriplesGenerationGauge,
+                                  awaitingTransformationGauge,
+                                  underTransformationGauge,
+                                  queriesExecTimes,
+                                  ApplicationLogger
                                 )
         subscriptionCategoryRegistry <- IOSubscriptionCategoryRegistry(transactor,
                                                                        awaitingGenerationGauge,
-                                                                       underTriplesGeneration,
+                                                                       underTriplesGenerationGauge,
                                                                        queriesExecTimes,
                                                                        ApplicationLogger
                                         )

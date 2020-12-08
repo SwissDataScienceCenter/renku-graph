@@ -39,8 +39,8 @@ object EventsGenerators {
     TransformingTriples,
     TriplesStore,
     Skipped,
-    RecoverableFailure,
-    NonRecoverableFailure
+    GenerationRecoverableFailure,
+    GenerationNonRecoverableFailure
   )
 
   implicit val compoundEventIds: Gen[CompoundEventId] = for {

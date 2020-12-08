@@ -40,6 +40,10 @@ private case class EventStatusRenamerImpl[Interpretation[_]](
     for {
       _ <- renameAllStatuses(from = "PROCESSING", to = "GENERATING_TRIPLES")
       _ <- logger.info(s"'PROCESSING' event status renamed to 'GENERATING_TRIPLES'")
+      _ <- renameAllStatuses(from = "RECOVERABLE_FAILURE", to = "GENERATION_RECOVERABLE_FAILURE")
+      _ <- logger.info(s"'RECOVERABLE_FAILURE' event status renamed to 'GENERATION_RECOVERABLE_FAILURE'")
+      _ <- renameAllStatuses(from = "NON_RECOVERABLE_FAILURE", to = "GENERATION_NON_RECOVERABLE_FAILURE")
+      _ <- logger.info(s"'NON_RECOVERABLE_FAILURE' event status renamed to 'GENERATION_NON_RECOVERABLE_FAILURE'")
     } yield ()
   } recoverWith logging
 
@@ -49,7 +53,7 @@ private case class EventStatusRenamerImpl[Interpretation[_]](
       .void
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)(s"Renaming of PROCESSING events failed")
+    logger.error(exception)(s"Renaming of events failed")
     ME.raiseError(exception)
   }
 }
@@ -59,5 +63,5 @@ private object EventStatusRenamer {
       transactor: DbTransactor[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): EventStatusRenamer[Interpretation] =
-    new EventStatusRenamerImpl(transactor, logger)
+    EventStatusRenamerImpl(transactor, logger)
 }

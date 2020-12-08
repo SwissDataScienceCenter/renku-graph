@@ -20,7 +20,7 @@ package io.renku.eventlog.init
 
 import cats.effect.Bracket
 import ch.datascience.db.{DbClient, DbTransactor}
-import ch.datascience.graph.model.events.EventStatus.RecoverableFailure
+import ch.datascience.graph.model.events.EventStatus.GenerationRecoverableFailure
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
@@ -73,7 +73,9 @@ private class EventLogTableCreatorImpl[Interpretation[_]](
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)")
-    _ <- execute(sql"UPDATE event_log set status=${RecoverableFailure.value} where status='TRIPLES_STORE_FAILURE'")
+    _ <- execute(
+           sql"UPDATE event_log set status=${GenerationRecoverableFailure.value} where status='TRIPLES_STORE_FAILURE'"
+         )
     _ <- logger info "'event_log' table created"
   } yield ()
 

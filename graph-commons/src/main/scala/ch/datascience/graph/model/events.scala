@@ -18,13 +18,13 @@
 
 package ch.datascience.graph.model
 
-import java.time.{Clock, Instant}
-
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 import io.circe.Decoder
 import io.circe.Decoder.decodeString
+
+import java.time.{Clock, Instant}
 
 object events {
 
@@ -69,14 +69,17 @@ object events {
   object EventStatus extends TinyTypeFactory[EventStatus](EventStatusInstantiator) {
 
     val all: Set[EventStatus] =
-      Set(New,
-          GeneratingTriples,
-          TriplesGenerated,
-          TransformingTriples,
-          TriplesStore,
-          Skipped,
-          RecoverableFailure,
-          NonRecoverableFailure
+      Set(
+        New,
+        GeneratingTriples,
+        TriplesGenerated,
+        TransformingTriples,
+        TriplesStore,
+        Skipped,
+        GenerationRecoverableFailure,
+        GenerationNonRecoverableFailure,
+        TransformationRecoverableFailure,
+        TransformationNonRecoverableFailure
       )
 
     final case object New extends EventStatus {
@@ -106,15 +109,25 @@ object events {
 
     sealed trait FailureStatus extends EventStatus
 
-    final case object RecoverableFailure extends FailureStatus {
-      override val value: String = "RECOVERABLE_FAILURE"
+    final case object GenerationRecoverableFailure extends FailureStatus {
+      override val value: String = "GENERATION_RECOVERABLE_FAILURE"
     }
-    type RecoverableFailure = RecoverableFailure.type
+    type GenerationRecoverableFailure = GenerationRecoverableFailure.type
 
-    final case object NonRecoverableFailure extends FailureStatus with FinalStatus {
-      override val value: String = "NON_RECOVERABLE_FAILURE"
+    final case object GenerationNonRecoverableFailure extends FailureStatus with FinalStatus {
+      override val value: String = "GENERATION_NON_RECOVERABLE_FAILURE"
     }
-    type NonRecoverableFailure = NonRecoverableFailure.type
+    type GenerationNonRecoverableFailure = GenerationNonRecoverableFailure.type
+
+    final case object TransformationRecoverableFailure extends FailureStatus {
+      override val value: String = "TRANSFORMATION_RECOVERABLE_FAILURE"
+    }
+    type TransformationRecoverableFailure = TransformationRecoverableFailure.type
+
+    final case object TransformationNonRecoverableFailure extends FailureStatus with FinalStatus {
+      override val value: String = "TRANSFORMATION_NON_RECOVERABLE_FAILURE"
+    }
+    type TransformationNonRecoverableFailure = TransformationNonRecoverableFailure.type
 
     implicit val eventStatusDecoder: Decoder[EventStatus] = decodeString.emap { value =>
       Either.fromOption(

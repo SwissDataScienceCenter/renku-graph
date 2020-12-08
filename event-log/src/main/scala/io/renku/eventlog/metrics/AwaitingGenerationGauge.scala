@@ -42,7 +42,7 @@ object AwaitingGenerationGauge {
       labelName = "project",
       resetDataFetch = () =>
         statsFinder
-          .countEvents(Set(New, RecoverableFailure), maybeLimit = Some(NumberOfProjects))
+          .countEvents(Set(New, GenerationRecoverableFailure), maybeLimit = Some(NumberOfProjects))
           .map(_.view.mapValues(_.toDouble).toMap)
     )(metricsRegistry)
 }

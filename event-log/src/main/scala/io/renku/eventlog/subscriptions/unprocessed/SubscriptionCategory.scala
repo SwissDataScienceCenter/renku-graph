@@ -23,18 +23,18 @@ import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.{EventLogDB, subscriptions}
 import io.renku.eventlog.subscriptions.{IOEventsDistributor, Subscribers, SubscriptionCategoryImpl}
+import io.renku.eventlog.{EventLogDB, subscriptions}
 
 import scala.concurrent.ExecutionContext
 
 private[subscriptions] object SubscriptionCategory {
   def apply(
-      transactor:           DbTransactor[IO, EventLogDB],
-      waitingEventsGauge:   LabeledGauge[IO, projects.Path],
-      underProcessingGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
-      logger:               Logger[IO]
+      transactor:                  DbTransactor[IO, EventLogDB],
+      waitingEventsGauge:          LabeledGauge[IO, projects.Path],
+      underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
+      logger:                      Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
@@ -42,9 +42,9 @@ private[subscriptions] object SubscriptionCategory {
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers <- Subscribers(logger)
     eventFetcher <-
-      IOUnprocessedEventFetcher(transactor, waitingEventsGauge, underProcessingGauge, queriesExecTimes)
+      IOUnprocessedEventFetcher(transactor, waitingEventsGauge, underTriplesGenerationGauge, queriesExecTimes)
     eventsDistributor <-
-      IOEventsDistributor(transactor, subscribers, eventFetcher, underProcessingGauge, queriesExecTimes, logger)
+      IOEventsDistributor(transactor, subscribers, eventFetcher, underTriplesGenerationGauge, queriesExecTimes, logger)
     deserializer = SubscriptionRequestDeserializer[IO]()
   } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](subscribers, eventsDistributor, deserializer)
 }
