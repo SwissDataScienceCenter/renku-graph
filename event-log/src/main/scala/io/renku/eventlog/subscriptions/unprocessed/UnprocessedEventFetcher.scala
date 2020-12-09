@@ -93,7 +93,7 @@ private class UnprocessedEventFetcherImpl(
         SELECT project_id
         FROM event evt
         WHERE evt.project_id = proj.project_id
-          AND ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" AND execution_date < ${now()})
+          AND ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
             OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
           )
       )
@@ -114,13 +114,13 @@ private class UnprocessedEventFetcherImpl(
            SELECT project_id, min(event_date) as min_event_date
            FROM event
            WHERE project_id = ${idAndPath.id}
-             AND ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" AND execution_date < ${now()})
+             AND ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
                OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
            GROUP BY project_id
          ) oldest_event_date
          JOIN event evt ON oldest_event_date.project_id = evt.project_id 
            AND oldest_event_date.min_event_date = evt.event_date
-           AND ((""" ++ `status IN`(New, RecoverableFailure) ++ fr""" AND execution_date < ${now()})
+           AND ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
                OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})) 
          LIMIT 1
          """

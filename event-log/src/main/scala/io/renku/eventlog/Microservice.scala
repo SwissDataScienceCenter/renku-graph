@@ -18,9 +18,6 @@
 
 package io.renku.eventlog
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors.newFixedThreadPool
-
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
@@ -37,9 +34,10 @@ import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
 import io.renku.eventlog.subscriptions._
-import io.renku.eventlog.subscriptions.unprocessed.IOUnprocessedEventFetcher
 import pureconfig.ConfigSource
 
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors.newFixedThreadPool
 import scala.concurrent.ExecutionContext
 
 object Microservice extends IOMicroservice {
@@ -60,42 +58,53 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB]) =
     transactorResource.use { transactor =>
       for {
-        certificateLoader    <- CertificateLoader[IO](ApplicationLogger)
-        sentryInitializer    <- SentryInitializer[IO]()
-        dbInitializer        <- IODbInitializer(transactor, ApplicationLogger)
-        metricsRegistry      <- MetricsRegistry()
-        queriesExecTimes     <- QueriesExecutionTimes(metricsRegistry)
-        statsFinder          <- IOStatsFinder(transactor, queriesExecTimes)
-        eventLogMetrics      <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
-        waitingEventsGauge   <- WaitingEventsGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        underProcessingGauge <- UnderProcessingGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        metricsResetScheduler <- IOGaugeResetScheduler(List(waitingEventsGauge, underProcessingGauge),
-                                                       MetricsConfigProvider(),
-                                                       ApplicationLogger
-                                 )
+        certificateLoader           <- CertificateLoader[IO](ApplicationLogger)
+        sentryInitializer           <- SentryInitializer[IO]()
+        dbInitializer               <- IODbInitializer(transactor, ApplicationLogger)
+        metricsRegistry             <- MetricsRegistry()
+        queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
+        statsFinder                 <- IOStatsFinder(transactor, queriesExecTimes)
+        eventLogMetrics             <- IOEventLogMetrics(statsFinder, ApplicationLogger, metricsRegistry)
+        awaitingGenerationGauge     <- AwaitingGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        underTriplesGenerationGauge <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
+        metricsResetScheduler <-
+          IOGaugeResetScheduler(
+            List(awaitingGenerationGauge,
+                 underTriplesGenerationGauge,
+                 awaitingTransformationGauge,
+                 underTransformationGauge
+            ),
+            MetricsConfigProvider(),
+            ApplicationLogger
+          )
         eventCreationEndpoint <- IOEventCreationEndpoint(
                                    transactor,
-                                   waitingEventsGauge,
+                                   awaitingGenerationGauge,
                                    queriesExecTimes,
                                    ApplicationLogger
                                  )
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
-                                                           waitingEventsGauge,
-                                                           underProcessingGauge,
+                                                           awaitingGenerationGauge,
+                                                           underTriplesGenerationGauge,
                                                            queriesExecTimes,
                                                            ApplicationLogger
                                   )
-        statusChangeEndpoint <- IOStatusChangeEndpoint(transactor,
-                                                       waitingEventsGauge,
-                                                       underProcessingGauge,
-                                                       queriesExecTimes,
-                                                       ApplicationLogger
+        statusChangeEndpoint <- IOStatusChangeEndpoint(
+                                  transactor,
+                                  awaitingGenerationGauge,
+                                  underTriplesGenerationGauge,
+                                  awaitingTransformationGauge,
+                                  underTransformationGauge,
+                                  queriesExecTimes,
+                                  ApplicationLogger
                                 )
         subscriptionCategoryRegistry <- IOSubscriptionCategoryRegistry(transactor,
-                                                                       waitingEventsGauge,
-                                                                       underProcessingGauge,
+                                                                       awaitingGenerationGauge,
+                                                                       underTriplesGenerationGauge,
                                                                        queriesExecTimes,
                                                                        ApplicationLogger
                                         )

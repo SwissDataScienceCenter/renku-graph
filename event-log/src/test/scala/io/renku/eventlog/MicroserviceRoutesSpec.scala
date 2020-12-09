@@ -36,7 +36,7 @@ import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
-import io.renku.eventlog.subscriptions.{SubscriptionCategory, SubscriptionCategoryPayload, SubscriptionCategoryRegistry, SubscriptionsEndpoint}
+import io.renku.eventlog.subscriptions.{SubscriptionCategoryRegistry, SubscriptionsEndpoint}
 import org.http4s.MediaType.application
 import org.http4s.Method.{GET, PATCH, POST}
 import org.http4s.Status._
@@ -146,7 +146,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "define a GET /processing-status?project-id=:id endpoint " +
       s"returning $NotFound if no project-id parameter is given" in new TestCase {
-        val projectId = projectIds.generateOne
 
         val request = Request[IO](GET, uri"processing-status")
 
@@ -159,8 +158,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "define a GET /processing-status?project-id=:id endpoint " +
       s"returning $BadRequest if illegal project-id parameter value is given" in new TestCase {
-        val projectId = projectIds.generateOne
-
         val request = Request[IO](GET, uri"processing-status".withQueryParam("project-id", "non int value"))
 
         val response = routes.call(request)
@@ -216,9 +213,17 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       subscriptionCategoryRegistry: SubscriptionCategoryRegistry[IO],
       logger:                       Logger[IO]
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
-  class TestStatusChangeEndpoint(updateCommandsRunner: StatusUpdatesRunner[IO],
-                                 waitingEventsGauge:   LabeledGauge[IO, projects.Path],
-                                 underProcessingGauge: LabeledGauge[IO, projects.Path],
-                                 logger:               Logger[IO]
-  ) extends StatusChangeEndpoint[IO](updateCommandsRunner, waitingEventsGauge, underProcessingGauge, logger)
+  class TestStatusChangeEndpoint(updateCommandsRunner:            StatusUpdatesRunner[IO],
+                                 awaitingTriplesGenerationGauge:  LabeledGauge[IO, projects.Path],
+                                 underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
+                                 awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
+                                 underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
+                                 logger:                          Logger[IO]
+  ) extends StatusChangeEndpoint[IO](updateCommandsRunner,
+                                     awaitingTriplesGenerationGauge,
+                                     underTriplesGenerationGauge,
+                                     awaitingTransformationGauge,
+                                     underTriplesTransformationGauge,
+                                     logger
+      )
 }

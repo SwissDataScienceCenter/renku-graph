@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.implicits.catsSyntaxApplicativeId
 import cats.syntax.all._
 import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus.{New, RecoverableFailure}
+import ch.datascience.graph.model.events.EventStatus.{GenerationRecoverableFailure, New}
 import io.circe
 import io.circe.Decoder
 import io.renku.eventlog.subscriptions
@@ -41,7 +41,7 @@ private case class SubscriptionRequestDeserializer[Interpretation[_]]()(implicit
       .fold(_ => Option.empty[SubscriptionCategoryPayload], maybeSubscriptionUrl)
       .pure[Interpretation]
 
-  private val acceptedStatuses = Set(New, RecoverableFailure)
+  private val acceptedStatuses = Set(New, GenerationRecoverableFailure)
   private def maybeSubscriptionUrl(urlAndStatuses: UrlAndStatuses): Option[SubscriptionCategoryPayload] =
     if (urlAndStatuses.eventStatuses != acceptedStatuses) Option.empty[SubscriptionCategoryPayload]
     else SubscriptionCategoryPayload(urlAndStatuses.subscriberUrl).some

@@ -18,19 +18,16 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import java.time.Instant
-
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
 import io.renku.eventlog._
@@ -40,7 +37,9 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ToNonRecoverableFailureSpec
+import java.time.Instant
+
+class ToTransformationNonRecoverableFailureSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with MockFactory
@@ -48,13 +47,13 @@ class ToNonRecoverableFailureSpec
 
   "command" should {
 
-    s"set status $NonRecoverableFailure on the event with the given id and $GeneratingTriples status, " +
+    s"set status $TransformationNonRecoverableFailure on the event with the given id and $TransformingTriples status" +
       "decrement waiting events and under processing gauges for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         storeEvent(
           compoundEventIds.generateOne.copy(id = eventId.id),
-          EventStatus.GeneratingTriples,
+          EventStatus.TransformingTriples,
           executionDates.generateOne,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -64,7 +63,7 @@ class ToNonRecoverableFailureSpec
         val projectPath   = projectPaths.generateOne
         storeEvent(
           eventId,
-          EventStatus.GeneratingTriples,
+          EventStatus.TransformingTriples,
           executionDate,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -72,22 +71,22 @@ class ToNonRecoverableFailureSpec
           projectPath = projectPath
         )
 
-        findEvent(eventId) shouldBe Some((executionDate, GeneratingTriples, None))
+        findEvent(eventId) shouldBe Some((executionDate, TransformingTriples, None))
 
-        (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
+        (underTriplesTransformationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
-          ToNonRecoverableFailure[IO](eventId, maybeMessage, underProcessingGauge, currentTime)
+          ToTransformationNonRecoverableFailure[IO](eventId, maybeMessage, underTriplesTransformationGauge, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvent(eventId) shouldBe Some((ExecutionDate(now), NonRecoverableFailure, maybeMessage))
+        findEvent(eventId) shouldBe Some((ExecutionDate(now), TransformationNonRecoverableFailure, maybeMessage))
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
 
-    EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
+    EventStatus.all.filterNot(status => status == TransformingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
         s"and return ${UpdateResult.Conflict}" in new TestCase {
 
@@ -104,7 +103,11 @@ class ToNonRecoverableFailureSpec
 
           val maybeMessage = Gen.option(eventMessages).generateOne
           val command =
-            ToNonRecoverableFailure[IO](eventId, maybeMessage, underProcessingGauge, currentTime)
+            ToTransformationNonRecoverableFailure[IO](eventId,
+                                                      maybeMessage,
+                                                      underTriplesTransformationGauge,
+                                                      currentTime
+            )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -116,25 +119,15 @@ class ToNonRecoverableFailureSpec
   }
 
   private trait TestCase {
-    val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val histogram            = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val currentTime          = mockFunction[Instant]
-    val eventId              = compoundEventIds.generateOne
-    val eventBatchDate       = batchDates.generateOne
+    val underTriplesTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val histogram                       = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val currentTime                     = mockFunction[Instant]
+    val eventId                         = compoundEventIds.generateOne
+    val eventBatchDate                  = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
-
-  private def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
-    execute {
-      sql"""|SELECT execution_date, status, message
-            |FROM event 
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
-         """.stripMargin
-        .query[(ExecutionDate, EventStatus, Option[EventMessage])]
-        .option
-    }
 }

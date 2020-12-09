@@ -18,8 +18,6 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import java.time.Instant
-
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
@@ -32,28 +30,30 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage}
 
-final case class ToNonRecoverableFailure[Interpretation[_]](
-    eventId:              CompoundEventId,
-    maybeMessage:         Option[EventMessage],
-    underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
-    now:                  () => Instant = () => Instant.now
-)(implicit ME:            Bracket[Interpretation, Throwable])
+import java.time.Instant
+
+final case class ToTransformationNonRecoverableFailure[Interpretation[_]](
+    eventId:                         CompoundEventId,
+    maybeMessage:                    Option[EventMessage],
+    underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                             () => Instant = () => Instant.now
+)(implicit ME:                       Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override val status: EventStatus = NonRecoverableFailure
+  override lazy val status: EventStatus = TransformationNonRecoverableFailure
 
   override def query: SqlQuery[Int] = SqlQuery(
-    sql"""|UPDATE event 
+    sql"""|UPDATE event
           |SET status = $status, execution_date = ${now()}, message = $maybeMessage
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
+          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
           |""".stripMargin.update.run,
-    name = "generating_triples->non_recoverable_fail"
+    name = "transforming_triples->transformation_non_recoverable_fail"
   )
 
   override def updateGauges(
       updateResult:      UpdateResult
   )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated => findProjectPath(eventId) flatMap underProcessingGauge.decrement
+    case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesTransformationGauge.decrement
     case _                    => ME.unit
   }
 }

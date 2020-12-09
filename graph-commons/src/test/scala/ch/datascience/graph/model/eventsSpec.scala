@@ -18,8 +18,6 @@
 
 package ch.datascience.graph.model
 
-import java.time.{Clock, Instant, ZoneId}
-
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
@@ -31,18 +29,22 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import java.time.{Clock, Instant, ZoneId}
+
 class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "EventStatus" should {
 
     val scenarios = Table(
-      "String Value"            -> "Expected EventStatus",
-      "NEW"                     -> New,
-      "GENERATING_TRIPLES"      -> GeneratingTriples,
-      "TRIPLES_STORE"           -> TriplesStore,
-      "SKIPPED"                 -> Skipped,
-      "RECOVERABLE_FAILURE"     -> RecoverableFailure,
-      "NON_RECOVERABLE_FAILURE" -> NonRecoverableFailure
+      "String Value"                           -> "Expected EventStatus",
+      "NEW"                                    -> New,
+      "GENERATING_TRIPLES"                     -> GeneratingTriples,
+      "TRIPLES_STORE"                          -> TriplesStore,
+      "SKIPPED"                                -> Skipped,
+      "GENERATION_RECOVERABLE_FAILURE"         -> GenerationRecoverableFailure,
+      "GENERATION_NON_RECOVERABLE_FAILURE"     -> GenerationNonRecoverableFailure,
+      "TRANSFORMATION_RECOVERABLE_FAILURE"     -> TransformationRecoverableFailure,
+      "TRANSFORMATION_NON_RECOVERABLE_FAILURE" -> TransformationNonRecoverableFailure
     )
 
     forAll(scenarios) { (stringValue, expectedStatus) =>
@@ -87,8 +89,8 @@ class CompoundEventIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
 
 class EventBodySpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
-  import io.circe.literal._
   import io.circe.Decoder
+  import io.circe.literal._
 
   "EventBody" should {
 

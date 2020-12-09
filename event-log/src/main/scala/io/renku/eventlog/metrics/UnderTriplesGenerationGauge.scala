@@ -19,17 +19,14 @@
 package io.renku.eventlog.metrics
 
 import cats.effect.IO
-import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.EventStatus.GeneratingTriples
 import ch.datascience.graph.model.projects
-import ch.datascience.metrics._
-import eu.timepit.refined.api.Refined
+import ch.datascience.metrics.{Gauge, LabeledGauge, MetricsRegistry}
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
 import io.chrisdavenport.log4cats.Logger
 
-object WaitingEventsGauge {
-
-  val NumberOfProjects: Int Refined Positive = 20
+object UnderTriplesGenerationGauge {
 
   def apply(
       metricsRegistry: MetricsRegistry[IO],
@@ -37,12 +34,10 @@ object WaitingEventsGauge {
       logger:          Logger[IO]
   ): IO[LabeledGauge[IO, projects.Path]] =
     Gauge[IO, projects.Path](
-      name = "events_waiting_count",
-      help = "Number of waiting Events by project path.",
+      name = "events_under_triples_generation_count",
+      help = "Number of Events under triples generation by project path.",
       labelName = "project",
-      resetDataFetch = () =>
-        statsFinder
-          .countEvents(Set(New, RecoverableFailure), maybeLimit = Some(NumberOfProjects))
-          .map(_.view.mapValues(_.toDouble).toMap)
+      resetDataFetch =
+        () => statsFinder.countEvents(Set(GeneratingTriples: EventStatus)).map(_.view.mapValues(_.toDouble).toMap)
     )(metricsRegistry)
 }

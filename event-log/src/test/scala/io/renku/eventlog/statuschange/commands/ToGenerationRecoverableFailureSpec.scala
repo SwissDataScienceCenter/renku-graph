@@ -29,33 +29,29 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, executionDates}
+import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
+import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
-import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit.MINUTES
 
-class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
+class ToGenerationRecoverableFailureSpec
+    extends AnyWordSpec
+    with InMemoryEventLogDbSpec
+    with MockFactory
+    with should.Matchers {
 
   "command" should {
 
-    s"set status $New on the event with the given id and $GeneratingTriples status, " +
+    s"set status $GenerationRecoverableFailure on the event with the given id and $GeneratingTriples status, " +
       "increment waiting events gauge and decrement under processing gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
-        val projectPath = projectPaths.generateOne
-        storeEvent(
-          eventId,
-          EventStatus.GeneratingTriples,
-          executionDates.generateOne,
-          eventDates.generateOne,
-          eventBodies.generateOne,
-          batchDate = eventBatchDate,
-          projectPath = projectPath
-        )
         storeEvent(
           compoundEventIds.generateOne.copy(id = eventId.id),
           EventStatus.GeneratingTriples,
@@ -64,30 +60,43 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
           eventBodies.generateOne,
           batchDate = eventBatchDate
         )
+        val executionDate = executionDates.generateOne
+        val projectPath   = projectPaths.generateOne
+
         storeEvent(
-          compoundEventIds.generateOne,
+          eventId,
           EventStatus.GeneratingTriples,
-          executionDates.generateOne,
+          executionDate,
           eventDates.generateOne,
           eventBodies.generateOne,
-          batchDate = eventBatchDate
+          batchDate = eventBatchDate,
+          projectPath = projectPath
         )
 
-        findEvents(status = New) shouldBe List.empty
+        findEvent(eventId) shouldBe Some((executionDate, GeneratingTriples, None))
 
         (awaitingTriplesGenerationGauge.increment _).expects(projectPath).returning(IO.unit)
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-        val command = ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, currentTime)
+        val maybeMessage = Gen.option(eventMessages).generateOne
+        val command =
+          ToGenerationRecoverableFailure[IO](eventId,
+                                             maybeMessage,
+                                             awaitingTriplesGenerationGauge,
+                                             underTriplesGenerationGauge,
+                                             currentTime
+          )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvents(status = New) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
+        findEvent(eventId) shouldBe Some(
+          (ExecutionDate(now.plus(10, MINUTES)), GenerationRecoverableFailure, maybeMessage)
+        )
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
 
-    EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
+    EventStatus.all.filterNot(status => status == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
         s"and return ${UpdateResult.Conflict}" in new TestCase {
 
@@ -100,16 +109,20 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
                      batchDate = eventBatchDate
           )
 
-          findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
+          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
-          val command = ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, currentTime)
+          val maybeMessage = Gen.option(eventMessages).generateOne
+          val command =
+            ToGenerationRecoverableFailure[IO](eventId,
+                                               maybeMessage,
+                                               awaitingTriplesGenerationGauge,
+                                               underTriplesGenerationGauge,
+                                               currentTime
+            )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
-          val expectedEvents =
-            if (eventStatus != New) List.empty
-            else List((eventId, executionDate, eventBatchDate))
-          findEvents(status = New) shouldBe expectedEvents
+          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
           histogram.verifyExecutionTimeMeasured(command.query.name)
         }
@@ -120,14 +133,14 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
     val awaitingTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
     val underTriplesGenerationGauge    = mock[LabeledGauge[IO, projects.Path]]
     val histogram                      = TestLabeledHistogram[SqlQuery.Name]("query_id")
-
-    val currentTime    = mockFunction[Instant]
-    val eventId        = compoundEventIds.generateOne
-    val eventBatchDate = batchDates.generateOne
+    val currentTime                    = mockFunction[Instant]
+    val eventId                        = compoundEventIds.generateOne
+    val eventBatchDate                 = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
+
 }

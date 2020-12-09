@@ -35,10 +35,12 @@ object EventsGenerators {
   implicit val eventStatuses: Gen[EventStatus] = Gen.oneOf(
     New,
     GeneratingTriples,
+    TriplesGenerated,
+    TransformingTriples,
     TriplesStore,
     Skipped,
-    RecoverableFailure,
-    NonRecoverableFailure
+    GenerationRecoverableFailure,
+    GenerationNonRecoverableFailure
   )
 
   implicit val compoundEventIds: Gen[CompoundEventId] = for {

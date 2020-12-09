@@ -32,6 +32,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.MetricsTools._
 import ch.datascience.metrics.{LabeledGauge, MetricsRegistry}
 import io.prometheus.client.{Gauge => LibGauge}
+import io.renku.eventlog.metrics.AwaitingGenerationGauge.NumberOfProjects
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -39,11 +40,11 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
 
-class UnderProcessingGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class UnderTransformationGaugeSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "apply" should {
 
-    "create and register events_processing_count named gauge" in new TestCase {
+    "create and register an events_awaiting_transformation_count named gauge" in new TestCase {
 
       (metricsRegistry
         .register[LibGauge, LibGauge.Builder](_: LibGauge.Builder)(_: MonadError[IO, Throwable]))
@@ -55,7 +56,7 @@ class UnderProcessingGaugeSpec extends AnyWordSpec with MockFactory with should.
           actual.pure[IO]
         }
 
-      val gauge = UnderProcessingGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
+      val gauge = UnderTransformationGauge(metricsRegistry, statsFinder, TestLogger()).unsafeRunSync()
 
       gauge.isInstanceOf[LabeledGauge[IO, projects.Path]] shouldBe true
     }
@@ -67,22 +68,24 @@ class UnderProcessingGaugeSpec extends AnyWordSpec with MockFactory with should.
         .expects(*, *)
         .onCall((_: LibGauge.Builder, _: MonadError[IO, Throwable]) => underlying.pure[IO])
 
-      val processingEvents = processingEventsGen.generateOne
+      val underTransformationEvents = underTransformation.generateOne
+
       (statsFinder.countEvents _)
-        .expects(Set(GeneratingTriples: EventStatus), None)
-        .returning(processingEvents.pure[IO])
+        .expects(Set[EventStatus](TransformingTriples), None)
+        .returning(underTransformationEvents.pure[IO])
 
-      UnderProcessingGauge(metricsRegistry, statsFinder, TestLogger()).flatMap(_.reset()).unsafeRunSync()
+      UnderTransformationGauge(metricsRegistry, statsFinder, TestLogger()).flatMap(_.reset()).unsafeRunSync()
 
-      underlying.collectAllSamples should contain theSameElementsAs processingEvents.map { case (project, count) =>
-        ("project", project.value, count.toDouble)
+      underlying.collectAllSamples should contain theSameElementsAs underTransformationEvents.map {
+        case (project, count) =>
+          ("project", project.value, count.toDouble)
       }
     }
   }
 
   private trait TestCase {
     val underlying = LibGauge
-      .build("events_processing_count", "Number of Events under processing by project path.")
+      .build("events_under_transformation_count", "Number of Events under triples transformation by project path.")
       .labelNames("project")
       .create()
 
@@ -90,10 +93,11 @@ class UnderProcessingGaugeSpec extends AnyWordSpec with MockFactory with should.
     val statsFinder     = mock[StatsFinder[IO]]
   }
 
-  private lazy val processingEventsGen: Gen[Map[Path, Long]] = nonEmptySet {
+  private lazy val underTransformation: Gen[Map[Path, Long]] = nonEmptySet {
     for {
       path  <- projectPaths
       count <- nonNegativeLongs()
     } yield path -> count.value
   }.map(_.toMap)
+
 }

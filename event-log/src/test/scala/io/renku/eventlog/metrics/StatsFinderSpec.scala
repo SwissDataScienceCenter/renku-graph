@@ -51,12 +51,16 @@ class StatsFinderSpec
         statuses foreach store
 
         stats.statuses().unsafeRunSync() shouldBe Map(
-          New                   -> statuses.count(_ == New),
-          GeneratingTriples     -> statuses.count(_ == GeneratingTriples),
-          TriplesStore          -> statuses.count(_ == TriplesStore),
-          Skipped               -> statuses.count(_ == Skipped),
-          RecoverableFailure    -> statuses.count(_ == RecoverableFailure),
-          NonRecoverableFailure -> statuses.count(_ == NonRecoverableFailure)
+          New                                 -> statuses.count(_ == New),
+          GeneratingTriples                   -> statuses.count(_ == GeneratingTriples),
+          TriplesGenerated                    -> statuses.count(_ == TriplesGenerated),
+          TransformingTriples                 -> statuses.count(_ == TransformingTriples),
+          TriplesStore                        -> statuses.count(_ == TriplesStore),
+          Skipped                             -> statuses.count(_ == Skipped),
+          GenerationRecoverableFailure        -> statuses.count(_ == GenerationRecoverableFailure),
+          GenerationNonRecoverableFailure     -> statuses.count(_ == GenerationNonRecoverableFailure),
+          TransformationRecoverableFailure    -> statuses.count(_ == TransformationRecoverableFailure),
+          TransformationNonRecoverableFailure -> statuses.count(_ == TransformationNonRecoverableFailure)
         )
 
         queriesExecTimes.verifyExecutionTimeMeasured("statuses count")
@@ -74,11 +78,11 @@ class StatsFinderSpec
 
         events foreach store
 
-        stats.countEvents(Set(New, RecoverableFailure)).unsafeRunSync() shouldBe events
+        stats.countEvents(Set(New, GenerationRecoverableFailure)).unsafeRunSync() shouldBe events
           .groupBy(_._1)
           .map { case (projectPath, sameProjectGroup) =>
             projectPath -> sameProjectGroup.count { case (_, _, status, _) =>
-              Set(New, RecoverableFailure) contains status
+              Set(New, GenerationRecoverableFailure) contains status
             }
           }
           .filter { case (_, count) => count > 0 }
@@ -95,7 +99,7 @@ class StatsFinderSpec
 
       val limit: Int Refined Positive = 2
 
-      stats.countEvents(Set(New, RecoverableFailure), Some(limit)).unsafeRunSync() shouldBe events
+      stats.countEvents(Set(New, GenerationRecoverableFailure), Some(limit)).unsafeRunSync() shouldBe events
         .groupBy(_._1)
         .toSeq
         .sortBy { case (_, sameProjectGroup) =>
@@ -105,7 +109,7 @@ class StatsFinderSpec
         .reverse
         .map { case (projectPath, sameProjectGroup) =>
           projectPath -> sameProjectGroup.count { case (_, _, status, _) =>
-            Set(New, RecoverableFailure) contains status
+            Set(New, GenerationRecoverableFailure) contains status
           }
         }
         .filter { case (_, count) => count > 0 }

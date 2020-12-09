@@ -38,11 +38,11 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
 
   "postToEventLog" should {
 
-    s"succeed if posting Subscriber URL and statuses NEW and RECOVERABLE_FAILURE results with $Accepted" in new TestCase {
+    s"succeed if posting Subscriber URL and statuses NEW and GENERATION_RECOVERABLE_FAILURE results with $Accepted" in new TestCase {
 
       stubFor {
         post("/subscriptions")
-          .withRequestBody(equalToJson((subscriberUrl -> Set("NEW", "RECOVERABLE_FAILURE")).asJson.spaces2))
+          .withRequestBody(equalToJson((subscriberUrl -> Set("NEW", "GENERATION_RECOVERABLE_FAILURE")).asJson.spaces2))
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
@@ -54,7 +54,7 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
       val message = "message"
       stubFor {
         post("/subscriptions")
-          .withRequestBody(equalToJson((subscriberUrl -> Set("NEW", "RECOVERABLE_FAILURE")).asJson.spaces2))
+          .withRequestBody(equalToJson((subscriberUrl -> Set("NEW", "GENERATION_RECOVERABLE_FAILURE")).asJson.spaces2))
           .willReturn(badRequest().withBody(message))
       }
 

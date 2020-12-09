@@ -18,41 +18,41 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import java.time.Instant
-
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+
+import java.time.Instant
 
 final case class ToTriplesStore[Interpretation[_]](
-    eventId:              CompoundEventId,
-    underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
-    now:                  () => Instant = () => Instant.now
-)(implicit ME:            Bracket[Interpretation, Throwable])
+    eventId:                     CompoundEventId,
+    underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
+    now:                         () => Instant = () => Instant.now
+)(implicit ME:                   Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override val status: EventStatus = TriplesStore
-
+  override lazy val status: EventStatus = TriplesStore
+// TODO temporary status change from GeneratingTriples to triples store in the end only TransformingTriples can be transformed to TriplesStore
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event
           |SET status = $status, execution_date = ${now()}
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
+          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND (status = ${GeneratingTriples: EventStatus} OR status = ${TransformingTriples: EventStatus})
           |""".stripMargin.update.run,
-    name = "generating_triples->triples_store"
+    name = "generating_triples-transforming_triples->triples_store"
   )
 
   override def updateGauges(
       updateResult:      UpdateResult
   )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated => findProjectPath(eventId) flatMap underProcessingGauge.decrement
+    case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesGenerationGauge.decrement
     case _                    => ME.unit
   }
 }

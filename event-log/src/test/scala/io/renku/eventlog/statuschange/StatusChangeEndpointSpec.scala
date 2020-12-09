@@ -59,17 +59,32 @@ class StatusChangeEndpointSpec
 
     val scenarios = Table(
       "status"     -> "command builder",
-      TriplesStore -> ToTriplesStore[IO](compoundEventIds.generateOne, underProcessingGauge),
-      Skipped      -> ToSkipped[IO](compoundEventIds.generateOne, eventMessages.generateOne, underProcessingGauge),
-      New          -> ToNew[IO](compoundEventIds.generateOne, waitingEventsGauge, underProcessingGauge),
-      RecoverableFailure -> ToRecoverableFailure[IO](compoundEventIds.generateOne,
-                                                     eventMessages.generateOption,
-                                                     waitingEventsGauge,
-                                                     underProcessingGauge
+      TriplesStore -> ToTriplesStore[IO](compoundEventIds.generateOne, underTriplesGenerationGauge),
+      Skipped      -> ToSkipped[IO](compoundEventIds.generateOne, eventMessages.generateOne, underTriplesGenerationGauge),
+      New          -> ToNew[IO](compoundEventIds.generateOne, awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
+      TriplesGenerated -> ToTriplesGenerated[IO](compoundEventIds.generateOne,
+                                                 underTriplesGenerationGauge,
+                                                 awaitingTriplesTransformationGauge
       ),
-      NonRecoverableFailure -> ToNonRecoverableFailure[IO](compoundEventIds.generateOne,
-                                                           eventMessages.generateOption,
-                                                           underProcessingGauge
+      GenerationRecoverableFailure -> ToGenerationRecoverableFailure[IO](
+        compoundEventIds.generateOne,
+        eventMessages.generateOption,
+        awaitingTriplesGenerationGauge,
+        underTriplesGenerationGauge
+      ),
+      GenerationNonRecoverableFailure -> ToGenerationNonRecoverableFailure[IO](compoundEventIds.generateOne,
+                                                                               eventMessages.generateOption,
+                                                                               underTriplesGenerationGauge
+      ),
+      TransformationRecoverableFailure -> ToTransformationRecoverableFailure[IO](
+        compoundEventIds.generateOne,
+        eventMessages.generateOption,
+        awaitingTriplesTransformationGauge,
+        underTriplesTransformationGauge
+      ),
+      TransformationNonRecoverableFailure -> ToTransformationNonRecoverableFailure[IO](compoundEventIds.generateOne,
+                                                                                       eventMessages.generateOption,
+                                                                                       underTriplesTransformationGauge
       )
     )
     forAll(scenarios) { (status, command) =>
@@ -214,7 +229,7 @@ class StatusChangeEndpointSpec
 
       val eventId = compoundEventIds.generateOne
 
-      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, underProcessingGauge)
+      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, underTriplesGenerationGauge)
       val exception = exceptions.generateOne
       (commandsRunner.run _)
         .expects(command)
@@ -240,33 +255,46 @@ class StatusChangeEndpointSpec
     val logger         = TestLogger[IO]()
     val changeStatus = new StatusChangeEndpoint[IO](
       commandsRunner,
-      waitingEventsGauge,
-      underProcessingGauge,
+      awaitingTriplesGenerationGauge,
+      underTriplesGenerationGauge,
+      awaitingTriplesTransformationGauge,
+      underTriplesTransformationGauge,
       logger
     ).changeStatus _
   }
 
   implicit val commandEncoder: Encoder[ChangeStatusCommand[IO]] = Encoder.instance[ChangeStatusCommand[IO]] {
-    case command: ToNew[IO]                   => json"""{
+    case command: ToNew[IO]                                 => json"""{
         "status": ${command.status.value}
       }"""
-    case command: ToTriplesStore[IO]          => json"""{
+    case command: ToTriplesStore[IO]                        => json"""{
         "status": ${command.status.value}
       }"""
-    case command: ToSkipped[IO]               => json"""{
+    case command: ToSkipped[IO]                             => json"""{
         "status": ${command.status.value},
         "message": ${command.message.value}
       }"""
-    case command: ToRecoverableFailure[IO]    => json"""{
+    case command: ToTriplesGenerated[IO]                    => json"""{
+        "status": ${command.status.value}
+      }"""
+    case command: ToGenerationRecoverableFailure[IO]        => json"""{
         "status": ${command.status.value}
       }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
-    case command: ToNonRecoverableFailure[IO] => json"""{
+    case command: ToGenerationNonRecoverableFailure[IO]     => json"""{
+        "status": ${command.status.value}
+      }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
+    case command: ToTransformationRecoverableFailure[IO]    => json"""{
+        "status": ${command.status.value}
+      }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
+    case command: ToTransformationNonRecoverableFailure[IO] => json"""{
         "status": ${command.status.value}
       }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
   }
 
-  private lazy val waitingEventsGauge:   LabeledGauge[IO, projects.Path] = new GaugeStub
-  private lazy val underProcessingGauge: LabeledGauge[IO, projects.Path] = new GaugeStub
+  private lazy val awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path] = new GaugeStub
+  private lazy val underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path] = new GaugeStub
+  private lazy val awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path] = new GaugeStub
+  private lazy val underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path] = new GaugeStub
   private class GaugeStub extends LabeledGauge[IO, projects.Path] {
     override def set(labelValue:       (projects.Path, Double)) = IO.unit
     override def increment(labelValue: projects.Path)           = IO.unit

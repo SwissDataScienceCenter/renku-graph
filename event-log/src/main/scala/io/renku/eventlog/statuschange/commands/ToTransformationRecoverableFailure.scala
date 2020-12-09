@@ -18,9 +18,6 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit.MINUTES
-
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
@@ -33,23 +30,26 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage}
 
-final case class ToRecoverableFailure[Interpretation[_]](
-    eventId:              CompoundEventId,
-    maybeMessage:         Option[EventMessage],
-    waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
-    underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
-    now:                  () => Instant = () => Instant.now
-)(implicit ME:            Bracket[Interpretation, Throwable])
+import java.time.Instant
+import java.time.temporal.ChronoUnit.MINUTES
+
+final case class ToTransformationRecoverableFailure[Interpretation[_]](
+    eventId:                            CompoundEventId,
+    maybeMessage:                       Option[EventMessage],
+    awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+    underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
+    now:                                () => Instant = () => Instant.now
+)(implicit ME:                          Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override val status: EventStatus = RecoverableFailure
+  override lazy val status: EventStatus = TransformationRecoverableFailure
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event
           |SET status = $status, execution_date = ${now().plus(10, MINUTES)}, message = $maybeMessage
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
+          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
           |""".stripMargin.update.run,
-    name = "generating_triples->recoverable_fail"
+    name = "transforming_triples->transformation_recoverable_fail"
   )
 
   override def updateGauges(
@@ -58,8 +58,8 @@ final case class ToRecoverableFailure[Interpretation[_]](
     case UpdateResult.Updated =>
       for {
         path <- findProjectPath(eventId)
-        _    <- waitingEventsGauge increment path
-        _    <- underProcessingGauge decrement path
+        _    <- awaitingTriplesTransformationGauge increment path
+        _    <- underTriplesTransformationGauge decrement path
       } yield ()
     case _ => ME.unit
   }

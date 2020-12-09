@@ -27,27 +27,29 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+import io.renku.eventlog.{EventLogDB, EventMessage}
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit.MINUTES
 
-final case class ToNew[Interpretation[_]](
+final case class ToGenerationRecoverableFailure[Interpretation[_]](
     eventId:                        CompoundEventId,
+    maybeMessage:                   Option[EventMessage],
     awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
     now:                            () => Instant = () => Instant.now
 )(implicit ME:                      Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override lazy val status: EventStatus = New
+  override lazy val status: EventStatus = GenerationRecoverableFailure
 
   override def query: SqlQuery[Int] = SqlQuery(
-    sql"""|UPDATE event 
-          |SET status = $status, execution_date = ${now()}
+    sql"""|UPDATE event
+          |SET status = $status, execution_date = ${now().plus(10, MINUTES)}, message = $maybeMessage
           |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
           |""".stripMargin.update.run,
-    name = "generating_triples->new"
+    name = "generating_triples->generation_recoverable_fail"
   )
 
   override def updateGauges(

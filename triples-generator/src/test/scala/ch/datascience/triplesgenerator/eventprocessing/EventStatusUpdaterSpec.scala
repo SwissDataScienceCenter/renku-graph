@@ -103,7 +103,9 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withRequestBody(
-              equalToJson(json"""{"status": "RECOVERABLE_FAILURE", "message": ${asString(exception)}}""".spaces2)
+              equalToJson(
+                json"""{"status": "GENERATION_RECOVERABLE_FAILURE", "message": ${asString(exception)}}""".spaces2
+              )
             )
             .willReturn(aResponse().withStatus(status.code))
         }
@@ -134,7 +136,9 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withRequestBody(
-              equalToJson(json"""{"status": "NON_RECOVERABLE_FAILURE", "message": ${asString(exception)}}""".spaces2)
+              equalToJson(
+                json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE", "message": ${asString(exception)}}""".spaces2
+              )
             )
             .willReturn(aResponse().withStatus(status.code))
         }

@@ -51,7 +51,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
     s"return $Accepted when the payload is acceptable" +
       "and subscriber URL was added to the pool" in new TestCase {
 
-        val payload = (subscriptionCategoryPayload.subscriberUrl -> Set(New, RecoverableFailure)).asJson
+        val payload = (subscriptionCategoryPayload.subscriberUrl -> Set(New, GenerationRecoverableFailure)).asJson
         val request = Request(Method.POST, uri"subscriptions")
           .withEntity(payload)
 
@@ -105,7 +105,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
 
       val exception = exceptions.generateOne
 
-      private val payload = (subscriptionCategoryPayload.subscriberUrl -> Set(New, RecoverableFailure)).asJson
+      private val payload = (subscriptionCategoryPayload.subscriberUrl -> Set(New, GenerationRecoverableFailure)).asJson
       val request = Request(Method.POST, uri"subscriptions")
         .withEntity(payload)
 

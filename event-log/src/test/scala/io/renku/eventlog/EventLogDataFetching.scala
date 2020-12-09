@@ -52,11 +52,15 @@ trait EventLogDataFetching {
   }
 
   protected def findEventMessage(eventId: CompoundEventId): Option[EventMessage] =
+    findEvent(eventId).flatMap(_._3)
+
+  protected def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
     execute {
-      sql"""SELECT message
-            FROM event 
-            WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}"""
-        .query[Option[EventMessage]]
-        .unique
+      sql"""|SELECT execution_date, status, message
+            |FROM event 
+            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
+         """.stripMargin
+        .query[(ExecutionDate, EventStatus, Option[EventMessage])]
+        .option
     }
 }

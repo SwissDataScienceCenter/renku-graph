@@ -18,19 +18,19 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import java.time.Instant
-
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage}
+
+import java.time.Instant
 
 final case class ToSkipped[Interpretation[_]](
     eventId:              CompoundEventId,
@@ -40,7 +40,7 @@ final case class ToSkipped[Interpretation[_]](
 )(implicit ME:            Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
-  override val status: EventStatus = Skipped
+  override lazy val status: EventStatus = Skipped
 
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event 

@@ -18,20 +18,16 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit.MINUTES
-
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
 import io.renku.eventlog._
@@ -41,17 +37,24 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
+import java.time.Instant
+import java.time.temporal.ChronoUnit.MINUTES
+
+class ToTransformationRecoverableFailureSpec
+    extends AnyWordSpec
+    with InMemoryEventLogDbSpec
+    with MockFactory
+    with should.Matchers {
 
   "command" should {
 
-    s"set status $RecoverableFailure on the event with the given id and $GeneratingTriples status, " +
+    s"set status $TransformationRecoverableFailure on the event with the given id and $TransformingTriples status, " +
       "increment waiting events gauge and decrement under processing gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         storeEvent(
           compoundEventIds.generateOne.copy(id = eventId.id),
-          EventStatus.GeneratingTriples,
+          EventStatus.TransformingTriples,
           executionDates.generateOne,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -59,9 +62,10 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
         )
         val executionDate = executionDates.generateOne
         val projectPath   = projectPaths.generateOne
+
         storeEvent(
           eventId,
-          EventStatus.GeneratingTriples,
+          EventStatus.TransformingTriples,
           executionDate,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -69,23 +73,31 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
           projectPath = projectPath
         )
 
-        findEvent(eventId) shouldBe Some((executionDate, GeneratingTriples, None))
+        findEvent(eventId) shouldBe Some((executionDate, TransformingTriples, None))
 
-        (waitingEventsGauge.increment _).expects(projectPath).returning(IO.unit)
-        (underProcessingGauge.decrement _).expects(projectPath).returning(IO.unit)
+        (awaitingTriplesTransformationGauge.increment _).expects(projectPath).returning(IO.unit)
+        (underTriplesTransformationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
-          ToRecoverableFailure[IO](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge, currentTime)
+          ToTransformationRecoverableFailure[IO](
+            eventId,
+            maybeMessage,
+            awaitingTriplesTransformationGauge,
+            underTriplesTransformationGauge,
+            currentTime
+          )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvent(eventId) shouldBe Some((ExecutionDate(now.plus(10, MINUTES)), RecoverableFailure, maybeMessage))
+        findEvent(eventId) shouldBe Some(
+          (ExecutionDate(now.plus(10, MINUTES)), TransformationRecoverableFailure, maybeMessage)
+        )
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
 
-    EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
+    EventStatus.all.filterNot(status => status == TransformingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
         s"and return ${UpdateResult.Conflict}" in new TestCase {
 
@@ -102,7 +114,13 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
 
           val maybeMessage = Gen.option(eventMessages).generateOne
           val command =
-            ToRecoverableFailure[IO](eventId, maybeMessage, waitingEventsGauge, underProcessingGauge, currentTime)
+            ToTransformationRecoverableFailure[IO](
+              eventId,
+              maybeMessage,
+              awaitingTriplesTransformationGauge,
+              underTriplesTransformationGauge,
+              currentTime
+            )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -114,12 +132,12 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
   }
 
   private trait TestCase {
-    val waitingEventsGauge   = mock[LabeledGauge[IO, projects.Path]]
-    val underProcessingGauge = mock[LabeledGauge[IO, projects.Path]]
-    val histogram            = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val currentTime          = mockFunction[Instant]
-    val eventId              = compoundEventIds.generateOne
-    val eventBatchDate       = batchDates.generateOne
+    val awaitingTriplesTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val underTriplesTransformationGauge    = mock[LabeledGauge[IO, projects.Path]]
+    val histogram                          = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val currentTime                        = mockFunction[Instant]
+    val eventId                            = compoundEventIds.generateOne
+    val eventBatchDate                     = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
@@ -127,13 +145,4 @@ class ToRecoverableFailureSpec extends AnyWordSpec with InMemoryEventLogDbSpec w
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
 
-  private def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
-    execute {
-      sql"""|SELECT execution_date, status, message
-            |FROM event 
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
-         """.stripMargin
-        .query[(ExecutionDate, EventStatus, Option[EventMessage])]
-        .option
-    }
 }
