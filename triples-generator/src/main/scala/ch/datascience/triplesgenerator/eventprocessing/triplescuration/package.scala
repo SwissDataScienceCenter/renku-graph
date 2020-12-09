@@ -26,7 +26,7 @@ import ch.datascience.tinytypes.TinyType
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import io.circe.Decoder.decodeString
 import io.circe.{Decoder, Json}
-import io.renku.jsonld.EntityId
+import io.renku.jsonld.{EntityId, Property}
 
 package object triplescuration {
 
@@ -118,7 +118,7 @@ package object triplescuration {
         case _        => OptionT.liftF(new IllegalStateException(s"Multiple values found for $property").raiseError[F, T])
       }
 
-    def remove(property: String): Json = root.obj.modify(_.remove(property))(json)
+    def remove(property: Property): Json = root.obj.modify(_.remove(property.toString))(json)
   }
 
   implicit val entityIdDecoder: Decoder[EntityId] =

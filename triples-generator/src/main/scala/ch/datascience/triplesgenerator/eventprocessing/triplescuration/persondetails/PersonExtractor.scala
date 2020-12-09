@@ -3,6 +3,7 @@ package persondetails
 
 import cats.MonadError
 import cats.syntax.all._
+import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -89,9 +90,9 @@ private class PersonExtractorImpl[Interpretation[_]]()(implicit ME: MonadError[I
 
   private def removeNameAndEmail(json: Json) =
     json
-      .remove("http://schema.org/name")
-      .remove("http://schema.org/email")
-      .remove("http://www.w3.org/2000/01/rdf-schema#label")
+      .remove(schema / "name")
+      .remove(schema / "email")
+      .remove(rdf / "label")
 
 }
 

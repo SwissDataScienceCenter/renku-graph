@@ -44,8 +44,8 @@ private class TriplesUpdater {
       case types if types.contains("http://schema.org/Dataset") =>
         json.get[EntityId]("@id") match {
           case Some(topmostData.datasetId) =>
-            val noSameAsJson  = json.remove((renku / "topmostSameAs").toString)
-            val noTopmostJson = noSameAsJson.remove((renku / "topmostDerivedFrom").toString)
+            val noSameAsJson  = json.remove(renku / "topmostSameAs")
+            val noTopmostJson = noSameAsJson.remove(renku / "topmostDerivedFrom")
             noTopmostJson deepMerge Json.obj(
               (renku / "topmostSameAs").toString      -> topmostData.topmostSameAs.asJsonLD.toJson,
               (renku / "topmostDerivedFrom").toString -> topmostData.topmostDerivedFrom.asJsonLD.toJson
