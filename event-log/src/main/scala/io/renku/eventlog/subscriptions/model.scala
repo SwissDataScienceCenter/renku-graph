@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog
+package io.renku.eventlog.subscriptions
 
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.constraints.Url
@@ -24,15 +24,13 @@ import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
 
-package object subscriptions {
-  final case class ProjectIds(id: projects.Id, path: projects.Path)
+private final case class ProjectIds(id: projects.Id, path: projects.Path)
 
-  final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
-  object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url {
-    implicit val subscriberUrlDecoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
-  }
+private final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
+private object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url {
+  implicit val subscriberUrlDecoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
+}
 
-  trait SubscriptionCategoryPayload {
-    def subscriberUrl: SubscriberUrl
-  }
+private trait SubscriptionCategoryPayload {
+  def subscriberUrl: SubscriberUrl
 }

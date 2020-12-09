@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions
 import ch.datascience.generators.Generators.httpUrls
 import org.scalacheck.Gen
 
-object Generators {
+private object Generators {
   val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
 
   implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
