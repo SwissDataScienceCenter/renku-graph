@@ -53,7 +53,7 @@ trait DbInitSpec extends InMemoryEventLogDb with BeforeAndAfter {
   }
 
   protected def createEventTable(): Unit =
-    List(eventLogTableCreator, batchDateAdder, eventLogTableRenamer, eventPayloadTableCreator)
+    List(eventLogTableCreator, batchDateAdder, eventLogTableRenamer)
       .map(_.run())
       .sequence
       .void

@@ -19,8 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.Bracket
-import ch.datascience.db.{DbClient, DbTransactor}
-import ch.datascience.graph.model.events.EventStatus.GenerationRecoverableFailure
+import ch.datascience.db.DbTransactor
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
@@ -50,11 +49,11 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]](
 
   override def run(): Interpretation[Unit] =
     whenEventTableExists(
-      logger info "'event_payload' table creation skipped",
-      otherwise = checkTableExists flatMap {
+      checkTableExists flatMap {
         case true  => logger info "'event_payload' table exists"
         case false => createTable
-      }
+      },
+      otherwise = ME.raiseError(new Exception("Event table missing; creation of event_payload is not possible"))
     )
 
   private def checkTableExists: Interpretation[Boolean] =
@@ -70,6 +69,7 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]](
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)")
     _ <- logger info "'event_payload' table created"
+    _ <- foreignKeySql.run transact transactor.get
   } yield ()
 
   private lazy val createTableSql = sql"""
@@ -80,4 +80,9 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]](
       PRIMARY KEY (event_id, project_id)
     );
     """
+
+  private lazy val foreignKeySql = sql"""
+    ALTER TABLE event
+    ADD CONSTRAINT fk_event FOREIGN KEY (event_id, project_id) REFERENCES event_payload (event_id, project_id);
+  """.update
 }

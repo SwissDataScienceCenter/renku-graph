@@ -47,7 +47,6 @@ class DbInitializerImpl[Interpretation[_]](
   override def run(): Interpretation[Unit] = {
     for {
       _ <- eventLogTableCreator.run()
-      _ <- eventPayloadTableCreator.run()
       _ <- projectPathAdder.run()
       _ <- batchDateAdder.run()
       _ <- latestEventDatesViewRemover.run()
@@ -55,6 +54,7 @@ class DbInitializerImpl[Interpretation[_]](
       _ <- projectPathRemover.run()
       _ <- eventLogTableRenamer.run()
       _ <- eventStatusRenamer.run()
+      _ <- eventPayloadTableCreator.run()
       _ <- logger info "Event Log database initialization success"
     } yield ()
   } recoverWith logging

@@ -30,8 +30,20 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with DbInitSpec with shou
   protected override lazy val migrationsToRun: List[Migration] = List(eventLogTableCreator)
 
   "run" should {
+    "fail if the 'event' table does not exist" in new TestCase {
+
+      tableExists("event")         shouldBe false
+      tableExists("event_payload") shouldBe false
+
+      intercept[Exception] {
+
+        tableCreator.run().unsafeRunSync()
+      }.getMessage shouldBe "Event table missing; creation of event_payload is not possible"
+    }
+
     "create the 'event_payload' table if it doesn't exist" in new TestCase {
 
+      createEventTable()
       tableExists("event_payload") shouldBe false
 
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
@@ -43,6 +55,7 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with DbInitSpec with shou
 
     "do nothing if the 'event_payload' table already exists" in new TestCase {
 
+      createEventTable()
       tableExists("event_payload") shouldBe false
 
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
@@ -60,6 +73,9 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with DbInitSpec with shou
 
     "create indices for certain columns" in new TestCase {
 
+      createEventTable()
+
+      tableExists("event_payload")       shouldBe false
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("event_payload") shouldBe true
