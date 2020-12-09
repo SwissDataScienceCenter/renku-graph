@@ -52,14 +52,10 @@ private[eventprocessing] class TriplesCuratorImpl[Interpretation[_]](
       triples:                 JsonLDTriples
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] =
     for {
-      triplesWithPersonDetails    <- personDetailsUpdater.curate(CuratedTriples(triples, updatesGroups = Nil)).toRight
+      triplesWithPersonDetails    <- personDetailsUpdater.curate(CuratedTriples(triples, updatesGroups = Nil))
       triplesWithForkInfo         <- updateForkInfo(commit, triplesWithPersonDetails)
       triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithForkInfo)
     } yield triplesWithEnrichedDatasets
-
-  private implicit class InterpretationOps(out: Interpretation[CuratedTriples[Interpretation]]) {
-    lazy val toRight: CurationResults[Interpretation] = EitherT.right[ProcessingRecoverableError](out)
-  }
 }
 
 private[eventprocessing] object IOTriplesCurator {
@@ -71,6 +67,10 @@ private[eventprocessing] object IOTriplesCurator {
   final case class CurationRecoverableError(message: String, cause: Throwable)
       extends Exception(message, cause)
       with ProcessingRecoverableError
+
+  object CurationRecoverableError {
+    def apply(message: String): CurationRecoverableError = CurationRecoverableError(message, null)
+  }
 
   def apply(
       gitLabThrottler:         Throttler[IO, GitLab],

@@ -293,7 +293,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
     lazy val regenerateResourceId: Person = person.copy(id = person.toResourceId)
   }
-``
+
   private trait TestCase {
     val updatesCreator = new UpdatesCreator(gitLabApiUrl)
   }

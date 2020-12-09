@@ -20,18 +20,19 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 package persondetails
 
 import cats.MonadError
+import cats.data.EitherT
 import cats.effect.{ContextShift, Timer}
-import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 private[triplescuration] trait PersonDetailsUpdater[Interpretation[_]] {
-  def curate(curatedTriples: CuratedTriples[Interpretation]): Interpretation[CuratedTriples[Interpretation]]
+  def curate(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation]
 }
 
 private class PersonDetailsUpdaterImpl[Interpretation[_]](
@@ -52,16 +53,21 @@ private class PersonDetailsUpdaterImpl[Interpretation[_]](
   import projectPathExtractor._
   import updatesCreator._
 
-  def curate(curatedTriples: CuratedTriples[Interpretation]): Interpretation[CuratedTriples[Interpretation]] =
+  def curate(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation] =
     for {
-      triplesAndPersons <- extractPersons(curatedTriples.triples)
+      triplesAndPersons <- extractPersons(curatedTriples.triples).toRightT
       (updatedTriples, persons) = triplesAndPersons
-      projectPath      <- extractProjectPath(updatedTriples)
-      maybeAccessToken <- findAccessToken(projectPath)
+      projectPath      <- extractProjectPath(updatedTriples).toRightT
+      maybeAccessToken <- findAccessToken(projectPath).toRightT
       projectMembers   <- findProjectMembers(projectPath)(maybeAccessToken)
       personsWithGitlabIds = merge(persons, projectMembers)
       newUpdatesGroups     = personsWithGitlabIds map prepareUpdates[Interpretation]
     } yield CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
+
+  private implicit class ResultOps[T](out: Interpretation[T]) {
+    lazy val toRightT: EitherT[Interpretation, ProcessingRecoverableError, T] =
+      EitherT.right[ProcessingRecoverableError](out)
+  }
 }
 
 private[triplescuration] object PersonDetailsUpdater {

@@ -2,6 +2,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.personde
 
 import PersonDetailsGenerators._
 import cats.MonadError
+import cats.data.EitherT
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits.GenOps
@@ -19,6 +20,8 @@ import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.graph.tokenrepository.IOAccessTokenFinder.projectPathToPath
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 
 import scala.util.{Success, Try}
 
@@ -50,7 +53,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
       (projectMembersFinder
         .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
-        .returning(projectMembers.pure[Try])
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError](projectMembers))
 
       val personsWithGitlabIds = persons.generateSet()
       (personsAndProjectMembersMatcher.merge _)
@@ -67,7 +70,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
         acc :+ updatesGroup
       }
 
-      val Success(CuratedTriples(actualTriples, actualUpdates)) = updater.curate(curatedTriples)
+      val Success(Right(CuratedTriples(actualTriples, actualUpdates))) = updater.curate(curatedTriples).value
 
       actualTriples                                           shouldBe triplesWithoutPersonDetails
       actualUpdates.take(curatedTriples.updatesGroups.length) shouldBe curatedTriples.updatesGroups
@@ -82,7 +85,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
         .expects(curatedTriples.triples)
         .returning(exception.raiseError[Try, (JsonLDTriples, Set[Person])])
 
-      updater.curate(curatedTriples) shouldBe exception.raiseError[Try, (JsonLDTriples, Set[Person])]
+      updater.curate(curatedTriples).value shouldBe exception.raiseError[Try, (JsonLDTriples, Set[Person])]
     }
 
     "fail if extracting project path fails" in new TestCase {
@@ -99,7 +102,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
         .expects(triplesWithoutPersonDetails)
         .returning(exception.raiseError[Try, projects.Path])
 
-      updater.curate(curatedTriples) shouldBe exception.raiseError[Try, (JsonLDTriples, Set[Person])]
+      updater.curate(curatedTriples).value shouldBe exception.raiseError[Try, (JsonLDTriples, Set[Person])]
     }
 
     "fail if finding project access token fails" in new TestCase {
@@ -122,7 +125,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
         .expects(projectPath, projectPathToPath)
         .returning(exception.raiseError[Try, Option[AccessToken]])
 
-      updater.curate(curatedTriples) shouldBe exception.raiseError[Try, (JsonLDTriples, Set[Person])]
+      updater.curate(curatedTriples).value shouldBe exception.raiseError[Try, (JsonLDTriples, Set[Person])]
     }
 
     "fail if finding project members fails" in new TestCase {
@@ -149,9 +152,42 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
       (projectMembersFinder
         .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
         .expects(projectPath, maybeAccessToken)
-        .returning(exception.raiseError[Try, Set[GitLabProjectMember]])
+        .returning(
+          EitherT(exception.raiseError[Try, Either[ProcessingRecoverableError, Set[GitLabProjectMember]]])
+        )
 
-      updater.curate(curatedTriples) shouldBe exception.raiseError[Try, (JsonLDTriples, Set[Person])]
+      updater.curate(curatedTriples).value shouldBe exception.raiseError[Try, (JsonLDTriples, Set[Person])]
+    }
+
+    "return ProcessingRecoverableError if finding project members returns one" in new TestCase {
+
+      val curatedTriples              = curatedTriplesObjects[Try].generateOne
+      val triplesWithoutPersonDetails = jsonLDTriples.generateOne
+      val extractedPersons            = persons.generateSet()
+      (personExtractor.extractPersons _)
+        .expects(curatedTriples.triples)
+        .returning((triplesWithoutPersonDetails, extractedPersons).pure[Try])
+
+      val projectPath = projectPaths.generateOne
+      (projectPathExtractor.extractProjectPath _)
+        .expects(triplesWithoutPersonDetails)
+        .returning(projectPath.pure[Try])
+
+      val maybeAccessToken = accessTokens.generateOption
+      (accessTokenFinder
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
+        .returning(maybeAccessToken.pure[Try])
+
+      val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
+      (projectMembersFinder
+        .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
+        .expects(projectPath, maybeAccessToken)
+        .returning(
+          EitherT.leftT[Try, Set[GitLabProjectMember]](exception)
+        )
+
+      updater.curate(curatedTriples).value shouldBe Left(exception).pure[Try]
     }
   }
 

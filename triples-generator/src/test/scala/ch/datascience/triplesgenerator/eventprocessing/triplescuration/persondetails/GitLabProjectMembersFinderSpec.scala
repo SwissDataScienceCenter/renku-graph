@@ -3,7 +3,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.personde
 import PersonDetailsGenerators._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.generators.CommonGraphGenerators.accessTokens
+import ch.datascience.generators.CommonGraphGenerators.{accessTokens, gitLabUrls}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -11,16 +11,20 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
+import org.http4s.Status.{Forbidden, Unauthorized}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class GitLabProjectMembersFinderSpec
     extends AnyWordSpec
@@ -44,7 +48,8 @@ class GitLabProjectMembersFinderSpec
 
         finder
           .findProjectMembers(path)
-          .unsafeRunSync() shouldBe gitLabProjectUsers.toSet ++ gitLabProjectMembers.toSet
+          .value
+          .unsafeRunSync() shouldBe Right(gitLabProjectUsers.toSet ++ gitLabProjectMembers.toSet)
       }
     }
 
@@ -71,7 +76,8 @@ class GitLabProjectMembersFinderSpec
 
       finder
         .findProjectMembers(path)
-        .unsafeRunSync() shouldBe projectUsers.toSet ++ projectMembers.toSet
+        .value
+        .unsafeRunSync() shouldBe Right(projectUsers.toSet ++ projectMembers.toSet)
     }
 
     "return an empty list when service responds with NOT_FOUND" in new TestCase {
@@ -85,20 +91,46 @@ class GitLabProjectMembersFinderSpec
           .willReturn(notFound())
       }
 
-      finder.findProjectMembers(path).unsafeRunSync() shouldBe Set.empty
+      finder.findProjectMembers(path).value.unsafeRunSync() shouldBe Right(Set.empty)
+    }
+
+    Forbidden +: Unauthorized +: Nil foreach { status =>
+      s"return a CurationRecoverableError when service responds with $status" in new TestCase {
+        stubFor {
+          get(s"/api/v4/projects/${urlEncode(path.toString)}/members")
+            .willReturn(aResponse.withStatus(status.code))
+        }
+
+        val Left(error) = finder.findProjectMembers(path).value.unsafeRunSync()
+
+        error shouldBe a[CurationRecoverableError]
+      }
+    }
+
+    "return a CurationRecoverableError when service is not available" in new TestCase {
+
+      override val finder = new IOGitLabProjectMembersFinder(gitLabUrls.generateOne.apiV4,
+                                                             Throttler.noThrottling,
+                                                             TestLogger(),
+                                                             retryInterval = 1 millis
+      )
+
+      val Left(error) = finder.findProjectMembers(path).value.unsafeRunSync()
+
+      error shouldBe a[CurationRecoverableError]
     }
   }
+
+  private implicit lazy val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit lazy val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
 
     val path = projectPaths.generateOne
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
-    private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-    private implicit val timer: Timer[IO]        = IO.timer(global)
-
     private val gitLabUrl = GitLabUrl(externalServiceBaseUrl)
-    val finder            = new IOGitLabProjectMembersFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
+    val finder            = new IOGitLabProjectMembersFinder(gitLabUrl.apiV4, Throttler.noThrottling, TestLogger())
   }
 
   private implicit val projectMemberEncoder: Encoder[GitLabProjectMember] = Encoder.instance[GitLabProjectMember] {
