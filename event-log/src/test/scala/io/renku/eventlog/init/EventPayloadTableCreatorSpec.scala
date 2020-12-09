@@ -27,11 +27,20 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class EventPayloadTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
-  protected override lazy val migrationsToRun: List[Migration] = List(eventLogTableCreator)
+  protected override lazy val migrationsToRun: List[Migration] = List(
+    eventLogTableCreator,
+    projectPathAdder,
+    batchDateAdder,
+    latestEventDatesViewRemover,
+    projectTableCreator,
+    projectPathRemover,
+    eventLogTableRenamer,
+    eventStatusRenamer
+  )
 
   "run" should {
     "fail if the 'event' table does not exist" in new TestCase {
-
+      dropTable("event")
       tableExists("event")         shouldBe false
       tableExists("event_payload") shouldBe false
 
@@ -43,7 +52,6 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with DbInitSpec with shou
 
     "create the 'event_payload' table if it doesn't exist" in new TestCase {
 
-      createEventTable()
       tableExists("event_payload") shouldBe false
 
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
@@ -55,7 +63,6 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with DbInitSpec with shou
 
     "do nothing if the 'event_payload' table already exists" in new TestCase {
 
-      createEventTable()
       tableExists("event_payload") shouldBe false
 
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
@@ -73,9 +80,8 @@ class EventPayloadTableCreatorSpec extends AnyWordSpec with DbInitSpec with shou
 
     "create indices for certain columns" in new TestCase {
 
-      createEventTable()
+      tableExists("event_payload") shouldBe false
 
-      tableExists("event_payload")       shouldBe false
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
 
       tableExists("event_payload") shouldBe true
