@@ -82,7 +82,7 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]](
     """
 
   private lazy val foreignKeySql = sql"""
-    ALTER TABLE event
-    ADD CONSTRAINT fk_event FOREIGN KEY (event_id, project_id) REFERENCES event_payload (event_id, project_id);
+    ALTER TABLE event_payload
+    ADD CONSTRAINT fk_event FOREIGN KEY (event_id, project_id) REFERENCES event (event_id, project_id);
   """.update
 }

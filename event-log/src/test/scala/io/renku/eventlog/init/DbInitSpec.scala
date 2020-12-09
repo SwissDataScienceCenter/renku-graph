@@ -29,7 +29,7 @@ import scala.language.reflectiveCalls
 trait DbInitSpec extends InMemoryEventLogDb with BeforeAndAfter {
   self: Suite =>
 
-  private val tablesToDropBeforeEachTest = List("event_log", "event", "project", "event_payload")
+  private val tablesToDropBeforeEachTest = List("event_payload", "event_log", "event", "project")
 
   private val logger = TestLogger[IO]()
 
