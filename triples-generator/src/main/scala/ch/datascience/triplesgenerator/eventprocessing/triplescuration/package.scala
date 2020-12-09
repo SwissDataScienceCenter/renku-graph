@@ -110,9 +110,9 @@ package object triplescuration {
     }
 
     def getValue[F[_], T](
-        property:      String
+        property:      Property
     )(implicit decode: Decoder[T], encode: Encoder[T], ME: MonadError[F, Throwable]): OptionT[F, T] =
-      getValues(property)(decode, encode) match {
+      getValues(property.toString)(decode, encode) match {
         case Nil      => OptionT.none[F, T]
         case x +: Nil => OptionT.some[F](x)
         case _        => OptionT.liftF(new IllegalStateException(s"Multiple values found for $property").raiseError[F, T])

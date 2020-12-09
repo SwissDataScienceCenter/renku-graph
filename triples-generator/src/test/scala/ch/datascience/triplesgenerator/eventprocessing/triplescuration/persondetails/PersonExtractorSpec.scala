@@ -70,13 +70,11 @@ class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFact
 
       val originalPersons = jsonTriples.collectAllPersons
 
-      val actual = foundPersons.map(person => (person.id, person.name, person.maybeEmail))
-      val expected = originalPersons.map(person =>
-        (person.id, NonEmptyList.fromListUnsafe(person.maybeName.toList), person.maybeEmail.toSet)
-      )
+      val actual   = foundPersons.map(person => (person.id, person.name.some, person.maybeEmail))
+      val expected = originalPersons.map(person => (person.id, person.maybeName, person.maybeEmail))
       actual shouldBe expected
 
-      val updatedPersons: Set[Person] = updatedTriples.collectAllPersons
+      val updatedPersons = updatedTriples.collectAllPersons
 
       updatedPersons.foldLeft(true) {
         case (acc, Person(_, None, None, _)) => acc
@@ -144,9 +142,9 @@ class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFact
           case types if types.contains("http://schema.org/Person") =>
             collected add Person(
               root.`@id`.as[ResourceId].getOption(json).getOrElse(fail("Person '@id' not found")),
-              json.getValue[Try, Name]("http://schema.org/name").value.fold(throw _, identity),
-              json.getValue[Try, Email]("http://schema.org/email").value.fold(throw _, identity),
-              json.getValue[Try, Affiliation]("http://schema.org/affiliation").value.fold(throw _, identity)
+              json.getValue[Try, Name](schema / "name").value.fold(throw _, identity),
+              json.getValue[Try, Email](schema / "email").value.fold(throw _, identity),
+              json.getValue[Try, Affiliation](schema / "affiliation").value.fold(throw _, identity)
             )
           case _ => ()
         }
