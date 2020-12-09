@@ -43,6 +43,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
   "command" should {
 
     s"set status $TriplesGenerated on the event with the given id and $GeneratingTriples status, " +
+      "insert the payload in the event_payload table" +
       "increment awaiting transformation gauge and decrement under triples generation gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
@@ -74,6 +75,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
         )
 
         findEvents(status = TriplesGenerated) shouldBe List.empty
+        findPayload(eventId)                  shouldBe None
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
         (awaitingTransformationGauge.increment _).expects(projectPath).returning(IO.unit)
@@ -89,6 +91,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
         findEvents(status = TriplesGenerated) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
+        findPayload(eventId)                  shouldBe Some((eventId, payload))
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
@@ -96,7 +99,6 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
         s"and return ${UpdateResult.Conflict}" in new TestCase {
-
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
                      eventStatus,
@@ -107,6 +109,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           )
 
           findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
+          findPayload(eventId)             shouldBe None
           val command =
             ToTriplesGenerated[IO](eventId,
                                    payload,
@@ -121,6 +124,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
             if (eventStatus != TriplesGenerated) List.empty
             else List((eventId, executionDate, eventBatchDate))
           findEvents(status = TriplesGenerated) shouldBe expectedEvents
+          findPayload(eventId)                  shouldBe None
 
           histogram.verifyExecutionTimeMeasured(command.query.name)
         }

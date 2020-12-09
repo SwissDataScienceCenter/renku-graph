@@ -19,13 +19,14 @@
 package io.renku.eventlog.statuschange
 
 import cats.effect.{Bracket, IO}
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
+import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 
 trait StatusUpdatesRunner[Interpretation[_]] {
@@ -45,20 +46,23 @@ class StatusUpdatesRunnerImpl(
   import doobie.implicits._
 
   override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] =
-    for {
-      _            <- checkIfPersisted(command, command.eventId)
-      queryResult  <- measureExecutionTime(command.query) transact transactor.get
-      updateResult <- ME.catchNonFatal(command mapResult queryResult)
-      _            <- logInfo(command, updateResult)
-      _            <- command updateGauges updateResult
-    } yield updateResult
+    checkIfPersisted(command.eventId) transact transactor.get flatMap {
+      case true =>
+        for {
+          queryResult  <- measureExecutionTime(command.query) transact transactor.get
+          updateResult <- ME.catchNonFatal(command mapResult queryResult)
+          _            <- logInfo(command, updateResult)
+          _            <- command updateGauges updateResult
+        } yield updateResult
+      case false => NotFound.pure[IO]
+    }
 
   private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {
     case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
     case _       => ME.unit
   }
 
-  private def checkIfPersisted(command: ChangeStatusCommand[IO], eventId: CompoundEventId) = measureExecutionTime {
+  private def checkIfPersisted(eventId: CompoundEventId) = measureExecutionTime {
     SqlQuery(
       sql"""|SELECT event_id
             |FROM event
@@ -66,7 +70,7 @@ class StatusUpdatesRunnerImpl(
         .query[String]
         .option
         .map(_.isDefined),
-      name = s"${command.status} check existence"
+      name = "Event update check existence"
     )
   }
 }

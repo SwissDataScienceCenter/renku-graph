@@ -44,5 +44,6 @@ sealed trait UpdateResult extends Product with Serializable
 object UpdateResult {
   case object Conflict extends UpdateResult
   case object Updated  extends UpdateResult
+  case object NotFound extends UpdateResult
   case class Failure(message: String Refined NonEmpty) extends UpdateResult
 }

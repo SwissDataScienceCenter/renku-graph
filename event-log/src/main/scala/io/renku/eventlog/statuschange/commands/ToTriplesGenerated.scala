@@ -45,7 +45,12 @@ private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
   override def query: SqlQuery[Int] = SqlQuery(
     sql"""|UPDATE event 
           |SET status = $status, execution_date = ${now()}
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
+          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus};
+          |INSERT INTO
+          |event_payload (event_id, project_id, payload)
+          |VALUES (${eventId.id},  ${eventId.projectId}, $payload)
+          |ON CONFLICT (event_id, project_id)
+          |DO UPDATE SET payload = EXCLUDED.payload;
           |""".stripMargin.update.run,
     name = "generating_triples->triples_generated"
   )
