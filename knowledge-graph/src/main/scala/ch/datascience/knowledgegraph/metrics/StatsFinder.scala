@@ -87,7 +87,15 @@ class StatsFinderImpl(
         |    WHERE { 
         |      ?activityId rdf:type prov:Activity;
         |                  prov:wasAssociatedWith ?id.
+        |      ?id rdf:type schema:Person.
+        |    }
+        |  } UNION {
+        |    SELECT (CONCAT(STR(schema:Person), ' with GitLabId') AS ?type) (COUNT(DISTINCT ?id) AS ?count)
+        |    WHERE { 
+        |      ?activityId rdf:type prov:Activity;
+        |                  prov:wasAssociatedWith ?id.
         |      ?id rdf:type schema:Person;
+        |          schema:sameAs/schema:additionalType 'GitLab'.
         |    }
         |  }
         |}
