@@ -32,6 +32,7 @@ trait DbInitializer[Interpretation[_]] {
 
 class DbInitializerImpl[Interpretation[_]](
     eventLogTableCreator:        EventLogTableCreator[Interpretation],
+    eventPayloadTableCreator:    EventPayloadTableCreator[Interpretation],
     projectPathAdder:            ProjectPathAdder[Interpretation],
     batchDateAdder:              BatchDateAdder[Interpretation],
     latestEventDatesViewRemover: LatestEventDatesViewRemover[Interpretation],
@@ -53,6 +54,7 @@ class DbInitializerImpl[Interpretation[_]](
       _ <- projectPathRemover.run()
       _ <- eventLogTableRenamer.run()
       _ <- eventStatusRenamer.run()
+      _ <- eventPayloadTableCreator.run()
       _ <- logger info "Event Log database initialization success"
     } yield ()
   } recoverWith logging
@@ -70,6 +72,7 @@ object IODbInitializer {
   )(implicit contextShift: ContextShift[IO]): IO[DbInitializer[IO]] = IO {
     new DbInitializerImpl[IO](
       EventLogTableCreator(transactor, logger),
+      EventPayloadTableCreator(transactor, logger),
       ProjectPathAdder(transactor, logger),
       BatchDateAdder(transactor, logger),
       LatestEventDatesViewRemover[IO](transactor, logger),
