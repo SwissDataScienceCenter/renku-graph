@@ -26,7 +26,7 @@ import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAcces
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
-import ch.datascience.graph.acceptancetests.tooling.GraphServices
+import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
 import ch.datascience.graph.model.EventsGenerators.commitIds
@@ -36,6 +36,7 @@ import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.webhookservice.model.HookToken
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -50,6 +51,7 @@ import scala.language.postfixOps
 
 class EventsProcessingStatusSpec
     extends AnyFeatureSpec
+    with ModelImplicits
     with GivenWhenThen
     with GraphServices
     with Eventually
@@ -110,15 +112,16 @@ class EventsProcessingStatusSpec
       projectId:          Id,
       projectPath:        Path
   )(implicit accessToken: AccessToken): Unit = {
-    `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(projectId, projectPath)
+    `GET <gitlabApi>/projects/:id returning OK with Project Path`(projectId, projectPath)
     tokenRepositoryClient
       .PUT(s"projects/$projectId/tokens", accessToken.toJson, maybeAccessToken = None)
       .status shouldBe NoContent
-    `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
-    `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
+    `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
+    `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(projectId)
   }
 
   private def sendEventsForProcessing(project: Project)(implicit accessToken: AccessToken) = {
+
     val allCommitIds = nonEmptyList(
       commitIds,
       minElements = numberOfEvents,
@@ -127,20 +130,22 @@ class EventsProcessingStatusSpec
 
     givenAccessTokenPresentFor(project)
 
-    `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
-                                                                                            allCommitIds.head,
-                                                                                            allCommitIds.tail.toSet
+    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id,
+                                                                                        allCommitIds.head,
+                                                                                        allCommitIds.tail.toSet
     )
     // assuring there's project info in GitLab for the triples curation process
-    `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
+    `GET <gitlabApi>/projects/:path returning OK with`(project)
 
     allCommitIds.map { commitId =>
       // GitLab to return commit info about all the parent commits
       if (commitId != allCommitIds.head)
-        `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
+        `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)
 
-      // making the triples generation be happy and not throwing exceptions to the logs
-      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+      // making the triples generation process happy and not throwing exceptions to the logs
+      val committer = persons.generateOne
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
+      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project.path, committer.asMember())
     }
 
     webhookServiceClient

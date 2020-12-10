@@ -31,7 +31,7 @@ object AccessTokenPresence extends should.Matchers {
 
   def givenAccessTokenPresentFor(project: Project)(implicit accessToken: AccessToken): Assertion = {
 
-    `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(project)
+    `GET <gitlabApi>/projects/:id returning OK with Project Path`(project)
 
     tokenRepositoryClient
       .PUT(s"projects/${project.id}/tokens", accessToken.asJson, None)

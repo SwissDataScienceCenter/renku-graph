@@ -61,6 +61,7 @@ class LineageQuerySpec
       `data in the RDF store`(
         project,
         commitId,
+        committer,
         JsonLD.arr(jsons: _*)
       )
 

@@ -299,6 +299,7 @@ object bundles extends Schemas {
     final case class ExamplarData(
         location:          Location,
         commitId:          CommitId,
+        committer:         Person,
         `sha3 zhbikes`:    NodeDef,
         `sha7 plot_data`:  NodeDef,
         `sha7 clean_data`: NodeDef,
@@ -584,10 +585,11 @@ object bundles extends Schemas {
       val commit12CumulativePngEntityFactory = (activity: Activity) => Entity(Generation(cumulativePng, activity))
       val commit12GridPlotPngEntityFactory   = (activity: Activity) => Entity(Generation(gridPlotPng, activity))
       val commit12ParquetEntityFactory       = (activity: Activity) => Entity(Generation(bikesParquet, activity))
+      val commit12Committer                  = persons.generateOne
       val commit12Workflow = WorkflowRun(
         CommitId("0000012"),
         committedDates.generateOne,
-        persons.generateOne,
+        commit12Committer,
         project,
         agent,
         comment = "renku update: committing 2 newly added files",
@@ -632,6 +634,7 @@ object bundles extends Schemas {
       val examplarData = ExamplarData(
         gridPlotPng,
         commit12Workflow.commitId,
+        commit12Committer,
         NodeDef(commit3AddingDataSetFile.entity(dataSetFolder)),
         NodeDef(commit7Activity.entity(plotData)),
         NodeDef(commit7Activity.entity(cleanData)),

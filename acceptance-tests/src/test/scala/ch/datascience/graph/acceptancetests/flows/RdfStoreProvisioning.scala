@@ -26,13 +26,14 @@ import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
-import ch.datascience.graph.acceptancetests.tooling.RDFStore
+import ch.datascience.graph.acceptancetests.tooling.{ModelImplicits, RDFStore}
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.events.{CommitId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.users.Email
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.jsonld.JsonLD
@@ -41,35 +42,42 @@ import org.scalatest.Assertion
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 
-object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience with should.Matchers {
+object RdfStoreProvisioning extends ModelImplicits with Eventually with AcceptanceTestPatience with should.Matchers {
 
   def `data in the RDF store`(
       project:            Project,
       commitId:           CommitId,
+      committer:          Person,
       schemaVersion:      CliVersion = currentCliVersion
   )(implicit accessToken: AccessToken): Assertion =
     `data in the RDF store`(
       project,
       commitId,
-      fileCommit(commitId = commitId, cliVersion = schemaVersion)(projectPath = project.path,
-                                                                  projectVersion = project.version
-      )
+      committer,
+      fileCommit(
+        commitId = commitId,
+        committer = committer,
+        cliVersion = schemaVersion
+      )(projectPath = project.path, projectVersion = project.version)
     )
 
   def `data in the RDF store`(
       project:            Project,
       commitId:           CommitId,
+      committer:          Person,
       triples:            JsonLD
   )(implicit accessToken: AccessToken): Assertion = {
     val projectId = project.id
 
     givenAccessTokenPresentFor(project)
 
-    `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
+    `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
-    `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
+    `GET <gitlabApi>/projects/:path returning OK with`(project)
 
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
+
+    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project.path, committer.asMember())
 
     webhookServiceClient
       .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))
@@ -97,7 +105,7 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience with 
     }
 
     eventually {
-      EventLog.findEvents(projectId, status = EventStatus.GeneratingTriples) shouldBe empty
+      EventLog.findEvents(projectId, status = EventStatus.GeneratingTriples).isEmpty shouldBe true
     }
   }
 
@@ -116,6 +124,6 @@ object RdfStoreProvisioning extends Eventually with AcceptanceTestPatience with 
       .flatMap(_.get("email"))
       .toSet
 
-    (emails.map(_.value) diff emailsInStore) shouldBe empty
+    (emails.map(_.value) diff emailsInStore).isEmpty shouldBe true
   }
 }

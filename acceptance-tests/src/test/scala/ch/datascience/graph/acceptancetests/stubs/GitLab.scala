@@ -24,8 +24,10 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.tooling.GraphServices.webhookServiceClient
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{Id, Path, Visibility}
+import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
@@ -38,15 +40,16 @@ import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.circe.Json
 import io.circe.literal._
+import io.circe.syntax._
+import io.circe.{Encoder, Json}
 
 object GitLab {
 
   private val logger = TestLogger()
   private val port: Int Refined Positive = 2048
-  import ch.datascience.graph.model.GraphModelGenerators._
-  def `GET <gitlab>/api/v4/projects/:id returning OK`(
+
+  def `GET <gitlabApi>/projects/:id returning OK`(
       projectId:          Id,
       projectVisibility:  Visibility
   )(implicit accessToken: AccessToken): Unit = {
@@ -61,7 +64,7 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(
+  def `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     val webhookUrl = s"${webhookServiceClient.baseUrl}/webhooks/events"
@@ -72,7 +75,7 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlab>/api/v4/projects/:id/hooks returning OK with no hooks`(
+  def `GET <gitlabApi>/projects/:id/hooks returning OK with no hooks`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
@@ -82,7 +85,7 @@ object GitLab {
     ()
   }
 
-  def `POST <gitlab>/api/v4/projects/:id/hooks returning CREATED`(
+  def `POST <gitlabApi>/projects/:id/hooks returning CREATED`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
@@ -92,7 +95,7 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlab>/api/v4/projects/:id/repository/commits returning OK with a commit`(
+  def `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(
       projectId:          Id,
       commitId:           CommitId
   )(implicit accessToken: AccessToken): Unit = {
@@ -114,7 +117,7 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(
+  def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(
       projectId:          Id,
       commitId:           CommitId,
       parentIds:          Set[CommitId] = Set.empty
@@ -135,12 +138,12 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(
+  def `GET <gitlabApi>/projects/:id returning OK with Project Path`(
       project:            Project
   )(implicit accessToken: AccessToken): Unit =
-    `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(project.id, project.path)
+    `GET <gitlabApi>/projects/:id returning OK with Project Path`(project.id, project.path)
 
-  def `GET <gitlab>/api/v4/projects/:id returning OK with Project Path`(
+  def `GET <gitlabApi>/projects/:id returning OK with Project Path`(
       projectId:          Id,
       projectPath:        Path
   )(implicit accessToken: AccessToken): Unit = {
@@ -154,7 +157,32 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlab>/api/v4/projects/:path returning OK with`(
+  def `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
+      projectPath:        Path,
+      person:             (users.GitLabId, users.Username, users.Name),
+      otherPersons:       (users.GitLabId, users.Username, users.Name)*
+  )(implicit accessToken: AccessToken): Unit = {
+    implicit val personEncoder: Encoder[(users.GitLabId, users.Username, users.Name)] = Encoder.instance {
+      case (gitLabId, username, name) =>
+        json"""{
+          "id":       ${gitLabId.value},
+          "username": ${username.value},
+          "name":     ${name.value}
+        }"""
+    }
+
+    stubFor {
+      get(s"/api/v4/projects/${urlEncode(projectPath.value)}/members").withAccessTokenInHeader
+        .willReturn(okJson((person +: otherPersons).toList.asJson.noSpaces))
+    }
+    stubFor {
+      get(s"/api/v4/projects/${urlEncode(projectPath.value)}/users").withAccessTokenInHeader
+        .willReturn(okJson((person +: otherPersons).toList.asJson.noSpaces))
+    }
+    ()
+  }
+
+  def `GET <gitlabApi>/projects/:path returning OK with`(
       project:            Project,
       withStatistics:     Boolean = false
   )(implicit accessToken: AccessToken): Unit = {
