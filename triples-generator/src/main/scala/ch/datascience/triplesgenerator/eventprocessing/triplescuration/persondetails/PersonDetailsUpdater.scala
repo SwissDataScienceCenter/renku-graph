@@ -27,17 +27,19 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.Project
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 private[triplescuration] trait PersonDetailsUpdater[Interpretation[_]] {
-  def curate(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation]
+  def updatePersonDetails(curatedTriples: CuratedTriples[Interpretation],
+                          project:        Project
+  ): CurationResults[Interpretation]
 }
 
 private class PersonDetailsUpdaterImpl[Interpretation[_]](
     personExtractor:                 PersonExtractor[Interpretation],
-    projectPathExtractor:            ProjectPathExtractor[Interpretation],
     accessTokenFinder:               AccessTokenFinder[Interpretation],
     projectMembersFinder:            GitLabProjectMembersFinder[Interpretation],
     personsAndProjectMembersMatcher: PersonsAndProjectMembersMatcher,
@@ -50,16 +52,16 @@ private class PersonDetailsUpdaterImpl[Interpretation[_]](
   import personExtractor._
   import personsAndProjectMembersMatcher._
   import projectMembersFinder._
-  import projectPathExtractor._
   import updatesCreator._
 
-  def curate(curatedTriples: CuratedTriples[Interpretation]): CurationResults[Interpretation] =
+  def updatePersonDetails(curatedTriples: CuratedTriples[Interpretation],
+                          project:        Project
+  ): CurationResults[Interpretation] =
     for {
       triplesAndPersons <- extractPersons(curatedTriples.triples).toRightT
       (updatedTriples, persons) = triplesAndPersons
-      projectPath      <- extractProjectPath(updatedTriples).toRightT
-      maybeAccessToken <- findAccessToken(projectPath).toRightT
-      projectMembers   <- findProjectMembers(projectPath)(maybeAccessToken)
+      maybeAccessToken <- findAccessToken(project.path).toRightT
+      projectMembers   <- findProjectMembers(project.path)(maybeAccessToken)
       personsWithGitlabIds = merge(persons, projectMembers)
       newUpdatesGroups     = personsWithGitlabIds map prepareUpdates[Interpretation]
     } yield CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
@@ -87,7 +89,6 @@ private[triplescuration] object PersonDetailsUpdater {
     gitLabUrl            <- GitLabUrl[IO]()
   } yield new PersonDetailsUpdaterImpl[IO](
     PersonExtractor[IO](),
-    ProjectPathExtractor[IO](),
     accessTokenFinder,
     projectMembersFinder,
     new PersonsAndProjectMembersMatcher(),

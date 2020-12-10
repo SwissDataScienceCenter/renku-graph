@@ -45,13 +45,14 @@ private[eventprocessing] class TriplesCuratorImpl[Interpretation[_]](
     extends TriplesCurator[Interpretation] {
 
   import forkInfoUpdater._
+  import personDetailsUpdater._
 
   override def curate(
       commit:                  CommitEvent,
       triples:                 JsonLDTriples
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] =
     for {
-      triplesWithPersonDetails    <- personDetailsUpdater.curate(CuratedTriples(triples, updatesGroups = Nil))
+      triplesWithPersonDetails    <- updatePersonDetails(CuratedTriples(triples, updatesGroups = Nil), commit.project)
       triplesWithForkInfo         <- updateForkInfo(commit, triplesWithPersonDetails)
       triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithForkInfo)
     } yield triplesWithEnrichedDatasets
