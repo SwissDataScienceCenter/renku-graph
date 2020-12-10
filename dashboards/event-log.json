@@ -16,7 +16,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": 1,
-  "iteration": 1606992771356,
+  "iteration": 1607178089006,
   "links": [],
   "panels": [
     {
@@ -46,6 +46,7 @@
         "alignAsTable": true,
         "avg": false,
         "current": true,
+        "hideZero": true,
         "max": false,
         "min": false,
         "rightSide": true,
@@ -1190,8 +1191,8 @@
         "allValue": null,
         "current": {
           "selected": false,
-          "text": "david-renku",
-          "value": "david-renku"
+          "text": "renku",
+          "value": "renku"
         },
         "datasource": "Prometheus",
         "definition": "server_request_count",
@@ -1215,7 +1216,7 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {

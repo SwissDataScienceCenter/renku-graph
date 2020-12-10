@@ -18,6 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
+import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.graph.model.datasets.{DateCreated, PartLocation, PartName, Url}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import org.scalacheck.Gen
@@ -72,6 +73,7 @@ object DataSetPart {
 
   implicit def encoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[DataSetPartArtifact] =
     JsonLDEncoder.instance { entity =>

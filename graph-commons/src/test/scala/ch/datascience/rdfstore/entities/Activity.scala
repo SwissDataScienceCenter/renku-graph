@@ -19,7 +19,7 @@
 package ch.datascience.rdfstore.entities
 
 import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.ProcessRun.{ChildProcessRun, StandAloneProcessRun, WorkflowProcessRun}
@@ -85,6 +85,7 @@ object Activity {
 
   private[entities] implicit def converter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Activity] =
     new PartialEntityConverter[Activity] {
@@ -114,7 +115,11 @@ object Activity {
         entity => (EntityId of (fusekiBaseUrl / "activities" / "commit" / entity.commitId)).some
     }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Activity] =
+  implicit def encoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): JsonLDEncoder[Activity] =
     JsonLDEncoder.instance {
       case a: ActivityWorkflowRun                => a.asJsonLD
       case a: Activity with ChildProcessRun      => a.asJsonLD
@@ -126,6 +131,7 @@ object Activity {
 
   implicit def entityIdEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): EntityIdEncoder[Activity] =
     EntityIdEncoder.instance {

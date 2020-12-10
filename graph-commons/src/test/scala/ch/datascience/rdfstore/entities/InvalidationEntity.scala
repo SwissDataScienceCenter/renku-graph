@@ -19,7 +19,7 @@
 package ch.datascience.rdfstore.entities
 
 import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.rdfstore.FusekiBaseUrl
 import io.renku.jsonld.syntax._
@@ -42,6 +42,7 @@ object InvalidationEntity {
 
   private[entities] implicit def converter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[InvalidationEntity] =
     new PartialEntityConverter[InvalidationEntity] {
@@ -54,6 +55,7 @@ object InvalidationEntity {
 
   implicit def encoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[InvalidationEntity] =
     JsonLDEncoder.instance { entity =>

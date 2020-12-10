@@ -131,6 +131,8 @@ object Generators {
     } yield set
   }
 
+  lazy val booleans: Gen[Boolean] = Gen.oneOf(true, false)
+
   def positiveInts(max: Int = 1000): Gen[Int Refined Positive] =
     choose(1, max) map Refined.unsafeApply
 
@@ -297,6 +299,9 @@ object Generators {
       def generateList(ofSize: Int Refined Positive): List[T] =
         generateNonEmptyList(minElements = ofSize, maxElements = ofSize).toList
 
+      def generateSet(ofSize: Int Refined Positive = 5): Set[T] =
+        generateExample(setOf(generator, minElements = ofSize, maxElements = ofSize))
+
       def generateNonEmptyList(minElements: Int Refined Positive = 1,
                                maxElements: Int Refined Positive = 5
       ): NonEmptyList[T] =
@@ -321,6 +326,9 @@ object Generators {
                                     maxElements: Int Refined Positive = 5
       ): Gen[NonEmptyList[T]] =
         nonEmptyList(generator, minElements, maxElements)
+
+      def toGeneratorOfSet(minElements: Int Refined Positive = 1, maxElements: Int Refined Positive = 5): Gen[Set[T]] =
+        setOf(generator, minElements, maxElements)
 
       private def generateExample[O](generator: Gen[O]): O =
         generator.sample getOrElse generateExample(generator)

@@ -32,6 +32,7 @@ object RemoteTriplesGenerator {
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
       project:    Project,
       commitId:   CommitId,
+      committer:  Person,
       cliVersion: CliVersion = currentCliVersion
   ): Unit =
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(
@@ -39,6 +40,7 @@ object RemoteTriplesGenerator {
       commitId,
       fileCommit(
         commitId = commitId,
+        committer = committer,
         cliVersion = cliVersion
       )(
         projectPath = project.path,

@@ -20,8 +20,8 @@ package ch.datascience.graph.model
 
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
-import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{Renderer, StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt}
+import ch.datascience.tinytypes.{IntTinyType, Renderer, StringTinyType, TinyTypeFactory}
 import io.renku.jsonld.EntityId
 
 object users {
@@ -40,6 +40,9 @@ object users {
       }
     }
   }
+
+  final class GitLabId private (val value: Int) extends AnyVal with IntTinyType
+  implicit object GitLabId extends TinyTypeFactory[GitLabId](new GitLabId(_)) with NonNegativeInt
 
   final class Email private (val value: String) extends AnyVal with StringTinyType
   implicit object Email extends TinyTypeFactory[Email](new Email(_)) with NonBlank {

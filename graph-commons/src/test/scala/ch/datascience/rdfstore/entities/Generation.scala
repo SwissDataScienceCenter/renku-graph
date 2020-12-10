@@ -18,6 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
+import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.rdfstore.entities.ProcessRun.ChildProcessRun
 
 final case class Generation(location:           Location,
@@ -37,7 +38,11 @@ object Generation {
     Generation(entity.location, activity, Some(entity))
   }
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Generation] =
+  implicit def encoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): JsonLDEncoder[Generation] =
     JsonLDEncoder.instance { entity =>
       val maybeStep = entity.activity match {
         case a: ChildProcessRun => Some(a.processRunStep)

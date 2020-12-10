@@ -27,6 +27,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
+import ch.datascience.generators.CommonGraphGenerators._
 
 class GitLabUrlSpec extends AnyWordSpec with should.Matchers {
 
@@ -53,4 +54,15 @@ class GitLabUrlSpec extends AnyWordSpec with should.Matchers {
       exception shouldBe an[ConfigLoadingException]
     }
   }
+
+  "apiV4" should {
+    "return the full URL including the API path" in {
+
+      val url = gitLabUrls.generateOne
+
+      url.apiV4.value shouldBe s"$url/api/v4"
+      url.apiV4       shouldBe a[GitLabApiUrl]
+    }
+  }
+
 }

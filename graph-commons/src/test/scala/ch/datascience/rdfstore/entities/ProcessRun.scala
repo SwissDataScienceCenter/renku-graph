@@ -19,6 +19,7 @@
 package ch.datascience.rdfstore.entities
 
 import cats.syntax.all._
+import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.entities.Association.{ChildRunPlanAssociation, ProcessRunPlanAssociation, WorkflowRunPlanAssociation}
 import ch.datascience.rdfstore.entities.RunPlan.{ProcessRunPlan, WorkflowRunPlan}
@@ -138,6 +139,7 @@ object ProcessRun {
 
   private[entities] implicit def childProcessRunConverter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Activity with ChildProcessRun] =
     new PartialEntityConverter[Activity with ChildProcessRun] {
@@ -158,6 +160,7 @@ object ProcessRun {
 
   private[entities] implicit def standAloneProcessRunConverter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Activity with StandAloneProcessRun] =
     new PartialEntityConverter[Activity with StandAloneProcessRun] {
@@ -177,6 +180,7 @@ object ProcessRun {
 
   private[entities] implicit def workflowProcessRunConverter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Activity with WorkflowProcessRun] =
     new PartialEntityConverter[Activity with WorkflowProcessRun] {
@@ -196,6 +200,7 @@ object ProcessRun {
 
   implicit def childProcessRunEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[Activity with ChildProcessRun] =
     JsonLDEncoder.instance { entity =>
@@ -207,6 +212,7 @@ object ProcessRun {
 
   implicit def standAloneProcessRunEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[Activity with StandAloneProcessRun] =
     JsonLDEncoder.instance { entity =>
@@ -218,6 +224,7 @@ object ProcessRun {
 
   implicit def workflowProcessRunEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[Activity with WorkflowProcessRun] =
     JsonLDEncoder.instance { entity =>
@@ -229,6 +236,7 @@ object ProcessRun {
 
   implicit def childEntityIdEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): EntityIdEncoder[Activity with ChildProcessRun] =
     EntityIdEncoder.instance { entity =>
@@ -240,6 +248,7 @@ object ProcessRun {
 
   implicit def standAloneEntityIdEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): EntityIdEncoder[Activity with StandAloneProcessRun] =
     EntityIdEncoder.instance { entity =>
@@ -251,6 +260,7 @@ object ProcessRun {
 
   implicit def workflowEntityIdEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): EntityIdEncoder[Activity with WorkflowProcessRun] =
     EntityIdEncoder.instance { entity =>

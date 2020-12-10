@@ -64,6 +64,8 @@ object GraphModelGenerators {
       .from(maybeEmail.map(email => s"mailto:$email").getOrElse(s"_:${UUID.randomUUID()}"))
       .fold(throw _, identity)
 
+  implicit val userGitLabIds: Gen[users.GitLabId] = nonNegativeInts().map(users.GitLabId(_))
+
   implicit val projectIds: Gen[Id] = for {
     min <- choose(1, 1000)
     max <- choose(1001, 100000)

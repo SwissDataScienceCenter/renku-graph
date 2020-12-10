@@ -20,15 +20,16 @@ package ch.datascience.rdfstore.entities
 
 import java.util.UUID
 
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.users.{Affiliation, Email, Name}
+import ch.datascience.graph.model.users.{Affiliation, Email, GitLabId, Name}
 import org.scalacheck.Gen
 
 final case class Person(
     name:             Name,
     maybeEmail:       Option[Email] = None,
-    maybeAffiliation: Option[Affiliation] = None
+    maybeAffiliation: Option[Affiliation] = None,
+    maybeGitLabId:    Option[GitLabId] = None
 )
 
 object Person {
@@ -38,20 +39,31 @@ object Person {
       email: Email
   ): Person = Person(name, Some(email))
 
-  import java.util.UUID.randomUUID
-
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
+  import JsonLDEncoder._
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Person] = JsonLDEncoder.instance { entity =>
-    JsonLD.entity(
-      entityId(entity),
-      EntityTypes.of(prov / "Person", schema / "Person"),
-      schema / "email"       -> entity.maybeEmail.asJsonLD,
-      schema / "name"        -> entity.name.asJsonLD,
-      rdfs / "label"         -> entity.name.asJsonLD,
-      schema / "affiliation" -> entity.maybeAffiliation.asJsonLD
-    )
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
+    JsonLDEncoder.instance { entity =>
+      JsonLD.entity(
+        entityId(entity),
+        EntityTypes.of(prov / "Person", schema / "Person"),
+        schema / "email"       -> entity.maybeEmail.asJsonLD,
+        schema / "name"        -> entity.name.asJsonLD,
+        rdfs / "label"         -> entity.name.asJsonLD,
+        schema / "affiliation" -> entity.maybeAffiliation.asJsonLD,
+        schema / "sameAs"      -> entity.maybeGitLabId.asJsonLD(encodeOption(gitLabIdEncoder))
+      )
+    }
+
+  private def gitLabIdEncoder(implicit gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[GitLabId] = JsonLDEncoder.instance {
+    gitLabId =>
+      JsonLD.entity(
+        EntityId of (gitLabApiUrl / "users" / gitLabId).toString,
+        EntityTypes.of(schema / "URL"),
+        schema / "identifier"     -> gitLabId.value.asJsonLD,
+        schema / "additionalType" -> "GitLab".asJsonLD
+      )
   }
 
   private def entityId(person: Person)(implicit renkuBaseUrl: RenkuBaseUrl): EntityId = person.maybeEmail match {

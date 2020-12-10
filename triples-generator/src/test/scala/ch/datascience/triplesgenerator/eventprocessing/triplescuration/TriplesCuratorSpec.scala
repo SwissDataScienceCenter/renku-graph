@@ -18,10 +18,8 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
-import cats.syntax.all._
-import cats.MonadError
 import cats.data.EitherT
-
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -33,7 +31,7 @@ import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationG
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.datasets.DataSetInfoEnricher
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks.ForkInfoUpdater
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.{PersonDetailsUpdater, UpdatesCreator}
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -47,9 +45,9 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
     "pass the given triples through all the curation steps and return the final results" in new TestCase {
 
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
-      (personDetailsUpdater.curate _)
-        .expects(CuratedTriples[Try](triples, updatesGroups = Nil))
-        .returning(triplesWithPersonDetails.pure[Try])
+      (personDetailsUpdater.updatePersonDetails _)
+        .expects(CuratedTriples[Try](triples, updatesGroups = Nil), event.project)
+        .returning(triplesWithPersonDetails.toRightT)
 
       val triplesWithForkInfo = curatedTriplesObjects[Try].generateOne
       (forkInfoUpdater
@@ -68,9 +66,9 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
     "fail with the failure from the person details update" in new TestCase {
 
       val exception = exceptions.generateOne
-      (personDetailsUpdater.curate _)
-        .expects(CuratedTriples[Try](triples, updatesGroups = Nil))
-        .returning(exception.raiseError[Try, CuratedTriples[Try]])
+      (personDetailsUpdater.updatePersonDetails _)
+        .expects(CuratedTriples[Try](triples, updatesGroups = Nil), event.project)
+        .returning(exception.toEitherTError)
 
       curator.curate(event, triples).value shouldBe exception.raiseError[Try, CuratedTriples[Try]]
     }
@@ -78,9 +76,9 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
     "fail with the failure from the fork info update" in new TestCase {
 
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
-      (personDetailsUpdater.curate _)
-        .expects(CuratedTriples[Try](triples, updatesGroups = Nil))
-        .returning(triplesWithPersonDetails.pure[Try])
+      (personDetailsUpdater.updatePersonDetails _)
+        .expects(CuratedTriples[Try](triples, updatesGroups = Nil), event.project)
+        .returning(triplesWithPersonDetails.toRightT)
 
       val exception = exceptions.generateOne
       (forkInfoUpdater
@@ -94,9 +92,9 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
     "fail with the failure from the dataset enricher update" in new TestCase {
 
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
-      (personDetailsUpdater.curate _)
-        .expects(CuratedTriples[Try](triples, updatesGroups = Nil))
-        .returning(triplesWithPersonDetails.pure[Try])
+      (personDetailsUpdater.updatePersonDetails _)
+        .expects(CuratedTriples[Try](triples, updatesGroups = Nil), event.project)
+        .returning(triplesWithPersonDetails.toRightT)
 
       val triplesWithForkInfo = curatedTriplesObjects[Try].generateOne
       (forkInfoUpdater
@@ -112,12 +110,22 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
       curator.curate(event, triples).value shouldBe exception.raiseError[Try, CuratedTriples[Try]]
     }
 
+    s"return $CurationRecoverableError if personDetailsUpdater returns one" in new TestCase {
+
+      val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
+      (personDetailsUpdater.updatePersonDetails _)
+        .expects(CuratedTriples[Try](triples, updatesGroups = Nil), event.project)
+        .returning(exception.toLeftT)
+
+      curator.curate(event, triples).value shouldBe Left(exception).pure[Try]
+    }
+
     s"return $CurationRecoverableError if forkInfoUpdater returns one" in new TestCase {
 
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
-      (personDetailsUpdater.curate _)
-        .expects(CuratedTriples[Try](triples, updatesGroups = Nil))
-        .returning(triplesWithPersonDetails.pure[Try])
+      (personDetailsUpdater.updatePersonDetails _)
+        .expects(CuratedTriples[Try](triples, updatesGroups = Nil), event.project)
+        .returning(triplesWithPersonDetails.toRightT)
 
       val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
       (forkInfoUpdater
@@ -130,13 +138,11 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
   }
 
   private trait TestCase {
-    implicit val context = MonadError[Try, Throwable]
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
     val triples = jsonLDTriples.generateOne
     val event   = commitEvents.generateOne
 
-    class TryPersonDetailsUpdater(updatesCreator: UpdatesCreator) extends PersonDetailsUpdater[Try](updatesCreator)
-    val personDetailsUpdater = mock[TryPersonDetailsUpdater]
+    val personDetailsUpdater = mock[PersonDetailsUpdater[Try]]
     val forkInfoUpdater      = mock[ForkInfoUpdater[Try]]
     val dataSetInfoEnricher  = mock[DataSetInfoEnricher[Try]]
     val curator              = new TriplesCuratorImpl[Try](personDetailsUpdater, forkInfoUpdater, dataSetInfoEnricher)

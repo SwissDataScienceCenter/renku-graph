@@ -122,6 +122,7 @@ class LineageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
       exception.getMessage shouldBe s"${types.mkString(", ")} cannot be converted to a NodeType"
     }
   }
+
   "getNode" should {
 
     "return a Node if there is one with the given location" in {

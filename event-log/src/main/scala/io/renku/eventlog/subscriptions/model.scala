@@ -18,15 +18,19 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.generators.Generators.httpUrls
-import org.scalacheck.Gen
+import ch.datascience.graph.model.projects
+import ch.datascience.tinytypes.constraints.Url
+import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import io.circe.Decoder
 
-private object Generators {
-  val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
+private final case class ProjectIds(id: projects.Id, path: projects.Path)
 
-  implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
-    url <- subscriberUrls
-  } yield new SubscriptionCategoryPayload {
-    override def subscriberUrl: SubscriberUrl = url
-  }
+private final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
+private object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url {
+  implicit val subscriberUrlDecoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
+}
+
+private trait SubscriptionCategoryPayload {
+  def subscriberUrl: SubscriberUrl
 }

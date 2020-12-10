@@ -18,6 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
+import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.rdfstore.entities.RunPlan.{ProcessRunPlan, WorkflowRunPlan}
 import ch.datascience.rdfstore.entities.WorkflowRun.ActivityWorkflowRun
@@ -79,6 +80,7 @@ object Association {
 
   implicit def childRunPlanAssociationEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[ChildRunPlanAssociation] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
@@ -91,6 +93,7 @@ object Association {
 
   implicit def workflowRunPlanAssociationEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[WorkflowRunPlanAssociation] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(
@@ -103,6 +106,7 @@ object Association {
 
   implicit def processRunPlanAssociationEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[ProcessRunPlanAssociation] = JsonLDEncoder.instance { entity =>
     JsonLD.entity(

@@ -36,13 +36,14 @@ import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
-import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
+import ch.datascience.http.rest.Links.{Href, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
@@ -76,12 +77,13 @@ class DatasetsResourcesSpec
         forking = initProject.forking.copy(maybeParent = None)
       )
     }
-    val dataset1CommitId = commitIds.generateOne
     val dataset1Creation = addedToProjectObjects.generateOne.copy(
       agent = DatasetAgent(project.created.maybeCreator.flatMap(_.maybeEmail),
                            project.created.maybeCreator.map(_.name).getOrElse(userNames.generateOne)
       )
     )
+    val dataset1CommitId  = commitIds.generateOne
+    val dataset1Committer = Person(dataset1Creation.agent.name, dataset1Creation.agent.maybeEmail)
     val dataset1 = nonModifiedDatasets().generateOne.copy(
       maybeDescription = Some(datasetDescriptions.generateOne),
       published = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
@@ -103,7 +105,7 @@ class DatasetsResourcesSpec
         nonModifiedDataSetCommit(
           commitId = dataset1CommitId,
           committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
-          committer = Person(dataset1Creation.agent.name, dataset1Creation.agent.maybeEmail),
+          committer = dataset1Committer,
           cliVersion = currentCliVersion
         )(
           projectPath = project.path,
@@ -166,7 +168,7 @@ class DatasetsResourcesSpec
         )
       )
 
-      `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)
+      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)
 
       `triples updates run`(
         (List(dataset1, dataset2)
@@ -176,7 +178,7 @@ class DatasetsResourcesSpec
       )
 
       And("the project exists in GitLab")
-      `GET <gitlab>/api/v4/projects/:path returning OK with`(project, withStatistics = true)
+      `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
 
       When("user fetches project's datasets with GET knowledge-graph/projects/<project-name>/datasets")
       val projectDatasetsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}/datasets"
@@ -365,20 +367,24 @@ class DatasetsResourcesSpec
       val firstProject +: otherProjects = projects
 
       val commitId      = commitIds.generateOne
+      val committer     = persons.generateOne
       val committedDate = committedDates.generateOne
-      val datasetJsonLD = toDataSetCommit(firstProject, commitId, committedDate, dataset)
-      `data in the RDF store`(firstProject, commitId, datasetJsonLD)
+      val datasetJsonLD = toDataSetCommit(firstProject, commitId, committer, committedDate, dataset)
+      `data in the RDF store`(firstProject, commitId, committer, datasetJsonLD)
       `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
 
       otherProjects.foldLeft(List(dataset.id)) { (datasetsIds, project) =>
         val commitId  = commitIds.generateOne
+        val committer = persons.generateOne
         val datasetId = datasetIdentifiers.generateOne
 
         `data in the RDF store`(
           project,
           commitId,
+          committer,
           toDataSetCommit(project,
                           commitId,
+                          committer,
                           CommittedDate(committedDate.value plusSeconds positiveInts().generateOne.value),
                           dataset,
                           datasetId.some
@@ -393,12 +399,14 @@ class DatasetsResourcesSpec
 
     def toDataSetCommit(project:              Project,
                         commitId:             CommitId,
+                        committer:            Person,
                         committedDate:        CommittedDate,
                         dataset:              NonModifiedDataset,
                         overriddenIdentifier: Option[Identifier] = None
     ): JsonLD =
       nonModifiedDataSetCommit(
         commitId = commitId,
+        committer = committer,
         committedDate = committedDate,
         cliVersion = currentCliVersion
       )(
