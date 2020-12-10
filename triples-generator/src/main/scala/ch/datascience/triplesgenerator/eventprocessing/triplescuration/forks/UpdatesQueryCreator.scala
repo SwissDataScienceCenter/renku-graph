@@ -101,15 +101,12 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
     )
   }
 
-  def addNewCreator(projectPath:       Path,
-                    maybeCreatorEmail: Option[Email],
-                    maybeCreatorName:  Option[users.Name]
-  ): List[SparqlQuery] = {
+  def addNewCreator(projectPath: Path, creator: GitLabCreator): List[SparqlQuery] = {
     val projectId = ResourceId(renkuBaseUrl, projectPath)
-    maybeCreatorEmail match {
+    creator.maybeEmail match {
       case Some(creatorEmail) =>
         val creatorResource = findCreatorId(creatorEmail)
-        insertOrUpdateCreator(creatorResource, maybeCreatorEmail, maybeCreatorName) ++
+        insertOrUpdateCreator(creatorResource, Some(creatorEmail), Some(creator.name)) ++
           swapCreator(projectPath, creatorResource)
       case None =>
         maybeCreatorName match {
@@ -174,6 +171,7 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
     ).flatten
   }
 
+  // TODO: go to KG to get this resource ID
   private def findCreatorId(email: Email): users.ResourceId = users.ResourceId(s"mailto:$email")
 
   def recreateDateCreated(projectPath: Path, dateCreated: DateCreated): List[SparqlQuery] = {

@@ -37,22 +37,22 @@ class KGInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheck
 
   "findCreatorId" should {
 
-    "return ResourceId of a Person with the given email" in new TestCase {
-      forAll { email: Email =>
-        val person = entitiesPersons(email.some).generateOne
+    "return ResourceId of a Person with the given gitLabId" in new TestCase {
+      forAll { gitLabId: users.GitLabId =>
+        val person = entitiesPersons(Some(gitLabId)).generateOne
 
         loadToStore(person.asJsonLD, entitiesPersons().generateOne.asJsonLD)
 
-        val Some(resourceId) = finder.findCreatorId(email).unsafeRunSync()
+        val Some(resourceId) = finder.findCreatorId(gitLabId).unsafeRunSync()
 
         findPerson(resourceId) should contain theSameElementsAs Set(
-          person.name.value -> email.value
+          person.name.value
         )
       }
     }
 
-    "return no ResourceId if there's no Person with the given email" in new TestCase {
-      finder.findCreatorId(userEmails.generateOne).unsafeRunSync() shouldBe None
+    "return no ResourceId if there's no Person with the given gitLabId" in new TestCase {
+      finder.findCreatorId(userGitLabIds.generateOne).unsafeRunSync() shouldBe None
     }
   }
 
@@ -62,15 +62,14 @@ class KGInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheck
     val finder               = new IOKGInfoFinder(rdfStoreConfig, logger, timeRecorder)
   }
 
-  private def findPerson(resourceId: users.ResourceId): Set[(String, String)] =
+  private def findPerson(resourceId: users.ResourceId): Set[String] =
     runQuery(s"""|SELECT ?name ?email
                  |WHERE {
                  |  ${resourceId.showAs[RdfResource]} rdf:type schema:Person;
-                 |                                    schema:name ?name;
-                 |                                    schema:email ?email 
+                 |                                    schema:name ?name
                  |}
                  |""".stripMargin)
       .unsafeRunSync()
-      .map(row => (row("name"), row("email")))
+      .map(row => row("name"))
       .toSet
 }

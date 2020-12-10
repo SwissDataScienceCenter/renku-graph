@@ -35,10 +35,10 @@ package object forks {
   implicit val gitLabApiUrl:  GitLabApiUrl  = gitLabUrls.generateOne.apiV4
   implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 
-  def gitLabProjects(projectPath: Path, parentPath: Path): Gen[GitLabProject] =
+  private[forks] def gitLabProjects(projectPath: Path, parentPath: Path): Gen[GitLabProject] =
     gitLabProjects(projectPath = projectPath, maybeParentPaths = Gen.const(parentPath).toGeneratorOfSomes)
 
-  def gitLabProjects(
+  private[forks] def gitLabProjects(
       projectPath:      Path,
       maybeParentPaths: Gen[Option[Path]] = projectPaths.toGeneratorOfOptions
   ): Gen[GitLabProject] =
@@ -48,13 +48,14 @@ package object forks {
       dateCreated     <- projectCreatedDates
     } yield GitLabProject(projectPath, maybeParentPath, maybeCreator, dateCreated)
 
-  def gitLabCreator(maybeEmail: Option[Email] = userEmails.generateOption,
-                    maybeName:  Option[users.Name] = userNames.generateOption
+  private[forks] def gitLabCreator(gitLabId:   users.GitLabId = userGitLabIds.generateOne,
+                                   maybeEmail: Option[Email] = userEmails.generateOption,
+                                   name:       users.Name = userNames.generateOne
   ): Gen[GitLabCreator] =
-    GitLabCreator(maybeEmail, maybeName)
+    GitLabCreator(gitLabId, name, maybeEmail)
 
-  def kgCreator(maybeEmail: Option[Email] = userEmails.generateOption,
-                name:       users.Name = userNames.generateOne
+  private[forks] def kgCreator(maybeEmail: Option[Email] = userEmails.generateOption,
+                               name:       users.Name = userNames.generateOne
   ): Gen[KGCreator] =
     for {
       resourceId <- userResourceIds(maybeEmail)
@@ -74,9 +75,9 @@ package object forks {
       version     <- projectSchemaVersions
     } yield Project(path, name, createdDate, maybeCreator, maybeParentProject, version)
 
-  def entitiesPersons(maybeEmailGen: Gen[Option[Email]] = userEmails.toGeneratorOfOptions): Gen[Person] =
+  def entitiesPersons(maybeGitLabId: Gen[Option[users.GitLabId]] = userGitLabIds.toGeneratorOfOptions): Gen[Person] =
     for {
       name       <- userNames
-      maybeEmail <- maybeEmailGen
-    } yield Person(name, maybeEmail)
+      maybeEmail <- userEmails.toGeneratorOfOptions
+    } yield Person(name = name, maybeEmail = maybeEmail, maybeAffiliation = None, maybeGitLabId = maybeGitLabId)
 }

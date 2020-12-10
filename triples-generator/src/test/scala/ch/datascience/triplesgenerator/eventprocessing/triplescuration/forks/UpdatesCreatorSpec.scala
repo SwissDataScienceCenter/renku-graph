@@ -57,19 +57,20 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
     }
 
     "update the wasDerivedFrom triple, recreate dateCreated and update the project creator" +
-      "if Gitlab project's creator has an email and the user exists in KG" in new TestCase {
+      "if the user exists in KG" in new TestCase {
 
-        val emailInGitLab = userEmails.generateOne
+        val gitLabId = userGitLabIds.generateOne
+
         val gitLabProject = given {
           gitLabProjects(event.project.path).generateOne.copy(
-            maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+            maybeCreator = gitLabCreator(gitLabId = gitLabId).generateSome
           )
         }.existsInGitLab
 
-        val newCreatorId = userResourceIds(Some(emailInGitLab)).generateOne
+        val newCreatorId = userResourceIds(None).generateOne
         given(
           creatorId = newCreatorId,
-          forEmail = emailInGitLab
+          forGitLabId = gitLabId
         ).existsInKG
 
         val wasDerivedFromUpdates = (updatesQueryCreator
@@ -98,7 +99,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
         val emailInGitLab = userEmails.generateOne
         val gitLabProject = given {
           gitLabProjects(event.project.path).generateOne.copy(
-            maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+            maybeCreator = gitLabCreator(maybeEmail = Some(emailInGitLab)).generateSome
           )
         }.existsInGitLab
 
@@ -111,7 +112,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
 
         val creatorUpdates = (updatesQueryCreator
           .addNewCreator(_: Path, _: Option[Email], _: Option[users.Name]))
-          .expects(gitLabProject.path, Some(emailInGitLab), gitLabProject.maybeCreator.flatMap(_.maybeName))
+          .expects(gitLabProject.path, Some(emailInGitLab), gitLabProject.maybeCreator.map(_.name))
           .returningUpdates
 
         val recreateDateCreated = (updatesQueryCreator
@@ -140,7 +141,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
 
         val creatorUpdates = (updatesQueryCreator
           .addNewCreator(_: Path, _: Option[Email], _: Option[users.Name]))
-          .expects(gitLabProject.path, None, gitLabProject.maybeCreator.flatMap(_.maybeName))
+          .expects(gitLabProject.path, None, gitLabProject.maybeCreator.map(_.name))
           .returningUpdates
 
         val recreateDateCreated = (updatesQueryCreator
@@ -175,7 +176,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
         val emailInGitLab = userEmails.generateOne
         given {
           gitLabProjects(projectPaths.generateOne).generateOne.copy(
-            maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+            maybeCreator = gitLabCreator(maybeEmail = Some(emailInGitLab)).generateSome
           )
         }.existsInGitLab
 
@@ -211,7 +212,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
         val emailInGitLab = userEmails.generateOne
         given {
           gitLabProjects(projectPaths.generateOne).generateOne.copy(
-            maybeCreator = gitLabCreator(Some(emailInGitLab)).generateSome
+            maybeCreator = gitLabCreator(maybeEmail = Some(emailInGitLab)).generateSome
           )
         }.existsInGitLab
 
@@ -254,11 +255,11 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(Option.empty.pure[IO])
     }
 
-    def given(creatorId: users.ResourceId, forEmail: Email) = new {
+    def given(creatorId: users.ResourceId, forGitLabId: users.GitLabId) = new {
       lazy val existsInKG =
         (kgInfoFinder
-          .findCreatorId(_: Email))
-          .expects(forEmail)
+          .findCreatorId(_: users.GitLabId))
+          .expects(forGitLabId)
           .returning(creatorId.some.pure[IO])
     }
 

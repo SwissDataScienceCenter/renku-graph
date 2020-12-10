@@ -28,7 +28,7 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 private trait KGInfoFinder[Interpretation[_]] {
-  def findCreatorId(email: users.Email): Interpretation[Option[users.ResourceId]]
+  def findCreatorId(gitLabId: users.GitLabId): Interpretation[Option[users.ResourceId]]
 }
 
 private class IOKGInfoFinder(
@@ -50,13 +50,13 @@ private class IOKGInfoFinder(
   import ch.datascience.graph.model.users.Email
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-  override def findCreatorId(email: users.Email): IO[Option[users.ResourceId]] = {
+  override def findCreatorId(gitLabId: users.GitLabId): IO[Option[users.ResourceId]] = {
     implicit val decoder: Decoder[List[users.ResourceId]] = recordsDecoder(resourceIdDecoder)
-    queryExpecting[List[users.ResourceId]](using = personIdFindingQuery(email)) flatMap toSingleResult(email)
+    queryExpecting[List[users.ResourceId]](using = personIdFindingQuery(gitLabId)) flatMap toSingleResult(gitLabId)
   }
 
-  private def personIdFindingQuery(email: Email) = SparqlQuery(
-    name = "upload - personId by email",
+  private def personIdFindingQuery(gitLabId: users.GitLabId) = SparqlQuery(
+    name = "upload - personId by gitLabId",
     Set(
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
       "PREFIX schema: <http://schema.org/>"
@@ -64,7 +64,9 @@ private class IOKGInfoFinder(
     s"""|SELECT DISTINCT ?id
         |WHERE {
         |  ?id rdf:type <http://schema.org/Person>;
-        |      schema:email "${sparqlEncode(email.value)}".
+        |      schema:sameAs ?sameAsId".
+        |  ?sameAsId schema:additionalType 'GitLab';
+        |            schema:identifier     ${gitLabId.value}
         |}
         |""".stripMargin
   )

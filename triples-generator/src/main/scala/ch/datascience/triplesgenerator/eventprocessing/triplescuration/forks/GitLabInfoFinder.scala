@@ -24,11 +24,12 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{DateCreated, Path}
-import ch.datascience.graph.model.users.Email
+import ch.datascience.graph.model.users.{Email, GitLabId}
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
+import ch.datascience.graph.model.users
 
 private trait GitLabInfoFinder[Interpretation[_]] {
 
@@ -55,7 +56,7 @@ private class IOGitLabInfoFinder(
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  private type ProjectAndCreatorId = (GitLabProject, Option[Int])
+  private type ProjectAndCreatorId = (GitLabProject, Option[users.GitLabId])
 
   override def findProject(
       path:                    projects.Path
@@ -68,7 +69,7 @@ private class IOGitLabInfoFinder(
     } yield project.copy(maybeCreator = maybeCreator)
   }.value
 
-  private def fetchCreator(maybeCreatorId:   Option[Int],
+  private def fetchCreator(maybeCreatorId:   Option[users.GitLabId],
                            maybeAccessToken: Option[AccessToken]
   ): OptionT[IO, Option[GitLabCreator]] =
     maybeCreatorId match {
@@ -96,8 +97,8 @@ private class IOGitLabInfoFinder(
     implicit val decoder: Decoder[ProjectAndCreatorId] = cursor =>
       for {
         path           <- cursor.downField("path_with_namespace").as[projects.Path]
-        dateCreated    <- cursor.downField("created_at").as[DateCreated]
-        maybeCreatorId <- cursor.downField("creator_id").as[Option[Int]]
+        dateCreated    <- cursor.downField("created_at").as[projects.DateCreated]
+        maybeCreatorId <- cursor.downField("creator_id").as[Option[users.GitLabId]]
         maybeParentPath <- cursor
                              .downField("forked_from_project")
                              .as[Option[projects.Path]](decodeOption(parentPathDecoder))
@@ -107,22 +108,17 @@ private class IOGitLabInfoFinder(
   }
 
   private implicit lazy val creatorDecoder: EntityDecoder[IO, GitLabCreator] = {
-    import ch.datascience.graph.model.users
 
     implicit val decoder: Decoder[GitLabCreator] = cursor =>
       for {
-        maybeName <- cursor.downField("name").as[Option[users.Name]]
-        maybeEmail <- cursor
-                        .downField("email")
-                        .as[Option[String]]
-                        .map(blankToNone)
-                        .flatMap(toOption[Email])
+        gitLabId <- cursor.downField("id").as[users.GitLabId]
+        name     <- cursor.downField("name").as[users.Name]
         maybePublicEmail <- cursor
                               .downField("public_email")
                               .as[Option[String]]
                               .map(blankToNone)
                               .flatMap(toOption[Email])
-      } yield GitLabCreator(maybeEmail orElse maybePublicEmail, maybeName)
+      } yield GitLabCreator(gitLabId, name, maybePublicEmail)
 
     jsonOf[IO, GitLabCreator]
   }

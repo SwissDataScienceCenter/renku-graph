@@ -67,7 +67,24 @@ private[triplescuration] class UpdatesCreatorImpl(
         }
     )
 
-  private lazy val forkInfoUpdates: Option[GitLabProject] => IO[List[SparqlQuery]] = {
+  private def forkInfoUpdates(maybeGitLabProject: Option[GitLabProject]) : IO[List[SparqlQuery]] = maybeGitLabProject match {
+    case Some(GitLabProject(path, maybeParentPath, Some(creator), dateCreated)) =>
+      OptionT(kg.findCreatorId(creator.gitLabId))
+        .map { existingUserResource =>
+          updateWasDerivedFrom(path, maybeParentPath) ++
+            swapCreator(path, existingUserResource) ++
+            recreateDateCreated(path, dateCreated)
+        }
+        .getOrElse {
+          updateWasDerivedFrom(path, maybeParentPath) ++
+            addNewCreator(path, creator) ++
+            recreateDateCreated(path, dateCreated)
+        }
+    case None => ???
+  }
+
+  {
+    case `when `
     case `when creator has an email`(creatorEmail, gitLabProject) =>
       OptionT(kg.findCreatorId(creatorEmail))
         .map { existingUserResource =>
@@ -104,7 +121,7 @@ private[triplescuration] class UpdatesCreatorImpl(
   private implicit class GitLabProjectOps(gitLabProject: GitLabProject) {
 
     lazy val maybeEmail = gitLabProject.maybeCreator.flatMap(_.maybeEmail)
-    lazy val maybeName  = gitLabProject.maybeCreator.flatMap(_.maybeName)
+    lazy val maybeName  = gitLabProject.maybeCreator.map(_.name)
   }
 
   private lazy val maybeToRecoverableError
