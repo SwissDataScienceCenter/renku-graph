@@ -181,7 +181,9 @@ Currently, only status changing payloads are allowed:
 
 ```json
 {
-  "status": "TRIPLES_GENERATED"
+  "status": "TRIPLES_GENERATED",
+  "payload": "json payload",
+  "schema_version": "schema version of the triples"
 }
 ```
 
@@ -325,6 +327,13 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | project_id INT4          PK NOT NULL |
 | project_path VARCHAR        NOT NULL |
 | latest_event_date TIMESTAMP NOT NULL |
+
+| event_payload                        |
+|--------------------------------------|
+| event_id   VARCHAR    PK FK NOT NULL |
+| project_id INT4       PK FK NOT NULL |
+| payload    TEXT             NOT NULL |
+| schema_version TEXT         NOT NULL |
 
 ## Trying out
 
