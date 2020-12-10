@@ -24,6 +24,7 @@ import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.projects.SchemaVersion
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
@@ -93,9 +94,10 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
 
     implicit val commandDecoder: Decoder[ChangeStatusCommand[Interpretation]] = (cursor: HCursor) =>
       for {
-        status       <- cursor.downField("status").as[EventStatus]
-        maybeMessage <- cursor.downField("message").as[Option[EventMessage]]
-        maybePayload <- cursor.downField("payload").as[Option[EventPayload]]
+        status             <- cursor.downField("status").as[EventStatus]
+        maybeMessage       <- cursor.downField("message").as[Option[EventMessage]]
+        maybePayload       <- cursor.downField("payload").as[Option[EventPayload]]
+        maybeSchemaVersion <- cursor.downField("schema_version").as[Option[SchemaVersion]]
       } yield status match {
         case TriplesStore => ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge)
         case New          => ToNew[Interpretation](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
@@ -103,6 +105,7 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
           ToTriplesGenerated[Interpretation](
             eventId,
             maybePayload getOrElse (throw new Exception(s"$status status needs a payload")),
+            maybeSchemaVersion getOrElse (throw new Exception(s"$status status needs a schema_version")),
             underTriplesGenerationGauge,
             awaitingTriplesTransformationGauge
           )

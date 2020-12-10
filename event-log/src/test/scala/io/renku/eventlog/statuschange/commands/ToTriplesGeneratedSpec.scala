@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
@@ -83,6 +83,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
         val command =
           ToTriplesGenerated[IO](eventId,
                                  payload,
+                                 schemaVersion,
                                  underTriplesGenerationGauge,
                                  awaitingTransformationGauge,
                                  currentTime
@@ -113,6 +114,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           val command =
             ToTriplesGenerated[IO](eventId,
                                    payload,
+                                   schemaVersion,
                                    awaitingTransformationGauge,
                                    underTriplesGenerationGauge,
                                    currentTime
@@ -140,8 +142,8 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     val eventId        = compoundEventIds.generateOne
     val eventBatchDate = batchDates.generateOne
 
-    val payload = eventPayloads.generateOne
-
+    val payload       = eventPayloads.generateOne
+    val schemaVersion = projectSchemaVersions.generateOne
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()

@@ -48,6 +48,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.graph.model.GraphModelGenerators._
 
 class StatusChangeEndpointSpec
     extends AnyWordSpec
@@ -62,10 +63,12 @@ class StatusChangeEndpointSpec
       TriplesStore -> ToTriplesStore[IO](compoundEventIds.generateOne, underTriplesGenerationGauge),
       Skipped      -> ToSkipped[IO](compoundEventIds.generateOne, eventMessages.generateOne, underTriplesGenerationGauge),
       New          -> ToNew[IO](compoundEventIds.generateOne, awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
-      TriplesGenerated -> ToTriplesGenerated[IO](compoundEventIds.generateOne,
-                                                 eventPayloads.generateOne,
-                                                 underTriplesGenerationGauge,
-                                                 awaitingTriplesTransformationGauge
+      TriplesGenerated -> ToTriplesGenerated[IO](
+        compoundEventIds.generateOne,
+        eventPayloads.generateOne,
+        projectSchemaVersions.generateOne,
+        underTriplesGenerationGauge,
+        awaitingTriplesTransformationGauge
       ),
       GenerationRecoverableFailure -> ToGenerationRecoverableFailure[IO](
         compoundEventIds.generateOne,
@@ -209,7 +212,8 @@ class StatusChangeEndpointSpec
 
       val eventId = compoundEventIds.generateOne
 
-      val payload = json"""{"status": ${TriplesGenerated.value}}"""
+      val payload =
+        json"""{"status": ${TriplesGenerated.value}, "schema_version": ${projectSchemaVersions.generateOne.value} }"""
       val request = Request(
         Method.PATCH,
         uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
@@ -220,6 +224,25 @@ class StatusChangeEndpointSpec
       response.status                           shouldBe BadRequest
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("TRIPLES_GENERATED status needs a payload")
+
+      logger.expectNoLogs()
+    }
+
+    s"return $BadRequest for $TriplesGenerated status with no schema version" in new TestCase {
+
+      val eventId = compoundEventIds.generateOne
+
+      val payload = json"""{"status": ${TriplesGenerated.value}, "payload": ${eventPayloads.generateOne.value} }"""
+      val request = Request(
+        Method.PATCH,
+        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+      ).withEntity(payload)
+
+      val response = changeStatus(eventId, request).unsafeRunSync()
+
+      response.status                           shouldBe BadRequest
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("TRIPLES_GENERATED status needs a schema_version")
 
       logger.expectNoLogs()
     }
@@ -296,7 +319,8 @@ class StatusChangeEndpointSpec
       }"""
     case command: ToTriplesGenerated[IO]                    => json"""{
         "status": ${command.status.value},
-        "payload": ${command.payload.value}
+        "payload": ${command.payload.value},
+        "schema_version": ${command.schemaVersion.value}
       }"""
     case command: ToGenerationRecoverableFailure[IO]        => json"""{
         "status": ${command.status.value}

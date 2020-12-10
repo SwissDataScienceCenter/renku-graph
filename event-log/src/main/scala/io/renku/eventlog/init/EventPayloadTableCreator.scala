@@ -77,6 +77,7 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]](
       event_id       varchar   NOT NULL,
       project_id     int4      NOT NULL,
       payload        text,
+      schema_version text,
       PRIMARY KEY (event_id, project_id)
     );
     """
