@@ -16,7 +16,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": 1,
-  "iteration": 1607178089006,
+  "iteration": 1607600550932,
   "links": [],
   "panels": [
     {
@@ -184,7 +184,7 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(ceil(max by(project) (events_waiting_count{kubernetes_name=\"[[kube_env_name]]-event-log\"})), \"project\", \"$1\", \"project\", \"(.*)\")",
+          "expr": "label_replace(ceil(max by(project) (events_awaiting_generation_count{kubernetes_name=\"[[kube_env_name]]-event-log\"})), \"project\", \"$1\", \"project\", \"(.*)\")",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
@@ -196,7 +196,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Top priority queued events",
+      "title": "Top priority events for triples generation",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -289,8 +289,9 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "label_replace(ceil(max by(project)(events_processing_count{kubernetes_name=\"[[kube_env_name]]-event-log\"})), \"project\", \"$1\", \"project\", \"(.*)\")",
+          "expr": "label_replace(ceil(max by(project)(events_under_triples_generation_count{kubernetes_name=\"[[kube_env_name]]-event-log\"})), \"project\", \"$1\", \"project\", \"(.*)\")",
           "format": "time_series",
+          "interval": "",
           "intervalFactor": 1,
           "legendFormat": "{{project}}",
           "refId": "A"
@@ -300,7 +301,7 @@
       "timeFrom": null,
       "timeRegions": [],
       "timeShift": null,
-      "title": "Events under processing",
+      "title": "Events under triples generation",
       "tooltip": {
         "shared": true,
         "sort": 0,
@@ -1246,5 +1247,5 @@
   "timezone": "",
   "title": "Renku Event Log",
   "uid": "cb9J1WBZz",
-  "version": 31
+  "version": 32
 }
