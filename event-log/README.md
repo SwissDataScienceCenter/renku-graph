@@ -182,7 +182,7 @@ Currently, only status changing payloads are allowed:
 ```json
 {
   "status": "TRIPLES_GENERATED",
-  "payload": "json payload",
+  "payload": "json-ld as string",
   "schema_version": "schema version of the triples"
 }
 ```
