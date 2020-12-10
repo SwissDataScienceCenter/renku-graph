@@ -22,7 +22,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit._
 
 import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.Association.WorkflowRunPlanAssociation
@@ -79,6 +79,7 @@ object WorkflowRun {
 
   private[entities] implicit def converter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Activity with WorkflowRun] =
     new PartialEntityConverter[Activity with WorkflowRun] {
@@ -97,6 +98,7 @@ object WorkflowRun {
 
   implicit def encoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[ActivityWorkflowRun] =
     JsonLDEncoder.instance { entity =>
@@ -109,6 +111,7 @@ object WorkflowRun {
 
   implicit def entityIdEncoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): EntityIdEncoder[ActivityWorkflowRun] =
     EntityIdEncoder.instance { entity =>

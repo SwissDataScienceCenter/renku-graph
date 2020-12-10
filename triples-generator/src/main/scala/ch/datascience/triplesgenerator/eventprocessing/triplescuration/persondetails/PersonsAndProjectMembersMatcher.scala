@@ -16,17 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
-import ch.datascience.generators.Generators.httpUrls
-import org.scalacheck.Gen
+import cats.syntax.all._
 
-private object Generators {
-  val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
+private class PersonsAndProjectMembersMatcher {
 
-  implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
-    url <- subscriberUrls
-  } yield new SubscriptionCategoryPayload {
-    override def subscriberUrl: SubscriberUrl = url
-  }
+  def merge(persons: Set[Person], projectMembers: Set[GitLabProjectMember]): Set[Person] =
+    persons map { person =>
+      projectMembers
+        .find(byNameOrUsername(person))
+        .map(addGitlabId(person))
+        .getOrElse(person)
+    }
+
+  private def byNameOrUsername(person: Person)(member: GitLabProjectMember): Boolean =
+    (member.name == person.name) || (member.username.value == person.name.value)
+
+  private def addGitlabId(person: Person)(member: GitLabProjectMember): Person =
+    person.copy(maybeGitLabId = member.id.some)
 }

@@ -29,7 +29,8 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
 import ch.datascience.rdfstore.entities._
-import ch.datascience.rdfstore.entities.bundles.{generateProject, nonModifiedDataSetCommit, renkuBaseUrl}
+import ProjectsGenerators._
+import ch.datascience.rdfstore.entities.bundles.{generateProject, gitLabApiUrl, nonModifiedDataSetCommit, renkuBaseUrl}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._
@@ -45,13 +46,14 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
 
     "return zero if there are no entity in the DB" in new TestCase {
       stats.entitiesCount().unsafeRunSync() shouldBe Map(
-        EntityType((schema / "Dataset").toString)     -> EntitiesCount(0L),
-        EntityType((schema / "Project").toString)     -> EntitiesCount(0L),
-        EntityType((prov / "Activity").toString)      -> EntitiesCount(0L),
-        EntityType((wfprov / "ProcessRun").toString)  -> EntitiesCount(0L),
-        EntityType((wfprov / "WorkflowRun").toString) -> EntitiesCount(0L),
-        EntityType((renku / "Run").toString)          -> EntitiesCount(0L),
-        EntityType((schema / "Person").toString)      -> EntitiesCount(0L)
+        EntityType((schema / "Dataset").toString)              -> EntitiesCount(0L),
+        EntityType((schema / "Project").toString)              -> EntitiesCount(0L),
+        EntityType((prov / "Activity").toString)               -> EntitiesCount(0L),
+        EntityType((wfprov / "ProcessRun").toString)           -> EntitiesCount(0L),
+        EntityType((wfprov / "WorkflowRun").toString)          -> EntitiesCount(0L),
+        EntityType((renku / "Run").toString)                   -> EntitiesCount(0L),
+        EntityType((schema / "Person").toString)               -> EntitiesCount(0L),
+        EntityType((schema / "Person with GitLabId").toString) -> EntitiesCount(0L)
       )
     }
 
@@ -65,6 +67,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         .update(prov / "Activity", datasetsJsons.size)
         .update(schema / "Dataset", datasetsJsons.size)
         .update(schema / "Person", datasetsJsons.size)
+        .update(schema / "Person with GitLabId", 0)
 
       val processRunsJsons = nonEmptyList(processRuns).generateOne.toList
       val entitiesWithProcessRuns = entitiesWithDatasets
@@ -73,6 +76,7 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         .update(wfprov / "ProcessRun", processRunsJsons.size)
         .update(renku / "Run", processRunsJsons.size)
         .update(schema / "Person", processRunsJsons.size)
+        .update(schema / "Person with GitLabId", 0)
 
       val workflowsJsons = nonEmptyList(workflows).generateOne.toList
       val entitiesWithWorkflows = entitiesWithProcessRuns
@@ -82,10 +86,43 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
         .update(wfprov / "WorkflowRun", workflowsJsons.size)
         .update(renku / "Run", workflowsJsons.size)
         .update(schema / "Person", workflowsJsons.size)
+        .update(schema / "Person with GitLabId", 0)
 
       loadToStore(datasetsJsons ++ processRunsJsons ++ workflowsJsons: _*)
 
       stats.entitiesCount().unsafeRunSync() shouldBe entitiesWithWorkflows
+    }
+
+    "return info about number of Person objects with GitLabId" in new TestCase {
+
+      val entitiesByType = Map.empty[EntityType, EntitiesCount]
+
+      val activity1Committer = persons.generateOne
+      val activity1 = Activity(commitIds.generateOne,
+                               committedDates.generateOne,
+                               activity1Committer,
+                               projects.generateOne,
+                               Agent(cliVersions.generateOne)
+      )
+      val activity2Committer = persons.generateOne.copy(maybeGitLabId = userGitLabIds.generateSome)
+      val activity2 = Activity(commitIds.generateOne,
+                               committedDates.generateOne,
+                               activity2Committer,
+                               projects.generateOne,
+                               Agent(cliVersions.generateOne)
+      )
+
+      loadToStore(activity1.asJsonLD, activity2.asJsonLD)
+
+      stats.entitiesCount().unsafeRunSync() shouldBe entitiesByType
+        .update(schema / "Dataset", 0)
+        .update(schema / "Project", 2)
+        .update(prov / "Activity", 2)
+        .update(wfprov / "ProcessRun", 0)
+        .update(wfprov / "WorkflowRun", 0)
+        .update(renku / "Run", 0)
+        .update(schema / "Person", 2)
+        .update(schema / "Person with GitLabId", 1)
     }
   }
 

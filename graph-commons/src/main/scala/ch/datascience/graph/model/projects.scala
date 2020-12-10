@@ -19,7 +19,6 @@
 package ch.datascience.graph.model
 
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
 import io.circe.Decoder
@@ -43,8 +42,13 @@ object projects {
   }
 
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
-  implicit object ResourceId extends TinyTypeFactory[ResourceId](new ResourceId(_)) with Url {
+  implicit object ResourceId
+      extends TinyTypeFactory[ResourceId](new ResourceId(_))
+      with Url
+      with UrlResourceRenderer[ResourceId] {
+
     private val regexValidator = s"^http[s]?:\\/\\/.*\\/projects\\/${Path.regexValidator.drop(1)}"
+
     addConstraint(
       _ matches regexValidator,
       message = (value: String) => s"'$value' is not a valid $typeName"
@@ -60,10 +64,6 @@ object projects {
     implicit lazy val projectPathConverter: TinyTypeConverter[ResourceId, Path] = {
       case ResourceId(pathExtractor(path)) => Path.from(path)
       case illegalValue                    => Left(new IllegalArgumentException(s"'$illegalValue' cannot be converted to a ProjectPath"))
-    }
-
-    implicit object RdfResourceRenderer extends Renderer[RdfResource, ResourceId] {
-      override def render(value: ResourceId): String = s"<$value>"
     }
   }
 

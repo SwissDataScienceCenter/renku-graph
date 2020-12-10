@@ -25,12 +25,13 @@ import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAcces
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
-import ch.datascience.graph.acceptancetests.tooling.GraphServices
+import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
+import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.literal._
 import org.http4s.Status._
@@ -41,6 +42,7 @@ import org.scalatest.matchers.should
 
 class PushEventsConsumptionSpec
     extends AnyFeatureSpec
+    with ModelImplicits
     with GivenWhenThen
     with GraphServices
     with Eventually
@@ -55,15 +57,19 @@ class PushEventsConsumptionSpec
       val project   = projects.generateOne
       val projectId = project.id
       val commitId  = commitIds.generateOne
+      val committer = persons.generateOne
 
       Given("commit with the commit id matching Push Event's 'after' exists on the project in GitLab")
-      `GET <gitlab>/api/v4/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
+      `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
-      // making the triples generation be happy and not throwing exceptions to the logs
-      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId)
+      // making the triples generation process happy and not throwing exceptions to the logs
+      `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
+
+      And("project members/users exists in GitLab")
+      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project.path, committer.asMember())
 
       And("project exists in GitLab")
-      `GET <gitlab>/api/v4/projects/:path returning OK with`(project)
+      `GET <gitlabApi>/projects/:path returning OK with`(project)
 
       And("access token is present")
       givenAccessTokenPresentFor(project)

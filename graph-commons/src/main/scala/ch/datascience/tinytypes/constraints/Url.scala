@@ -32,6 +32,14 @@ trait Url extends Constraints[String] {
   )
 }
 
+trait UrlResourceRenderer[T <: StringTinyType] {
+  self: TinyTypeFactory[T] with Url =>
+
+  import ch.datascience.graph.model.views.RdfResource
+
+  implicit val rdfResourceRenderer: Renderer[RdfResource, T] = url => s"<$url>"
+}
+
 trait UrlOps[T <: StringTinyType] {
   self: TinyTypeFactory[T] with Url =>
 

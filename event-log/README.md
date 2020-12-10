@@ -183,7 +183,7 @@ Currently, only status changing payloads are allowed:
 {
   "status": "TRIPLES_GENERATED",
   "payload": "json-ld as string",
-  "schema_version": "schema version of the triples"
+  "schemaVersion": "schema version of the triples"
 }
 ```
 

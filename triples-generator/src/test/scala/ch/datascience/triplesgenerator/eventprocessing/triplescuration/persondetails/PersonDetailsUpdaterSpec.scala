@@ -18,159 +18,176 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
+import PersonDetailsGenerators._
 import cats.MonadError
-import cats.data.NonEmptyList
+import cats.data.EitherT
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.users.{Affiliation, Email, Name, ResourceId}
-import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples, entities}
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import ch.datascience.tinytypes.json.TinyTypeEncoders._
+import ch.datascience.graph.model.projects
+import ch.datascience.http.client.AccessToken
+import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsUpdater.{Person => UpdatePerson}
-import eu.timepit.refined.auto._
-import io.circe.optics.JsonOptics._
-import io.circe.optics.JsonPath.root
-import io.circe.{Decoder, Encoder, Json}
-import io.renku.jsonld.syntax._
-import monocle.function.Plated
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.projects.Path
+import ch.datascience.graph.tokenrepository.AccessTokenFinder
+import ch.datascience.graph.tokenrepository.IOAccessTokenFinder.projectPathToPath
+import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 
-import scala.collection.mutable
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 
 class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with MockFactory {
 
-  "curate" should {
+  "updatePersonDetails" should {
 
-    "remove name and email properties from all the Person entities found in the given Json " +
-      "except those which id starts with '_' (blank nodes) " +
-      "and create SPARQL updates for them" in new TestCase {
-        val projectCreatorName  = userNames.generateOne
-        val projectCreatorEmail = userEmails.generateOne
-        val committerName       = userNames.generateOne
-        val committerEmail      = userEmails.generateOne
-        val datasetCreatorsSet = nonEmptyList(entities.Person.persons, minElements = 5, maxElements = 10)
-          .retryUntil(atLeastOneWithoutEmail)
-          .generateOne
-          .toList
-          .toSet
-        val jsonTriples = JsonLDTriples {
-          nonModifiedDataSetCommit(
-            committer = entities.Person(committerName, committerEmail)
-          )(
-            projectPath = projectPaths.generateOne,
-            maybeProjectCreator = entities.Person(projectCreatorName, projectCreatorEmail).some
-          )(
-            datasetCreators = datasetCreatorsSet
-          ).toJson
-        }
+    "extract persons, match with project members and prepare updates for extracted persons" in new TestCase {
 
-        val allPersons = jsonTriples.collectAllPersons
-        allPersons.filter(blankIds)    should not be empty
-        allPersons.filterNot(blankIds) should not be empty
+      val triplesWithoutPersonDetails = jsonLDTriples.generateOne
+      val extractedPersons            = persons.generateSet()
+      (personExtractor.extractPersons _)
+        .expects(curatedTriples.triples)
+        .returning((triplesWithoutPersonDetails, extractedPersons).pure[Try])
 
-        val allPersonsInPayload = datasetCreatorsSet +
-          entities.Person(projectCreatorName, projectCreatorEmail) +
-          entities.Person(committerName, committerEmail)
+      val maybeAccessToken = accessTokens.generateOption
+      (accessTokenFinder
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(project.path, projectPathToPath)
+        .returning(maybeAccessToken.pure[Try])
 
-        val expectedUpdatesGroups = allPersonsInPayload
-          .map(maybeUpdatedPerson)
-          .flatten
-          .map { person =>
-            val updatesGroup = curationUpdatesGroups[Try].generateOne
-            (updatesCreator
-              .prepareUpdates[Try](_: UpdatePerson)(_: MonadError[Try, Throwable]))
-              .expects(person, *)
-              .returning(updatesGroup)
-            updatesGroup
-          }
+      val projectMembers = gitLabProjectMembers.generateNonEmptyList().toList.toSet
+      (projectMembersFinder
+        .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
+        .expects(project.path, maybeAccessToken)
+        .returning(EitherT.rightT[Try, ProcessingRecoverableError](projectMembers))
 
-        val Success(curatedTriples) = curator curate CuratedTriples(jsonTriples, updatesGroups = Nil)
+      val personsWithGitlabIds = persons.generateSet()
+      (personsAndProjectMembersMatcher.merge _)
+        .expects(extractedPersons, projectMembers)
+        .returning(personsWithGitlabIds)
 
-        val curatedPersons = curatedTriples.triples.collectAllPersons
-        curatedPersons.filter(blankIds)    shouldBe allPersons.filter(blankIds)
-        curatedPersons.filterNot(blankIds) shouldBe allPersons.filterNot(blankIds).map(noEmailAndName)
+      val newUpdatesGroups = personsWithGitlabIds.foldLeft(List.empty[CurationUpdatesGroup[Try]]) { (acc, person) =>
+        val updatesGroup = curationUpdatesGroups[Try].generateOne
+        (updatesCreator
+          .prepareUpdates[Try](_: Person)(_: MonadError[Try, Throwable]))
+          .expects(person, *)
+          .returning(updatesGroup)
 
-        curatedTriples.updatesGroups shouldBe expectedUpdatesGroups.toList
+        acc :+ updatesGroup
       }
 
-    "fail if there's a Person entity without a name" in new TestCase {
+      val Success(Right(CuratedTriples(actualTriples, actualUpdates))) =
+        updater.updatePersonDetails(curatedTriples, project).value
 
-      val jsonTriples = JsonLDTriples(randomDataSetCommit.toJson)
+      actualTriples                                           shouldBe triplesWithoutPersonDetails
+      actualUpdates.take(curatedTriples.updatesGroups.length) shouldBe curatedTriples.updatesGroups
+      actualUpdates.drop(curatedTriples.updatesGroups.length)   should contain theSameElementsAs newUpdatesGroups
+    }
 
-      val noNamesJson = JsonLDTriples(jsonTriples.removePersonsNames)
+    "fail if extracting persons fails" in new TestCase {
 
-      val result = curator curate CuratedTriples(noNamesJson, updatesGroups = Nil)
+      val exception = exceptions.generateOne
+      (personExtractor.extractPersons _)
+        .expects(curatedTriples.triples)
+        .returning(exception.raiseError[Try, (JsonLDTriples, Set[Person])])
 
-      result                     shouldBe a[Failure[_]]
-      result.failed.get.getMessage should include regex "No names for person with '(.*)' id found in generated JSON-LD".r
+      updater.updatePersonDetails(curatedTriples, project).value shouldBe exception
+        .raiseError[Try, (JsonLDTriples, Set[Person])]
+    }
+
+    "fail if finding project access token fails" in new TestCase {
+
+      val triplesWithoutPersonDetails = jsonLDTriples.generateOne
+      val extractedPersons            = persons.generateSet()
+      (personExtractor.extractPersons _)
+        .expects(curatedTriples.triples)
+        .returning((triplesWithoutPersonDetails, extractedPersons).pure[Try])
+
+      val exception = exceptions.generateOne
+      (accessTokenFinder
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(project.path, projectPathToPath)
+        .returning(exception.raiseError[Try, Option[AccessToken]])
+
+      updater.updatePersonDetails(curatedTriples, project).value shouldBe exception
+        .raiseError[Try, (JsonLDTriples, Set[Person])]
+    }
+
+    "fail if finding project members fails" in new TestCase {
+
+      val triplesWithoutPersonDetails = jsonLDTriples.generateOne
+      val extractedPersons            = persons.generateSet()
+      (personExtractor.extractPersons _)
+        .expects(curatedTriples.triples)
+        .returning((triplesWithoutPersonDetails, extractedPersons).pure[Try])
+
+      val maybeAccessToken = accessTokens.generateOption
+      (accessTokenFinder
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(project.path, projectPathToPath)
+        .returning(maybeAccessToken.pure[Try])
+
+      val exception = exceptions.generateOne
+      (projectMembersFinder
+        .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
+        .expects(project.path, maybeAccessToken)
+        .returning(
+          EitherT(exception.raiseError[Try, Either[ProcessingRecoverableError, Set[GitLabProjectMember]]])
+        )
+
+      updater.updatePersonDetails(curatedTriples, project).value shouldBe exception
+        .raiseError[Try, (JsonLDTriples, Set[Person])]
+    }
+
+    "return ProcessingRecoverableError if finding project members returns one" in new TestCase {
+
+      val triplesWithoutPersonDetails = jsonLDTriples.generateOne
+      val extractedPersons            = persons.generateSet()
+      (personExtractor.extractPersons _)
+        .expects(curatedTriples.triples)
+        .returning((triplesWithoutPersonDetails, extractedPersons).pure[Try])
+
+      val maybeAccessToken = accessTokens.generateOption
+      (accessTokenFinder
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(project.path, projectPathToPath)
+        .returning(maybeAccessToken.pure[Try])
+
+      val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
+      (projectMembersFinder
+        .findProjectMembers(_: projects.Path)(_: Option[AccessToken]))
+        .expects(project.path, maybeAccessToken)
+        .returning(
+          EitherT.leftT[Try, Set[GitLabProjectMember]](exception)
+        )
+
+      updater.updatePersonDetails(curatedTriples, project).value shouldBe Left(exception).pure[Try]
     }
   }
 
   private trait TestCase {
-    implicit val renkuBaseUrl:  RenkuBaseUrl  = renkuBaseUrls.generateOne
-    implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
+    val project        = EventProcessingGenerators.projects.generateOne
+    val curatedTriples = curatedTriplesObjects[Try].generateOne
 
-    val updatesCreator = mock[UpdatesCreator]
-    val curator        = new PersonDetailsUpdater[Try](updatesCreator)
+    val personExtractor                 = mock[PersonExtractor[Try]]
+    val accessTokenFinder               = mock[AccessTokenFinder[Try]]
+    val updatesCreator                  = mock[UpdatesCreator]
+    val projectMembersFinder            = mock[GitLabProjectMembersFinder[Try]]
+    val personsAndProjectMembersMatcher = mock[PersonsAndProjectMembersMatcher]
+
+    val updater = new PersonDetailsUpdaterImpl[Try](
+      personExtractor,
+      accessTokenFinder,
+      projectMembersFinder,
+      personsAndProjectMembersMatcher,
+      updatesCreator
+    )
   }
-
-  private implicit class TriplesOps(triples: JsonLDTriples) {
-
-    lazy val removePersonsNames: Json = Plated.transform[Json] { json =>
-      root.`@type`.each.string.getAll(json) match {
-        case types if types.contains("http://schema.org/Person") =>
-          root.obj.modify(_.remove("http://schema.org/name"))(json)
-        case _ => json
-      }
-    }(triples.value)
-
-    lazy val collectAllPersons: Set[Person] = {
-      val collected = mutable.HashSet.empty[Person]
-      Plated.transform[Json] { json =>
-        root.`@type`.each.string.getAll(json) match {
-          case types if types.contains("http://schema.org/Person") =>
-            collected add Person(
-              root.`@id`.as[ResourceId].getOption(json).getOrElse(fail("Person '@id' not found")),
-              extractValue[Name]("http://schema.org/name")(json).headOption,
-              extractValue[Email]("http://schema.org/email")(json).headOption,
-              extractValue[Affiliation]("http://schema.org/affiliation")(json).headOption
-            )
-          case _ => ()
-        }
-        json
-      }(triples.value)
-      collected.toSet
-    }
-
-    private def extractValue[T](property: String)(json: Json)(implicit decoder: Decoder[T], encoder: Encoder[T]) =
-      root.selectDynamic(property).each.`@value`.as[T].getAll(json)
-  }
-
-  private case class Person(id:               ResourceId,
-                            maybeName:        Option[Name],
-                            maybeEmail:       Option[Email],
-                            maybeAffiliation: Option[Affiliation]
-  )
-
-  private lazy val maybeUpdatedPerson: entities.Person => Option[UpdatePerson] = { person =>
-    person.maybeEmail map { email =>
-      val entityId = person.asJsonLD.entityId getOrElse (throw new Exception(s"Cannot find entity id for $person"))
-      UpdatePerson(ResourceId(entityId), NonEmptyList.of(person.name), Set(email))
-    }
-  }
-
-  private lazy val atLeastOneWithoutEmail: NonEmptyList[entities.Person] => Boolean = _.exists(_.maybeEmail.isEmpty)
-
-  private lazy val blankIds:       Person => Boolean = p => !(p.id.value startsWith "mailto:")
-  private lazy val noEmailAndName: Person => Person  = _.copy(maybeName = None, maybeEmail = None)
 }

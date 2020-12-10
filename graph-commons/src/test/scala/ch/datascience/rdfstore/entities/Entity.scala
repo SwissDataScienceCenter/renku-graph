@@ -19,7 +19,7 @@
 package ch.datascience.rdfstore.entities
 
 import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.Collection.EntityCollection
@@ -52,6 +52,7 @@ object Entity {
 
   private[entities] implicit def converter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[Entity] =
     new PartialEntityConverter[Entity] {
@@ -72,6 +73,7 @@ object Entity {
 
   implicit def encoderWithArtifact(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[Entity with Artifact] =
     JsonLDEncoder.instance {
@@ -111,6 +113,7 @@ object Collection {
 
   private implicit def converter(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): PartialEntityConverter[EntityCollection] =
     new PartialEntityConverter[EntityCollection] {
@@ -127,6 +130,7 @@ object Collection {
 
   implicit def encoder(implicit
       renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
       fusekiBaseUrl: FusekiBaseUrl
   ): JsonLDEncoder[EntityCollection] =
     JsonLDEncoder.instance { entity =>

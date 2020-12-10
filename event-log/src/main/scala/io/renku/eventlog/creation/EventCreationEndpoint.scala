@@ -19,7 +19,7 @@
 package io.renku.eventlog.creation
 
 import cats.MonadError
-import cats.effect.{Effect, IO}
+import cats.effect.Effect
 import cats.syntax.all._
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
@@ -114,7 +114,7 @@ object EventCreationEndpoint {
         Left(DecodingFailure(s"Status $invalidStatus is not valid. Only NEW or SKIPPED are accepted", Nil))
     }
 
-  def verifyMessage(result: Decoder.Result[Option[String]]) =
+  private def verifyMessage(result: Decoder.Result[Option[String]]) =
     result
       .map(blankToNone)
       .flatMap {

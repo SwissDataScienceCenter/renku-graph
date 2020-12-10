@@ -16,8 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration
+package forks
 
+import ch.datascience.graph.Schemas._
 import ch.datascience.rdfstore.JsonLDTriples
 import io.circe.Json
 import io.circe.optics.JsonOptics._
@@ -33,11 +35,7 @@ private class ProjectPropertiesRemover extends (JsonLDTriples => JsonLDTriples) 
   private def toJsonWithoutCreatorDetails(json: Json): Json =
     root.`@type`.each.string.getAll(json) match {
       case types if types.contains("http://schema.org/Project") =>
-        json remove "http://schema.org/creator" remove "http://schema.org/dateCreated"
+        json.remove(schema / "creator").remove(schema / "dateCreated")
       case _ => json
     }
-
-  private implicit class JsonOps(json: Json) {
-    def remove(property: String): Json = root.obj.modify(_.remove(property))(json)
-  }
 }

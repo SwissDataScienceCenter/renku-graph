@@ -113,7 +113,7 @@ object RDFStore {
       _         <- maybeJena.map(_.stop()).getOrElse(IO.unit)
     } yield ()
 
-  def findAllTriplesNumber(): Int =
+  def allTriplesCount: Int =
     jenaReference.read
       .map { jena =>
         jena.connection

@@ -16,17 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails
 
-import ch.datascience.generators.Generators.httpUrls
-import org.scalacheck.Gen
+import ch.datascience.graph.model.users.{Email, GitLabId, Name, ResourceId, Username}
 
-private object Generators {
-  val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
+private final case class GitLabProjectMember(id: GitLabId, username: Username, name: Name)
 
-  implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
-    url <- subscriberUrls
-  } yield new SubscriptionCategoryPayload {
-    override def subscriberUrl: SubscriberUrl = url
-  }
+private final case class Person(id: ResourceId, maybeGitLabId: Option[GitLabId], name: Name, maybeEmail: Option[Email])
+private object Person {
+  def apply(id: ResourceId, name: Name, maybeEmail: Option[Email]): Person = Person(id, None, name, maybeEmail)
 }

@@ -19,7 +19,6 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 
 import cats.MonadError
-import cats.data.EitherT
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent
@@ -46,20 +45,17 @@ private[eventprocessing] class TriplesCuratorImpl[Interpretation[_]](
     extends TriplesCurator[Interpretation] {
 
   import forkInfoUpdater._
+  import personDetailsUpdater._
 
   override def curate(
       commit:                  CommitEvent,
       triples:                 JsonLDTriples
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] =
     for {
-      triplesWithPersonDetails    <- personDetailsUpdater.curate(CuratedTriples(triples, updatesGroups = Nil)).toRight
+      triplesWithPersonDetails    <- updatePersonDetails(CuratedTriples(triples, updatesGroups = Nil), commit.project)
       triplesWithForkInfo         <- updateForkInfo(commit, triplesWithPersonDetails)
       triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithForkInfo)
     } yield triplesWithEnrichedDatasets
-
-  private implicit class InterpretationOps(out: Interpretation[CuratedTriples[Interpretation]]) {
-    lazy val toRight: CurationResults[Interpretation] = EitherT.right[ProcessingRecoverableError](out)
-  }
 }
 
 private[eventprocessing] object IOTriplesCurator {
@@ -72,17 +68,18 @@ private[eventprocessing] object IOTriplesCurator {
       extends Exception(message, cause)
       with ProcessingRecoverableError
 
+  object CurationRecoverableError {
+    def apply(message: String): CurationRecoverableError = CurationRecoverableError(message, null)
+  }
+
   def apply(
       gitLabThrottler:         Throttler[IO, GitLab],
       logger:                  Logger[IO],
       timeRecorder:            SparqlQueryTimeRecorder[IO]
   )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[TriplesCurator[IO]] =
     for {
-      forkInfoUpdater     <- IOForkInfoUpdater(gitLabThrottler, logger, timeRecorder)
-      dataSetInfoEnricher <- IODataSetInfoEnricher(logger, timeRecorder)
-    } yield new TriplesCuratorImpl[IO](
-      PersonDetailsUpdater[IO](),
-      forkInfoUpdater,
-      dataSetInfoEnricher
-    )
+      personDetailsUpdater <- PersonDetailsUpdater(gitLabThrottler, logger)
+      forkInfoUpdater      <- IOForkInfoUpdater(gitLabThrottler, logger, timeRecorder)
+      dataSetInfoEnricher  <- IODataSetInfoEnricher(logger, timeRecorder)
+    } yield new TriplesCuratorImpl[IO](personDetailsUpdater, forkInfoUpdater, dataSetInfoEnricher)
 }

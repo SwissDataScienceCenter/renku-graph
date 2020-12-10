@@ -21,18 +21,21 @@ package ch.datascience.graph.config
 import cats.MonadError
 import ch.datascience.config.ConfigLoader
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.tinytypes.constraints.{Url, UrlOps}
+import ch.datascience.tinytypes.constraints.{Url, UrlOps, UrlResourceRenderer}
 import ch.datascience.tinytypes.{Renderer, StringTinyType, TinyTypeFactory}
 
 class RenkuBaseUrl private (val value: String) extends AnyVal with StringTinyType
-object RenkuBaseUrl extends TinyTypeFactory[RenkuBaseUrl](new RenkuBaseUrl(_)) with Url with UrlOps[RenkuBaseUrl] {
+object RenkuBaseUrl
+    extends TinyTypeFactory[RenkuBaseUrl](new RenkuBaseUrl(_))
+    with Url
+    with UrlOps[RenkuBaseUrl]
+    with UrlResourceRenderer[RenkuBaseUrl] {
+
   import ConfigLoader._
   import com.typesafe.config.{Config, ConfigFactory}
   import pureconfig.ConfigReader
 
   private implicit val renkuBaseUrlReader: ConfigReader[RenkuBaseUrl] = stringTinyTypeReader(this)
-
-  implicit val rdfResourceRenderer: Renderer[RdfResource, RenkuBaseUrl] = url => s"<$url>"
 
   def apply[Interpretation[_]](
       config:    Config = ConfigFactory.load()

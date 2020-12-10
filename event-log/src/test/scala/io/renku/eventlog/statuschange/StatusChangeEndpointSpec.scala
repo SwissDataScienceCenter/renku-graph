@@ -213,7 +213,7 @@ class StatusChangeEndpointSpec
       val eventId = compoundEventIds.generateOne
 
       val payload =
-        json"""{"status": ${TriplesGenerated.value}, "schema_version": ${projectSchemaVersions.generateOne.value} }"""
+        json"""{"status": ${TriplesGenerated.value}, "schemaVersion": ${projectSchemaVersions.generateOne.value} }"""
       val request = Request(
         Method.PATCH,
         uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
@@ -242,7 +242,7 @@ class StatusChangeEndpointSpec
 
       response.status                           shouldBe BadRequest
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("TRIPLES_GENERATED status needs a schema_version")
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("TRIPLES_GENERATED status needs a schemaVersion")
 
       logger.expectNoLogs()
     }
@@ -320,7 +320,7 @@ class StatusChangeEndpointSpec
     case command: ToTriplesGenerated[IO]                    => json"""{
         "status": ${command.status.value},
         "payload": ${command.payload.value},
-        "schema_version": ${command.schemaVersion.value}
+        "schemaVersion": ${command.schemaVersion.value}
       }"""
     case command: ToGenerationRecoverableFailure[IO]        => json"""{
         "status": ${command.status.value}

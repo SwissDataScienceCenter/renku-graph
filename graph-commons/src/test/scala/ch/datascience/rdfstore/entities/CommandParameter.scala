@@ -21,7 +21,7 @@ package ch.datascience.rdfstore.entities
 import java.util.UUID.randomUUID
 
 import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory._
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream.StdIn
@@ -172,6 +172,7 @@ object CommandParameter {
 
     private implicit def converter(implicit
         renkuBaseUrl:  RenkuBaseUrl,
+        gitLabApiUrl:  GitLabApiUrl,
         fusekiBaseUrl: FusekiBaseUrl
     ): PartialEntityConverter[CommandParameter with Argument] =
       new PartialEntityConverter[CommandParameter with Argument] {
@@ -189,6 +190,7 @@ object CommandParameter {
 
     implicit def argumentEncoder(implicit
         renkuBaseUrl:  RenkuBaseUrl,
+        gitLabApiUrl:  GitLabApiUrl,
         fusekiBaseUrl: FusekiBaseUrl
     ): JsonLDEncoder[CommandParameter with Argument] =
       JsonLDEncoder.instance[CommandParameter with Argument] { entity =>
@@ -284,6 +286,7 @@ object CommandParameter {
 
     private implicit def converter(implicit
         renkuBaseUrl:  RenkuBaseUrl,
+        gitLabApiUrl:  GitLabApiUrl,
         fusekiBaseUrl: FusekiBaseUrl
     ): PartialEntityConverter[CommandParameter with Input] =
       new PartialEntityConverter[CommandParameter with Input] {
@@ -308,6 +311,7 @@ object CommandParameter {
 
     implicit def inputEncoder(implicit
         renkuBaseUrl:  RenkuBaseUrl,
+        gitLabApiUrl:  GitLabApiUrl,
         fusekiBaseUrl: FusekiBaseUrl
     ): JsonLDEncoder[CommandParameter with Input] =
       JsonLDEncoder.instance[CommandParameter with Input] {
@@ -421,6 +425,7 @@ object CommandParameter {
 
     private implicit def converter(implicit
         renkuBaseUrl:  RenkuBaseUrl,
+        gitLabApiUrl:  GitLabApiUrl,
         fusekiBaseUrl: FusekiBaseUrl
     ): PartialEntityConverter[CommandParameter with Output] =
       new PartialEntityConverter[CommandParameter with Output] {
@@ -447,6 +452,7 @@ object CommandParameter {
 
     implicit def outputEncoder(implicit
         renkuBaseUrl:  RenkuBaseUrl,
+        gitLabApiUrl:  GitLabApiUrl,
         fusekiBaseUrl: FusekiBaseUrl
     ): JsonLDEncoder[CommandParameter with Output] =
       JsonLDEncoder.instance {

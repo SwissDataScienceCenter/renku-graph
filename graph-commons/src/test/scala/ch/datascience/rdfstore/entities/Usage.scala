@@ -18,6 +18,7 @@
 
 package ch.datascience.rdfstore.entities
 
+import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.{EntityCommandParameter, Input}
 
@@ -38,7 +39,11 @@ object Usage {
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLDEncoder[Usage] =
+  implicit def encoder(implicit
+      renkuBaseUrl:  RenkuBaseUrl,
+      gitLabApiUrl:  GitLabApiUrl,
+      fusekiBaseUrl: FusekiBaseUrl
+  ): JsonLDEncoder[Usage] =
     JsonLDEncoder.instance { entity =>
       val entityId = entity.maybeStep match {
         case None =>

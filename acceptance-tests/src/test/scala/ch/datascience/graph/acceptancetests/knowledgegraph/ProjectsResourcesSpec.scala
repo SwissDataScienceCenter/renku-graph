@@ -29,7 +29,7 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
-import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
@@ -41,6 +41,7 @@ import ch.datascience.knowledgegraph.projects.model.Permissions.{GroupPermission
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.Person
+import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.bundles._
 import io.circe.Json
 import io.circe.literal._
@@ -102,8 +103,9 @@ class ProjectsResourcesSpec
           version = projectSchemaVersions.generateOne
         )
 
+      val parentProjectCommitter = persons.generateOne
       val jsonLDParentProjectTriples = JsonLD.arr(
-        nonModifiedDataSetCommit(commitId = parentProjectCommit)(
+        nonModifiedDataSetCommit(commitId = parentProjectCommit, committer = parentProjectCommitter)(
           projectPath = parentProject.path,
           projectName = parentProject.name,
           projectDateCreated = parentProject.created.date,
@@ -112,11 +114,17 @@ class ProjectsResourcesSpec
           projectVersion = fullParentProject.version
         )()
       )
-      `data in the RDF store`(fullParentProject, parentProjectCommit, jsonLDParentProjectTriples)
+      `data in the RDF store`(fullParentProject,
+                              parentProjectCommit,
+                              parentProjectCommitter,
+                              jsonLDParentProjectTriples
+      )
 
+      val projectCommitter = persons.generateOne
       val jsonLDTriples = JsonLD.arr(
         nonModifiedDataSetCommit(
           commitId = dataset1CommitId,
+          committer = projectCommitter,
           cliVersion = currentCliVersion
         )(
           projectPath = project.path,
@@ -132,7 +140,7 @@ class ProjectsResourcesSpec
           maybeDatasetSameAs = dataset.sameAs.some
         )
       )
-      `data in the RDF store`(project, dataset1CommitId, jsonLDTriples)
+      `data in the RDF store`(project, dataset1CommitId, projectCommitter, jsonLDTriples)
 
       `triples updates run`(
         Set(project.created.maybeCreator.flatMap(_.maybeEmail),
@@ -141,7 +149,7 @@ class ProjectsResourcesSpec
       )
 
       And("the project exists in GitLab")
-      `GET <gitlab>/api/v4/projects/:path returning OK with`(project, withStatistics = true)
+      `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
 
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}"

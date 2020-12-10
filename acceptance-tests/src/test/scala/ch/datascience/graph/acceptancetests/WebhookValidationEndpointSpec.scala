@@ -42,10 +42,10 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
       implicit val accessToken: AccessToken = accessTokens.generateOne
 
       Given("project is present in GitLab")
-      `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
+      `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
 
       Given("project has Graph Services hook in GitLab")
-      `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
+      `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(projectId)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
       val response = webhookServiceClient.POST(s"projects/$projectId/webhooks/validation", Some(accessToken))
@@ -60,10 +60,10 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
       implicit val accessToken: AccessToken = accessTokens.generateOne
 
       Given("project is present in GitLab")
-      `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Public)
+      `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
 
       Given("project does not have Graph Services hook in GitLab")
-      `GET <gitlab>/api/v4/projects/:id/hooks returning OK with no hooks`(projectId)
+      `GET <gitlabApi>/projects/:id/hooks returning OK with no hooks`(projectId)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
       val response = webhookServiceClient.POST(s"projects/$projectId/webhooks/validation", Some(accessToken))
@@ -78,10 +78,10 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
       implicit val accessToken: AccessToken = accessTokens.generateOne
 
       Given("project is present in GitLab")
-      `GET <gitlab>/api/v4/projects/:id returning OK`(projectId, projectVisibility = Private)
+      `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Private)
 
       Given("project has Graph Services hook in GitLab")
-      `GET <gitlab>/api/v4/projects/:id/hooks returning OK with the hook`(projectId)
+      `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(projectId)
 
       When("user does POST webhook-service/projects/:id/webhooks/validation")
       val response = webhookServiceClient.POST(s"projects/$projectId/webhooks/validation", Some(accessToken))
@@ -95,7 +95,7 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
         .bodyAsJson shouldBe accessToken.toJson
 
       And("when the hook get deleted from GitLab")
-      `GET <gitlab>/api/v4/projects/:id/hooks returning OK with no hooks`(projectId)
+      `GET <gitlabApi>/projects/:id/hooks returning OK with no hooks`(projectId)
 
       And("user does POST webhook-service/projects/:id/webhooks/validation again")
       val afterDeletionResponse =
