@@ -189,11 +189,11 @@ Currently, only status changing payloads are allowed:
 
 **Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
 
-- for transitioning event from status `GENERATING_TRIPLES` to `RECOVERABLE_FAILURE`
+- for transitioning event from status `GENERATING_TRIPLES` to `GENERATION_RECOVERABLE_FAILURE`
 
 ```json
 {
-  "status": "RECOVERABLE_FAILURE",
+  "status": "GENERATION_RECOVERABLE_FAILURE",
   "message": "error message"
 }
 ```
@@ -211,16 +211,38 @@ Currently, only status changing payloads are allowed:
 
 **Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
 
-- for transitioning event from status `GENERATING_TRIPLES` to `NON_RECOVERABLE_FAILURE`
+- for transitioning event from status `GENERATING_TRIPLES` to `GENERATION_NON_RECOVERABLE_FAILURE`
 
 ```json
 {
-  "status": "NON_RECOVERABLE_FAILURE",
+  "status": "GENERATION_NON_RECOVERABLE_FAILURE",
   "message": "error message"
 }
 ```
 
 **Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
+
+- for transitioning event from status `TRANSFORMING_TRIPLES` to `TRANFORMATION_RECOVERABLE_FAILURE`
+
+```json
+{
+  "status": "TRANSFORMATION_RECOVERABLE_FAILURE",
+  "message": "error message"
+}
+```
+
+**Notice** `CONFLICT (409)` returned when current event status is different from `TRANSFORMING_TRIPLES`.
+
+- for transitioning event from status `TRANSFORMING_TRIPLES` to `TRANSFORMATION_NON_RECOVERABLE_FAILURE`
+
+```json
+{
+  "status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
+  "message": "error message"
+}
+```
+
+**Notice** `CONFLICT (409)` returned when current event status is different from `TRANSFORMING_TRIPLES`.
 
 **Response**
 
@@ -228,6 +250,7 @@ Currently, only status changing payloads are allowed:
 |----------------------------|-----------------------------------------------------------------------------|
 | OK (200)                   | If status update is successful                                              |
 | BAD_REQUEST (400)          | When invalid payload is given                                               |
+| NOT_FOUND (404)            | When the event does not exists                                              |
 | CONFLICT (409)             | When current status of the event does not allow to become the requested one |
 | INTERNAL SERVER ERROR (500)| When some problems occurs                                                   |
 
