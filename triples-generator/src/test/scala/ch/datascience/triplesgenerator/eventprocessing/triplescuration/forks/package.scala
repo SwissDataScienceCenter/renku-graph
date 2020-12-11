@@ -26,6 +26,7 @@ import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.{Person, Project}
 import org.scalacheck.Gen
 
@@ -48,11 +49,9 @@ package object forks {
       dateCreated     <- projectCreatedDates
     } yield GitLabProject(projectPath, maybeParentPath, maybeCreator, dateCreated)
 
-  private[forks] def gitLabCreator(gitLabId:   users.GitLabId = userGitLabIds.generateOne,
-                                   maybeEmail: Option[Email] = userEmails.generateOption,
-                                   name:       users.Name = userNames.generateOne
-  ): Gen[GitLabCreator] =
-    GitLabCreator(gitLabId, name, maybeEmail)
+  private[forks] def gitLabCreator(gitLabId: users.GitLabId = userGitLabIds.generateOne,
+                                   name:     users.Name = userNames.generateOne
+  ): Gen[GitLabCreator] = GitLabCreator(gitLabId, name)
 
   private[forks] def kgCreator(maybeEmail: Option[Email] = userEmails.generateOption,
                                name:       users.Name = userNames.generateOne
@@ -62,22 +61,16 @@ package object forks {
     } yield KGCreator(resourceId, maybeEmail, name)
 
   implicit val entitiesProjects: Gen[Project] = entitiesProjects(
-    maybeCreator = entitiesPersons(userEmails.generateSome).generateOption,
-    maybeParentProject = entitiesProjects(entitiesPersons(userEmails.generateSome).generateOption).generateOption
+    maybeCreator = persons.generateOption,
+    maybeParentProject = entitiesProjects(persons.generateOption).generateOption
   )
-  def entitiesProjects(maybeCreator:       Option[Person] = entitiesPersons().generateOption,
-                       maybeParentProject: Option[Project] = None
-  ): Gen[Project] =
-    for {
-      path        <- projectPaths
-      name        <- projectNames
-      createdDate <- projectCreatedDates
-      version     <- projectSchemaVersions
-    } yield Project(path, name, createdDate, maybeCreator, maybeParentProject, version)
 
-  def entitiesPersons(maybeGitLabId: Gen[Option[users.GitLabId]] = userGitLabIds.toGeneratorOfOptions): Gen[Person] =
-    for {
-      name       <- userNames
-      maybeEmail <- userEmails.toGeneratorOfOptions
-    } yield Person(name = name, maybeEmail = maybeEmail, maybeAffiliation = None, maybeGitLabId = maybeGitLabId)
+  def entitiesProjects(maybeCreator:       Option[Person] = persons.generateOption,
+                       maybeParentProject: Option[Project] = None
+  ): Gen[Project] = for {
+    path        <- projectPaths
+    name        <- projectNames
+    createdDate <- projectCreatedDates
+    version     <- projectSchemaVersions
+  } yield Project(path, name, createdDate, maybeCreator, maybeParentProject, version)
 }

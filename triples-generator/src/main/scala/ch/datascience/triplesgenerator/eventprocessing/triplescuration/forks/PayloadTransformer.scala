@@ -32,14 +32,14 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[triplescuration] trait PayloadTransformer[Interpretation[_]] {
+private trait PayloadTransformer[Interpretation[_]] {
   def transform(
       commit:                  CommitEvent,
       triples:                 JsonLDTriples
   )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, ProcessingRecoverableError, JsonLDTriples]
 }
 
-private[triplescuration] class PayloadTransformerImpl(
+private class PayloadTransformerImpl(
     gitLab:                   GitLabInfoFinder[IO],
     projectPropertiesRemover: JsonLDTriples => JsonLDTriples
 )(implicit ME:                MonadError[IO, Throwable], cs: ContextShift[IO])
@@ -73,7 +73,7 @@ private[triplescuration] class PayloadTransformerImpl(
   }
 }
 
-private[triplescuration] object IOPayloadTransformer {
+private object IOPayloadTransformer {
   import cats.effect.Timer
   import ch.datascience.config.GitLab
   import ch.datascience.control.Throttler

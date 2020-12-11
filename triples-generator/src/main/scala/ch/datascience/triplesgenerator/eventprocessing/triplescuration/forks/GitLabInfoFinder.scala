@@ -22,14 +22,13 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{DateCreated, Path}
-import ch.datascience.graph.model.users.{Email, GitLabId}
+import ch.datascience.graph.model.{projects, users}
+import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
-import ch.datascience.graph.model.users
 
 private trait GitLabInfoFinder[Interpretation[_]] {
 
@@ -113,12 +112,7 @@ private class IOGitLabInfoFinder(
       for {
         gitLabId <- cursor.downField("id").as[users.GitLabId]
         name     <- cursor.downField("name").as[users.Name]
-        maybePublicEmail <- cursor
-                              .downField("public_email")
-                              .as[Option[String]]
-                              .map(blankToNone)
-                              .flatMap(toOption[Email])
-      } yield GitLabCreator(gitLabId, name, maybePublicEmail)
+      } yield GitLabCreator(gitLabId, name)
 
     jsonOf[IO, GitLabCreator]
   }

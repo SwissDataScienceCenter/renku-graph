@@ -28,6 +28,6 @@ private final case class GitLabProject(path:            Path,
                                        dateCreated:     DateCreated
 )
 
-private final case class GitLabCreator(gitLabId: GitLabId, name: users.Name, maybeEmail: Option[Email])
+private final case class GitLabCreator(gitLabId: GitLabId, name: users.Name)
 
 private final case class KGCreator(resourceId: users.ResourceId, maybeEmail: Option[Email], name: users.Name)

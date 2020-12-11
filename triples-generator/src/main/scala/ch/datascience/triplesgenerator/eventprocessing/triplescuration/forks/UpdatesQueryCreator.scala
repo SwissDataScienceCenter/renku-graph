@@ -18,17 +18,17 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
-import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.Schemas._
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.projects.{DateCreated, Path, ResourceId}
 import ch.datascience.graph.model.users
-import ch.datascience.graph.model.users.Email
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import eu.timepit.refined.auto._
 
-private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
+private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl) {
 
   def updateWasDerivedFrom(projectPath: Path, maybeForkPath: Option[Path]) = List {
     val rdfResource = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]
@@ -75,26 +75,16 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
     )
   }
 
-  def swapCreatorWithoutEmail(projectId: ResourceId, creatorName: users.Name): List[SparqlQuery] = {
-    val rdfResource = projectId.showAs[RdfResource]
+  def unlinkCreator(projectPath: Path): List[SparqlQuery] = {
+    val rdfResource = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]
     List(
       SparqlQuery(
-        name = "upload - project creator delete",
+        name = "upload - project creator unlink",
         Set("PREFIX schema: <http://schema.org/>"),
         s"""|DELETE { $rdfResource schema:creator ?creatorId }
-            |WHERE  { $rdfResource schema:creator ?creatorId }
-            |""".stripMargin
-      ),
-      SparqlQuery(
-        name = "upload - project creator insert",
-        Set(
-          "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-          "PREFIX schema: <http://schema.org/>"
-        ),
-        s"""|INSERT DATA {
-            |  _:b0 rdf:type <http://schema.org/Person>;
-            |       schema:name '${sparqlEncode(creatorName.value)}'.
-            |  $rdfResource schema:creator _:b0.
+            |WHERE  { 
+            |  OPTIONAL { $rdfResource schema:creator ?maybeCreatorId } 
+            |  BIND (IF(BOUND(?maybeCreatorId), ?maybeCreatorId, "nonexisting") AS ?creatorId)
             |}
             |""".stripMargin
       )
@@ -102,77 +92,33 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl) {
   }
 
   def addNewCreator(projectPath: Path, creator: GitLabCreator): List[SparqlQuery] = {
-    val projectId = ResourceId(renkuBaseUrl, projectPath)
-    creator.maybeEmail match {
-      case Some(creatorEmail) =>
-        val creatorResource = findCreatorId(creatorEmail)
-        insertOrUpdateCreator(creatorResource, Some(creatorEmail), Some(creator.name)) ++
-          swapCreator(projectPath, creatorResource)
-      case None =>
-        maybeCreatorName match {
-          case None              => List.empty
-          case Some(creatorName) => swapCreatorWithoutEmail(projectId, creatorName)
-        }
-    }
+    val creatorResourceId = users.ResourceId(
+      (renkuBaseUrl / "persons" / s"gitlabid${creator.gitLabId}").toString
+    )
+    insertCreator(creatorResourceId, creator) ++
+      swapCreator(projectPath, creatorResourceId)
   }
 
-  private def insertOrUpdateCreator(
-      personId:          users.ResourceId,
-      maybeCreatorEmail: Option[Email],
-      maybeCreatorName:  Option[users.Name]
-  ): List[SparqlQuery] = {
+  private def insertCreator(personId: users.ResourceId, creator: GitLabCreator): List[SparqlQuery] = {
     val creatorResource = personId.showAs[RdfResource]
+    val sameAsId        = (gitLabApiUrl / "users" / creator.gitLabId).showAs[RdfResource]
     List(
-      maybeCreatorEmail -> maybeCreatorName match {
-        case (Some(email), Some(name)) =>
-          SparqlQuery(
-            name = "upload - creator update",
-            Set(
-              "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-              "PREFIX schema: <http://schema.org/>"
-            ),
-            s"""|DELETE { $creatorResource schema:name ?name }
-                |INSERT { $creatorResource rdf:type <http://schema.org/Person>;
-                |         schema:email '${sparqlEncode(email.value)}';
-                |         schema:name '${sparqlEncode(name.value)}' .
-                |}
-                |WHERE  { 
-                |  OPTIONAL { $creatorResource schema:name ?maybeName} 
-                |  BIND (IF(BOUND(?maybeName), ?maybeName, "nonexisting") AS ?name)
-                |}
-                |""".stripMargin
-          ).some
-        case (Some(email), None) =>
-          SparqlQuery(
-            name = "upload - creator insert email",
-            Set(
-              "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-              "PREFIX schema: <http://schema.org/>"
-            ),
-            s"""|INSERT DATA {
-                |  $creatorResource rdf:type <http://schema.org/Person>;
-                |                   schema:email '${sparqlEncode(email.value)}' .
-                |}""".stripMargin
-          ).some
-        case (None, Some(name)) =>
-          SparqlQuery(
-            name = "upload - creator insert name",
-            Set(
-              "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-              "PREFIX schema: <http://schema.org/>"
-            ),
-            s"""|INSERT DATA {
-                |  $creatorResource rdf:type <http://schema.org/Person>;
-                |                   schema:name '${sparqlEncode(name.value)}' .
-                |}""".stripMargin
-          ).some
-        case _ => None
-      }
-    ).flatten
+      SparqlQuery
+        .of(
+          name = "upload - creator update",
+          Prefixes.of(rdf -> "rdf", schema -> "schema"),
+          s"""|INSERT DATA { 
+              |  $creatorResource rdf:type <http://schema.org/Person>;
+              |                   schema:name '${sparqlEncode(creator.name.value)}';
+              |                   schema:sameAs $sameAsId.
+              |  $sameAsId rdf:type schema:URL;
+              |            schema:identifier ${creator.gitLabId};
+              |            schema:additionalType 'GitLab'.
+              |}
+              |""".stripMargin
+        )
+    )
   }
-
-  // TODO: go to KG to get this resource ID
-  private def findCreatorId(email: Email): users.ResourceId = users.ResourceId(s"mailto:$email")
 
   def recreateDateCreated(projectPath: Path, dateCreated: DateCreated): List[SparqlQuery] = {
     val rdfResource = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]

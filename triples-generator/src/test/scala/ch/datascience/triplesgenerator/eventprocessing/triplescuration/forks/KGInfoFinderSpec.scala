@@ -19,14 +19,13 @@
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.effect.IO
-import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users
-import ch.datascience.graph.model.users.Email
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
@@ -39,15 +38,13 @@ class KGInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheck
 
     "return ResourceId of a Person with the given gitLabId" in new TestCase {
       forAll { gitLabId: users.GitLabId =>
-        val person = entitiesPersons(Some(gitLabId)).generateOne
+        val person = persons.generateOne.copy(maybeGitLabId = Some(gitLabId))
 
-        loadToStore(person.asJsonLD, entitiesPersons().generateOne.asJsonLD)
+        loadToStore(person.asJsonLD, persons.generateOne.asJsonLD)
 
         val Some(resourceId) = finder.findCreatorId(gitLabId).unsafeRunSync()
 
-        findPerson(resourceId) should contain theSameElementsAs Set(
-          person.name.value
-        )
+        findPerson(resourceId) shouldBe Set(person.name.value)
       }
     }
 
@@ -63,7 +60,7 @@ class KGInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheck
   }
 
   private def findPerson(resourceId: users.ResourceId): Set[String] =
-    runQuery(s"""|SELECT ?name ?email
+    runQuery(s"""|SELECT ?name
                  |WHERE {
                  |  ${resourceId.showAs[RdfResource]} rdf:type schema:Person;
                  |                                    schema:name ?name
