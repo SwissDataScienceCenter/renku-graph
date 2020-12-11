@@ -35,6 +35,7 @@ trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable w
   def mapResult: Int => UpdateResult = {
     case 0 => UpdateResult.Conflict
     case 1 => UpdateResult.Updated
+    case 2 => UpdateResult.NotFound
     case _ => UpdateResult.Failure(Refined.unsafeApply(s"An attempt to set status $status on $eventId failed"))
   }
 }

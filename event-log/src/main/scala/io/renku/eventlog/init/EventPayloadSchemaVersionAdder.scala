@@ -23,7 +23,7 @@ import ch.datascience.db.DbTransactor
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
-private trait EventPayloadTableSchemaVersionAdder[Interpretation[_]] {
+private trait EventPayloadSchemaVersionAdder[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
@@ -31,15 +31,15 @@ private object EventPayloadTableSchemaVersionAdder {
   def apply[Interpretation[_]](
       transactor: DbTransactor[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): EventPayloadTableSchemaVersionAdder[Interpretation] =
-    new EventPayloadTableSchemaVersionAdder(transactor, logger)
+  )(implicit ME:  Bracket[Interpretation, Throwable]): EventPayloadSchemaVersionAdder[Interpretation] =
+    new EventPayloadSchemaVersionAdderImpl(transactor, logger)
 }
 
-private class EventPayloadTableSchemaVersionAdder[Interpretation[_]](
+private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventPayloadTableSchemaVersionAdder[Interpretation]
+    extends EventPayloadSchemaVersionAdder[Interpretation]
     with EventTableCheck[Interpretation] {
 
   import cats.syntax.all._
@@ -69,9 +69,9 @@ private class EventPayloadTableSchemaVersionAdder[Interpretation[_]](
 
   private lazy val alterTableSql = sql"""
     ALTER TABLE event_payload
-    ALTER COLUMN payload text NOT NULL,
+    ALTER COLUMN payload SET NOT NULL,
     ADD schema_version text NOT NULL,
-    DROP PRIMARY KEY (event_id, project_id)
+    DROP CONSTRAINT event_payload_pkey,
     ADD PRIMARY KEY (event_id, project_id, schema_version)
     """
 }

@@ -45,7 +45,10 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
       val command = TestCommand(eventId, projectPath, gauge)
 
+      (gauge.increment _).expects(projectPath).returning(IO.unit)
+
       runner.run(command).unsafeRunSync() shouldBe NotFound
+
     }
 
     "execute query from the given command, " +

@@ -23,6 +23,7 @@ import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.LabeledHistogram
+import doobie.free.connection.ConnectionIO
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -46,21 +47,22 @@ class StatusUpdatesRunnerImpl(
   import doobie.implicits._
 
   override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] =
-    checkIfPersisted(command.eventId) transact transactor.get flatMap {
-      case true =>
-        for {
-          queryResult  <- measureExecutionTime(command.query) transact transactor.get
-          updateResult <- ME.catchNonFatal(command mapResult queryResult)
-          _            <- logInfo(command, updateResult)
-          _            <- command updateGauges updateResult
-        } yield updateResult
-      case false => NotFound.pure[IO]
-    }
+    for {
+      updateResult <- executeCommand(command) transact transactor.get
+      _            <- logInfo(command, updateResult)
+      _            <- command updateGauges updateResult
+    } yield updateResult
 
   private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {
     case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
     case _       => ME.unit
   }
+
+  private def executeCommand(command: ChangeStatusCommand[IO]) =
+    checkIfPersisted(command.eventId).flatMap {
+      case true  => measureExecutionTime(command.query).map(command.mapResult)
+      case false => (NotFound: commands.UpdateResult).pure[ConnectionIO]
+    }
 
   private def checkIfPersisted(eventId: CompoundEventId) = measureExecutionTime {
     SqlQuery(

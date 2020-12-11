@@ -60,9 +60,9 @@ trait InMemoryEventLogDbSpec
       sql"""|CREATE TABLE IF NOT EXISTS event_payload(
             |event_id       varchar   NOT NULL,
             |project_id     int4      NOT NULL,
-            |payload        text,
-            |schema_version text,
-            |PRIMARY KEY (event_id, project_id)
+            |payload        text      NOT NULL,
+            |schema_version text      NOT NULL,
+            |PRIMARY KEY (event_id, project_id, schema_version)
             |);
     """.stripMargin.update.run.void
     }
