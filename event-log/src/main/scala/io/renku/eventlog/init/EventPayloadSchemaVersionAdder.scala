@@ -23,23 +23,23 @@ import ch.datascience.db.DbTransactor
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
-private trait EventPayloadTableCreator[Interpretation[_]] {
+private trait EventPayloadTableSchemaVersionAdder[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private object EventPayloadTableCreator {
+private object EventPayloadTableSchemaVersionAdder {
   def apply[Interpretation[_]](
       transactor: DbTransactor[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): EventPayloadTableCreator[Interpretation] =
-    new EventPayloadTableCreatorImpl(transactor, logger)
+  )(implicit ME:  Bracket[Interpretation, Throwable]): EventPayloadTableSchemaVersionAdder[Interpretation] =
+    new EventPayloadTableSchemaVersionAdder(transactor, logger)
 }
 
-private class EventPayloadTableCreatorImpl[Interpretation[_]](
+private class EventPayloadTableSchemaVersionAdder[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventPayloadTableCreator[Interpretation]
+    extends EventPayloadTableSchemaVersionAdder[Interpretation]
     with EventTableCheck[Interpretation] {
 
   import cats.syntax.all._
@@ -48,13 +48,10 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]](
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
-    whenEventTableExists(
-      checkTableExists flatMap {
-        case true  => logger info "'event_payload' table exists"
-        case false => createTable
-      },
-      otherwise = ME.raiseError(new Exception("Event table missing; creation of event_payload is not possible"))
-    )
+    checkTableExists flatMap {
+      case true  => alterTable
+      case false => ME.raiseError(new Exception("Event payload table missing; alteration is not possible"))
+    }
 
   private def checkTableExists: Interpretation[Boolean] =
     sql"select event_id from event_payload limit 1"
@@ -64,25 +61,17 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]](
       .map(_ => true)
       .recover { case _ => false }
 
-  private def createTable = for {
-    _ <- createTableSql.update.run transact transactor.get
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)")
-    _ <- logger info "'event_payload' table created"
-    _ <- foreignKeySql.run transact transactor.get
+  private def alterTable = for {
+    _ <- alterTableSql.update.run transact transactor.get
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_schema_version ON event_payload(schema_version)")
+    _ <- logger info "'event_payload' table altered"
   } yield ()
 
-  private lazy val createTableSql = sql"""
-    CREATE TABLE IF NOT EXISTS event_payload(
-      event_id       varchar   NOT NULL,
-      project_id     int4      NOT NULL,
-      payload        text,
-      PRIMARY KEY (event_id, project_id)
-    );
-    """
-
-  private lazy val foreignKeySql = sql"""
+  private lazy val alterTableSql = sql"""
     ALTER TABLE event_payload
-    ADD CONSTRAINT fk_event FOREIGN KEY (event_id, project_id) REFERENCES event (event_id, project_id);
-  """.update
+    ALTER COLUMN payload text NOT NULL,
+    ADD schema_version text NOT NULL,
+    DROP PRIMARY KEY (event_id, project_id)
+    ADD PRIMARY KEY (event_id, project_id, schema_version)
+    """
 }

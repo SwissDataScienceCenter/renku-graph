@@ -64,7 +64,7 @@ private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
   private lazy val upsertEventPayload = sql"""|INSERT INTO
                                               |event_payload (event_id, project_id, payload, schema_version)
                                               |VALUES (${eventId.id},  ${eventId.projectId}, $payload, $schemaVersion)
-                                              |ON CONFLICT (event_id, project_id)
+                                              |ON CONFLICT (event_id, project_id, schema_version)
                                               |DO UPDATE SET payload = EXCLUDED.payload;
                                               |""".stripMargin.update.run
 
