@@ -41,7 +41,7 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.knowledgegraph.projects.model.{Creator, Project}
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.bundles._
@@ -74,7 +74,8 @@ class DatasetsResourcesSpec
       val initProject = projects.generateOne
       initProject.copy(
         maybeDescription = projectDescriptions.generateSome,
-        forking = initProject.forking.copy(maybeParent = None)
+        forking = initProject.forking.copy(maybeParent = None),
+        created = initProject.created.copy(maybeCreator = None)
       )
     }
     val dataset1Creation = addedToProjectObjects.generateOne.copy(
