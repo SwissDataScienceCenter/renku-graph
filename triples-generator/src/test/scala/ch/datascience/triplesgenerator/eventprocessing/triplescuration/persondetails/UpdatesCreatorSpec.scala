@@ -28,8 +28,8 @@ import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.ResourceId
+import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.{InMemoryRdfStore, JsonLDTriples}
-import ch.datascience.rdfstore.entities.ProjectsGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.persondetails.PersonDetailsGenerators.persons
 import io.renku.jsonld.JsonLD
 import io.renku.jsonld.syntax._
@@ -47,10 +47,14 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         val person     = persons(None).generateOne
         val resourceId = person.toResourceId
 
+        loadToStore(person.toJsonLd)
+
+        findPersons shouldBe Set(
+          (resourceId.value, Some(person.name.value), person.maybeEmail.map(_.value), None, None)
+        )
+
         val newName  = userNames.generateOne
         val newEmail = userEmails.generateOption
-
-        loadToStore(person.toJsonLd)
 
         val updatesGroup = updatesCreator.prepareUpdates[IO](
           person.copy(maybeGitLabId = gitLabId.some, name = newName, maybeEmail = newEmail)
@@ -58,7 +62,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
 
         updatesGroup.generateUpdates().foldF(throw _, _.runAll).unsafeRunSync()
 
-        findPersons should contain theSameElementsAs Set(
+        findPersons shouldBe Set(
           (resourceId.value,
            Some(newName.value),
            newEmail.map(_.value),
@@ -143,11 +147,14 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       // This could happen if a user changes their email
       val gitLabId = userGitLabIds.generateOne
       val person   = persons(gitLabId.some).generateOne
-      val project1 = projects.generateOne.copy(maybeCreator = Some(person.toEntitiesPerson))
-      val project2 = projects.generateOne.copy(maybeCreator = Some(person.toEntitiesPerson))
-      loadToStore(person.toJsonLd, project1.asJsonLD, project2.asJsonLD)
+      val project1 = projectEntities.generateOne.copy(maybeCreator = Some(person.toEntitiesPerson))
+      val project2 = projectEntities.generateOne.copy(maybeCreator = Some(person.toEntitiesPerson))
+      val activity = activityEntities.generateOne.copy(committer = person.toEntitiesPerson, project = project1)
 
-      findProjectsCreatorIds shouldBe Set(person.toResourceId.value)
+      loadToStore(person.toJsonLd, project1.asJsonLD, project2.asJsonLD, activity.asJsonLD)
+
+      findProjectsCreatorIds     shouldBe Set(person.toResourceId.value)
+      findActivitiesCommitterIds shouldBe Set(person.toResourceId.value)
 
       val updatedPerson = persons(gitLabId.some).generateOne
 
@@ -164,7 +171,8 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
         )
       )
 
-      findProjectsCreatorIds shouldBe Set(updatedPerson.toResourceId.value)
+      findProjectsCreatorIds     shouldBe Set(updatedPerson.toResourceId.value)
+      findActivitiesCommitterIds shouldBe Set(updatedPerson.toResourceId.value)
     }
 
     "generate query which upserts name or email and remove GitLab Id " +
@@ -264,8 +272,20 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
   private def findProjectsCreatorIds: Set[String] =
     runQuery(s"""|SELECT ?id
                  |WHERE {
-                 |  ?projectId rdf:type schema:Project ;
-                 |  schema:creator ?id
+                 |  ?projectId rdf:type schema:Project;
+                 |             schema:creator ?id
+                 |}
+                 |""".stripMargin)
+      .unsafeRunSync()
+      .map(row => row("id"))
+      .toSet
+
+  private def findActivitiesCommitterIds: Set[String] =
+    runQuery(s"""|SELECT ?id
+                 |WHERE {
+                 |  ?projectId rdf:type prov:Activity;
+                 |             prov:wasAssociatedWith ?id.
+                 |  ?id rdf:type schema:Person.
                  |}
                  |""".stripMargin)
       .unsafeRunSync()
