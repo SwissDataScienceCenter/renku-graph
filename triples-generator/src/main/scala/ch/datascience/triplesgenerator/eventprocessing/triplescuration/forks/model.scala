@@ -20,14 +20,14 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import ch.datascience.graph.model.projects.{DateCreated, Path}
 import ch.datascience.graph.model.users
-import ch.datascience.graph.model.users.Email
+import ch.datascience.graph.model.users.{Email, GitLabId}
 
-final case class GitLabProject(path:            Path,
-                               maybeParentPath: Option[Path],
-                               maybeCreator:    Option[GitLabCreator],
-                               dateCreated:     DateCreated
+private final case class GitLabProject(path:            Path,
+                                       maybeParentPath: Option[Path],
+                                       maybeCreator:    Option[GitLabCreator],
+                                       dateCreated:     DateCreated
 )
 
-final case class GitLabCreator(maybeEmail: Option[Email], maybeName: Option[users.Name])
+private final case class GitLabCreator(gitLabId: GitLabId, name: users.Name)
 
-final case class KGCreator(resourceId: users.ResourceId, maybeEmail: Option[Email], name: users.Name)
+private final case class KGCreator(resourceId: users.ResourceId, maybeEmail: Option[Email], name: users.Name)

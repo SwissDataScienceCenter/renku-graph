@@ -18,12 +18,13 @@
 
 package ch.datascience.rdfstore.entities
 
-import java.util.UUID
-
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Affiliation, Email, GitLabId, Name}
 import org.scalacheck.Gen
+
+import java.util.UUID
 
 final case class Person(
     name:             Name,
@@ -40,8 +41,8 @@ object Person {
   ): Person = Person(name, Some(email))
 
   import io.renku.jsonld._
-  import io.renku.jsonld.syntax._
   import JsonLDEncoder._
+  import io.renku.jsonld.syntax._
 
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Person] =
     JsonLDEncoder.instance { entity =>
@@ -71,9 +72,15 @@ object Person {
     case None        => EntityId of (renkuBaseUrl / "persons" / UUID.nameUUIDFromBytes(person.name.value.getBytes()).toString)
   }
 
-  val persons: Gen[Person] = for {
+  val persons: Gen[Person] = persons()
+
+  def persons(
+      maybeGitLabIds: Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfNones,
+      maybeEmails:    Gen[Option[Email]] = userEmails.toGeneratorOfOptions
+  ): Gen[Person] = for {
     name             <- userNames
-    maybeEmail       <- Gen.option(userEmails)
-    maybeAffiliation <- Gen.option(userAffiliations)
-  } yield Person(name, maybeEmail, maybeAffiliation)
+    maybeEmail       <- maybeEmails
+    maybeAffiliation <- userAffiliations.toGeneratorOfOptions
+    maybeGitLabId    <- maybeGitLabIds
+  } yield Person(name, maybeEmail, maybeAffiliation, maybeGitLabId)
 }

@@ -20,15 +20,15 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.users
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 private trait KGInfoFinder[Interpretation[_]] {
-  def findCreatorId(email: users.Email): Interpretation[Option[users.ResourceId]]
+  def findCreatorId(gitLabId: users.GitLabId): Interpretation[Option[users.ResourceId]]
 }
 
 private class IOKGInfoFinder(
@@ -46,25 +46,23 @@ private class IOKGInfoFinder(
   import eu.timepit.refined.auto._
   import io.circe.Decoder
   import Decoder._
-  import SparqlValueEncoder.sparqlEncode
-  import ch.datascience.graph.model.users.Email
+  import ch.datascience.graph.Schemas._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-  override def findCreatorId(email: users.Email): IO[Option[users.ResourceId]] = {
+  override def findCreatorId(gitLabId: users.GitLabId): IO[Option[users.ResourceId]] = {
     implicit val decoder: Decoder[List[users.ResourceId]] = recordsDecoder(resourceIdDecoder)
-    queryExpecting[List[users.ResourceId]](using = personIdFindingQuery(email)) flatMap toSingleResult(email)
+    queryExpecting[List[users.ResourceId]](using = personIdFindingQuery(gitLabId)) flatMap toSingleResult(gitLabId)
   }
 
-  private def personIdFindingQuery(email: Email) = SparqlQuery(
-    name = "upload - personId by email",
-    Set(
-      "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
-      "PREFIX schema: <http://schema.org/>"
-    ),
+  private def personIdFindingQuery(gitLabId: users.GitLabId) = SparqlQuery.of(
+    name = "upload - personId by gitLabId",
+    Prefixes.of(rdf -> "rdf", schema -> "schema"),
     s"""|SELECT DISTINCT ?id
         |WHERE {
         |  ?id rdf:type <http://schema.org/Person>;
-        |      schema:email "${sparqlEncode(email.value)}".
+        |      schema:sameAs ?sameAsId.
+        |  ?sameAsId schema:additionalType 'GitLab';
+        |            schema:identifier     ${gitLabId.value}.
         |}
         |""".stripMargin
   )

@@ -20,9 +20,8 @@ package ch.datascience.graph.config
 
 import cats.MonadError
 import ch.datascience.config.ConfigLoader
-import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.tinytypes.constraints.{Url, UrlOps, UrlResourceRenderer}
-import ch.datascience.tinytypes.{Renderer, StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 class RenkuBaseUrl private (val value: String) extends AnyVal with StringTinyType
 object RenkuBaseUrl

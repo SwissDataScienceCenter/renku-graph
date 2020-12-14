@@ -33,6 +33,7 @@ import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessT
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model.{ParentProject, Permissions, Project}
+import ch.datascience.rdfstore.entities.Person
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
@@ -184,6 +185,7 @@ object GitLab {
 
   def `GET <gitlabApi>/projects/:path returning OK with`(
       project:            Project,
+      maybeCreator:       Option[Person] = None,
       withStatistics:     Boolean = false
   )(implicit accessToken: AccessToken): Unit = {
 
@@ -215,7 +217,6 @@ object GitLab {
     }
 
     val queryParams = if (withStatistics) "?statistics=true" else ""
-    val maybeCreatorId: Option[Int Refined Positive] = project.created.maybeCreator.map(_ => positiveInts().generateOne)
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}$queryParams").withAccessTokenInHeader
         .willReturn(
@@ -249,7 +250,8 @@ object GitLab {
                   .getOrElse(Json.obj())
               )
               .deepMerge(
-                maybeCreatorId
+                maybeCreator
+                  .flatMap(_.maybeGitLabId)
                   .map(creatorId => json"""{"creator_id": ${creatorId.value}}""")
                   .getOrElse(Json.obj())
               )
@@ -258,13 +260,13 @@ object GitLab {
         )
     }
 
-    (project.created.maybeCreator -> maybeCreatorId) mapN { (creator, creatorId) =>
+    (project.created.maybeCreator -> maybeCreator.flatMap(_.maybeGitLabId)) mapN { (creator, creatorId) =>
       stubFor {
         get(s"/api/v4/users/$creatorId").withAccessTokenInHeader
           .willReturn(
             okJson(json"""{
-              "name":         ${creator.name.value},
-              "public_email": ${creator.maybeEmail.map(_.value)}
+              "id":   ${creatorId.value},
+              "name": ${creator.name.value}
             }""".noSpaces)
           )
       }

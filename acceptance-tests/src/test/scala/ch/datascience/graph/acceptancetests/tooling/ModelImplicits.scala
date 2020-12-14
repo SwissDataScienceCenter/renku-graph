@@ -21,17 +21,13 @@ package ch.datascience.graph.acceptancetests.tooling
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users
-import ch.datascience.graph.model.users.{GitLabId, Username}
 import ch.datascience.rdfstore.entities.Person
 
 trait ModelImplicits {
 
   implicit class PersonOps(person: Person) {
 
-    def asMember(gitLabId: GitLabId, username: Username): (users.GitLabId, users.Username, users.Name) =
-      (gitLabId, username, person.name)
-
     def asMember(): (users.GitLabId, users.Username, users.Name) =
-      (userGitLabIds.generateOne, usernames.generateOne, person.name)
+      (person.maybeGitLabId getOrElse userGitLabIds.generateOne, usernames.generateOne, person.name)
   }
 }

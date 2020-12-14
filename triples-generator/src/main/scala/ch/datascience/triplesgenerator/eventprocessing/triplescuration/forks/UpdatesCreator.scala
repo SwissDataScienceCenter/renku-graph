@@ -23,7 +23,7 @@ import cats.MonadError
 import cats.data.{EitherT, OptionT}
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
@@ -37,13 +37,13 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-private[triplescuration] trait UpdatesCreator[Interpretation[_]] {
+private trait UpdatesCreator[Interpretation[_]] {
   def create(commit:    CommitEvent)(implicit
       maybeAccessToken: Option[AccessToken]
   ): CurationUpdatesGroup[Interpretation]
 }
 
-private[triplescuration] class UpdatesCreatorImpl(
+private class UpdatesCreatorImpl(
     gitLab:              GitLabInfoFinder[IO],
     kg:                  KGInfoFinder[IO],
     updatesQueryCreator: UpdatesQueryCreator
@@ -68,44 +68,44 @@ private[triplescuration] class UpdatesCreatorImpl(
     )
 
   private lazy val forkInfoUpdates: Option[GitLabProject] => IO[List[SparqlQuery]] = {
-    case `when creator has an email`(creatorEmail, gitLabProject) =>
-      OptionT(kg.findCreatorId(creatorEmail))
-        .map { existingUserResource =>
-          updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
-            swapCreator(gitLabProject.path, existingUserResource) ++
-            recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
-        }
-        .getOrElse {
-          updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
-            addNewCreator(gitLabProject.path, gitLabProject.maybeEmail, gitLabProject.maybeName) ++
-            recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
-        }
-    case `when creator has no email`(gitLabProject) =>
-      (updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
-        addNewCreator(gitLabProject.path, gitLabProject.maybeEmail, gitLabProject.maybeName) ++
-        recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)).pure[IO]
-    case _ => List.empty[SparqlQuery].pure[IO]
+    case `when project has a creator`(creator, gitLabProject) =>
+      OptionT(kg.findCreatorId(creator.gitLabId))
+        .map(existingUserResource => updateProjectAndSwapCreator(gitLabProject, existingUserResource))
+        .getOrElse(updateProjectAndAddCreator(gitLabProject, creator))
+    case `when project has no creator`(gitLabProject) =>
+      updateProjectAndUnlinkCreator(gitLabProject).pure[IO]
+    case _ =>
+      List.empty[SparqlQuery].pure[IO]
   }
 
-  private object `when creator has an email` {
-    def unapply(maybeProject: Option[GitLabProject]): Option[(users.Email, GitLabProject)] = maybeProject match {
-      case Some(gitLabProject) => gitLabProject.maybeEmail.map(_ -> gitLabProject)
-      case _                   => None
+  private object `when project has a creator` {
+    def unapply(maybeProject: Option[GitLabProject]): Option[(GitLabCreator, GitLabProject)] = maybeProject match {
+      case Some(project @ GitLabProject(_, _, Some(creator), _)) => (creator -> project).some
+      case _                                                     => None
     }
   }
 
-  private object `when creator has no email` {
+  private object `when project has no creator` {
     def unapply(maybeProject: Option[GitLabProject]): Option[GitLabProject] = maybeProject match {
-      case Some(gitLabProject) if gitLabProject.maybeEmail.isEmpty => Some(gitLabProject)
-      case _                                                       => None
+      case Some(project @ GitLabProject(_, _, None, _)) => project.some
+      case _                                            => None
     }
   }
 
-  private implicit class GitLabProjectOps(gitLabProject: GitLabProject) {
+  private def updateProjectAndSwapCreator(gitLabProject: GitLabProject, existingUserResource: users.ResourceId) =
+    updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
+      swapCreator(gitLabProject.path, existingUserResource) ++
+      recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
 
-    lazy val maybeEmail = gitLabProject.maybeCreator.flatMap(_.maybeEmail)
-    lazy val maybeName  = gitLabProject.maybeCreator.flatMap(_.maybeName)
-  }
+  private def updateProjectAndAddCreator(gitLabProject: GitLabProject, creator: GitLabCreator) =
+    updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
+      addNewCreator(gitLabProject.path, creator) ++
+      recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
+
+  private def updateProjectAndUnlinkCreator(gitLabProject: GitLabProject) =
+    updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
+      unlinkCreator(gitLabProject.path) ++
+      recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
 
   private lazy val maybeToRecoverableError
       : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[SparqlQuery]]] = {
@@ -120,7 +120,7 @@ private[triplescuration] class UpdatesCreatorImpl(
   }
 }
 
-private[triplescuration] object IOUpdateFunctionsCreator {
+private object IOUpdateFunctionsCreator {
   import cats.effect.Timer
   import ch.datascience.config.GitLab
   import ch.datascience.control.Throttler
@@ -132,7 +132,8 @@ private[triplescuration] object IOUpdateFunctionsCreator {
   )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[UpdatesCreator[IO]] =
     for {
       renkuBaseUrl     <- RenkuBaseUrl[IO]()
+      gitLabApiUrl     <- GitLabUrl[IO]().map(_.apiV4)
       gitLabInfoFinder <- IOGitLabInfoFinder(gitLabThrottler, logger)
       kgInfoFinder     <- IOKGInfoFinder(timeRecorder, logger)
-    } yield new UpdatesCreatorImpl(gitLabInfoFinder, kgInfoFinder, new UpdatesQueryCreator(renkuBaseUrl))
+    } yield new UpdatesCreatorImpl(gitLabInfoFinder, kgInfoFinder, new UpdatesQueryCreator(renkuBaseUrl, gitLabApiUrl))
 }

@@ -113,8 +113,8 @@ class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFact
 
       val result = personExtractor extractPersons noNamesJson
 
-      result                     shouldBe a[Failure[_]]
-      result.failed.get.getMessage should include regex "No names for person with '(.*)' id found in generated JSON-LD".r
+      result                       shouldBe a[Failure[_]]
+      result.failed.get.getMessage shouldBe "No names for person in generated JSON-LD"
     }
   }
 
