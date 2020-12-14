@@ -20,6 +20,7 @@ package ch.datascience.config
 
 import cats.MonadError
 import cats.syntax.all._
+import ch.datascience.graph.model.projects.SchemaVersion
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import com.typesafe.config.Config
 import pureconfig._
