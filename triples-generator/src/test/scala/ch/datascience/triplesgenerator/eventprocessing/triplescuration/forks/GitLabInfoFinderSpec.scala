@@ -23,20 +23,17 @@ import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.graph.model.users.Email
+import ch.datascience.graph.model.users
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.json.JsonOps._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
 import io.circe.Json
 import io.circe.literal._
 import org.scalatest.matchers.should
@@ -54,10 +51,22 @@ class GitLabInfoFinderSpec
 
   "findProject" should {
 
+    "return info about a project with the given path" in new TestCase {
+      forAll { path: model.projects.Path =>
+        val creator   = gitLabCreator().generateOne
+        val project   = gitLabProjects(path).generateOne.copy(maybeCreator = creator.some)
+        val creatorId = userGitLabIds.generateOne
+        `/api/v4/projects`(path) returning okJson(projectJson(project, creatorId.some).noSpaces)
+        `/api/v4/users`(creatorId) returning okJson(userJson(creator).noSpaces)
+
+        finder.findProject(path)(maybeAccessToken).unsafeRunSync() shouldBe Some(project)
+      }
+    }
+
     "return info about a project with the given path - case when user cannot be found in GitLab" in new TestCase {
       forAll { path: model.projects.Path =>
         val project   = gitLabProjects(path).generateOne
-        val creatorId = positiveInts().generateOne
+        val creatorId = userGitLabIds.generateOne
         `/api/v4/projects`(path) returning okJson(projectJson(project, creatorId.some).noSpaces)
         `/api/v4/users`(creatorId) returning notFound()
 
@@ -69,58 +78,6 @@ class GitLabInfoFinderSpec
       val path    = projectPaths.generateOne
       val project = gitLabProjects(path).generateOne.copy(maybeCreator = None)
       `/api/v4/projects`(path) returning okJson(projectJson(project, maybeCreatorId = None).noSpaces)
-
-      finder.findProject(path)(maybeAccessToken).unsafeRunSync() shouldBe Some(project)
-    }
-
-    "return info about a project with the given path - case when user email is in the 'email' property" in new TestCase {
-      val path      = projectPaths.generateOne
-      val creator   = gitLabCreator(userEmails.generateSome).generateOne
-      val project   = gitLabProjects(path).generateOne.copy(maybeCreator = creator.some)
-      val creatorId = positiveInts().generateOne
-      `/api/v4/projects`(path) returning okJson(projectJson(project, creatorId.some).noSpaces)
-      `/api/v4/users`(creatorId) returning okJson(userJsonWithEmailProperty(creator).noSpaces)
-
-      finder.findProject(path)(maybeAccessToken).unsafeRunSync() shouldBe Some(project)
-    }
-
-    "return info about a project with the given path - case when user email is in the 'public_email' property" in new TestCase {
-      val path      = projectPaths.generateOne
-      val creator   = gitLabCreator(userEmails.generateSome).generateOne
-      val project   = gitLabProjects(path).generateOne.copy(maybeCreator = creator.some)
-      val creatorId = positiveInts().generateOne
-      `/api/v4/projects`(path) returning okJson(projectJson(project, creatorId.some).noSpaces)
-      `/api/v4/users`(creatorId) returning okJson(userJsonWithPublicEmailProperty(creator).noSpaces)
-
-      finder.findProject(path)(maybeAccessToken).unsafeRunSync() shouldBe Some(project)
-    }
-
-    "return info about a project with the given path - case when user email is in both 'email' and 'public_email' property" in new TestCase {
-      val path      = projectPaths.generateOne
-      val creator   = gitLabCreator(userEmails.generateSome).generateOne
-      val project   = gitLabProjects(path).generateOne.copy(maybeCreator = creator.some)
-      val creatorId = positiveInts().generateOne
-      `/api/v4/projects`(path) returning okJson(projectJson(project, creatorId.some).noSpaces)
-      `/api/v4/users`(creatorId) returning okJson(
-        (userJsonWithEmailProperty(creator) deepMerge userJsonWithPublicEmailProperty(
-          creator.copy(maybeEmail = userEmails.generateSome)
-        )).noSpaces
-      )
-
-      finder.findProject(path)(maybeAccessToken).unsafeRunSync() shouldBe Some(project)
-    }
-
-    "return info about a project with the given path - case when blank values in both 'email' and 'public_email' property" in new TestCase {
-      val path      = projectPaths.generateOne
-      val creator   = gitLabCreator(userEmails.generateNone).generateOne
-      val project   = gitLabProjects(path).generateOne.copy(maybeCreator = creator.some)
-      val creatorId = positiveInts().generateOne
-      `/api/v4/projects`(path) returning okJson(projectJson(project, creatorId.some).noSpaces)
-      `/api/v4/users`(creatorId) returning okJson(
-        userJsonWithEmailProperty(creator, emailBlank = true)
-          .deepMerge(userJsonWithPublicEmailProperty(creator, emailBlank = true))
-          .noSpaces
-      )
 
       finder.findProject(path)(maybeAccessToken).unsafeRunSync() shouldBe Some(project)
     }
@@ -143,7 +100,7 @@ class GitLabInfoFinderSpec
     val finder    = new IOGitLabInfoFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
   }
 
-  private def projectJson(project: GitLabProject, maybeCreatorId: Option[Int Refined Positive]): Json =
+  private def projectJson(project: GitLabProject, maybeCreatorId: Option[users.GitLabId]): Json =
     json"""{
       "path_with_namespace": ${project.path.value},
       "created_at":          ${project.dateCreated.value}
@@ -157,23 +114,11 @@ class GitLabInfoFinderSpec
       } getOrElse Json.obj())
       .addIfDefined("creator_id" -> maybeCreatorId.map(_.value))
 
-  private def userJsonWithEmailProperty(creator: GitLabCreator, emailBlank: Boolean = false): Json =
+  private def userJson(creator: GitLabCreator, emailBlank: Boolean = false): Json =
     json"""{
-      "name":  ${creator.maybeName.map(_.value)},
-      "email": ${creator.maybeEmail.toValue(emailBlank)}
+      "id":   ${creator.gitLabId.value},     
+      "name": ${creator.name.value}
     }"""
-
-  private def userJsonWithPublicEmailProperty(creator: GitLabCreator, emailBlank: Boolean = false): Json =
-    json"""{
-      "name":         ${creator.maybeName.map(_.value)},
-      "public_email": ${creator.maybeEmail.toValue(emailBlank)}
-    }"""
-
-  private implicit class EmailOps(maybeEmail: Option[Email]) {
-    def toValue(emailBlank: Boolean): Option[String] =
-      if (emailBlank) blankStrings().generateSome
-      else maybeEmail.map(_.value)
-  }
 
   private def `/api/v4/projects`(path: Path) = new {
     def returning(response: ResponseDefinitionBuilder) = stubFor {
@@ -182,7 +127,7 @@ class GitLabInfoFinderSpec
     }
   }
 
-  private def `/api/v4/users`(creatorId: Int Refined Positive) = new {
+  private def `/api/v4/users`(creatorId: users.GitLabId) = new {
     def returning(response: ResponseDefinitionBuilder) = stubFor {
       get(s"/api/v4/users/$creatorId")
         .willReturn(response)

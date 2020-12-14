@@ -18,20 +18,21 @@
 
 package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
-import java.time.Instant
-
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, userEmails}
+import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
 import ch.datascience.graph.model.projects.{DateCreated, ResourceId}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.{Person, Project}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
 import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
+
+import java.time.Instant
 
 class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Matchers {
 
@@ -110,121 +111,94 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   "swapCreator" should {
 
     "replace the current Project's creator with the given one" in new TestCase {
-      val creator1 = entitiesPersons(userEmails.generateSome).generateOne
-      val creator2 = entitiesPersons(userEmails.generateSome).generateOne
+      val creator1 = persons.generateOne
+      val creator2 = persons.generateOne
       val project1 = entitiesProjects(creator1.some).generateOne
       val project2 = entitiesProjects(creator2.some).generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 
       findCreators should contain theSameElementsAs Set(
-        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value)),
-        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
+        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None),
+        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
       )
 
       updatesQueryCreator.swapCreator(project1.path, creator2.resourceId).runAll.unsafeRunSync()
 
       findCreators should contain theSameElementsAs Set(
-        (project1.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value)),
-        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
+        (project1.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None),
+        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
       )
     }
 
     "add a new creator to the Project when there is no creator linked to the project" in new TestCase {
-      val creator1 = entitiesPersons(userEmails.generateSome).generateOne
+      val creator1 = persons.generateOne
       val project1 = entitiesProjects(None).generateOne
       val project2 = entitiesProjects(creator1.some).generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 
       findCreators should contain theSameElementsAs Set(
-        (project2.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value))
+        (project2.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None)
       )
 
       updatesQueryCreator.swapCreator(project1.path, creator1.resourceId).runAll.unsafeRunSync()
 
       findCreators should contain theSameElementsAs Set(
-        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value)),
-        (project2.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value))
+        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None),
+        (project2.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None)
+      )
+    }
+  }
+
+  "unlinkCreator" should {
+
+    "remove creator from the project" in new TestCase {
+      val creator1 = persons.generateOne
+      val creator2 = persons.generateOne
+      val project1 = entitiesProjects(creator1.some).generateOne
+      val project2 = entitiesProjects(creator2.some).generateOne
+
+      loadToStore(project1.asJsonLD, project2.asJsonLD)
+
+      findCreators should contain theSameElementsAs Set(
+        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None),
+        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
+      )
+
+      updatesQueryCreator.unlinkCreator(project1.path).runAll.unsafeRunSync()
+
+      findCreators should contain theSameElementsAs Set(
+        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
       )
     }
   }
 
   "addNewCreator" should {
 
-    "create a new Person and link it to the given Project - case of Person with email" in new TestCase {
-      val creator1 = entitiesPersons().generateOne
-      val creator2 = entitiesPersons().generateOne
+    "create a new Person and link it to the given Project replacing the old creator on the project" in new TestCase {
+      val creator1 = persons.generateOne
+      val creator2 = persons.generateOne
       val project1 = entitiesProjects(creator1.some).generateOne
       val project2 = entitiesProjects(creator2.some).generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 
       findCreators should contain theSameElementsAs Set(
-        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value)),
-        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
+        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None),
+        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
       )
 
-      val newCreator = entitiesPersons(userEmails.toGeneratorOfSomes).generateOne
+      val newCreator = gitLabCreator().generateOne
 
       updatesQueryCreator
-        .addNewCreator(project1.path, newCreator.maybeEmail, newCreator.name.some)
+        .addNewCreator(project1.path, newCreator)
         .runAll
         .unsafeRunSync()
 
       findCreators should contain theSameElementsAs Set(
-        (project1.resourceId.value, newCreator.name.value, newCreator.maybeEmail.map(_.value)),
-        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
-      )
-    }
-
-    "create a new Person and link it to the given Project - case of Person without email" in new TestCase {
-      val creator1 = entitiesPersons().generateOne
-      val creator2 = entitiesPersons().generateOne
-      val project1 = entitiesProjects(creator1.some).generateOne
-      val project2 = entitiesProjects(creator2.some).generateOne
-
-      loadToStore(project1.asJsonLD, project2.asJsonLD)
-
-      findCreators should contain theSameElementsAs Set(
-        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value)),
-        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
-      )
-
-      val newCreator = entitiesPersons(userEmails.toGeneratorOfNones).generateOne
-
-      updatesQueryCreator
-        .addNewCreator(project1.path, None, newCreator.name.some)
-        .runAll
-        .unsafeRunSync()
-
-      findCreators should contain theSameElementsAs Set(
-        (project1.resourceId.value, newCreator.name.value, None),
-        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
-      )
-    }
-
-    "do nothing - case of Person without email and name" in new TestCase {
-      val creator1 = entitiesPersons().generateOne
-      val creator2 = entitiesPersons().generateOne
-      val project1 = entitiesProjects(creator1.some).generateOne
-      val project2 = entitiesProjects(creator2.some).generateOne
-
-      loadToStore(project1.asJsonLD, project2.asJsonLD)
-
-      findCreators should contain theSameElementsAs Set(
-        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value)),
-        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
-      )
-
-      updatesQueryCreator
-        .addNewCreator(project1.path, None, None)
-        .runAll
-        .unsafeRunSync()
-
-      findCreators should contain theSameElementsAs Set(
-        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value)),
-        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value))
+        (project1.resourceId.value, newCreator.name.value, None, newCreator.gitLabId.value.some),
+        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
       )
     }
   }
@@ -277,7 +251,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
   }
 
   private trait TestCase {
-    val updatesQueryCreator = new UpdatesQueryCreator(renkuBaseUrl)
+    val updatesQueryCreator = new UpdatesQueryCreator(renkuBaseUrl, gitLabApiUrl)
   }
 
   private implicit class ProjectOps(project: Project) {
@@ -303,17 +277,23 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
       .map(row => (row("id"), row.get("maybeParentId")))
       .toSet
 
-  private def findCreators: Set[(String, String, Option[String])] =
-    runQuery(s"""|SELECT ?id ?name ?email ?creatorId
+  private def findCreators: Set[(String, String, Option[String], Option[Int])] =
+    runQuery(s"""|SELECT ?id ?name ?email ?creatorId ?gitLabId
                  |WHERE {
                  |  ?id rdf:type schema:Project;
                  |      schema:creator ?creatorId.
                  |  ?creatorId schema:name ?name.
                  |  OPTIONAL { ?creatorId schema:email ?email }
+                 |  OPTIONAL { 
+                 |    ?creatorId schema:sameAs ?sameAsId.
+                 |    ?sameAsId rdf:type schema:URL;
+                 |              schema:additionalType 'GitLab';
+                 |              schema:identifier ?gitLabId;
+                 |  }
                  |}
                  |""".stripMargin)
       .unsafeRunSync()
-      .map(row => (row("id"), row("name"), row.get("email")))
+      .map(row => (row("id"), row("name"), row.get("email"), row.get("gitLabId").flatMap(_.toIntOption)))
       .toSet
 
   private def findDateCreated: Set[(String, Option[DateCreated])] =

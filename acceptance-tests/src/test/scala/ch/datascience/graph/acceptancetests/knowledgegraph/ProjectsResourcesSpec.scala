@@ -61,7 +61,9 @@ class ProjectsResourcesSpec
   import ProjectsResources._
 
   private implicit val accessToken: AccessToken = accessTokens.generateOne
-  private val fullParentProject = projects.generateOne
+  private val fullParentProject = projects.generateOne.copy(
+    created = Creation(projectCreatedDates.generateOne, maybeCreator = None)
+  )
 
   private val parentProject = ParentProject(
     fullParentProject.path,
@@ -71,12 +73,16 @@ class ProjectsResourcesSpec
     )
   )
 
+  private val dataset1Committer = persons(userGitLabIds.generateSome, userEmails.generateSome).generateOne
   private val project = {
     val initProject = projects.generateOne
     initProject.copy(
       maybeDescription = projectDescriptions.generateSome,
       forking = initProject.forking.copy(
         maybeParent = parentProject.some
+      ),
+      created = initProject.created.copy(
+        maybeCreator = Creator(dataset1Committer.maybeEmail, dataset1Committer.name).some
       )
     )
   }
@@ -120,11 +126,10 @@ class ProjectsResourcesSpec
                               jsonLDParentProjectTriples
       )
 
-      val projectCommitter = persons.generateOne
       val jsonLDTriples = JsonLD.arr(
         nonModifiedDataSetCommit(
           commitId = dataset1CommitId,
-          committer = projectCommitter,
+          committer = dataset1Committer,
           cliVersion = currentCliVersion
         )(
           projectPath = project.path,
@@ -140,7 +145,7 @@ class ProjectsResourcesSpec
           maybeDatasetSameAs = dataset.sameAs.some
         )
       )
-      `data in the RDF store`(project, dataset1CommitId, projectCommitter, jsonLDTriples)
+      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)
 
       `triples updates run`(
         Set(project.created.maybeCreator.flatMap(_.maybeEmail),
@@ -149,7 +154,10 @@ class ProjectsResourcesSpec
       )
 
       And("the project exists in GitLab")
-      `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
+      `GET <gitlabApi>/projects/:path returning OK with`(project,
+                                                         maybeCreator = dataset1Committer.some,
+                                                         withStatistics = true
+      )
 
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
       val projectDetailsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}"
@@ -228,10 +236,6 @@ object ProjectsResources {
       "name":    ${parent.name.value},
       "created": ${parent.created.toJson}
     }"""
-  }
-
-  private implicit class ProjectOps(project: Project) {
-    lazy val parent: ParentProject = project.forking.maybeParent.getOrElse(throw new Exception("Parent expected"))
   }
 
   private implicit class CreatorOps(creator: Creator) {

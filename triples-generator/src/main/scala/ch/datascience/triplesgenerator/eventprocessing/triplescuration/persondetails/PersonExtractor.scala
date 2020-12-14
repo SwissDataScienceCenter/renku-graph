@@ -84,13 +84,13 @@ private class PersonExtractorImpl[Interpretation[_]]()(implicit ME: MonadError[I
     private lazy val toSingleName: List[Name] => Interpretation[Name] = {
       case Nil =>
         ME.raiseError {
-          new Exception(s"No names for person with '$entityId' id found in generated JSON-LD")
+          new Exception("No names for person in generated JSON-LD")
         }
       case first :: Nil =>
         first.pure[Interpretation]
       case _ =>
         ME.raiseError {
-          new Exception(s"Multiple names for person with '$entityId' id found in generated JSON-LD")
+          new Exception("Multiple names for person in generated JSON-LD")
         }
 
     }
