@@ -41,7 +41,7 @@ import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
+import ch.datascience.rdfstore.entities.EntitiesGenerators.projectEntities
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.entities.{Artifact, Entity, InvalidationEntity}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
@@ -367,7 +367,7 @@ class IODatasetsFinderSpec
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with unrelated datasets" in new TestCase {
-          val project                = projects.generateOne
+          val project                = projectEntities.generateOne
           val datasetProject         = project.toDatasetProject
           val dataset0               = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
           val datasetToBeInvalidated = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
@@ -390,7 +390,7 @@ class IODatasetsFinderSpec
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets and the fork dataset is deleted" in new TestCase {
-          val project        = projects.generateOne
+          val project        = projectEntities.generateOne
           val datasetProject = project.toDatasetProject
           val dataset        = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
           val datasetFork    = dataset.copy(projects = List(datasetProjects.generateOne))
@@ -414,7 +414,7 @@ class IODatasetsFinderSpec
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with forks on renku created datasets and original dataset is deleted" in new TestCase {
-          val project        = projects.generateOne
+          val project        = projectEntities.generateOne
           val datasetProject = project.toDatasetProject
           val dataset        = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
           val datasetFork    = dataset.copy(projects = List(datasetProjects.generateOne))
@@ -438,7 +438,7 @@ class IODatasetsFinderSpec
 
       s"not return deleted datasets when the given phrase is $maybePhrase" +
         "- case with modification on renku created datasets" in new TestCase {
-          val project        = projects.generateOne
+          val project        = projectEntities.generateOne
           val datasetProject = project.toDatasetProject
           val dataset0       = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
           val dataset1       = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
@@ -655,7 +655,7 @@ class IODatasetsFinderSpec
     s"not return deleted datasets even if the phrase match" +
       "- case with unrelated datasets" in new TestCase {
         val phrase         = phrases.generateOne
-        val project        = projects.generateOne
+        val project        = projectEntities.generateOne
         val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
         val datasetToBeInvalidated =
           nonModifiedDatasets(projects = datasetProject).generateOne.makeTitleContaining(phrase)
