@@ -342,7 +342,6 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | execution_date TIMESTAMP    NOT NULL |
 | event_date TIMESTAMP        NOT NULL |
 | event_body TEXT             NOT NULL |
-| message TEXT                NOT NULL |
 | message TEXT                         |
 
 | project                              |
@@ -356,7 +355,7 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | event_id   VARCHAR    PK FK NOT NULL |
 | project_id INT4       PK FK NOT NULL |
 | payload    TEXT             NOT NULL |
-| schema_version TEXT         NOT NULL |
+| schema_version TEXT   PK    NOT NULL |
 
 ## Trying out
 
