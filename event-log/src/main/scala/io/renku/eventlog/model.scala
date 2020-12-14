@@ -105,3 +105,7 @@ object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) w
     )
   }
 }
+final class EventPayload private (val value: String) extends AnyVal with StringTinyType
+object EventPayload extends TinyTypeFactory[EventPayload](new EventPayload(_)) with NonBlank {
+  implicit val decoder: Decoder[EventPayload] = stringDecoder(EventPayload)
+}

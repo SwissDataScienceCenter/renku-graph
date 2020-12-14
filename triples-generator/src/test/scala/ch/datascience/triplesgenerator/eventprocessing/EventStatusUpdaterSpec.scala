@@ -39,7 +39,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
   "markNew" should {
 
-    Set(Ok, Conflict) foreach { status =>
+    Set(Ok, Conflict, NotFound) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
@@ -68,7 +68,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
   "markDone" should {
 
-    Set(Ok, Conflict) foreach { status =>
+    Set(Ok, Conflict, NotFound) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
@@ -97,7 +97,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
   "markEventFailedRecoverably" should {
 
-    Set(Ok, Conflict) foreach { status =>
+    Set(Ok, Conflict, NotFound) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
         val exception = exceptions.generateOne
         stubFor {
@@ -130,7 +130,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
   "markEventFailedNonRecoverably" should {
 
-    Set(Ok, Conflict) foreach { status =>
+    Set(Ok, Conflict, NotFound) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
         val exception = exceptions.generateOne
         stubFor {
@@ -165,7 +165,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
     val message = "MigrationEvent"
 
-    Set(Ok, Conflict) foreach { status =>
+    Set(Ok, Conflict, NotFound) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))

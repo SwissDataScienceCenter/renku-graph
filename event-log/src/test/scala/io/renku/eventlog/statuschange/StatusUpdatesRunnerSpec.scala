@@ -31,7 +31,7 @@ import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators.{eventDates, executionDates}
-import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
+import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
@@ -41,6 +41,15 @@ import org.scalatest.wordspec.AnyWordSpec
 class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
   "run" should {
+    "return not found if the event is not in the DB" in new TestCase {
+
+      val command = TestCommand(eventId, projectPath, gauge)
+
+      (gauge.increment _).expects(projectPath).returning(IO.unit)
+
+      runner.run(command).unsafeRunSync() shouldBe NotFound
+
+    }
 
     "execute query from the given command, " +
       "map the result using command's result mapping rules " +

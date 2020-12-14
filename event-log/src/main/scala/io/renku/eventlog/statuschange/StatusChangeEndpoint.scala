@@ -24,10 +24,11 @@ import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.projects.SchemaVersion
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
-import io.renku.eventlog.{EventLogDB, EventMessage}
+import io.renku.eventlog.{EventLogDB, EventMessage, EventPayload}
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal
@@ -65,6 +66,7 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
   private implicit class ResultOps(result: UpdateResult) {
     lazy val asHttpResponse: Interpretation[Response[Interpretation]] = result match {
       case UpdateResult.Updated  => Ok(InfoMessage("Event status updated"))
+      case UpdateResult.NotFound => NotFound(InfoMessage("Event not found"))
       case UpdateResult.Conflict => Conflict(InfoMessage("Event status cannot be updated"))
       case UpdateResult.Failure(message) =>
         logger.error(message.value)
@@ -92,14 +94,18 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
 
     implicit val commandDecoder: Decoder[ChangeStatusCommand[Interpretation]] = (cursor: HCursor) =>
       for {
-        status       <- cursor.downField("status").as[EventStatus]
-        maybeMessage <- cursor.downField("message").as[Option[EventMessage]]
+        status             <- cursor.downField("status").as[EventStatus]
+        maybeMessage       <- cursor.downField("message").as[Option[EventMessage]]
+        maybePayload       <- cursor.downField("payload").as[Option[EventPayload]]
+        maybeSchemaVersion <- cursor.downField("schemaVersion").as[Option[SchemaVersion]]
       } yield status match {
         case TriplesStore => ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge)
         case New          => ToNew[Interpretation](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
         case TriplesGenerated =>
           ToTriplesGenerated[Interpretation](
             eventId,
+            maybePayload getOrElse (throw new Exception(s"$status status needs a payload")),
+            maybeSchemaVersion getOrElse (throw new Exception(s"$status status needs a schemaVersion")),
             underTriplesGenerationGauge,
             awaitingTriplesTransformationGauge
           )

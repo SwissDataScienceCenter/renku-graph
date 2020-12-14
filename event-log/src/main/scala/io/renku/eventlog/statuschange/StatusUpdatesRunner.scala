@@ -19,11 +19,15 @@
 package io.renku.eventlog.statuschange
 
 import cats.effect.{Bracket, IO}
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.LabeledHistogram
+import doobie.free.connection.ConnectionIO
+import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
+import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 
 trait StatusUpdatesRunner[Interpretation[_]] {
@@ -44,8 +48,7 @@ class StatusUpdatesRunnerImpl(
 
   override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] =
     for {
-      queryResult  <- measureExecutionTime(command.query) transact transactor.get
-      updateResult <- ME.catchNonFatal(command mapResult queryResult)
+      updateResult <- executeCommand(command) transact transactor.get
       _            <- logInfo(command, updateResult)
       _            <- command updateGauges updateResult
     } yield updateResult
@@ -53,6 +56,24 @@ class StatusUpdatesRunnerImpl(
   private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {
     case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
     case _       => ME.unit
+  }
+
+  private def executeCommand(command: ChangeStatusCommand[IO]) =
+    checkIfPersisted(command.eventId).flatMap {
+      case true  => measureExecutionTime(command.query).map(command.mapResult)
+      case false => (NotFound: commands.UpdateResult).pure[ConnectionIO]
+    }
+
+  private def checkIfPersisted(eventId: CompoundEventId) = measureExecutionTime {
+    SqlQuery(
+      sql"""|SELECT event_id
+            |FROM event
+            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}""".stripMargin
+        .query[String]
+        .option
+        .map(_.isDefined),
+      name = "Event update check existence"
+    )
   }
 }
 

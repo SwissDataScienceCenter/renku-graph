@@ -22,14 +22,14 @@ import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, executionDates}
+import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventPayloads, executionDates}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
@@ -43,6 +43,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
   "command" should {
 
     s"set status $TriplesGenerated on the event with the given id and $GeneratingTriples status, " +
+      "insert the payload in the event_payload table" +
       "increment awaiting transformation gauge and decrement under triples generation gauge for the project " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
@@ -74,15 +75,24 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
         )
 
         findEvents(status = TriplesGenerated) shouldBe List.empty
+        findPayload(eventId)                  shouldBe None
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
         (awaitingTransformationGauge.increment _).expects(projectPath).returning(IO.unit)
+
         val command =
-          ToTriplesGenerated[IO](eventId, underTriplesGenerationGauge, awaitingTransformationGauge, currentTime)
+          ToTriplesGenerated[IO](eventId,
+                                 payload,
+                                 schemaVersion,
+                                 underTriplesGenerationGauge,
+                                 awaitingTransformationGauge,
+                                 currentTime
+          )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
         findEvents(status = TriplesGenerated) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
+        findPayload(eventId)                  shouldBe Some((eventId, payload))
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
@@ -90,7 +100,6 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
         s"and return ${UpdateResult.Conflict}" in new TestCase {
-
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
                      eventStatus,
@@ -101,8 +110,15 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           )
 
           findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
+          findPayload(eventId)             shouldBe None
           val command =
-            ToTriplesGenerated[IO](eventId, awaitingTransformationGauge, underTriplesGenerationGauge, currentTime)
+            ToTriplesGenerated[IO](eventId,
+                                   payload,
+                                   schemaVersion,
+                                   awaitingTransformationGauge,
+                                   underTriplesGenerationGauge,
+                                   currentTime
+            )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -110,6 +126,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
             if (eventStatus != TriplesGenerated) List.empty
             else List((eventId, executionDate, eventBatchDate))
           findEvents(status = TriplesGenerated) shouldBe expectedEvents
+          findPayload(eventId)                  shouldBe None
 
           histogram.verifyExecutionTimeMeasured(command.query.name)
         }
@@ -125,6 +142,8 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     val eventId        = compoundEventIds.generateOne
     val eventBatchDate = batchDates.generateOne
 
+    val payload       = eventPayloads.generateOne
+    val schemaVersion = projectSchemaVersions.generateOne
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()

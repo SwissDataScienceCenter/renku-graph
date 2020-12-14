@@ -18,14 +18,8 @@
 
 package io.renku.eventlog
 
-import java.time.Instant
-
+import cats.syntax.all._
 import ch.datascience.db.DbSpec
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.Path
 import doobie.implicits._
 import doobie.util.fragment.Fragment
 import org.scalatest.TestSuite
@@ -51,7 +45,7 @@ trait InMemoryEventLogDbSpec
             | message varchar,
             | PRIMARY KEY (event_id, project_id)
             |);
-       """.stripMargin.update.run.map(_ => ())
+       """.stripMargin.update.run.void
     }
     execute {
       sql"""|CREATE TABLE IF NOT EXISTS project(
@@ -60,8 +54,19 @@ trait InMemoryEventLogDbSpec
             |latest_event_date timestamp NOT NULL,
             |PRIMARY KEY (project_id)
             |);
-    """.stripMargin.update.run.map(_ => ())
+    """.stripMargin.update.run.void
     }
+    execute {
+      sql"""|CREATE TABLE IF NOT EXISTS event_payload(
+            |event_id       varchar   NOT NULL,
+            |project_id     int4      NOT NULL,
+            |payload        text      NOT NULL,
+            |schema_version text      NOT NULL,
+            |PRIMARY KEY (event_id, project_id, schema_version)
+            |);
+    """.stripMargin.update.run.void
+    }
+
   }
 
   protected def prepareDbForTest(): Unit = Tables.all.foreach { tableName =>

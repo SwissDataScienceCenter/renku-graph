@@ -181,17 +181,19 @@ Currently, only status changing payloads are allowed:
 
 ```json
 {
-  "status": "TRIPLES_GENERATED"
+  "status": "TRIPLES_GENERATED",
+  "payload": "json-ld as string",
+  "schemaVersion": "schema version of the triples"
 }
 ```
 
 **Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
 
-- for transitioning event from status `GENERATING_TRIPLES` to `RECOVERABLE_FAILURE`
+- for transitioning event from status `GENERATING_TRIPLES` to `GENERATION_RECOVERABLE_FAILURE`
 
 ```json
 {
-  "status": "RECOVERABLE_FAILURE",
+  "status": "GENERATION_RECOVERABLE_FAILURE",
   "message": "error message"
 }
 ```
@@ -209,16 +211,38 @@ Currently, only status changing payloads are allowed:
 
 **Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
 
-- for transitioning event from status `GENERATING_TRIPLES` to `NON_RECOVERABLE_FAILURE`
+- for transitioning event from status `GENERATING_TRIPLES` to `GENERATION_NON_RECOVERABLE_FAILURE`
 
 ```json
 {
-  "status": "NON_RECOVERABLE_FAILURE",
+  "status": "GENERATION_NON_RECOVERABLE_FAILURE",
   "message": "error message"
 }
 ```
 
 **Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
+
+- for transitioning event from status `TRANSFORMING_TRIPLES` to `TRANFORMATION_RECOVERABLE_FAILURE`
+
+```json
+{
+  "status": "TRANSFORMATION_RECOVERABLE_FAILURE",
+  "message": "error message"
+}
+```
+
+**Notice** `CONFLICT (409)` returned when current event status is different from `TRANSFORMING_TRIPLES`.
+
+- for transitioning event from status `TRANSFORMING_TRIPLES` to `TRANSFORMATION_NON_RECOVERABLE_FAILURE`
+
+```json
+{
+  "status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
+  "message": "error message"
+}
+```
+
+**Notice** `CONFLICT (409)` returned when current event status is different from `TRANSFORMING_TRIPLES`.
 
 **Response**
 
@@ -226,6 +250,7 @@ Currently, only status changing payloads are allowed:
 |----------------------------|-----------------------------------------------------------------------------|
 | OK (200)                   | If status update is successful                                              |
 | BAD_REQUEST (400)          | When invalid payload is given                                               |
+| NOT_FOUND (404)            | When the event does not exists                                              |
 | CONFLICT (409)             | When current status of the event does not allow to become the requested one |
 | INTERNAL SERVER ERROR (500)| When some problems occurs                                                   |
 
@@ -317,7 +342,6 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | execution_date TIMESTAMP    NOT NULL |
 | event_date TIMESTAMP        NOT NULL |
 | event_body TEXT             NOT NULL |
-| message TEXT                NOT NULL |
 | message TEXT                         |
 
 | project                              |
@@ -325,6 +349,13 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | project_id INT4          PK NOT NULL |
 | project_path VARCHAR        NOT NULL |
 | latest_event_date TIMESTAMP NOT NULL |
+
+| event_payload                        |
+|--------------------------------------|
+| event_id   VARCHAR    PK FK NOT NULL |
+| project_id INT4       PK FK NOT NULL |
+| payload    TEXT             NOT NULL |
+| schema_version TEXT   PK    NOT NULL |
 
 ## Trying out
 

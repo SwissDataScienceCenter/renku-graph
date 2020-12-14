@@ -19,7 +19,6 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import java.io.{PrintWriter, StringWriter}
-
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
@@ -55,7 +54,7 @@ private class IOEventStatusUpdater(
   import io.circe.literal._
   import io.circe.syntax._
   import org.http4s.Method.PATCH
-  import org.http4s.Status.{Conflict, Ok}
+  import org.http4s.Status.{Conflict, NotFound, Ok}
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 
@@ -105,6 +104,7 @@ private class IOEventStatusUpdater(
   private lazy val okConflictAsSuccess: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
     case (Ok, _, _)       => IO.unit
     case (Conflict, _, _) => IO.unit
+    case (NotFound, _, _) => IO.unit
   }
 
   private implicit val exceptionEncoder: Encoder[Throwable] = Encoder.instance[Throwable] { exception =>

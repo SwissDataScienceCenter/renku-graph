@@ -18,12 +18,13 @@
 
 package ch.datascience.graph.model
 
-import java.time.Instant
-
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
+import io.circe.Decoder
 import io.renku.jsonld.EntityId
+
+import java.time.Instant
 
 object projects {
 
@@ -103,5 +104,8 @@ object projects {
   }
 
   final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
-  implicit object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank
+  implicit object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank {
+    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    implicit val decoder: Decoder[SchemaVersion] = stringDecoder(SchemaVersion)
+  }
 }

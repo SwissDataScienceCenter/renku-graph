@@ -36,7 +36,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.prometheus.client.Gauge
-import io.renku.eventlog.DbEventLogGenerators.eventMessages
+import io.renku.eventlog.DbEventLogGenerators.{eventMessages, eventPayloads}
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
 import org.http4s.MediaType._
@@ -48,6 +48,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.graph.model.GraphModelGenerators._
 
 class StatusChangeEndpointSpec
     extends AnyWordSpec
@@ -62,9 +63,12 @@ class StatusChangeEndpointSpec
       TriplesStore -> ToTriplesStore[IO](compoundEventIds.generateOne, underTriplesGenerationGauge),
       Skipped      -> ToSkipped[IO](compoundEventIds.generateOne, eventMessages.generateOne, underTriplesGenerationGauge),
       New          -> ToNew[IO](compoundEventIds.generateOne, awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
-      TriplesGenerated -> ToTriplesGenerated[IO](compoundEventIds.generateOne,
-                                                 underTriplesGenerationGauge,
-                                                 awaitingTriplesTransformationGauge
+      TriplesGenerated -> ToTriplesGenerated[IO](
+        compoundEventIds.generateOne,
+        eventPayloads.generateOne,
+        projectSchemaVersions.generateOne,
+        underTriplesGenerationGauge,
+        awaitingTriplesTransformationGauge
       ),
       GenerationRecoverableFailure -> ToGenerationRecoverableFailure[IO](
         compoundEventIds.generateOne,
@@ -204,6 +208,45 @@ class StatusChangeEndpointSpec
       logger.expectNoLogs()
     }
 
+    s"return $BadRequest for $TriplesGenerated status with no payload" in new TestCase {
+
+      val eventId = compoundEventIds.generateOne
+
+      val payload =
+        json"""{"status": ${TriplesGenerated.value}, "schemaVersion": ${projectSchemaVersions.generateOne.value} }"""
+      val request = Request(
+        Method.PATCH,
+        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+      ).withEntity(payload)
+
+      val response = changeStatus(eventId, request).unsafeRunSync()
+
+      response.status                           shouldBe BadRequest
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("TRIPLES_GENERATED status needs a payload")
+
+      logger.expectNoLogs()
+    }
+
+    s"return $BadRequest for $TriplesGenerated status with no schema version" in new TestCase {
+
+      val eventId = compoundEventIds.generateOne
+
+      val payload = json"""{"status": ${TriplesGenerated.value}, "payload": ${eventPayloads.generateOne.value} }"""
+      val request = Request(
+        Method.PATCH,
+        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
+      ).withEntity(payload)
+
+      val response = changeStatus(eventId, request).unsafeRunSync()
+
+      response.status                           shouldBe BadRequest
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("TRIPLES_GENERATED status needs a schemaVersion")
+
+      logger.expectNoLogs()
+    }
+
     s"return $BadRequest for unsupported status" in new TestCase {
 
       val eventId = compoundEventIds.generateOne
@@ -275,7 +318,9 @@ class StatusChangeEndpointSpec
         "message": ${command.message.value}
       }"""
     case command: ToTriplesGenerated[IO]                    => json"""{
-        "status": ${command.status.value}
+        "status": ${command.status.value},
+        "payload": ${command.payload.value},
+        "schemaVersion": ${command.schemaVersion.value}
       }"""
     case command: ToGenerationRecoverableFailure[IO]        => json"""{
         "status": ${command.status.value}
@@ -295,9 +340,11 @@ class StatusChangeEndpointSpec
   private lazy val underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path] = new GaugeStub
   private lazy val awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path] = new GaugeStub
   private lazy val underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path] = new GaugeStub
+
   private class GaugeStub extends LabeledGauge[IO, projects.Path] {
-    override def set(labelValue:       (projects.Path, Double)) = IO.unit
-    override def increment(labelValue: projects.Path)           = IO.unit
+    override def set(labelValue: (projects.Path, Double)) = IO.unit
+
+    override def increment(labelValue: projects.Path) = IO.unit
 
     override def decrement(labelValue: projects.Path) = IO.unit
 
