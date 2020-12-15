@@ -18,7 +18,12 @@
 
 package ch.datascience.rdfstore.entities
 
+import Person.persons
+import ch.datascience.generators.CommonGraphGenerators.cliVersions
+import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
+import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectPaths, projectSchemaVersions}
 import eu.timepit.refined.api.Refined.unsafeApply
 import org.scalacheck.Gen
 
@@ -33,4 +38,21 @@ trait EntitiesGenerators {
 
   implicit val runPlanCommands: Gen[RunPlan.Command] = nonBlankStrings() map (c => RunPlan.Command(c.value))
 
+  implicit val projectEntities: Gen[Project] = for {
+    path         <- projectPaths
+    name         <- projectNames
+    dateCreated  <- projectCreatedDates
+    maybeCreator <- persons.toGeneratorOfOptions
+    version      <- projectSchemaVersions
+  } yield Project(path, name, dateCreated, maybeCreator, maybeParentProject = None, version)
+
+  implicit val agentEntities: Gen[Agent] = cliVersions map Agent.apply
+
+  implicit val activityEntities: Gen[Activity] = for {
+    commitId      <- commitIds
+    committedDate <- committedDates
+    committer     <- persons
+    project       <- projectEntities
+    agent         <- agentEntities
+  } yield Activity(commitId, committedDate, committer, project, agent)
 }

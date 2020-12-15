@@ -43,6 +43,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       given(eventLogTableRenamer).succeeds(returning = ())
       given(eventStatusRenamer).succeeds(returning = ())
       given(eventPayloadTableCreator).succeeds(returning = ())
+      given(eventPayloadSchemaAdder).succeeds(returning = ())
 
       dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
@@ -174,6 +175,25 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
         dbInitializer.run().unsafeRunSync()
       } shouldBe exception
     }
+
+    "fail if creating the event_payload table alteration fails" in new TestCase {
+
+      given(eventLogTableCreator).succeeds(returning = ())
+      given(projectPathAdder).succeeds(returning = ())
+      given(batchDateAdder).succeeds(returning = ())
+      given(viewRemover).succeeds(returning = ())
+      given(projectTableCreator).succeeds(returning = ())
+      given(projectPathRemover).succeeds(returning = ())
+      given(eventLogTableRenamer).succeeds(returning = ())
+      given(eventStatusRenamer).succeeds(returning = ())
+      given(eventPayloadTableCreator).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(eventPayloadSchemaAdder).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        dbInitializer.run().unsafeRunSync()
+      } shouldBe exception
+    }
   }
 
   private trait TestCase {
@@ -186,6 +206,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
     val projectPathRemover       = mock[ProjectPathRemover[IO]]
     val eventLogTableRenamer     = mock[EventLogTableRenamer[IO]]
     val eventStatusRenamer       = mock[EventStatusRenamer[IO]]
+    val eventPayloadSchemaAdder  = mock[EventPayloadSchemaVersionAdder[IO]]
     val logger                   = TestLogger[IO]()
     val dbInitializer = new DbInitializerImpl[IO](
       eventLogTableCreator,
@@ -197,6 +218,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       projectPathRemover,
       eventLogTableRenamer,
       eventStatusRenamer,
+      eventPayloadSchemaAdder,
       logger
     )
   }

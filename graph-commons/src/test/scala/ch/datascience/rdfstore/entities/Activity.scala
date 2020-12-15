@@ -53,6 +53,19 @@ class Activity(val commitId:                 CommitId,
       .find(entity => tag.runtimeClass isAssignableFrom entity.getClass)
       .getOrElse(throw new IllegalStateException(s"No entity of type ${tag.runtimeClass} on Activity for $commitId"))
       .asInstanceOf[T]
+
+  def copy(committer: Person, project: Project): Activity = Activity(commitId,
+                                                                     committedDate,
+                                                                     committer,
+                                                                     project,
+                                                                     agent,
+                                                                     comment,
+                                                                     maybeInformedBy,
+                                                                     maybeInfluenced,
+                                                                     maybeInvalidation,
+                                                                     maybeGenerationFactories
+  )
+  def copy(committer: Person): Activity = copy(committer, project)
 }
 
 object Activity {

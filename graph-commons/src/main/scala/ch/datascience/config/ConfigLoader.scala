@@ -26,6 +26,7 @@ import com.typesafe.config.Config
 import pureconfig._
 import pureconfig.error.{CannotConvert, ConfigReaderFailures}
 
+import scala.jdk.CollectionConverters.ListHasAsScala
 import scala.language.implicitConversions
 
 abstract class ConfigLoader[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
@@ -47,6 +48,21 @@ object ConfigLoader {
     fromEither {
       ConfigSource.fromConfig(config).at(key).load[T]
     }
+
+  def findListOfTuples[Interpretation[_], T, S](
+      key:       String,
+      tuple1Key: String,
+      tuple2Key: String,
+      config:    Config
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[List[Tuple2[T, S]]] =
+    config
+      .getObjectList(key)
+      .asScala
+      .map(config =>
+        config.get(tuple1Key).unwrapped().asInstanceOf[T] -> config.get(tuple2Key).unwrapped().asInstanceOf[S]
+      )
+      .toList
+      .pure[Interpretation]
 
   private def fromEither[Interpretation[_], T](
       loadedConfig: ConfigReaderFailures Either T

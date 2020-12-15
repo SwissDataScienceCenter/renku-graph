@@ -45,6 +45,8 @@ class KGInfoFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheck
         val Some(resourceId) = finder.findCreatorId(gitLabId).unsafeRunSync()
 
         findPerson(resourceId) shouldBe Set(person.name.value)
+
+        clearDataset()
       }
     }
 
