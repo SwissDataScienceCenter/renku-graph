@@ -15,8 +15,8 @@
   "editable": true,
   "gnetId": null,
   "graphTooltip": 0,
-  "id": 1,
-  "iteration": 1607600550932,
+  "id": 37,
+  "iteration": 1607792922601,
   "links": [],
   "panels": [
     {
@@ -51,7 +51,7 @@
         "min": false,
         "rightSide": true,
         "show": true,
-        "sideWidth": 380,
+        "sideWidth": 430,
         "total": false,
         "values": true
       },
@@ -160,7 +160,7 @@
         "min": false,
         "rightSide": true,
         "show": true,
-        "sideWidth": 380,
+        "sideWidth": 430,
         "sort": "current",
         "sortDesc": true,
         "total": false,
@@ -265,7 +265,7 @@
         "min": false,
         "rightSide": true,
         "show": true,
-        "sideWidth": 380,
+        "sideWidth": 430,
         "sort": "current",
         "sortDesc": true,
         "total": false,
@@ -370,7 +370,7 @@
         "min": false,
         "rightSide": true,
         "show": true,
-        "sideWidth": 380,
+        "sideWidth": 430,
         "sort": "current",
         "sortDesc": true,
         "total": false,
@@ -475,7 +475,7 @@
         "min": false,
         "rightSide": true,
         "show": true,
-        "sideWidth": 380,
+        "sideWidth": 430,
         "sort": "current",
         "sortDesc": true,
         "total": false,
@@ -577,7 +577,7 @@
         "min": false,
         "rightSide": true,
         "show": true,
-        "sideWidth": 380,
+        "sideWidth": 430,
         "total": false,
         "values": true
       },
@@ -700,7 +700,7 @@
         "min": false,
         "rightSide": true,
         "show": true,
-        "sideWidth": 380,
+        "sideWidth": 430,
         "total": false,
         "values": true
       },
@@ -1181,7 +1181,7 @@
     }
   ],
   "refresh": "1m",
-  "schemaVersion": 25,
+  "schemaVersion": 21,
   "style": "dark",
   "tags": [
     "renku"
@@ -1191,7 +1191,6 @@
       {
         "allValue": null,
         "current": {
-          "selected": false,
           "text": "renku",
           "value": "renku"
         },
@@ -1217,7 +1216,7 @@
     ]
   },
   "time": {
-    "from": "now-3h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {
@@ -1247,5 +1246,5 @@
   "timezone": "",
   "title": "Renku Event Log",
   "uid": "cb9J1WBZz",
-  "version": 32
+  "version": 3
 }

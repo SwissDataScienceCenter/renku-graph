@@ -18,8 +18,6 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
-import java.lang.Thread.sleep
-
 import cats.data.NonEmptyList
 import cats.effect._
 import cats.syntax.all._
@@ -39,9 +37,10 @@ import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.jdk.CollectionConverters._
+import java.lang.Thread.sleep
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.language.postfixOps
 
 class EventsProcessingRunnerSpec
@@ -76,7 +75,7 @@ class EventsProcessingRunnerSpec
         expectAvailabilityIsCommunicated
 
         // once at least one process is done, new events should be accepted again
-        sleep(eventProcessingTime.toMillis + 150)
+        sleep(eventProcessingTime.toMillis + 250)
         processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
       }
 
@@ -92,7 +91,7 @@ class EventsProcessingRunnerSpec
       expectAvailabilityIsCommunicated
 
       // once at least one process is done, new events should be accepted again
-      sleep(eventProcessingTime.toMillis + 150)
+      sleep(eventProcessingTime.toMillis + 250)
       processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
 
       eventually {
