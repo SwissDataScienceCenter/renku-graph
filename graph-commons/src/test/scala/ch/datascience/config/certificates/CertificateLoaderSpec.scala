@@ -20,16 +20,17 @@ package ch.datascience.config.certificates
 
 import cats.MonadError
 import cats.syntax.all._
+import ch.datascience.generators.CommonGraphGenerators.certificates
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{exceptions, nonBlankStrings}
+import ch.datascience.generators.Generators.exceptions
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import javax.net.ssl.SSLContext
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import javax.net.ssl.SSLContext
 import scala.util.{Failure, Try}
 
 class CertificateLoaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
@@ -138,6 +139,5 @@ class CertificateLoaderSpec extends AnyWordSpec with MockFactory with should.Mat
     )
   }
 
-  private lazy val certificates: Gen[Certificate] = nonBlankStrings().map(v => Certificate(v.value))
-  private lazy val sslContexts:  Gen[SslContext]  = Gen.uuid.map(_ => new SslContext(SSLContext.getInstance("TLS")))
+  private lazy val sslContexts: Gen[SslContext] = Gen.uuid.map(_ => new SslContext(SSLContext.getInstance("TLS")))
 }

@@ -19,7 +19,6 @@
 package ch.datascience.triplesgenerator
 
 import java.util.concurrent.ConcurrentHashMap
-
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.generators.Generators.Implicits._
@@ -27,6 +26,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.testtools.MockedRunnableCollaborators
+import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
 import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioning
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
@@ -49,6 +49,7 @@ class MicroserviceRunnerSpec
       "and subscription, re-provisioning and the http server start up" in new TestCase {
 
         given(certificateLoader).succeeds(returning = ())
+        given(gitCertificateInstaller).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
         given(datasetInitializer).succeeds(returning = ())
         given(subscriber).succeeds(returning = ())
@@ -68,9 +69,21 @@ class MicroserviceRunnerSpec
       } shouldBe exception
     }
 
+    "fail if installing Certificate for Git fails" in new TestCase {
+
+      given(certificateLoader).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(gitCertificateInstaller).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        runner.run().unsafeRunSync()
+      } shouldBe exception
+    }
+
     "fail if Sentry initialization fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
+      given(gitCertificateInstaller).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(sentryInitializer).fails(becauseOf = exception)
 
@@ -82,6 +95,7 @@ class MicroserviceRunnerSpec
     "fail if RDF dataset verification fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
+      given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(datasetInitializer).fails(becauseOf = exception)
@@ -94,6 +108,7 @@ class MicroserviceRunnerSpec
     "fail if starting the Http Server fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
+      given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
       given(subscriber).succeeds(returning = ())
@@ -109,6 +124,7 @@ class MicroserviceRunnerSpec
     "return Success ExitCode even if running Subscriber fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
+      given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
       given(subscriber).fails(becauseOf = exceptions.generateOne)
@@ -121,6 +137,7 @@ class MicroserviceRunnerSpec
     "return Success ExitCode even if starting re-provisioning process fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
+      given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
       given(subscriber).succeeds(returning = ())
@@ -132,14 +149,16 @@ class MicroserviceRunnerSpec
   }
 
   private trait TestCase {
-    val certificateLoader  = mock[CertificateLoader[IO]]
-    val sentryInitializer  = mock[IOSentryInitializer]
-    val datasetInitializer = mock[IOFusekiDatasetInitializer]
-    val subscriber         = mock[Subscriber[IO]]
-    val reProvisioning     = mock[ReProvisioning[IO]]
-    val httpServer         = mock[IOHttpServer]
+    val certificateLoader       = mock[CertificateLoader[IO]]
+    val gitCertificateInstaller = mock[GitCertificateInstaller[IO]]
+    val sentryInitializer       = mock[IOSentryInitializer]
+    val datasetInitializer      = mock[IOFusekiDatasetInitializer]
+    val subscriber              = mock[Subscriber[IO]]
+    val reProvisioning          = mock[ReProvisioning[IO]]
+    val httpServer              = mock[IOHttpServer]
     val runner = new MicroserviceRunner(
       certificateLoader,
+      gitCertificateInstaller,
       sentryInitializer,
       datasetInitializer,
       subscriber,
