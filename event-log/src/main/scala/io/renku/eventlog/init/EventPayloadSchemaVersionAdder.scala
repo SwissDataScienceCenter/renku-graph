@@ -70,8 +70,8 @@ private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]](
   private lazy val alterTableSql = sql"""
     ALTER TABLE event_payload
     ALTER COLUMN payload SET NOT NULL,
-    ADD schema_version text NOT NULL,
-    DROP CONSTRAINT event_payload_pkey,
+    ADD COLUMN IF NOT EXISTS schema_version text NOT NULL,
+    DROP CONSTRAINT IF EXISTS event_payload_pkey,
     ADD PRIMARY KEY (event_id, project_id, schema_version)
     """
 }
