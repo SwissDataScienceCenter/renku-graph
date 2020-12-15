@@ -18,9 +18,10 @@
 
 package ch.datascience.generators
 
+import ch.datascience.config.certificates.Certificate
+
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
-
 import ch.datascience.config.renku
 import ch.datascience.config.sentry.SentryConfig
 import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
@@ -175,6 +176,15 @@ object CommonGraphGenerators {
       .fold(throw _, identity)
 
   implicit val fusekiBaseUrls: Gen[FusekiBaseUrl] = httpUrls() map FusekiBaseUrl.apply
+
+  implicit lazy val certificates: Gen[Certificate] =
+    nonBlankStrings()
+      .toGeneratorOfNonEmptyList(minElements = 2)
+      .map { lines =>
+        Certificate {
+          lines.toList.mkString("-----BEGIN CERTIFICATE-----\n", "\n", "\n-----END CERTIFICATE-----")
+        }
+      }
 
   implicit val jsonLDTriples: Gen[JsonLDTriples] = for {
     subject <- nonEmptyStrings()

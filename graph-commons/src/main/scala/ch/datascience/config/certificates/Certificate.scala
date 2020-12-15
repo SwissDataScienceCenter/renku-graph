@@ -20,12 +20,11 @@ package ch.datascience.config.certificates
 
 import cats.MonadError
 import cats.syntax.all._
-import ch.datascience.logging.ApplicationLogger
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-private final class Certificate private (val value: String) extends AnyVal with StringTinyType
-private object Certificate extends TinyTypeFactory[Certificate](new Certificate(_)) with NonBlank {
+final class Certificate private (val value: String) extends AnyVal with StringTinyType
+object Certificate extends TinyTypeFactory[Certificate](new Certificate(_)) with NonBlank {
 
   import ch.datascience.config.ConfigLoader.find
   import com.typesafe.config.{Config, ConfigFactory}

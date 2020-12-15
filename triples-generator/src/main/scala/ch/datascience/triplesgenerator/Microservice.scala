@@ -20,7 +20,6 @@ package ch.datascience.triplesgenerator
 
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors.newFixedThreadPool
-
 import cats.effect._
 import ch.datascience.config.GitLab
 import ch.datascience.config.certificates.CertificateLoader
@@ -32,6 +31,7 @@ import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.TriplesGeneration
+import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.init._
 import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
@@ -57,6 +57,7 @@ object Microservice extends IOMicroservice {
   override def run(args: List[String]): IO[ExitCode] =
     for {
       certificateLoader        <- CertificateLoader[IO](ApplicationLogger)
+      gitCertificateInstaller  <- GitCertificateInstaller[IO](ApplicationLogger)
       sentryInitializer        <- SentryInitializer[IO]()
       fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
       subscriber               <- Subscriber(ApplicationLogger)
@@ -80,6 +81,7 @@ object Microservice extends IOMicroservice {
       exitCode <- microserviceRoutes.use { routes =>
                     new MicroserviceRunner(
                       certificateLoader,
+                      gitCertificateInstaller,
                       sentryInitializer,
                       fusekiDatasetInitializer,
                       subscriber,
@@ -93,6 +95,7 @@ object Microservice extends IOMicroservice {
 
 private class MicroserviceRunner(
     certificateLoader:        CertificateLoader[IO],
+    gitCertificateInstaller:  GitCertificateInstaller[IO],
     sentryInitializer:        SentryInitializer[IO],
     datasetInitializer:       FusekiDatasetInitializer[IO],
     subscriber:               Subscriber[IO],
@@ -103,6 +106,7 @@ private class MicroserviceRunner(
 
   def run(): IO[ExitCode] = for {
     _        <- certificateLoader.run()
+    _        <- gitCertificateInstaller.run()
     _        <- sentryInitializer.run()
     _        <- datasetInitializer.run()
     _        <- subscriber.run().start.map(gatherCancelToken)

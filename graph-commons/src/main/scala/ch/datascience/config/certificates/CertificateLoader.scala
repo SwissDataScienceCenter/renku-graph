@@ -34,7 +34,7 @@ object CertificateLoader {
   )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[CertificateLoader[Interpretation]] =
     for {
       keystore <- Keystore[Interpretation]()
-    } yield new CertificateLoaderImpl(
+    } yield new CertificateLoaderImpl[Interpretation](
       keystore,
       findCertificate = () => Certificate.fromConfig[Interpretation](),
       createSslContext = (keystore: Keystore[Interpretation]) => SslContext.from(keystore),
