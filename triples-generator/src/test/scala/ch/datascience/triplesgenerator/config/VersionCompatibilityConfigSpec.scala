@@ -20,7 +20,7 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
         Map("compatibility-matrix" -> List.empty[String].asJava).asJava
       )
       val Failure(exception) = VersionCompatibilityConfig[Try](config)
-      exception            shouldBe a[Throwable]
+      exception            shouldBe a[Exception]
       exception.getMessage shouldBe "No compatibility matrix provided for schema version"
     }
 
