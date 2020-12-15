@@ -26,7 +26,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.EntityGenerators.invalidationEntity
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
+import ch.datascience.rdfstore.entities.EntitiesGenerators.projectEntities
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -134,7 +134,7 @@ class IOProjectDatasetsFinderSpec
     }
 
     "not returned deleted dataset" in new TestCase {
-      forAll(projects, addedToProjectObjects) { (project, addedToProject) =>
+      forAll(projectEntities, addedToProjectObjects) { (project, addedToProject) =>
         val datasetProject = project.toDatasetProject
         val dataset1       = nonModifiedDatasets(projects = datasetProject.toGenerator).generateOne
         val datasetToBeInvalidated = nonModifiedDatasets(
@@ -155,7 +155,7 @@ class IOProjectDatasetsFinderSpec
     }
 
     "not returned deleted dataset when its latest version was deleted" in new TestCase {
-      forAll(projects, addedToProjectObjects) { (project, addedToProject) =>
+      forAll(projectEntities, addedToProjectObjects) { (project, addedToProject) =>
         val datasetProject = project.toDatasetProject
         val dataset1       = nonModifiedDatasets(projects = datasetProject.toGenerator).generateOne
         val dataset2 = nonModifiedDatasets(

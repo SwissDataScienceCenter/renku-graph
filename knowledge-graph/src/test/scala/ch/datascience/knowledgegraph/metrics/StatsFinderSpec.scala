@@ -29,7 +29,6 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
 import ch.datascience.rdfstore.entities._
-import ProjectsGenerators._
 import ch.datascience.rdfstore.entities.bundles.{generateProject, gitLabApiUrl, nonModifiedDataSetCommit, renkuBaseUrl}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import eu.timepit.refined.auto._
@@ -98,19 +97,9 @@ class StatsFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckP
       val entitiesByType = Map.empty[EntityType, EntitiesCount]
 
       val activity1Committer = persons.generateOne
-      val activity1 = Activity(commitIds.generateOne,
-                               committedDates.generateOne,
-                               activity1Committer,
-                               projects.generateOne,
-                               Agent(cliVersions.generateOne)
-      )
+      val activity1          = activityEntities.generateOne.copy(committer = activity1Committer)
       val activity2Committer = persons.generateOne.copy(maybeGitLabId = userGitLabIds.generateSome)
-      val activity2 = Activity(commitIds.generateOne,
-                               committedDates.generateOne,
-                               activity2Committer,
-                               projects.generateOne,
-                               Agent(cliVersions.generateOne)
-      )
+      val activity2          = activityEntities.generateOne.copy(committer = activity2Committer)
 
       loadToStore(activity1.asJsonLD, activity2.asJsonLD)
 

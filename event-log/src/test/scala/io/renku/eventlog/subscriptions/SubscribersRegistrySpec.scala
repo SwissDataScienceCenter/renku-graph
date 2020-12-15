@@ -32,7 +32,7 @@ import io.renku.eventlog.subscriptions.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
-import org.scalatest.time.{Millis, Minutes, Span}
+import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -42,7 +42,7 @@ import scala.language.postfixOps
 class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers with Eventually {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
-    timeout = scaled(Span(5, Minutes)),
+    timeout = scaled(Span(30, Seconds)),
     interval = scaled(Span(100, Millis))
   )
 
@@ -123,6 +123,8 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
         .sequence
         .start
         .unsafeRunAsyncAndForget()
+
+      Thread sleep 500
 
       subscribersRegistry.add(subscriberUrl).unsafeRunSync() shouldBe true
 

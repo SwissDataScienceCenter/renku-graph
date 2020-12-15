@@ -81,24 +81,24 @@ private class UnprocessedEventFetcherImpl(
 
   // format: off
   private def findProjectsWithEventsInQueue = SqlQuery({fr"""
-      SELECT 
+      SELECT
         proj.project_id,
         proj.project_path,
         proj.latest_event_date,
-        (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = ${GeneratingTriples: EventStatus}) as current_occupancy 
-      FROM (SELECT project_id, project_path, latest_event_date 
-            FROM project 
-            ORDER BY latest_event_date desc) proj
-      WHERE EXISTS (
-        SELECT project_id
+        (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = ${GeneratingTriples: EventStatus}) as current_occupancy
+      FROM (
+        SELECT DISTINCT
+          proj.project_id,
+          proj.project_path,
+          proj.latest_event_date
         FROM event evt
-        WHERE evt.project_id = proj.project_id
-          AND ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
-            OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
-          )
-      )
-      ORDER BY latest_event_date DESC
-      LIMIT ${projectsFetchingLimit.value}  
+        JOIN project proj on evt.project_id = proj.project_id
+        WHERE ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
+          OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
+        )
+        ORDER BY proj.latest_event_date DESC
+        LIMIT ${projectsFetchingLimit.value}
+      ) proj
       """ 
     }.query[(projects.Id, projects.Path, EventDate, Int)]
     .map { case (projectId, projectPath, eventDate, currentOccupancy) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy)) }
@@ -175,7 +175,7 @@ private class UnprocessedEventFetcherImpl(
 
 private object IOUnprocessedEventFetcher {
 
-  private val MaxProcessingTime:     Duration             = Duration.ofHours(5)
+  private val MaxProcessingTime:     Duration             = Duration.ofHours(24)
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
   def apply(

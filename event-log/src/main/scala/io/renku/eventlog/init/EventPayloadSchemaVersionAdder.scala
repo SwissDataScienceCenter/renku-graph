@@ -27,7 +27,7 @@ private trait EventPayloadSchemaVersionAdder[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private object EventPayloadTableSchemaVersionAdder {
+private object EventPayloadSchemaVersionAdder {
   def apply[Interpretation[_]](
       transactor: DbTransactor[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]

@@ -30,7 +30,7 @@ import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.EntityGenerators.invalidationEntity
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.ProjectsGenerators.projects
+import ch.datascience.rdfstore.entities.EntitiesGenerators.projectEntities
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import io.renku.jsonld.syntax._
@@ -39,7 +39,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCheckPropertyChecks with should.Matchers {
@@ -596,7 +595,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
 
     "not return the details of a dataset" +
       "- case when the dataset has been invalidated" in new TestCase {
-        val project = projects.generateOne
+        val project = projectEntities.generateOne
         val dataset = nonModifiedDatasets().generateOne.copy(
           projects = List(project.toDatasetProject)
         )
@@ -613,7 +612,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
 
     "not return the details of a dataset" +
       "- case when the latest version of the dataset has been invalidated" in new TestCase {
-        val project = projects.generateOne
+        val project = projectEntities.generateOne
         private val datasetProject: DatasetProject = project.toDatasetProject
         val dataset = nonModifiedDatasets().generateOne.copy(
           projects = List(datasetProject)
@@ -638,7 +637,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
     "not return the details of a dataset" +
       "- case when the latest version of the dataset has been invalidated " +
       "and the requested id is anywhere in the hierarchy" in new TestCase {
-        val project = projects.generateOne
+        val project = projectEntities.generateOne
         private val datasetProject: DatasetProject = project.toDatasetProject
         val dataset = nonModifiedDatasets().generateOne.copy(
           projects = List(datasetProject)
