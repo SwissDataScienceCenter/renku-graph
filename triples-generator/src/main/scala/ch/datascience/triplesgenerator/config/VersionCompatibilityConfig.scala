@@ -22,7 +22,7 @@ object VersionCompatibilityConfig {
 
   implicit val reader = ConfigReader[List[String]].map(_.map { s =>
     val (cliVersion, schemaVersion) = s.splitAt(s.indexOf(separator))
-    VersionSchemaPair(CliVersion(cliVersion), SchemaVersion(schemaVersion))
+    VersionSchemaPair(CliVersion(cliVersion.trim), SchemaVersion(schemaVersion.trim))
   })
 
   def apply[Interpretation[_]](
