@@ -198,9 +198,14 @@ object Generators {
     chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'f').map(_.toString)))
   } yield chars.mkString("")
 
-  val timestamps: Gen[Instant] =
+  val timestamps: Gen[Instant] = timestamps()
+
+  def timestamps(
+      min: Instant = Instant.EPOCH,
+      max: Instant = Instant.now().plus(2000, JAVA_DAYS)
+  ): Gen[Instant] =
     Gen
-      .choose(Instant.EPOCH.toEpochMilli, Instant.now().plus(2000, JAVA_DAYS).toEpochMilli)
+      .choose(min.toEpochMilli, max.toEpochMilli)
       .map(Instant.ofEpochMilli)
 
   val timestampsNotInTheFuture: Gen[Instant] =

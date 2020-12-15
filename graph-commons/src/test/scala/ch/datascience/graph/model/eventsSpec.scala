@@ -29,6 +29,7 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import java.time.temporal.ChronoUnit._
 import java.time.{Clock, Instant, ZoneId}
 
 class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
@@ -82,6 +83,26 @@ class CompoundEventIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     "be of format 'id = <eventId>, projectId = <projectId>'" in {
       forAll { commitEventId: CompoundEventId =>
         commitEventId.toString shouldBe s"id = ${commitEventId.id}, projectId = ${commitEventId.projectId}"
+      }
+    }
+  }
+}
+
+class CommittedDateSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+
+  "instantiation" should {
+
+    "succeed if less than a day in the future" in {
+      forAll(timestamps(max = Instant.now().plus(24, HOURS).minus(1, SECONDS))) { value =>
+        CommittedDate.from(value).map(_.value) shouldBe Right(value)
+      }
+    }
+
+    "fail if further than a day in the future" in {
+      forAll(timestamps(min = Instant.now().plus(24, HOURS).plus(1, SECONDS))) { value =>
+        val Left(exception) = CommittedDate.from(value).map(_.value)
+        exception          shouldBe an[IllegalArgumentException]
+        exception.getMessage should startWith(s"${CommittedDate.typeName} has to be <= ")
       }
     }
   }
