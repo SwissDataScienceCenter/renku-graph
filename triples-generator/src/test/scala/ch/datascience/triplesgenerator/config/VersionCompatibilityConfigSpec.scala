@@ -1,18 +1,16 @@
 package ch.datascience.triplesgenerator.config
 
-import ch.datascience.graph.model.CliVersion
-import ch.datascience.graph.model.projects.SchemaVersion
+import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators._
 import com.typesafe.config.ConfigFactory
-import org.apache.commons.lang3.tuple.Pair
+import eu.timepit.refined.auto._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import ch.datascience.generators.Generators.Implicits._
-import eu.timepit.refined.auto._
+
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
 
 class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
