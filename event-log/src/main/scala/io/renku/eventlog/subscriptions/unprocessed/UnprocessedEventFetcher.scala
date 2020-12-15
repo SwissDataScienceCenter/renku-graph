@@ -175,7 +175,7 @@ private class UnprocessedEventFetcherImpl(
 
 private object IOUnprocessedEventFetcher {
 
-  private val MaxProcessingTime:     Duration             = Duration.ofHours(5)
+  private val MaxProcessingTime:     Duration             = Duration.ofHours(24)
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
   def apply(
