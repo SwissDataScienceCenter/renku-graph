@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.rdfstore._
+import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

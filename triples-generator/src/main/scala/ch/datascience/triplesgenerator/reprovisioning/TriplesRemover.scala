@@ -67,7 +67,7 @@ private class IOTriplesRemover(
         |  }
         |}
         |LIMIT 1
-        |""".stripMargin
+        |""".stripMargin // TODO: change CLIVersion to RenkuVersionPair
   )
 
   private val removeTriplesBatch = SparqlQuery(
@@ -87,7 +87,7 @@ private class IOTriplesRemover(
         |  }
         |  LIMIT ${removalBatchSize.value}
         |}
-        |""".stripMargin
+        |""".stripMargin // TODO: change CLIVersion to RenkuVersionPair
   )
 
   private implicit val storeEmptyFlagDecoder: Decoder[Boolean] = {

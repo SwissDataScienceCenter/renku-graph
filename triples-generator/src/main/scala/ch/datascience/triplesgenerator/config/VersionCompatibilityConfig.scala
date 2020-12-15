@@ -6,11 +6,9 @@ import ch.datascience.graph.model.projects.SchemaVersion
 import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigList}
 import pureconfig.ConfigReader
 import cats.syntax.all._
+import ch.datascience.triplesgenerator.models.RenkuVersionPair
 
 final case class VersionCompatibilityConfig(matrix: List[(CliVersion, SchemaVersion)]) extends Product with Serializable
-final case class VersionSchemaPair(cliVersion: CliVersion, schemaVersion: SchemaVersion)
-    extends Product
-    with Serializable
 
 object VersionCompatibilityConfig {
 
@@ -25,15 +23,15 @@ object VersionCompatibilityConfig {
       case List(cliVersion, schemaVersion) => (cliVersion, schemaVersion)
       case _                               => throw new Exception(s"Did not find exactly two elements: ${pair}")
     }
-    VersionSchemaPair(CliVersion(cliVersion.trim), SchemaVersion(schemaVersion.trim))
+    RenkuVersionPair(CliVersion(cliVersion.trim), SchemaVersion(schemaVersion.trim))
   })
 
   def apply[Interpretation[_]](
       config:    Config = ConfigFactory.load
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[List[VersionSchemaPair]] =
-    find[Interpretation, List[VersionSchemaPair]]("compatibility-matrix", config)(reader, ME).flatMap {
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[List[RenkuVersionPair]] =
+    find[Interpretation, List[RenkuVersionPair]]("compatibility-matrix", config)(reader, ME).flatMap {
       case Nil =>
-        ME.raiseError[List[VersionSchemaPair]](new Exception("No compatibility matrix provided for schema version"))
+        ME.raiseError[List[RenkuVersionPair]](new Exception("No compatibility matrix provided for schema version"))
       case list => list.pure[Interpretation]
     }
 }

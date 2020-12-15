@@ -48,7 +48,7 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
       project:            Project,
       commitId:           CommitId,
       committer:          Person,
-      schemaVersion:      CliVersion = currentCliVersion
+      cliVersion:         CliVersion = currentCliVersion
   )(implicit accessToken: AccessToken): Assertion =
     `data in the RDF store`(
       project,
@@ -57,7 +57,7 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
       fileCommit(
         commitId = commitId,
         committer = committer,
-        cliVersion = schemaVersion
+        cliVersion = cliVersion
       )(projectPath = project.path, projectVersion = project.version)
     )
 

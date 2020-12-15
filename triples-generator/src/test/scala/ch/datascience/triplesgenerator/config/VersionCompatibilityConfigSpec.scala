@@ -3,6 +3,7 @@ package ch.datascience.triplesgenerator.config
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.auto._
 import org.scalatest.matchers.should
@@ -32,10 +33,10 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers wi
 
       val expected =
         cliVersionNumbers.toList.zip(schemaVersionNumbers.toList).map { case (cliVersion, schemaVersion) =>
-          VersionSchemaPair(cliVersion, schemaVersion)
+          RenkuVersionPair(cliVersion, schemaVersion)
         }
 
-      val unparsedConfigElements = expected.map { case VersionSchemaPair(cliVersion, schemaVersion) =>
+      val unparsedConfigElements = expected.map { case RenkuVersionPair(cliVersion, schemaVersion) =>
         s"${cliVersion.value} -> ${schemaVersion.value}"
       }.asJava
 
