@@ -176,7 +176,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       } shouldBe exception
     }
 
-    "fail if creating the event_payload table fails" in new TestCase {
+    "fail if creating the event_payload table alteration fails" in new TestCase {
 
       given(eventLogTableCreator).succeeds(returning = ())
       given(projectPathAdder).succeeds(returning = ())

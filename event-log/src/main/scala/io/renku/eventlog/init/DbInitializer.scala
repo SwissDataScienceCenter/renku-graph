@@ -82,7 +82,7 @@ object IODbInitializer {
       ProjectPathRemover(transactor, logger),
       EventLogTableRenamer(transactor, logger),
       EventStatusRenamer(transactor, logger),
-      EventPayloadTableSchemaVersionAdder(transactor, logger),
+      EventPayloadSchemaVersionAdder(transactor, logger),
       logger
     )
   }
