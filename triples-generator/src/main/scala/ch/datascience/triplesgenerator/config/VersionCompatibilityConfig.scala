@@ -20,8 +20,11 @@ object VersionCompatibilityConfig {
 
   private val separator = "->"
 
-  implicit val reader = ConfigReader[List[String]].map(_.map { s =>
-    val (cliVersion, schemaVersion) = s.splitAt(s.indexOf(separator))
+  implicit val reader = ConfigReader[List[String]].map(_.map { pair =>
+    val (cliVersion, schemaVersion): (String, String) = pair.split(separator).toList match {
+      case List(cliVersion, schemaVersion) => (cliVersion, schemaVersion)
+      case _                               => throw new Exception(s"Did not find exactly two elements: ${pair}")
+    }
     VersionSchemaPair(CliVersion(cliVersion.trim), SchemaVersion(schemaVersion.trim))
   })
 
@@ -31,6 +34,6 @@ object VersionCompatibilityConfig {
     find[Interpretation, List[VersionSchemaPair]]("compatibility-matrix", config)(reader, ME).flatMap {
       case Nil =>
         ME.raiseError[List[VersionSchemaPair]](new Exception("No compatibility matrix provided for schema version"))
-      case l => l.pure[Interpretation]
+      case list => list.pure[Interpretation]
     }
 }
