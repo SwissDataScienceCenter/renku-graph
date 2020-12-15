@@ -20,7 +20,7 @@ package io.renku.eventlog
 
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
+import ch.datascience.tinytypes.constraints.{BoundedInstant, InstantNotInTheFuture, NonBlank}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
@@ -77,7 +77,11 @@ object Event {
 final case class EventProject(id: projects.Id, path: projects.Path)
 
 final class EventDate private (val value: Instant) extends AnyVal with InstantTinyType
-object EventDate extends TinyTypeFactory[EventDate](new EventDate(_)) with InstantNotInTheFuture {
+object EventDate extends TinyTypeFactory[EventDate](new EventDate(_)) with BoundedInstant {
+  import java.time.temporal.ChronoUnit.HOURS
+
+  protected[this] override def maybeMax: Option[Instant] = Some(now.plus(24, HOURS))
+
   implicit val decoder: Decoder[EventDate] = instantDecoder(EventDate)
 }
 
