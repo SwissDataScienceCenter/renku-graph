@@ -20,7 +20,6 @@ package io.renku.eventlog.init
 
 import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

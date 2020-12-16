@@ -22,11 +22,33 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
-import io.circe.Json
 import io.renku.eventlog.DbEventLogGenerators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import java.time.Instant
+import java.time.temporal.ChronoUnit.{HOURS, SECONDS}
+
+class EventDateSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+
+  "instantiation" should {
+
+    "succeed if less than a day in the future" in {
+      forAll(timestamps(max = Instant.now().plus(24, HOURS).minus(1, SECONDS))) { value =>
+        EventDate.from(value).map(_.value) shouldBe Right(value)
+      }
+    }
+
+    "fail if further than a day in the future" in {
+      forAll(timestamps(min = Instant.now().plus(24, HOURS).plus(1, SECONDS))) { value =>
+        val Left(exception) = EventDate.from(value).map(_.value)
+        exception          shouldBe an[IllegalArgumentException]
+        exception.getMessage should startWith(s"${EventDate.typeName} has to be <= ")
+      }
+    }
+  }
+}
 
 class CreatedDateSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 

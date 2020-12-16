@@ -715,7 +715,7 @@ object bundles extends Schemas {
             case (allParams, parameter: PositionInfo) => (parameter.position -> asString(parameter)) +: allParams
             case (allParams, _) => allParams
           }
-          .sortBy(_._1.value)
+          .sortBy(_._1)
           .map(_._2)
           .mkString(s"${runPlan.runCommand} ", " ", "")
           .trim

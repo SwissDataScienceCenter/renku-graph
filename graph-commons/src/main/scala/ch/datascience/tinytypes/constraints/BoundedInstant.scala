@@ -16,24 +16,25 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.ordering
+package ch.datascience.tinytypes.constraints
 
-import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.TestTinyTypes.InstantTestType
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import ch.datascience.tinytypes.Constraints
 
-class TinyTypeOrderingsSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+import java.time.Instant
 
-  import TinyTypeOrderings._
+trait BoundedInstant extends Constraints[Instant] {
+  protected[this] def maybeMin: Option[Instant] = None
+  protected[this] def maybeMax: Option[Instant] = None
+  protected[this] def now:      Instant         = Instant.now()
 
-  "compareTo" should {
-
-    "work for InstantTinyTypes" in {
-      forAll(timestamps, timestamps) { (instant1, instant2) =>
-        InstantTestType(instant1) compareTo InstantTestType(instant2) shouldBe (instant1 compareTo instant2)
-      }
+  addConstraint(
+    check = v => maybeMin.forall(min => v.compareTo(min) >= 0) && maybeMax.forall(max => v.compareTo(max) <= 0),
+    message = (_: Instant) => {
+      val messageParts = List(
+        maybeMin.map(v => s">= $v"),
+        maybeMax.map(v => s"<= $v")
+      ).flatten.mkString(" and ")
+      s"$typeName has to be $messageParts"
     }
-  }
+  )
 }
