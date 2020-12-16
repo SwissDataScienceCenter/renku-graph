@@ -41,7 +41,6 @@ import eu.timepit.refined.auto._
 import io.renku.jsonld.{EntityId, JsonLD}
 import org.scalacheck.Gen
 
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 package object rest {
@@ -300,16 +299,12 @@ package object rest {
   }
 
   implicit lazy val partsAlphabeticalOrdering: Ordering[DatasetPart] =
-    (part1: DatasetPart, part2: DatasetPart) => part1.name.value compareTo part2.name.value
+    (part1: DatasetPart, part2: DatasetPart) => part1.name compareTo part2.name
 
   implicit lazy val projectsAlphabeticalOrdering: Ordering[DatasetProject] =
-    (project1: DatasetProject, project2: DatasetProject) => project1.name.value compareTo project2.name.value
+    (project1: DatasetProject, project2: DatasetProject) => project1.name compareTo project2.name
 
-  implicit val dateCreatedInProjectOrdering: Ordering[DateCreatedInProject] =
-    (x: DateCreatedInProject, y: DateCreatedInProject) => x.value compareTo y.value
-
-  lazy val byName: Ordering[Dataset] =
-    (ds1: Dataset, ds2: Dataset) => ds1.name.value compareTo ds2.name.value
+  lazy val byName: Ordering[Dataset] = (ds1: Dataset, ds2: Dataset) => ds1.name compareTo ds2.name
 
   val single: Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects, maxElements = 1)
   val two:    Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)
