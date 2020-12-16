@@ -11,4 +11,5 @@ object VersionGenerators {
     cliVersion    <- cliVersions
     schemaVersion <- projectSchemaVersions
   } yield RenkuVersionPair(cliVersion, schemaVersion)
+
 }

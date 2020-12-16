@@ -1,19 +1,56 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
-import cats.effect.IO
+import cats.MonadError
+import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import cats.syntax.all._
+import ch.datascience.graph.Schemas.rdf
+import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.CliVersion
+import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
+import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import io.chrisdavenport.log4cats.Logger
+import eu.timepit.refined.auto._
+
+import scala.concurrent.ExecutionContext
 
 // See TriplesVersionFinder
 trait RenkuVersionPairFinder[Interpretation[_]] {
 
-  def find(): Interpretation[RenkuVersionPair]
+  def find(): Interpretation[Option[RenkuVersionPair]]
 
 }
 
-private class RenkuVersionPairFinderImpl[Interpretation[_]] extends RenkuVersionPairFinder[Interpretation] {
-  override def find(): Interpretation[RenkuVersionPair] = ???
-}
+private class IORenkuVersionPairFinder(rdfStoreConfig: RdfStoreConfig,
+                                       renkuBaseUrl:   RenkuBaseUrl,
+                                       logger:         Logger[IO],
+                                       timeRecorder:   SparqlQueryTimeRecorder[IO]
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO],
+    ME:               MonadError[IO, Throwable]
+) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    with RenkuVersionPairFinder[IO] {
 
-object IORenkuVersionPairFinder {
-  def apply(): RenkuVersionPairFinder[IO] = new RenkuVersionPairFinderImpl
+  override def find(): IO[Option[RenkuVersionPair]] = queryExpecting[List[RenkuVersionPair]] {
+    val entityId = (renkuBaseUrl / "version-pair").showAs[RdfResource]
+    SparqlQuery.of(
+      name = "version pair find",
+      Prefixes.of(rdf -> "rdf"),
+      s"""|SELECT DISTINCT ?schemaVersion ?cliVersion
+          |WHERE {
+          |  $entityId rdf:type <${RenkuVersionPairJsonLD.objectType}>;
+          |      <${RenkuVersionPairJsonLD.schemaVersion}> ?schemaVersion;
+          |      <${RenkuVersionPairJsonLD.cliVersion}> ?cliVersion.
+          |}
+          |""".stripMargin
+    )
+  }.flatMap {
+    case Nil         => None.pure[IO]
+    case head :: Nil => head.some.pure[IO]
+    case versionPairs =>
+      new IllegalStateException(s"Too many Version pair found: $versionPairs").raiseError[IO, Option[RenkuVersionPair]]
+  }
 }

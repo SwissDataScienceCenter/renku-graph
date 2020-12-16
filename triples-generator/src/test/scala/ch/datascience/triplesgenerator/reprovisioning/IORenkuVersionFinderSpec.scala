@@ -19,59 +19,69 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.CliVersion
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
+import ch.datascience.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
+import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityTypes, JsonLD}
-import org.scalatest.matchers.should
+import org.scalatest._
+import matchers._
 import org.scalatest.wordspec.AnyWordSpec
 
-class IOTriplesVersionFinderSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
+class IORenkuVersionFinderSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
 
   private implicit lazy val renkuBaseUrl: RenkuBaseUrl = renkuBaseUrls.generateOne
 
-  "triplesUpToDate" should {
+  "find" should {
 
-    "return true if CLI Version in the triples store matches the current version of Renku" in new TestCase {
+    "return the Version pair in the triples store" in new TestCase {
 
-      loadToStore(cliVersionOnTG(currentCliVersion))
+      loadToStore(versionPairOnTG(currentVersionPair))
 
-      triplesVersionFinder.triplesUpToDate().unsafeRunSync() shouldBe true
+      versionPairFinder.find().unsafeRunSync() shouldBe currentVersionPair.some
 
-      logger.loggedOnly(Warn(s"cli version find finished${executionTimeRecorder.executionTimeInfo}"))
+      logger.loggedOnly(Warn(s"version pair find finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
-    "return false if CLI Version in the triples store does not match the current version of Renku" in new TestCase {
+    "return None if there are no Version pair in the triple store" in new TestCase {
 
-      loadToStore(cliVersionOnTG(cliVersions.generateOne))
+      versionPairFinder.find().unsafeRunSync() shouldBe None
 
-      triplesVersionFinder.triplesUpToDate().unsafeRunSync() shouldBe false
+      logger.loggedOnly(Warn(s"version pair find finished${executionTimeRecorder.executionTimeInfo}"))
     }
 
-    "return false if CLI Version cannot be found in the triples store" in new TestCase {
-      triplesVersionFinder.triplesUpToDate().unsafeRunSync() shouldBe false
+    "return an IllegalStateException if there are multiple Version Pairs" in new TestCase {
+      val secondVersionPair = renkuVersionPairs.generateOne
+      loadToStore(versionPairOnTG(currentVersionPair))
+      loadToStore(versionPairOnTG(secondVersionPair))
+
+      intercept[IllegalStateException] {
+        versionPairFinder.find().unsafeRunSync()
+      }.getMessage should startWith("Too many Version pair found:")
     }
   }
 
   private trait TestCase {
-    val currentCliVersion     = cliVersions.generateOne
+    val currentVersionPair    = renkuVersionPairs.generateOne
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder(logger)
     private val timeRecorder  = new SparqlQueryTimeRecorder(executionTimeRecorder)
-    val triplesVersionFinder  = new IOTriplesVersionFinder(rdfStoreConfig, currentCliVersion, logger, timeRecorder)
+    val versionPairFinder     = new IORenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
   }
 
-  private def cliVersionOnTG(version: CliVersion) =
+  private def versionPairOnTG(version: RenkuVersionPair) =
     JsonLD.entity(
-      EntityId of renkuBaseUrl / "cli-version",
-      EntityTypes of renku / "CliVersion",
-      renku / "version" -> version.asJsonLD
+      EntityId of renkuBaseUrl / "version-pair",
+      EntityTypes of renku / "VersionPair",
+      renku / "schemaVersion" -> version.schemaVersion.asJsonLD,
+      renku / "cliVersion"    -> version.cliVersion.asJsonLD
     )
 }

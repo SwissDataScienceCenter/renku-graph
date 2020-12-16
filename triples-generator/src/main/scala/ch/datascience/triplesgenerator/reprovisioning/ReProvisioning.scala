@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.MonadError
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, OptionT}
 import cats.effect.Timer
 import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
@@ -42,7 +42,7 @@ trait ReProvisioning[Interpretation[_]] {
 class ReProvisioningImpl[Interpretation[_]](
     renkuVersionPairFinder:    RenkuVersionPairFinder[Interpretation],
     versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
-    reprovisionJudge:          ReprovisionJudge[Interpretation],
+    reprovisionJudge:          ReprovisionJudge,
     triplesRemover:            TriplesRemover[Interpretation],
     eventsReScheduler:         EventsReScheduler[Interpretation],
     renkuVersionPairUpdater:   RenkuVersionPairUpdater[Interpretation],
@@ -58,14 +58,18 @@ class ReProvisioningImpl[Interpretation[_]](
   import triplesRemover._
   import reprovisionJudge.isReprovisioningNeeded
 
-  override def run(): Interpretation[Unit] = for {
-    currentVersionPair <- renkuVersionPairFinder.find()
-    _ <- isReprovisioningNeeded(currentVersionPair, versionCompatibilityPairs)
-           .flatMap {
-             case true  => triggerReProvisioning
-             case false => logger.info("All projects' triples up to date")
-           } recoverWith tryAgain(run())
-  } yield ()
+  override def run(): Interpretation[Unit] = (for {
+    currentVersionPair <- OptionT(renkuVersionPairFinder.find())
+    _ <- OptionT.liftF(
+           isReprovisioningNeeded(currentVersionPair, versionCompatibilityPairs) match {
+             case true => triggerReProvisioning recoverWith tryAgain(run())
+             case false =>
+               renkuVersionPairUpdater
+                 .update(versionCompatibilityPairs.head)
+                 .flatMap(_ => logger.info("All projects' triples up to date"))
+           }
+         )
+  } yield ()).value.void
 
   private def triggerReProvisioning =
     measureExecutionTime {
@@ -125,9 +129,9 @@ object IOReProvisioning {
       executionTimeRecorder     <- ExecutionTimeRecorder[IO](ApplicationLogger)
       triplesRemover            <- IOTriplesRemover(rdfStoreConfig, logger, timeRecorder)
     } yield new ReProvisioningImpl[IO](
-      IORenkuVersionPairFinder(),
+      new IORenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
       versionCompatibilityPairs,
-      IOReprovisionJudge(),
+      new ReprovisionJudgeImpl(),
       triplesRemover,
       eventsReScheduler,
       new IORenkuVersionPairUpdater(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
