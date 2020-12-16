@@ -1,12 +1,13 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import ch.datascience.triplesgenerator.models.RenkuVersionPair
 
 trait ReprovisionJudge[Interpretation[_]] {
 
   def isReprovisioningNeeded(currentVersionPair:        RenkuVersionPair,
-                             versionCompatibilityPairs: List[RenkuVersionPair]
+                             versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
   ): Interpretation[Boolean]
 
 }
@@ -14,7 +15,7 @@ trait ReprovisionJudge[Interpretation[_]] {
 private class ReprovisionJudgeImpl[Interpretation[_]] extends ReprovisionJudge[Interpretation] {
 
   override def isReprovisioningNeeded(currentVersionPair:        RenkuVersionPair,
-                                      versionCompatibilityPairs: List[RenkuVersionPair]
+                                      versionCompatibilityPairs: NonEmptyList[RenkuVersionPair]
   ): Interpretation[Boolean] = ???
 }
 

@@ -47,11 +47,8 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects()
           .returning(IO(currentVersionCompatibilityPair))
 
-        (
-            (versionCompatibilityPairs: scala.List[_root_.ch.datascience.triplesgenerator.models.RenkuVersionPair]) =>
-              reprovisionJudge.isReprovisioningNeeded(currentVersionCompatibilityPair, versionCompatibilityPairs)
-        )
-          .expects(versionCompatibilityPairs)
+        (reprovisionJudge.isReprovisioningNeeded _)
+          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true.pure[IO])
 
         (reProvisioningStatus.setRunning _)
@@ -59,7 +56,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
-          .expects()
+          .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
@@ -137,7 +134,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
-          .expects()
+          .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
@@ -176,7 +173,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
-          .expects()
+          .expects(versionCompatibilityPairs.head)
           .returning(exception.raiseError[IO, Unit])
 
         (reprovisionJudge.isReprovisioningNeeded _)
@@ -188,7 +185,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
-          .expects()
+          .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
@@ -227,7 +224,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
-          .expects()
+          .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
@@ -270,7 +267,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
-          .expects()
+          .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
@@ -317,7 +314,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
-          .expects()
+          .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
@@ -350,7 +347,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
   private implicit val timer: Timer[IO] = IO.timer(global)
 
   private trait TestCase {
-    val versionCompatibilityPairs       = renkuVersionPairs.generateNonEmptyList(2).toList
+    val versionCompatibilityPairs       = renkuVersionPairs.generateNonEmptyList(2)
     val currentVersionCompatibilityPair = renkuVersionPairs.generateOne
     val renkuVersionPairFinder          = mock[RenkuVersionPairFinder[IO]]
     val reprovisionJudge                = mock[ReprovisionJudge[IO]]

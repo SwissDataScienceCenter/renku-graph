@@ -1,6 +1,7 @@
 package ch.datascience.triplesgenerator.config
 
 import cats.MonadError
+import cats.data.NonEmptyList
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.projects.SchemaVersion
 import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigList}
@@ -28,10 +29,12 @@ object VersionCompatibilityConfig {
 
   def apply[Interpretation[_]](
       config:    Config = ConfigFactory.load
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[List[RenkuVersionPair]] =
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[NonEmptyList[RenkuVersionPair]] =
     find[Interpretation, List[RenkuVersionPair]]("compatibility-matrix", config)(reader, ME).flatMap {
       case Nil =>
-        ME.raiseError[List[RenkuVersionPair]](new Exception("No compatibility matrix provided for schema version"))
-      case list => list.pure[Interpretation]
+        ME.raiseError[NonEmptyList[RenkuVersionPair]](
+          new Exception("No compatibility matrix provided for schema version")
+        )
+      case head :: tail => NonEmptyList(head, tail).pure[Interpretation]
     }
 }

@@ -1,49 +1,53 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
-import ch.datascience.rdfstore.InMemoryRdfStore
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.generators.Generators.Implicits._
+import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.CliVersion
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.SchemaVersion
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.generators.VersionGenerators._
-import eu.timepit.refined.auto._
+import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import org.scalatest.matchers.should.Matchers
+import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.Try
-
-class RenkuVersionPairUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with should.Matchers {
-  "updater" should {
+class RenkuVersionPairUpdaterSpec extends AnyWordSpec with InMemoryRdfStore with Matchers {
+  "update" should {
     "create a renku:VersionPair with the given version pair" in new TestCase {
-      ???
+      findPairInDb shouldBe Set.empty
+
+      renkuVersionPairUpdater.update(currentRenkuVersionPair).unsafeRunSync()
+
+      findPairInDb shouldBe Set(currentRenkuVersionPair)
+
+      renkuVersionPairUpdater.update(newVersionCompatibilityPairs).unsafeRunSync()
+
+      findPairInDb shouldBe Set(newVersionCompatibilityPairs)
+
     }
   }
 
   private trait TestCase {
-    val currentRenkuVersionPair = renkuVersionPairs.generateOne
+    val currentRenkuVersionPair      = renkuVersionPairs.generateOne
+    private val renkuBaseUrl         = renkuBaseUrls.generateOne
+    private val logger               = TestLogger[IO]()
+    private val timeRecorder         = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
+    val newVersionCompatibilityPairs = renkuVersionPairs.generateOne
 
-    val versionCompatibilityPairs = renkuVersionPairs.generateNonEmptyList(2).toList
+    val renkuVersionPairUpdater = new IORenkuVersionPairUpdater(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
 
-    def newCreator(versionPair: RenkuVersionPair): RenkuVersionPairUpdater[Try] =
-      new RenkuVersionPairUpdaterImpl[Try](versionCompatibilityPairs)
-
-    private def findPairInDb: Set[RenkuVersionPair] =
-      runQuery(s"""|SELECT DISTINCT ?versionPair
+    def findPairInDb: Set[RenkuVersionPair] =
+      runQuery(s"""|SELECT DISTINCT ?schemaVersion ?cliVersion
                    |WHERE {
                    |   ?id rdf:type renku:VersionPair;
-                   |       renku:versionPair ?versionPair.
+                   |       renku:schemaVersion ?schemaVersion ;
+                   |       renku:cliVersion ?cliVersion.
                    |}
                    |""".stripMargin)
         .unsafeRunSync()
-        .map { row =>
-          row("versionPair").split(":").toList match {
-            case List(cliVersion, schemaVersion) =>
-              RenkuVersionPair(CliVersion(cliVersion), SchemaVersion(schemaVersion))
-            case _ => throw new Exception("")
-          }
-        }
+        .map(row => RenkuVersionPair(CliVersion(row("cliVersion")), SchemaVersion(row("schemaVersion"))))
         .toSet
   }
 }
