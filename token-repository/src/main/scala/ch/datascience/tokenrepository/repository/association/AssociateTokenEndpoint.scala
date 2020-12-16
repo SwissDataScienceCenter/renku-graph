@@ -23,9 +23,10 @@ import cats.effect.Effect
 import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
+import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe._
@@ -75,14 +76,15 @@ object IOAssociateTokenEndpoint {
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor: DbTransactor[IO, ProjectsTokensDB],
-      logger:     Logger[IO]
+      transactor:       DbTransactor[IO, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[AssociateTokenEndpoint[IO]] =
     for {
-      tokenAssociator <- IOTokenAssociator(transactor, logger)
+      tokenAssociator <- IOTokenAssociator(transactor, queriesExecTimes, logger)
     } yield new AssociateTokenEndpoint[IO](tokenAssociator, logger)
 }
