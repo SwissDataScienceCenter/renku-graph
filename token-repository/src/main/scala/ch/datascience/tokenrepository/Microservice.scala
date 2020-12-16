@@ -30,6 +30,7 @@ import ch.datascience.tokenrepository.repository.association.IOAssociateTokenEnd
 import ch.datascience.tokenrepository.repository.deletion.IODeleteTokenEndpoint
 import ch.datascience.tokenrepository.repository.fetching.IOFetchTokenEndpoint
 import ch.datascience.tokenrepository.repository.init.{DbInitializer, IODbInitializer}
+import ch.datascience.tokenrepository.repository.metrics.QueriesExecutionTimes
 import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -48,9 +49,10 @@ object Microservice extends IOMicroservice {
         certificateLoader      <- CertificateLoader[IO](ApplicationLogger)
         sentryInitializer      <- SentryInitializer[IO]()
         fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, ApplicationLogger)
-        associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, ApplicationLogger)
-        dbInitializer          <- IODbInitializer(transactor, ApplicationLogger)
         metricsRegistry        <- MetricsRegistry()
+        queriesExecTimes       <- QueriesExecutionTimes(metricsRegistry)
+        associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, queriesExecTimes, ApplicationLogger)
+        dbInitializer          <- IODbInitializer(transactor, ApplicationLogger)
         deleteTokenEndpoint    <- IODeleteTokenEndpoint(transactor, ApplicationLogger)
         microserviceRoutes = new MicroserviceRoutes[IO](
                                fetchTokenEndpoint,

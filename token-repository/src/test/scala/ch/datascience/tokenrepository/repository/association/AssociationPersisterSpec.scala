@@ -18,10 +18,13 @@
 
 package ch.datascience.tokenrepository.repository.association
 
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.metrics.TestLabeledHistogram
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
+import eu.timepit.refined.auto._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -29,36 +32,57 @@ class AssociationPersisterSpec extends AnyWordSpec with InMemoryProjectsTokensDb
 
   "persistAssociation" should {
 
-    "succeed if token does not exist" in new TestCase {
+    "insert the given token " +
+      "if no token for the given project path" in new TestCase {
 
-      val encryptedToken = encryptedAccessTokens.generateOne
+        val encryptedToken = encryptedAccessTokens.generateOne
 
-      associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ((): Unit)
+        associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ((): Unit)
 
-      findToken(projectId)   shouldBe Some(encryptedToken.value)
-      findToken(projectPath) shouldBe Some(encryptedToken.value)
-    }
+        findToken(projectId)   shouldBe Some(encryptedToken.value)
+        findToken(projectPath) shouldBe Some(encryptedToken.value)
+      }
 
-    "succeed if token exists" in new TestCase {
+    "update the given token " +
+      "if there's a token for the project path and id" in new TestCase {
 
-      val encryptedToken = encryptedAccessTokens.generateOne
+        val encryptedToken = encryptedAccessTokens.generateOne
 
-      associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ((): Unit)
+        associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ((): Unit)
 
-      findToken(projectId) shouldBe Some(encryptedToken.value)
+        findToken(projectId) shouldBe Some(encryptedToken.value)
 
-      val newEncryptedToken = encryptedAccessTokens.generateOne
-      associator.persistAssociation(projectId, projectPath, newEncryptedToken).unsafeRunSync() shouldBe ((): Unit)
+        val newEncryptedToken = encryptedAccessTokens.generateOne
+        associator.persistAssociation(projectId, projectPath, newEncryptedToken).unsafeRunSync() shouldBe ((): Unit)
 
-      findToken(projectId)   shouldBe Some(newEncryptedToken.value)
-      findToken(projectPath) shouldBe Some(newEncryptedToken.value)
-    }
+        findToken(projectId)   shouldBe Some(newEncryptedToken.value)
+        findToken(projectPath) shouldBe Some(newEncryptedToken.value)
+      }
+
+    "update the given token and project id" +
+      "if there's a token for the project path but with different project id" in new TestCase {
+
+        val encryptedToken = encryptedAccessTokens.generateOne
+
+        associator.persistAssociation(projectId, projectPath, encryptedToken).unsafeRunSync() shouldBe ((): Unit)
+
+        findToken(projectId) shouldBe Some(encryptedToken.value)
+
+        val newProjectId      = projectIds.generateOne
+        val newEncryptedToken = encryptedAccessTokens.generateOne
+        associator.persistAssociation(newProjectId, projectPath, newEncryptedToken).unsafeRunSync() shouldBe ((): Unit)
+
+        findToken(projectId)    shouldBe None
+        findToken(newProjectId) shouldBe Some(newEncryptedToken.value)
+        findToken(projectPath)  shouldBe Some(newEncryptedToken.value)
+      }
   }
 
   private trait TestCase {
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val associator = new AssociationPersister(transactor)
+    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val associator       = new AssociationPersister(transactor, queriesExecTimes)
   }
 }

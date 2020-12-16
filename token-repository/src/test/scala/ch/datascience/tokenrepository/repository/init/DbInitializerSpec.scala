@@ -23,12 +23,18 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.testtools.MockedRunnableCollaborators
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDb
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class DbInitializerSpec extends AnyWordSpec with InMemoryProjectsTokensDb with MockFactory with should.Matchers {
+class DbInitializerSpec
+    extends AnyWordSpec
+    with InMemoryProjectsTokensDb
+    with MockFactory
+    with should.Matchers
+    with MockedRunnableCollaborators {
 
   "run" should {
 
@@ -37,9 +43,8 @@ class DbInitializerSpec extends AnyWordSpec with InMemoryProjectsTokensDb with M
 
       tableExists() shouldBe true
 
-      (projectPathAdder.run _)
-        .expects()
-        .returning(IO.unit)
+      given(projectPathAdder).succeeds(returning = ())
+      given(duplicateProjectsRemover).succeeds(returning = ())
 
       dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
@@ -53,9 +58,8 @@ class DbInitializerSpec extends AnyWordSpec with InMemoryProjectsTokensDb with M
 
       tableExists() shouldBe false
 
-      (projectPathAdder.run _)
-        .expects()
-        .returning(IO.unit)
+      given(projectPathAdder).succeeds(returning = ())
+      given(duplicateProjectsRemover).succeeds(returning = ())
 
       dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
@@ -70,9 +74,23 @@ class DbInitializerSpec extends AnyWordSpec with InMemoryProjectsTokensDb with M
       tableExists() shouldBe false
 
       val exception = exceptions.generateOne
-      (projectPathAdder.run _)
-        .expects()
-        .returning(IO raiseError exception)
+      given(projectPathAdder).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
+      } shouldBe exception
+
+      logger.loggedOnly(Error("Projects Tokens database initialization failure", exception))
+    }
+
+    "fail if the Projects de-duplication fails" in new TestCase {
+      if (tableExists()) dropTable()
+
+      tableExists() shouldBe false
+
+      given(projectPathAdder).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(duplicateProjectsRemover).fails(becauseOf = exception)
 
       intercept[Exception] {
         dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
@@ -83,8 +101,9 @@ class DbInitializerSpec extends AnyWordSpec with InMemoryProjectsTokensDb with M
   }
 
   private trait TestCase {
-    val logger           = TestLogger[IO]()
-    val projectPathAdder = mock[IOProjectPathAdder]
-    val dbInitializer    = new DbInitializer[IO](projectPathAdder, transactor, logger)
+    val logger                   = TestLogger[IO]()
+    val projectPathAdder         = mock[IOProjectPathAdder]
+    val duplicateProjectsRemover = mock[DuplicateProjectsRemover[IO]]
+    val dbInitializer            = new DbInitializer[IO](projectPathAdder, duplicateProjectsRemover, transactor, logger)
   }
 }

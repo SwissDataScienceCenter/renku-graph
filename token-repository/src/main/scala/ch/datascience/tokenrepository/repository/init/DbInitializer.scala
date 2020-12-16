@@ -27,10 +27,11 @@ import io.chrisdavenport.log4cats.Logger
 import scala.util.control.NonFatal
 
 class DbInitializer[Interpretation[_]](
-    projectPathAdder: ProjectPathAdder[Interpretation],
-    transactor:       DbTransactor[Interpretation, ProjectsTokensDB],
-    logger:           Logger[Interpretation]
-)(implicit ME:        Bracket[Interpretation, Throwable]) {
+    projectPathAdder:         ProjectPathAdder[Interpretation],
+    duplicateProjectsRemover: DuplicateProjectsRemover[Interpretation],
+    transactor:               DbTransactor[Interpretation, ProjectsTokensDB],
+    logger:                   Logger[Interpretation]
+)(implicit ME:                Bracket[Interpretation, Throwable]) {
 
   import doobie.implicits._
 
@@ -38,16 +39,16 @@ class DbInitializer[Interpretation[_]](
     for {
       _ <- createTable
       _ <- projectPathAdder.run()
+      _ <- duplicateProjectsRemover.run()
       _ <- logger.info("Projects Tokens database initialization success")
     } yield ()
   } recoverWith logging
 
   private def createTable: Interpretation[Unit] =
-    sql"""
-         |CREATE TABLE IF NOT EXISTS projects_tokens(
-         | project_id int4 PRIMARY KEY,
-         | token VARCHAR NOT NULL
-         |);
+    sql"""|CREATE TABLE IF NOT EXISTS projects_tokens(
+          | project_id int4 PRIMARY KEY,
+          | token VARCHAR NOT NULL
+          |);
        """.stripMargin.update.run
       .transact(transactor.get)
       .map(_ => ())
@@ -71,5 +72,6 @@ object IODbInitializer {
   ): IO[DbInitializer[IO]] =
     for {
       pathAdder <- IOProjectPathAdder(transactor, logger)
-    } yield new DbInitializer[IO](pathAdder, transactor, logger)
+      duplicateProjectsRemover = DuplicateProjectsRemover[IO](transactor, logger)
+    } yield new DbInitializer[IO](pathAdder, duplicateProjectsRemover, transactor, logger)
 }
