@@ -20,38 +20,59 @@ package ch.datascience.tokenrepository.repository.association
 
 import cats.Monad
 import cats.effect.{Bracket, ContextShift, IO}
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.{Id, Path}
+import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
+import eu.timepit.refined.auto._
 
 private class AssociationPersister[Interpretation[_]: Monad](
-    transactor: DbTransactor[Interpretation, ProjectsTokensDB]
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+    transactor:       DbTransactor[Interpretation, ProjectsTokensDB],
+    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
+)(implicit ME:        Bracket[Interpretation, Throwable])
+    extends DbClient(Some(queriesExecTimes)) {
 
   import doobie.implicits._
 
   def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Interpretation[Unit] =
-    sql"select token from projects_tokens where project_id = ${projectId.value}"
-      .query[String]
-      .option
-      .flatMap {
-        case Some(_) => update(projectId, projectPath, encryptedToken)
-        case None    => insert(projectId, projectPath, encryptedToken)
-      }
-      .transact(transactor.get)
+    upsert(projectId, projectPath, encryptedToken) transact transactor.get
 
-  private def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) =
-    sql"""insert into 
+  private def upsert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) =
+    checkIfTokenExists(projectPath) flatMap {
+      case true  => update(projectId, projectPath, encryptedToken)
+      case false => insert(projectId, projectPath, encryptedToken)
+    }
+
+  private def checkIfTokenExists(projectPath: Path) = measureExecutionTime {
+    SqlQuery(
+      sql"SELECT token FROM projects_tokens WHERE project_path = ${projectPath.value}"
+        .query[String]
+        .option
+        .map(_.isDefined),
+      name = "associate token - check"
+    )
+  }
+
+  private def update(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) = measureExecutionTime {
+    SqlQuery(
+      sql"""UPDATE projects_tokens 
+          SET token = ${encryptedToken.value}, project_id = ${projectId.value}
+          WHERE project_path = ${projectPath.value}
+      """.update.run.map(failIfMultiUpdate(projectId, projectPath)),
+      name = "associate token - update"
+    )
+  }
+
+  private def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) = measureExecutionTime {
+    SqlQuery(
+      sql"""INSERT INTO 
           projects_tokens (project_id, project_path, token) 
-          values (${projectId.value}, ${projectPath.value}, ${encryptedToken.value})
-      """.update.run.map(failIfMultiUpdate(projectId, projectPath))
-
-  private def update(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) =
-    sql"""update projects_tokens 
-          set token = ${encryptedToken.value}, project_path = ${projectPath.value}  
-          where project_id = ${projectId.value}
-      """.update.run.map(failIfMultiUpdate(projectId, projectPath))
+          VALUES (${projectId.value}, ${projectPath.value}, ${encryptedToken.value})
+      """.update.run.map(failIfMultiUpdate(projectId, projectPath)),
+      name = "associate token - insert"
+    )
+  }
 
   private def failIfMultiUpdate(projectId: Id, projectPath: Path): Int => Unit = {
     case 1 => ()
@@ -60,6 +81,7 @@ private class AssociationPersister[Interpretation[_]: Monad](
 }
 
 private class IOAssociationPersister(
-    transactor:          DbTransactor[IO, ProjectsTokensDB]
+    transactor:          DbTransactor[IO, ProjectsTokensDB],
+    queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
 )(implicit contextShift: ContextShift[IO])
-    extends AssociationPersister[IO](transactor)
+    extends AssociationPersister[IO](transactor, queriesExecTimes)
