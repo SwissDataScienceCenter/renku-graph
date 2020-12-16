@@ -18,8 +18,6 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import java.time.LocalDate
-
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
@@ -52,6 +50,8 @@ import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import java.time.LocalDate
 
 class IODatasetsFinderSpec
     extends AnyWordSpec
@@ -87,7 +87,7 @@ class IODatasetsFinderSpec
               sameAs1DatasetsAndJsons.toDatasetSearchResult(matchIdFrom = result.results),
               sameAs2DatasetsAndJsons.toDatasetSearchResult(matchIdFrom = result.results),
               sameAs3DatasetsAndJsons.toDatasetSearchResult(matchIdFrom = result.results)
-            ).flatten.sortBy(_.title.value)
+            ).flatten.sortBy(_.title)
 
           result.results shouldBe datasetsList
 
@@ -110,7 +110,7 @@ class IODatasetsFinderSpec
 
           result.results shouldBe datasetsAndJsons
             .flatMap(_.toDatasetSearchResult(matchIdFrom = result.results))
-            .sortBy(_.title.value)
+            .sortBy(_.title)
 
           result.pagingInfo.total shouldBe Total(datasetsAndJsons.size)
         }
@@ -152,7 +152,7 @@ class IODatasetsFinderSpec
 
           result.results shouldBe List(List(dataset1), List(datasets2Modification))
             .flatMap(_.toDatasetSearchResult(matchIdFrom = result.results))
-            .sortBy(_.title.value)
+            .sortBy(_.title)
 
           result.pagingInfo.total shouldBe Total(2)
         }
@@ -205,7 +205,7 @@ class IODatasetsFinderSpec
 
           result.results shouldBe modifiedDatasetsList
             .map(_.toDatasetSearchResult(projectsCount = 1))
-            .sortBy(_.title.value)
+            .sortBy(_.title)
 
           result.pagingInfo.total shouldBe Total(modifiedDatasetsList.size)
         }
@@ -253,7 +253,7 @@ class IODatasetsFinderSpec
 
           result.results shouldBe List(List(dataset1Modification), List(nonModifiedDataset))
             .flatMap(_.toDatasetSearchResult(result.results))
-            .sortBy(_.title.value)
+            .sortBy(_.title)
           result.pagingInfo.total shouldBe Total(2)
         }
 
@@ -279,7 +279,7 @@ class IODatasetsFinderSpec
           result.results shouldBe List(
             jsonsAndDatasets.dataset(havingOnly = project2).toDatasetSearchResult(projectsCount = 1),
             datasetModification.toDatasetSearchResult(projectsCount = 1)
-          ).sortBy(_.title.value)
+          ).sortBy(_.title)
 
           result.pagingInfo.total shouldBe Total(2)
         }
@@ -327,7 +327,7 @@ class IODatasetsFinderSpec
           result.results shouldBe List(
             datasetFork.toDatasetSearchResult(projectsCount = 1),
             datasetModification.toDatasetSearchResult(projectsCount = 1)
-          ).sortBy(_.title.value)
+          ).sortBy(_.title)
 
           result.pagingInfo.total shouldBe Total(2)
         }
@@ -360,7 +360,7 @@ class IODatasetsFinderSpec
           val expected = List(
             datasetModification.toDatasetSearchResult(projectsCount = 1),
             datasetModificationOnFork.toDatasetSearchResult(projectsCount = 1)
-          ).sortBy(_.title.value)
+          ).sortBy(_.title)
           actual                    should contain theSameElementsAs expected
           result.pagingInfo.total shouldBe Total(2)
         }
@@ -506,7 +506,7 @@ class IODatasetsFinderSpec
                                      sameAs4DatasetsAndJsons
         )
           .flatMap(_.toDatasetSearchResult(result.results))
-          .sortBy(_.title.value)
+          .sortBy(_.title)
 
         result.pagingInfo.total shouldBe Total(4)
       }
@@ -697,7 +697,7 @@ class IODatasetsFinderSpec
 
           results shouldBe datasetsAndJsons
             .flatMap(_.toDatasetSearchResult(results))
-            .sortBy(_.title.value)
+            .sortBy(_.title)
       }
     }
 
@@ -724,15 +724,6 @@ class IODatasetsFinderSpec
         .flatMap(_.toDatasetSearchResult(results))
         .sortBy(_.published.maybeDate)
         .reverse
-
-      implicit lazy val maybePublishedOrdering: Ordering[Option[PublishedDate]] =
-        (x: Option[PublishedDate], y: Option[PublishedDate]) =>
-          x -> y match {
-            case (Some(left), Some(right)) => left.value.compareTo(right.value)
-            case (Some(_), None)           => 1
-            case (None, Some(_))           => -1
-            case _                         => 0
-          }
     }
 
     s"return datasets with name, description or creator matching the given phrase sorted by $ProjectsCountProperty" in new TestCase {
@@ -756,7 +747,7 @@ class IODatasetsFinderSpec
 
       results shouldBe datasetsAndJsons
         .flatMap(_.toDatasetSearchResult(results))
-        .sortBy(_.projectsCount.value)
+        .sortBy(_.projectsCount)
     }
   }
 
@@ -786,7 +777,7 @@ class IODatasetsFinderSpec
       // so that's why there's only one item
       val expectedResults = datasetsAndJsons
         .flatMap(_.toDatasetSearchResult(result.results))
-        .sortBy(_.title.value)
+        .sortBy(_.title)
       result.results shouldBe expectedResults
 
       result.pagingInfo.pagingRequest shouldBe pagingRequest

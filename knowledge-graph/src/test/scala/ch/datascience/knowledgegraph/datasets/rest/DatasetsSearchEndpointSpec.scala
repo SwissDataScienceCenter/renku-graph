@@ -190,7 +190,7 @@ class DatasetsSearchEndpointSpec
     }
   }
 
-  private implicit val datasetSearchResultItems: Gen[DatasetSearchResult] = for {
+  private implicit lazy val datasetSearchResultItems: Gen[DatasetSearchResult] = for {
     id               <- datasetIdentifiers
     title            <- datasetTitles
     name             <- datasetNames

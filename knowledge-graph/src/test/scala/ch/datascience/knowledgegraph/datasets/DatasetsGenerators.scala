@@ -98,7 +98,7 @@ object DatasetsGenerators {
   } yield DatasetPublishing(maybePublishedDate, creators)
 
   private implicit lazy val datasetCreatorsOrdering: Order[DatasetCreator] =
-    (creator1: DatasetCreator, creator2: DatasetCreator) => creator1.name.value compareTo creator2.name.value
+    (creator1: DatasetCreator, creator2: DatasetCreator) => creator1.name compareTo creator2.name
 
   private implicit lazy val datasetParts: Gen[DatasetPart] = for {
     name     <- datasetPartNames

@@ -103,8 +103,8 @@ class StatsFinderSpec
         .groupBy(_._1)
         .toSeq
         .sortBy { case (_, sameProjectGroup) =>
-          val (_, _, _, maxEventDate) = sameProjectGroup.maxBy { case (_, _, _, eventDate) => eventDate.value }
-          maxEventDate.value
+          val (_, _, _, maxEventDate) = sameProjectGroup.maxBy { case (_, _, _, eventDate) => eventDate }
+          maxEventDate
         }
         .reverse
         .map { case (projectPath, sameProjectGroup) =>

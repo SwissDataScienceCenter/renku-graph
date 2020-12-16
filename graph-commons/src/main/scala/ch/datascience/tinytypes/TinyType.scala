@@ -18,12 +18,12 @@
 
 package ch.datascience.tinytypes
 
-import java.time.{Instant, LocalDate}
-
 import cats.MonadError
 import cats.syntax.all._
 import ch.datascience.tinytypes.constraints.PathSegment
 import io.circe.Json
+
+import java.time.{Instant, LocalDate}
 
 trait TinyType extends Any {
 
@@ -68,6 +68,7 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
     extends From[TT]
     with Constraints[TT#V]
     with ValueTransformation[TT#V]
+    with TinyTypeOrdering[TT]
     with TypeName {
 
   import scala.util.Try
@@ -118,6 +119,18 @@ trait Renderer[View, -T] {
 
 trait From[TT <: TinyType] {
   def from(value: TT#V): Either[IllegalArgumentException, TT]
+}
+
+trait TinyTypeOrdering[TT <: TinyType] {
+  self: TinyTypeFactory[TT] =>
+
+  implicit class TinyTypeOps(tinyType: TT)(implicit val ord: Ordering[TT#V]) {
+    def compareTo(other: TT): Int =
+      ord.compare(tinyType.value, other.value)
+  }
+
+  implicit def ordering(implicit valueOrdering: Ordering[TT#V]): Ordering[TT] =
+    (x: TT, y: TT) => valueOrdering.compare(x.value, y.value)
 }
 
 trait Constraints[V] extends TypeName {

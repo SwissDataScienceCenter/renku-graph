@@ -89,7 +89,7 @@ class ProcessingStatusFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec
       val Some(processingStatus) = processingStatusFinder.fetchStatus(projectId).value.unsafeRunSync()
 
       val latestBatchStatuses =
-        if ((batch1Date.value compareTo batch2Date.value) > 0) batch1Statuses
+        if ((batch1Date compareTo batch2Date) > 0) batch1Statuses
         else batch2Statuses
       processingStatus.total.value shouldBe latestBatchStatuses.size
     }

@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DateCreatedInProject, InitialVersion, Keyword, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{DateCreatedInProject, InitialVersion, TopmostSameAs}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.EntityGenerators.invalidationEntity
@@ -677,12 +677,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
   }
 
   private implicit lazy val partsAlphabeticalOrdering: Ordering[DatasetPart] =
-    (part1: DatasetPart, part2: DatasetPart) => part1.name.value compareTo part2.name.value
+    (part1: DatasetPart, part2: DatasetPart) => part1.name compareTo part2.name
 
   private implicit lazy val projectsAlphabeticalOrdering: Ordering[DatasetProject] =
-    (project1: DatasetProject, project2: DatasetProject) => project1.name.value compareTo project2.name.value
-
-  private implicit lazy val keywordsAlphabeticalOrdering: Ordering[Keyword] =
-    (keyword1: Keyword, keyword2: Keyword) => keyword1.value compareTo keyword2.value
-
+    (project1: DatasetProject, project2: DatasetProject) => project1.name compareTo project2.name
 }

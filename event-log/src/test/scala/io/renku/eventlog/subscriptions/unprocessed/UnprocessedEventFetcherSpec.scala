@@ -143,7 +143,7 @@ private class UnprocessedEventFetcherSpec
         expectWaitingEventsGaugeDecrement(projectPath)
         expectUnderProcessingGaugeIncrement(projectPath)
 
-        val latestEventDate = List(event1Date, event2Date, event3Date).maxBy(_.value)
+        val latestEventDate = List(event1Date, event2Date, event3Date).max
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 0)),
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
