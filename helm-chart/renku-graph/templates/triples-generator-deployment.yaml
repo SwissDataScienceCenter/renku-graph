@@ -85,8 +85,6 @@ spec:
               value: -Xmx{{ .Values.triplesGenerator.jvmXmx }} -XX:+UseG1GC
             - name: RENKU_PYTHON_DEV_VERSION
               value: "{{ .Values.triplesGenerator.renkuPythonDevVersion }}"
-            - name: VERSION_COMPATIBILITY_MATRIX
-              value: {{- range .Values.triplesGenerator.compatibilityMatrix }} {{.}}{{- end }}
           ports:
             - name: http-triples-gn
               containerPort: 9002
