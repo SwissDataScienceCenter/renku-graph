@@ -21,9 +21,10 @@ package ch.datascience.tokenrepository.repository.association
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
+import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 import io.chrisdavenport.log4cats.Logger
@@ -56,8 +57,9 @@ private class TokenAssociator[Interpretiation[_]](
 
 private object IOTokenAssociator {
   def apply(
-      transactor: DbTransactor[IO, ProjectsTokensDB],
-      logger:     Logger[IO]
+      transactor:       DbTransactor[IO, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
@@ -66,7 +68,7 @@ private object IOTokenAssociator {
     for {
       pathFinder        <- IOProjectPathFinder(logger)
       accessTokenCrypto <- AccessTokenCrypto[IO]()
-      persister    = new IOAssociationPersister(transactor)
+      persister    = new IOAssociationPersister(transactor, queriesExecTimes)
       tokenRemover = new TokenRemover[IO](transactor)
     } yield new TokenAssociator[IO](pathFinder, accessTokenCrypto, persister, tokenRemover)
 }

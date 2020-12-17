@@ -20,15 +20,15 @@ package io.renku.eventlog.init
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.{EventBody, EventId, EventStatus}
+import ch.datascience.graph.model.events.EventId
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
+import eu.timepit.refined.auto._
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.DbEventLogGenerators._
-import eu.timepit.refined.auto._
-import io.renku.eventlog.{CompoundId, Event, EventLogDataFetching, EventLogDataProvisioning, InMemoryEventLogDb}
+import io.renku.eventlog._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

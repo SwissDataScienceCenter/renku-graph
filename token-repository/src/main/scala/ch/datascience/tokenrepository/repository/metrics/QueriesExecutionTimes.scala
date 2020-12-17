@@ -16,15 +16,20 @@
  * limitations under the License.
  */
 
-package ch.datascience.tokenrepository.repository.init
+package ch.datascience.tokenrepository.repository.metrics
 
 import cats.effect.IO
-import ch.datascience.db.DbTransactor
-import ch.datascience.tokenrepository.repository.ProjectsTokensDB
-import io.chrisdavenport.log4cats.Logger
+import ch.datascience.db.SqlQuery
+import ch.datascience.metrics.{Histogram, LabeledHistogram, MetricsRegistry}
+import eu.timepit.refined.auto._
 
-abstract class IODbInitializer(projectPathAdder:         ProjectPathAdder[IO],
-                               duplicateProjectsRemover: DuplicateProjectsRemover[IO],
-                               transactor:               DbTransactor[IO, ProjectsTokensDB],
-                               logger:                   Logger[IO]
-) extends DbInitializer(projectPathAdder, duplicateProjectsRemover, transactor, logger)
+object QueriesExecutionTimes {
+
+  def apply(metricsRegistry: MetricsRegistry[IO]): IO[LabeledHistogram[IO, SqlQuery.Name]] =
+    Histogram[IO, SqlQuery.Name](
+      name = "token_repository_queries_execution_times",
+      help = "Token Repository queries execution times",
+      labelName = "query_id",
+      buckets = Seq(.005, .01, .025, .05, .075, .1, .25, .5, .75, 1, 2.5, 5, 7.5, 10, 25, 50)
+    )(metricsRegistry)
+}
