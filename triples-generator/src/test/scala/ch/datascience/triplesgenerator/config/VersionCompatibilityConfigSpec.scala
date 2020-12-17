@@ -1,5 +1,6 @@
 package ch.datascience.triplesgenerator.config
 
+import cats.data.NonEmptyList
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -13,7 +14,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 
-class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
+class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
   "apply" should {
 
@@ -45,7 +46,7 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers wi
       )
 
       val Success(result) = VersionCompatibilityConfig[Try](config)
-      result shouldBe expected
+      result shouldBe NonEmptyList.fromListUnsafe(expected)
     }
 
     "fail if pair is malformed" in {

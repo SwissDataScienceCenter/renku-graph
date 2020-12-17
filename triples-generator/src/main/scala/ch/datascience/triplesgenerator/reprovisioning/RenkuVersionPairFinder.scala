@@ -2,20 +2,18 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import cats.syntax.all._
 import ch.datascience.graph.Schemas.rdf
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
-import io.chrisdavenport.log4cats.Logger
+import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import eu.timepit.refined.auto._
+import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-// See TriplesVersionFinder
 trait RenkuVersionPairFinder[Interpretation[_]] {
 
   def find(): Interpretation[Option[RenkuVersionPair]]

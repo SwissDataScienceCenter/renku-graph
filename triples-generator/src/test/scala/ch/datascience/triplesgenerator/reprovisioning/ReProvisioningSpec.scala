@@ -27,6 +27,7 @@ import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.triplesgenerator.generators.VersionGenerators._
 import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -34,13 +35,12 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import eu.timepit.refined.auto._
 
 class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
 
-    "clear the RDF Store and reschedule for processing all Commit Events in the Log if store is outdated" in new TestCase {
+    "clear the RDF Store and reschedule all Commit Events for processing in the Log if store is outdated" in new TestCase {
 
       inSequence {
         (renkuVersionPairFinder.find _)
@@ -81,16 +81,23 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
     }
 
     "do nothing if there all RDF store is up to date" in new TestCase {
+      (renkuVersionPairFinder.find _)
+        .expects()
+        .returning(IO(currentVersionCompatibilityPair.some))
+
       (reprovisionJudge.isReprovisioningNeeded _)
         .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
         .returning(false)
+
+      (renkuVersionPairUpdater.update _)
+        .expects(versionCompatibilityPairs.head)
+        .returning(IO.unit)
 
       reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("All projects' triples up to date"))
     }
 
-    // TODO: Decide if we need a test in case the judge fails
     "do not fail but simply retry if checking if finding version pair in RDF store fails" in new TestCase {
       val exception = exceptions.generateOne
 
@@ -103,6 +110,14 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         (renkuVersionPairFinder.find _)
           .expects()
           .returning(currentVersionCompatibilityPair.some.pure[IO])
+
+        (reprovisionJudge.isReprovisioningNeeded _)
+          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .returning(false)
+
+        (renkuVersionPairUpdater.update _)
+          .expects(versionCompatibilityPairs.head)
+          .returning(IO.unit)
       }
 
       reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
@@ -113,10 +128,14 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       )
     }
 
-    "do not fail but simply retry if setting the re-provisioning flag fails" in new TestCase {
+    "do not fail but simply retry if setRunning method fails" in new TestCase {
       val exception = exceptions.generateOne
 
       inSequence {
+        (renkuVersionPairFinder.find _)
+          .expects()
+          .returning(currentVersionCompatibilityPair.some.pure[IO])
+
         (reprovisionJudge.isReprovisioningNeeded _)
           .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
@@ -124,10 +143,6 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         (reProvisioningStatus.setRunning _)
           .expects()
           .returning(exception.raiseError[IO, Unit])
-
-        (reprovisionJudge.isReprovisioningNeeded _)
-          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
-          .returning(true)
 
         (reProvisioningStatus.setRunning _)
           .expects()
@@ -155,7 +170,6 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       logger.loggedOnly(
         Info("The triples are not up to date - re-provisioning is clearing DB"),
         Error("Re-provisioning failure", exception),
-        Info("The triples are not up to date - re-provisioning is clearing DB"),
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
@@ -164,6 +178,11 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       val exception = exceptions.generateOne
 
       inSequence {
+
+        (renkuVersionPairFinder.find _)
+          .expects()
+          .returning(currentVersionCompatibilityPair.some.pure[IO])
+
         (reprovisionJudge.isReprovisioningNeeded _)
           .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
@@ -175,14 +194,6 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         (renkuVersionPairUpdater.update _)
           .expects(versionCompatibilityPairs.head)
           .returning(exception.raiseError[IO, Unit])
-
-        (reprovisionJudge.isReprovisioningNeeded _)
-          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
-          .returning(true)
-
-        (reProvisioningStatus.setRunning _)
-          .expects()
-          .returning(IO.unit)
 
         (renkuVersionPairUpdater.update _)
           .expects(versionCompatibilityPairs.head)
@@ -206,7 +217,6 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       logger.loggedOnly(
         Info("The triples are not up to date - re-provisioning is clearing DB"),
         Error("Re-provisioning failure", exception),
-        Info("The triples are not up to date - re-provisioning is clearing DB"),
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
@@ -215,6 +225,11 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       val exception = exceptions.generateOne
 
       inSequence {
+
+        (renkuVersionPairFinder.find _)
+          .expects()
+          .returning(currentVersionCompatibilityPair.some.pure[IO])
+
         (reprovisionJudge.isReprovisioningNeeded _)
           .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
@@ -258,6 +273,11 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       val exception2 = exceptions.generateOne
 
       inSequence {
+
+        (renkuVersionPairFinder.find _)
+          .expects()
+          .returning(currentVersionCompatibilityPair.some.pure[IO])
+
         (reprovisionJudge.isReprovisioningNeeded _)
           .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
@@ -305,6 +325,11 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       val exception = exceptions.generateOne
 
       inSequence {
+
+        (renkuVersionPairFinder.find _)
+          .expects()
+          .returning(currentVersionCompatibilityPair.some.pure[IO])
+
         (reprovisionJudge.isReprovisioningNeeded _)
           .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
           .returning(true)
@@ -342,6 +367,7 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
+
   }
 
   private implicit val timer: Timer[IO] = IO.timer(global)

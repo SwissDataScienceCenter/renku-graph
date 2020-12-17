@@ -43,8 +43,6 @@ triplesGenerator:
   threadsNumber: 6
   # set this to a pip-installable renku-python version which will be installed on startup
   renkuPythonDevVersion:
-  compatibilityMatrix:
-    - '0.13.1 -> 14'
 
 webhookService:
   image:

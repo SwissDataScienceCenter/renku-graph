@@ -1,17 +1,12 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.data.NonEmptyList
-import ch.datascience.graph.model.CliVersion
-import ch.datascience.graph.model.projects.SchemaVersion
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.triplesgenerator.generators.VersionGenerators._
+import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.triplesgenerator.generators.VersionGenerators._
-import eu.timepit.refined.auto._
-
-import scala.util.Try
 
 class ReprovisionJudgeSpec extends AnyWordSpec with should.Matchers with MockFactory {
 

@@ -26,7 +26,7 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.config.{TriplesGeneration, VersionCompatibilityConfig}
+import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import com.typesafe.config.{Config, ConfigFactory}
 import io.chrisdavenport.log4cats.Logger
@@ -55,28 +55,34 @@ class ReProvisioningImpl[Interpretation[_]](
 
   import eventsReScheduler._
   import executionTimeRecorder._
-  import triplesRemover._
   import reprovisionJudge.isReprovisioningNeeded
+  import triplesRemover._
 
-  override def run(): Interpretation[Unit] = (for {
-    currentVersionPair <- OptionT(renkuVersionPairFinder.find())
-    _ <- OptionT.liftF(
-           isReprovisioningNeeded(currentVersionPair, versionCompatibilityPairs) match {
-             case true => triggerReProvisioning recoverWith tryAgain(run())
-             case false =>
-               renkuVersionPairUpdater
-                 .update(versionCompatibilityPairs.head)
-                 .flatMap(_ => logger.info("All projects' triples up to date"))
-           }
-         )
-  } yield ()).value.void
+  override def run(): Interpretation[Unit] =
+    (for {
+      currentVersionPair <- OptionT(renkuVersionPairFinder.find() recoverWith tryAgain(renkuVersionPairFinder.find()))
+      _ <- OptionT.liftF(
+             decideIfReprovisioningRequired(currentVersionPair)
+           )
+    } yield ()).value.void
+
+  private def decideIfReprovisioningRequired(currentVersionPair: RenkuVersionPair) =
+    isReprovisioningNeeded(currentVersionPair, versionCompatibilityPairs) match {
+      case true => triggerReProvisioning recoverWith tryAgain(triggerReProvisioning)
+      case false =>
+        renkuVersionPairUpdater
+          .update(versionCompatibilityPairs.head)
+          .flatMap(_ => logger.info("All projects' triples up to date"))
+    }
 
   private def triggerReProvisioning =
     measureExecutionTime {
       for {
         _ <- logger.info("The triples are not up to date - re-provisioning is clearing DB")
-        _ <- reProvisioningStatus.setRunning()
-        _ <- renkuVersionPairUpdater.update(versionCompatibilityPairs.head)
+        _ <- reProvisioningStatus.setRunning() recoverWith tryAgain(reProvisioningStatus.setRunning())
+        _ <- renkuVersionPairUpdater.update(versionCompatibilityPairs.head) recoverWith tryAgain(
+               renkuVersionPairUpdater.update(versionCompatibilityPairs.head)
+             )
         _ <- removeAllTriples() recoverWith tryAgain(removeAllTriples())
         _ <- triggerEventsReScheduling() recoverWith tryAgain(triggerEventsReScheduling())
         _ <- reProvisioningStatus.clear() recoverWith tryAgain(reProvisioningStatus.clear())
@@ -87,14 +93,14 @@ class ReProvisioningImpl[Interpretation[_]](
     logger.info(s"Clearing DB finished in ${elapsedTime}ms - re-processing all the events")
   }
 
-  private def tryAgain(step: => Interpretation[Unit]): PartialFunction[Throwable, Interpretation[Unit]] = {
+  private def tryAgain[T](step: => Interpretation[T]): PartialFunction[Throwable, Interpretation[T]] = {
     case NonFatal(exception) =>
       {
         for {
-          _ <- logger.error(exception)("Re-provisioning failure")
-          _ <- timer sleep sleepWhenBusy
-          _ <- step
-        } yield ()
+          _      <- logger.error(exception)("Re-provisioning failure")
+          _      <- timer sleep sleepWhenBusy
+          result <- step
+        } yield result
       } recoverWith tryAgain(step)
   }
 }
@@ -110,11 +116,12 @@ object IOReProvisioning {
   private val SleepWhenBusy = 10 minutes
 
   def apply(
-      triplesGeneration:    TriplesGeneration,
-      reProvisioningStatus: ReProvisioningStatus[IO],
-      timeRecorder:         SparqlQueryTimeRecorder[IO],
-      logger:               Logger[IO],
-      configuration:        Config = ConfigFactory.load()
+      triplesGeneration:         TriplesGeneration,
+      reProvisioningStatus:      ReProvisioningStatus[IO],
+      versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
+      timeRecorder:              SparqlQueryTimeRecorder[IO],
+      logger:                    Logger[IO],
+      configuration:             Config = ConfigFactory.load()
   )(implicit
       ME:               MonadError[IO, Throwable],
       executionContext: ExecutionContext,
@@ -122,12 +129,11 @@ object IOReProvisioning {
       timer:            Timer[IO]
   ): IO[ReProvisioning[IO]] =
     for {
-      rdfStoreConfig            <- RdfStoreConfig[IO](configuration)
-      eventsReScheduler         <- IOEventsReScheduler(logger)
-      versionCompatibilityPairs <- VersionCompatibilityConfig[IO]()
-      renkuBaseUrl              <- RenkuBaseUrl[IO]()
-      executionTimeRecorder     <- ExecutionTimeRecorder[IO](ApplicationLogger)
-      triplesRemover            <- IOTriplesRemover(rdfStoreConfig, logger, timeRecorder)
+      rdfStoreConfig        <- RdfStoreConfig[IO](configuration)
+      eventsReScheduler     <- IOEventsReScheduler(logger)
+      renkuBaseUrl          <- RenkuBaseUrl[IO]()
+      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+      triplesRemover        <- IOTriplesRemover(rdfStoreConfig, logger, timeRecorder)
     } yield new ReProvisioningImpl[IO](
       new IORenkuVersionPairFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
       versionCompatibilityPairs,

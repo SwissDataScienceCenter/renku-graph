@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.reprovisioning
+package ch.datascience.triplesgenerator.init
 
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._

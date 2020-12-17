@@ -21,9 +21,10 @@ private class ReprovisionJudgeImpl extends ReprovisionJudge {
   ): Boolean =
     `is current schema version different from latest`(currentVersionPair.schemaVersion,
                                                       versionCompatibilityPairs.head.schemaVersion
-    ) || `are latest schema version same but cli versions different`(versionCompatibilityPairs.toList,
-                                                                     currentVersionPair.cliVersion
-    )
+    ) ||
+      `are latest schema version same but cli versions different`(versionCompatibilityPairs.toList,
+                                                                  currentVersionPair.cliVersion
+      )
 
   private def `is current schema version different from latest`(current: SchemaVersion, latest: SchemaVersion) =
     current != latest

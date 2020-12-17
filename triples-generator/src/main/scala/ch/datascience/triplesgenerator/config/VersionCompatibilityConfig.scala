@@ -4,18 +4,14 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.projects.SchemaVersion
-import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigList}
-import pureconfig.ConfigReader
-import cats.syntax.all._
 import ch.datascience.triplesgenerator.models.RenkuVersionPair
-
-final case class VersionCompatibilityConfig(matrix: List[(CliVersion, SchemaVersion)]) extends Product with Serializable
+import com.typesafe.config.{Config, ConfigFactory}
+import pureconfig.ConfigReader
 
 object VersionCompatibilityConfig {
 
   import cats.syntax.all._
   import ch.datascience.config.ConfigLoader._
-  import pureconfig.generic.auto._
 
   private val separator = "->"
 

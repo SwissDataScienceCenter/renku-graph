@@ -18,22 +18,24 @@
 
 package ch.datascience.triplesgenerator
 
-import java.util.concurrent.ConcurrentHashMap
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
-import ch.datascience.interpreters.IOSentryInitializer
+import ch.datascience.interpreters.TestLogger.Level.Warn
+import ch.datascience.interpreters.{IOSentryInitializer, TestLogger}
 import ch.datascience.testtools.MockedRunnableCollaborators
+import ch.datascience.triplesgenerator.config.RenkuPythonDevVersion
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
-import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
+import ch.datascience.triplesgenerator.init.{CliVersionCompatibilityVerifier, IOFusekiDatasetInitializer}
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioning
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext
 
 class MicroserviceRunnerSpec
@@ -51,6 +53,7 @@ class MicroserviceRunnerSpec
         given(certificateLoader).succeeds(returning = ())
         given(gitCertificateInstaller).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
+        given(cliVersionCompatChecker).succeeds(returning = ())
         given(datasetInitializer).succeeds(returning = ())
         given(subscriber).succeeds(returning = ())
         given(reProvisioning).succeeds(returning = ())
@@ -92,11 +95,24 @@ class MicroserviceRunnerSpec
       } shouldBe exception
     }
 
+    "fail if cli version compatibility fails" in new TestCase {
+      given(certificateLoader).succeeds(returning = ())
+      given(gitCertificateInstaller).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(cliVersionCompatChecker) fails (becauseOf = exception)
+
+      intercept[Exception] {
+        runner.run().unsafeRunSync()
+      } shouldBe exception
+    }
+
     "fail if RDF dataset verification fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
+      given(cliVersionCompatChecker).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(datasetInitializer).fails(becauseOf = exception)
 
@@ -110,6 +126,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
+      given(cliVersionCompatChecker).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
       given(subscriber).succeeds(returning = ())
       given(reProvisioning).succeeds(returning = ())
@@ -126,6 +143,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
+      given(cliVersionCompatChecker).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
       given(subscriber).fails(becauseOf = exceptions.generateOne)
       given(reProvisioning).succeeds(returning = ())
@@ -139,6 +157,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
+      given(cliVersionCompatChecker).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
       given(subscriber).succeeds(returning = ())
       given(reProvisioning).fails(becauseOf = exceptions.generateOne)
@@ -146,25 +165,61 @@ class MicroserviceRunnerSpec
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
+
+    "return Success Exit code but not run VersionCompatibilityChecker or run reprovisioning when renkuPythonDevVersion defined" in new TestCase {
+
+      val runnerWithRenkuPythonDevVersion = new MicroserviceRunner(
+        certificateLoader,
+        gitCertificateInstaller,
+        sentryInitializer,
+        maybeRenkuPythonDevVersion = Some(RenkuPythonDevVersion(nonEmptyStrings().generateOne)),
+        cliVersionCompatChecker,
+        datasetInitializer,
+        subscriber,
+        reProvisioning,
+        httpServer,
+        new ConcurrentHashMap[CancelToken[IO], Unit](),
+        logger
+      )
+
+      given(certificateLoader).succeeds(returning = ())
+      given(gitCertificateInstaller).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      given(datasetInitializer).succeeds(returning = ())
+      given(subscriber).succeeds(returning = ())
+      given(httpServer).succeeds(returning = ExitCode.Success)
+
+      runnerWithRenkuPythonDevVersion.run().unsafeRunSync() shouldBe ExitCode.Success
+
+      logger.loggedOnly(
+        Warn(s"RENKU_PYTHON_DEV_VERSION env variable is set. No reprovisioning will take place")
+      )
+    }
   }
 
   private trait TestCase {
     val certificateLoader       = mock[CertificateLoader[IO]]
     val gitCertificateInstaller = mock[GitCertificateInstaller[IO]]
     val sentryInitializer       = mock[IOSentryInitializer]
+    val cliVersionCompatChecker = mock[CliVersionCompatibilityVerifier[IO]]
     val datasetInitializer      = mock[IOFusekiDatasetInitializer]
     val subscriber              = mock[Subscriber[IO]]
     val reProvisioning          = mock[ReProvisioning[IO]]
     val httpServer              = mock[IOHttpServer]
+    val logger                  = TestLogger[IO]()
+
     val runner = new MicroserviceRunner(
       certificateLoader,
       gitCertificateInstaller,
       sentryInitializer,
+      maybeRenkuPythonDevVersion = None,
+      cliVersionCompatChecker,
       datasetInitializer,
       subscriber,
       reProvisioning,
       httpServer,
-      new ConcurrentHashMap[CancelToken[IO], Unit]()
+      new ConcurrentHashMap[CancelToken[IO], Unit](),
+      logger
     )
   }
 
