@@ -23,7 +23,7 @@ import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
-import ch.datascience.interpreters.TestLogger.Level.Warn
+import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.interpreters.{IOSentryInitializer, TestLogger}
 import ch.datascience.testtools.MockedRunnableCollaborators
 import ch.datascience.triplesgenerator.config.RenkuPythonDevVersion
@@ -70,6 +70,10 @@ class MicroserviceRunnerSpec
       intercept[Exception] {
         runner.run().unsafeRunSync()
       } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
     }
 
     "fail if installing Certificate for Git fails" in new TestCase {
@@ -81,6 +85,10 @@ class MicroserviceRunnerSpec
       intercept[Exception] {
         runner.run().unsafeRunSync()
       } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
     }
 
     "fail if Sentry initialization fails" in new TestCase {
@@ -93,6 +101,10 @@ class MicroserviceRunnerSpec
       intercept[Exception] {
         runner.run().unsafeRunSync()
       } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
     }
 
     "fail if cli version compatibility fails" in new TestCase {
@@ -105,6 +117,10 @@ class MicroserviceRunnerSpec
       intercept[Exception] {
         runner.run().unsafeRunSync()
       } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
     }
 
     "fail if RDF dataset verification fails" in new TestCase {
@@ -119,6 +135,10 @@ class MicroserviceRunnerSpec
       intercept[Exception] {
         runner.run().unsafeRunSync()
       } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
     }
 
     "fail if starting the Http Server fails" in new TestCase {
@@ -136,6 +156,10 @@ class MicroserviceRunnerSpec
       intercept[Exception] {
         runner.run().unsafeRunSync()
       } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
     }
 
     "return Success ExitCode even if running Subscriber fails" in new TestCase {

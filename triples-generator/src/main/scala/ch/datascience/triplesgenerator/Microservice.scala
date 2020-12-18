@@ -18,9 +18,8 @@
 
 package ch.datascience.triplesgenerator
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors.newFixedThreadPool
 import cats.effect._
+import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
@@ -30,8 +29,8 @@ import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.config.{RenkuPythonDevVersion, RenkuPythonDevVersionConfig, TriplesGeneration, VersionCompatibilityConfig}
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
+import ch.datascience.triplesgenerator.config.{RenkuPythonDevVersion, RenkuPythonDevVersionConfig, TriplesGeneration, VersionCompatibilityConfig}
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.init._
 import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
@@ -39,11 +38,13 @@ import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import pureconfig._
-import cats.syntax.all._
 import io.chrisdavenport.log4cats.Logger
+import pureconfig._
 
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors.newFixedThreadPool
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
 object Microservice extends IOMicroservice {
 
@@ -56,6 +57,10 @@ object Microservice extends IOMicroservice {
 
   protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
 
+  private lazy val errorToNone: PartialFunction[Throwable, IO[Option[RenkuPythonDevVersion]]] = { case NonFatal(_) =>
+    None.pure[IO]
+  }
+
   override def run(args: List[String]): IO[ExitCode] =
     for {
       certificateLoader          <- CertificateLoader[IO](ApplicationLogger)
@@ -64,11 +69,11 @@ object Microservice extends IOMicroservice {
       subscriber                 <- Subscriber(ApplicationLogger)
       triplesGeneration          <- TriplesGeneration[IO]()
       sentryInitializer          <- SentryInitializer[IO]()
-      maybeRenkuPythonDevVersion <- RenkuPythonDevVersionConfig[IO]()
+      maybeRenkuPythonDevVersion <- RenkuPythonDevVersionConfig[IO]() recoverWith errorToNone
       cliVersion                 <- CliVersionLoader[IO](triplesGeneration)
+      metricsRegistry            <- MetricsRegistry()
       renkuVersionPairs          <- VersionCompatibilityConfig[IO]()
       cliVersionCompatChecker    <- IOCliVersionCompatibilityChecker(cliVersion, renkuVersionPairs)
-      metricsRegistry            <- MetricsRegistry()
       gitLabRateLimit            <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler            <- Throttler[IO, GitLab](gitLabRateLimit)
       sparqlTimeRecorder         <- SparqlQueryTimeRecorder(metricsRegistry)
@@ -122,7 +127,7 @@ private class MicroserviceRunner(
     logger:                          Logger[IO]
 )(implicit contextShift:             ContextShift[IO]) {
 
-  def run(): IO[ExitCode] = for {
+  def run(): IO[ExitCode] = (for {
     _                   <- certificateLoader.run()
     _                   <- gitCertificateInstaller.run()
     _                   <- sentryInitializer.run()
@@ -132,11 +137,15 @@ private class MicroserviceRunner(
     _                   <- subscriber.run().start.map(gatherCancelToken)
     _                   <- if (!isDevVersionDefined) reProvisioning.run().start.map(gatherCancelToken) else ().pure[IO]
     exitCode            <- httpServer.run()
-  } yield exitCode
+  } yield exitCode) recoverWith logAndThrow(logger)
 
   private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
     subProcessesCancelTokens.put(fiber.cancel, ())
     fiber
+  }
+
+  private def logAndThrow(logger: Logger[IO]): PartialFunction[Throwable, IO[ExitCode]] = { case NonFatal(exception) =>
+    logger.error(exception)(exception.getMessage).flatMap(_ => exception.raiseError[IO, ExitCode])
   }
 
   private def isRenkuPythonDevVersionDefined(logger:                Logger[IO],
@@ -145,6 +154,5 @@ private class MicroserviceRunner(
     case Some(_) =>
       logger.warn("RENKU_PYTHON_DEV_VERSION env variable is set. No reprovisioning will take place").map(_ => true)
     case None => false.pure[IO]
-
   }
 }
