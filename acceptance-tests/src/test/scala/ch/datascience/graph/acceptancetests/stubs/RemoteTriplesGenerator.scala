@@ -33,7 +33,7 @@ object RemoteTriplesGenerator {
       project:    Project,
       commitId:   CommitId,
       committer:  Person,
-      cliVersion: CliVersion = currentCliVersion
+      cliVersion: CliVersion = currentVersionPair.cliVersion
   ): Unit =
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(
       project,

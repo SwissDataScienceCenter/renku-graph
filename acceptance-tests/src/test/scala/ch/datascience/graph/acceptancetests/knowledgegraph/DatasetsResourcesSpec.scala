@@ -107,7 +107,7 @@ class DatasetsResourcesSpec
           commitId = dataset1CommitId,
           committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer = dataset1Committer,
-          cliVersion = currentCliVersion
+          cliVersion = currentVersionPair.cliVersion
         )(
           projectPath = project.path,
           projectName = project.name,
@@ -128,7 +128,7 @@ class DatasetsResourcesSpec
           commitId = dataset2CommitId,
           committedDate = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer = Person(dataset2Creation.agent.name, dataset2Creation.agent.maybeEmail),
-          cliVersion = currentCliVersion
+          cliVersion = currentVersionPair.cliVersion
         )(
           projectPath = project.path,
           projectName = project.name,
@@ -150,7 +150,7 @@ class DatasetsResourcesSpec
           committer = Person(modifiedDataset2.projects.head.created.agent.name,
                              modifiedDataset2.projects.head.created.agent.maybeEmail
           ),
-          cliVersion = currentCliVersion
+          cliVersion = currentVersionPair.cliVersion
         )(
           projectPath = project.path,
           projectName = project.name,
@@ -409,7 +409,7 @@ class DatasetsResourcesSpec
         commitId = commitId,
         committer = committer,
         committedDate = committedDate,
-        cliVersion = currentCliVersion
+        cliVersion = currentVersionPair.cliVersion
       )(
         projectPath = project.path,
         projectName = project.name,

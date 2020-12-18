@@ -18,8 +18,8 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
-import ch.datascience.graph.acceptancetests.data.currentCliVersion
-import ch.datascience.graph.model.CliVersion
+import ch.datascience.graph.acceptancetests.data.currentVersionPair
+import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import com.github.tomakehurst.wiremock.client.WireMock
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig
@@ -35,7 +35,7 @@ object RdfStoreStub {
   def start(): Unit = {
     fusekiStub.start()
     WireMock.configureFor(fusekiStub.port())
-    givenTriplesUpToDateCheckReturning(currentCliVersion)
+    givenTriplesUpToDateCheckReturning(currentVersionPair)
   }
 
   def shutdown(): Unit = {
@@ -59,13 +59,14 @@ object RdfStoreStub {
     ()
   }
 
-  private def givenTriplesUpToDateCheckReturning(version: CliVersion): Unit = {
+  private def givenTriplesUpToDateCheckReturning(version: RenkuVersionPair): Unit = {
     stubFor {
       post("/renku/sparql")
         .willReturn(okJson(json"""{
           "results": {
             "bindings": [{
-              "version": { "value": ${version.toString} }
+              "cliVersion": { "value": ${version.cliVersion.toString} },
+              "schemaVersion": { "value": ${version.schemaVersion.toString} }
             }]
           }
         }""".noSpaces))

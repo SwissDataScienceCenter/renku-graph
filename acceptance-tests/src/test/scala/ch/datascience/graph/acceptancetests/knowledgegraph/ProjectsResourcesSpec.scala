@@ -130,7 +130,7 @@ class ProjectsResourcesSpec
         nonModifiedDataSetCommit(
           commitId = dataset1CommitId,
           committer = dataset1Committer,
-          cliVersion = currentCliVersion
+          cliVersion = currentVersionPair.cliVersion
         )(
           projectPath = project.path,
           projectName = project.name,
