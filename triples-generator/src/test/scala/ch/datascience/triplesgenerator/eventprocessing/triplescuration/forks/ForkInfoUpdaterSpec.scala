@@ -48,8 +48,8 @@ class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Match
 
       val updateGroup = curationUpdatesGroups[IO].generateOne
       (updatesCreator
-        .create(_: CommitEvent)(_: Option[AccessToken]))
-        .expects(event, maybeAccessToken)
+        .create(_: CommitEvent, _: CuratedTriples[IO])(_: Option[AccessToken]))
+        .expects(event, givenCuratedTriples, maybeAccessToken)
         .returning(updateGroup)
 
       forkInfoUpdater

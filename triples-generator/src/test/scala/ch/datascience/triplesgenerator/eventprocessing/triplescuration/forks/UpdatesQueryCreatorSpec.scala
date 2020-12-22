@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
+import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, userEmails, userNames}
 import ch.datascience.graph.model.projects.{DateCreated, ResourceId}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.views.RdfResource
@@ -176,31 +176,95 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
   "addNewCreator" should {
 
-    "create a new Person and link it to the given Project replacing the old creator on the project" in new TestCase {
-      val creator1 = persons.generateOne
-      val creator2 = persons.generateOne
-      val project1 = entitiesProjects(creator1.some).generateOne
-      val project2 = entitiesProjects(creator2.some).generateOne
+    "create a new Person and link it to the given Project replacing the old creator on the project" +
+      "using the current creator email if the name of the current creator name is the same as the gitlab user name" in new TestCase {
+        val currentCreatorEmail = userEmails.generateSome
+        val currentCreatorName  = userNames.generateOne
+        val creator1            = persons.generateOne
+        val creator2            = persons.generateOne
+        val project1            = entitiesProjects(creator1.some).generateOne
+        val project2            = entitiesProjects(creator2.some).generateOne
 
-      loadToStore(project1.asJsonLD, project2.asJsonLD)
+        loadToStore(project1.asJsonLD, project2.asJsonLD)
 
-      findCreators should contain theSameElementsAs Set(
-        (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None),
-        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
-      )
+        findCreators should contain theSameElementsAs Set(
+          (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None),
+          (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
+        )
 
-      val newCreator = gitLabCreator().generateOne
+        val newCreator = gitLabCreator().generateOne.copy(name = currentCreatorName)
 
-      updatesQueryCreator
-        .addNewCreator(project1.path, newCreator)
-        .runAll
-        .unsafeRunSync()
+        updatesQueryCreator
+          .addNewCreator(project1.path, newCreator, currentCreatorName.some, currentCreatorEmail)
+          .runAll
+          .unsafeRunSync()
 
-      findCreators should contain theSameElementsAs Set(
-        (project1.resourceId.value, newCreator.name.value, None, newCreator.gitLabId.value.some),
-        (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
-      )
-    }
+        private val creators: Set[(String, String, Option[String], Option[Int])] = findCreators
+        creators should contain theSameElementsAs Set(
+          (project1.resourceId.value,
+           newCreator.name.value,
+           currentCreatorEmail.map(_.value),
+           newCreator.gitLabId.value.some
+          ),
+          (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
+        )
+      }
+
+    "create a new Person and link it to the given Project replacing the old creator on the project" +
+      "using the gitlab creator details if the name of the current creator name is different from the gitlab user name" in new TestCase {
+        val currentCreatorName  = userNames.generateOne
+        val creator1            = persons.generateOne
+        val creator2            = persons.generateOne
+        val project1            = entitiesProjects(creator1.some).generateOne
+        val project2            = entitiesProjects(creator2.some).generateOne
+        val currentCreatorEmail = userEmails.generateOption
+
+        loadToStore(project1.asJsonLD, project2.asJsonLD)
+
+        findCreators should contain theSameElementsAs Set(
+          (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None),
+          (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
+        )
+
+        val newCreator = gitLabCreator().generateOne.copy(name = users.Name(currentCreatorName.value.reverse))
+
+        updatesQueryCreator
+          .addNewCreator(project1.path, newCreator, currentCreatorName.some, currentCreatorEmail)
+          .runAll
+          .unsafeRunSync()
+
+        findCreators should contain theSameElementsAs Set(
+          (project1.resourceId.value, newCreator.name.value, None, newCreator.gitLabId.value.some),
+          (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
+        )
+      }
+
+    "create a new Person and link it to the given Project replacing the old creator on the project" +
+      "using the gitlab creator details if the current creator does not have an email" in new TestCase {
+        val creator1 = persons.generateOne.copy(maybeEmail = None)
+        val creator2 = persons.generateOne
+        val project1 = entitiesProjects(creator1.some).generateOne
+        val project2 = entitiesProjects(creator2.some).generateOne
+
+        loadToStore(project1.asJsonLD, project2.asJsonLD)
+
+        findCreators should contain theSameElementsAs Set(
+          (project1.resourceId.value, creator1.name.value, creator1.maybeEmail.map(_.value), None),
+          (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
+        )
+
+        val newCreator = gitLabCreator().generateOne
+
+        updatesQueryCreator
+          .addNewCreator(project1.path, newCreator, userNames.generateOption, None)
+          .runAll
+          .unsafeRunSync()
+
+        findCreators should contain theSameElementsAs Set(
+          (project1.resourceId.value, newCreator.name.value, None, newCreator.gitLabId.value.some),
+          (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
+        )
+      }
   }
 
   "recreateDateCreated" should {

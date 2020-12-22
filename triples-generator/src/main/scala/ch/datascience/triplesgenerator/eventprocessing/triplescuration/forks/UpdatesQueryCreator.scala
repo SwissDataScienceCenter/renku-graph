@@ -22,6 +22,7 @@ import ch.datascience.graph.Schemas._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.projects.{DateCreated, Path, ResourceId}
 import ch.datascience.graph.model.users
+import ch.datascience.graph.model.users.{Email, Name}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
@@ -91,12 +92,20 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
     )
   }
 
-  def addNewCreator(projectPath: Path, creator: GitLabCreator): List[SparqlQuery] = {
+  def addNewCreator(projectPath:             Path,
+                    creator:                 GitLabCreator,
+                    maybeCurrentCreatorName: Option[Name],
+                    maybeEmail:              Option[Email]
+  ): List[SparqlQuery] = {
     val creatorResourceId = users.ResourceId(
       (renkuBaseUrl / "persons" / s"gitlabid${creator.gitLabId}").toString
     )
-    insertCreator(creatorResourceId, creator) ++
-      swapCreator(projectPath, creatorResourceId)
+    val insertionQuery = maybeEmail match {
+      case Some(email) if maybeCurrentCreatorName.contains(creator.name) =>
+        insertCreatorWithEmail(creatorResourceId, creator, email)
+      case _ => insertCreator(creatorResourceId, creator)
+    }
+    insertionQuery ++ swapCreator(projectPath, creatorResourceId)
   }
 
   private def insertCreator(personId: users.ResourceId, creator: GitLabCreator): List[SparqlQuery] = {
@@ -111,6 +120,31 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
               |  $creatorResource rdf:type <http://schema.org/Person>;
               |                   schema:name '${sparqlEncode(creator.name.value)}';
               |                   schema:sameAs $sameAsId.
+              |  $sameAsId rdf:type schema:URL;
+              |            schema:identifier ${creator.gitLabId};
+              |            schema:additionalType 'GitLab'.
+              |}
+              |""".stripMargin
+        )
+    )
+  }
+
+  private def insertCreatorWithEmail(personId: users.ResourceId,
+                                     creator:  GitLabCreator,
+                                     email:    Email
+  ): List[SparqlQuery] = {
+    val creatorResource = personId.showAs[RdfResource]
+    val sameAsId        = (gitLabApiUrl / "users" / creator.gitLabId).showAs[RdfResource]
+    List(
+      SparqlQuery
+        .of(
+          name = "upload - creator update",
+          Prefixes.of(rdf -> "rdf", schema -> "schema"),
+          s"""|INSERT DATA { 
+              |  $creatorResource rdf:type <http://schema.org/Person>;
+              |                   schema:name '${sparqlEncode(creator.name.value)}';
+              |                   schema:sameAs $sameAsId;
+              |                   schema:email '${email.value}'.
               |  $sameAsId rdf:type schema:URL;
               |            schema:identifier ${creator.gitLabId};
               |            schema:additionalType 'GitLab'.

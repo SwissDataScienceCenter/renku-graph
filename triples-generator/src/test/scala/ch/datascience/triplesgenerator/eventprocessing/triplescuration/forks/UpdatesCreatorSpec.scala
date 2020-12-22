@@ -26,10 +26,12 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.{DateCreated, Path}
 import ch.datascience.graph.model.users
+import ch.datascience.graph.model.users.{Email, Name}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError._
-import ch.datascience.rdfstore.SparqlQuery
+import ch.datascience.rdfstore.{JsonLDTriples, SparqlQuery}
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
 import eu.timepit.refined.auto._
 import org.scalamock.handlers.CallHandler
@@ -50,7 +52,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
         gitLabProjects(projectPath = event.project.path, maybeParentPaths = emptyOptionOf[Path]).generateOne
       ).doesNotExistsInGitLab
 
-      updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
+      updatesCreator.create(event, curatedTriples).generateUpdates().value.unsafeRunSync() shouldBe Right(
         List.empty[SparqlQuery]
       )
     }
@@ -87,7 +89,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects(gitLabProject.path, gitLabProject.dateCreated)
           .returningUpdates
 
-        updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
+        updatesCreator.create(event, curatedTriples).generateUpdates().value.unsafeRunSync() shouldBe Right(
           List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
         )
       }
@@ -114,11 +116,11 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .returningUpdates
 
         val creatorUpdates = (updatesQueryCreator
-          .addNewCreator(_: Path, _: GitLabCreator))
-          .expects(gitLabProject.path, creator)
+          .addNewCreator(_: Path, _: GitLabCreator, _: Option[Name], _: Option[Email]))
+          .expects(gitLabProject.path, creator, None, None)
           .returningUpdates
 
-        updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
+        updatesCreator.create(event, curatedTriples).generateUpdates().value.unsafeRunSync() shouldBe Right(
           List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
         )
       }
@@ -145,7 +147,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects(gitLabProject.path)
           .returningUpdates
 
-        updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
+        updatesCreator.create(event, curatedTriples).generateUpdates().value.unsafeRunSync() shouldBe Right(
           List(wasDerivedFromUpdates, unlinkCreatorUpdates, recreateDateCreated).flatten
         )
       }
@@ -163,7 +165,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(exception.raiseError[IO, Option[GitLabProject]])
 
         intercept[Exception] {
-          updatesCreator.create(event).generateUpdates().value.unsafeRunSync()
+          updatesCreator.create(event, curatedTriples).generateUpdates().value.unsafeRunSync()
         } shouldBe exception
       }
 
@@ -182,7 +184,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .returning(exception.raiseError[IO, Option[users.ResourceId]])
 
         intercept[Exception] {
-          updatesCreator.create(event).generateUpdates().value.unsafeRunSync()
+          updatesCreator.create(event, curatedTriples).generateUpdates().value.unsafeRunSync()
         } shouldBe exception
       }
     }
@@ -198,7 +200,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects(event.project.path, maybeAccessToken)
           .returning(exception.raiseError[IO, Option[GitLabProject]])
 
-        updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Left {
+        updatesCreator.create(event, curatedTriples).generateUpdates().value.unsafeRunSync() shouldBe Left {
           CurationRecoverableError("Problem with finding fork info", exception)
         }
       }
@@ -217,7 +219,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects(gitLabId)
           .returning(exception.raiseError[IO, Option[users.ResourceId]])
 
-        updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Left {
+        updatesCreator.create(event, curatedTriples).generateUpdates().value.unsafeRunSync() shouldBe Left {
           CurationRecoverableError("Problem with finding fork info", exception)
         }
       }
@@ -234,6 +236,8 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
     val kgInfoFinder        = mock[KGInfoFinder[IO]]
     val updatesQueryCreator = mock[UpdatesQueryCreator]
     val updatesCreator      = new UpdatesCreatorImpl(gitLabInfoFinder, kgInfoFinder, updatesQueryCreator)
+
+    val curatedTriples = CuratedTriples[IO](JsonLDTriples(jsons.generateNonEmptyList(2).toList), Nil)
 
     def given(gitLabProject: GitLabProject) = new {
       lazy val existsInGitLab: GitLabProject = {

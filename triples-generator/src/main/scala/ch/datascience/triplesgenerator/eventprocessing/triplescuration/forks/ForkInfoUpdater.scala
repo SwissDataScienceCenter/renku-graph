@@ -49,7 +49,9 @@ class ForkInfoUpdaterImpl(
     payloadTransformer
       .transform(commit, curatedTriples.triples)
       .map { transformedTriples =>
-        CuratedTriples(transformedTriples, curatedTriples.updatesGroups :+ updateFunctionsCreator.create(commit))
+        CuratedTriples(transformedTriples,
+                       curatedTriples.updatesGroups :+ updateFunctionsCreator.create(commit, curatedTriples)
+        )
       }
 }
 

@@ -20,11 +20,12 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration
 package forks
 
 import cats.MonadError
-import cats.data.{EitherT, OptionT}
+import cats.data.EitherT
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.users
+import ch.datascience.graph.model.users.{Email, Name}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.{SparqlQuery, SparqlQueryTimeRecorder}
@@ -38,7 +39,7 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 private trait UpdatesCreator[Interpretation[_]] {
-  def create(commit:    CommitEvent)(implicit
+  def create(commit:    CommitEvent, curatedTriples: CuratedTriples[Interpretation])(implicit
       maybeAccessToken: Option[AccessToken]
   ): CurationUpdatesGroup[Interpretation]
 }
@@ -53,7 +54,8 @@ private class UpdatesCreatorImpl(
   import updatesQueryCreator._
 
   override def create(
-      commit:                  CommitEvent
+      commit:                  CommitEvent,
+      curatedTriples:          CuratedTriples[IO]
   )(implicit maybeAccessToken: Option[AccessToken]): CurationUpdatesGroup[IO] =
     CurationUpdatesGroup[IO](
       "Fork info updates",
@@ -61,17 +63,38 @@ private class UpdatesCreatorImpl(
         EitherT {
           gitLab
             .findProject(commit.project.path)
-            .flatMap(forkInfoUpdates)
+            .flatMap(forkInfoUpdates(curatedTriples))
             .map(_.asRight[ProcessingRecoverableError])
             .recover(maybeToRecoverableError)
         }
     )
 
-  private lazy val forkInfoUpdates: Option[GitLabProject] => IO[List[SparqlQuery]] = {
+  private def forkInfoUpdates(curatedTriples: CuratedTriples[IO]): Option[GitLabProject] => IO[List[SparqlQuery]] = {
     case `when project has a creator`(creator, gitLabProject) =>
-      OptionT(kg.findCreatorId(creator.gitLabId))
-        .map(existingUserResource => updateProjectAndSwapCreator(gitLabProject, existingUserResource))
-        .getOrElse(updateProjectAndAddCreator(gitLabProject, creator))
+      val currentCreatorId =
+        curatedTriples.triples.value.hcursor.downField("http://schema.org/creator").get[String]("@id")
+
+      val currentCreator = curatedTriples.triples.value.hcursor
+        .find(json =>
+          json.hcursor.downField("@id").as[String] == currentCreatorId && json.hcursor
+            .downField("@type")
+            .as[List[String]]
+            .contains("http://schema.org/Person")
+        )
+
+      val maybeEmail = currentCreator.get[List[String]]("http://schema.org/email").toOption.flatMap {
+        case Nil    => None
+        case x :: _ => Some(Email(x))
+      }
+      val maybeName = currentCreator.get[List[String]]("http://schema.org/name").toOption.flatMap {
+        case Nil    => None
+        case x :: _ => Some(Name(x))
+      }
+
+      kg.findCreatorId(creator.gitLabId).map {
+        case Some(existingUserResource) => updateProjectAndSwapCreator(gitLabProject, existingUserResource)
+        case None                       => updateProjectAndAddCreator(gitLabProject, creator, maybeName, maybeEmail)
+      }
     case `when project has no creator`(gitLabProject) =>
       updateProjectAndUnlinkCreator(gitLabProject).pure[IO]
     case _ =>
@@ -97,9 +120,13 @@ private class UpdatesCreatorImpl(
       swapCreator(gitLabProject.path, existingUserResource) ++
       recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
 
-  private def updateProjectAndAddCreator(gitLabProject: GitLabProject, creator: GitLabCreator) =
+  private def updateProjectAndAddCreator(gitLabProject:           GitLabProject,
+                                         creator:                 GitLabCreator,
+                                         maybeCurrentCreatorName: Option[Name],
+                                         maybeEmail:              Option[Email]
+  ) =
     updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
-      addNewCreator(gitLabProject.path, creator) ++
+      addNewCreator(gitLabProject.path, creator, maybeCurrentCreatorName, maybeEmail) ++
       recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
 
   private def updateProjectAndUnlinkCreator(gitLabProject: GitLabProject) =
