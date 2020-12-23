@@ -23,6 +23,7 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
+import ch.datascience.graph.Schemas.schema
 import ch.datascience.graph.config.{GitLabUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.{Email, Name}
@@ -71,26 +72,7 @@ private class UpdatesCreatorImpl(
 
   private def forkInfoUpdates(curatedTriples: CuratedTriples[IO]): Option[GitLabProject] => IO[List[SparqlQuery]] = {
     case `when project has a creator`(creator, gitLabProject) =>
-      val currentCreatorId =
-        curatedTriples.triples.value.hcursor.downField("http://schema.org/creator").get[String]("@id")
-
-      val currentCreator = curatedTriples.triples.value.hcursor
-        .find(json =>
-          json.hcursor.downField("@id").as[String] == currentCreatorId && json.hcursor
-            .downField("@type")
-            .as[List[String]]
-            .contains("http://schema.org/Person")
-        )
-
-      val maybeEmail = currentCreator.get[List[String]]("http://schema.org/email").toOption.flatMap {
-        case Nil    => None
-        case x :: _ => Some(Email(x))
-      }
-      val maybeName = currentCreator.get[List[String]]("http://schema.org/name").toOption.flatMap {
-        case Nil    => None
-        case x :: _ => Some(Name(x))
-      }
-
+      val (maybeName, maybeEmail) = CreatorInfoExtratorImpl.extract(curatedTriples.triples)
       kg.findCreatorId(creator.gitLabId).map {
         case Some(existingUserResource) => updateProjectAndSwapCreator(gitLabProject, existingUserResource)
         case None                       => updateProjectAndAddCreator(gitLabProject, creator, maybeName, maybeEmail)
