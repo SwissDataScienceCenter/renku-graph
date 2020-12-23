@@ -92,16 +92,16 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
     )
   }
 
-  def addNewCreator(projectPath:             Path,
-                    creator:                 GitLabCreator,
-                    maybeCurrentCreatorName: Option[Name],
-                    maybeEmail:              Option[Email]
+  def addNewCreator(projectPath:              Path,
+                    creator:                  GitLabCreator,
+                    maybeCurrentCreatorNames: List[Name],
+                    maybeEmail:               Option[Email]
   ): List[SparqlQuery] = {
     val creatorResourceId = users.ResourceId(
       (renkuBaseUrl / "persons" / s"gitlabid${creator.gitLabId}").toString
     )
     val insertionQuery = maybeEmail match {
-      case Some(email) if maybeCurrentCreatorName.contains(creator.name) =>
+      case Some(email) if maybeCurrentCreatorNames.contains(creator.name) =>
         insertCreatorWithEmail(creatorResourceId, creator, email)
       case _ => insertCreator(creatorResourceId, creator)
     }

@@ -179,7 +179,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
     "create a new Person and link it to the given Project replacing the old creator on the project" +
       "using the current creator email if the name of the current creator name is the same as the gitlab user name" in new TestCase {
         val currentCreatorEmail = userEmails.generateSome
-        val currentCreatorName  = userNames.generateOne
+        val currentCreatorNames = userNames.generateNonEmptyList()
         val creator1            = persons.generateOne
         val creator2            = persons.generateOne
         val project1            = entitiesProjects(creator1.some).generateOne
@@ -192,10 +192,10 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
           (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
         )
 
-        val newCreator = gitLabCreator().generateOne.copy(name = currentCreatorName)
+        val newCreator = gitLabCreator().generateOne.copy(name = currentCreatorNames.head)
 
         updatesQueryCreator
-          .addNewCreator(project1.path, newCreator, currentCreatorName.some, currentCreatorEmail)
+          .addNewCreator(project1.path, newCreator, currentCreatorNames.toList, currentCreatorEmail)
           .runAll
           .unsafeRunSync()
 
@@ -212,7 +212,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
     "create a new Person and link it to the given Project replacing the old creator on the project" +
       "using the gitlab creator details if the name of the current creator name is different from the gitlab user name" in new TestCase {
-        val currentCreatorName  = userNames.generateOne
+        val currentCreatorNames = userNames.generateNonEmptyList()
         val creator1            = persons.generateOne
         val creator2            = persons.generateOne
         val project1            = entitiesProjects(creator1.some).generateOne
@@ -226,10 +226,10 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
           (project2.resourceId.value, creator2.name.value, creator2.maybeEmail.map(_.value), None)
         )
 
-        val newCreator = gitLabCreator().generateOne.copy(name = users.Name(currentCreatorName.value.reverse))
+        val newCreator = gitLabCreator().generateOne.copy(name = users.Name(currentCreatorNames.head.value.reverse))
 
         updatesQueryCreator
-          .addNewCreator(project1.path, newCreator, currentCreatorName.some, currentCreatorEmail)
+          .addNewCreator(project1.path, newCreator, currentCreatorNames.toList, currentCreatorEmail)
           .runAll
           .unsafeRunSync()
 
@@ -256,7 +256,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
         val newCreator = gitLabCreator().generateOne
 
         updatesQueryCreator
-          .addNewCreator(project1.path, newCreator, userNames.generateOption, None)
+          .addNewCreator(project1.path, newCreator, userNames.generateNonEmptyList().toList, None)
           .runAll
           .unsafeRunSync()
 

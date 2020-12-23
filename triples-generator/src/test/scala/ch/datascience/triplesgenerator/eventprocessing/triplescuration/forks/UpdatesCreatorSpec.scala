@@ -116,8 +116,8 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .returningUpdates
 
         val creatorUpdates = (updatesQueryCreator
-          .addNewCreator(_: Path, _: GitLabCreator, _: Option[Name], _: Option[Email]))
-          .expects(gitLabProject.path, creator, None, None)
+          .addNewCreator(_: Path, _: GitLabCreator, _: List[Name], _: Option[Email]))
+          .expects(gitLabProject.path, creator, Nil, None)
           .returningUpdates
 
         updatesCreator.create(event, curatedTriples).generateUpdates().value.unsafeRunSync() shouldBe Right(

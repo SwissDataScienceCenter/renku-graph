@@ -3,24 +3,33 @@ package ch.datascience.triplesgenerator.eventprocessing.triplescuration.forks
 import ch.datascience.graph.Schemas.schema
 import ch.datascience.graph.model.users.{Email, Name}
 import ch.datascience.rdfstore.JsonLDTriples
-import io.circe.Json
+import io.circe.{Decoder, Json}
+import io.renku.jsonld.Property
 
 trait CreatorInfoExtractor {
-  def extract(triples: JsonLDTriples): (Option[Name], Option[Email])
+  def extract(triples: JsonLDTriples): (List[Name], Option[Email])
 }
 
 object CreatorInfoExtratorImpl extends CreatorInfoExtractor {
-  override def extract(triples: JsonLDTriples): (Option[Name], Option[Email]) =
+  override def extract(triples: JsonLDTriples): (List[Name], Option[Email]) =
     (for {
       currentCreatorId <- findCreatorId(triples)
       currentCreator   <- findCreator(currentCreatorId, triples)
     } yield {
-      val maybeEmail =
-        currentCreator.hcursor.downField((schema / "email").toString).get[String]("@value").toOption.map(Email(_))
-      val maybeName =
-        currentCreator.hcursor.downField((schema / "name").toString).get[String]("@value").toOption.map(Name(_))
-      (maybeName, maybeEmail)
-    }).getOrElse((None, None))
+      val maybeEmail = getValueIfUnique(schema / "email", currentCreator).map(Email(_))
+      val maybeNames =
+        currentCreator.hcursor
+          .get[List[Json]]((schema / "name").toString)
+          .toOption
+          .map(names =>
+            names.map(jsonLDname => jsonLDname.hcursor.get[String]("@value").toOption).collect { case Some(name) =>
+              Name(name)
+            }
+          )
+          .getOrElse(Nil)
+
+      (maybeNames, maybeEmail)
+    }).getOrElse((Nil, None))
 
   private def findCreatorId(triples: JsonLDTriples) = triples.value.findAllByKey((schema / "creator").toString) match {
     case Nil    => None
@@ -38,4 +47,13 @@ object CreatorInfoExtratorImpl extends CreatorInfoExtractor {
         }
     )
 
+  private def getValueIfUnique(property: Property, json: Json): Option[String] =
+    json.hcursor
+      .downField(property.toString)
+      .as[List[Json]]
+      .map {
+        case x :: Nil => x.hcursor.get[String]("@value").toOption
+        case _        => None
+      }
+      .getOrElse(None)
 }
