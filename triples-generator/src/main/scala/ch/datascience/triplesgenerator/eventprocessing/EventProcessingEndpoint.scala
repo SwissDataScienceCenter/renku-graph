@@ -29,7 +29,8 @@ import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
-import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
+import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import ch.datascience.triplesgenerator.reprovisioning.{ReProvisioningStatus, RenkuVersionPairUpdater}
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl

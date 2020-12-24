@@ -18,19 +18,17 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
-import EventProcessingGenerators._
 import cats.MonadError
 import cats.data.EitherT.{leftT, rightT}
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
-
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.Id
+import ch.datascience.graph.model.projects.{Id, SchemaVersion}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
@@ -41,29 +39,31 @@ import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
 import ch.datascience.triplesgenerator.eventprocessing.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.IOCommitEventProcessor.eventsProcessingTimesBuilder
-import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{CuratedTriples, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.eventprocessing.triplescuration.IOTriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.eventprocessing.triplescuration.{CuratedTriples, TriplesCurator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.GenerationResult.{MigrationEvent, Triples}
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.{GenerationResult, TriplesGenerator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TryUploader
+import ch.datascience.triplesgenerator.generators.VersionGenerators._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.prometheus.client.Histogram
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers.should
-import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.Assertion
+import org.scalatest.concurrent.{Eventually, IntegrationPatience}
+import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.jdk.CollectionConverters._
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.jdk.CollectionConverters._
 import scala.util.Try
 
 class CommitEventProcessorSpec
@@ -205,6 +205,8 @@ class CommitEventProcessorSpec
         .expects(commit, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](Triples(rawTriples)))
 
+      expectEventMarkedAsTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id), rawTriples)
+
       val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
       (triplesCurator
         .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
@@ -232,6 +234,8 @@ class CommitEventProcessorSpec
         .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
         .expects(commit, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](Triples(rawTriples)))
+
+      expectEventMarkedAsTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id), rawTriples)
 
       val exception = exceptions.generateOne
       (triplesCurator
@@ -261,6 +265,8 @@ class CommitEventProcessorSpec
           .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
           .expects(commit1, maybeAccessToken)
           .returning(rightT[Try, ProcessingRecoverableError](Triples(rawTriples)))
+
+        expectEventMarkedAsTriplesGenerated(CompoundEventId(commit1.eventId, commit1.project.id), rawTriples)
 
         val curatedTriples = curatedTriplesObjects[Try].generateOne
         (triplesCurator
@@ -303,6 +309,8 @@ class CommitEventProcessorSpec
             .generateTriples(_: CommitEvent)(_: Option[AccessToken]))
             .expects(commit1, maybeAccessToken)
             .returning(rightT[Try, ProcessingRecoverableError](Triples(rawTriples)))
+
+          expectEventMarkedAsTriplesGenerated(CompoundEventId(commit1.eventId, commit1.project.id), rawTriples)
 
           val curatedTriples = curatedTriplesObjects[Try].generateOne
           (triplesCurator
@@ -416,6 +424,7 @@ class CommitEventProcessorSpec
 
     val eventId          = compoundEventIds.generateOne
     val maybeAccessToken = Gen.option(accessTokens).generateOne
+    val versionPair      = renkuVersionPairs.generateOne
 
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
     val triplesFinder         = mock[TriplesGenerator[Try]]
@@ -430,6 +439,7 @@ class CommitEventProcessorSpec
       triplesCurator,
       uploader,
       eventStatusUpdater,
+      versionPair,
       logger,
       executionTimeRecorder
     )
@@ -454,6 +464,8 @@ class CommitEventProcessorSpec
         .curate(_: CommitEvent, _: JsonLDTriples)(_: Option[AccessToken]))
         .expects(commit, triples, maybeAccessToken)
         .returning(rightT[Try, ProcessingRecoverableError](curatedTriples))
+
+      expectEventMarkedAsTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id), triples)
 
       (uploader
         .upload(_: CuratedTriples[Try]))
@@ -483,6 +495,12 @@ class CommitEventProcessorSpec
       (eventStatusUpdater
         .markEventSkipped(_: CompoundEventId, _: String))
         .expects(commitEventId, message)
+        .returning(context.unit)
+
+    def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId, triples: JsonLDTriples) =
+      (eventStatusUpdater
+        .markTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion))
+        .expects(compoundEventId, triples, versionPair.schemaVersion)
         .returning(context.unit)
 
     def logSummary(commits:  NonEmptyList[CommitEvent],
