@@ -72,10 +72,10 @@ private class UpdatesCreatorImpl(
 
   private def forkInfoUpdates(curatedTriples: CuratedTriples[IO]): Option[GitLabProject] => IO[List[SparqlQuery]] = {
     case `when project has a creator`(creator, gitLabProject) =>
-      val (maybeNames, maybeEmail) = CreatorInfoExtratorImpl.extract(curatedTriples.triples)
+      val (creatorNames, maybeEmail) = CreatorInfoExtratorImpl.extract(curatedTriples.triples)
       kg.findCreatorId(creator.gitLabId).map {
         case Some(existingUserResource) => updateProjectAndSwapCreator(gitLabProject, existingUserResource)
-        case None                       => updateProjectAndAddCreator(gitLabProject, creator, maybeNames, maybeEmail)
+        case None                       => updateProjectAndAddCreator(gitLabProject, creator, creatorNames, maybeEmail)
       }
     case `when project has no creator`(gitLabProject) =>
       updateProjectAndUnlinkCreator(gitLabProject).pure[IO]
@@ -102,13 +102,13 @@ private class UpdatesCreatorImpl(
       swapCreator(gitLabProject.path, existingUserResource) ++
       recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
 
-  private def updateProjectAndAddCreator(gitLabProject:            GitLabProject,
-                                         creator:                  GitLabCreator,
-                                         maybeCurrentCreatorNames: List[Name],
-                                         maybeEmail:               Option[Email]
+  private def updateProjectAndAddCreator(gitLabProject:       GitLabProject,
+                                         creator:             GitLabCreator,
+                                         currentCreatorNames: List[Name],
+                                         maybeEmail:          Option[Email]
   ) =
     updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
-      addNewCreator(gitLabProject.path, creator, maybeCurrentCreatorNames, maybeEmail) ++
+      addNewCreator(gitLabProject.path, creator, currentCreatorNames, maybeEmail) ++
       recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
 
   private def updateProjectAndUnlinkCreator(gitLabProject: GitLabProject) =
