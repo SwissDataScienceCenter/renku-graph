@@ -82,7 +82,7 @@ private class IOEventStatusUpdater(
   ): IO[Unit] = sendStatusChange(
     eventId,
     payload =
-      json"""{"status": "TRIPLES_GENERATED", "payload": ${payload.value.noSpaces} , "schemaVersion": "${schemaVersion.value}" }""",
+      json"""{"status": "TRIPLES_GENERATED", "payload": ${payload.value.noSpaces} , "schemaVersion": ${schemaVersion.value} }""",
     responseMapping = okConflictAsSuccess
   )
 

@@ -45,6 +45,7 @@ import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.triplesgenerator.generators.VersionGenerators._
 
 class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
@@ -62,7 +63,7 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
           .returning(commitEvents.pure[IO])
 
         (processingRunner.scheduleForProcessing _)
-          .expects(eventId, commitEvents)
+          .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
           .returning(EventSchedulingResult.Accepted.pure[IO])
 
         val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
@@ -90,7 +91,7 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
           .returning(commitEvents.pure[IO])
 
         (processingRunner.scheduleForProcessing _)
-          .expects(eventId, commitEvents)
+          .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
           .returning(EventSchedulingResult.Busy.pure[IO])
 
         val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
@@ -169,7 +170,7 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
 
       val exception = exceptions.generateOne
       (processingRunner.scheduleForProcessing _)
-        .expects(eventId, commitEvents)
+        .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
         .returning(exception.raiseError[IO, EventSchedulingResult])
 
       val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
@@ -185,8 +186,9 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
   }
 
   private trait TestCase {
-    val eventId   = compoundEventIds.generateOne
-    val eventBody = eventBodies.generateOne
+    val eventId          = compoundEventIds.generateOne
+    val eventBody        = eventBodies.generateOne
+    val renkuVersionPair = renkuVersionPairs.generateOne
 
     val eventBodyDeserializer = mock[IOEventBodyDeserialiser]
     val processingRunner      = mock[EventsProcessingRunner[IO]]
@@ -195,6 +197,7 @@ class EventProcessingEndpointSpec extends AnyWordSpec with MockFactory with shou
     val processEvent = new EventProcessingEndpoint[IO](eventBodyDeserializer,
                                                        processingRunner,
                                                        reProvisioningStatus,
+                                                       renkuVersionPair,
                                                        logger
     ).processEvent _
 

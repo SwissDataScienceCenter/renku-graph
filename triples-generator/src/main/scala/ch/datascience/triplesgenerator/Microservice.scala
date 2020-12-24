@@ -88,6 +88,7 @@ object Microservice extends IOMicroservice {
       eventProcessingEndpoint <- IOEventProcessingEndpoint(subscriber,
                                                            triplesGeneration,
                                                            reProvisioningStatus,
+                                                           renkuVersionPairs.head,
                                                            metricsRegistry,
                                                            gitLabThrottler,
                                                            sparqlTimeRecorder,

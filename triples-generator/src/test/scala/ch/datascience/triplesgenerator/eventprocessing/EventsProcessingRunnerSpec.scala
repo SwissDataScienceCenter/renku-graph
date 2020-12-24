@@ -24,7 +24,9 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.projects.SchemaVersion
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.triplesgenerator.eventprocessing.EventProcessingGenerators._
@@ -58,7 +60,7 @@ class EventsProcessingRunnerSpec
   "scheduleForProcessing" should {
 
     s"return $Accepted if there is enough capacity to process an event" in new TestCase {
-      processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
+      processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync() shouldBe Accepted
     }
 
     s"return $Busy when processing capacity is reached " +
@@ -66,33 +68,33 @@ class EventsProcessingRunnerSpec
 
         // draining processing capacity by scheduling max number of jobs
         (1 to processesNumber).toList map { _ =>
-          processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync()
+          processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync()
         }
 
         // any new job to get the Busy status
-        processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Busy
+        processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync() shouldBe Busy
 
         expectAvailabilityIsCommunicated
 
         // once at least one process is done, new events should be accepted again
         sleep(eventProcessingTime.toMillis + 250)
-        processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
+        processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync() shouldBe Accepted
       }
 
     "release the processing resource on processing failure" in new TestCase {
 
       // draining processing capacity by scheduling max number of jobs
-      processingRunner.scheduleForProcessing(eventIdCausingFailure, events).unsafeRunSync()
-      processingRunner.scheduleForProcessing(eventIdCausingFailure, events).unsafeRunSync()
+      processingRunner.scheduleForProcessing(eventIdCausingFailure, events, schemaVersion).unsafeRunSync()
+      processingRunner.scheduleForProcessing(eventIdCausingFailure, events, schemaVersion).unsafeRunSync()
 
       // any new job to get the Busy status
-      processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Busy
+      processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync() shouldBe Busy
 
       expectAvailabilityIsCommunicated
 
       // once at least one process is done, new events should be accepted again
       sleep(eventProcessingTime.toMillis + 250)
-      processingRunner.scheduleForProcessing(eventId, events).unsafeRunSync() shouldBe Accepted
+      processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync() shouldBe Accepted
 
       eventually {
         logger.logged(Error(s"Processing event $eventIdCausingFailure failed", exception))
@@ -109,10 +111,11 @@ class EventsProcessingRunnerSpec
     val eventIdCausingFailure = compoundEventIds.generateOne
     val events                = commitEvents.generateNonEmptyList()
     val exception             = exceptions.generateOne
+    val schemaVersion         = projectSchemaVersions.generateOne
 
     val eventProcessingTime = 500 millis
     val eventProcessor: EventProcessor[IO] =
-      (id: CompoundEventId, _: NonEmptyList[CommitEvent]) =>
+      (id: CompoundEventId, _: NonEmptyList[CommitEvent], _: SchemaVersion) =>
         id match {
           case `eventIdCausingFailure` =>
             timer sleep eventProcessingTime flatMap (_ => exception.raiseError[IO, Unit])

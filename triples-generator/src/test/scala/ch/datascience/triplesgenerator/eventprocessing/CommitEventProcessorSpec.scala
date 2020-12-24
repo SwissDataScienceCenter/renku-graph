@@ -27,6 +27,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.{Id, SchemaVersion}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
@@ -49,7 +50,6 @@ import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.Triples
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.{GenerationResult, TriplesGenerator}
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TryUploader
-import ch.datascience.triplesgenerator.generators.VersionGenerators._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -89,7 +89,7 @@ class CommitEventProcessorSpec
 
       expectEventMarkedDone(commitEvents.head.compoundEventId)
 
-      eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
       logSummary(commitEvents, uploaded = commitsAndTriples.size)
 
@@ -115,7 +115,7 @@ class CommitEventProcessorSpec
 
       expectEventMarkedAsSkipped(commit2.compoundEventId, "MigrationEvent")
 
-      eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
       logSummary(commitEvents, uploaded = successfulCommitsAndTriples.size, skipped = 1)
     }
@@ -141,7 +141,7 @@ class CommitEventProcessorSpec
 
         expectEventMarkedAsNonRecoverableFailure(commit2.compoundEventId, exception2)
 
-        eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+        eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
         logError(commit2, exception2)
         logSummary(commitEvents, uploaded = successfulCommitsAndTriples.size, failed = 1)
@@ -163,7 +163,7 @@ class CommitEventProcessorSpec
 
       expectEventMarkedAsNonRecoverableFailure(commit.compoundEventId, exception)
 
-      eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
       logError(commitEvents.head, exception)
       logSummary(commitEvents, failed = 1)
@@ -185,7 +185,7 @@ class CommitEventProcessorSpec
 
       expectEventMarkedAsRecoverableFailure(commit.compoundEventId, exception)
 
-      eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
       logError(commitEvents.head, exception, exception.getMessage)
       logSummary(commitEvents, failed = 1)
@@ -215,7 +215,7 @@ class CommitEventProcessorSpec
 
       expectEventMarkedAsRecoverableFailure(commit.compoundEventId, exception)
 
-      eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
       logError(commitEvents.head, exception, exception.getMessage)
       logSummary(commitEvents, failed = 1)
@@ -245,7 +245,7 @@ class CommitEventProcessorSpec
 
       expectEventMarkedAsNonRecoverableFailure(commit.compoundEventId, exception)
 
-      eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
       logError(commitEvents.head, exception)
       logSummary(commitEvents, failed = 1)
@@ -288,7 +288,7 @@ class CommitEventProcessorSpec
 
         expectEventMarkedAsRecoverableFailure(commit1.compoundEventId, uploadingError)
 
-        eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+        eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
         logError(commitEvents.head, uploadingError.message)
         logSummary(commitEvents, failed = 2)
@@ -331,7 +331,7 @@ class CommitEventProcessorSpec
 
           expectEventMarkedAsNonRecoverableFailure(commit1.compoundEventId, failure)
 
-          eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+          eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
           logError(commitEvents.head, failure.getMessage)
           logSummary(commitEvents, failed = 2)
@@ -355,7 +355,7 @@ class CommitEventProcessorSpec
         .expects(commit.compoundEventId)
         .returning(context.raiseError(exception))
 
-      eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
       logError(commitEvents.head, exception, "failed to mark as TriplesStore in the Event Log")
       logSummary(commitEvents, uploaded = 1)
@@ -374,7 +374,7 @@ class CommitEventProcessorSpec
         .expects(commitEvents.head.compoundEventId)
         .returning(context.unit)
 
-      eventProcessor.process(eventId, commitEvents) shouldBe context.unit
+      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
 
       logger.loggedOnly(
         Error(
@@ -424,7 +424,7 @@ class CommitEventProcessorSpec
 
     val eventId          = compoundEventIds.generateOne
     val maybeAccessToken = Gen.option(accessTokens).generateOne
-    val versionPair      = renkuVersionPairs.generateOne
+    val schemaVersion    = projectSchemaVersions.generateOne
 
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
     val triplesFinder         = mock[TriplesGenerator[Try]]
@@ -439,7 +439,6 @@ class CommitEventProcessorSpec
       triplesCurator,
       uploader,
       eventStatusUpdater,
-      versionPair,
       logger,
       executionTimeRecorder
     )
@@ -500,7 +499,7 @@ class CommitEventProcessorSpec
     def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId, triples: JsonLDTriples) =
       (eventStatusUpdater
         .markTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion))
-        .expects(compoundEventId, triples, versionPair.schemaVersion)
+        .expects(compoundEventId, triples, schemaVersion)
         .returning(context.unit)
 
     def logSummary(commits:  NonEmptyList[CommitEvent],

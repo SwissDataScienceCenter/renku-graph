@@ -42,6 +42,7 @@ class EventProcessingEndpoint[Interpretation[_]: Effect](
     eventBodyDeserializer:  EventBodyDeserialiser[Interpretation],
     eventsProcessingRunner: EventsProcessingRunner[Interpretation],
     reProvisioningStatus:   ReProvisioningStatus[Interpretation],
+    currentVersionPair:     RenkuVersionPair,
     logger:                 Logger[Interpretation]
 )(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
@@ -66,7 +67,7 @@ class EventProcessingEndpoint[Interpretation[_]: Effect](
     for {
       eventAndBody <- request.as[IdAndBody] recoverWith badRequest("Event deserialization error")
       commitEvents <- toCommitEvents(eventAndBody._2) recoverWith badRequest("Event body deserialization error")
-      result       <- scheduleForProcessing(eventAndBody._1, commitEvents)
+      result       <- scheduleForProcessing(eventAndBody._1, commitEvents, currentVersionPair.schemaVersion)
       response     <- result.asHttpResponse(eventAndBody._1, commitEvents)
     } yield response
   } recoverWith httpResponse
@@ -129,6 +130,7 @@ object IOEventProcessingEndpoint {
       subscriber:           Subscriber[IO],
       triplesGeneration:    TriplesGeneration,
       reProvisioningStatus: ReProvisioningStatus[IO],
+      currentVersionPair:   RenkuVersionPair,
       metricsRegistry:      MetricsRegistry[IO],
       gitLabThrottler:      Throttler[IO, GitLab],
       timeRecorder:         SparqlQueryTimeRecorder[IO],
@@ -144,5 +146,10 @@ object IOEventProcessingEndpoint {
         IOCommitEventProcessor(triplesGenerator, metricsRegistry, gitLabThrottler, timeRecorder, logger)
       eventsProcessingRunner <- IOEventsProcessingRunner(commitEventProcessor, subscriber, logger)
       bodyDeserialiser = new EventBodyDeserialiser[IO]()
-    } yield new EventProcessingEndpoint[IO](bodyDeserialiser, eventsProcessingRunner, reProvisioningStatus, logger)
+    } yield new EventProcessingEndpoint[IO](bodyDeserialiser,
+                                            eventsProcessingRunner,
+                                            reProvisioningStatus,
+                                            currentVersionPair,
+                                            logger
+    )
 }

@@ -18,14 +18,13 @@
 
 package ch.datascience.triplesgenerator.eventprocessing
 
-import java.io.{PrintWriter, StringWriter}
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.generators.Generators._
-import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
@@ -34,6 +33,7 @@ import org.http4s.Status._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.io.{PrintWriter, StringWriter}
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
@@ -104,13 +104,13 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withRequestBody(
               equalToJson(
-                json"""{"status": "TRIPLES_GENERATED", "payload": ${rawTriples.value.noSpaces}, "schemaVersion": "${schemaVersion.value}"}""".spaces2
+                json"""{"status": "TRIPLES_GENERATED", "payload": ${rawTriples.value.noSpaces}, "schemaVersion": ${schemaVersion.value} }""".spaces2
               )
             )
             .willReturn(aResponse().withStatus(status.code))
         }
 
-        updater.markTriplesGenerated(eventId, rawTriples).unsafeRunSync() shouldBe ((): Unit)
+        updater.markTriplesGenerated(eventId, rawTriples, schemaVersion).unsafeRunSync() shouldBe ((): Unit)
       }
     }
 
@@ -121,14 +121,14 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
           .withRequestBody(
             equalToJson(
-              json"""{"status": "TRIPLES_GENERATED", "payload": ${rawTriples.value.noSpaces}, "schemaVersion": "${schemaVersion.value}" }""".spaces2
+              json"""{"status": "TRIPLES_GENERATED", "payload": ${rawTriples.value.noSpaces}, "schemaVersion": ${schemaVersion.value}  }""".spaces2
             )
           )
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
-        updater.markTriplesGenerated(eventId, rawTriples).unsafeRunSync() shouldBe ((): Unit)
+        updater.markTriplesGenerated(eventId, rawTriples, schemaVersion).unsafeRunSync() shouldBe ((): Unit)
       }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
   }
