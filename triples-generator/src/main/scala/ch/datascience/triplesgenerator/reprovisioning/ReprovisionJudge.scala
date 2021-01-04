@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.data.NonEmptyList
 import ch.datascience.graph.model.{CliVersion, SchemaVersion}
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import ch.datascience.graph.model.RenkuVersionPair
 
 trait ReprovisionJudge {
 

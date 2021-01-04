@@ -27,7 +27,7 @@ import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import ch.datascience.graph.model.RenkuVersionPair
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
 import org.scalatest.matchers.should

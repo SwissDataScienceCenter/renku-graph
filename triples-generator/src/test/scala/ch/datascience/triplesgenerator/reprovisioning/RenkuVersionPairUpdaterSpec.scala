@@ -26,7 +26,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.generators.VersionGenerators._
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import ch.datascience.graph.model.RenkuVersionPair
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpec
 

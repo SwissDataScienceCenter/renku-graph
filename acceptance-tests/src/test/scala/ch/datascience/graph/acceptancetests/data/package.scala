@@ -22,7 +22,7 @@ import ch.datascience.config.renku
 import ch.datascience.graph.acceptancetests.tooling.RDFStore
 import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.rdfstore.FusekiBaseUrl
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import ch.datascience.graph.model.RenkuVersionPair
 
 package object data {
   val currentVersionPair:     RenkuVersionPair   = RenkuVersionPair(CliVersion("0.12.2"), SchemaVersion("8"))

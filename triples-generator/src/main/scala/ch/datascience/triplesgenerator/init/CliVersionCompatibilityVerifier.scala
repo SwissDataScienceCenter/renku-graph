@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.IO
 import ch.datascience.graph.model.CliVersion
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import ch.datascience.graph.model.RenkuVersionPair
 import cats.syntax.all._
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 

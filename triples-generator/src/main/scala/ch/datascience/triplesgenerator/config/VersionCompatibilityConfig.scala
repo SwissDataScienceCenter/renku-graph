@@ -23,7 +23,7 @@ import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.graph.model.{CliVersion, SchemaVersion}
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import ch.datascience.graph.model.RenkuVersionPair
 import com.typesafe.config.{Config, ConfigFactory}
 import io.chrisdavenport.log4cats.Logger
 import pureconfig.ConfigReader
