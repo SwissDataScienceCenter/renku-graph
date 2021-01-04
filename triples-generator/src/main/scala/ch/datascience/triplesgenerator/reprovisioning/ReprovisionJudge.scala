@@ -19,9 +19,7 @@
 package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.data.NonEmptyList
-import cats.effect.IO
-import ch.datascience.graph.model.projects._
-import ch.datascience.graph.model.{CliVersion, projects}
+import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.triplesgenerator.models.RenkuVersionPair
 
 trait ReprovisionJudge {
