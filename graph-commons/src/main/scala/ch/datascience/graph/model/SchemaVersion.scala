@@ -16,25 +16,14 @@
  * limitations under the License.
  */
 
-package ch.datascience.tinytypes.constraints
+package ch.datascience.graph.model
 
-import ch.datascience.tinytypes.Constraints
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.NonBlank
+import io.circe.Decoder
 
-import java.time.Instant
-
-trait BoundedInstant extends Constraints[Instant] {
-  protected[this] def maybeMin: Option[Instant] = None
-  protected[this] def maybeMax: Option[Instant] = None
-  protected[this] def now:      Instant         = Instant.now()
-
-  addConstraint(
-    check = v => maybeMin.forall(min => v.compareTo(min) >= 0) && maybeMax.forall(max => v.compareTo(max) <= 0),
-    message = (_: Instant) => {
-      val messageParts = List(
-        maybeMin.map(v => s">= $v"),
-        maybeMax.map(v => s"<= $v")
-      ).flatten.mkString(" and ")
-      s"$typeName has to be $messageParts"
-    }
-  )
+final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
+object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank {
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  implicit val decoder: Decoder[SchemaVersion] = stringDecoder(SchemaVersion)
 }

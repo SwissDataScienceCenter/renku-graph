@@ -27,6 +27,7 @@ import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.projects._
 import ch.datascience.graph.model.users.{Email, Name => UserName}
 import ch.datascience.http.rest.Links

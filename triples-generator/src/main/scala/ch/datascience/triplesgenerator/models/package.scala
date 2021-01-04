@@ -18,8 +18,7 @@
 
 package ch.datascience.triplesgenerator
 
-import ch.datascience.graph.model.CliVersion
-import ch.datascience.graph.model.projects.SchemaVersion
+import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 

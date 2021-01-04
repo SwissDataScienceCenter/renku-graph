@@ -22,8 +22,7 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.graph.model.CliVersion
-import ch.datascience.graph.model.projects.SchemaVersion
+import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import com.typesafe.config.{Config, ConfigFactory}
 import io.chrisdavenport.log4cats.Logger

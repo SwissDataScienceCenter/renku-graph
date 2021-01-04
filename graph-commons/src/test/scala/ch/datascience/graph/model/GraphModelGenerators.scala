@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Swiss Data Science Center (SDSC)
+ * Copyright 2021 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects.{FilePath, Id, Path, ResourceId, SchemaVersion, Visibility}
+import ch.datascience.graph.model.projects.{FilePath, Id, Path, ResourceId, Visibility}
 import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen

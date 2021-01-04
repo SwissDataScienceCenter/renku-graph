@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Swiss Data Science Center (SDSC)
+ * Copyright 2021 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -23,8 +23,7 @@ import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
-import ch.datascience.graph.model.projects.SchemaVersion
-import ch.datascience.graph.model.{events, projects}
+import ch.datascience.graph.model.{SchemaVersion, events, projects}
 import ch.datascience.metrics.LabeledGauge
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._

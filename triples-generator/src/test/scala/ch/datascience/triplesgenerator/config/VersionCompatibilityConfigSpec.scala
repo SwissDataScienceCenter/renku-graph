@@ -23,9 +23,8 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.nonEmptyStrings
-import ch.datascience.graph.model.CliVersion
+import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.SchemaVersion
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.triplesgenerator.models.RenkuVersionPair
