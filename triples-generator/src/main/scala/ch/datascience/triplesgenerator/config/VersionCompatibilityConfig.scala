@@ -20,6 +20,8 @@ package ch.datascience.triplesgenerator.config
 
 import cats.MonadError
 import cats.data.NonEmptyList
+import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.projects.SchemaVersion
 import ch.datascience.triplesgenerator.models.RenkuVersionPair
@@ -27,7 +29,10 @@ import com.typesafe.config.{Config, ConfigFactory}
 import io.chrisdavenport.log4cats.Logger
 import pureconfig.ConfigReader
 
-object VersionCompatibilityConfig {
+import scala.util.control.NonFatal
+trait VersionCompatibilityConfig
+
+private object VersionCompatibilityConfig extends VersionCompatibilityConfig {
 
   import cats.syntax.all._
   import ch.datascience.config.ConfigLoader._
@@ -45,7 +50,7 @@ object VersionCompatibilityConfig {
   def apply[Interpretation[_]](
       maybeRenkuDevVersion: Option[RenkuPythonDevVersion],
       logger:               Logger[Interpretation],
-      config:               Config = ConfigFactory.load
+      config:               Config
   )(implicit ME:            MonadError[Interpretation, Throwable]): Interpretation[NonEmptyList[RenkuVersionPair]] =
     find[Interpretation, List[RenkuVersionPair]]("compatibility-matrix", config)(reader, ME).flatMap {
       case Nil =>
@@ -62,6 +67,16 @@ object VersionCompatibilityConfig {
               .map(_ => NonEmptyList(head.copy(cliVersion = CliVersion(devVersion.version)), tail))
           case None => NonEmptyList(head, tail).pure[Interpretation]
         }
-
     }
+}
+
+object IOVersionCompatibilityConfig {
+  def apply(logger: Logger[IO], config: Config = ConfigFactory.load): IO[NonEmptyList[RenkuVersionPair]] = for {
+    maybeRenkuDevVersion       <- RenkuPythonDevVersionConfig[IO]() recoverWith errorToNone
+    versionCompatibilityConfig <- VersionCompatibilityConfig(maybeRenkuDevVersion, logger, config)
+  } yield versionCompatibilityConfig
+
+  private lazy val errorToNone: PartialFunction[Throwable, IO[Option[RenkuPythonDevVersion]]] = { case NonFatal(_) =>
+    None.pure[IO]
+  }
 }

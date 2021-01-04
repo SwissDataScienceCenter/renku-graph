@@ -107,7 +107,7 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map("compatibility-matrix" -> List(malformedPair).asJava).asJava
       )
-      val Failure(exception) = VersionCompatibilityConfig[Try](None, TestLogger(), config)
+      val Failure(exception) = versionCompatibilityWith(config)
       exception.getMessage shouldBe s"Did not find exactly two elements: $malformedPair."
     }
   }

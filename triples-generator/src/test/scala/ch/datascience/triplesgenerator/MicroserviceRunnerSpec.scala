@@ -23,10 +23,9 @@ import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
-import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
+import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.interpreters.{IOSentryInitializer, TestLogger}
 import ch.datascience.testtools.MockedRunnableCollaborators
-import ch.datascience.triplesgenerator.config.RenkuPythonDevVersion
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
 import ch.datascience.triplesgenerator.init.{CliVersionCompatibilityVerifier, IOFusekiDatasetInitializer}
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioning
@@ -34,7 +33,7 @@ import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import cats.syntax.all._
+
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext
 
@@ -189,38 +188,6 @@ class MicroserviceRunnerSpec
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
-
-    "return Success Exit code but not run VersionCompatibilityChecker when renkuPythonDevVersion defined" in new TestCase {
-      val runnerWithRenkuPythonDevVersion = new MicroserviceRunner(
-        certificateLoader,
-        gitCertificateInstaller,
-        sentryInitializer,
-        maybeRenkuPythonDevVersion = RenkuPythonDevVersion(nonEmptyStrings().generateOne).some,
-        cliVersionCompatChecker,
-        datasetInitializer,
-        subscriber,
-        reProvisioning,
-        httpServer,
-        new ConcurrentHashMap[CancelToken[IO], Unit](),
-        logger
-      )
-
-      given(certificateLoader).succeeds(returning = ())
-      given(gitCertificateInstaller).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(datasetInitializer).succeeds(returning = ())
-      given(subscriber).succeeds(returning = ())
-      given(reProvisioning).succeeds(returning = ())
-      given(httpServer).succeeds(returning = ExitCode.Success)
-
-      runnerWithRenkuPythonDevVersion.run().unsafeRunSync() shouldBe ExitCode.Success
-
-      logger.loggedOnly(
-        Warn(
-          s"RENKU_PYTHON_DEV_VERSION env variable is set. No version compatibility check will take place"
-        )
-      )
-    }
   }
 
   private trait TestCase {
@@ -238,7 +205,6 @@ class MicroserviceRunnerSpec
       certificateLoader,
       gitCertificateInstaller,
       sentryInitializer,
-      maybeRenkuPythonDevVersion = None,
       cliVersionCompatChecker,
       datasetInitializer,
       subscriber,
