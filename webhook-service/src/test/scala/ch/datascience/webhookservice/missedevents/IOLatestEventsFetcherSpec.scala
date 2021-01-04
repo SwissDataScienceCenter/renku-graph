@@ -21,17 +21,14 @@ package ch.datascience.webhookservice.missedevents
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.missedevents.LatestEventsFetcher.LatestProjectCommit
+import ch.datascience.webhookservice.missedevents.LatestEventsFetcher._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import org.http4s.Status
-import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -43,7 +40,7 @@ class IOLatestEventsFetcherSpec extends AnyWordSpec with ExternalServiceStubbing
 
     "return a list of latest projects commits fetched from the Event Log" in new TestCase {
 
-      val latestProjectCommitsList = latestProjectCommits.generateNonEmptyList().toList
+      val latestProjectCommitsList = latestProjectsCommits.generateNonEmptyList().toList
 
       stubFor {
         get("/events?latest-per-project=true")
@@ -96,15 +93,11 @@ class IOLatestEventsFetcherSpec extends AnyWordSpec with ExternalServiceStubbing
     val fetcher     = new IOLatestEventsFetcher(eventLogUrl, TestLogger())
   }
 
-  private implicit val latestProjectCommits: Gen[LatestProjectCommit] = for {
-    projectId <- projectIds
-    commitId  <- commitIds
-  } yield LatestProjectCommit(commitId, projectId)
-
   private implicit val latestCommitsEncoder: Encoder[LatestProjectCommit] = Encoder.instance[LatestProjectCommit] {
-    case LatestProjectCommit(commitId, projectId) => json"""{
+    case LatestProjectCommit(commitId, Project(projectId, projectPath)) => json"""{
       "project": {
-        "id": ${projectId.value}
+        "id": ${projectId.value},
+        "path": ${projectPath.value}
       },
       "body": ${json"""{"id": ${commitId.value}}""".noSpaces}
     }"""
