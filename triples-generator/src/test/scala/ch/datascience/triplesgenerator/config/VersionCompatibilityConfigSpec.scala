@@ -19,10 +19,15 @@
 package ch.datascience.triplesgenerator.config
 
 import cats.data.NonEmptyList
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.nonEmptyStrings
+import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.projects.SchemaVersion
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Warn
 import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
@@ -67,20 +72,60 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
       result shouldBe NonEmptyList.fromListUnsafe(expected)
     }
 
+    "return a list of VersionSchemaPairs, as the first element the RenkuDevVersion if it exists and log a warning" in new TestCase {
+      val cliVersionNumbers     = cliVersions.generateNonEmptyList(2, 10)
+      val renkuPythonDevVersion = renkuPythonDevVersions.generateOne
+      val schemaVersionNumbers  = projectSchemaVersions.generateNonEmptyList(2, 10)
+
+      val configVersions =
+        cliVersionNumbers.toList.zip(schemaVersionNumbers.toList).map { case (cliVersion, schemaVersion) =>
+          RenkuVersionPair(cliVersion, schemaVersion)
+        }
+
+      val unparsedConfigElements = configVersions.map { case RenkuVersionPair(cliVersion, schemaVersion) =>
+        s"${cliVersion.value} -> ${schemaVersion.value}"
+      }.asJava
+
+      val config = ConfigFactory.parseMap(
+        Map("compatibility-matrix" -> unparsedConfigElements).asJava
+      )
+
+      val expected = renkuPythonDevVersion.toRenkuVersionPair(configVersions.head.schemaVersion) +: configVersions.tail
+
+      val Success(result) = VersionCompatibilityConfig[Try](renkuPythonDevVersion.some, logger, config)
+      result shouldBe NonEmptyList.fromListUnsafe(expected)
+
+      logger.loggedOnly(
+        Warn(
+          s"RENKU_PYTHON_DEV_VERSION env variable is set. CLI config version is now set to ${renkuPythonDevVersion.version}"
+        )
+      )
+    }
+
     "fail if pair is malformed" in new TestCase {
       val malformedPair = "1.2.3 -> 12 -> 3"
       val config = ConfigFactory.parseMap(
         Map("compatibility-matrix" -> List(malformedPair).asJava).asJava
       )
-      val Failure(exception) = versionCompatibilityWith(config)
-      exception            shouldBe a[Exception]
+      val Failure(exception) = VersionCompatibilityConfig[Try](None, TestLogger(), config)
       exception.getMessage shouldBe s"Did not find exactly two elements: $malformedPair."
     }
   }
 
   private trait TestCase {
 
-    def versionCompatibilityWith(config: Config) = VersionCompatibilityConfig[Try](None, TestLogger(), config)
+    val logger = TestLogger[Try]()
+
+    def versionCompatibilityWith(config: Config) = VersionCompatibilityConfig[Try](None, logger, config)
+
+    implicit lazy val renkuPythonDevVersions = for {
+      version <- nonEmptyStrings()
+    } yield RenkuPythonDevVersion(version)
+
+    implicit class RenkuPythonDevVersionOps(devVersion: RenkuPythonDevVersion) {
+      def toRenkuVersionPair(schemaVersion: SchemaVersion) =
+        RenkuVersionPair(CliVersion(devVersion.version), schemaVersion)
+    }
   }
 
 }

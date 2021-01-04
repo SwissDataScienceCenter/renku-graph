@@ -55,12 +55,11 @@ object VersionCompatibilityConfig {
       case head :: tail =>
         maybeRenkuDevVersion match {
           case Some(devVersion) =>
-            for {
-              _ <-
-                logger.warn(
-                  s"RENKU_PYTHON_DEV_VERSION env variable is set. CLI config version is now set to ${devVersion.version}"
-                )
-            } yield NonEmptyList(head.copy(cliVersion = CliVersion(devVersion.version)), tail)
+            logger
+              .warn(
+                s"RENKU_PYTHON_DEV_VERSION env variable is set. CLI config version is now set to ${devVersion.version}"
+              )
+              .map(_ => NonEmptyList(head.copy(cliVersion = CliVersion(devVersion.version)), tail))
           case None => NonEmptyList(head, tail).pure[Interpretation]
         }
 
