@@ -25,8 +25,6 @@ import io.circe.Decoder.decodeList
 
 package object models {
   final case class RenkuVersionPair(cliVersion: CliVersion, schemaVersion: SchemaVersion)
-      extends Product
-      with Serializable
 
   object RenkuVersionPair {
     implicit lazy val versionPairDecoder: Decoder[List[RenkuVersionPair]] = { topCursor =>
