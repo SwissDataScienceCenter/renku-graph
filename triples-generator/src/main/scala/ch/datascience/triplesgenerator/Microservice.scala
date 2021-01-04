@@ -70,10 +70,9 @@ object Microservice extends IOMicroservice {
       triplesGeneration          <- TriplesGeneration[IO]()
       sentryInitializer          <- SentryInitializer[IO]()
       maybeRenkuPythonDevVersion <- RenkuPythonDevVersionConfig[IO]() recoverWith errorToNone
-      cliVersion                 <- CliVersionLoader[IO](triplesGeneration)
       metricsRegistry            <- MetricsRegistry()
       renkuVersionPairs          <- VersionCompatibilityConfig[IO]()
-      cliVersionCompatChecker    <- IOCliVersionCompatibilityChecker(cliVersion, renkuVersionPairs)
+      cliVersionCompatChecker    <- IOCliVersionCompatibilityChecker(triplesGeneration, renkuVersionPairs)
       gitLabRateLimit            <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler            <- Throttler[IO, GitLab](gitLabRateLimit)
       sparqlTimeRecorder         <- SparqlQueryTimeRecorder(metricsRegistry)

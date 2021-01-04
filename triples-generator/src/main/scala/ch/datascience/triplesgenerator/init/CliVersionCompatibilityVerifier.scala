@@ -24,6 +24,7 @@ import cats.effect.IO
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import cats.syntax.all._
+import ch.datascience.triplesgenerator.config.TriplesGeneration
 
 trait CliVersionCompatibilityVerifier[Interpretation[_]] {
 
@@ -46,9 +47,9 @@ private class CliVersionCompatibilityVerifierImpl[Interpretation[_]](cliVersion:
 }
 
 object IOCliVersionCompatibilityChecker {
-  def apply(cliVersion:        CliVersion,
+  def apply(triplesGeneration: TriplesGeneration,
             renkuVersionPairs: NonEmptyList[RenkuVersionPair]
-  ): IO[CliVersionCompatibilityVerifier[IO]] = IO(
-    new CliVersionCompatibilityVerifierImpl[IO](cliVersion, renkuVersionPairs)
-  )
+  ): IO[CliVersionCompatibilityVerifier[IO]] = for {
+    cliVersion <- CliVersionLoader[IO](triplesGeneration)
+  } yield new CliVersionCompatibilityVerifierImpl[IO](cliVersion, renkuVersionPairs)
 }
