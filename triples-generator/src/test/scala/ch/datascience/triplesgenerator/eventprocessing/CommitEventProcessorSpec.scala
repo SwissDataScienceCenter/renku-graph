@@ -30,7 +30,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.Id
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
@@ -80,7 +80,7 @@ class CommitEventProcessorSpec
 
       val commitEvents = commitsLists().generateOne
 
-      givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
         .returning(context.pure(maybeAccessToken))
 
       val commitsAndTriples = generateTriples(forCommits = commitEvents)
@@ -101,7 +101,7 @@ class CommitEventProcessorSpec
       val commitEvents                         = commitsLists(size = Gen.const(3)).generateOne
       val commit1 +: commit2 +: commit3 +: Nil = commitEvents.toList
 
-      givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
         .returning(context.pure(maybeAccessToken))
 
       val successfulCommitsAndTriples = generateTriples(forCommits = NonEmptyList.of(commit1, commit3))
@@ -126,7 +126,7 @@ class CommitEventProcessorSpec
         val commitEvents                         = commitsLists(size = Gen.const(3)).generateOne
         val commit1 +: commit2 +: commit3 +: Nil = commitEvents.toList
 
-        givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+        givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
           .returning(context.pure(maybeAccessToken))
 
         val successfulCommitsAndTriples = generateTriples(forCommits = NonEmptyList.of(commit1, commit3))
@@ -152,7 +152,7 @@ class CommitEventProcessorSpec
       val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
       val commit +: Nil = commitEvents.toList
 
-      givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
         .returning(context.pure(maybeAccessToken))
 
       val exception = exceptions.generateOne
@@ -174,7 +174,7 @@ class CommitEventProcessorSpec
       val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
       val commit +: Nil = commitEvents.toList
 
-      givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
         .returning(context.pure(maybeAccessToken))
 
       val exception = GenerationRecoverableError(nonBlankStrings().generateOne.value)
@@ -196,7 +196,7 @@ class CommitEventProcessorSpec
       val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
       val commit +: Nil = commitEvents.toList
 
-      givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
         .returning(context.pure(maybeAccessToken))
 
       val rawTriples = jsonLDTriples.generateOne
@@ -224,7 +224,7 @@ class CommitEventProcessorSpec
       val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
       val commit +: Nil = commitEvents.toList
 
-      givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
         .returning(context.pure(maybeAccessToken))
 
       val rawTriples = jsonLDTriples.generateOne
@@ -253,7 +253,7 @@ class CommitEventProcessorSpec
         val commitEvents              = commitsLists(size = Gen.const(2)).generateOne
         val commit1 +: commit2 +: Nil = commitEvents.toList
 
-        givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+        givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
           .returning(context.pure(maybeAccessToken))
 
         val rawTriples = jsonLDTriples.generateOne
@@ -295,7 +295,7 @@ class CommitEventProcessorSpec
           val commitEvents              = commitsLists(size = Gen.const(2)).generateOne
           val commit1 +: commit2 +: Nil = commitEvents.toList
 
-          givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+          givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
             .returning(context.pure(maybeAccessToken))
 
           val rawTriples = jsonLDTriples.generateOne
@@ -336,7 +336,7 @@ class CommitEventProcessorSpec
       val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
       val commit +: Nil = commitEvents.toList
 
-      givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
         .returning(context.pure(maybeAccessToken))
 
       successfulTriplesGenerationAndUpload(commit -> jsonLDTriples.generateOne)
@@ -358,7 +358,7 @@ class CommitEventProcessorSpec
       val commitEvents = commitsLists(size = Gen.const(1)).generateOne
 
       val exception = exceptions.generateOne
-      givenFetchingAccessToken(forProjectId = commitEvents.head.project.id)
+      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
         .returning(context.raiseError(exception))
 
       (eventStatusUpdater
@@ -434,10 +434,10 @@ class CommitEventProcessorSpec
       executionTimeRecorder
     )
 
-    def givenFetchingAccessToken(forProjectId: Id) =
+    def givenFetchingAccessToken(forProjectPath: Path) =
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
-        .expects(forProjectId, projectIdToPath)
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(forProjectPath, projectPathToPath)
 
     def generateTriples(forCommits: NonEmptyList[CommitEvent]): NonEmptyList[(CommitEvent, JsonLDTriples)] =
       forCommits map (_ -> jsonLDTriples.generateOne)

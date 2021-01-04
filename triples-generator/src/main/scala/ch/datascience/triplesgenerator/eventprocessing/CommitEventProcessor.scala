@@ -70,7 +70,7 @@ private class CommitEventProcessor[Interpretation[_]](
   def process(eventId: CompoundEventId, events: NonEmptyList[CommitEvent]): Interpretation[Unit] =
     measureExecutionTime {
       for {
-        maybeAccessToken <- findAccessToken(events.head.project.id) recoverWith rollback(events.head)
+        maybeAccessToken <- findAccessToken(events.head.project.path) recoverWith rollback(events.head)
         uploadingResults <- allToTriplesAndUpload(events)(maybeAccessToken)
       } yield uploadingResults
     } flatMap logSummary recoverWith logError(eventId, events.head.project.path)

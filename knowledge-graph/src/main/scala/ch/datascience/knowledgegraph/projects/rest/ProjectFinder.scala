@@ -52,11 +52,10 @@ class IOProjectFinder(
   def findProject(path: Path): IO[Option[Project]] =
     ((OptionT(findInKG(path)), findInGitLab(path)) parMapN (merge(path, _, _))).value
 
-  private def findInGitLab(path: Path) =
-    for {
-      accessToken   <- OptionT(findAccessToken(path))
-      gitLabProject <- findProjectInGitLab(path, Some(accessToken))
-    } yield gitLabProject
+  private def findInGitLab(path: Path) = for {
+    accessToken   <- OptionT(findAccessToken(path))
+    gitLabProject <- findProjectInGitLab(path, Some(accessToken))
+  } yield gitLabProject
 
   private def merge(path: Path, kgProject: KGProject, gitLabProject: GitLabProject) =
     Project(
