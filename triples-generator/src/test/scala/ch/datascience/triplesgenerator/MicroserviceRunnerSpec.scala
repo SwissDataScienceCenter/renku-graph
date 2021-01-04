@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Swiss Data Science Center (SDSC)
+ * Copyright 2021 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -34,7 +34,7 @@ import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
+import cats.syntax.all._
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext
 
@@ -190,13 +190,12 @@ class MicroserviceRunnerSpec
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
 
-    "return Success Exit code but not run VersionCompatibilityChecker or run reprovisioning when renkuPythonDevVersion defined" in new TestCase {
-
+    "return Success Exit code but not run VersionCompatibilityChecker when renkuPythonDevVersion defined" in new TestCase {
       val runnerWithRenkuPythonDevVersion = new MicroserviceRunner(
         certificateLoader,
         gitCertificateInstaller,
         sentryInitializer,
-        maybeRenkuPythonDevVersion = Some(RenkuPythonDevVersion(nonEmptyStrings().generateOne)),
+        maybeRenkuPythonDevVersion = RenkuPythonDevVersion(nonEmptyStrings().generateOne).some,
         cliVersionCompatChecker,
         datasetInitializer,
         subscriber,
@@ -211,12 +210,15 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
       given(subscriber).succeeds(returning = ())
+      given(reProvisioning).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
       runnerWithRenkuPythonDevVersion.run().unsafeRunSync() shouldBe ExitCode.Success
 
       logger.loggedOnly(
-        Warn(s"RENKU_PYTHON_DEV_VERSION env variable is set. No reprovisioning will take place")
+        Warn(
+          s"RENKU_PYTHON_DEV_VERSION env variable is set. No version compatibility check will take place"
+        )
       )
     }
   }

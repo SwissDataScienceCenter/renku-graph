@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Swiss Data Science Center (SDSC)
+ * Copyright 2021 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -71,18 +71,17 @@ object Microservice extends IOMicroservice {
       sentryInitializer          <- SentryInitializer[IO]()
       maybeRenkuPythonDevVersion <- RenkuPythonDevVersionConfig[IO]() recoverWith errorToNone
       metricsRegistry            <- MetricsRegistry()
-      renkuVersionPairs          <- VersionCompatibilityConfig[IO]()
+      renkuVersionPairs          <- VersionCompatibilityConfig[IO](maybeRenkuPythonDevVersion, ApplicationLogger)
       cliVersionCompatChecker    <- IOCliVersionCompatibilityChecker(triplesGeneration, renkuVersionPairs)
       gitLabRateLimit            <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler            <- Throttler[IO, GitLab](gitLabRateLimit)
       sparqlTimeRecorder         <- SparqlQueryTimeRecorder(metricsRegistry)
       reProvisioningStatus       <- ReProvisioningStatus(subscriber, ApplicationLogger, sparqlTimeRecorder)
-      reProvisioning <- IOReProvisioning(
-                          triplesGeneration,
-                          reProvisioningStatus,
-                          renkuVersionPairs,
-                          sparqlTimeRecorder,
-                          ApplicationLogger
+      reProvisioning <- IOReProvisioning(triplesGeneration,
+                                         reProvisioningStatus,
+                                         renkuVersionPairs,
+                                         sparqlTimeRecorder,
+                                         ApplicationLogger
                         )
       eventProcessingEndpoint <- IOEventProcessingEndpoint(subscriber,
                                                            triplesGeneration,
@@ -134,7 +133,7 @@ private class MicroserviceRunner(
     _                   <- if (!isDevVersionDefined) cliVersionCompatibilityVerifier.run() else ().pure[IO]
     _                   <- datasetInitializer.run()
     _                   <- subscriber.run().start.map(gatherCancelToken)
-    _                   <- if (!isDevVersionDefined) reProvisioning.run().start.map(gatherCancelToken) else ().pure[IO]
+    _                   <- reProvisioning.run().start.map(gatherCancelToken)
     exitCode            <- httpServer.run()
   } yield exitCode) recoverWith logAndThrow(logger)
 
@@ -151,7 +150,9 @@ private class MicroserviceRunner(
                                              maybePythonDevVersion: Option[RenkuPythonDevVersion]
   ): IO[Boolean] = maybePythonDevVersion match {
     case Some(_) =>
-      logger.warn("RENKU_PYTHON_DEV_VERSION env variable is set. No reprovisioning will take place").map(_ => true)
+      logger
+        .warn("RENKU_PYTHON_DEV_VERSION env variable is set. No version compatibility check will take place")
+        .map(_ => true)
     case None => false.pure[IO]
   }
 }

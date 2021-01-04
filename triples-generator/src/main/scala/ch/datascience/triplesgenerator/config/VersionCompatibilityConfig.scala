@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Swiss Data Science Center (SDSC)
+ * Copyright 2021 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,6 +24,7 @@ import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.projects.SchemaVersion
 import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import com.typesafe.config.{Config, ConfigFactory}
+import io.chrisdavenport.log4cats.Logger
 import pureconfig.ConfigReader
 
 object VersionCompatibilityConfig {
@@ -42,13 +43,26 @@ object VersionCompatibilityConfig {
   })
 
   def apply[Interpretation[_]](
-      config:    Config = ConfigFactory.load
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[NonEmptyList[RenkuVersionPair]] =
+      maybeRenkuDevVersion: Option[RenkuPythonDevVersion],
+      logger:               Logger[Interpretation],
+      config:               Config = ConfigFactory.load
+  )(implicit ME:            MonadError[Interpretation, Throwable]): Interpretation[NonEmptyList[RenkuVersionPair]] =
     find[Interpretation, List[RenkuVersionPair]]("compatibility-matrix", config)(reader, ME).flatMap {
       case Nil =>
         ME.raiseError[NonEmptyList[RenkuVersionPair]](
           new Exception("No compatibility matrix provided for schema version")
         )
-      case head :: tail => NonEmptyList(head, tail).pure[Interpretation]
+      case head :: tail =>
+        maybeRenkuDevVersion match {
+          case Some(devVersion) =>
+            for {
+              _ <-
+                logger.warn(
+                  s"RENKU_PYTHON_DEV_VERSION env variable is set. CLI config version is now set to ${devVersion.version}"
+                )
+            } yield NonEmptyList(head.copy(cliVersion = CliVersion(devVersion.version)), tail)
+          case None => NonEmptyList(head, tail).pure[Interpretation]
+        }
+
     }
 }
