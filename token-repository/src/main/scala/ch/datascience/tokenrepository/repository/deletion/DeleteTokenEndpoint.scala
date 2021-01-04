@@ -23,8 +23,9 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage
 import ch.datascience.controllers.ErrorMessage._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.Id
+import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Response
@@ -55,8 +56,9 @@ class DeleteTokenEndpoint[Interpretation[_]: Effect](
 object IODeleteTokenEndpoint {
   def apply(
       transactor:          DbTransactor[IO, ProjectsTokensDB],
+      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
       logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]) = IO {
-    new DeleteTokenEndpoint[IO](new TokenRemover[IO](transactor), logger)
+  )(implicit contextShift: ContextShift[IO]): IO[DeleteTokenEndpoint[IO]] = IO {
+    new DeleteTokenEndpoint[IO](new TokenRemover[IO](transactor, queriesExecTimes), logger)
   }
 }

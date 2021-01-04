@@ -69,6 +69,6 @@ private object IOTokenAssociator {
       pathFinder        <- IOProjectPathFinder(logger)
       accessTokenCrypto <- AccessTokenCrypto[IO]()
       persister    = new IOAssociationPersister(transactor, queriesExecTimes)
-      tokenRemover = new TokenRemover[IO](transactor)
+      tokenRemover = new TokenRemover[IO](transactor, queriesExecTimes)
     } yield new TokenAssociator[IO](pathFinder, accessTokenCrypto, persister, tokenRemover)
 }

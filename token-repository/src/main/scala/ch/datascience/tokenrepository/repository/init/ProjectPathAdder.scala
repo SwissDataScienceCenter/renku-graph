@@ -20,8 +20,9 @@ package ch.datascience.tokenrepository.repository.init
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.{Id, Path}
+import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.association.{IOProjectPathFinder, ProjectPathFinder}
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
@@ -138,8 +139,9 @@ private object IOProjectPathAdder {
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor: DbTransactor[IO, ProjectsTokensDB],
-      logger:     Logger[IO]
+      transactor:       DbTransactor[IO, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
@@ -148,6 +150,6 @@ private object IOProjectPathAdder {
     for {
       accessTokenCrypto <- AccessTokenCrypto[IO]()
       pathFinder        <- IOProjectPathFinder(logger)
-      tokenRemover = new TokenRemover[IO](transactor)
+      tokenRemover = new TokenRemover[IO](transactor, queriesExecTimes)
     } yield new IOProjectPathAdder(transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
 }
