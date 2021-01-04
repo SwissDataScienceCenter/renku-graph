@@ -27,7 +27,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.Id
+import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
@@ -55,8 +55,8 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
-        .expects(projectId, projectIdToPath)
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
         .returning(context pure maybeAccessToken)
 
       (commitEventsSource
@@ -64,7 +64,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
         .expects(startCommit, maybeAccessToken, clock)
         .returning(context pure eventsFlowBuilder)
 
-      val commitEvents @ startCommitEvent +: ancestorEvents = commitEventsFrom(startCommit).generateOne
+      val commitEvents = commitEventsFrom(startCommit).generateOne
       (eventsFlowBuilder
         .transformEventsWith(_: CommitEvent => Try[SendingResult]))
         .expects(*)
@@ -99,8 +99,8 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
-        .expects(projectId, projectIdToPath)
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
         .returning(context pure maybeAccessToken)
 
       (commitEventsSource
@@ -125,8 +125,8 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
 
       val exception = exceptions.generateOne
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
-        .expects(projectId, projectIdToPath)
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
         .returning(context raiseError exception)
 
       commitToEventLog.storeCommitsInEventLog(startCommit) shouldBe Failure(exception)
@@ -138,8 +138,8 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
-        .expects(projectId, projectIdToPath)
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
         .returning(context pure maybeAccessToken)
 
       val exception = exceptions.generateOne
@@ -157,8 +157,8 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
-        .expects(projectId, projectIdToPath)
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
         .returning(context.pure(maybeAccessToken))
 
       (commitEventsSource
@@ -181,8 +181,8 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
 
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
-        .expects(projectId, projectIdToPath)
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
         .returning(context.pure(maybeAccessToken))
 
       (commitEventsSource
@@ -206,8 +206,8 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
     "store all non failing events and log errors for these which failed" in new TestCase {
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
-        .expects(projectId, projectIdToPath)
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
         .returning(context.pure(maybeAccessToken))
 
       (commitEventsSource
@@ -248,7 +248,7 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
     val context = MonadError[Try, Throwable]
 
     val startCommit = startCommits.generateOne
-    val projectId   = startCommit.project.id
+    val projectPath = startCommit.project.path
     val batchDate   = BatchDate(Instant.now)
     val clock       = Clock.fixed(batchDate.value, ZoneId.systemDefault)
 
