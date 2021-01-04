@@ -79,8 +79,8 @@ jobs:
       DOCKER_LABEL: ${{ github.head_ref }}
       DOCKER_PUSH_LATEST: true
       DOCKER_REPOSITORY: renku/
-      HELM_URL: https://charts.helm.sh/stable
-      HELM_TGZ: helm-v2.8.2-linux-amd64.tar.gz
+      HELM_URL: https://storage.googleapis.com/kubernetes-helm
+      HELM_TGZ: helm-v2.17.0-linux-amd64.tar.gz
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 1.11
