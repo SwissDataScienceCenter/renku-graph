@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Swiss Data Science Center (SDSC)
+ * Copyright 2021 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -24,9 +24,7 @@ import cats.effect.{ContextShift, IO}
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.projects.Id
+import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
@@ -93,11 +91,11 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
         givenLatestCommitsAndLogEventsMatch(commit1, commit3)
 
         val maybeAccessToken2 = Gen.option(accessTokens).generateOne
-        givenAccessToken(commit2.projectId, maybeAccessToken2)
+        givenAccessToken(commit2.project.path, maybeAccessToken2)
         val commitInfo2 = commitInfos.generateOne
         givenFetchLatestCommit(commit2, maybeAccessToken2)
           .returning(OptionT.some[IO](commitInfo2))
-        val projectInfo2 = projectInfos.generateOne.copy(id = commit2.projectId)
+        val projectInfo2 = projectInfos.generateOne.copy(id = commit2.project.id)
         givenFindingProjectInfo(commit2, maybeAccessToken2)
           .returning(context.pure(projectInfo2))
 
@@ -121,7 +119,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
         .returning(context.pure(latestProjectsCommitsList))
 
       val maybeAccessToken1 = Gen.option(accessTokens).generateOne
-      givenAccessToken(commit1.projectId, maybeAccessToken1)
+      givenAccessToken(commit1.project.path, maybeAccessToken1)
       givenFetchLatestCommit(commit1, maybeAccessToken1)
         .returning(OptionT.none[IO, CommitInfo])
 
@@ -145,8 +143,8 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
       val exception = exceptions.generateOne
       latestProjectsCommitsList.headOption.foreach { event =>
         (accessTokenFinder
-          .findAccessToken(_: Id)(_: Id => String))
-          .expects(event.projectId, projectIdToPath)
+          .findAccessToken(_: Path)(_: Path => String))
+          .expects(event.project.path, projectPathToPath)
           .returning(context.raiseError(exception))
       }
 
@@ -155,7 +153,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       latestProjectsCommitsList.headOption.foreach { event =>
-        logger.logged(Warn(s"Synchronizing Commits for project ${event.projectId} failed", exception))
+        logger.logged(Warn(s"Synchronizing Commits for project ${event.project.path} failed", exception))
       }
       logger.logged(
         Info(
@@ -172,7 +170,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
         .returning(context.pure(latestProjectsCommitsList))
 
       val maybeAccessToken1 = Gen.option(accessTokens).generateOne
-      givenAccessToken(commit1.projectId, maybeAccessToken1)
+      givenAccessToken(commit1.project.path, maybeAccessToken1)
       val exception = exceptions.generateOne
       givenFetchLatestCommit(commit1, maybeAccessToken1)
         .returning(OptionT.liftF(context.raiseError(exception)))
@@ -182,7 +180,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Warn(s"Synchronizing Commits for project ${commit1.projectId} failed", exception),
+        Warn(s"Synchronizing Commits for project ${commit1.project.path} failed", exception),
         Info(
           s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 1 skipped, 1 failed"
         )
@@ -197,7 +195,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
         .returning(context.pure(latestProjectsCommitsList))
 
       val maybeAccessToken1 = Gen.option(accessTokens).generateOne
-      givenAccessToken(commit1.projectId, maybeAccessToken1)
+      givenAccessToken(commit1.project.path, maybeAccessToken1)
       val commitInfo1 = commitInfos.generateOne
       givenFetchLatestCommit(commit1, maybeAccessToken1)
         .returning(OptionT.some[IO](commitInfo1))
@@ -210,7 +208,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Warn(s"Synchronizing Commits for project ${commit1.projectId} failed", exception),
+        Warn(s"Synchronizing Commits for project ${commit1.project.path} failed", exception),
         Info(
           s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 1 skipped, 1 failed"
         )
@@ -225,11 +223,11 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
         .returning(context.pure(latestProjectsCommitsList))
 
       val maybeAccessToken1 = Gen.option(accessTokens).generateOne
-      givenAccessToken(commit1.projectId, maybeAccessToken1)
+      givenAccessToken(commit1.project.path, maybeAccessToken1)
       val commitInfo1 = commitInfos.generateOne
       givenFetchLatestCommit(commit1, maybeAccessToken1)
         .returning(OptionT.some[IO](commitInfo1))
-      val projectInfo1 = projectInfos.generateOne.copy(id = commit1.projectId)
+      val projectInfo1 = projectInfos.generateOne.copy(id = commit1.project.id)
       givenFindingProjectInfo(commit1, maybeAccessToken1)
         .returning(context.pure(projectInfo1))
       val exception = exceptions.generateOne
@@ -242,7 +240,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
       eventsLoader.loadMissedEvents.unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
-        Warn(s"Synchronizing Commits for project ${commit1.projectId} failed", exception),
+        Warn(s"Synchronizing Commits for project ${commit1.project.path} failed", exception),
         Info(
           s"Synchronized Commits with GitLab in ${executionTimeRecorder.elapsedTime}ms: 0 updates, 1 skipped, 1 failed"
         )
@@ -291,7 +289,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
     def givenLatestCommitsAndLogEventsMatch(latestCommits: LatestProjectCommit*): Unit =
       latestCommits foreach { latestCommit =>
         val maybeAccessToken = Gen.option(accessTokens).generateOne
-        givenAccessToken(latestCommit.projectId, maybeAccessToken)
+        givenAccessToken(latestCommit.project.path, maybeAccessToken)
 
         val commitInfo = commitInfos.generateOne.copy(id = latestCommit.commitId)
         givenFetchLatestCommit(latestCommit, maybeAccessToken)
@@ -301,27 +299,22 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
     def givenFetchLatestCommit(latestCommit: LatestProjectCommit, maybeAccessToken: Option[AccessToken]) =
       (latestCommitFinder
         .findLatestCommit(_: Id, _: Option[AccessToken]))
-        .expects(latestCommit.projectId, maybeAccessToken)
+        .expects(latestCommit.project.id, maybeAccessToken)
 
-    def givenAccessToken(projectId: Id, maybeAccessToken: Option[AccessToken]) =
+    def givenAccessToken(projectPath: Path, maybeAccessToken: Option[AccessToken]) =
       (accessTokenFinder
-        .findAccessToken(_: Id)(_: Id => String))
-        .expects(projectId, projectIdToPath)
+        .findAccessToken(_: Path)(_: Path => String))
+        .expects(projectPath, projectPathToPath)
         .returning(context.pure(maybeAccessToken))
 
     def givenFindingProjectInfo(latestProjectCommit: LatestProjectCommit, maybeAccessToken: Option[AccessToken]) =
       (projectInfoFinder
         .findProjectInfo(_: Id, _: Option[AccessToken]))
-        .expects(latestProjectCommit.projectId, maybeAccessToken)
+        .expects(latestProjectCommit.project.id, maybeAccessToken)
 
     def givenStoring(pushEvent: StartCommit) =
       (commitToEventLog
         .storeCommitsInEventLog(_: StartCommit))
         .expects(pushEvent)
   }
-
-  private implicit val latestProjectsCommits: Gen[LatestProjectCommit] = for {
-    commitId  <- commitIds
-    projectId <- projectIds
-  } yield LatestProjectCommit(commitId, projectId)
 }

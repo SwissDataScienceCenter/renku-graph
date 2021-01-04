@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Swiss Data Science Center (SDSC)
+ * Copyright 2021 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -25,7 +25,7 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.{CommitId, EventBody}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.IORestClient
-import ch.datascience.webhookservice.missedevents.LatestEventsFetcher.LatestProjectCommit
+import ch.datascience.webhookservice.missedevents.LatestEventsFetcher._
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -35,7 +35,8 @@ private trait LatestEventsFetcher[Interpretation[_]] {
 }
 
 private object LatestEventsFetcher {
-  final case class LatestProjectCommit(commitId: CommitId, projectId: projects.Id)
+  final case class Project(id: projects.Id, path: projects.Path)
+  final case class LatestProjectCommit(commitId: CommitId, project: Project)
 }
 
 private class IOLatestEventsFetcher(
@@ -87,9 +88,10 @@ private object IOLatestEventsFetcher {
 
   implicit lazy val latestCommitDecoder: Decoder[LatestProjectCommit] = cursor =>
     for {
-      projectId <- cursor.downField("project").downField("id").as[projects.Id]
-      commitId  <- cursor.downField("body").as[EventBody].flatMap(_.decodeAs(commitId))
-    } yield LatestProjectCommit(commitId, projectId)
+      projectId   <- cursor.downField("project").downField("id").as[projects.Id]
+      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
+      commitId    <- cursor.downField("body").as[EventBody].flatMap(_.decodeAs(commitId))
+    } yield LatestProjectCommit(commitId, Project(projectId, projectPath))
 
   private val commitId: Decoder[CommitId] = _.downField("id").as[CommitId]
 }

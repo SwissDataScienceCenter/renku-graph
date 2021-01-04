@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Swiss Data Science Center (SDSC)
+ * Copyright 2021 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -81,8 +81,8 @@ private class IOMissedEventsLoader(
 
   private def loadEvents(latestProjectCommit: LatestProjectCommit): IO[UpdateResult] = {
     for {
-      maybeAccessToken  <- findAccessToken(latestProjectCommit.projectId)
-      maybeLatestCommit <- findLatestCommit(latestProjectCommit.projectId, maybeAccessToken).value
+      maybeAccessToken  <- findAccessToken(latestProjectCommit.project.path)
+      maybeLatestCommit <- findLatestCommit(latestProjectCommit.project.id, maybeAccessToken).value
       updateResult      <- addEventsIfMissing(latestProjectCommit, maybeLatestCommit, maybeAccessToken)
     } yield updateResult
   } recoverWith loggingWarning(latestProjectCommit)
@@ -96,7 +96,7 @@ private class IOMissedEventsLoader(
       case Some(commitInfo) if commitInfo.id == latestProjectCommit.commitId => IO.pure(Skipped)
       case Some(commitInfo) =>
         for {
-          projectInfo <- findProjectInfo(latestProjectCommit.projectId, maybeAccessToken)
+          projectInfo <- findProjectInfo(latestProjectCommit.project.id, maybeAccessToken)
           startCommit <- startCommitFrom(commitInfo, projectInfo)
           _           <- storeCommitsInEventLog(startCommit)
         } yield Updated
@@ -111,7 +111,7 @@ private class IOMissedEventsLoader(
 
   private def loggingWarning(latestProjectCommit: LatestProjectCommit): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) =>
-      logger.warn(exception)(s"Synchronizing Commits for project ${latestProjectCommit.projectId} failed")
+      logger.warn(exception)(s"Synchronizing Commits for project ${latestProjectCommit.project.path} failed")
       IO.pure(Failed)
   }
 
