@@ -23,9 +23,10 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
+import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 import io.circe.syntax._
@@ -71,9 +72,10 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
 object IOFetchTokenEndpoint {
   def apply(
       transactor:          DbTransactor[IO, ProjectsTokensDB],
+      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[FetchTokenEndpoint[IO]] =
     for {
-      tokenFinder <- IOTokenFinder(transactor)
+      tokenFinder <- IOTokenFinder(transactor, queriesExecTimes)
     } yield new FetchTokenEndpoint[IO](tokenFinder, logger)
 }

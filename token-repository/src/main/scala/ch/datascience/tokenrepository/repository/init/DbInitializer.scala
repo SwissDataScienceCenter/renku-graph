@@ -20,7 +20,8 @@ package ch.datascience.tokenrepository.repository.init
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 
@@ -63,15 +64,16 @@ object IODbInitializer {
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor: DbTransactor[IO, ProjectsTokensDB],
-      logger:     Logger[IO]
+      transactor:       DbTransactor[IO, ProjectsTokensDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      logger:           Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[DbInitializer[IO]] =
     for {
-      pathAdder <- IOProjectPathAdder(transactor, logger)
+      pathAdder <- IOProjectPathAdder(transactor, queriesExecTimes, logger)
       duplicateProjectsRemover = DuplicateProjectsRemover[IO](transactor, logger)
     } yield new DbInitializer[IO](pathAdder, duplicateProjectsRemover, transactor, logger)
 }

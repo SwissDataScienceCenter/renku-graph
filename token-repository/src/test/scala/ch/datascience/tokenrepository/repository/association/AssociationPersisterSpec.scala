@@ -82,7 +82,7 @@ class AssociationPersisterSpec extends AnyWordSpec with InMemoryProjectsTokensDb
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val associator       = new AssociationPersister(transactor, queriesExecTimes)
+    private val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val associator               = new AssociationPersister(transactor, queriesExecTimes)
   }
 }
