@@ -63,7 +63,7 @@ private class IOTriplesRemover(
         |WHERE { ?subject ?p ?o 
         |  MINUS {
         |    ?subject rdf:type ?type
-        |    FILTER (?type IN (<${CliVersionJsonLD.objectType}>, <${ReProvisioningJsonLD.objectType}>)) 
+        |    FILTER (?type IN (<${RenkuVersionPairJsonLD.objectType}>, <${ReProvisioningJsonLD.objectType}>)) 
         |  }
         |}
         |LIMIT 1
@@ -82,7 +82,7 @@ private class IOTriplesRemover(
         |  WHERE { ?s ?p ?o 
         |    MINUS {
         |      ?s rdf:type ?type
-        |      FILTER (?type IN (<${CliVersionJsonLD.objectType}>, <${ReProvisioningJsonLD.objectType}>)) 
+        |      FILTER (?type IN (<${RenkuVersionPairJsonLD.objectType}>, <${ReProvisioningJsonLD.objectType}>)) 
         |    }
         |  }
         |  LIMIT ${removalBatchSize.value}

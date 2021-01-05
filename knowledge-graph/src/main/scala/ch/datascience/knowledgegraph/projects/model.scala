@@ -20,11 +20,10 @@ package ch.datascience.knowledgegraph.projects
 
 import java.net.{MalformedURLException, URL}
 import java.time.Instant
-
 import cats.data.Validated
 import cats.syntax.all._
-import ch.datascience.graph.model.projects.{DateCreated, Description, Id, Name, Path, SchemaVersion, Visibility}
-import ch.datascience.graph.model.users
+import ch.datascience.graph.model.projects.{DateCreated, Description, Id, Name, Path, Visibility}
+import ch.datascience.graph.model.{SchemaVersion, users}
 import ch.datascience.knowledgegraph.projects.model.Statistics._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._

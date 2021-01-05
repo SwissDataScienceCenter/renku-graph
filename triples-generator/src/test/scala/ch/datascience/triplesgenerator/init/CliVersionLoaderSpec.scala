@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.reprovisioning
+package ch.datascience.triplesgenerator.init
 
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
@@ -30,7 +30,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.jdk.CollectionConverters._
 import scala.util.{Success, Try}
 
-class CliVersionFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class CliVersionLoaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "apply" should {
 
@@ -47,14 +47,14 @@ class CliVersionFinderSpec extends AnyWordSpec with MockFactory with should.Matc
         ).asJava
       )
 
-      CliVersionFinder[Try](triplesGeneration = RemoteTriplesGeneration,
+      CliVersionLoader[Try](triplesGeneration = RemoteTriplesGeneration,
                             renkuVersionFinder = cliVersions.generateOne.pure[Try],
                             config = config
       ) shouldBe Success(cliVersion)
     }
 
     s"call 'renku --version' if TriplesGeneration is $RenkuLog" in {
-      CliVersionFinder[Try](triplesGeneration = RenkuLog,
+      CliVersionLoader[Try](triplesGeneration = RenkuLog,
                             renkuVersionFinder = cliVersion.pure[Try],
                             config = ConfigFactory.empty()
       ) shouldBe Success(cliVersion)

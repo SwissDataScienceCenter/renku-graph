@@ -18,22 +18,23 @@
 
 package ch.datascience.triplesgenerator
 
-import java.util.concurrent.ConcurrentHashMap
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
-import ch.datascience.interpreters.IOSentryInitializer
+import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.interpreters.{IOSentryInitializer, TestLogger}
 import ch.datascience.testtools.MockedRunnableCollaborators
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
-import ch.datascience.triplesgenerator.init.IOFusekiDatasetInitializer
+import ch.datascience.triplesgenerator.init.{CliVersionCompatibilityVerifier, IOFusekiDatasetInitializer}
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioning
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext
 
 class MicroserviceRunnerSpec
@@ -51,6 +52,7 @@ class MicroserviceRunnerSpec
         given(certificateLoader).succeeds(returning = ())
         given(gitCertificateInstaller).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
+        given(cliVersionCompatChecker).succeeds(returning = ())
         given(datasetInitializer).succeeds(returning = ())
         given(subscriber).succeeds(returning = ())
         given(reProvisioning).succeeds(returning = ())
@@ -67,6 +69,10 @@ class MicroserviceRunnerSpec
       intercept[Exception] {
         runner.run().unsafeRunSync()
       } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
     }
 
     "fail if installing Certificate for Git fails" in new TestCase {
@@ -78,6 +84,10 @@ class MicroserviceRunnerSpec
       intercept[Exception] {
         runner.run().unsafeRunSync()
       } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
     }
 
     "fail if Sentry initialization fails" in new TestCase {
@@ -90,6 +100,26 @@ class MicroserviceRunnerSpec
       intercept[Exception] {
         runner.run().unsafeRunSync()
       } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
+    }
+
+    "fail if cli version compatibility fails" in new TestCase {
+      given(certificateLoader).succeeds(returning = ())
+      given(gitCertificateInstaller).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(cliVersionCompatChecker) fails (becauseOf = exception)
+
+      intercept[Exception] {
+        runner.run().unsafeRunSync()
+      } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
     }
 
     "fail if RDF dataset verification fails" in new TestCase {
@@ -97,12 +127,17 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
+      given(cliVersionCompatChecker).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(datasetInitializer).fails(becauseOf = exception)
 
       intercept[Exception] {
         runner.run().unsafeRunSync()
       } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
     }
 
     "fail if starting the Http Server fails" in new TestCase {
@@ -110,6 +145,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
+      given(cliVersionCompatChecker).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
       given(subscriber).succeeds(returning = ())
       given(reProvisioning).succeeds(returning = ())
@@ -119,6 +155,10 @@ class MicroserviceRunnerSpec
       intercept[Exception] {
         runner.run().unsafeRunSync()
       } shouldBe exception
+
+      logger.loggedOnly(
+        Error(exception.getMessage, exception)
+      )
     }
 
     "return Success ExitCode even if running Subscriber fails" in new TestCase {
@@ -126,6 +166,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
+      given(cliVersionCompatChecker).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
       given(subscriber).fails(becauseOf = exceptions.generateOne)
       given(reProvisioning).succeeds(returning = ())
@@ -139,6 +180,7 @@ class MicroserviceRunnerSpec
       given(certificateLoader).succeeds(returning = ())
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
+      given(cliVersionCompatChecker).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
       given(subscriber).succeeds(returning = ())
       given(reProvisioning).fails(becauseOf = exceptions.generateOne)
@@ -152,19 +194,24 @@ class MicroserviceRunnerSpec
     val certificateLoader       = mock[CertificateLoader[IO]]
     val gitCertificateInstaller = mock[GitCertificateInstaller[IO]]
     val sentryInitializer       = mock[IOSentryInitializer]
+    val cliVersionCompatChecker = mock[CliVersionCompatibilityVerifier[IO]]
     val datasetInitializer      = mock[IOFusekiDatasetInitializer]
     val subscriber              = mock[Subscriber[IO]]
     val reProvisioning          = mock[ReProvisioning[IO]]
     val httpServer              = mock[IOHttpServer]
+    val logger                  = TestLogger[IO]()
+
     val runner = new MicroserviceRunner(
       certificateLoader,
       gitCertificateInstaller,
       sentryInitializer,
+      cliVersionCompatChecker,
       datasetInitializer,
       subscriber,
       reProvisioning,
       httpServer,
-      new ConcurrentHashMap[CancelToken[IO], Unit]()
+      new ConcurrentHashMap[CancelToken[IO], Unit](),
+      logger
     )
   }
 

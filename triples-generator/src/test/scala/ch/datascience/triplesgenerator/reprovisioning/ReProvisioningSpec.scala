@@ -25,6 +25,9 @@ import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.triplesgenerator.generators.VersionGenerators._
+import ch.datascience.graph.model.RenkuVersionPair
+import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -37,18 +40,23 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
 
   "run" should {
 
-    "clear the RDF Store and reschedule for processing all Commit Events in the Log if store is outdated" in new TestCase {
+    "clear the RDF Store and reschedule all Commit Events for processing in the Log if store is outdated" in new TestCase {
+
       inSequence {
-        (triplesVersionFinder.triplesUpToDate _)
+        (renkuVersionPairFinder.find _)
           .expects()
-          .returning(false.pure[IO])
+          .returning(IO(currentVersionCompatibilityPair.some))
+
+        (reprovisionJudge.isReprovisioningNeeded _)
+          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .returning(true)
 
         (reProvisioningStatus.setRunning _)
           .expects()
           .returning(IO.unit)
 
-        (triplesVersionCreator.updateCliVersion _)
-          .expects()
+        (renkuVersionPairUpdater.update _)
+          .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
@@ -73,26 +81,43 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
     }
 
     "do nothing if there all RDF store is up to date" in new TestCase {
-      (triplesVersionFinder.triplesUpToDate _)
+      (renkuVersionPairFinder.find _)
         .expects()
-        .returning(true.pure[IO])
+        .returning(IO(currentVersionCompatibilityPair.some))
+
+      (reprovisionJudge.isReprovisioningNeeded _)
+        .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+        .returning(false)
+
+      (renkuVersionPairUpdater.update _)
+        .expects(versionCompatibilityPairs.head)
+        .returning(IO.unit)
 
       reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("All projects' triples up to date"))
     }
 
-    "do not fail but simply retry if checking if RDF store is up to date fails" in new TestCase {
+    "do not fail but simply retry if checking if finding version pair in RDF store fails" in new TestCase {
       val exception = exceptions.generateOne
 
       inSequence {
-        (triplesVersionFinder.triplesUpToDate _)
-          .expects()
-          .returning(exception.raiseError[IO, Boolean])
 
-        (triplesVersionFinder.triplesUpToDate _)
+        (renkuVersionPairFinder.find _)
           .expects()
-          .returning(true.pure[IO])
+          .returning(exception.raiseError[IO, Option[RenkuVersionPair]])
+
+        (renkuVersionPairFinder.find _)
+          .expects()
+          .returning(currentVersionCompatibilityPair.some.pure[IO])
+
+        (reprovisionJudge.isReprovisioningNeeded _)
+          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .returning(false)
+
+        (renkuVersionPairUpdater.update _)
+          .expects(versionCompatibilityPairs.head)
+          .returning(IO.unit)
       }
 
       reProvisioning.run().unsafeRunSync() shouldBe ((): Unit)
@@ -103,28 +128,28 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       )
     }
 
-    "do not fail but simply retry if setting the re-provisioning flag fails" in new TestCase {
+    "do not fail but simply retry if setRunning method fails" in new TestCase {
       val exception = exceptions.generateOne
 
       inSequence {
-        (triplesVersionFinder.triplesUpToDate _)
+        (renkuVersionPairFinder.find _)
           .expects()
-          .returning(false.pure[IO])
+          .returning(currentVersionCompatibilityPair.some.pure[IO])
+
+        (reprovisionJudge.isReprovisioningNeeded _)
+          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .returning(true)
 
         (reProvisioningStatus.setRunning _)
           .expects()
           .returning(exception.raiseError[IO, Unit])
 
-        (triplesVersionFinder.triplesUpToDate _)
-          .expects()
-          .returning(false.pure[IO])
-
         (reProvisioningStatus.setRunning _)
           .expects()
           .returning(IO.unit)
 
-        (triplesVersionCreator.updateCliVersion _)
-          .expects()
+        (renkuVersionPairUpdater.update _)
+          .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
@@ -145,7 +170,6 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       logger.loggedOnly(
         Info("The triples are not up to date - re-provisioning is clearing DB"),
         Error("Re-provisioning failure", exception),
-        Info("The triples are not up to date - re-provisioning is clearing DB"),
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
@@ -154,28 +178,25 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       val exception = exceptions.generateOne
 
       inSequence {
-        (triplesVersionFinder.triplesUpToDate _)
+
+        (renkuVersionPairFinder.find _)
           .expects()
-          .returning(false.pure[IO])
+          .returning(currentVersionCompatibilityPair.some.pure[IO])
+
+        (reprovisionJudge.isReprovisioningNeeded _)
+          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .returning(true)
 
         (reProvisioningStatus.setRunning _)
           .expects()
           .returning(IO.unit)
 
-        (triplesVersionCreator.updateCliVersion _)
-          .expects()
+        (renkuVersionPairUpdater.update _)
+          .expects(versionCompatibilityPairs.head)
           .returning(exception.raiseError[IO, Unit])
 
-        (triplesVersionFinder.triplesUpToDate _)
-          .expects()
-          .returning(false.pure[IO])
-
-        (reProvisioningStatus.setRunning _)
-          .expects()
-          .returning(IO.unit)
-
-        (triplesVersionCreator.updateCliVersion _)
-          .expects()
+        (renkuVersionPairUpdater.update _)
+          .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
@@ -196,7 +217,6 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       logger.loggedOnly(
         Info("The triples are not up to date - re-provisioning is clearing DB"),
         Error("Re-provisioning failure", exception),
-        Info("The triples are not up to date - re-provisioning is clearing DB"),
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
@@ -205,16 +225,21 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       val exception = exceptions.generateOne
 
       inSequence {
-        (triplesVersionFinder.triplesUpToDate _)
+
+        (renkuVersionPairFinder.find _)
           .expects()
-          .returning(false.pure[IO])
+          .returning(currentVersionCompatibilityPair.some.pure[IO])
+
+        (reprovisionJudge.isReprovisioningNeeded _)
+          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .returning(true)
 
         (reProvisioningStatus.setRunning _)
           .expects()
           .returning(IO.unit)
 
-        (triplesVersionCreator.updateCliVersion _)
-          .expects()
+        (renkuVersionPairUpdater.update _)
+          .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
@@ -248,16 +273,21 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       val exception2 = exceptions.generateOne
 
       inSequence {
-        (triplesVersionFinder.triplesUpToDate _)
+
+        (renkuVersionPairFinder.find _)
           .expects()
-          .returning(false.pure[IO])
+          .returning(currentVersionCompatibilityPair.some.pure[IO])
+
+        (reprovisionJudge.isReprovisioningNeeded _)
+          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .returning(true)
 
         (reProvisioningStatus.setRunning _)
           .expects()
           .returning(IO.unit)
 
-        (triplesVersionCreator.updateCliVersion _)
-          .expects()
+        (renkuVersionPairUpdater.update _)
+          .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
@@ -295,16 +325,21 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
       val exception = exceptions.generateOne
 
       inSequence {
-        (triplesVersionFinder.triplesUpToDate _)
+
+        (renkuVersionPairFinder.find _)
           .expects()
-          .returning(false.pure[IO])
+          .returning(currentVersionCompatibilityPair.some.pure[IO])
+
+        (reprovisionJudge.isReprovisioningNeeded _)
+          .expects(currentVersionCompatibilityPair, versionCompatibilityPairs)
+          .returning(true)
 
         (reProvisioningStatus.setRunning _)
           .expects()
           .returning(IO.unit)
 
-        (triplesVersionCreator.updateCliVersion _)
-          .expects()
+        (renkuVersionPairUpdater.update _)
+          .expects(versionCompatibilityPairs.head)
           .returning(IO.unit)
 
         (triplesRemover.removeAllTriples _)
@@ -332,23 +367,29 @@ class ReProvisioningSpec extends AnyWordSpec with MockFactory with should.Matche
         Info(s"Clearing DB finished in ${executionTimeRecorder.elapsedTime}ms - re-processing all the events")
       )
     }
+
   }
 
   private implicit val timer: Timer[IO] = IO.timer(global)
 
   private trait TestCase {
-    val triplesVersionFinder  = mock[TriplesVersionFinder[IO]]
-    val triplesRemover        = mock[TriplesRemover[IO]]
-    val eventsReScheduler     = mock[EventsReScheduler[IO]]
-    val triplesVersionCreator = mock[TriplesVersionCreator[IO]]
-    val reProvisioningStatus  = mock[ReProvisioningStatus[IO]]
-    val logger                = TestLogger[IO]()
-    val executionTimeRecorder = TestExecutionTimeRecorder(logger)
+    val versionCompatibilityPairs       = renkuVersionPairs.generateNonEmptyList(2)
+    val currentVersionCompatibilityPair = renkuVersionPairs.generateOne
+    val renkuVersionPairFinder          = mock[RenkuVersionPairFinder[IO]]
+    val reprovisionJudge                = mock[ReprovisionJudge]
+    val triplesRemover                  = mock[TriplesRemover[IO]]
+    val eventsReScheduler               = mock[EventsReScheduler[IO]]
+    val renkuVersionPairUpdater         = mock[RenkuVersionPairUpdater[IO]]
+    val reProvisioningStatus            = mock[ReProvisioningStatus[IO]]
+    val logger                          = TestLogger[IO]()
+    val executionTimeRecorder           = TestExecutionTimeRecorder(logger)
     val reProvisioning = new ReProvisioningImpl[IO](
-      triplesVersionFinder,
+      renkuVersionPairFinder,
+      versionCompatibilityPairs,
+      reprovisionJudge,
       triplesRemover,
       eventsReScheduler,
-      triplesVersionCreator,
+      renkuVersionPairUpdater,
       reProvisioningStatus,
       executionTimeRecorder,
       logger,
