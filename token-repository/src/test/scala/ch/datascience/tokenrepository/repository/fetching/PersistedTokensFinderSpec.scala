@@ -18,10 +18,13 @@
 
 package ch.datascience.tokenrepository.repository.fetching
 
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.metrics.TestLabeledHistogram
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
+import eu.timepit.refined.auto._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -56,6 +59,7 @@ class PersistedTokensFinderSpec extends AnyWordSpec with InMemoryProjectsTokensD
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val finder = new PersistedTokensFinder(transactor)
+    private val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val finder                   = new PersistedTokensFinder(transactor, queriesExecTimes)
   }
 }

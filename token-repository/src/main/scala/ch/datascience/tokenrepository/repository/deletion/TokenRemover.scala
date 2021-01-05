@@ -18,25 +18,32 @@
 
 package ch.datascience.tokenrepository.repository.deletion
 
-import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import cats.effect.{Bracket, IO}
+import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.Id
+import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
+import eu.timepit.refined.auto._
 
 class TokenRemover[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, ProjectsTokensDB]
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+    transactor:       DbTransactor[Interpretation, ProjectsTokensDB],
+    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
+)(implicit ME:        Bracket[Interpretation, Throwable])
+    extends DbClient(Some(queriesExecTimes)) {
 
   import doobie.implicits._
 
-  def delete(projectId: Id): Interpretation[Unit] =
-    sql"""
+  def delete(projectId: Id): Interpretation[Unit] = measureExecutionTime {
+    SqlQuery(
+      sql"""
           delete 
           from projects_tokens 
           where project_id = ${projectId.value}
           """.update.run
-      .map(failIfMultiUpdate(projectId))
-      .transact(transactor.get)
+        .map(failIfMultiUpdate(projectId)),
+      name = "remove token"
+    )
+  }.transact(transactor.get)
 
   private def failIfMultiUpdate(projectId: Id): Int => Unit = {
     case 0 => ()

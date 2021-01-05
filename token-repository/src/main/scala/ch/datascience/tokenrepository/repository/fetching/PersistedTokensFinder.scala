@@ -21,29 +21,41 @@ package ch.datascience.tokenrepository.repository.fetching
 import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.{Id, Path}
+import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
+import eu.timepit.refined.auto._
 
 private class PersistedTokensFinder[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, ProjectsTokensDB]
-)(implicit ME:  Bracket[Interpretation, Throwable]) {
+    transactor:       DbTransactor[Interpretation, ProjectsTokensDB],
+    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
+)(implicit ME:        Bracket[Interpretation, Throwable])
+    extends DbClient(Some(queriesExecTimes)) {
 
   import doobie.implicits._
 
-  def findToken(projectId: Id): OptionT[Interpretation, EncryptedAccessToken] = OptionT {
-    sql"select token from projects_tokens where project_id = ${projectId.value}"
-      .query[String]
-      .option
-      .transact(transactor.get)
-      .flatMap(toSerializedAccessToken)
+  def findToken(projectId: Id): OptionT[Interpretation, EncryptedAccessToken] = run {
+    SqlQuery(
+      sql"select token from projects_tokens where project_id = ${projectId.value}"
+        .query[String]
+        .option,
+      name = "find token - id"
+    )
   }
 
-  def findToken(projectPath: Path): OptionT[Interpretation, EncryptedAccessToken] = OptionT {
-    sql"select token from projects_tokens where project_path = ${projectPath.value}"
-      .query[String]
-      .option
+  def findToken(projectPath: Path): OptionT[Interpretation, EncryptedAccessToken] = run {
+    SqlQuery(
+      sql"select token from projects_tokens where project_path = ${projectPath.value}"
+        .query[String]
+        .option,
+      name = "find token - path"
+    )
+  }
+
+  private def run(query: SqlQuery[Option[String]]) = OptionT {
+    measureExecutionTime(query)
       .transact(transactor.get)
       .flatMap(toSerializedAccessToken)
   }
@@ -58,6 +70,7 @@ private class PersistedTokensFinder[Interpretation[_]](
 }
 
 private class IOPersistedTokensFinder(
-    transactor:          DbTransactor[IO, ProjectsTokensDB]
+    transactor:          DbTransactor[IO, ProjectsTokensDB],
+    queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
 )(implicit contextShift: ContextShift[IO])
-    extends PersistedTokensFinder[IO](transactor)
+    extends PersistedTokensFinder[IO](transactor, queriesExecTimes)

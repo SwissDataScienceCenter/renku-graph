@@ -29,7 +29,6 @@ class TestLabeledHistogram[LabelValue](
 ) extends LabeledHistogram[IO, LabelValue] {
 
   import MetricsTools._
-  import org.scalatest.matchers._
 
   def verifyExecutionTimeMeasured(forLabelValue: LabelValue, other: LabelValue*): Unit =
     (forLabelValue +: other).map(_.toString) diff histogram.collectAllSamples.map(_._2) match {

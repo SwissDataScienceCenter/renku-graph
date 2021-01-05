@@ -18,10 +18,13 @@
 
 package ch.datascience.tokenrepository.repository.deletion
 
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.metrics.TestLabeledHistogram
 import ch.datascience.tokenrepository.repository.InMemoryProjectsTokensDbSpec
 import ch.datascience.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
+import eu.timepit.refined.auto._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -49,6 +52,7 @@ class TokenRemoverSpec extends AnyWordSpec with InMemoryProjectsTokensDbSpec wit
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val remover = new TokenRemover(transactor)
+    private val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val remover                  = new TokenRemover(transactor, queriesExecTimes)
   }
 }
