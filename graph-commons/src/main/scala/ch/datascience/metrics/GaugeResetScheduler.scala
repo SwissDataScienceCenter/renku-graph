@@ -40,7 +40,7 @@ class GaugeResetSchedulerImpl[Interpretation[_], LabelValue](
 
   override def run(): Interpretation[Unit] = for {
     interval <- metricsSchedulerConfig.getInterval()
-    _        <- resetGauges recoverWith logError
+    _        <- resetGauges
     _        <- resetGaugesEvery(interval).foreverM[Unit]
   } yield ()
 
@@ -52,7 +52,7 @@ class GaugeResetSchedulerImpl[Interpretation[_], LabelValue](
   } recoverWith logError
 
   private def resetGauges: Interpretation[Unit] =
-    gauges.map(_.reset()).sequence.void
+    gauges.map(_.reset() recoverWith logError).sequence.void
 
   private lazy val logError: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     logger.error(exception)(s"Clearing event gauge metrics failed")
