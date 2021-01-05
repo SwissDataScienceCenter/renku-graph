@@ -19,12 +19,9 @@
 package ch.datascience.generators
 
 import ch.datascience.config.certificates.Certificate
-
-import java.nio.charset.StandardCharsets.UTF_8
-import java.util.Base64
 import ch.datascience.config.renku
 import ch.datascience.config.sentry.SentryConfig
-import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, ServiceName}
+import ch.datascience.config.sentry.SentryConfig.{EnvironmentName, SentryBaseUrl, SentryStackTracePackage, ServiceName}
 import ch.datascience.control.{RateLimit, RateLimitUnit}
 import ch.datascience.crypto.AesCrypto
 import ch.datascience.generators.Generators.Implicits._
@@ -46,6 +43,8 @@ import io.circe.literal._
 import io.renku.jsonld.Schema
 import org.scalacheck.Gen
 
+import java.nio.charset.StandardCharsets.UTF_8
+import java.util.Base64
 import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.Try
@@ -123,11 +122,14 @@ object CommonGraphGenerators {
   } yield SentryBaseUrl(s"$url@$projectName/$projectId")
   private implicit val serviceNames:     Gen[ServiceName]     = nonEmptyStrings() map ServiceName.apply
   private implicit val environmentNames: Gen[EnvironmentName] = nonEmptyStrings() map EnvironmentName.apply
+  private implicit val stackTracePackages: Gen[SentryStackTracePackage] =
+    nonEmptyStrings() map SentryStackTracePackage.apply
   implicit val sentryConfigs: Gen[SentryConfig] = for {
-    url             <- sentryBaseUrls
-    serviceName     <- serviceNames
-    environmentName <- environmentNames
-  } yield SentryConfig(url, environmentName, serviceName)
+    url               <- sentryBaseUrls
+    serviceName       <- serviceNames
+    environmentName   <- environmentNames
+    stackTracePackage <- stackTracePackages
+  } yield SentryConfig(url, environmentName, serviceName, stackTracePackage)
 
   implicit val rels: Gen[Rel] = nonEmptyStrings() map Rel.apply
   implicit val hrefs: Gen[Href] = for {

@@ -19,7 +19,6 @@
 package ch.datascience.config.sentry
 
 import cats.MonadError
-
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -39,7 +38,7 @@ class SentryInitializerSpec extends AnyWordSpec with MockFactory with should.Mat
 
       initSentry.expects {
         s"${sentryConfig.baseUrl}?" +
-          s"stacktrace.app.packages=&" +
+          s"stacktrace.app.packages=${urlEncode(sentryConfig.stackTracePackage.toString)}&" +
           s"servername=${urlEncode(sentryConfig.serviceName.toString)}&" +
           s"environment=${urlEncode(sentryConfig.environmentName.toString)}"
       }
