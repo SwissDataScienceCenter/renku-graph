@@ -36,6 +36,8 @@ object RdfStoreStub {
     fusekiStub.start()
     WireMock.configureFor(fusekiStub.port())
     givenTriplesUpToDateCheckReturning(currentVersionPair)
+    givenTriplesVersionPairIsUpdated()
+    ()
   }
 
   def shutdown(): Unit = {
@@ -73,4 +75,10 @@ object RdfStoreStub {
     }
     ()
   }
+
+  private def givenTriplesVersionPairIsUpdated() =
+    stubFor {
+      post("/renku/update")
+        .willReturn(ok())
+    }
 }

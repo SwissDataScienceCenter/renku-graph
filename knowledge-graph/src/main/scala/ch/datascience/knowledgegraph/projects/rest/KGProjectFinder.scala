@@ -95,7 +95,7 @@ private class IOKGProjectFinder(
         |                    schema:name ?maybeCreatorName.
         |    OPTIONAL { ?maybeCreatorId schema:email ?maybeCreatorEmail }
         |  }
-        |  OPTIONAL { 
+        |  OPTIONAL {
         |    ?projectId prov:wasDerivedFrom ?maybeParentId.
         |    ?maybeParentId rdf:type <http://schema.org/Project>;
         |                   schema:name ?maybeParentName;

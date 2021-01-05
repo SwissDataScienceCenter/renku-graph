@@ -28,9 +28,11 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
 import ch.datascience.graph.acceptancetests.tooling.{ModelImplicits, RDFStore}
 import ch.datascience.graph.model.CliVersion
-import ch.datascience.graph.model.events.{CommitId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{CommitId, EventStatus}
+import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.users.Email
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
@@ -105,25 +107,47 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
     }
 
     eventually {
-      EventLog.findEvents(projectId, status = EventStatus.GeneratingTriples).isEmpty shouldBe true
+      EventLog
+        .findEvents(projectId, status = EventStatus.GeneratingTriples, EventStatus.TransformingTriples)
+        .isEmpty shouldBe true
     }
   }
 
-  def `triples updates run`(emails: Set[Email]): Assertion = eventually {
+  def `triples updates run`(emails: Set[Email], projectPath: Path): Assertion = {
+    eventually {
 
-    val emailsInStore = RDFStore
-      .run("""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-              |PREFIX schema: <http://schema.org/>
-              |
-              |SELECT ?email
-              |WHERE {
-              |  ?resource rdf:type <http://schema.org/Person> ;
-              |            schema:email ?email .
-              |}
-              |""".stripMargin)
-      .flatMap(_.get("email"))
-      .toSet
+      val emailsInStore = RDFStore
+        .run("""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                |PREFIX schema: <http://schema.org/>
+                |
+                |SELECT ?email
+                |WHERE {
+                |  ?resource rdf:type <http://schema.org/Person> ;
+                |            schema:email ?email .
+                |}
+                |""".stripMargin)
+        .flatMap(_.get("email"))
+        .toSet
 
-    (emails.map(_.value) diff emailsInStore).isEmpty shouldBe true
+      (emails.map(_.value) diff emailsInStore).isEmpty shouldBe true
+    }
+
+    eventually {
+      val projects = RDFStore
+        .run(s"""
+                |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                |PREFIX schema: <http://schema.org/>
+                |
+                |SELECT DISTINCT  ?dateCreated
+                |WHERE {
+                |  ${ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]} rdf:type <http://schema.org/Project>; 
+                | schema:dateCreated ?dateCreated .
+                |} 
+                |
+                |""".stripMargin)
+        .flatMap(_.get("dateCreated"))
+        .toSet
+      projects.nonEmpty shouldBe true
+    }
   }
 }
