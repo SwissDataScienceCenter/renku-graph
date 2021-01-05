@@ -24,11 +24,10 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.graph.model.{CliVersion, RenkuVersionPair}
 import ch.datascience.triplesgenerator.config.TriplesGeneration
+import ch.datascience.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
 
 trait CliVersionCompatibilityVerifier[Interpretation[_]] {
-
   def run(): Interpretation[Unit]
-
 }
 
 private class CliVersionCompatibilityVerifierImpl[Interpretation[_]](cliVersion:        CliVersion,
@@ -46,9 +45,15 @@ private class CliVersionCompatibilityVerifierImpl[Interpretation[_]](cliVersion:
 }
 
 object IOCliVersionCompatibilityChecker {
+
   def apply(triplesGeneration: TriplesGeneration,
             renkuVersionPairs: NonEmptyList[RenkuVersionPair]
-  ): IO[CliVersionCompatibilityVerifier[IO]] = for {
-    cliVersion <- CliVersionLoader[IO](triplesGeneration)
-  } yield new CliVersionCompatibilityVerifierImpl[IO](cliVersion, renkuVersionPairs)
+  ): IO[CliVersionCompatibilityVerifier[IO]] = {
+    // the concept of TriplesGeneration flag is a temporary solution
+    // to provide acceptance-tests with the expected CLI version
+    triplesGeneration match {
+      case RenkuLog                => CliVersionLoader[IO]()
+      case RemoteTriplesGeneration => renkuVersionPairs.head.cliVersion.pure[IO]
+    }
+  }.map(cliVersion => new CliVersionCompatibilityVerifierImpl[IO](cliVersion, renkuVersionPairs))
 }

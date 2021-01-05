@@ -23,11 +23,10 @@ import cats.data.{NonEmptyList, OptionT}
 import cats.effect.Timer
 import cats.syntax.all._
 import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.config.TriplesGeneration
-import ch.datascience.graph.model.RenkuVersionPair
 import com.typesafe.config.{Config, ConfigFactory}
 import io.chrisdavenport.log4cats.Logger
 
@@ -116,7 +115,6 @@ object IOReProvisioning {
   private val SleepWhenBusy = 10 minutes
 
   def apply(
-      triplesGeneration:         TriplesGeneration,
       reProvisioningStatus:      ReProvisioningStatus[IO],
       versionCompatibilityPairs: NonEmptyList[RenkuVersionPair],
       timeRecorder:              SparqlQueryTimeRecorder[IO],

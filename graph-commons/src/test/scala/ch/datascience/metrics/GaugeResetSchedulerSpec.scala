@@ -18,8 +18,6 @@
 
 package ch.datascience.metrics
 
-import java.lang.Thread.sleep
-
 import cats.MonadError
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
@@ -28,11 +26,15 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
+import io.prometheus.client.{Gauge => LibGauge}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.lang.Thread.sleep
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
 import scala.concurrent.duration._
@@ -52,29 +54,35 @@ class GaugeResetSchedulerSpec
 
         val gaugeScheduler = newGaugeScheduler(refreshing = gauge1, gauge2)
 
-        (gauge1.reset _).expects().returning(context.unit).atLeastTwice()
-        (gauge2.reset _).expects().returning(context.unit).atLeastTwice()
+        gauge1.givenResetMethodToReturn add context.unit
+        gauge2.givenResetMethodToReturn add context.unit
 
         gaugeScheduler.run().start.unsafeRunAsyncAndForget()
 
         sleep(2 * interval.toMillis + 1000)
+
+        gauge1.resetCallsCount.get() should be > 2
+        gauge2.resetCallsCount.get() should be > 2
 
         logger.expectNoLogs()
       }
 
     "log an error and continue refreshing in case of failures" in new TestCase {
 
-      val gaugeScheduler = newGaugeScheduler(refreshing = gauge1)
+      val gaugeScheduler = newGaugeScheduler(refreshing = gauge1, gauge2)
 
       val exception1 = exceptions.generateOne
-      (gauge1.reset _).expects().returning(context.raiseError(exception1))
+      gauge1.givenResetMethodToReturn add IO.raiseError(exception1)
+
       val exception2 = exceptions.generateOne
-      (gauge1.reset _).expects().returning(context.raiseError(exception2))
-      (gauge1.reset _).expects().returning(context.unit).atLeastTwice()
+      gauge2.givenResetMethodToReturn add IO.raiseError(exception2)
 
       gaugeScheduler.run().start.unsafeRunAsyncAndForget()
 
       sleep(3 * interval.toMillis + 1000)
+
+      gauge1.resetCallsCount.get() should be > 2
+      gauge2.resetCallsCount.get() should be > 2
 
       eventually {
         logger.loggedOnly(Error(s"Clearing event gauge metrics failed", exception1),
@@ -90,8 +98,8 @@ class GaugeResetSchedulerSpec
     val logger                = TestLogger[IO]()
     val timer                 = IO.timer(global)
     val context               = MonadError[IO, Throwable]
-    val gauge1                = mock[LabeledGauge[IO, Double]]
-    val gauge2                = mock[LabeledGauge[IO, Double]]
+    val gauge1                = new TestLabeledGauge
+    val gauge2                = new TestLabeledGauge
     val interval              = 100 millis
     val metricsConfigProvider = mock[MetricsConfigProvider[IO]]
 
@@ -99,5 +107,36 @@ class GaugeResetSchedulerSpec
       new GaugeResetSchedulerImpl[IO, Double](refreshing.toList, metricsConfigProvider, logger)(context, timer)
 
     (metricsConfigProvider.getInterval _).expects().returning(interval.pure[IO]).once()
+
+    class TestLabeledGauge extends LabeledGauge[IO, Double] {
+
+      val givenResetMethodToReturn = new ConcurrentLinkedQueue[IO[Unit]]()
+      val resetCallsCount          = new AtomicInteger(0)
+
+      override def reset(): IO[Unit] = {
+        resetCallsCount.incrementAndGet()
+        Option(givenResetMethodToReturn.poll()) getOrElse IO.unit
+      }
+
+      override def set(labelValue: (Double, Double)): IO[Unit] = {
+        fail("Spec shouldn't be calling that")
+        IO.unit
+      }
+
+      override def increment(labelValue: Double): IO[Unit] = {
+        fail("Spec shouldn't be calling that")
+        IO.unit
+      }
+
+      override def decrement(labelValue: Double): IO[Unit] = {
+        fail("Spec shouldn't be calling that")
+        IO.unit
+      }
+
+      protected override lazy val gauge: LibGauge = LibGauge
+        .build()
+        .name("gauge")
+        .create()
+    }
   }
 }
