@@ -23,7 +23,7 @@ import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
-import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
+import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.interpreters.{IOSentryInitializer, TestLogger}
 import ch.datascience.testtools.MockedRunnableCollaborators
 import ch.datascience.triplesgenerator.config.RenkuPythonDevVersion
@@ -190,35 +190,6 @@ class MicroserviceRunnerSpec
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
 
-    "return Success Exit code but not run VersionCompatibilityChecker or run reprovisioning when renkuPythonDevVersion defined" in new TestCase {
-
-      val runnerWithRenkuPythonDevVersion = new MicroserviceRunner(
-        certificateLoader,
-        gitCertificateInstaller,
-        sentryInitializer,
-        maybeRenkuPythonDevVersion = Some(RenkuPythonDevVersion(nonEmptyStrings().generateOne)),
-        cliVersionCompatChecker,
-        datasetInitializer,
-        subscriber,
-        reProvisioning,
-        httpServer,
-        new ConcurrentHashMap[CancelToken[IO], Unit](),
-        logger
-      )
-
-      given(certificateLoader).succeeds(returning = ())
-      given(gitCertificateInstaller).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      given(datasetInitializer).succeeds(returning = ())
-      given(subscriber).succeeds(returning = ())
-      given(httpServer).succeeds(returning = ExitCode.Success)
-
-      runnerWithRenkuPythonDevVersion.run().unsafeRunSync() shouldBe ExitCode.Success
-
-      logger.loggedOnly(
-        Warn(s"RENKU_PYTHON_DEV_VERSION env variable is set. No reprovisioning will take place")
-      )
-    }
   }
 
   private trait TestCase {
@@ -236,7 +207,6 @@ class MicroserviceRunnerSpec
       certificateLoader,
       gitCertificateInstaller,
       sentryInitializer,
-      maybeRenkuPythonDevVersion = None,
       cliVersionCompatChecker,
       datasetInitializer,
       subscriber,

@@ -24,8 +24,8 @@ import cats.effect._
 import cats.effect.concurrent.Semaphore
 import cats.syntax.all._
 import ch.datascience.config.ConfigLoader
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.projects.SchemaVersion
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult._
 import ch.datascience.triplesgenerator.subscriptions.Subscriber

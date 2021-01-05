@@ -20,7 +20,8 @@ package ch.datascience.rdfstore.entities
 
 import cats.implicits.catsSyntaxOptionId
 import ch.datascience.graph.config.GitLabApiUrl
-import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId, SchemaVersion}
+import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId}
 
 final case class Project(path:               Path,
                          name:               Name,

@@ -24,7 +24,7 @@ import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery.{Prefix, Prefixes}
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import ch.datascience.graph.model.RenkuVersionPair
 import io.chrisdavenport.log4cats.Logger
 import io.renku.jsonld.EntityId
 import eu.timepit.refined.auto._

@@ -48,12 +48,12 @@ object Microservice extends IOMicroservice {
       for {
         certificateLoader      <- CertificateLoader[IO](ApplicationLogger)
         sentryInitializer      <- SentryInitializer[IO]()
-        fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, ApplicationLogger)
         metricsRegistry        <- MetricsRegistry()
         queriesExecTimes       <- QueriesExecutionTimes(metricsRegistry)
+        fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, queriesExecTimes, ApplicationLogger)
-        dbInitializer          <- IODbInitializer(transactor, ApplicationLogger)
-        deleteTokenEndpoint    <- IODeleteTokenEndpoint(transactor, ApplicationLogger)
+        dbInitializer          <- IODbInitializer(transactor, queriesExecTimes, ApplicationLogger)
+        deleteTokenEndpoint    <- IODeleteTokenEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         microserviceRoutes = new MicroserviceRoutes[IO](
                                fetchTokenEndpoint,
                                associateTokenEndpoint,

@@ -25,7 +25,7 @@ import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
-private[triplesgenerator] object CliVersionLoader {
+private[init] object CliVersionLoader {
 
   import ch.datascience.config.ConfigLoader._
 

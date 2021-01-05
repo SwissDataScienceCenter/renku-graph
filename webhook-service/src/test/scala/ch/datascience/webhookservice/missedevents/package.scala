@@ -16,18 +16,19 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.generators
+package ch.datascience.webhookservice
 
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.RenkuVersionPair
+import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import org.scalacheck.Gen
 
-object VersionGenerators {
+package object missedevents {
 
-  implicit val renkuVersionPairs: Gen[RenkuVersionPair] = for {
-    cliVersion    <- cliVersions
-    schemaVersion <- projectSchemaVersions
-  } yield RenkuVersionPair(cliVersion, schemaVersion)
+  import ch.datascience.webhookservice.missedevents.LatestEventsFetcher._
 
+  private[missedevents] implicit lazy val latestProjectsCommits: Gen[LatestProjectCommit] = for {
+    commitId    <- commitIds
+    projectId   <- projectIds
+    projectPath <- projectPaths
+  } yield LatestProjectCommit(commitId, Project(projectId, projectPath))
 }

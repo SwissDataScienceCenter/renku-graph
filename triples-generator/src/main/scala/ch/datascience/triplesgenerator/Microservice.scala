@@ -30,8 +30,8 @@ import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
-import ch.datascience.triplesgenerator.config.{RenkuPythonDevVersion, RenkuPythonDevVersionConfig, TriplesGeneration, VersionCompatibilityConfig}
-import ch.datascience.triplesgenerator.eventprocessing._
+import ch.datascience.triplesgenerator.config.{IOVersionCompatibilityConfig, TriplesGeneration}
+import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessingEndpoint
 import ch.datascience.triplesgenerator.init._
 import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
@@ -57,33 +57,26 @@ object Microservice extends IOMicroservice {
 
   protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
 
-  private lazy val errorToNone: PartialFunction[Throwable, IO[Option[RenkuPythonDevVersion]]] = { case NonFatal(_) =>
-    None.pure[IO]
-  }
-
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      certificateLoader          <- CertificateLoader[IO](ApplicationLogger)
-      gitCertificateInstaller    <- GitCertificateInstaller[IO](ApplicationLogger)
-      fusekiDatasetInitializer   <- IOFusekiDatasetInitializer()
-      subscriber                 <- Subscriber(ApplicationLogger)
-      triplesGeneration          <- TriplesGeneration[IO]()
-      sentryInitializer          <- SentryInitializer[IO]()
-      maybeRenkuPythonDevVersion <- RenkuPythonDevVersionConfig[IO]() recoverWith errorToNone
-      cliVersion                 <- CliVersionLoader[IO](triplesGeneration)
-      metricsRegistry            <- MetricsRegistry()
-      renkuVersionPairs          <- VersionCompatibilityConfig[IO]()
-      cliVersionCompatChecker    <- IOCliVersionCompatibilityChecker(cliVersion, renkuVersionPairs)
-      gitLabRateLimit            <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-      gitLabThrottler            <- Throttler[IO, GitLab](gitLabRateLimit)
-      sparqlTimeRecorder         <- SparqlQueryTimeRecorder(metricsRegistry)
-      reProvisioningStatus       <- ReProvisioningStatus(subscriber, ApplicationLogger, sparqlTimeRecorder)
-      reProvisioning <- IOReProvisioning(
-                          triplesGeneration,
-                          reProvisioningStatus,
-                          renkuVersionPairs,
-                          sparqlTimeRecorder,
-                          ApplicationLogger
+      certificateLoader        <- CertificateLoader[IO](ApplicationLogger)
+      gitCertificateInstaller  <- GitCertificateInstaller[IO](ApplicationLogger)
+      fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
+      subscriber               <- Subscriber(ApplicationLogger)
+      triplesGeneration        <- TriplesGeneration[IO]()
+      sentryInitializer        <- SentryInitializer[IO]()
+      metricsRegistry          <- MetricsRegistry()
+      renkuVersionPairs        <- IOVersionCompatibilityConfig(ApplicationLogger)
+      cliVersionCompatChecker  <- IOCliVersionCompatibilityChecker(triplesGeneration, renkuVersionPairs)
+      gitLabRateLimit          <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+      gitLabThrottler          <- Throttler[IO, GitLab](gitLabRateLimit)
+      sparqlTimeRecorder       <- SparqlQueryTimeRecorder(metricsRegistry)
+      reProvisioningStatus     <- ReProvisioningStatus(subscriber, ApplicationLogger, sparqlTimeRecorder)
+      reProvisioning <- IOReProvisioning(triplesGeneration,
+                                         reProvisioningStatus,
+                                         renkuVersionPairs,
+                                         sparqlTimeRecorder,
+                                         ApplicationLogger
                         )
       eventProcessingEndpoint <- IOEventProcessingEndpoint(subscriber,
                                                            triplesGeneration,
@@ -101,7 +94,6 @@ object Microservice extends IOMicroservice {
                       certificateLoader,
                       gitCertificateInstaller,
                       sentryInitializer,
-                      maybeRenkuPythonDevVersion,
                       cliVersionCompatChecker,
                       fusekiDatasetInitializer,
                       subscriber,
@@ -118,7 +110,6 @@ private class MicroserviceRunner(
     certificateLoader:               CertificateLoader[IO],
     gitCertificateInstaller:         GitCertificateInstaller[IO],
     sentryInitializer:               SentryInitializer[IO],
-    maybeRenkuPythonDevVersion:      Option[RenkuPythonDevVersion],
     cliVersionCompatibilityVerifier: CliVersionCompatibilityVerifier[IO],
     datasetInitializer:              FusekiDatasetInitializer[IO],
     subscriber:                      Subscriber[IO],
@@ -129,15 +120,14 @@ private class MicroserviceRunner(
 )(implicit contextShift:             ContextShift[IO]) {
 
   def run(): IO[ExitCode] = (for {
-    _                   <- certificateLoader.run()
-    _                   <- gitCertificateInstaller.run()
-    _                   <- sentryInitializer.run()
-    isDevVersionDefined <- isRenkuPythonDevVersionDefined(logger, maybeRenkuPythonDevVersion)
-    _                   <- if (!isDevVersionDefined) cliVersionCompatibilityVerifier.run() else ().pure[IO]
-    _                   <- datasetInitializer.run()
-    _                   <- subscriber.run().start.map(gatherCancelToken)
-    _                   <- if (!isDevVersionDefined) reProvisioning.run().start.map(gatherCancelToken) else ().pure[IO]
-    exitCode            <- httpServer.run()
+    _        <- certificateLoader.run()
+    _        <- gitCertificateInstaller.run()
+    _        <- sentryInitializer.run()
+    _        <- cliVersionCompatibilityVerifier.run()
+    _        <- datasetInitializer.run()
+    _        <- subscriber.run().start.map(gatherCancelToken)
+    _        <- reProvisioning.run().start.map(gatherCancelToken)
+    exitCode <- httpServer.run()
   } yield exitCode) recoverWith logAndThrow(logger)
 
   private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
@@ -147,13 +137,5 @@ private class MicroserviceRunner(
 
   private def logAndThrow(logger: Logger[IO]): PartialFunction[Throwable, IO[ExitCode]] = { case NonFatal(exception) =>
     logger.error(exception)(exception.getMessage).flatMap(_ => exception.raiseError[IO, ExitCode])
-  }
-
-  private def isRenkuPythonDevVersionDefined(logger:                Logger[IO],
-                                             maybePythonDevVersion: Option[RenkuPythonDevVersion]
-  ): IO[Boolean] = maybePythonDevVersion match {
-    case Some(_) =>
-      logger.warn("RENKU_PYTHON_DEV_VERSION env variable is set. No reprovisioning will take place").map(_ => true)
-    case None => false.pure[IO]
   }
 }

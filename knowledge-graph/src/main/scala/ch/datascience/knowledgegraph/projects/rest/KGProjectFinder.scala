@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects._
-import ch.datascience.graph.model.users
+import ch.datascience.graph.model.{SchemaVersion, users}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import ch.datascience.logging.ApplicationLogger

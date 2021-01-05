@@ -19,7 +19,7 @@
 package ch.datascience.graph.acceptancetests.stubs
 
 import ch.datascience.graph.acceptancetests.data.currentVersionPair
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import ch.datascience.graph.model.RenkuVersionPair
 import com.github.tomakehurst.wiremock.client.WireMock
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration.wireMockConfig

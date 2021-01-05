@@ -23,8 +23,7 @@ import cats.effect.{ContextShift, Effect}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.SchemaVersion
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}

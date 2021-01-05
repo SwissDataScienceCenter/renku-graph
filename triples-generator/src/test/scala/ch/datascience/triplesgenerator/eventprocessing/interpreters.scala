@@ -19,7 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.IO
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
+import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
 import io.chrisdavenport.log4cats.Logger
 

@@ -19,15 +19,19 @@
 package ch.datascience.triplesgenerator.config
 
 import cats.data.NonEmptyList
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.nonEmptyStrings
+import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
-import com.typesafe.config.ConfigFactory
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Warn
+import ch.datascience.graph.model.RenkuVersionPair
+import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
@@ -36,17 +40,17 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
   "apply" should {
 
-    "fail if there are not value set for the matrix" in {
+    "fail if there are not value set for the matrix" in new TestCase {
 
       val config = ConfigFactory.parseMap(
         Map("compatibility-matrix" -> List.empty[String].asJava).asJava
       )
-      val Failure(exception) = VersionCompatibilityConfig[Try](config)
+      val Failure(exception) = versionCompatibilityWith(config)
       exception            shouldBe a[Exception]
       exception.getMessage shouldBe "No compatibility matrix provided for schema version"
     }
 
-    "return a list of VersionSchemaPairs if the value is set for the matrix" in {
+    "return a list of VersionSchemaPairs if the value is set for the matrix" in new TestCase {
       val cliVersionNumbers    = cliVersions.generateNonEmptyList(2, 10)
       val schemaVersionNumbers = projectSchemaVersions.generateNonEmptyList(2, 10)
 
@@ -63,18 +67,64 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
         Map("compatibility-matrix" -> unparsedConfigElements).asJava
       )
 
-      val Success(result) = VersionCompatibilityConfig[Try](config)
+      val Success(result) = versionCompatibilityWith(config)
       result shouldBe NonEmptyList.fromListUnsafe(expected)
     }
 
-    "fail if pair is malformed" in {
+    "return a list of VersionSchemaPairs, as the first element the RenkuDevVersion if it exists and log a warning" in new TestCase {
+      val cliVersionNumbers     = cliVersions.generateNonEmptyList(2, 10)
+      val renkuPythonDevVersion = renkuPythonDevVersions.generateOne
+      val schemaVersionNumbers  = projectSchemaVersions.generateNonEmptyList(2, 10)
+
+      val configVersions =
+        cliVersionNumbers.toList.zip(schemaVersionNumbers.toList).map { case (cliVersion, schemaVersion) =>
+          RenkuVersionPair(cliVersion, schemaVersion)
+        }
+
+      val unparsedConfigElements = configVersions.map { case RenkuVersionPair(cliVersion, schemaVersion) =>
+        s"${cliVersion.value} -> ${schemaVersion.value}"
+      }.asJava
+
+      val config = ConfigFactory.parseMap(
+        Map("compatibility-matrix" -> unparsedConfigElements).asJava
+      )
+
+      val expected = renkuPythonDevVersion.toRenkuVersionPair(configVersions.head.schemaVersion) +: configVersions.tail
+
+      val Success(result) = VersionCompatibilityConfig[Try](renkuPythonDevVersion.some, logger, config)
+      result shouldBe NonEmptyList.fromListUnsafe(expected)
+
+      logger.loggedOnly(
+        Warn(
+          s"RENKU_PYTHON_DEV_VERSION env variable is set. CLI config version is now set to ${renkuPythonDevVersion.version}"
+        )
+      )
+    }
+
+    "fail if pair is malformed" in new TestCase {
       val malformedPair = "1.2.3 -> 12 -> 3"
       val config = ConfigFactory.parseMap(
         Map("compatibility-matrix" -> List(malformedPair).asJava).asJava
       )
-      val Failure(exception) = VersionCompatibilityConfig[Try](config)
-      exception            shouldBe a[Exception]
+      val Failure(exception) = versionCompatibilityWith(config)
       exception.getMessage shouldBe s"Did not find exactly two elements: $malformedPair."
     }
   }
+
+  private trait TestCase {
+
+    val logger = TestLogger[Try]()
+
+    def versionCompatibilityWith(config: Config) = VersionCompatibilityConfig[Try](None, logger, config)
+
+    implicit lazy val renkuPythonDevVersions = for {
+      version <- nonEmptyStrings()
+    } yield RenkuPythonDevVersion(version)
+
+    implicit class RenkuPythonDevVersionOps(devVersion: RenkuPythonDevVersion) {
+      def toRenkuVersionPair(schemaVersion: SchemaVersion) =
+        RenkuVersionPair(CliVersion(devVersion.version), schemaVersion)
+    }
+  }
+
 }

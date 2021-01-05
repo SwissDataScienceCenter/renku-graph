@@ -23,8 +23,8 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.projects.SchemaVersion
 import ch.datascience.http.client.IORestClient
 import ch.datascience.rdfstore.JsonLDTriples
 import io.chrisdavenport.log4cats.Logger

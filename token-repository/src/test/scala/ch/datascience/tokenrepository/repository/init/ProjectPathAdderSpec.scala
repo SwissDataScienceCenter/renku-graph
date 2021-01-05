@@ -20,6 +20,7 @@ package ch.datascience.tokenrepository.repository.init
 
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -27,12 +28,14 @@ import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
+import ch.datascience.metrics.TestLabeledHistogram
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.RepositoryGenerators.encryptedAccessTokens
 import ch.datascience.tokenrepository.repository.association.ProjectPathFinder
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{IOAccessTokenCrypto, InMemoryProjectsTokensDbSpec}
 import doobie.implicits._
+import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -136,7 +139,8 @@ class ProjectPathAdderSpec
     val logger            = TestLogger[IO]()
     val accessTokenCrypto = mock[IOAccessTokenCrypto]
     val pathFinder        = mock[ProjectPathFinder[IO]]
-    val tokenRemover      = new TokenRemover[IO](transactor)
+    val queriesExecTimes  = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val tokenRemover      = new TokenRemover[IO](transactor, queriesExecTimes)
     val projectPathAdder  = new IOProjectPathAdder(transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
 
     def assumePathExistsInGitLab(projectId:        Id,

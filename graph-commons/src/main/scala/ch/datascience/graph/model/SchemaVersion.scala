@@ -16,18 +16,14 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.generators
+package ch.datascience.graph.model
 
-import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.RenkuVersionPair
-import org.scalacheck.Gen
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.NonBlank
+import io.circe.Decoder
 
-object VersionGenerators {
-
-  implicit val renkuVersionPairs: Gen[RenkuVersionPair] = for {
-    cliVersion    <- cliVersions
-    schemaVersion <- projectSchemaVersions
-  } yield RenkuVersionPair(cliVersion, schemaVersion)
-
+final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
+object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank {
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  implicit val decoder: Decoder[SchemaVersion] = stringDecoder(SchemaVersion)
 }

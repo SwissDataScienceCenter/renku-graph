@@ -24,8 +24,7 @@ import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.SchemaVersion
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
@@ -37,7 +36,6 @@ import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.Generat
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.eventprocessing.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
-import ch.datascience.triplesgenerator.models.RenkuVersionPair
 import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Histogram
 
@@ -78,7 +76,7 @@ private class CommitEventProcessor[Interpretation[_]](
   ): Interpretation[Unit] =
     measureExecutionTime {
       for {
-        maybeAccessToken <- findAccessToken(events.head.project.id) recoverWith rollback(events.head)
+        maybeAccessToken <- findAccessToken(events.head.project.path) recoverWith rollback(events.head)
         uploadingResults <- allToTriplesAndUpload(events, currentSchemaVersion)(maybeAccessToken)
       } yield uploadingResults
     } flatMap logSummary recoverWith logError(eventId, events.head.project.path)

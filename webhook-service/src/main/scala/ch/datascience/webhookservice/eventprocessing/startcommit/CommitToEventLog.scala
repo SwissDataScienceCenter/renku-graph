@@ -53,7 +53,7 @@ class CommitToEventLog[Interpretation[_]: Monad](
   def storeCommitsInEventLog(startCommit: StartCommit): Interpretation[Unit] =
     measureExecutionTime {
       for {
-        maybeAccessToken   <- findAccessToken(startCommit.project.id)
+        maybeAccessToken   <- findAccessToken(startCommit.project.path)
         commitEventsSource <- buildEventsSource(startCommit, maybeAccessToken, clock)
         sendingResults <-
           commitEventsSource transformEventsWith sendEvent(startCommit) recoverWith eventFindingException

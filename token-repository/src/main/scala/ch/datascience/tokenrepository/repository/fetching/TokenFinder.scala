@@ -21,9 +21,10 @@ package ch.datascience.tokenrepository.repository.fetching
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
+import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository._
 
 private class TokenFinder[Interpretation[_]](
@@ -48,12 +49,13 @@ private class TokenFinder[Interpretation[_]](
 
 private object IOTokenFinder {
   def apply(
-      transactor:          DbTransactor[IO, ProjectsTokensDB]
+      transactor:          DbTransactor[IO, ProjectsTokensDB],
+      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[TokenFinder[IO]] =
     for {
       accessTokenCrypto <- AccessTokenCrypto[IO]()
     } yield new TokenFinder[IO](
-      new IOPersistedTokensFinder(transactor),
+      new IOPersistedTokensFinder(transactor, queriesExecTimes),
       accessTokenCrypto
     )
 }
