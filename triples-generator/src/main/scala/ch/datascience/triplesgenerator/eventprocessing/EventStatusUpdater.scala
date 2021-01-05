@@ -23,16 +23,22 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.http.client.IORestClient
+import ch.datascience.rdfstore.JsonLDTriples
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
 
 import scala.concurrent.ExecutionContext
 
 private trait EventStatusUpdater[Interpretation[_]] {
-  def markEventNew(eventId:                  CompoundEventId):           Interpretation[Unit]
-  def markEventDone(eventId:                 CompoundEventId): Interpretation[Unit]
+  def markEventNew(eventId:               CompoundEventId): Interpretation[Unit]
+  def markEventDone(eventId:              CompoundEventId): Interpretation[Unit]
+  def markTriplesGenerated(eventId:       CompoundEventId,
+                           payload:       JsonLDTriples,
+                           schemaVersion: SchemaVersion
+  ): Interpretation[Unit]
   def markEventFailedRecoverably(eventId:    CompoundEventId, exception: Throwable): Interpretation[Unit]
   def markEventFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): Interpretation[Unit]
   def markEventSkipped(eventId:              CompoundEventId, message:   String):    Interpretation[Unit]
@@ -67,6 +73,16 @@ private class IOEventStatusUpdater(
   override def markEventDone(eventId: CompoundEventId): IO[Unit] = sendStatusChange(
     eventId,
     payload = json"""{"status": "TRIPLES_STORE"}""",
+    responseMapping = okConflictAsSuccess
+  )
+
+  override def markTriplesGenerated(eventId:       CompoundEventId,
+                                    payload:       JsonLDTriples,
+                                    schemaVersion: SchemaVersion
+  ): IO[Unit] = sendStatusChange(
+    eventId,
+    payload =
+      json"""{"status": "TRIPLES_GENERATED", "payload": ${payload.value.noSpaces} , "schemaVersion": ${schemaVersion.value} }""",
     responseMapping = okConflictAsSuccess
   )
 

@@ -29,7 +29,7 @@ import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
-import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
@@ -150,7 +150,8 @@ class ProjectsResourcesSpec
       `triples updates run`(
         Set(project.created.maybeCreator.flatMap(_.maybeEmail),
             parentProject.created.maybeCreator.flatMap(_.maybeEmail)
-        ).flatten
+        ).flatten,
+        project.path
       )
 
       And("the project exists in GitLab")

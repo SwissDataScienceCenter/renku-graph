@@ -26,6 +26,7 @@ import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.interpreters.{IOSentryInitializer, TestLogger}
 import ch.datascience.testtools.MockedRunnableCollaborators
+import ch.datascience.triplesgenerator.config.RenkuPythonDevVersion
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
 import ch.datascience.triplesgenerator.init.{CliVersionCompatibilityVerifier, IOFusekiDatasetInitializer}
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioning
@@ -188,6 +189,7 @@ class MicroserviceRunnerSpec
 
       runner.run().unsafeRunSync() shouldBe ExitCode.Success
     }
+
   }
 
   private trait TestCase {

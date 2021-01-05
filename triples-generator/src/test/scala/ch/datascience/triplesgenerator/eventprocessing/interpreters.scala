@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.eventprocessing
 
 import cats.effect.IO
+import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
 import io.chrisdavenport.log4cats.Logger
 
@@ -27,5 +28,11 @@ private class IOEventBodyDeserialiser extends EventBodyDeserialiser[IO]
 abstract class IOEventProcessingEndpoint(eventBodyDeserializer:  EventBodyDeserialiser[IO],
                                          eventsProcessingRunner: EventsProcessingRunner[IO],
                                          reProvisioningStatus:   ReProvisioningStatus[IO],
+                                         currentVersionPair:     RenkuVersionPair,
                                          logger:                 Logger[IO]
-) extends EventProcessingEndpoint[IO](eventBodyDeserializer, eventsProcessingRunner, reProvisioningStatus, logger)
+) extends EventProcessingEndpoint[IO](eventBodyDeserializer,
+                                      eventsProcessingRunner,
+                                      reProvisioningStatus,
+                                      currentVersionPair,
+                                      logger
+    )

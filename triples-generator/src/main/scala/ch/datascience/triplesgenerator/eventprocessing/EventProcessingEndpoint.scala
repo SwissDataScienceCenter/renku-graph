@@ -24,12 +24,12 @@ import cats.effect.{Effect, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventId}
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{RenkuVersionPair, projects}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.eventprocessing.triplesgeneration.TriplesGenerator
-import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
+import ch.datascience.triplesgenerator.reprovisioning.{ReProvisioningStatus, RenkuVersionPairUpdater}
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
@@ -41,6 +41,7 @@ class EventProcessingEndpoint[Interpretation[_]: Effect](
     eventBodyDeserializer:  EventBodyDeserialiser[Interpretation],
     eventsProcessingRunner: EventsProcessingRunner[Interpretation],
     reProvisioningStatus:   ReProvisioningStatus[Interpretation],
+    currentVersionPair:     RenkuVersionPair,
     logger:                 Logger[Interpretation]
 )(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
@@ -65,7 +66,7 @@ class EventProcessingEndpoint[Interpretation[_]: Effect](
     for {
       eventAndBody <- request.as[IdAndBody] recoverWith badRequest("Event deserialization error")
       commitEvents <- toCommitEvents(eventAndBody._2) recoverWith badRequest("Event body deserialization error")
-      result       <- scheduleForProcessing(eventAndBody._1, commitEvents)
+      result       <- scheduleForProcessing(eventAndBody._1, commitEvents, currentVersionPair.schemaVersion)
       response     <- result.asHttpResponse(eventAndBody._1, commitEvents)
     } yield response
   } recoverWith httpResponse
@@ -128,6 +129,7 @@ object IOEventProcessingEndpoint {
       subscriber:           Subscriber[IO],
       triplesGeneration:    TriplesGeneration,
       reProvisioningStatus: ReProvisioningStatus[IO],
+      currentVersionPair:   RenkuVersionPair,
       metricsRegistry:      MetricsRegistry[IO],
       gitLabThrottler:      Throttler[IO, GitLab],
       timeRecorder:         SparqlQueryTimeRecorder[IO],
@@ -143,5 +145,10 @@ object IOEventProcessingEndpoint {
         IOCommitEventProcessor(triplesGenerator, metricsRegistry, gitLabThrottler, timeRecorder, logger)
       eventsProcessingRunner <- IOEventsProcessingRunner(commitEventProcessor, subscriber, logger)
       bodyDeserialiser = new EventBodyDeserialiser[IO]()
-    } yield new EventProcessingEndpoint[IO](bodyDeserialiser, eventsProcessingRunner, reProvisioningStatus, logger)
+    } yield new EventProcessingEndpoint[IO](bodyDeserialiser,
+                                            eventsProcessingRunner,
+                                            reProvisioningStatus,
+                                            currentVersionPair,
+                                            logger
+    )
 }

@@ -21,9 +21,8 @@ package ch.datascience.triplesgenerator.init
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.IO
-import ch.datascience.graph.model.CliVersion
-import ch.datascience.graph.model.RenkuVersionPair
 import cats.syntax.all._
+import ch.datascience.graph.model.{CliVersion, RenkuVersionPair}
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 
 trait CliVersionCompatibilityVerifier[Interpretation[_]] {

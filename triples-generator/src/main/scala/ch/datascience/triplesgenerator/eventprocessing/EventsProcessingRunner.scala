@@ -24,6 +24,7 @@ import cats.effect._
 import cats.effect.concurrent.Semaphore
 import cats.syntax.all._
 import ch.datascience.config.ConfigLoader
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult
 import ch.datascience.triplesgenerator.eventprocessing.EventsProcessingRunner.EventSchedulingResult._
@@ -36,8 +37,9 @@ import io.chrisdavenport.log4cats.Logger
 import scala.util.control.NonFatal
 
 private trait EventsProcessingRunner[Interpretation[_]] {
-  def scheduleForProcessing(eventId: CompoundEventId,
-                            events:  NonEmptyList[CommitEvent]
+  def scheduleForProcessing(eventId:              CompoundEventId,
+                            events:               NonEmptyList[CommitEvent],
+                            currentSchemaVersion: SchemaVersion
   ): Interpretation[EventSchedulingResult]
 }
 
@@ -60,8 +62,9 @@ private class IOEventsProcessingRunner private (
 )(implicit cs:           ContextShift[IO])
     extends EventsProcessingRunner[IO] {
 
-  override def scheduleForProcessing(eventId: CompoundEventId,
-                                     events:  NonEmptyList[CommitEvent]
+  override def scheduleForProcessing(eventId:              CompoundEventId,
+                                     events:               NonEmptyList[CommitEvent],
+                                     currentSchemaVersion: SchemaVersion
   ): IO[EventSchedulingResult] =
     semaphore.available flatMap {
       case 0 => Busy.pure[IO]
@@ -69,14 +72,17 @@ private class IOEventsProcessingRunner private (
         {
           for {
             _ <- semaphore.acquire
-            _ <- process(eventId, events).start
+            _ <- process(eventId, events, currentSchemaVersion).start
           } yield Accepted: EventSchedulingResult
         } recoverWith releasingSemaphore
     }
 
-  private def process(eventId: CompoundEventId, events: NonEmptyList[CommitEvent]) = {
+  private def process(eventId:              CompoundEventId,
+                      events:               NonEmptyList[CommitEvent],
+                      currentSchemaVersion: SchemaVersion
+  ) = {
     for {
-      _ <- eventProcessor.process(eventId, events)
+      _ <- eventProcessor.process(eventId, events, currentSchemaVersion)
       _ <- releaseAndNotify()
     } yield ()
   } recoverWith { case NonFatal(exception) =>

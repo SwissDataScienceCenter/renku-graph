@@ -24,7 +24,7 @@ import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
@@ -43,7 +43,10 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private trait EventProcessor[Interpretation[_]] {
-  def process(eventId: CompoundEventId, events: NonEmptyList[CommitEvent]): Interpretation[Unit]
+  def process(eventId:              CompoundEventId,
+              events:               NonEmptyList[CommitEvent],
+              currentSchemaVersion: SchemaVersion
+  ): Interpretation[Unit]
 }
 
 private class CommitEventProcessor[Interpretation[_]](
@@ -67,11 +70,14 @@ private class CommitEventProcessor[Interpretation[_]](
   import triplesGenerator._
   import uploader._
 
-  def process(eventId: CompoundEventId, events: NonEmptyList[CommitEvent]): Interpretation[Unit] =
+  def process(eventId:              CompoundEventId,
+              events:               NonEmptyList[CommitEvent],
+              currentSchemaVersion: SchemaVersion
+  ): Interpretation[Unit] =
     measureExecutionTime {
       for {
         maybeAccessToken <- findAccessToken(events.head.project.path) recoverWith rollback(events.head)
-        uploadingResults <- allToTriplesAndUpload(events)(maybeAccessToken)
+        uploadingResults <- allToTriplesAndUpload(events, currentSchemaVersion)(maybeAccessToken)
       } yield uploadingResults
     } flatMap logSummary recoverWith logError(eventId, events.head.project.path)
 
@@ -83,15 +89,17 @@ private class CommitEventProcessor[Interpretation[_]](
   }
 
   private def allToTriplesAndUpload(
-      commits:                 NonEmptyList[CommitEvent]
+      commits:                 NonEmptyList[CommitEvent],
+      currentSchemaVersion:    SchemaVersion
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[NonEmptyList[UploadingResult]] =
     commits
-      .map(toTriplesAndUpload)
+      .map(commit => toTriplesAndUpload(commit, currentSchemaVersion))
       .sequence
       .flatMap(updateEventLog)
 
   private def toTriplesAndUpload(
-      commit:                  CommitEvent
+      commit:                  CommitEvent,
+      currentSchemaVersion:    SchemaVersion
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     generateTriples(commit) flatMap {
       case MigrationEvent =>
@@ -100,6 +108,10 @@ private class CommitEventProcessor[Interpretation[_]](
         }
       case Triples(rawTriples) =>
         for {
+          _ <-
+            EitherT.liftF(
+              markTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id), rawTriples, currentSchemaVersion)
+            )
           curatedTriples <- curate(commit, rawTriples)
           result         <- right[ProcessingRecoverableError](upload(curatedTriples) map toUploadingResult(commit))
         } yield result

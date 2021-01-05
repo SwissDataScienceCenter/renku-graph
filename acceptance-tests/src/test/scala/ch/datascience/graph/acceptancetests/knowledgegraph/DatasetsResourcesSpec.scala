@@ -175,7 +175,8 @@ class DatasetsResourcesSpec
         (List(dataset1, dataset2)
           .flatMap(_.published.creators.map(_.maybeEmail))
           .toSet + dataset1Creation.agent.maybeEmail + dataset2Creation.agent.maybeEmail + project.created.maybeCreator
-          .flatMap(_.maybeEmail)).flatten
+          .flatMap(_.maybeEmail)).flatten,
+        project.path
       )
 
       And("the project exists in GitLab")
@@ -372,7 +373,7 @@ class DatasetsResourcesSpec
       val committedDate = committedDates.generateOne
       val datasetJsonLD = toDataSetCommit(firstProject, commitId, committer, committedDate, dataset)
       `data in the RDF store`(firstProject, commitId, committer, datasetJsonLD)
-      `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
+      `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail), firstProject.path)
 
       otherProjects.foldLeft(List(dataset.id)) { (datasetsIds, project) =>
         val commitId  = commitIds.generateOne
@@ -392,7 +393,7 @@ class DatasetsResourcesSpec
           )
         )
 
-        `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail))
+        `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail), project.path)
 
         datasetsIds :+ datasetId
       }

@@ -31,7 +31,7 @@ import ch.datascience.microservices.IOMicroservice
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
 import ch.datascience.triplesgenerator.config.{IOVersionCompatibilityConfig, TriplesGeneration}
-import ch.datascience.triplesgenerator.eventprocessing._
+import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessingEndpoint
 import ch.datascience.triplesgenerator.init._
 import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
@@ -81,6 +81,7 @@ object Microservice extends IOMicroservice {
       eventProcessingEndpoint <- IOEventProcessingEndpoint(subscriber,
                                                            triplesGeneration,
                                                            reProvisioningStatus,
+                                                           renkuVersionPairs.head,
                                                            metricsRegistry,
                                                            gitLabThrottler,
                                                            sparqlTimeRecorder,
