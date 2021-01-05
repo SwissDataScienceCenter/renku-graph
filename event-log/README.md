@@ -167,7 +167,7 @@ Currently, only status changing payloads are allowed:
 
 **Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
 
-- for transitioning event from status `GENERATING_TRIPLES` to `TRIPLES_STORE`
+- for transitioning event from status `TRIPLES_GENERATED` to `TRIPLES_STORE`
 
 ```json
 {
@@ -175,7 +175,7 @@ Currently, only status changing payloads are allowed:
 }
 ```
 
-**Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
+**Notice** `CONFLICT (409)` returned when current event status is different from `TRIPLES_GENERATED`.
 
 - for transitioning event from status `GENERATING_TRIPLES` to `TRIPLES_GENERATED`
 

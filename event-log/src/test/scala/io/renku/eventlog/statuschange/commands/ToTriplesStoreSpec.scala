@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Swiss Data Science Center (SDSC)
+ * Copyright 2021 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -51,7 +51,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
         storeEvent(
           eventId,
-          EventStatus.GeneratingTriples,
+          EventStatus.TriplesGenerated,
           executionDates.generateOne,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -60,7 +60,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
         )
         storeEvent(
           compoundEventIds.generateOne.copy(id = eventId.id),
-          EventStatus.GeneratingTriples,
+          EventStatus.TriplesGenerated,
           executionDates.generateOne,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -68,7 +68,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
         )
         storeEvent(
           compoundEventIds.generateOne,
-          EventStatus.GeneratingTriples,
+          EventStatus.TriplesGenerated,
           executionDates.generateOne,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -104,7 +104,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
 
-    EventStatus.all.filterNot(status => status == GeneratingTriples || status == TransformingTriples) foreach {
+    EventStatus.all.filterNot(status => status == TriplesGenerated || status == TransformingTriples) foreach {
       eventStatus =>
         s"do nothing when updating event with $eventStatus status " +
           s"and return ${UpdateResult.Conflict}" in new TestCase {
