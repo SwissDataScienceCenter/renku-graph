@@ -29,9 +29,11 @@ import java.time.Instant
 object projects {
 
   final class Id private (val value: Int) extends AnyVal with IntTinyType
+
   implicit object Id extends TinyTypeFactory[Id](new Id(_)) with NonNegativeInt
 
   class Path private (val value: String) extends AnyVal with RelativePathTinyType
+
   implicit object Path extends TinyTypeFactory[Path](new Path(_)) with RelativePath {
     private val allowedFirstChar         = ('a' to 'z') ++ ('A' to 'Z') ++ ('0' to '9') :+ '_'
     private[projects] val regexValidator = "^([\\w.-]+)(\\/([\\w.-]+))+$"
@@ -42,6 +44,7 @@ object projects {
   }
 
   class ResourceId private (val value: String) extends AnyVal with StringTinyType
+
   implicit object ResourceId
       extends TinyTypeFactory[ResourceId](new ResourceId(_))
       with Url
@@ -68,15 +71,19 @@ object projects {
   }
 
   final class Name private (val value: String) extends AnyVal with StringTinyType
+
   implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
 
   final class DateCreated private (val value: Instant) extends AnyVal with InstantTinyType
+
   implicit object DateCreated extends TinyTypeFactory[DateCreated](new DateCreated(_)) with InstantNotInTheFuture
 
   final class FilePath private (val value: String) extends AnyVal with RelativePathTinyType
+
   object FilePath extends TinyTypeFactory[FilePath](new FilePath(_)) with RelativePath with RelativePathOps[FilePath]
 
   final class Description private (val value: String) extends AnyVal with StringTinyType
+
   implicit object Description extends TinyTypeFactory[Description](new Description(_)) with NonBlank
 
   sealed trait Visibility extends StringTinyType with Product with Serializable
@@ -85,9 +92,17 @@ object projects {
 
     val all: Set[Visibility] = Set(Public, Private, Internal)
 
-    final case object Public   extends Visibility { override val value: String = "public" }
-    final case object Private  extends Visibility { override val value: String = "private" }
-    final case object Internal extends Visibility { override val value: String = "internal" }
+    final case object Public extends Visibility {
+      override val value: String = "public"
+    }
+
+    final case object Private extends Visibility {
+      override val value: String = "private"
+    }
+
+    final case object Internal extends Visibility {
+      override val value: String = "internal"
+    }
 
     import io.circe.Decoder
 
@@ -101,11 +116,5 @@ object projects {
             )
         }
       }
-  }
-
-  final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
-  implicit object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank {
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
-    implicit val decoder: Decoder[SchemaVersion] = stringDecoder(SchemaVersion)
   }
 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.reprovisioning
+package ch.datascience.triplesgenerator.init
 
 import cats.MonadError
 import ch.datascience.graph.model.CliVersion
@@ -25,7 +25,7 @@ import ch.datascience.triplesgenerator.config.TriplesGeneration._
 import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
-private object CliVersionFinder {
+private[init] object CliVersionLoader {
 
   import ch.datascience.config.ConfigLoader._
 
@@ -36,7 +36,7 @@ private object CliVersionFinder {
   )(implicit ME:         MonadError[Interpretation, Throwable]): Interpretation[CliVersion] =
     apply(triplesGeneration, findRenkuVersion, ConfigFactory.load())
 
-  private[reprovisioning] def apply[Interpretation[_]](
+  private[init] def apply[Interpretation[_]](
       triplesGeneration:  TriplesGeneration,
       renkuVersionFinder: Interpretation[CliVersion],
       config:             Config

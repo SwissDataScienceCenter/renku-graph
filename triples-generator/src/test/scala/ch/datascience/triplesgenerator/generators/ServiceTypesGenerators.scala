@@ -33,4 +33,5 @@ object ServiceTypesGenerators {
     datasetType     <- Gen.oneOf(Mem, TDB)
     authCredentials <- basicAuthCredentials
   } yield FusekiAdminConfig(fusekiUrl, datasetName, datasetType, authCredentials)
+
 }

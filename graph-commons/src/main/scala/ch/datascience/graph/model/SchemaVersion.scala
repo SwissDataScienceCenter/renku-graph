@@ -16,16 +16,14 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests
+package ch.datascience.graph.model
 
-import ch.datascience.config.renku
-import ch.datascience.graph.acceptancetests.tooling.RDFStore
-import ch.datascience.graph.model.{CliVersion, SchemaVersion}
-import ch.datascience.rdfstore.FusekiBaseUrl
-import ch.datascience.graph.model.RenkuVersionPair
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.NonBlank
+import io.circe.Decoder
 
-package object data {
-  val currentVersionPair:     RenkuVersionPair   = RenkuVersionPair(CliVersion("0.12.2"), SchemaVersion("8"))
-  val renkuResourcesUrl:      renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
-  implicit val fusekiBaseUrl: FusekiBaseUrl      = RDFStore.fusekiBaseUrl
+final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
+object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank {
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
+  implicit val decoder: Decoder[SchemaVersion] = stringDecoder(SchemaVersion)
 }

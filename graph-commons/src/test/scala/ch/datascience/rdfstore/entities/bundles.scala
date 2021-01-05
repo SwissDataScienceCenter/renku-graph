@@ -28,8 +28,8 @@ import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, Description, Identifier, Keyword, Name, PartLocation, PartName, PublishedDate, SameAs, Title, TopmostDerivedFrom, TopmostSameAs, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
-import ch.datascience.graph.model.projects.{DateCreated, Path, SchemaVersion}
-import ch.datascience.graph.model.{CliVersion, GraphModelGenerators, datasets, projects}
+import ch.datascience.graph.model.projects.{DateCreated, Path}
+import ch.datascience.graph.model.{CliVersion, GraphModelGenerators, SchemaVersion, datasets, projects}
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream
 import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position

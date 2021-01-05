@@ -16,16 +16,18 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.acceptancetests
+package ch.datascience.triplesgenerator.generators
 
-import ch.datascience.config.renku
-import ch.datascience.graph.acceptancetests.tooling.RDFStore
-import ch.datascience.graph.model.{CliVersion, SchemaVersion}
-import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.generators.CommonGraphGenerators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.RenkuVersionPair
+import org.scalacheck.Gen
 
-package object data {
-  val currentVersionPair:     RenkuVersionPair   = RenkuVersionPair(CliVersion("0.12.2"), SchemaVersion("8"))
-  val renkuResourcesUrl:      renku.ResourcesUrl = renku.ResourcesUrl("http://localhost:9004/knowledge-graph")
-  implicit val fusekiBaseUrl: FusekiBaseUrl      = RDFStore.fusekiBaseUrl
+object VersionGenerators {
+
+  implicit val renkuVersionPairs: Gen[RenkuVersionPair] = for {
+    cliVersion    <- cliVersions
+    schemaVersion <- projectSchemaVersions
+  } yield RenkuVersionPair(cliVersion, schemaVersion)
+
 }

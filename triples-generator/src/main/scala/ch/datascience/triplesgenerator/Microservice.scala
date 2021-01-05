@@ -18,9 +18,8 @@
 
 package ch.datascience.triplesgenerator
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors.newFixedThreadPool
 import cats.effect._
+import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
@@ -30,8 +29,8 @@ import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.microservices.IOMicroservice
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
+import ch.datascience.triplesgenerator.config.{IOVersionCompatibilityConfig, TriplesGeneration}
 import ch.datascience.triplesgenerator.eventprocessing._
 import ch.datascience.triplesgenerator.init._
 import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
@@ -39,9 +38,13 @@ import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.chrisdavenport.log4cats.Logger
 import pureconfig._
 
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors.newFixedThreadPool
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
 object Microservice extends IOMicroservice {
 
@@ -58,16 +61,23 @@ object Microservice extends IOMicroservice {
     for {
       certificateLoader        <- CertificateLoader[IO](ApplicationLogger)
       gitCertificateInstaller  <- GitCertificateInstaller[IO](ApplicationLogger)
-      sentryInitializer        <- SentryInitializer[IO]()
       fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
       subscriber               <- Subscriber(ApplicationLogger)
       triplesGeneration        <- TriplesGeneration[IO]()
+      sentryInitializer        <- SentryInitializer[IO]()
       metricsRegistry          <- MetricsRegistry()
+      renkuVersionPairs        <- IOVersionCompatibilityConfig(ApplicationLogger)
+      cliVersionCompatChecker  <- IOCliVersionCompatibilityChecker(triplesGeneration, renkuVersionPairs)
       gitLabRateLimit          <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler          <- Throttler[IO, GitLab](gitLabRateLimit)
       sparqlTimeRecorder       <- SparqlQueryTimeRecorder(metricsRegistry)
       reProvisioningStatus     <- ReProvisioningStatus(subscriber, ApplicationLogger, sparqlTimeRecorder)
-      reProvisioning           <- IOReProvisioning(triplesGeneration, reProvisioningStatus, sparqlTimeRecorder, ApplicationLogger)
+      reProvisioning <- IOReProvisioning(triplesGeneration,
+                                         reProvisioningStatus,
+                                         renkuVersionPairs,
+                                         sparqlTimeRecorder,
+                                         ApplicationLogger
+                        )
       eventProcessingEndpoint <- IOEventProcessingEndpoint(subscriber,
                                                            triplesGeneration,
                                                            reProvisioningStatus,
@@ -83,39 +93,48 @@ object Microservice extends IOMicroservice {
                       certificateLoader,
                       gitCertificateInstaller,
                       sentryInitializer,
+                      cliVersionCompatChecker,
                       fusekiDatasetInitializer,
                       subscriber,
                       reProvisioning,
                       new HttpServer[IO](serverPort = ServicePort.value, routes),
-                      subProcessesCancelTokens
+                      subProcessesCancelTokens,
+                      ApplicationLogger
                     ).run()
                   }
     } yield exitCode
 }
 
 private class MicroserviceRunner(
-    certificateLoader:        CertificateLoader[IO],
-    gitCertificateInstaller:  GitCertificateInstaller[IO],
-    sentryInitializer:        SentryInitializer[IO],
-    datasetInitializer:       FusekiDatasetInitializer[IO],
-    subscriber:               Subscriber[IO],
-    reProvisioning:           ReProvisioning[IO],
-    httpServer:               HttpServer[IO],
-    subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
-)(implicit contextShift:      ContextShift[IO]) {
+    certificateLoader:               CertificateLoader[IO],
+    gitCertificateInstaller:         GitCertificateInstaller[IO],
+    sentryInitializer:               SentryInitializer[IO],
+    cliVersionCompatibilityVerifier: CliVersionCompatibilityVerifier[IO],
+    datasetInitializer:              FusekiDatasetInitializer[IO],
+    subscriber:                      Subscriber[IO],
+    reProvisioning:                  ReProvisioning[IO],
+    httpServer:                      HttpServer[IO],
+    subProcessesCancelTokens:        ConcurrentHashMap[CancelToken[IO], Unit],
+    logger:                          Logger[IO]
+)(implicit contextShift:             ContextShift[IO]) {
 
-  def run(): IO[ExitCode] = for {
+  def run(): IO[ExitCode] = (for {
     _        <- certificateLoader.run()
     _        <- gitCertificateInstaller.run()
     _        <- sentryInitializer.run()
+    _        <- cliVersionCompatibilityVerifier.run()
     _        <- datasetInitializer.run()
     _        <- subscriber.run().start.map(gatherCancelToken)
     _        <- reProvisioning.run().start.map(gatherCancelToken)
     exitCode <- httpServer.run()
-  } yield exitCode
+  } yield exitCode) recoverWith logAndThrow(logger)
 
   private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
     subProcessesCancelTokens.put(fiber.cancel, ())
     fiber
+  }
+
+  private def logAndThrow(logger: Logger[IO]): PartialFunction[Throwable, IO[ExitCode]] = { case NonFatal(exception) =>
+    logger.error(exception)(exception.getMessage).flatMap(_ => exception.raiseError[IO, ExitCode])
   }
 }
