@@ -44,6 +44,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       given(eventStatusRenamer).succeeds(returning = ())
       given(eventPayloadTableCreator).succeeds(returning = ())
       given(eventPayloadSchemaAdder).succeeds(returning = ())
+      given(subscriptionCategorySyncTimeTableCreator).succeeds(returning = ())
 
       dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
@@ -194,20 +195,41 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
         dbInitializer.run().unsafeRunSync()
       } shouldBe exception
     }
+
+    "fail if creating the subscription_category_sync_time table creation fails" in new TestCase {
+
+      given(eventLogTableCreator).succeeds(returning = ())
+      given(projectPathAdder).succeeds(returning = ())
+      given(batchDateAdder).succeeds(returning = ())
+      given(viewRemover).succeeds(returning = ())
+      given(projectTableCreator).succeeds(returning = ())
+      given(projectPathRemover).succeeds(returning = ())
+      given(eventLogTableRenamer).succeeds(returning = ())
+      given(eventStatusRenamer).succeeds(returning = ())
+      given(eventPayloadTableCreator).succeeds(returning = ())
+      given(eventPayloadSchemaAdder).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(subscriptionCategorySyncTimeTableCreator).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        dbInitializer.run().unsafeRunSync()
+      } shouldBe exception
+    }
   }
 
   private trait TestCase {
-    val eventLogTableCreator     = mock[EventLogTableCreator[IO]]
-    val eventPayloadTableCreator = mock[EventPayloadTableCreator[IO]]
-    val projectPathAdder         = mock[ProjectPathAdder[IO]]
-    val batchDateAdder           = mock[BatchDateAdder[IO]]
-    val viewRemover              = mock[LatestEventDatesViewRemover[IO]]
-    val projectTableCreator      = mock[ProjectTableCreator[IO]]
-    val projectPathRemover       = mock[ProjectPathRemover[IO]]
-    val eventLogTableRenamer     = mock[EventLogTableRenamer[IO]]
-    val eventStatusRenamer       = mock[EventStatusRenamer[IO]]
-    val eventPayloadSchemaAdder  = mock[EventPayloadSchemaVersionAdder[IO]]
-    val logger                   = TestLogger[IO]()
+    val eventLogTableCreator                     = mock[EventLogTableCreator[IO]]
+    val eventPayloadTableCreator                 = mock[EventPayloadTableCreator[IO]]
+    val projectPathAdder                         = mock[ProjectPathAdder[IO]]
+    val batchDateAdder                           = mock[BatchDateAdder[IO]]
+    val viewRemover                              = mock[LatestEventDatesViewRemover[IO]]
+    val projectTableCreator                      = mock[ProjectTableCreator[IO]]
+    val projectPathRemover                       = mock[ProjectPathRemover[IO]]
+    val eventLogTableRenamer                     = mock[EventLogTableRenamer[IO]]
+    val eventStatusRenamer                       = mock[EventStatusRenamer[IO]]
+    val eventPayloadSchemaAdder                  = mock[EventPayloadSchemaVersionAdder[IO]]
+    val subscriptionCategorySyncTimeTableCreator = mock[SubscriptionCategorySyncTimeTableCreator[IO]]
+    val logger                                   = TestLogger[IO]()
     val dbInitializer = new DbInitializerImpl[IO](
       eventLogTableCreator,
       eventPayloadTableCreator,
@@ -219,6 +241,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       eventLogTableRenamer,
       eventStatusRenamer,
       eventPayloadSchemaAdder,
+      subscriptionCategorySyncTimeTableCreator,
       logger
     )
   }
