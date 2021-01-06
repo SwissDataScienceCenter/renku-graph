@@ -31,18 +31,19 @@ trait DbInitializer[Interpretation[_]] {
 }
 
 class DbInitializerImpl[Interpretation[_]](
-    eventLogTableCreator:           EventLogTableCreator[Interpretation],
-    eventPayloadTableCreator:       EventPayloadTableCreator[Interpretation],
-    projectPathAdder:               ProjectPathAdder[Interpretation],
-    batchDateAdder:                 BatchDateAdder[Interpretation],
-    latestEventDatesViewRemover:    LatestEventDatesViewRemover[Interpretation],
-    projectTableCreator:            ProjectTableCreator[Interpretation],
-    projectPathRemover:             ProjectPathRemover[Interpretation],
-    eventLogTableRenamer:           EventLogTableRenamer[Interpretation],
-    eventStatusRenamer:             EventStatusRenamer[Interpretation],
-    eventPayloadSchemaVersionAdder: EventPayloadSchemaVersionAdder[Interpretation],
-    logger:                         Logger[Interpretation]
-)(implicit ME:                      Bracket[Interpretation, Throwable])
+    eventLogTableCreator:                     EventLogTableCreator[Interpretation],
+    eventPayloadTableCreator:                 EventPayloadTableCreator[Interpretation],
+    projectPathAdder:                         ProjectPathAdder[Interpretation],
+    batchDateAdder:                           BatchDateAdder[Interpretation],
+    latestEventDatesViewRemover:              LatestEventDatesViewRemover[Interpretation],
+    projectTableCreator:                      ProjectTableCreator[Interpretation],
+    projectPathRemover:                       ProjectPathRemover[Interpretation],
+    eventLogTableRenamer:                     EventLogTableRenamer[Interpretation],
+    eventStatusRenamer:                       EventStatusRenamer[Interpretation],
+    eventPayloadSchemaVersionAdder:           EventPayloadSchemaVersionAdder[Interpretation],
+    subscriptionCategorySyncTimeTableCreator: SubscriptionCategorySyncTimeTableCreator[Interpretation],
+    logger:                                   Logger[Interpretation]
+)(implicit ME:                                Bracket[Interpretation, Throwable])
     extends DbInitializer[Interpretation] {
 
   override def run(): Interpretation[Unit] = {
@@ -57,6 +58,7 @@ class DbInitializerImpl[Interpretation[_]](
       _ <- eventStatusRenamer.run()
       _ <- eventPayloadTableCreator.run()
       _ <- eventPayloadSchemaVersionAdder.run()
+      _ <- subscriptionCategorySyncTimeTableCreator.run()
       _ <- logger info "Event Log database initialization success"
     } yield ()
   } recoverWith logging
@@ -83,6 +85,7 @@ object IODbInitializer {
       EventLogTableRenamer(transactor, logger),
       EventStatusRenamer(transactor, logger),
       EventPayloadSchemaVersionAdder(transactor, logger),
+      SubscriptionCategorySyncTimeTableCreator(transactor, logger),
       logger
     )
   }

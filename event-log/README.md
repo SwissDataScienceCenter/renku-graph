@@ -357,6 +357,12 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | payload    TEXT             NOT NULL |
 | schema_version TEXT   PK    NOT NULL |
 
+| subscription_category_sync_time      |
+|--------------------------------------|
+| project_id       INT4  PK FK NOT NULL |
+| category_name    TEXT  PK    NOT NULL |
+| last_synced      TIMESTAMP   NOT NULL |
+
 ## Trying out
 
 The event-log is a part of multi-module sbt project thus it has to be built from the root level.
