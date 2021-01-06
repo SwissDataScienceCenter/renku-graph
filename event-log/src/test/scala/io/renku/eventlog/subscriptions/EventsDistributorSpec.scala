@@ -377,13 +377,12 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
   private trait TestCase {
 
-    val underTriplesGenerationGauge     = mock[LabeledGauge[IO, projects.Path]]
-    val underTriplesTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
-    val subscribers                     = mock[Subscribers[IO]]
-    val eventsFinder                    = mock[EventFetcher[IO]]
-    val statusUpdatesRunner             = mock[StatusUpdatesRunner[IO]]
-    val eventsSender                    = mock[EventsSender[IO]]
-    val logger                          = TestLogger[IO]()
+    val underTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
+    val subscribers                 = mock[Subscribers[IO]]
+    val eventsFinder                = mock[EventFinder[IO]]
+    val statusUpdatesRunner         = mock[StatusUpdatesRunner[IO]]
+    val eventsSender                = mock[EventsSender[IO]]
+    val logger                      = TestLogger[IO]()
     val distributor = new EventsDistributorImpl[IO](
       subscribers,
       eventsFinder,

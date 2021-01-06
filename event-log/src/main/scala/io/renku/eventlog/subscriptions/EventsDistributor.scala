@@ -25,6 +25,7 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Encoder
 import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
@@ -39,31 +40,29 @@ private trait EventsDistributor[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private class EventsDistributorImpl[Interpretation[_]: Effect](
-    subscribers:                 Subscribers[Interpretation],
-    eventsFinder:                EventFetcher[Interpretation],
-    statusUpdatesRunner:         StatusUpdatesRunner[Interpretation],
-    eventsSender:                EventsSender[Interpretation],
-    underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-    logger:                      Logger[Interpretation],
-    noEventSleep:                FiniteDuration,
-    onErrorSleep:                FiniteDuration
-)(implicit timer:                Timer[Interpretation])
+private class EventsDistributorImpl[Interpretation[_]: Effect, FoundEvent](
+    subscribers:      Subscribers[Interpretation],
+    eventsFinder:     EventFinder[Interpretation, FoundEvent],
+    eventsSender:     EventsSender[Interpretation, FoundEvent],
+    dispatchRecovery: DispatchRecovery[Interpretation, FoundEvent],
+    logger:           Logger[Interpretation],
+    noEventSleep:     FiniteDuration,
+    onErrorSleep:     FiniteDuration
+)(implicit timer:     Timer[Interpretation])
     extends EventsDistributor[Interpretation] {
 
   import eventsSender._
   import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
   import subscribers._
 
-  def run(): Interpretation[Unit] =
-    for {
-      _ <- popEvent flatMap { case (eventId, eventBody) =>
-             runOnSubscriber(dispatch(eventId, eventBody)) recoverWith tryReDispatch(eventId, eventBody)
-           }
-      _ <- run()
-    } yield ()
+  def run(): Interpretation[Unit] = for {
+    _ <- popEvent flatMap { foundEvent =>
+           runOnSubscriber(dispatch(foundEvent)) recoverWith tryReDispatch(foundEvent)
+         }
+    _ <- run()
+  } yield ()
 
-  private def popEvent: Interpretation[(CompoundEventId, EventBody)] =
+  private def popEvent: Interpretation[FoundEvent] =
     eventsFinder
       .popEvent()
       .recoverWith(loggingErrorAndRetry(retry = eventsFinder.popEvent))
@@ -72,50 +71,37 @@ private class EventsDistributorImpl[Interpretation[_]: Effect](
         case Some(idAndBody) => idAndBody.pure[Interpretation]
       }
 
-  private def dispatch(id: CompoundEventId, body: EventBody)(subscriber: SubscriberUrl): Interpretation[Unit] = {
+  private def dispatch(foundEvent: FoundEvent)(subscriber: SubscriberUrl): Interpretation[Unit] = {
     for {
-      result <- sendEvent(subscriber, id, body)
-      _      <- logStatement(result, subscriber, id)
+      result <- sendEvent(subscriber, foundEvent)
+      _      <- logStatement(result, subscriber, foundEvent)
       _ <- result match {
              case Delivered => ().pure[Interpretation]
              case ServiceBusy =>
-               markBusy(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(id, body)))
+               markBusy(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(foundEvent)))
              case Misdelivered =>
-               delete(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(id, body)))
+               delete(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(foundEvent)))
            }
     } yield ()
-  } recoverWith markEventAsNonRecoverable(subscriber, id)
+  } recoverWith dispatchRecovery.recover(subscriber, foundEvent)
 
-  private def tryReDispatch(eventId:   CompoundEventId,
-                            eventBody: EventBody
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    for {
-      _ <- logger.error(exception)("Dispatching an event failed")
-      _ <- timer sleep onErrorSleep
-      _ <- runOnSubscriber(dispatch(eventId, eventBody))
-    } yield ()
+  private def tryReDispatch(foundEvent: FoundEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      for {
+        _ <- logger.error(exception)("Dispatching an event failed")
+        _ <- timer sleep onErrorSleep
+        _ <- runOnSubscriber(dispatch(foundEvent))
+      } yield ()
   }
 
-  private def logStatement(result: SendingResult, url: SubscriberUrl, id: CompoundEventId): Interpretation[Unit] =
+  private def logStatement(result: SendingResult, url: SubscriberUrl, event: FoundEvent): Interpretation[Unit] =
     result match {
-      case result @ Delivered    => logger.info(s"Event $id, url = $url -> $result")
+      case result @ Delivered    => logger.info(s"Event $event, url = $url -> $result")
       case ServiceBusy           => ().pure[Interpretation]
-      case result @ Misdelivered => logger.error(s"Event $id, url = $url -> $result")
+      case result @ Misdelivered => logger.error(s"Event $event, url = $url -> $result")
     }
 
   private lazy val withNothing: PartialFunction[Throwable, Unit] = { case NonFatal(_) => () }
-
-  private def markEventAsNonRecoverable(
-      url: SubscriberUrl,
-      id:  CompoundEventId
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    val markEventFailed =
-      ToGenerationNonRecoverableFailure[Interpretation](id, EventMessage(exception), underTriplesGenerationGauge)
-    for {
-      _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
-      _ <- logger.error(exception)(s"Event $id, url = $url -> ${markEventFailed.status}")
-    } yield ()
-  }
 
   private def loggingErrorAndRetry[O](retry: () => Interpretation[O]): PartialFunction[Throwable, Interpretation[O]] = {
     case NonFatal(exception) =>
@@ -126,45 +112,39 @@ private class EventsDistributorImpl[Interpretation[_]: Effect](
       } yield result
   }
 
-  private def retry(
-      command: ChangeStatusCommand[Interpretation]
-  ): PartialFunction[Throwable, Interpretation[UpdateResult]] = { case NonFatal(exception) =>
-    {
-      for {
-        _      <- logger.error(exception)(s"Marking event as ${command.status} failed")
-        _      <- timer sleep onErrorSleep
-        result <- statusUpdatesRunner run command
-      } yield result
-    } recoverWith retry(command)
-  }
 }
 
 private object IOEventsDistributor {
   private val NoEventSleep: FiniteDuration = 1 seconds
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
-  def apply(
-      transactor:                  DbTransactor[IO, EventLogDB],
-      subscribers:                 Subscribers[IO],
-      eventsFinder:                EventFetcher[IO],
-      underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
-      logger:                      Logger[IO]
+  def apply[FoundEvent](
+      transactor:        DbTransactor[IO, EventLogDB],
+      subscribers:       Subscribers[IO],
+      eventsFinder:      EventFinder[IO, FoundEvent],
+      foundEventEncoder: Encoder[FoundEvent],
+      dispatchRecovery:  DispatchRecovery[IO, FoundEvent],
+      logger:            Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventsDistributor[IO]] =
     for {
-      eventsSender        <- IOEventsSender(logger)
-      updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
+      eventsSender <- IOEventsSender[FoundEvent](foundEventEncoder, logger)
     } yield new EventsDistributorImpl(subscribers,
                                       eventsFinder,
-                                      updateCommandRunner,
                                       eventsSender,
-                                      underTriplesGenerationGauge,
+                                      dispatchRecovery,
                                       logger,
                                       noEventSleep = NoEventSleep,
                                       onErrorSleep = OnErrorSleep
     )
+}
+
+private trait DispatchRecovery[Interpretation[_], FoundEvent] {
+  def recover(
+      url:        SubscriberUrl,
+      foundEvent: FoundEvent
+  ): PartialFunction[Throwable, Interpretation[Unit]]
 }

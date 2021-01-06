@@ -19,7 +19,6 @@
 package io.renku.eventlog.subscriptions.unprocessed
 
 import java.time.{Duration, Instant}
-
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
@@ -36,7 +35,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
-import io.renku.eventlog.subscriptions.{EventFetcher, ProjectIds}
+import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds}
 import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectInfo}
 
 import scala.language.postfixOps
@@ -52,21 +51,18 @@ private class UnprocessedEventFetcherImpl(
     maxProcessingTime:     Duration,
     projectsFetchingLimit: Int Refined Positive,
     projectPrioritisation: ProjectPrioritisation,
-    pickRandomlyFrom:      List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size),
-    waitForViewRefresh:    Boolean = false
+    pickRandomlyFrom:      List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size)
 )(implicit ME:             Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
-    with EventFetcher[IO]
+    with EventFinder[IO, UnprocessedEvent]
     with TypesSerializers {
 
-  private type EventIdAndBody = (CompoundEventId, EventBody)
-
-  override def popEvent(): IO[Option[EventIdAndBody]] =
+  override def popEvent(): IO[Option[UnprocessedEvent]] =
     for {
-      maybeProjectEventIdAndBody <- findEventAndUpdateForProcessing() transact transactor.get
-      (maybeProject, maybeEventIdAndBody) = maybeProjectEventIdAndBody
-      _ <- maybeUpdateMetrics(maybeProject, maybeEventIdAndBody)
-    } yield maybeEventIdAndBody
+      maybeProjectUnprocessedEvent <- findEventAndUpdateForProcessing() transact transactor.get
+      (maybeProject, maybeUnprocessedEvent) = maybeProjectUnprocessedEvent
+      _ <- maybeUpdateMetrics(maybeProject, maybeUnprocessedEvent)
+    } yield maybeUnprocessedEvent
 
   private def findEventAndUpdateForProcessing() =
     for {
@@ -75,7 +71,7 @@ private class UnprocessedEventFetcherImpl(
                         .map(selectProject)
       maybeIdAndProjectAndBody <- maybeProject
                                     .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
-                                    .getOrElse(Free.pure[ConnectionOp, Option[EventIdAndBody]](None))
+                                    .getOrElse(Free.pure[ConnectionOp, Option[UnprocessedEvent]](None))
       maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
     } yield maybeProject -> maybeBody
 
@@ -124,7 +120,7 @@ private class UnprocessedEventFetcherImpl(
                OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})) 
          LIMIT 1
          """
-    }.query[EventIdAndBody].option,
+    }.query[UnprocessedEvent].option, 
     name = "pop event - oldest"
   )
   // format: on
@@ -143,11 +139,11 @@ private class UnprocessedEventFetcherImpl(
       acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
     }
 
-  private lazy val markAsProcessing: Option[EventIdAndBody] => Free[ConnectionOp, Option[EventIdAndBody]] = {
+  private lazy val markAsProcessing: Option[UnprocessedEvent] => Free[ConnectionOp, Option[UnprocessedEvent]] = {
     case None =>
-      Free.pure[ConnectionOp, Option[EventIdAndBody]](None)
-    case Some(idAndBody @ (commitEventId, _)) =>
-      measureExecutionTime(updateStatus(commitEventId)) map toNoneIfEventAlreadyTaken(idAndBody)
+      Free.pure[ConnectionOp, Option[UnprocessedEvent]](None)
+    case Some(event @ UnprocessedEvent(id, _)) =>
+      measureExecutionTime(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
   }
 
   private def updateStatus(commitEventId: CompoundEventId) = SqlQuery(
@@ -159,12 +155,12 @@ private class UnprocessedEventFetcherImpl(
     name = "pop event - status update"
   )
 
-  private def toNoneIfEventAlreadyTaken(idAndBody: EventIdAndBody): Int => Option[EventIdAndBody] = {
+  private def toNoneIfEventAlreadyTaken(event: UnprocessedEvent): Int => Option[UnprocessedEvent] = {
     case 0 => None
-    case 1 => Some(idAndBody)
+    case 1 => Some(event)
   }
 
-  private def maybeUpdateMetrics(maybeProject: Option[ProjectIds], maybeBody: Option[EventIdAndBody]) =
+  private def maybeUpdateMetrics(maybeProject: Option[ProjectIds], maybeBody: Option[UnprocessedEvent]) =
     (maybeBody, maybeProject) mapN { case (_, ProjectIds(_, projectPath)) =>
       for {
         _ <- waitingEventsGauge decrement projectPath
@@ -183,7 +179,7 @@ private object IOUnprocessedEventFetcher {
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name]
-  )(implicit contextShift:  ContextShift[IO]): IO[EventFetcher[IO]] = IO {
+  )(implicit contextShift:  ContextShift[IO]): IO[EventFinder[IO, UnprocessedEvent]] = IO {
     new UnprocessedEventFetcherImpl(transactor,
                                     waitingEventsGauge,
                                     underProcessingGauge,

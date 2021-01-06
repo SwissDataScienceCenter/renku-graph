@@ -43,8 +43,9 @@ private[subscriptions] object SubscriptionCategory {
     subscribers <- Subscribers(logger)
     eventFetcher <-
       IOUnprocessedEventFetcher(transactor, waitingEventsGauge, underTriplesGenerationGauge, queriesExecTimes)
+    dispatchRecovery <- DispatchRecovery(transactor, underTriplesGenerationGauge, queriesExecTimes, logger)
     eventsDistributor <-
-      IOEventsDistributor(transactor, subscribers, eventFetcher, underTriplesGenerationGauge, queriesExecTimes, logger)
+      IOEventsDistributor(transactor, subscribers, eventFetcher, UnprocessedEventEncoder, dispatchRecovery, logger)
     deserializer = SubscriptionRequestDeserializer[IO]()
   } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](subscribers, eventsDistributor, deserializer)
 }
