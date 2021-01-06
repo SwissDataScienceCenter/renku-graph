@@ -19,6 +19,7 @@
 package ch.datascience.config.sentry
 
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
+import ch.datascience.config.sentry.SentryConfig.SentryStackTracePackage
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import com.typesafe.config.ConfigFactory
@@ -48,16 +49,17 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     }
 
     "return a SentryConfig if 'services.sentry.enabled' is 'true' and all " +
-      "'services.sentry.url', 'services.sentry.service-name' and 'services.sentry.environment-name' are set" in {
+      "'services.sentry.url', 'services.sentry.service-name', 'services.sentry.environment-name' and 'services.sentry.stacktrace-package' are set" in {
         forAll { sentryConfig: SentryConfig =>
           val config = ConfigFactory.parseMap(
             Map(
               "services" -> Map(
                 "sentry" -> Map(
-                  "enabled"          -> "true",
-                  "url"              -> sentryConfig.baseUrl.value,
-                  "service-name"     -> sentryConfig.serviceName.value,
-                  "environment-name" -> sentryConfig.environmentName.value
+                  "enabled"            -> "true",
+                  "url"                -> sentryConfig.baseUrl.value,
+                  "service-name"       -> sentryConfig.serviceName.value,
+                  "environment-name"   -> sentryConfig.environmentName.value,
+                  "stacktrace-package" -> sentryConfig.stackTracePackage.value
                 ).asJava
               ).asJava
             ).asJava
@@ -67,16 +69,38 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
         }
       }
 
-    "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.url' is invalid" in {
+    "return a SentryConfig if 'services.sentry.enabled' is 'true' but 'services.sentry.stacktrace-package' is invalid and replace it with an empty string" in {
+
       val sentryConfig = sentryConfigs.generateOne
       val config = ConfigFactory.parseMap(
         Map(
           "services" -> Map(
             "sentry" -> Map(
               "enabled"          -> "true",
-              "url"              -> "",
+              "url"              -> sentryConfig.baseUrl.value,
               "service-name"     -> sentryConfig.serviceName.value,
               "environment-name" -> sentryConfig.environmentName.value
+            ).asJava
+          ).asJava
+        ).asJava
+      )
+
+      SentryConfig[Try](config) shouldBe Success(
+        Some(sentryConfig.copy(stackTracePackage = SentryStackTracePackage.empty))
+      )
+    }
+
+    "fail if 'services.sentry.enabled' is 'true' but 'services.sentry.url' is invalid" in {
+      val sentryConfig = sentryConfigs.generateOne
+      val config = ConfigFactory.parseMap(
+        Map(
+          "services" -> Map(
+            "sentry" -> Map(
+              "enabled"            -> "true",
+              "url"                -> "",
+              "service-name"       -> sentryConfig.serviceName.value,
+              "environment-name"   -> sentryConfig.environmentName.value,
+              "stacktrace-package" -> sentryConfig.stackTracePackage.value
             ).asJava
           ).asJava
         ).asJava
@@ -93,10 +117,11 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
         Map(
           "services" -> Map(
             "sentry" -> Map(
-              "enabled"          -> "true",
-              "url"              -> sentryConfig.baseUrl.value,
-              "service-name"     -> "",
-              "environment-name" -> sentryConfig.environmentName.value
+              "enabled"            -> "true",
+              "url"                -> sentryConfig.baseUrl.value,
+              "service-name"       -> "",
+              "environment-name"   -> sentryConfig.environmentName.value,
+              "stacktrace-package" -> sentryConfig.stackTracePackage.value
             ).asJava
           ).asJava
         ).asJava
@@ -113,10 +138,11 @@ class SentryConfigSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
         Map(
           "services" -> Map(
             "sentry" -> Map(
-              "enabled"          -> "true",
-              "url"              -> sentryConfig.baseUrl.value,
-              "service-name"     -> sentryConfig.serviceName.value,
-              "environment-name" -> ""
+              "enabled"            -> "true",
+              "url"                -> sentryConfig.baseUrl.value,
+              "service-name"       -> sentryConfig.serviceName.value,
+              "environment-name"   -> "",
+              "stacktrace-package" -> sentryConfig.stackTracePackage.value
             ).asJava
           ).asJava
         ).asJava
