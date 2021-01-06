@@ -20,9 +20,6 @@ package ch.datascience.triplesgenerator.init
 
 import cats.MonadError
 import ch.datascience.graph.model.CliVersion
-import ch.datascience.triplesgenerator.config.TriplesGeneration
-import ch.datascience.triplesgenerator.config.TriplesGeneration._
-import com.typesafe.config.{Config, ConfigFactory}
 import pureconfig.ConfigReader
 
 private[init] object CliVersionLoader {
@@ -31,20 +28,13 @@ private[init] object CliVersionLoader {
 
   private implicit val cliVersionLoader: ConfigReader[CliVersion] = stringTinyTypeReader(CliVersion)
 
-  def apply[Interpretation[_]](
-      triplesGeneration: TriplesGeneration
-  )(implicit ME:         MonadError[Interpretation, Throwable]): Interpretation[CliVersion] =
-    apply(triplesGeneration, findRenkuVersion, ConfigFactory.load())
+  def apply[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[CliVersion] =
+    apply(findRenkuVersion)
 
   private[init] def apply[Interpretation[_]](
-      triplesGeneration:  TriplesGeneration,
-      renkuVersionFinder: Interpretation[CliVersion],
-      config:             Config
-  )(implicit ME:          MonadError[Interpretation, Throwable]): Interpretation[CliVersion] = triplesGeneration match {
-    case RenkuLog => renkuVersionFinder
-    case RemoteTriplesGeneration =>
-      find[Interpretation, CliVersion]("services.triples-generator.cli-version", config)
-  }
+      renkuVersionFinder: Interpretation[CliVersion]
+  )(implicit ME:          MonadError[Interpretation, Throwable]): Interpretation[CliVersion] =
+    renkuVersionFinder
 
   private def findRenkuVersion[Interpretation[_]](implicit
       ME: MonadError[Interpretation, Throwable]
