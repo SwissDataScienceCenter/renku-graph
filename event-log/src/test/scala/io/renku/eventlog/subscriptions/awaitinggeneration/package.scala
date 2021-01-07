@@ -16,31 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.unprocessed
+package io.renku.eventlog.subscriptions
 
-import ch.datascience.generators.Generators.Implicits._
-import io.circe.Encoder
-import io.circe.literal._
-import io.circe.syntax._
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
+import org.scalacheck.Gen
 
-class UnprocessedEventEncoderSpec extends AnyWordSpec with should.Matchers {
+package object awaitinggeneration {
 
-  private implicit val encoder: Encoder[UnprocessedEvent] = UnprocessedEventEncoder
-
-  "encoder" should {
-
-    "serialize UnprocessedEvent to Json" in {
-      val event = unprocessedEvents.generateOne
-
-      event.asJson shouldBe json"""{
-        "id":      ${event.id.id.value},
-        "project": {
-          "id":    ${event.id.projectId.value}
-        },
-        "body":    ${event.body.value}
-      }"""
-    }
-  }
+  private[awaitinggeneration] lazy val awaitingGenerationEvents: Gen[AwaitingGenerationEvent] = for {
+    eventId   <- compoundEventIds
+    eventBody <- eventBodies
+  } yield AwaitingGenerationEvent(eventId, eventBody)
 }

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.unprocessed
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._

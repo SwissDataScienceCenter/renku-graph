@@ -16,19 +16,26 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.unprocessed
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import ch.datascience.generators.Generators.Implicits._
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import io.circe.Encoder
 
-class UnprocessedEventSpec extends AnyWordSpec with should.Matchers {
+private final case class AwaitingGenerationEvent(id: CompoundEventId, body: EventBody) {
+  override lazy val toString: String = id.toString
+}
 
-  "toString" should {
+private object AwaitingGenerationEventEncoder extends Encoder[AwaitingGenerationEvent] {
 
-    "print out the id" in {
-      val event = unprocessedEvents.generateOne
-      event.toString shouldBe event.id.toString
-    }
-  }
+  import io.circe.Json
+  import io.circe.literal.JsonStringContext
+
+  override def apply(event: AwaitingGenerationEvent): Json =
+    json"""{
+        "id":      ${event.id.id.value},
+        "project": {
+          "id":    ${event.id.projectId.value}
+        },
+        "body":    ${event.body.value}
+      }"""
 }

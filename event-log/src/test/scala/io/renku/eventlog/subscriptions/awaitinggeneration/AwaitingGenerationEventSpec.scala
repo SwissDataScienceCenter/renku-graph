@@ -16,9 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.unprocessed
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import io.renku.eventlog.subscriptions
+import ch.datascience.generators.Generators.Implicits._
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-private case class SubscriptionCategoryPayload(override val subscriberUrl: subscriptions.SubscriberUrl)
-    extends subscriptions.SubscriptionCategoryPayload
+class AwaitingGenerationEventSpec extends AnyWordSpec with should.Matchers {
+
+  "toString" should {
+
+    "print out the id" in {
+      val event = awaitingGenerationEvents.generateOne
+      event.toString shouldBe event.id.toString
+    }
+  }
+}

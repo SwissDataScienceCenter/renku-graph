@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.unprocessed
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
@@ -34,7 +34,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
-import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds}
 
 import java.time.{Duration, Instant}
@@ -42,7 +42,7 @@ import scala.language.postfixOps
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class UnprocessedEventFetcherImpl(
+private class AwaitingGenerationEventFetcherImpl(
     transactor:            DbTransactor[IO, EventLogDB],
     waitingEventsGauge:    LabeledGauge[IO, projects.Path],
     underProcessingGauge:  LabeledGauge[IO, projects.Path],
@@ -54,15 +54,15 @@ private class UnprocessedEventFetcherImpl(
     pickRandomlyFrom:      List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size)
 )(implicit ME:             Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
-    with EventFinder[IO, UnprocessedEvent]
+    with EventFinder[IO, AwaitingGenerationEvent]
     with TypesSerializers {
 
-  override def popEvent(): IO[Option[UnprocessedEvent]] =
+  override def popEvent(): IO[Option[AwaitingGenerationEvent]] =
     for {
-      maybeProjectUnprocessedEvent <- findEventAndUpdateForProcessing() transact transactor.get
-      (maybeProject, maybeUnprocessedEvent) = maybeProjectUnprocessedEvent
-      _ <- maybeUpdateMetrics(maybeProject, maybeUnprocessedEvent)
-    } yield maybeUnprocessedEvent
+      maybeProjectAwaitingGenerationEvent <- findEventAndUpdateForProcessing() transact transactor.get
+      (maybeProject, maybeAwaitingGenerationEvent) = maybeProjectAwaitingGenerationEvent
+      _ <- maybeUpdateMetrics(maybeProject, maybeAwaitingGenerationEvent)
+    } yield maybeAwaitingGenerationEvent
 
   private def findEventAndUpdateForProcessing() =
     for {
@@ -71,7 +71,7 @@ private class UnprocessedEventFetcherImpl(
                         .map(selectProject)
       maybeIdAndProjectAndBody <- maybeProject
                                     .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
-                                    .getOrElse(Free.pure[ConnectionOp, Option[UnprocessedEvent]](None))
+                                    .getOrElse(Free.pure[ConnectionOp, Option[AwaitingGenerationEvent]](None))
       maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
     } yield maybeProject -> maybeBody
 
@@ -120,7 +120,7 @@ private class UnprocessedEventFetcherImpl(
                OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})) 
          LIMIT 1
          """
-    }.query[UnprocessedEvent].option, 
+    }.query[AwaitingGenerationEvent].option, 
     name = "pop event - oldest"
   )
   // format: on
@@ -139,10 +139,11 @@ private class UnprocessedEventFetcherImpl(
       acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
     }
 
-  private lazy val markAsProcessing: Option[UnprocessedEvent] => Free[ConnectionOp, Option[UnprocessedEvent]] = {
+  private lazy val markAsProcessing
+      : Option[AwaitingGenerationEvent] => Free[ConnectionOp, Option[AwaitingGenerationEvent]] = {
     case None =>
-      Free.pure[ConnectionOp, Option[UnprocessedEvent]](None)
-    case Some(event @ UnprocessedEvent(id, _)) =>
+      Free.pure[ConnectionOp, Option[AwaitingGenerationEvent]](None)
+    case Some(event @ AwaitingGenerationEvent(id, _)) =>
       measureExecutionTime(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
   }
 
@@ -155,12 +156,12 @@ private class UnprocessedEventFetcherImpl(
     name = "pop event - status update"
   )
 
-  private def toNoneIfEventAlreadyTaken(event: UnprocessedEvent): Int => Option[UnprocessedEvent] = {
+  private def toNoneIfEventAlreadyTaken(event: AwaitingGenerationEvent): Int => Option[AwaitingGenerationEvent] = {
     case 0 => None
     case 1 => Some(event)
   }
 
-  private def maybeUpdateMetrics(maybeProject: Option[ProjectIds], maybeBody: Option[UnprocessedEvent]) =
+  private def maybeUpdateMetrics(maybeProject: Option[ProjectIds], maybeBody: Option[AwaitingGenerationEvent]) =
     (maybeBody, maybeProject) mapN { case (_, ProjectIds(_, projectPath)) =>
       for {
         _ <- waitingEventsGauge decrement projectPath
@@ -169,7 +170,7 @@ private class UnprocessedEventFetcherImpl(
     } getOrElse ME.unit
 }
 
-private object IOUnprocessedEventFetcher {
+private object IOAwaitingGenerationEventFetcher {
 
   private val MaxProcessingTime:     Duration             = Duration.ofHours(24)
   private val ProjectsFetchingLimit: Int Refined Positive = 10
@@ -179,14 +180,14 @@ private object IOUnprocessedEventFetcher {
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name]
-  )(implicit contextShift:  ContextShift[IO]): IO[EventFinder[IO, UnprocessedEvent]] = IO {
-    new UnprocessedEventFetcherImpl(transactor,
-                                    waitingEventsGauge,
-                                    underProcessingGauge,
-                                    queriesExecTimes,
-                                    maxProcessingTime = MaxProcessingTime,
-                                    projectsFetchingLimit = ProjectsFetchingLimit,
-                                    projectPrioritisation = new ProjectPrioritisation()
+  )(implicit contextShift:  ContextShift[IO]): IO[EventFinder[IO, AwaitingGenerationEvent]] = IO {
+    new AwaitingGenerationEventFetcherImpl(transactor,
+                                           waitingEventsGauge,
+                                           underProcessingGauge,
+                                           queriesExecTimes,
+                                           maxProcessingTime = MaxProcessingTime,
+                                           projectsFetchingLimit = ProjectsFetchingLimit,
+                                           projectPrioritisation = new ProjectPrioritisation()
     )
   }
 }

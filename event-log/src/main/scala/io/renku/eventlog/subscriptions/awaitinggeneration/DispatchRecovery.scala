@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.unprocessed
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.effect.{Bracket, IO, Timer}
 import cats.syntax.all._
@@ -39,11 +39,11 @@ private class DispatchRecoveryImpl[Interpretation[_]](
     logger:                      Logger[Interpretation],
     onErrorSleep:                FiniteDuration
 )(implicit ME:                   Bracket[Interpretation, Throwable], timer: Timer[Interpretation])
-    extends subscriptions.DispatchRecovery[Interpretation, UnprocessedEvent] {
+    extends subscriptions.DispatchRecovery[Interpretation, AwaitingGenerationEvent] {
 
   override def recover(
       url:           SubscriberUrl,
-      categoryEvent: UnprocessedEvent
+      categoryEvent: AwaitingGenerationEvent
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     val markEventFailed = ToGenerationNonRecoverableFailure[Interpretation](
       categoryEvent.id,
@@ -77,7 +77,7 @@ private object DispatchRecovery {
             underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
             queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
             logger:                      Logger[IO]
-  )(implicit timer:                      Timer[IO]): IO[DispatchRecovery[IO, UnprocessedEvent]] = for {
+  )(implicit timer:                      Timer[IO]): IO[DispatchRecovery[IO, AwaitingGenerationEvent]] = for {
     updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
   } yield new DispatchRecoveryImpl[IO](underTriplesGenerationGauge, updateCommandRunner, logger, OnErrorSleep)
 }

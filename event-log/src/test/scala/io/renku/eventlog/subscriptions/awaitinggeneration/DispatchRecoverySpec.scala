@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.unprocessed
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.effect.{IO, Timer}
 import cats.syntax.all._
@@ -46,7 +46,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
 
     "retry changing event status if status update failed initially" in new TestCase {
 
-      val event      = unprocessedEvents.generateOne
+      val event      = awaitingGenerationEvents.generateOne
       val exception  = exceptions.generateOne
       val subscriber = subscriberUrls.generateOne
 

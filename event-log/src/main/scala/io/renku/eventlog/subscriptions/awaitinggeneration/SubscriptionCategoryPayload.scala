@@ -16,15 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
-import org.scalacheck.Gen
+import io.renku.eventlog.subscriptions
 
-package object unprocessed {
-
-  private[unprocessed] lazy val unprocessedEvents: Gen[UnprocessedEvent] = for {
-    eventId   <- compoundEventIds
-    eventBody <- eventBodies
-  } yield UnprocessedEvent(eventId, eventBody)
-}
+private case class SubscriptionCategoryPayload(override val subscriberUrl: subscriptions.SubscriberUrl)
+    extends subscriptions.SubscriptionCategoryPayload

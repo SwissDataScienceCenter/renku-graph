@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.unprocessed
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{DbTransactor, SqlQuery}
@@ -46,10 +46,16 @@ private[subscriptions] object SubscriptionCategory {
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers <- Subscribers(logger)
     eventFetcher <-
-      IOUnprocessedEventFetcher(transactor, waitingEventsGauge, underTriplesGenerationGauge, queriesExecTimes)
+      IOAwaitingGenerationEventFetcher(transactor, waitingEventsGauge, underTriplesGenerationGauge, queriesExecTimes)
     dispatchRecovery <- DispatchRecovery(transactor, underTriplesGenerationGauge, queriesExecTimes, logger)
     eventsDistributor <-
-      IOEventsDistributor(transactor, subscribers, eventFetcher, UnprocessedEventEncoder, dispatchRecovery, logger)
+      IOEventsDistributor(transactor,
+                          subscribers,
+                          eventFetcher,
+                          AwaitingGenerationEventEncoder,
+                          dispatchRecovery,
+                          logger
+      )
     deserializer = SubscriptionRequestDeserializer[IO]()
   } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](name,
                                                                         subscribers,

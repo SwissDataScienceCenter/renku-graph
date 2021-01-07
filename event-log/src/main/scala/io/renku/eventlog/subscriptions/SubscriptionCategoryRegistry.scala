@@ -77,13 +77,13 @@ object IOSubscriptionCategoryRegistry {
       executionContext: ExecutionContext
   ): IO[SubscriptionCategoryRegistry[IO]] =
     for {
-      unprocessedCategory <-
-        unprocessed.SubscriptionCategory(transactor,
-                                         waitingEventsGauge,
-                                         underTriplesGenerationGauge,
-                                         queriesExecTimes,
-                                         logger
+      awaitingGenerationCategory <-
+        awaitinggeneration.SubscriptionCategory(transactor,
+                                                waitingEventsGauge,
+                                                underTriplesGenerationGauge,
+                                                queriesExecTimes,
+                                                logger
         )
-    } yield new SubscriptionCategoryRegistryImpl(Set[SubscriptionCategory[IO]](unprocessedCategory))
+    } yield new SubscriptionCategoryRegistryImpl(Set[SubscriptionCategory[IO]](awaitingGenerationCategory))
 
 }
