@@ -18,6 +18,6 @@
 
 package io.renku.eventlog.subscriptions
 
-private trait EventFinder[Interpretation[_], FoundEvent] {
-  def popEvent(): Interpretation[Option[FoundEvent]]
+private trait EventFinder[Interpretation[_], CategoryEvent] {
+  def popEvent(): Interpretation[Option[CategoryEvent]]
 }

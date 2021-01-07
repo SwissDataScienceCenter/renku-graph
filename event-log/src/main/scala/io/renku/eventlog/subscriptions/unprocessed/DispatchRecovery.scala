@@ -27,17 +27,17 @@ private class DispatchRecoveryImpl[Interpretation[_]](
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
   override def recover(
-      url:        SubscriberUrl,
-      foundEvent: UnprocessedEvent
+      url:           SubscriberUrl,
+      categoryEvent: UnprocessedEvent
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     val markEventFailed =
-      ToGenerationNonRecoverableFailure[Interpretation](foundEvent.id,
+      ToGenerationNonRecoverableFailure[Interpretation](categoryEvent.id,
                                                         EventMessage(exception),
                                                         underTriplesGenerationGauge
       )
     for {
       _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
-      _ <- logger.error(exception)(s"Event $foundEvent, url = $url -> ${markEventFailed.status}")
+      _ <- logger.error(exception)(s"Event $categoryEvent, url = $url -> ${markEventFailed.status}")
     } yield ()
   }
 

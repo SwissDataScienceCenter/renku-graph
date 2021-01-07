@@ -25,6 +25,7 @@ import doobie.implicits._
 
 trait EventLogDataFetching {
   self: InMemoryEventLogDb =>
+
   // format: off
   protected def findEvents(status:  EventStatus,
                            orderBy: Fragment = fr"created_date asc"): List[(CompoundEventId, ExecutionDate, BatchDate)] =
@@ -37,6 +38,7 @@ trait EventLogDataFetching {
         .to[List]
     }
   // format: on
+
   protected def findPayload(eventId: CompoundEventId): Option[(CompoundEventId, EventPayload)] =
     execute {
       (fr"""SELECT event_id, project_id, payload

@@ -232,8 +232,7 @@ private class UnprocessedEventFetcherSpec
         currentTime,
         maxProcessingTime = maxProcessingTime,
         projectsFetchingLimit = 5,
-        projectPrioritisation = projectPrioritisation,
-        waitForViewRefresh = true
+        projectPrioritisation = projectPrioritisation
       )
 
       val events = readyStatuses
@@ -311,8 +310,7 @@ private class UnprocessedEventFetcherSpec
       currentTime,
       maxProcessingTime = maxProcessingTime,
       projectsFetchingLimit = 1,
-      projectPrioritisation = projectPrioritisation,
-      waitForViewRefresh = true
+      projectPrioritisation = projectPrioritisation
     )
   }
 
