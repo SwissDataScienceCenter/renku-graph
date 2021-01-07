@@ -86,6 +86,9 @@ private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFact
 
   trait TestCase {
     trait TestSubscriptionCategory extends SubscriptionCategory[IO] {
+
+      override val name: CategoryName = CategoryName(nonBlankStrings().generateOne.value)
+
       override def run(): IO[Unit] = ().pure[IO]
 
       override def register(payload: Json): IO[RegistrationResult] =

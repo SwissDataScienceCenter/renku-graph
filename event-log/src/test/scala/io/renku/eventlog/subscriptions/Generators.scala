@@ -22,6 +22,7 @@ import ch.datascience.generators.Generators.httpUrls
 import org.scalacheck.Gen
 
 private object Generators {
+
   val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
 
   implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {

@@ -21,17 +21,25 @@ package io.renku.eventlog.subscriptions
 import cats.Semigroup
 import cats.data.OptionT
 import cats.effect.Effect
+import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.circe.Json
-import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RegistrationResult, RejectedRegistration}
+import io.renku.eventlog.subscriptions.SubscriptionCategory._
 
 private trait SubscriptionCategory[Interpretation[_]] {
+
+  def name: CategoryName
+
   def run(): Interpretation[Unit]
 
   def register(payload: Json): Interpretation[RegistrationResult]
-
 }
 
 private[subscriptions] object SubscriptionCategory {
+
+  final class CategoryName private (val value: String) extends AnyVal with StringTinyType
+  implicit object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank
+
   sealed trait RegistrationResult
   final case object AcceptedRegistration extends RegistrationResult
   final case object RejectedRegistration extends RegistrationResult
@@ -39,11 +47,11 @@ private[subscriptions] object SubscriptionCategory {
   implicit val registrationResultSemigroup: Semigroup[RegistrationResult] = {
     case (RejectedRegistration, RejectedRegistration) => RejectedRegistration
     case _                                            => AcceptedRegistration
-
   }
 }
 
 private class SubscriptionCategoryImpl[Interpretation[_]: Effect, T <: SubscriptionCategoryPayload](
+    val name:          CategoryName,
     subscribers:       Subscribers[Interpretation],
     eventsDistributor: EventsDistributor[Interpretation],
     deserializer:      SubscriptionRequestDeserializer[Interpretation] { type PayloadType = T }

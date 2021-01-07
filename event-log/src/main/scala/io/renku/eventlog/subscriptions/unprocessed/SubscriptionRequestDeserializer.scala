@@ -20,42 +20,36 @@ package io.renku.eventlog.subscriptions.unprocessed
 
 import cats.MonadError
 import cats.implicits.catsSyntaxApplicativeId
-import cats.syntax.all._
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus.{GenerationRecoverableFailure, New}
-import io.circe
-import io.circe.Decoder
+import io.circe.{Decoder, Json}
 import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions.SubscriberUrl
-import io.renku.eventlog.subscriptions.unprocessed.SubscriptionRequestDeserializer.UrlAndStatuses
 
 private case class SubscriptionRequestDeserializer[Interpretation[_]]()(implicit
     monadError: MonadError[Interpretation, Throwable]
 ) extends subscriptions.SubscriptionRequestDeserializer[Interpretation] {
 
+  import SubscriptionRequestDeserializer.payloadDecoder
+
   override type PayloadType = SubscriptionCategoryPayload
 
-  override def deserialize(payload: circe.Json): Interpretation[Option[SubscriptionCategoryPayload]] =
+  override def deserialize(payload: Json): Interpretation[Option[SubscriptionCategoryPayload]] =
     payload
-      .as[UrlAndStatuses]
-      .fold(_ => Option.empty[SubscriptionCategoryPayload], maybeSubscriptionUrl)
+      .as[(String, SubscriberUrl)]
+      .fold(_ => Option.empty[SubscriptionCategoryPayload], toCategoryPayload)
       .pure[Interpretation]
 
-  private val acceptedStatuses = Set(New, GenerationRecoverableFailure)
-
-  private def maybeSubscriptionUrl(urlAndStatuses: UrlAndStatuses): Option[SubscriptionCategoryPayload] =
-    if (urlAndStatuses.eventStatuses != acceptedStatuses) Option.empty[SubscriptionCategoryPayload]
-    else SubscriptionCategoryPayload(urlAndStatuses.subscriberUrl).some
+  private lazy val toCategoryPayload: ((String, SubscriberUrl)) => Option[SubscriptionCategoryPayload] = {
+    case (SubscriptionCategory.name.value, subscriberUrl) => Some(SubscriptionCategoryPayload(subscriberUrl))
+    case _                                                => None
+  }
 }
 
 private object SubscriptionRequestDeserializer {
 
-  case class UrlAndStatuses(subscriberUrl: SubscriberUrl, eventStatuses: Set[EventStatus])
-
-  private implicit val payloadDecoder: Decoder[UrlAndStatuses] = { cursor =>
+  private implicit val payloadDecoder: Decoder[(String, SubscriberUrl)] = { cursor =>
     for {
+      categoryName  <- cursor.downField("categoryName").as[String]
       subscriberUrl <- cursor.downField("subscriberUrl").as[SubscriberUrl]
-      statuses      <- cursor.downField("statuses").as[List[EventStatus]]
-    } yield UrlAndStatuses(subscriberUrl, statuses.toSet)
+    } yield categoryName -> subscriberUrl
   }
 }

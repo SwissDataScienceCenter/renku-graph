@@ -313,11 +313,8 @@ As a good practice, the subscription should be renewed periodically in case of r
 
 ```json
 {
-  "subscriberUrl": "http://host/path",
-  "statuses": [
-    "NEW",
-    "RECOVERABLE_FAILURE"
-  ]
+  "categoryName":  "AWAITING_GENERATION",
+  "subscriberUrl": "http://host/path"
 }
 ```
 

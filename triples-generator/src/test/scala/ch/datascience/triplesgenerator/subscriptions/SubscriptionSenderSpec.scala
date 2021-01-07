@@ -42,7 +42,7 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
 
       stubFor {
         post("/subscriptions")
-          .withRequestBody(equalToJson((subscriberUrl -> Set("NEW", "GENERATION_RECOVERABLE_FAILURE")).asJson.spaces2))
+          .withRequestBody(equalToJson(subscriberUrl.asJson.spaces2))
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
@@ -54,7 +54,7 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
       val message = "message"
       stubFor {
         post("/subscriptions")
-          .withRequestBody(equalToJson((subscriberUrl -> Set("NEW", "GENERATION_RECOVERABLE_FAILURE")).asJson.spaces2))
+          .withRequestBody(equalToJson(subscriberUrl.asJson.spaces2))
           .willReturn(badRequest().withBody(message))
       }
 
@@ -74,11 +74,11 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
     val sender      = new IOSubscriptionSender(eventLogUrl, TestLogger())
   }
 
-  private implicit lazy val payloadEncoder: Encoder[(SubscriberUrl, Set[String])] =
-    Encoder.instance[(SubscriberUrl, Set[String])] { case (url, statuses) =>
+  private implicit lazy val payloadEncoder: Encoder[SubscriberUrl] =
+    Encoder.instance[SubscriberUrl] { url =>
       json"""{
-        "subscriberUrl": ${url.value},
-        "statuses": ${statuses.toList}
+        "categoryName":  "AWAITING_GENERATION",
+        "subscriberUrl": ${url.value}
       }"""
     }
 }

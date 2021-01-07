@@ -18,15 +18,11 @@
 
 package io.renku.eventlog.subscriptions.unprocessed
 
-import cats.data.NonEmptyList
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, GenerationNonRecoverableFailure, GenerationRecoverableFailure, New, Skipped, TriplesStore}
-import eu.timepit.refined.auto._
+import io.circe.Json
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.Generators._
-import io.renku.eventlog.subscriptions.SubscriberUrl
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -37,79 +33,39 @@ import scala.util.{Success, Try}
 private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "deserialize" should {
-    "return the subscriber URL if the statuses are valid" in new TestCase {
+
+    "return the subscriber URL if the categoryName and subscriberUrl are valid" in new TestCase {
       val subscriptionCategoryPayload = subscriptionCategoryPayloads.generateOne
-      val payload                     = jsonPayload(acceptedStatuses, subscriptionCategoryPayload.subscriberUrl)
+      val payload                     = json"""
+      {
+        "categoryName": "AWAITING_GENERATION",
+        "subscriberUrl": ${subscriptionCategoryPayload.subscriberUrl.value}
+      }"""
+
       deserializer.deserialize(payload) shouldBe Success(Some(subscriptionCategoryPayload))
     }
 
-    "return None if the payload does not contain the right supported statuses" in new TestCase {
+    "return None if the payload does not contain a valid categoryName" in new TestCase {
 
-      val payload = jsonPayload(eventStatuses)
+      val payload = json"""
+      {
+        "categoryName": ${nonBlankStrings().generateOne.value},
+        "subscriberUrl": ${subscriberUrls.generateOne.value}
+      }"""
+
       deserializer.deserialize(payload) shouldBe Success(Option.empty[SubscriptionCategoryPayload])
     }
 
-    "return None if the payload does not contain all the supported statuses" in new TestCase {
-
-      val payload = jsonPayload(singleStatus)
-      deserializer.deserialize(payload) shouldBe Success(Option.empty[SubscriptionCategoryPayload])
-    }
-
-    "return None if the payload does not contain the right fields" in new TestCase {
-
-      val unsupportedPayload = json"""
-          {
-          ${nonEmptyStrings().generateOne}: ${nonEmptyStrings().generateOne}
-          }
-            """
-
-      deserializer.deserialize(unsupportedPayload) shouldBe Success(Option.empty[SubscriptionCategoryPayload])
+    "return None if the payload does not contain required fields" in new TestCase {
+      deserializer.deserialize(Json.obj()) shouldBe Success(Option.empty[SubscriptionCategoryPayload])
     }
   }
 
-  trait TestCase {
+  private trait TestCase {
     val deserializer = SubscriptionRequestDeserializer[Try]()
 
     val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
       url <- subscriberUrls
     } yield SubscriptionCategoryPayload(url)
-
-    val acceptedStatuses: Gen[NonEmptyList[EventStatus]] = Gen.const(
-      NonEmptyList(
-        New,
-        List(GenerationRecoverableFailure)
-      )
-    )
-
-    implicit val rejectedStatuses: Gen[NonEmptyList[EventStatus]] = nonEmptyList(
-      Gen.oneOf(
-        GeneratingTriples,
-        TriplesStore,
-        Skipped,
-        GenerationNonRecoverableFailure
-      )
-    )
-
-    implicit val singleStatus: Gen[NonEmptyList[EventStatus]] = nonEmptyList(
-      Gen.oneOf(
-        New,
-        GenerationRecoverableFailure
-      ),
-      maxElements = 1
-    )
-
-    val eventStatuses: Gen[NonEmptyList[EventStatus]] = for {
-      accepted <- acceptedStatuses
-      rejected <- rejectedStatuses
-    } yield accepted ++ rejected.toList
-
-    def jsonPayload(from: Gen[NonEmptyList[EventStatus]], subscriberUrl: SubscriberUrl = subscriberUrls.generateOne) =
-      json"""
-             {
-               "subscriberUrl": ${subscriberUrl.value},
-               "statuses": ${from.generateOne.map(_.value)}
-             }
-          """
-
   }
 }
