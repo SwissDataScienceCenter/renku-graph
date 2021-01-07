@@ -42,6 +42,7 @@ private case class SubscriptionRequestDeserializer[Interpretation[_]]()(implicit
       .pure[Interpretation]
 
   private val acceptedStatuses = Set(New, GenerationRecoverableFailure)
+
   private def maybeSubscriptionUrl(urlAndStatuses: UrlAndStatuses): Option[SubscriptionCategoryPayload] =
     if (urlAndStatuses.eventStatuses != acceptedStatuses) Option.empty[SubscriptionCategoryPayload]
     else SubscriptionCategoryPayload(urlAndStatuses.subscriberUrl).some

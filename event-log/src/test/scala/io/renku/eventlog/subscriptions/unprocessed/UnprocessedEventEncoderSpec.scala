@@ -18,24 +18,29 @@
 
 package io.renku.eventlog.subscriptions.unprocessed
 
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.generators.Generators.Implicits._
 import io.circe.Encoder
+import io.circe.literal._
+import io.circe.syntax._
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-private final case class UnprocessedEvent(id: CompoundEventId, body: EventBody) {
-  override lazy val toString: String = id.toString
-}
+class UnprocessedEventEncoderSpec extends AnyWordSpec with should.Matchers {
 
-private object UnprocessedEventEncoder extends Encoder[UnprocessedEvent] {
+  private implicit val encoder: Encoder[UnprocessedEvent] = UnprocessedEventEncoder
 
-  import io.circe.Json
-  import io.circe.literal.JsonStringContext
+  "encoder" should {
 
-  override def apply(unprocessedEvent: UnprocessedEvent): Json =
-    json"""{
-        "id":      ${unprocessedEvent.id.id.value},
+    "serialize UnprocessedEvent to Json" in {
+      val event = unprocessedEvents.generateOne
+
+      event.asJson shouldBe json"""{
+        "id":      ${event.id.id.value},
         "project": {
-          "id":    ${unprocessedEvent.id.projectId.value}
+          "id":    ${event.id.projectId.value}
         },
-        "body":    ${unprocessedEvent.body.value}
+        "body":    ${event.body.value}
       }"""
+    }
+  }
 }

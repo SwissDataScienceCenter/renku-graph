@@ -84,7 +84,7 @@ private class UnprocessedEventFetcherSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event2Id -> event2Body)
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(UnprocessedEvent(event2Id, event2Body))
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event2Id, executionDate))
 
@@ -96,7 +96,7 @@ private class UnprocessedEventFetcherSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(UnprocessedEvent(event1Id, event1Body))
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event1Id, executionDate),
                                                                             (event2Id, executionDate)
@@ -149,7 +149,7 @@ private class UnprocessedEventFetcherSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(UnprocessedEvent(event1Id, event1Body))
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event1Id, executionDate))
 
@@ -179,7 +179,7 @@ private class UnprocessedEventFetcherSpec
           returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(eventId -> eventBody)
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(UnprocessedEvent(eventId, eventBody))
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((eventId, executionDate))
       }

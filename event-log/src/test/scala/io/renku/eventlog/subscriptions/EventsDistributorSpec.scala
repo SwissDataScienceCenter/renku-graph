@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
+import TestCategoryEvent._
 import cats.effect.{IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
@@ -27,7 +28,6 @@ import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult.{Delivered, Misdelivered, ServiceBusy}
 import io.renku.eventlog.subscriptions.Generators._
-import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
@@ -385,9 +385,4 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         .expects(to, event)
         .returning(got.pure[IO])
   }
-
-  private case class TestCategoryEvent(value: Int)
-
-  private lazy val testCategoryEvents: Gen[TestCategoryEvent] =
-    Arbitrary.arbInt.arbitrary map TestCategoryEvent.apply
 }

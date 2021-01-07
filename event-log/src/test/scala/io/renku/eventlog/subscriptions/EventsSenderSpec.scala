@@ -18,22 +18,17 @@
 
 package io.renku.eventlog.subscriptions
 
+import TestCategoryEvent._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.{eventBodies, eventIds}
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventId}
-import ch.datascience.graph.model.{events, projects}
+import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Encoder
-import io.circe.literal._
-import io.circe.syntax._
-import io.renku.eventlog.CompoundId
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult.{Delivered, Misdelivered, ServiceBusy}
 import org.http4s.Status._
-import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -41,61 +36,89 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
+class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with MockFactory with should.Matchers {
 
   "sendEvent" should {
 
     s"return Delivered if remote responds with $Accepted" in new TestCase {
+
+      val eventJson = jsons.generateOne
+      (categoryEventEncoder.apply _)
+        .expects(event)
+        .returning(eventJson)
+
       stubFor {
         post("/")
-          .withRequestBody(equalToJson(event.asJson.spaces2))
+          .withRequestBody(equalToJson(eventJson.spaces2))
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
-      sender.sendEvent(subscriberUrl, event.compoundEventId, event.body).unsafeRunSync() shouldBe Delivered
+      sender.sendEvent(subscriberUrl, event).unsafeRunSync() shouldBe Delivered
     }
 
     TooManyRequests +: ServiceUnavailable +: Nil foreach { status =>
       s"return ServiceBusy if remote responds with $status" in new TestCase {
+
+        val eventJson = jsons.generateOne
+        (categoryEventEncoder.apply _)
+          .expects(event)
+          .returning(eventJson)
+
         stubFor {
           post("/")
-            .withRequestBody(equalToJson(event.asJson.spaces2))
+            .withRequestBody(equalToJson(eventJson.spaces2))
             .willReturn(aResponse().withStatus(TooManyRequests.code))
         }
 
-        sender.sendEvent(subscriberUrl, event.compoundEventId, event.body).unsafeRunSync() shouldBe ServiceBusy
+        sender.sendEvent(subscriberUrl, event).unsafeRunSync() shouldBe ServiceBusy
       }
     }
 
     NotFound +: BadGateway +: Nil foreach { status =>
       s"return Misdelivered if remote responds with $status" in new TestCase {
+
+        val eventJson = jsons.generateOne
+        (categoryEventEncoder.apply _)
+          .expects(event)
+          .returning(eventJson)
+
         stubFor {
           post("/")
-            .withRequestBody(equalToJson(event.asJson.spaces2))
+            .withRequestBody(equalToJson(eventJson.spaces2))
             .willReturn(aResponse().withStatus(status.code))
         }
 
-        sender.sendEvent(subscriberUrl, event.compoundEventId, event.body).unsafeRunSync() shouldBe Misdelivered
+        sender.sendEvent(subscriberUrl, event).unsafeRunSync() shouldBe Misdelivered
       }
     }
 
     "return Misdelivered if call to the remote fails with Connect Exception" in new TestCase {
-      override val sender = new IOEventsSender(TestLogger(), retryInterval = 10 millis)
+      override val sender = new EventsSenderImpl(categoryEventEncoder, TestLogger(), retryInterval = 10 millis)
+
+      (categoryEventEncoder.apply _)
+        .expects(event)
+        .returning(jsons.generateOne)
 
       sender
-        .sendEvent(SubscriberUrl("http://unexisting"), event.compoundEventId, event.body)
+        .sendEvent(SubscriberUrl("http://unexisting"), event)
         .unsafeRunSync() shouldBe Misdelivered
     }
 
     s"fail if remote responds with $BadRequest" in new TestCase {
+
+      val eventJson = jsons.generateOne
+      (categoryEventEncoder.apply _)
+        .expects(event)
+        .returning(eventJson)
+
       stubFor {
         post("/")
-          .withRequestBody(equalToJson(event.asJson.spaces2))
+          .withRequestBody(equalToJson(eventJson.spaces2))
           .willReturn(badRequest().withBody("message"))
       }
 
       intercept[Exception] {
-        sender.sendEvent(subscriberUrl, event.compoundEventId, event.body).unsafeRunSync()
+        sender.sendEvent(subscriberUrl, event).unsafeRunSync()
       }.getMessage shouldBe s"POST $subscriberUrl returned $BadRequest; body: message"
     }
   }
@@ -104,30 +127,10 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with sho
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val event         = readyEvents.generateOne
-    val subscriberUrl = SubscriberUrl(externalServiceBaseUrl)
+    val event                = testCategoryEvents.generateOne
+    val subscriberUrl        = SubscriberUrl(externalServiceBaseUrl)
+    val categoryEventEncoder = mock[Encoder[TestCategoryEvent]]
 
-    val sender = new IOEventsSender(TestLogger())
+    val sender = new EventsSenderImpl[TestCategoryEvent](categoryEventEncoder, TestLogger())
   }
-
-  private implicit val eventEncoder: Encoder[ReadyEvent] = Encoder.instance[ReadyEvent] { event =>
-    json"""{
-      "id":      ${event.id.value},
-      "project": {
-        "id":    ${event.projectId.value}
-      },
-      "body":    ${event.body.value}
-    }"""
-  }
-
-  private case class ReadyEvent(id: EventId, projectId: projects.Id, body: EventBody) extends CompoundId {
-    override lazy val compoundEventId: events.CompoundEventId = CompoundEventId(id, projectId)
-  }
-
-  private implicit val readyEvents: Gen[ReadyEvent] = for {
-    eventId   <- eventIds
-    projectId <- projectIds
-    body      <- eventBodies
-  } yield ReadyEvent(eventId, projectId, body)
-
 }

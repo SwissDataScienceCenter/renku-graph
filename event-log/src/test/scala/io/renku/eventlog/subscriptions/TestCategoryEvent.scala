@@ -16,9 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.membersync
+package io.renku.eventlog.subscriptions
 
-import io.renku.eventlog.subscriptions
+import org.scalacheck.{Arbitrary, Gen}
 
-private case class SubscriptionCategoryPayload(override val subscriberUrl: subscriptions.SubscriberUrl)
-    extends subscriptions.SubscriptionCategoryPayload
+private case class TestCategoryEvent(value: Int)
+
+private object TestCategoryEvent {
+  lazy val testCategoryEvents: Gen[TestCategoryEvent] =
+    Arbitrary.arbInt.arbitrary map TestCategoryEvent.apply
+}
