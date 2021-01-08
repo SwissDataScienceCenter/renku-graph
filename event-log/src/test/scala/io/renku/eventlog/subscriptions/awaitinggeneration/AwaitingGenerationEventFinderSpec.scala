@@ -45,7 +45,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-private class AwaitingGenerationEventFetcherSpec
+private class AwaitingGenerationEventFinderSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with MockFactory
@@ -84,7 +84,7 @@ private class AwaitingGenerationEventFetcherSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(
+        eventLogFinder.popEvent().unsafeRunSync() shouldBe Some(
           AwaitingGenerationEvent(event2Id, projectPath, event2Body)
         )
 
@@ -98,7 +98,7 @@ private class AwaitingGenerationEventFetcherSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(
+        eventLogFinder.popEvent().unsafeRunSync() shouldBe Some(
           AwaitingGenerationEvent(event1Id, projectPath, event1Body)
         )
 
@@ -108,7 +108,7 @@ private class AwaitingGenerationEventFetcherSpec
 
         givenPrioritisation(takes = Nil, returns = Nil)
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe None
+        eventLogFinder.popEvent().unsafeRunSync() shouldBe None
 
         queriesExecTimes.verifyExecutionTimeMeasured("pop event - projects",
                                                      "pop event - oldest",
@@ -153,7 +153,7 @@ private class AwaitingGenerationEventFetcherSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(
+        eventLogFinder.popEvent().unsafeRunSync() shouldBe Some(
           AwaitingGenerationEvent(event1Id, projectPath, event1Body)
         )
 
@@ -161,7 +161,7 @@ private class AwaitingGenerationEventFetcherSpec
 
         givenPrioritisation(takes = Nil, returns = Nil)
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe None
+        eventLogFinder.popEvent().unsafeRunSync() shouldBe None
 
         queriesExecTimes.verifyExecutionTimeMeasured("pop event - projects",
                                                      "pop event - oldest",
@@ -185,7 +185,9 @@ private class AwaitingGenerationEventFetcherSpec
           returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(AwaitingGenerationEvent(eventId, projectPath, eventBody))
+        eventLogFinder.popEvent().unsafeRunSync() shouldBe Some(
+          AwaitingGenerationEvent(eventId, projectPath, eventBody)
+        )
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((eventId, executionDate))
       }
@@ -200,7 +202,7 @@ private class AwaitingGenerationEventFetcherSpec
 
         givenPrioritisation(takes = Nil, returns = Nil)
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe None
+        eventLogFinder.popEvent().unsafeRunSync() shouldBe None
       }
 
     "return events from all the projects" in new TestCase {
@@ -222,7 +224,7 @@ private class AwaitingGenerationEventFetcherSpec
       }
 
       events foreach { _ =>
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+        eventLogFinder.popEvent().unsafeRunSync() shouldBe a[Some[_]]
       }
 
       findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
@@ -230,7 +232,7 @@ private class AwaitingGenerationEventFetcherSpec
 
     "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
-      val eventLogFetch = new AwaitingGenerationEventFetcherImpl(
+      val eventLogFind = new AwaitingGenerationEventFinderImpl(
         transactor,
         waitingEventsGauge,
         underProcessingGauge,
@@ -262,14 +264,14 @@ private class AwaitingGenerationEventFetcherSpec
       }
 
       events foreach { _ =>
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+        eventLogFind.popEvent().unsafeRunSync() shouldBe a[Some[_]]
       }
 
       findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
 
       givenPrioritisation(takes = Nil, returns = Nil)
 
-      eventLogFetch.popEvent().unsafeRunSync() shouldBe None
+      eventLogFind.popEvent().unsafeRunSync() shouldBe None
     }
   }
 
@@ -308,7 +310,7 @@ private class AwaitingGenerationEventFetcherSpec
 
   private trait TestCase extends TestCaseCommons {
 
-    val eventLogFetch = new AwaitingGenerationEventFetcherImpl(
+    val eventLogFinder = new AwaitingGenerationEventFinderImpl(
       transactor,
       waitingEventsGauge,
       underProcessingGauge,

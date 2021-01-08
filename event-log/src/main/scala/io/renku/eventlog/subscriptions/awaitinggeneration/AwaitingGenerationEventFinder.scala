@@ -42,7 +42,7 @@ import scala.language.postfixOps
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
-private class AwaitingGenerationEventFetcherImpl(
+private class AwaitingGenerationEventFinderImpl(
     transactor:            DbTransactor[IO, EventLogDB],
     waitingEventsGauge:    LabeledGauge[IO, projects.Path],
     underProcessingGauge:  LabeledGauge[IO, projects.Path],
@@ -170,7 +170,7 @@ private class AwaitingGenerationEventFetcherImpl(
     } getOrElse ME.unit
 }
 
-private object IOAwaitingGenerationEventFetcher {
+private object IOAwaitingGenerationEventFinder {
 
   private val MaxProcessingTime:     Duration             = Duration.ofHours(24)
   private val ProjectsFetchingLimit: Int Refined Positive = 10
@@ -181,13 +181,13 @@ private object IOAwaitingGenerationEventFetcher {
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift:  ContextShift[IO]): IO[EventFinder[IO, AwaitingGenerationEvent]] = IO {
-    new AwaitingGenerationEventFetcherImpl(transactor,
-                                           waitingEventsGauge,
-                                           underProcessingGauge,
-                                           queriesExecTimes,
-                                           maxProcessingTime = MaxProcessingTime,
-                                           projectsFetchingLimit = ProjectsFetchingLimit,
-                                           projectPrioritisation = new ProjectPrioritisation()
+    new AwaitingGenerationEventFinderImpl(transactor,
+                                          waitingEventsGauge,
+                                          underProcessingGauge,
+                                          queriesExecTimes,
+                                          maxProcessingTime = MaxProcessingTime,
+                                          projectsFetchingLimit = ProjectsFetchingLimit,
+                                          projectPrioritisation = new ProjectPrioritisation()
     )
   }
 }
