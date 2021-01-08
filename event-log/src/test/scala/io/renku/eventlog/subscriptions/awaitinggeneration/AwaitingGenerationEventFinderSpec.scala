@@ -84,7 +84,7 @@ private class AwaitingGenerationEventFinderSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFinder.popEvent().unsafeRunSync() shouldBe Some(
+        finder.popEvent().unsafeRunSync() shouldBe Some(
           AwaitingGenerationEvent(event2Id, projectPath, event2Body)
         )
 
@@ -98,7 +98,7 @@ private class AwaitingGenerationEventFinderSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFinder.popEvent().unsafeRunSync() shouldBe Some(
+        finder.popEvent().unsafeRunSync() shouldBe Some(
           AwaitingGenerationEvent(event1Id, projectPath, event1Body)
         )
 
@@ -108,7 +108,7 @@ private class AwaitingGenerationEventFinderSpec
 
         givenPrioritisation(takes = Nil, returns = Nil)
 
-        eventLogFinder.popEvent().unsafeRunSync() shouldBe None
+        finder.popEvent().unsafeRunSync() shouldBe None
 
         queriesExecTimes.verifyExecutionTimeMeasured("pop event - projects",
                                                      "pop event - oldest",
@@ -153,7 +153,7 @@ private class AwaitingGenerationEventFinderSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFinder.popEvent().unsafeRunSync() shouldBe Some(
+        finder.popEvent().unsafeRunSync() shouldBe Some(
           AwaitingGenerationEvent(event1Id, projectPath, event1Body)
         )
 
@@ -161,7 +161,7 @@ private class AwaitingGenerationEventFinderSpec
 
         givenPrioritisation(takes = Nil, returns = Nil)
 
-        eventLogFinder.popEvent().unsafeRunSync() shouldBe None
+        finder.popEvent().unsafeRunSync() shouldBe None
 
         queriesExecTimes.verifyExecutionTimeMeasured("pop event - projects",
                                                      "pop event - oldest",
@@ -185,7 +185,7 @@ private class AwaitingGenerationEventFinderSpec
           returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFinder.popEvent().unsafeRunSync() shouldBe Some(
+        finder.popEvent().unsafeRunSync() shouldBe Some(
           AwaitingGenerationEvent(eventId, projectPath, eventBody)
         )
 
@@ -202,7 +202,7 @@ private class AwaitingGenerationEventFinderSpec
 
         givenPrioritisation(takes = Nil, returns = Nil)
 
-        eventLogFinder.popEvent().unsafeRunSync() shouldBe None
+        finder.popEvent().unsafeRunSync() shouldBe None
       }
 
     "return events from all the projects" in new TestCase {
@@ -224,7 +224,7 @@ private class AwaitingGenerationEventFinderSpec
       }
 
       events foreach { _ =>
-        eventLogFinder.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+        finder.popEvent().unsafeRunSync() shouldBe a[Some[_]]
       }
 
       findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
@@ -310,7 +310,7 @@ private class AwaitingGenerationEventFinderSpec
 
   private trait TestCase extends TestCaseCommons {
 
-    val eventLogFinder = new AwaitingGenerationEventFinderImpl(
+    val finder = new AwaitingGenerationEventFinderImpl(
       transactor,
       waitingEventsGauge,
       underProcessingGauge,

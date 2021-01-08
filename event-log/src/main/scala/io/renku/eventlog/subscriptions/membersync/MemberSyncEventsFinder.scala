@@ -18,20 +18,25 @@
 
 package io.renku.eventlog.subscriptions.membersync
 
-import cats.effect.{ContextShift, IO}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import cats.effect.{Bracket, ContextShift, IO}
+import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.{EventLogDB, TypeSerializers}
 import io.renku.eventlog.subscriptions.EventFinder
 
-private class MemberSyncEventsFinderImpl(transactor:       DbTransactor[IO, EventLogDB],
-                                         queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-) {}
+private class MemberSyncEventFinderImpl(transactor:       DbTransactor[IO, EventLogDB],
+                                        queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
+)(implicit ME:                                            Bracket[IO, Throwable], contextShift: ContextShift[IO])
+    extends DbClient(Some(queriesExecTimes))
+    with EventFinder[IO, MemberSyncEvent]
+    with TypeSerializers {
+  override def popEvent(): IO[Option[MemberSyncEvent]] = ???
+}
 
 private object MemberSyncEventsFinder {
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
-  )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, MemberSyncEvent]] = ???
+      transactor:       DbTransactor[IO, EventLogDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
+  )(implicit ME:        Bracket[IO, Throwable], contextShift: ContextShift[IO]): IO[EventFinder[IO, MemberSyncEvent]] = ???
 }

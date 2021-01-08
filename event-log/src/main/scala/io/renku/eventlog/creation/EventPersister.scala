@@ -52,7 +52,7 @@ class EventPersisterImpl(
     with EventPersister[IO] {
 
   import doobie.ConnectionIO
-  import io.renku.eventlog.TypesSerializers._
+  import io.renku.eventlog.TypeSerializers._
 
   override def storeNewEvent(event: Event): IO[Result] =
     for {

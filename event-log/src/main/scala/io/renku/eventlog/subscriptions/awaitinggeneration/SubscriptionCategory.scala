@@ -46,7 +46,7 @@ private[subscriptions] object SubscriptionCategory {
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers <- Subscribers(logger)
     eventFetcher <-
-      IOAwaitingGenerationEventFetcher(transactor, waitingEventsGauge, underTriplesGenerationGauge, queriesExecTimes)
+      IOAwaitingGenerationEventFinder(transactor, waitingEventsGauge, underTriplesGenerationGauge, queriesExecTimes)
     dispatchRecovery <- DispatchRecovery(transactor, underTriplesGenerationGauge, queriesExecTimes, logger)
     eventsDistributor <-
       IOEventsDistributor(transactor,

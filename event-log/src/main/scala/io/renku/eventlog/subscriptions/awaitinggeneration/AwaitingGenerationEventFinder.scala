@@ -55,7 +55,7 @@ private class AwaitingGenerationEventFinderImpl(
 )(implicit ME:             Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, AwaitingGenerationEvent]
-    with TypesSerializers {
+    with TypeSerializers {
 
   override def popEvent(): IO[Option[AwaitingGenerationEvent]] =
     for {

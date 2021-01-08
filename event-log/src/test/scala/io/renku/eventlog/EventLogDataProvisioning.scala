@@ -74,4 +74,5 @@ trait EventLogDataProvisioning {
             |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
       """.stripMargin.update.run.map(_ => ())
     }
+
 }

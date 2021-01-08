@@ -27,7 +27,7 @@ import io.renku.eventlog.EventLogDB
 
 private object ProjectPathFinder {
 
-  import io.renku.eventlog.TypesSerializers._
+  import io.renku.eventlog.TypeSerializers._
 
   def findProjectPath[Interpretation[_]](
       eventId:           CompoundEventId

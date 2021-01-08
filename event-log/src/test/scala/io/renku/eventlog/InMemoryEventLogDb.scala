@@ -31,7 +31,7 @@ import org.testcontainers.utility.DockerImageName
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-trait InMemoryEventLogDb extends ForAllTestContainer with TypesSerializers {
+trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
   self: Suite =>
 
   object Tables {
