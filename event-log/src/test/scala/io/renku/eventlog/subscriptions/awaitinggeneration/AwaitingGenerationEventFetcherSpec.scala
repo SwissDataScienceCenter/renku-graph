@@ -84,7 +84,9 @@ private class AwaitingGenerationEventFetcherSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(AwaitingGenerationEvent(event2Id, event2Body))
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(
+          AwaitingGenerationEvent(event2Id, projectPath, event2Body)
+        )
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event2Id, executionDate))
 
@@ -96,7 +98,9 @@ private class AwaitingGenerationEventFetcherSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(AwaitingGenerationEvent(event1Id, event1Body))
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(
+          AwaitingGenerationEvent(event1Id, projectPath, event1Body)
+        )
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event1Id, executionDate),
                                                                             (event2Id, executionDate)
@@ -149,7 +153,9 @@ private class AwaitingGenerationEventFetcherSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(AwaitingGenerationEvent(event1Id, event1Body))
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(
+          AwaitingGenerationEvent(event1Id, projectPath, event1Body)
+        )
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event1Id, executionDate))
 
@@ -179,7 +185,7 @@ private class AwaitingGenerationEventFetcherSpec
           returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(AwaitingGenerationEvent(eventId, eventBody))
+        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(AwaitingGenerationEvent(eventId, projectPath, eventBody))
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((eventId, executionDate))
       }

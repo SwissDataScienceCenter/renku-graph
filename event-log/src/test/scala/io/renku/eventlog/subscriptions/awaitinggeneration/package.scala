@@ -19,12 +19,14 @@
 package io.renku.eventlog.subscriptions
 
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import org.scalacheck.Gen
 
 package object awaitinggeneration {
 
   private[awaitinggeneration] lazy val awaitingGenerationEvents: Gen[AwaitingGenerationEvent] = for {
-    eventId   <- compoundEventIds
-    eventBody <- eventBodies
-  } yield AwaitingGenerationEvent(eventId, eventBody)
+    eventId     <- compoundEventIds
+    projectPath <- projectPaths
+    eventBody   <- eventBodies
+  } yield AwaitingGenerationEvent(eventId, projectPath, eventBody)
 }

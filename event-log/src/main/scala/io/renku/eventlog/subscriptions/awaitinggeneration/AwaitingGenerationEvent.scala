@@ -19,10 +19,11 @@
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.graph.model.projects
 import io.circe.Encoder
 
-private final case class AwaitingGenerationEvent(id: CompoundEventId, body: EventBody) {
-  override lazy val toString: String = id.toString
+private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPath: projects.Path, body: EventBody) {
+  override lazy val toString: String = s"$id, projectPath = $projectPath"
 }
 
 private object AwaitingGenerationEventEncoder extends Encoder[AwaitingGenerationEvent] {

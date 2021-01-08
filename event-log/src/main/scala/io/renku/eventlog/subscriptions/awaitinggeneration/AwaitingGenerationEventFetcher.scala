@@ -105,9 +105,9 @@ private class AwaitingGenerationEventFetcherImpl(
 
   // format: off
   private def findOldestEvent(idAndPath: ProjectIds) = SqlQuery({
-    fr"""SELECT evt.event_id, evt.project_id, evt.event_body
+    fr"""SELECT evt.event_id, evt.project_id, ${idAndPath.path} AS project_path, evt.event_body
          FROM (
-           SELECT project_id, min(event_date) as min_event_date
+           SELECT project_id, min(event_date) AS min_event_date
            FROM event
            WHERE project_id = ${idAndPath.id}
              AND ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
@@ -143,7 +143,7 @@ private class AwaitingGenerationEventFetcherImpl(
       : Option[AwaitingGenerationEvent] => Free[ConnectionOp, Option[AwaitingGenerationEvent]] = {
     case None =>
       Free.pure[ConnectionOp, Option[AwaitingGenerationEvent]](None)
-    case Some(event @ AwaitingGenerationEvent(id, _)) =>
+    case Some(event @ AwaitingGenerationEvent(id, _, _)) =>
       measureExecutionTime(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
   }
 
