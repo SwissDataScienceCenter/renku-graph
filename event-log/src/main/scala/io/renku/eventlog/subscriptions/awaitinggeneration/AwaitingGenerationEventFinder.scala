@@ -99,7 +99,7 @@ private class AwaitingGenerationEventFinderImpl(
     }.query[(projects.Id, projects.Path, EventDate, Int)]
     .map { case (projectId, projectPath, eventDate, currentOccupancy) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy)) }
     .to[List],
-    name = "pop event - projects"
+    name = "awaiting generation - find projects"
   )
   // format: on
 
@@ -121,7 +121,7 @@ private class AwaitingGenerationEventFinderImpl(
          LIMIT 1
          """
     }.query[AwaitingGenerationEvent].option, 
-    name = "pop event - oldest"
+    name = "awaiting generation - find oldest"
   )
   // format: on
 
@@ -153,7 +153,7 @@ private class AwaitingGenerationEventFinderImpl(
           |WHERE (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status <> ${GeneratingTriples: EventStatus})
           |  OR (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
           |""".stripMargin.update.run,
-    name = "pop event - status update"
+    name = "awaiting generation - update status"
   )
 
   private def toNoneIfEventAlreadyTaken(event: AwaitingGenerationEvent): Int => Option[AwaitingGenerationEvent] = {
