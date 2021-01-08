@@ -35,11 +35,12 @@ class AwaitingGenerationEventEncoderSpec extends AnyWordSpec with should.Matcher
       val event = awaitingGenerationEvents.generateOne
 
       event.asJson shouldBe json"""{
-        "id":      ${event.id.id.value},
+        "categoryName": "AWAITING_GENERATION",
+        "id":           ${event.id.id.value},
         "project": {
-          "id":    ${event.id.projectId.value}
+          "id":         ${event.id.projectId.value}
         },
-        "body":    ${event.body.value}
+        "body":         ${event.body.value}
       }"""
     }
   }

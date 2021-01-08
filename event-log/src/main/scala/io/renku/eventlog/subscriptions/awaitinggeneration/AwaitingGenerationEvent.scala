@@ -30,12 +30,12 @@ private object AwaitingGenerationEventEncoder extends Encoder[AwaitingGeneration
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def apply(event: AwaitingGenerationEvent): Json =
-    json"""{
-        "id":      ${event.id.id.value},
-        "project": {
-          "id":    ${event.id.projectId.value}
-        },
-        "body":    ${event.body.value}
-      }"""
+  override def apply(event: AwaitingGenerationEvent): Json = json"""{
+    "categoryName": ${SubscriptionCategory.name.value},
+    "id":           ${event.id.id.value},
+    "project": {
+      "id":         ${event.id.projectId.value}
+    },
+    "body":         ${event.body.value}
+  }"""
 }
