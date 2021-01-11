@@ -47,9 +47,11 @@ private[subscriptions] object SubscriptionCategoryRegistry {
 }
 
 private[subscriptions] class SubscriptionCategoryRegistryImpl[Interpretation[_]: Effect: Applicative](
-    categories: Set[SubscriptionCategory[Interpretation]]
-) extends SubscriptionCategoryRegistry[Interpretation] {
-  override def run(): Interpretation[Unit] = categories.toList.traverse_(_.run())
+    categories:      Set[SubscriptionCategory[Interpretation]]
+)(implicit parallel: Parallel[Interpretation])
+    extends SubscriptionCategoryRegistry[Interpretation] {
+
+  override def run(): Interpretation[Unit] = categories.toList.map(_.run()).parSequence.void
 
   override def register(subscriptionRequest: Json): Interpretation[SubscriptionResult] =
     if (categories.isEmpty) { (NoCategoriesAvailable: SubscriptionResult).pure[Interpretation] }
