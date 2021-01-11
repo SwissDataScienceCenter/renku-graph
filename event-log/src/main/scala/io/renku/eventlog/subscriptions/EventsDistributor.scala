@@ -26,6 +26,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.circe.Encoder
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
+import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -37,6 +38,7 @@ private trait EventsDistributor[Interpretation[_]] {
 }
 
 private class EventsDistributorImpl[Interpretation[_]: Effect, CategoryEvent](
+    categoryName:     CategoryName,
     subscribers:      Subscribers[Interpretation],
     eventsFinder:     EventFinder[Interpretation, CategoryEvent],
     eventsSender:     EventsSender[Interpretation, CategoryEvent],
@@ -86,7 +88,7 @@ private class EventsDistributorImpl[Interpretation[_]: Effect, CategoryEvent](
   private def tryReDispatch(categoryEvent: CategoryEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
       for {
-        _ <- logger.error(exception)("Dispatching an event failed")
+        _ <- logger.error(exception)(s"$categoryName: Dispatching an event failed")
         _ <- timer sleep onErrorSleep
         _ <- runOnSubscriber(dispatch(categoryEvent))
       } yield ()
@@ -94,9 +96,9 @@ private class EventsDistributorImpl[Interpretation[_]: Effect, CategoryEvent](
 
   private def logStatement(result: SendingResult, url: SubscriberUrl, event: CategoryEvent): Interpretation[Unit] =
     result match {
-      case result @ Delivered    => logger.info(s"$event, url = $url -> $result")
+      case result @ Delivered    => logger.info(s"$categoryName: $event, url = $url -> $result")
       case ServiceBusy           => ().pure[Interpretation]
-      case result @ Misdelivered => logger.error(s"$event, url = $url -> $result")
+      case result @ Misdelivered => logger.error(s"$categoryName: $event, url = $url -> $result")
     }
 
   private lazy val withNothing: PartialFunction[Throwable, Unit] = { case NonFatal(_) => () }
@@ -104,7 +106,7 @@ private class EventsDistributorImpl[Interpretation[_]: Effect, CategoryEvent](
   private def loggingErrorAndRetry[O](retry: () => Interpretation[O]): PartialFunction[Throwable, Interpretation[O]] = {
     case NonFatal(exception) =>
       for {
-        _      <- logger.error(exception)("Finding events to dispatch failed")
+        _      <- logger.error(exception)(s"$categoryName: Finding events to dispatch failed")
         _      <- timer sleep onErrorSleep
         result <- retry() recoverWith loggingErrorAndRetry(retry)
       } yield result
@@ -116,6 +118,7 @@ private object IOEventsDistributor {
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
   def apply[CategoryEvent](
+      categoryName:         CategoryName,
       transactor:           DbTransactor[IO, EventLogDB],
       subscribers:          Subscribers[IO],
       eventsFinder:         EventFinder[IO, CategoryEvent],
@@ -129,7 +132,8 @@ private object IOEventsDistributor {
   ): IO[EventsDistributor[IO]] =
     for {
       eventsSender <- IOEventsSender[CategoryEvent](categoryEventEncoder, logger)
-    } yield new EventsDistributorImpl(subscribers,
+    } yield new EventsDistributorImpl(categoryName,
+                                      subscribers,
                                       eventsFinder,
                                       eventsSender,
                                       dispatchRecovery,

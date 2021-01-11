@@ -44,7 +44,7 @@ private[subscriptions] object SubscriptionCategory {
     eventsFinder     <- MemberSyncEventFinder(transactor, queriesExecTimes)
     dispatchRecovery <- DispatchRecovery[IO](logger)
     eventsDistributor <-
-      IOEventsDistributor(transactor, subscribers, eventsFinder, MemberSyncEventEncoder, dispatchRecovery, logger)
+      IOEventsDistributor(name, transactor, subscribers, eventsFinder, MemberSyncEventEncoder, dispatchRecovery, logger)
     deserializer <-
       SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
   } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](name,

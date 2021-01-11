@@ -48,7 +48,8 @@ private[subscriptions] object SubscriptionCategory {
     eventFetcher <-
       IOAwaitingGenerationEventFinder(transactor, waitingEventsGauge, underTriplesGenerationGauge, queriesExecTimes)
     dispatchRecovery <- DispatchRecovery(transactor, underTriplesGenerationGauge, queriesExecTimes, logger)
-    eventsDistributor <- IOEventsDistributor(transactor,
+    eventsDistributor <- IOEventsDistributor(name,
+                                             transactor,
                                              subscribers,
                                              eventFetcher,
                                              AwaitingGenerationEventEncoder,

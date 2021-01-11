@@ -23,6 +23,7 @@ import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import doobie.free.connection.ConnectionOp
+import eu.timepit.refined.api.Refined
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.subscriptions.SubscriptionCategory.LastSyncedDate
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
@@ -68,7 +69,7 @@ private class MemberSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
       """.stripMargin
         .query[(projects.Id, Option[LastSyncedDate], MemberSyncEvent)]
         .option,
-      name = "member sync - find event"
+      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find event")
     )
   }
 
@@ -82,7 +83,7 @@ private class MemberSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
             |SET last_synced = ${now()}
             |WHERE project_id = $projectId AND category_name = ${SubscriptionCategory.name}
             |""".stripMargin.update.run,
-      name = "member sync - update last_synced"
+      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update last_synced")
     )
   }
 
@@ -94,7 +95,7 @@ private class MemberSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
             |DO 
             |  UPDATE SET last_synced = EXCLUDED.last_synced
             |""".stripMargin.update.run,
-      name = "member sync - insert last_synced"
+      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - insert last_synced")
     )
   }
 

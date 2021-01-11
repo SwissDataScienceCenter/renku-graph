@@ -43,7 +43,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
       recovery.recover(subscriber, event)(exception) shouldBe ().pure[Try]
 
       logger.loggedOnly(
-        Error(s"$event, url = $subscriber failed", exception)
+        Error(s"${SubscriptionCategory.name}: $event, url = $subscriber failed", exception)
       )
     }
   }

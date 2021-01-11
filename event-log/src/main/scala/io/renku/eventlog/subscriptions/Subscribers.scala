@@ -45,13 +45,13 @@ private class SubscribersImpl private[subscriptions] (
 
   override def add(subscriberUrl: SubscriberUrl): IO[Unit] = for {
     wasAdded <- subscribersRegistry add subscriberUrl
-    _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$subscriberUrl added to $categoryName category"))
+    _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$categoryName: $subscriberUrl added"))
   } yield ()
 
   override def delete(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
       removed <- subscribersRegistry delete subscriberUrl
-      _       <- Applicative[IO].whenA(removed)(logger.info(s"$subscriberUrl gone - deleting from $categoryName category"))
+      _       <- Applicative[IO].whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))
     } yield ()
 
   override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =

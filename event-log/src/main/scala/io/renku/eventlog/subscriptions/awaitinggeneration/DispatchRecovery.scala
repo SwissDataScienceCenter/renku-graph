@@ -42,17 +42,17 @@ private class DispatchRecoveryImpl[Interpretation[_]](
     extends subscriptions.DispatchRecovery[Interpretation, AwaitingGenerationEvent] {
 
   override def recover(
-      url:           SubscriberUrl,
-      categoryEvent: AwaitingGenerationEvent
+      url:   SubscriberUrl,
+      event: AwaitingGenerationEvent
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     val markEventFailed = ToGenerationNonRecoverableFailure[Interpretation](
-      categoryEvent.id,
+      event.id,
       EventMessage(exception),
       underTriplesGenerationGauge
     )
     for {
       _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
-      _ <- logger.error(exception)(s"Event $categoryEvent, url = $url -> ${markEventFailed.status}")
+      _ <- logger.error(exception)(s"${SubscriptionCategory.name}: $event, url = $url -> ${markEventFailed.status}")
     } yield ()
   }
 
@@ -61,7 +61,7 @@ private class DispatchRecoveryImpl[Interpretation[_]](
   ): PartialFunction[Throwable, Interpretation[UpdateResult]] = { case NonFatal(exception) =>
     {
       for {
-        _      <- logger.error(exception)(s"Marking event as ${command.status} failed")
+        _      <- logger.error(exception)(s"${SubscriptionCategory.name}: Marking event as ${command.status} failed")
         _      <- timer sleep onErrorSleep
         result <- statusUpdatesRunner run command
       } yield result

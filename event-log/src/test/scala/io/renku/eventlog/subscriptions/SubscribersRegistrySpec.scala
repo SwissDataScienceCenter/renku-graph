@@ -171,8 +171,8 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
 
       eventually {
         logger.loggedOnly(
-          Info(s"All 1 subscribers to $categoryName are busy; waiting for one to become available"),
-          Debug(s"$subscriberUrl taken from busy state for $categoryName")
+          Info(s"$categoryName: all 1 subscriber(s) are busy; waiting for one to become available"),
+          Debug(s"$categoryName: $subscriberUrl taken from busy state")
         )
       }
     }

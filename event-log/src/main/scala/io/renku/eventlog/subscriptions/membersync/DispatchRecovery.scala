@@ -34,7 +34,7 @@ private object DispatchRecovery {
   ): Interpretation[DispatchRecovery[Interpretation, MemberSyncEvent]] =
     ME.catchNonFatal { (url: SubscriberUrl, categoryEvent: MemberSyncEvent) =>
       { case NonFatal(exception) =>
-        logger.error(exception)(s"$categoryEvent, url = $url failed")
+        logger.error(exception)(s"${SubscriptionCategory.name}: $categoryEvent, url = $url failed")
       }
     }
 }

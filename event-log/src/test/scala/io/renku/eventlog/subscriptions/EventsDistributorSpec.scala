@@ -74,8 +74,8 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Info(s"$event, url = $subscriber -> $Delivered"),
-          Info(s"$otherEvent, url = $otherSubscriber -> $Delivered")
+          Info(s"$categoryName: $event, url = $subscriber -> $Delivered"),
+          Info(s"$categoryName: $otherEvent, url = $otherSubscriber -> $Delivered")
         )
       }
     }
@@ -105,7 +105,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
         eventually {
           logger.loggedOnly(
-            Info(s"$event, url = $otherSubscriber -> $Delivered")
+            Info(s"$categoryName: $event, url = $otherSubscriber -> $Delivered")
           )
         }
       }
@@ -143,9 +143,9 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
         eventually {
           logger.loggedOnly(
-            Error(s"$event, url = $subscriber -> $Misdelivered"),
-            Error(s"$event, url = $otherSubscriber -> $Misdelivered"),
-            Info(s"$event, url = $yetAnotherSubscriber -> $Delivered")
+            Error(s"$categoryName: $event, url = $subscriber -> $Misdelivered"),
+            Error(s"$categoryName: $event, url = $otherSubscriber -> $Misdelivered"),
+            Info(s"$categoryName: $event, url = $yetAnotherSubscriber -> $Delivered")
           )
         }
       }
@@ -183,7 +183,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
         eventually {
           logger.loggedOnly(
-            Info(s"$event, url = $subscriber -> $Delivered")
+            Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
           )
         }
       }
@@ -212,8 +212,8 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Error("Dispatching an event failed", exception),
-          Info(s"$event, url = $subscriber -> $Delivered")
+          Error(s"$categoryName: Dispatching an event failed", exception),
+          Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
         )
       }
     }
@@ -246,9 +246,9 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Error("Finding events to dispatch failed", exception),
-          Error("Finding events to dispatch failed", exception),
-          Info(s"$event, url = $subscriber -> $Delivered")
+          Error(s"$categoryName: Finding events to dispatch failed", exception),
+          Error(s"$categoryName: Finding events to dispatch failed", exception),
+          Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
         )
       }
     }
@@ -281,7 +281,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Info(s"$event, url = $subscriber -> $Delivered")
+          Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
         )
       }
     }
@@ -315,8 +315,8 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Error(s"$event, url = $subscriber -> $Misdelivered"),
-          Info(s"$event, url = $otherSubscriber -> $Delivered")
+          Error(s"$categoryName: $event, url = $subscriber -> $Misdelivered"),
+          Info(s"$categoryName: $event, url = $otherSubscriber -> $Delivered")
         )
       }
     }
@@ -326,12 +326,14 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
   private trait TestCase {
 
+    val categoryName             = categoryNames.generateOne
     val subscribers              = mock[Subscribers[IO]]
     val eventsFinder             = mock[EventFinder[IO, TestCategoryEvent]]
     val eventsSender             = mock[EventsSender[IO, TestCategoryEvent]]
     private val dispatchRecovery = mock[DispatchRecovery[IO, TestCategoryEvent]]
     val logger                   = TestLogger[IO]()
     val distributor = new EventsDistributorImpl[IO, TestCategoryEvent](
+      categoryName,
       subscribers,
       eventsFinder,
       eventsSender,

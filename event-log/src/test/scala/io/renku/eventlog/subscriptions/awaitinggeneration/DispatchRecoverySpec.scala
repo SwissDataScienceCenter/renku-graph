@@ -71,8 +71,8 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
       eventMessageBody should include(exception.getMessage)
 
       logger.loggedOnly(
-        Error(s"Marking event as $GenerationNonRecoverableFailure failed", exception),
-        Error(s"Event $event, url = $subscriber -> $GenerationNonRecoverableFailure", exception)
+        Error(s"${SubscriptionCategory.name}: Marking event as $GenerationNonRecoverableFailure failed", exception),
+        Error(s"${SubscriptionCategory.name}: $event, url = $subscriber -> $GenerationNonRecoverableFailure", exception)
       )
     }
   }

@@ -45,7 +45,7 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
       subscribers.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
-      logger.loggedOnly(Info(s"$subscriberUrl added to $categoryName category"))
+      logger.loggedOnly(Info(s"$categoryName: $subscriberUrl added"))
     }
 
     "adds the given subscriber to the registry and do not log info message when it was already added" in new TestCase {
@@ -111,7 +111,7 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
       subscribers.delete(subscriberUrl = subscriberUrl).unsafeRunSync()
 
-      logger.loggedOnly(Info(s"$subscriberUrl gone - deleting from $categoryName category"))
+      logger.loggedOnly(Info(s"$categoryName: $subscriberUrl gone - deleting"))
     }
 
     "not log if nothing was deleted" in new TestCase {
