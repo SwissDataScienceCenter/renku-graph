@@ -25,7 +25,7 @@ import doobie.implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class StatusesTransitionTimeTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
+class StatusesProcessingTimeTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
   protected override lazy val migrationsToRun: List[Migration] = List(
     eventLogTableCreator,
     projectPathAdder,
@@ -44,29 +44,29 @@ class StatusesTransitionTimeTableCreatorSpec extends AnyWordSpec with DbInitSpec
 
     "do nothing if the 'status_transition_time' table already exists" in new TestCase {
 
-      tableExists("status_transition_time") shouldBe false
+      tableExists("status_processing_time") shouldBe false
 
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
 
-      tableExists("subscription_category_sync_time") shouldBe true
+      tableExists("status_processing_time") shouldBe true
 
-      logger.loggedOnly(Info("'status_transition_time' table created"))
+      logger.loggedOnly(Info("'status_processing_time' table created"))
 
       logger.reset()
 
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
 
-      logger.loggedOnly(Info("'status_transition_time' table exists"))
+      logger.loggedOnly(Info("'status_processing_time' table exists"))
 
     }
 
     "create indices for certain columns" in new TestCase {
 
-      tableExists("status_transition_time") shouldBe false
+      tableExists("status_processing_time") shouldBe false
 
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
 
-      tableExists("status_transition_time") shouldBe true
+      tableExists("status_processing_time") shouldBe true
 
       verifyTrue(sql"DROP INDEX idx_event_id;")
       verifyTrue(sql"DROP INDEX idx_project_id;")
@@ -76,7 +76,7 @@ class StatusesTransitionTimeTableCreatorSpec extends AnyWordSpec with DbInitSpec
 
   private trait TestCase {
     val logger       = TestLogger[IO]()
-    val tableCreator = new StatusesTransitionTimeTableCreatorImpl[IO](transactor, logger)
+    val tableCreator = new StatusesProcessingTimeTableCreatorImpl[IO](transactor, logger)
   }
 
 }

@@ -23,23 +23,23 @@ import ch.datascience.db.DbTransactor
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
-private trait StatusesTransitionTimeTableCreator[Interpretation[_]] {
+private trait StatusesProcessingTimeTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private object StatusesTransitionTimeTableCreator {
+private object StatusesProcessingTimeTableCreator {
   def apply[Interpretation[_]](
       transactor: DbTransactor[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): StatusesTransitionTimeTableCreator[Interpretation] =
-    new StatusesTransitionTimeTableCreatorImpl[Interpretation](transactor, logger)
+  )(implicit ME:  Bracket[Interpretation, Throwable]): StatusesProcessingTimeTableCreator[Interpretation] =
+    new StatusesProcessingTimeTableCreatorImpl[Interpretation](transactor, logger)
 }
 
-private class StatusesTransitionTimeTableCreatorImpl[Interpretation[_]](
+private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
-    extends StatusesTransitionTimeTableCreator[Interpretation] {
+    extends StatusesProcessingTimeTableCreator[Interpretation] {
 
   import cats.syntax.all._
   import doobie.implicits._
@@ -47,12 +47,12 @@ private class StatusesTransitionTimeTableCreatorImpl[Interpretation[_]](
 
   override def run(): Interpretation[Unit] =
     checkTableExists flatMap {
-      case true  => logger info "'status_transition_time' table exists"
+      case true  => logger info "'status_processing_time' table exists"
       case false => createTable
     }
 
   private def checkTableExists: Interpretation[Boolean] =
-    sql"select event_id from status_transition_time limit 1"
+    sql"select event_id from status_processing_time limit 1"
       .query[String]
       .option
       .transact(transactor.get)
@@ -61,24 +61,24 @@ private class StatusesTransitionTimeTableCreatorImpl[Interpretation[_]](
 
   private def createTable = for {
     _ <- createTableSql.run transact transactor.get
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_transition_time(event_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_transition_time(project_id)")
-    _ <- logger info "'status_transition_time' table created"
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_processing_time(event_id)")
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_processing_time(project_id)")
+    _ <- logger info "'status_processing_time' table created"
     _ <- foreignKeySql.run transact transactor.get
   } yield ()
 
   private lazy val createTableSql = sql"""
-    CREATE TABLE IF NOT EXISTS status_transition_time(
+    CREATE TABLE IF NOT EXISTS status_processing_time(
       event_id          varchar   NOT NULL,
       project_id        int4      NOT NULL,
       status            varchar   NOT NULL,
-      transition_time   timestamp NOT NULL,
+      processing_time   timestamp NOT NULL,
       PRIMARY KEY (event_id, project_id)
     );
     """.update
 
   private lazy val foreignKeySql = sql"""
-    ALTER TABLE status_transition_time
+    ALTER TABLE status_processing_time
     ADD CONSTRAINT fk_event FOREIGN KEY (event_id, project_id) REFERENCES event (event_id, project_id);
   """.update
 }

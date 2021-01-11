@@ -45,7 +45,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       given(eventPayloadTableCreator).succeeds(returning = ())
       given(eventPayloadSchemaAdder).succeeds(returning = ())
       given(subscriptionCategorySyncTimeTableCreator).succeeds(returning = ())
-      given(statusTransitionTimeTableCreator).succeeds(returning = ())
+      given(statusProcessingTimeTableCreator).succeeds(returning = ())
 
       dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
@@ -231,7 +231,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       given(eventPayloadSchemaAdder).succeeds(returning = ())
       given(subscriptionCategorySyncTimeTableCreator).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(statusTransitionTimeTableCreator).fails(becauseOf = exception)
+      given(statusProcessingTimeTableCreator).fails(becauseOf = exception)
 
       intercept[Exception] {
         dbInitializer.run().unsafeRunSync()
@@ -251,7 +251,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
     val eventStatusRenamer                       = mock[EventStatusRenamer[IO]]
     val eventPayloadSchemaAdder                  = mock[EventPayloadSchemaVersionAdder[IO]]
     val subscriptionCategorySyncTimeTableCreator = mock[SubscriptionCategorySyncTimeTableCreator[IO]]
-    val statusTransitionTimeTableCreator         = mock[StatusesTransitionTimeTableCreator[IO]]
+    val statusProcessingTimeTableCreator         = mock[StatusesProcessingTimeTableCreator[IO]]
     val logger                                   = TestLogger[IO]()
     val dbInitializer = new DbInitializerImpl[IO](
       eventLogTableCreator,
@@ -265,7 +265,7 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       eventStatusRenamer,
       eventPayloadSchemaAdder,
       subscriptionCategorySyncTimeTableCreator,
-      statusTransitionTimeTableCreator,
+      statusProcessingTimeTableCreator,
       logger
     )
   }

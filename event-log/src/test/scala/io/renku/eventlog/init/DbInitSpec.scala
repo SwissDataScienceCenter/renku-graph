@@ -30,7 +30,7 @@ trait DbInitSpec extends InMemoryEventLogDb with BeforeAndAfter {
   self: Suite =>
 
   private val tablesToDropBeforeEachTest =
-    List("event_payload", "status_transition_time", "event_log", "event", "subscription_category_sync_time", "project")
+    List("event_payload", "status_processing_time", "event_log", "event", "subscription_category_sync_time", "project")
 
   private val logger = TestLogger[IO]()
 
@@ -46,8 +46,8 @@ trait DbInitSpec extends InMemoryEventLogDb with BeforeAndAfter {
   protected lazy val eventPayloadSchemaVersionAdder: Migration = EventPayloadSchemaVersionAdder(transactor, logger)
   protected lazy val subscriptionCategorySyncTimeTableCreator: Migration =
     SubscriptionCategorySyncTimeTableCreator(transactor, logger)
-  protected lazy val statusTransitionTimeTableCreator: Migration =
-    StatusesTransitionTimeTableCreator(transactor, logger)
+  protected lazy val statusProcessingTimeTableCreator: Migration =
+    StatusesProcessingTimeTableCreator(transactor, logger)
 
   protected type Migration = { def run(): IO[Unit] }
 
