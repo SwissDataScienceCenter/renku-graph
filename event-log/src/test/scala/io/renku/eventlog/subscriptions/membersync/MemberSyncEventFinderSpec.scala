@@ -1,3 +1,21 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.eventlog.subscriptions.membersync
 
 import ch.datascience.db.SqlQuery
@@ -33,14 +51,17 @@ class MemberSyncEventFinderSpec
         val projectPath0 = projectPaths.generateOne
         val eventDate0   = eventDates.generateOne
         upsertProject(compoundEventIds.generateOne, projectPath0, eventDate0)
+
         val projectPath1 = projectPaths.generateOne
         val eventDate1   = eventDates.generateOne
-
         upsertProject(compoundEventIds.generateOne, projectPath1, eventDate1)
-        val projectPathsByDateIncreasing =
-          List((projectPath0, eventDate0), (projectPath1, eventDate1)).sortBy(_._2).map(_._1)
-        finder.popEvent().unsafeRunSync() shouldBe Some(MemberSyncEvent(projectPathsByDateIncreasing.head))
-        finder.popEvent().unsafeRunSync() shouldBe Some(MemberSyncEvent(projectPathsByDateIncreasing.tail.head))
+
+        val projectPathsByDateDecreasing = List(
+          (projectPath0, eventDate0),
+          (projectPath1, eventDate1)
+        ).sortBy(_._2).map(_._1).reverse
+        finder.popEvent().unsafeRunSync() shouldBe Some(MemberSyncEvent(projectPathsByDateDecreasing.head))
+        finder.popEvent().unsafeRunSync() shouldBe Some(MemberSyncEvent(projectPathsByDateDecreasing.tail.head))
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
@@ -109,7 +130,6 @@ class MemberSyncEventFinderSpec
         finder.popEvent().unsafeRunSync() shouldBe Some(MemberSyncEvent(projectPath0))
         finder.popEvent().unsafeRunSync() shouldBe None
       }
-
   }
 
   private trait TestCase {
@@ -118,7 +138,7 @@ class MemberSyncEventFinderSpec
 
     val finder = new MemberSyncEventFinderImpl(transactor, queriesExecTimes)
 
-    def generateInstant(lessThanAgo: Duration = Duration.ofDays(999999), moreThanAgo: Duration = Duration.ZERO) =
+    def generateInstant(lessThanAgo: Duration = Duration.ofDays(365 * 5), moreThanAgo: Duration = Duration.ZERO) =
       timestamps(min = Instant.now.minus(lessThanAgo), max = Instant.now.minus(moreThanAgo)).generateOne
   }
 }
