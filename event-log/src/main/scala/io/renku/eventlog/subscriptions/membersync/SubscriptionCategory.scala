@@ -40,7 +40,7 @@ private[subscriptions] object SubscriptionCategory {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
-    subscribers      <- Subscribers(logger)
+    subscribers      <- Subscribers(name, logger)
     eventsFinder     <- MemberSyncEventFinder(transactor, queriesExecTimes)
     dispatchRecovery <- DispatchRecovery[IO](logger)
     eventsDistributor <-

@@ -20,13 +20,13 @@ package io.renku.eventlog.subscriptions
 
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
-
 import cats.Applicative
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
+import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -34,6 +34,7 @@ import scala.language.postfixOps
 import scala.util.Random
 
 private class SubscribersRegistry(
+    categoryName:                CategoryName,
     subscriberUrlReferenceQueue: Ref[IO, List[Deferred[IO, SubscriberUrl]]],
     now:                         () => Instant,
     logger:                      Logger[IO],
@@ -84,7 +85,7 @@ private class SubscribersRegistry(
   } yield ()
 
   private def logNoFreeSubscribersInfo: IO[Unit] = logger.info(
-    s"All ${subscriberCount()} subscribers are busy; waiting for one to become available"
+    s"All ${subscriberCount()} subscribers to $categoryName are busy; waiting for one to become available"
   )
 
   def delete(subscriberUrl: SubscriberUrl): IO[Boolean] = IO {
@@ -121,7 +122,7 @@ private class SubscribersRegistry(
   private def bringToAvailable(subscribers: List[SubscriberUrl]): IO[List[Unit]] = subscribers.map { subscriberUrl =>
     for {
       wasAdded <- add(subscriberUrl)
-      _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$subscriberUrl taken from busy state"))
+      _        <- Applicative[IO].whenA(wasAdded)(logger.debug(s"$subscriberUrl taken from busy state for $categoryName"))
     } yield ()
   }.sequence
 }
@@ -132,6 +133,7 @@ private object SubscribersRegistry {
   private object CheckupTime extends TinyTypeFactory[CheckupTime](new CheckupTime(_))
 
   def apply(
+      categoryName:    CategoryName,
       logger:          Logger[IO],
       busySleep:       FiniteDuration = 5 minutes,
       checkupInterval: FiniteDuration = 500 millis
@@ -142,7 +144,15 @@ private object SubscribersRegistry {
   ): IO[SubscribersRegistry] = for {
     subscriberUrlReferenceQueue <- Ref.of[IO, List[Deferred[IO, SubscriberUrl]]](List.empty)
     registry <-
-      IO(new SubscribersRegistry(subscriberUrlReferenceQueue, Instant.now, logger, busySleep, checkupInterval))
+      IO(
+        new SubscribersRegistry(categoryName,
+                                subscriberUrlReferenceQueue,
+                                Instant.now,
+                                logger,
+                                busySleep,
+                                checkupInterval
+        )
+      )
     _ <- registry.busySubscriberCheckup().foreverM.start
   } yield registry
 }
