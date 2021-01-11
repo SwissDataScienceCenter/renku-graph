@@ -357,11 +357,18 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | payload    TEXT             NOT NULL |
 | schema_version TEXT   PK    NOT NULL |
 
-| subscription_category_sync_time      |
-|--------------------------------------|
+| subscription_category_sync_time       |
+|---------------------------------------|
 | project_id       INT4  PK FK NOT NULL |
 | category_name    TEXT  PK    NOT NULL |
 | last_synced      TIMESTAMP   NOT NULL |
+
+| status_processing_time                    |
+|-------------------------------------------|
+| event_id        VARCHAR    PK FK NOT NULL |
+| project_id      INT4       PK FK NOT NULL |
+| status          VARCHAR          NOT NULL |
+| processing_time TIMESTAMP        NOT NULL |
 
 ## Trying out
 
