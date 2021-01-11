@@ -18,8 +18,11 @@
 
 package io.renku.eventlog.statuschange.commands
 
+import cats.data.NonEmptyList
+import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
+import doobie.free.connection.ConnectionIO
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.eventlog.{EventLogDB, TypesSerializers}
@@ -33,11 +36,20 @@ trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable w
   ): Interpretation[Unit]
 
   def mapResult: Int => UpdateResult = {
-    case 0 => UpdateResult.Conflict
+    case 0 => UpdateResult.NotFound
     case 1 => UpdateResult.Updated
-    case 2 => UpdateResult.NotFound
-    case _ => UpdateResult.Failure(Refined.unsafeApply(s"An attempt to set status $status on $eventId failed"))
+    case _ => UpdateResult.Conflict
   }
+
+  def runUpdateQueriesIfSuccessful(queries: NonEmptyList[doobie.Update0]): ConnectionIO[Int] =
+    (1, queries.toList)
+      .iterateWhileM {
+        case (_, query :: remainingQueries) =>
+          query.run.map(result => (result, remainingQueries))
+        case (previousResult, Nil) => (previousResult, List.empty[doobie.Update0]).pure[ConnectionIO]
+      } { case (previsousResult, queries) => previsousResult == 1 && queries.nonEmpty }
+      .map(_._1)
+
 }
 
 sealed trait UpdateResult extends Product with Serializable

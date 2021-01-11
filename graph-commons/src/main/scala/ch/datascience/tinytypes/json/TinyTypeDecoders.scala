@@ -20,13 +20,15 @@ package ch.datascience.tinytypes.json
 
 import java.time.ZoneOffset.UTC
 import java.time.{Instant, LocalDate, OffsetDateTime}
-
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder._
 import io.circe.{Decoder, DecodingFailure}
+
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 object TinyTypeDecoders {
 
@@ -87,6 +89,14 @@ object TinyTypeDecoders {
         .catchNonFatal(OffsetDateTime.parse(value))
         .flatMap(offsetDateTime => Either.catchNonFatal(offsetDateTime.atZoneSameInstant(UTC).toInstant))
         .orElse(Either.catchNonFatal(Instant.parse(value)))
+        .flatMap(tinyTypeFactory.from)
+        .leftMap(_.getMessage)
+    }
+
+  implicit def finiteDurationDecoder[TT <: FiniteDurationTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+    decodeString.emap { value =>
+      Either
+        .catchNonFatal(FiniteDuration.apply(Duration.create(value).toMillis, TimeUnit.MILLISECONDS))
         .flatMap(tinyTypeFactory.from)
         .leftMap(_.getMessage)
     }

@@ -18,7 +18,8 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import cats.effect.{Bracket, IO}
+import cats.data.NonEmptyList
+import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TriplesGenerated}
@@ -28,9 +29,9 @@ import ch.datascience.metrics.LabeledGauge
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.{EventLogDB, EventPayload}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
+import io.renku.eventlog.{EventLogDB, EventPayload, EventProcessingTime}
 
 import java.time.Instant
 
@@ -38,34 +39,34 @@ private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
     eventId:                     CompoundEventId,
     payload:                     EventPayload,
     schemaVersion:               SchemaVersion,
+    processingTime:              EventProcessingTime,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     now:                         () => Instant = () => Instant.now
 )(implicit ME:                   Bracket[Interpretation, Throwable])
-    extends ChangeStatusCommand[Interpretation] {
+    extends ChangeStatusCommand[Interpretation]
+    with StatusProcessingTime[Interpretation] {
   override lazy val status: events.EventStatus = TriplesGenerated
 
+  lazy val queries =
+    NonEmptyList(updateStatus, List(upsertEventPayload, upsertStatusProcessingTime(eventId, processingTime)))
+
   override def query: SqlQuery[Int] = SqlQuery(
-    query = updateStatus.flatMap { result =>
-      mapResult(result) match {
-        case Updated => upsertEventPayload
-        case _       => result.pure[ConnectionIO]
-      }
-    },
+    query = runUpdateQueriesIfSuccessful(queries),
     name = "generating_triples->triples_generated"
   )
 
   private lazy val updateStatus = sql"""|UPDATE event
                                         |SET status = $status, execution_date = ${now()}
                                         |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus};
-                                        |""".stripMargin.update.run
+                                        |""".stripMargin.update
 
   private lazy val upsertEventPayload = sql"""|INSERT INTO
                                               |event_payload (event_id, project_id, payload, schema_version)
                                               |VALUES (${eventId.id},  ${eventId.projectId}, $payload, $schemaVersion)
                                               |ON CONFLICT (event_id, project_id, schema_version)
                                               |DO UPDATE SET payload = EXCLUDED.payload;
-                                              |""".stripMargin.update.run
+                                              |""".stripMargin.update
 
   override def updateGauges(updateResult: UpdateResult)(implicit
       transactor:                         DbTransactor[Interpretation, EventLogDB]

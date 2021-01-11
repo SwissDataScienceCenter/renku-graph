@@ -29,7 +29,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, executionDates}
+import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventProcessingTimes, executionDates}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
@@ -88,13 +88,13 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-        val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, currentTime)
+        val command = ToTriplesStore[IO](eventId, processingTime, underTriplesGenerationGauge, currentTime)
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
         val transformingTriplesCommand =
-          ToTriplesStore[IO](transfromingTriplesId, underTriplesGenerationGauge, currentTime)
+          ToTriplesStore[IO](transfromingTriplesId, processingTime, underTriplesGenerationGauge, currentTime)
         (commandRunner run transformingTriplesCommand).unsafeRunSync() shouldBe UpdateResult.Updated
 
         findEvents(status = TriplesStore) shouldBe List((eventId, ExecutionDate(now), eventBatchDate),
@@ -120,7 +120,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
             findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-            val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, currentTime)
+            val command = ToTriplesStore[IO](eventId, processingTime, underTriplesGenerationGauge, currentTime)
 
             (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
 
@@ -139,6 +139,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
     val histogram                   = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val currentTime                 = mockFunction[Instant]
     val eventId                     = compoundEventIds.generateOne
+    val processingTime              = eventProcessingTimes.generateOne
     val eventBatchDate              = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())

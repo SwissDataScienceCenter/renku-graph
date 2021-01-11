@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.statuschange.commands
 
+import cats.data.NonEmptyList
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
@@ -27,27 +28,36 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.{EventLogDB, EventProcessingTime}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 
 import java.time.Instant
 
 final case class ToTriplesStore[Interpretation[_]](
     eventId:                     CompoundEventId,
+    processingTime:              EventProcessingTime,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     now:                         () => Instant = () => Instant.now
 )(implicit ME:                   Bracket[Interpretation, Throwable])
-    extends ChangeStatusCommand[Interpretation] {
+    extends ChangeStatusCommand[Interpretation]
+    with StatusProcessingTime[Interpretation] {
 
   override lazy val status: EventStatus = TriplesStore
+
+  lazy val queries = NonEmptyList(upsertEventStatus, List(upsertStatusProcessingTime(eventId, processingTime)))
+
 // TODO temporary status change from TriplesGenerated to triples store in the end only TransformingTriples can be transformed to TriplesStore
-  override def query: SqlQuery[Int] = SqlQuery(
+  override def query: SqlQuery[Int] =
+    SqlQuery(
+      query = runUpdateQueriesIfSuccessful(queries),
+      name = "triples_generated-transforming_triples->triples_store"
+    )
+
+  lazy val upsertEventStatus =
     sql"""|UPDATE event
           |SET status = $status, execution_date = ${now()}
           |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND (status = ${TriplesGenerated: EventStatus} OR status = ${TransformingTriples: EventStatus})
-          |""".stripMargin.update.run,
-    name = "triples_generated-transforming_triples->triples_store"
-  )
+          |""".stripMargin.update
 
   override def updateGauges(
       updateResult:      UpdateResult

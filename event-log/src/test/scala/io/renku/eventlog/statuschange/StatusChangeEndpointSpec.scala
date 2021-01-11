@@ -36,7 +36,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.prometheus.client.Gauge
-import io.renku.eventlog.DbEventLogGenerators.{eventMessages, eventPayloads}
+import io.renku.eventlog.DbEventLogGenerators.{eventMessages, eventPayloads, eventProcessingTimes}
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
 import org.http4s.MediaType._
@@ -59,14 +59,18 @@ class StatusChangeEndpointSpec
   "changeStatus" should {
 
     val scenarios = Table(
-      "status"     -> "command builder",
-      TriplesStore -> ToTriplesStore[IO](compoundEventIds.generateOne, underTriplesGenerationGauge),
-      Skipped      -> ToSkipped[IO](compoundEventIds.generateOne, eventMessages.generateOne, underTriplesGenerationGauge),
-      New          -> ToNew[IO](compoundEventIds.generateOne, awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
+      "status" -> "command builder",
+      TriplesStore -> ToTriplesStore[IO](compoundEventIds.generateOne,
+                                         eventProcessingTimes.generateOne,
+                                         underTriplesGenerationGauge
+      ),
+      Skipped -> ToSkipped[IO](compoundEventIds.generateOne, eventMessages.generateOne, underTriplesGenerationGauge),
+      New     -> ToNew[IO](compoundEventIds.generateOne, awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
       TriplesGenerated -> ToTriplesGenerated[IO](
         compoundEventIds.generateOne,
         eventPayloads.generateOne,
         projectSchemaVersions.generateOne,
+        eventProcessingTimes.generateOne,
         underTriplesGenerationGauge,
         awaitingTriplesTransformationGauge
       ),
@@ -270,9 +274,10 @@ class StatusChangeEndpointSpec
 
     s"return $InternalServerError when updating event status fails" in new TestCase {
 
-      val eventId = compoundEventIds.generateOne
+      val eventId        = compoundEventIds.generateOne
+      val processingTime = eventProcessingTimes.generateOne
 
-      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, underTriplesGenerationGauge)
+      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, processingTime, underTriplesGenerationGauge)
       val exception = exceptions.generateOne
       (commandsRunner.run _)
         .expects(command)
@@ -307,20 +312,26 @@ class StatusChangeEndpointSpec
   }
 
   implicit val commandEncoder: Encoder[ChangeStatusCommand[IO]] = Encoder.instance[ChangeStatusCommand[IO]] {
-    case command: ToNew[IO]                                 => json"""{
+    case command: ToNew[IO] => json"""{
         "status": ${command.status.value}
       }"""
-    case command: ToTriplesStore[IO]                        => json"""{
-        "status": ${command.status.value}
+    case command: ToTriplesStore[IO] =>
+      json"""{
+        "status": ${command.status.value},
+        "processingTime": { "length": ${command.processingTime.value.length}, "unit": ${command.processingTime.value.unit
+        .name()} }
       }"""
-    case command: ToSkipped[IO]                             => json"""{
+    case command: ToSkipped[IO] => json"""{
         "status": ${command.status.value},
         "message": ${command.message.value}
       }"""
-    case command: ToTriplesGenerated[IO]                    => json"""{
+    case command: ToTriplesGenerated[IO] =>
+      json"""{
         "status": ${command.status.value},
         "payload": ${command.payload.value},
-        "schemaVersion": ${command.schemaVersion.value}
+        "schemaVersion": ${command.schemaVersion.value},
+        "processingTime": { "length": ${command.processingTime.value.length}, "unit": ${command.processingTime.value.unit
+        .name()}  }
       }"""
     case command: ToGenerationRecoverableFailure[IO]        => json"""{
         "status": ${command.status.value}

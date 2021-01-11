@@ -23,12 +23,15 @@ import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.LabeledHistogram
-import doobie.free.connection.ConnectionIO
+import doobie.free.connection.{ConnectionIO, setSavepoint}
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
+
+import scala.util.control.NonFatal
 
 trait StatusUpdatesRunner[Interpretation[_]] {
   def run(command: ChangeStatusCommand[Interpretation]): Interpretation[UpdateResult]
@@ -48,10 +51,21 @@ class StatusUpdatesRunnerImpl(
 
   override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] =
     for {
-      updateResult <- executeCommand(command) transact transactor.get
+      updateResult <- executeCommand(command) transact transactor.get recoverWith errorToUpdateResult(command)
       _            <- logInfo(command, updateResult)
       _            <- command updateGauges updateResult
     } yield updateResult
+
+  private def errorToUpdateResult(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
+    case NonFatal(exception) =>
+      UpdateResult
+        .Failure(
+          Refined.unsafeApply(
+            s"${command.query.name} failed for event ${command.eventId} to status ${command.status} with ${exception.getMessage}"
+          )
+        )
+        .pure[IO]
+  }
 
   private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {
     case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")

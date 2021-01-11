@@ -29,7 +29,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventPayloads, executionDates}
+import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventPayloads, eventProcessingTimes, executionDates}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
@@ -84,6 +84,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           ToTriplesGenerated[IO](eventId,
                                  payload,
                                  schemaVersion,
+                                 eventProcessingTimes.generateOne,
                                  underTriplesGenerationGauge,
                                  awaitingTransformationGauge,
                                  currentTime
@@ -115,6 +116,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
             ToTriplesGenerated[IO](eventId,
                                    payload,
                                    schemaVersion,
+                                   eventProcessingTimes.generateOne,
                                    awaitingTransformationGauge,
                                    underTriplesGenerationGauge,
                                    currentTime

@@ -130,4 +130,12 @@ class TinyTypeDecodersSpec extends AnyWordSpec with should.Matchers {
       )
     }
   }
+
+  "finiteDurationDecoder" should {
+
+    "decode JSON String value with the time unit" in {
+      val value = durations.generateOne
+      json"""${value.toString}""".as[FiniteDurationTestType] shouldBe Right(FiniteDurationTestType(value))
+    }
+  }
 }

@@ -24,6 +24,7 @@ import ch.datascience.tinytypes.constraints.PathSegment
 import io.circe.Json
 
 import java.time.{Instant, LocalDate}
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 trait TinyType extends Any {
 
@@ -34,16 +35,17 @@ trait TinyType extends Any {
   override def toString: String = value.toString
 }
 
-trait StringTinyType       extends Any with TinyType { type V = String }
-trait RelativePathTinyType extends Any with TinyType { type V = String }
-trait UrlTinyType          extends Any with TinyType { type V = String }
-trait IntTinyType          extends Any with TinyType { type V = Int }
-trait LongTinyType         extends Any with TinyType { type V = Long }
-trait BigDecimalTinyType   extends Any with TinyType { type V = BigDecimal }
-trait JsonTinyType         extends Any with TinyType { type V = Json }
-trait InstantTinyType      extends Any with TinyType { type V = Instant }
-trait LocalDateTinyType    extends Any with TinyType { type V = LocalDate }
-trait BooleanTinyType      extends Any with TinyType { type V = Boolean }
+trait StringTinyType         extends Any with TinyType { type V = String }
+trait RelativePathTinyType   extends Any with TinyType { type V = String }
+trait UrlTinyType            extends Any with TinyType { type V = String }
+trait IntTinyType            extends Any with TinyType { type V = Int }
+trait LongTinyType           extends Any with TinyType { type V = Long }
+trait BigDecimalTinyType     extends Any with TinyType { type V = BigDecimal }
+trait JsonTinyType           extends Any with TinyType { type V = Json }
+trait InstantTinyType        extends Any with TinyType { type V = Instant }
+trait FiniteDurationTinyType extends Any with TinyType { type V = FiniteDuration }
+trait LocalDateTinyType      extends Any with TinyType { type V = LocalDate }
+trait BooleanTinyType        extends Any with TinyType { type V = Boolean }
 
 object StringTinyType {
   implicit val stringTinyTypeConverter: StringTinyType => List[PathSegment] =

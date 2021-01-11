@@ -27,9 +27,10 @@ import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
-import io.renku.eventlog.{EventLogDB, EventMessage, EventPayload}
+import io.renku.eventlog.{EventLogDB, EventMessage, EventPayload, EventProcessingTime, ExecutionDate}
 import org.http4s.dsl.Http4sDsl
 
+import java.time.Instant
 import scala.util.control.NonFatal
 
 class StatusChangeEndpoint[Interpretation[_]: Effect](
@@ -93,18 +94,21 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
 
     implicit val commandDecoder: Decoder[ChangeStatusCommand[Interpretation]] = (cursor: HCursor) =>
       for {
-        status             <- cursor.downField("status").as[EventStatus]
-        maybeMessage       <- cursor.downField("message").as[Option[EventMessage]]
-        maybePayload       <- cursor.downField("payload").as[Option[EventPayload]]
-        maybeSchemaVersion <- cursor.downField("schemaVersion").as[Option[SchemaVersion]]
+        status              <- cursor.downField("status").as[EventStatus]
+        maybeMessage        <- cursor.downField("message").as[Option[EventMessage]]
+        maybePayload        <- cursor.downField("payload").as[Option[EventPayload]]
+        maybeSchemaVersion  <- cursor.downField("schemaVersion").as[Option[SchemaVersion]]
+        maybeProcessingTime <- cursor.downField("processingTime").as[Option[EventProcessingTime]]
       } yield status match {
-        case TriplesStore => ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge)
-        case New          => ToNew[Interpretation](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
+        case TriplesStore =>
+          ToTriplesStore[Interpretation](eventId, maybeProcessingTime.get, underTriplesGenerationGauge)
+        case New => ToNew[Interpretation](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
         case TriplesGenerated =>
           ToTriplesGenerated[Interpretation](
             eventId,
             maybePayload getOrElse (throw new Exception(s"$status status needs a payload")),
             maybeSchemaVersion getOrElse (throw new Exception(s"$status status needs a schemaVersion")),
+            maybeProcessingTime.get,
             underTriplesGenerationGauge,
             awaitingTriplesTransformationGauge
           )
@@ -133,6 +137,11 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
       }
 
     jsonOf[Interpretation, ChangeStatusCommand[Interpretation]]
+  }
+
+  implicit class MaybeEventProcessingTimeOps(maybeEventProcessingTime: Option[EventProcessingTime]) {
+    def getOrCompute(from: ExecutionDate, upTo: Instant = Instant.now()): EventProcessingTime =
+      maybeEventProcessingTime.getOrElse(EventProcessingTime.fromMillis(upTo.toEpochMilli - from.value.toEpochMilli))
   }
 }
 

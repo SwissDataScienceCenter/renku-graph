@@ -18,9 +18,8 @@
 
 package ch.datascience.generators
 
-import java.time._
+import java.time.{Instant, LocalDate, LocalDateTime, ZoneId, ZoneOffset, ZonedDateTime}
 import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
-
 import cats.data.NonEmptyList
 import ch.datascience.config.ServiceUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
@@ -34,6 +33,7 @@ import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
 
@@ -236,6 +236,16 @@ object Generators {
     timestampsNotInTheFuture
       .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
       .map(_.toLocalDate)
+
+  val durations: Gen[FiniteDuration] = finiteDurations()
+
+  def finiteDurations(
+      min: FiniteDuration = Duration.Zero,
+      max: FiniteDuration = Duration.create(Instant.now().plus(2000, JAVA_DAYS).toEpochMilli, TimeUnit.MILLISECONDS)
+  ): Gen[FiniteDuration] =
+    Gen
+      .choose(min.toMillis, max.toMillis)
+      .map(FiniteDuration.apply(_, TimeUnit.MILLISECONDS))
 
   implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls() map ServiceUrl.apply
   implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply
