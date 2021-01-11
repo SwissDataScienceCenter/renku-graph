@@ -99,12 +99,9 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
   private trait TestCase {
     val eventsDistributor = mock[EventsDistributor[IO]]
     val subscribers       = mock[Subscribers[IO]]
-    val testCategoryName  = CategoryName(nonBlankStrings().generateOne.value)
+    val testCategoryName  = categoryNames.generateOne
 
-    trait Deserializer extends SubscriptionRequestDeserializer[IO] {
-      override type PayloadType = SubscriptionCategoryPayload
-    }
-    val deserializer = mock[Deserializer]
+    val deserializer = mock[SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload]]
 
     val subscriptionCategory = new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](
       testCategoryName,

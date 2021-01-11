@@ -18,4 +18,18 @@
 
 package io.renku.eventlog.subscriptions.membersync
 
-private case class SubscriptionRequestDeserializer[Interpretation[_]]() {}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.generators.Generators.Implicits._
+
+class MemberSyncEventSpec extends AnyWordSpec with should.Matchers {
+
+  "toString" should {
+
+    "print out the projectPath" in {
+      val event = MemberSyncEvent(projectPaths.generateOne)
+      event.toString shouldBe s"MemberSyncEvent projectPath = ${event.projectPath}"
+    }
+  }
+}

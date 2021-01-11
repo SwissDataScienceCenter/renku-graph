@@ -18,9 +18,49 @@
 
 package io.renku.eventlog.subscriptions
 
-import io.circe.Json
+import cats.MonadError
+import io.circe.{Decoder, Json}
+import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
 
-private trait SubscriptionRequestDeserializer[Interpretation[_]] {
-  type PayloadType <: SubscriptionCategoryPayload
+private trait SubscriptionRequestDeserializer[Interpretation[_], PayloadType <: SubscriptionCategoryPayload] {
   def deserialize(payload: Json): Interpretation[Option[PayloadType]]
+}
+
+private object SubscriptionRequestDeserializer {
+
+  def apply[Interpretation[_], PayloadType <: SubscriptionCategoryPayload](
+      categoryName:   CategoryName,
+      payloadFactory: SubscriberUrl => PayloadType
+  )(implicit
+      monadError: MonadError[Interpretation, Throwable]
+  ): Interpretation[SubscriptionRequestDeserializer[Interpretation, PayloadType]] = monadError.catchNonFatal {
+    new SubscriptionRequestDeserializerImpl(categoryName, payloadFactory)
+  }
+}
+
+private class SubscriptionRequestDeserializerImpl[Interpretation[_], PayloadType <: SubscriptionCategoryPayload](
+    categoryName:      CategoryName,
+    payloadFactory:    SubscriberUrl => PayloadType
+)(implicit monadError: MonadError[Interpretation, Throwable])
+    extends SubscriptionRequestDeserializer[Interpretation, PayloadType] {
+
+  import cats.syntax.all._
+
+  override def deserialize(payload: Json): Interpretation[Option[PayloadType]] =
+    payload
+      .as[(String, SubscriberUrl)]
+      .fold(_ => Option.empty[PayloadType], toCategoryPayload)
+      .pure[Interpretation]
+
+  private lazy val toCategoryPayload: ((String, SubscriberUrl)) => Option[PayloadType] = {
+    case (categoryName.value, subscriberUrl) => Some(payloadFactory(subscriberUrl))
+    case _                                   => None
+  }
+
+  private implicit lazy val payloadDecoder: Decoder[(String, SubscriberUrl)] = { cursor =>
+    for {
+      categoryName  <- cursor.downField("categoryName").as[String]
+      subscriberUrl <- cursor.downField("subscriberUrl").as[SubscriberUrl]
+    } yield categoryName -> subscriberUrl
+  }
 }

@@ -94,9 +94,9 @@ private class EventsDistributorImpl[Interpretation[_]: Effect, CategoryEvent](
 
   private def logStatement(result: SendingResult, url: SubscriberUrl, event: CategoryEvent): Interpretation[Unit] =
     result match {
-      case result @ Delivered    => logger.info(s"Event $event, url = $url -> $result")
+      case result @ Delivered    => logger.info(s"$event, url = $url -> $result")
       case ServiceBusy           => ().pure[Interpretation]
-      case result @ Misdelivered => logger.error(s"Event $event, url = $url -> $result")
+      case result @ Misdelivered => logger.error(s"$event, url = $url -> $result")
     }
 
   private lazy val withNothing: PartialFunction[Throwable, Unit] = { case NonFatal(_) => () }

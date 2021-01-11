@@ -16,19 +16,31 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.awaitinggeneration
+package io.renku.eventlog.subscriptions.membersync
 
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import io.circe.Encoder
+import io.circe.literal._
+import io.circe.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class AwaitingGenerationEventSpec extends AnyWordSpec with should.Matchers {
+class MemberSyncEventEncoderSpec extends AnyWordSpec with should.Matchers {
 
-  "toString" should {
+  private implicit val encoder: Encoder[MemberSyncEvent] = MemberSyncEventEncoder
 
-    "print out the id and projectPath" in {
-      val event = awaitingGenerationEvents.generateOne
-      event.toString shouldBe s"AwaitingGenerationEvent ${event.id}, projectPath = ${event.projectPath}"
+  "encoder" should {
+
+    "serialize MemberSyncEvent to Json" in {
+      val event = MemberSyncEvent(projectPaths.generateOne)
+
+      event.asJson shouldBe json"""{
+        "categoryName": "MEMBER_SYNC",
+        "project": {
+          "path":       ${event.projectPath.value}
+        }
+      }"""
     }
   }
 }

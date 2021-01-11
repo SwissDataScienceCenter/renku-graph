@@ -24,7 +24,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
-import io.renku.eventlog.subscriptions.{IOEventsDistributor, Subscribers, SubscriptionCategoryImpl}
+import io.renku.eventlog.subscriptions.{IOEventsDistributor, Subscribers, SubscriptionCategoryImpl, SubscriptionRequestDeserializer}
 import io.renku.eventlog.{EventLogDB, subscriptions}
 
 import scala.concurrent.ExecutionContext
@@ -48,15 +48,15 @@ private[subscriptions] object SubscriptionCategory {
     eventFetcher <-
       IOAwaitingGenerationEventFinder(transactor, waitingEventsGauge, underTriplesGenerationGauge, queriesExecTimes)
     dispatchRecovery <- DispatchRecovery(transactor, underTriplesGenerationGauge, queriesExecTimes, logger)
-    eventsDistributor <-
-      IOEventsDistributor(transactor,
-                          subscribers,
-                          eventFetcher,
-                          AwaitingGenerationEventEncoder,
-                          dispatchRecovery,
-                          logger
-      )
-    deserializer = SubscriptionRequestDeserializer[IO]()
+    eventsDistributor <- IOEventsDistributor(transactor,
+                                             subscribers,
+                                             eventFetcher,
+                                             AwaitingGenerationEventEncoder,
+                                             dispatchRecovery,
+                                             logger
+                         )
+    deserializer <-
+      SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
   } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](name,
                                                                         subscribers,
                                                                         eventsDistributor,

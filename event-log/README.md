@@ -331,6 +331,26 @@ As a good practice, the subscription should be renewed periodically in case of r
 }
 ```
 
+- **MEMBER_SYNC**
+
+**Request**
+```json
+{
+  "categoryName":  "MEMBER_SYNC",
+  "subscriberUrl": "http://host/path"
+}
+```
+
+**Response**
+```json
+{
+  "categoryName": "MEMBER_SYNC",
+  "project": {
+  "path":         "namespace/project-name"
+  } 
+}
+```
+
 **Response**
 
 | Status                     | Description                                                                                         |

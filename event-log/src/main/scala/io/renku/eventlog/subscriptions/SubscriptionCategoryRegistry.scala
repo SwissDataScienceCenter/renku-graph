@@ -84,6 +84,12 @@ object IOSubscriptionCategoryRegistry {
                                                 queriesExecTimes,
                                                 logger
         )
-    } yield new SubscriptionCategoryRegistryImpl(Set[SubscriptionCategory[IO]](awaitingGenerationCategory))
-
+      memberSyncCategory <-
+        membersync.SubscriptionCategory(transactor, queriesExecTimes, logger)
+    } yield new SubscriptionCategoryRegistryImpl(
+      Set[SubscriptionCategory[IO]](
+        awaitingGenerationCategory,
+        memberSyncCategory
+      )
+    )
 }

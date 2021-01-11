@@ -16,20 +16,25 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package io.renku.eventlog.subscriptions.membersync
 
-import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings}
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
-import org.scalacheck.Gen
+import cats.MonadError
+import io.chrisdavenport.log4cats.Logger
+import io.renku.eventlog.subscriptions.{DispatchRecovery, SubscriberUrl}
 
-private object Generators {
+import scala.language.postfixOps
+import scala.util.control.NonFatal
 
-  val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
-  val categoryNames:  Gen[CategoryName]  = nonBlankStrings() map (value => CategoryName(value.value))
+private object DispatchRecovery {
 
-  implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
-    url <- subscriberUrls
-  } yield new SubscriptionCategoryPayload {
-    override def subscriberUrl: SubscriberUrl = url
-  }
+  def apply[Interpretation[_]](
+      logger: Logger[Interpretation]
+  )(implicit
+      ME: MonadError[Interpretation, Throwable]
+  ): Interpretation[DispatchRecovery[Interpretation, MemberSyncEvent]] =
+    ME.catchNonFatal { (url: SubscriberUrl, categoryEvent: MemberSyncEvent) =>
+      { case NonFatal(exception) =>
+        logger.error(exception)(s"$categoryEvent, url = $url failed")
+      }
+    }
 }

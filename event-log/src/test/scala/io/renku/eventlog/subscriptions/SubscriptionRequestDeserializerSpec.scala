@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.awaitinggeneration
+package io.renku.eventlog.subscriptions
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -38,7 +38,7 @@ private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockF
       val subscriptionCategoryPayload = subscriptionCategoryPayloads.generateOne
       val payload                     = json"""
       {
-        "categoryName": "AWAITING_GENERATION",
+        "categoryName": ${categoryName.value},
         "subscriberUrl": ${subscriptionCategoryPayload.subscriberUrl.value}
       }"""
 
@@ -53,19 +53,25 @@ private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockF
         "subscriberUrl": ${subscriberUrls.generateOne.value}
       }"""
 
-      deserializer.deserialize(payload) shouldBe Success(Option.empty[SubscriptionCategoryPayload])
+      deserializer.deserialize(payload) shouldBe Success(Option.empty[TestSubscriptionCategoryPayload])
     }
 
     "return None if the payload does not contain required fields" in new TestCase {
-      deserializer.deserialize(Json.obj()) shouldBe Success(Option.empty[SubscriptionCategoryPayload])
+      deserializer.deserialize(Json.obj()) shouldBe Success(Option.empty[TestSubscriptionCategoryPayload])
     }
   }
 
   private trait TestCase {
-    val deserializer = SubscriptionRequestDeserializer[Try]()
+    val categoryName = categoryNames.generateOne
+    val Success(deserializer) = SubscriptionRequestDeserializer[Try, TestSubscriptionCategoryPayload](
+      categoryName,
+      TestSubscriptionCategoryPayload.apply
+    )
 
-    val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
+    val subscriptionCategoryPayloads: Gen[TestSubscriptionCategoryPayload] = for {
       url <- subscriberUrls
-    } yield SubscriptionCategoryPayload(url)
+    } yield TestSubscriptionCategoryPayload(url)
   }
+
+  private case class TestSubscriptionCategoryPayload(subscriberUrl: SubscriberUrl) extends SubscriptionCategoryPayload
 }

@@ -23,7 +23,7 @@ import ch.datascience.graph.model.projects
 import io.circe.Encoder
 
 private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPath: projects.Path, body: EventBody) {
-  override lazy val toString: String = s"$id, projectPath = $projectPath"
+  override lazy val toString: String = s"$AwaitingGenerationEvent $id, projectPath = $projectPath"
 }
 
 private object AwaitingGenerationEventEncoder extends Encoder[AwaitingGenerationEvent] {
