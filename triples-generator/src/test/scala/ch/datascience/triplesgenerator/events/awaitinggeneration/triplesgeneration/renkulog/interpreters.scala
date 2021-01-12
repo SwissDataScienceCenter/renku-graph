@@ -16,27 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.triplesgenerator.events.awaitinggeneration.triplesgeneration.renkulog
 
-import cats.effect.{Clock, ConcurrentEffect, Resource}
-import ch.datascience.metrics.RoutesMetrics
-import ch.datascience.triplesgenerator.events.EventEndpoint
-import org.http4s.dsl.Http4sDsl
+import cats.effect.IO
+import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.triplesgenerator.events.awaitinggeneration.triplesgeneration.renkulog.Commands.GitLabRepoUrlFinder
 
-private class MicroserviceRoutes[F[_]: ConcurrentEffect](
-    eventEndpoint: EventEndpoint[F],
-    routesMetrics: RoutesMetrics[F]
-)(implicit clock:  Clock[F])
-    extends Http4sDsl[F] {
-
-  import eventEndpoint._
-  import org.http4s.HttpRoutes
-  import routesMetrics._
-
-  // format: off
-  lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case request @ POST -> Root / "events" => processEvent(request)
-    case GET            -> Root / "ping"   => Ok("pong")
-  }.withMetrics
-  // format: on
-}
+private class IOGitLabRepoUrlFinder(
+    gitLabUrl: GitLabUrl
+) extends GitLabRepoUrlFinder[IO](gitLabUrl)
