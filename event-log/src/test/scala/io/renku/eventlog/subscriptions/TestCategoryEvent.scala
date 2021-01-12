@@ -18,18 +18,11 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings}
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
-import org.scalacheck.Gen
+import org.scalacheck.{Arbitrary, Gen}
 
-private object Generators {
+private case class TestCategoryEvent(value: Int)
 
-  val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
-  val categoryNames:  Gen[CategoryName]  = nonBlankStrings() map (value => CategoryName(value.value))
-
-  implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
-    url <- subscriberUrls
-  } yield new SubscriptionCategoryPayload {
-    override def subscriberUrl: SubscriberUrl = url
-  }
+private object TestCategoryEvent {
+  lazy val testCategoryEvents: Gen[TestCategoryEvent] =
+    Arbitrary.arbInt.arbitrary map TestCategoryEvent.apply
 }

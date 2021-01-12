@@ -45,7 +45,7 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
       subscribers.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
 
-      logger.loggedOnly(Info(s"$subscriberUrl added"))
+      logger.loggedOnly(Info(s"$categoryName: $subscriberUrl added"))
     }
 
     "adds the given subscriber to the registry and do not log info message when it was already added" in new TestCase {
@@ -111,7 +111,7 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
       subscribers.delete(subscriberUrl = subscriberUrl).unsafeRunSync()
 
-      logger.loggedOnly(Info(s"$subscriberUrl gone - deleting"))
+      logger.loggedOnly(Info(s"$categoryName: $subscriberUrl gone - deleting"))
     }
 
     "not log if nothing was deleted" in new TestCase {
@@ -133,7 +133,7 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
       subscribers.markBusy(subscriberUrl).unsafeRunSync()
 
-      logger.loggedOnly(Info(s"$subscriberUrl busy - putting on hold"))
+      logger.expectNoLogs()
     }
   }
 
@@ -141,10 +141,11 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
+    val categoryName  = categoryNames.generateOne
     val subscriberUrl = subscriberUrls.generateOne
 
     val subscribersRegistry = mock[SubscribersRegistry]
     val logger              = TestLogger[IO]()
-    val subscribers         = new SubscribersImpl(subscribersRegistry, logger)
+    val subscribers         = new SubscribersImpl(categoryName, subscribersRegistry, logger)
   }
 }

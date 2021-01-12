@@ -43,7 +43,7 @@ class EventPersisterSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with MockFactory
-    with TypesSerializers
+    with TypeSerializers
     with should.Matchers {
 
   "storeNewEvent" should {

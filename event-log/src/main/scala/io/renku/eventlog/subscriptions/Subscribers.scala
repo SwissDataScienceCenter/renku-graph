@@ -21,6 +21,7 @@ package io.renku.eventlog.subscriptions
 import cats.Applicative
 import cats.effect.{ContextShift, IO, Timer}
 import io.chrisdavenport.log4cats.Logger
+import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
 
 import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
@@ -36,6 +37,7 @@ private trait Subscribers[Interpretation[_]] {
 }
 
 private class SubscribersImpl private[subscriptions] (
+    categoryName:        CategoryName,
     subscribersRegistry: SubscribersRegistry,
     logger:              Logger[IO]
 )(implicit contextShift: ContextShift[IO])
@@ -43,20 +45,17 @@ private class SubscribersImpl private[subscriptions] (
 
   override def add(subscriberUrl: SubscriberUrl): IO[Unit] = for {
     wasAdded <- subscribersRegistry add subscriberUrl
-    _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$subscriberUrl added"))
+    _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$categoryName: $subscriberUrl added"))
   } yield ()
 
   override def delete(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
       removed <- subscribersRegistry delete subscriberUrl
-      _       <- Applicative[IO].whenA(removed)(logger.info(s"$subscriberUrl gone - deleting"))
+      _       <- Applicative[IO].whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))
     } yield ()
 
   override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =
-    for {
-      _ <- subscribersRegistry markBusy subscriberUrl
-      _ <- logger.info(s"$subscriberUrl busy - putting on hold")
-    } yield ()
+    subscribersRegistry markBusy subscriberUrl
 
   override def runOnSubscriber(f: SubscriberUrl => IO[Unit]): IO[Unit] =
     for {
@@ -71,13 +70,14 @@ private object Subscribers {
   import cats.effect.IO
 
   def apply(
-      logger: Logger[IO]
+      categoryName: CategoryName,
+      logger:       Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       timer:            Timer[IO],
       executionContext: ExecutionContext
   ): IO[Subscribers[IO]] = for {
-    subscribersRegistry <- SubscribersRegistry(logger)
-    subscribers         <- IO(new SubscribersImpl(subscribersRegistry, logger))
+    subscribersRegistry <- SubscribersRegistry(categoryName, logger)
+    subscribers         <- IO(new SubscribersImpl(categoryName, subscribersRegistry, logger))
   } yield subscribers
 }

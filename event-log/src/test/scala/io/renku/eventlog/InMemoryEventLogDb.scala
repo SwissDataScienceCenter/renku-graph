@@ -31,14 +31,15 @@ import org.testcontainers.utility.DockerImageName
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-trait InMemoryEventLogDb extends ForAllTestContainer with TypesSerializers {
+trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
   self: Suite =>
 
   object Tables {
-    val event        = "event"
-    val project      = "project"
-    val eventPayload = "event_payload"
-    lazy val all     = Set(event, project, eventPayload)
+    val event                        = "event"
+    val project                      = "project"
+    val eventPayload                 = "event_payload"
+    val subscriptionCategorySyncTime = "subscription_category_sync_time"
+    lazy val all                     = Set(event, eventPayload, subscriptionCategorySyncTime, project)
   }
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(global)

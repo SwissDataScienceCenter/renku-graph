@@ -21,12 +21,11 @@ package io.renku.eventlog.subscriptions
 import java.lang.Thread.sleep
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
-
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
+import ch.datascience.interpreters.TestLogger.Level.{Debug, Info}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.subscriptions.Generators._
 import org.scalamock.scalatest.MockFactory
@@ -172,8 +171,8 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
 
       eventually {
         logger.loggedOnly(
-          Info(s"All 1 subscribers are busy; waiting for one to become available"),
-          Info(s"$subscriberUrl taken from busy state")
+          Info(s"$categoryName: all 1 subscriber(s) are busy; waiting for one to become available"),
+          Debug(s"$categoryName: $subscriberUrl taken from busy state")
         )
       }
     }
@@ -203,11 +202,12 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
     implicit val timer: Timer[IO]        = IO.timer(global)
 
     val subscriberUrl = subscriberUrls.generateOne
+    val categoryName  = categoryNames.generateOne
 
     val busySleep                = 500 milliseconds
     val checkupInterval          = 500 milliseconds
     val logger                   = TestLogger[IO]()
-    lazy val subscribersRegistry = SubscribersRegistry(logger, checkupInterval, busySleep).unsafeRunSync()
+    lazy val subscribersRegistry = SubscribersRegistry(categoryName, logger, checkupInterval, busySleep).unsafeRunSync()
 
     def callFindSubscriber(callerId: Int, collectedCallers: ConcurrentHashMap[Unit, List[Int]]) = {
 

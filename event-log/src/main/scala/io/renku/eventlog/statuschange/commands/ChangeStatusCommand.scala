@@ -22,9 +22,9 @@ import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.eventlog.{EventLogDB, TypesSerializers}
+import io.renku.eventlog.{EventLogDB, TypeSerializers}
 
-trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable with TypesSerializers {
+trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable with TypeSerializers {
   def eventId: CompoundEventId
   def status:  EventStatus
   def query:   SqlQuery[Int]

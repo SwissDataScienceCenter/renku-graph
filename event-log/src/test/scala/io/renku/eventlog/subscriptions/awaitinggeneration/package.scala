@@ -18,18 +18,15 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings}
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import org.scalacheck.Gen
 
-private object Generators {
+package object awaitinggeneration {
 
-  val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
-  val categoryNames:  Gen[CategoryName]  = nonBlankStrings() map (value => CategoryName(value.value))
-
-  implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
-    url <- subscriberUrls
-  } yield new SubscriptionCategoryPayload {
-    override def subscriberUrl: SubscriberUrl = url
-  }
+  private[awaitinggeneration] lazy val awaitingGenerationEvents: Gen[AwaitingGenerationEvent] = for {
+    eventId     <- compoundEventIds
+    projectPath <- projectPaths
+    eventBody   <- eventBodies
+  } yield AwaitingGenerationEvent(eventId, projectPath, eventBody)
 }

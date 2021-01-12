@@ -16,27 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.statuschange.commands
+package io.renku.eventlog.subscriptions
 
-import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
-import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
+import io.renku.eventlog.subscriptions.SubscriptionCategory.{CategoryName, LastSyncedDate}
+import io.renku.eventlog.{EventLogDataProvisioning, InMemoryEventLogDb}
 import doobie.implicits._
-import io.renku.eventlog.EventLogDB
 
-private object ProjectPathFinder {
+trait SubscriptionDataProvisioning extends EventLogDataProvisioning with SubscriptionTypeSerializers {
+  self: InMemoryEventLogDb =>
 
-  import io.renku.eventlog.TypeSerializers._
-
-  def findProjectPath[Interpretation[_]](
-      eventId:           CompoundEventId
-  )(implicit transactor: DbTransactor[Interpretation, EventLogDB], ME: Bracket[Interpretation, Throwable]) =
-    sql"""|SELECT project_path
-          |FROM project 
-          |WHERE project_id = ${eventId.projectId}
-          |""".stripMargin
-      .query[projects.Path]
-      .unique
-      .transact(transactor.get)
+  protected def upsertLastSynced(projectId: projects.Id, categoryName: CategoryName, lastSynced: LastSyncedDate): Unit =
+    execute {
+      sql"""|INSERT INTO
+            |subscription_category_sync_time (project_id, category_name, last_synced)
+            |VALUES ($projectId, $categoryName, $lastSynced)
+            |ON CONFLICT (project_id, category_name)
+            |DO UPDATE SET  last_synced = excluded.last_synced 
+      """.stripMargin.update.run.map(_ => ())
+    }
 }

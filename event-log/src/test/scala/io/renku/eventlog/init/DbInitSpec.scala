@@ -18,36 +18,22 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.interpreters.TestLogger
 import io.renku.eventlog.InMemoryEventLogDb
 import org.scalatest.{BeforeAndAfter, Suite}
 
 import scala.language.reflectiveCalls
 
-trait DbInitSpec extends InMemoryEventLogDb with BeforeAndAfter {
+trait DbInitSpec extends InMemoryEventLogDb with EventLogDbMigrations with BeforeAndAfter {
   self: Suite =>
 
-  private val tablesToDropBeforeEachTest =
-    List("event_payload", "event_log", "event", "subscription_category_sync_time", "project")
-
-  private val logger = TestLogger[IO]()
-
-  protected lazy val eventLogTableCreator:           Migration = EventLogTableCreator(transactor, logger)
-  protected lazy val projectPathAdder:               Migration = ProjectPathAdder(transactor, logger)
-  protected lazy val batchDateAdder:                 Migration = BatchDateAdder(transactor, logger)
-  protected lazy val latestEventDatesViewRemover:    Migration = LatestEventDatesViewRemover(transactor, logger)
-  protected lazy val projectTableCreator:            Migration = ProjectTableCreator(transactor, logger)
-  protected lazy val projectPathRemover:             Migration = ProjectPathRemover(transactor, logger)
-  protected lazy val eventLogTableRenamer:           Migration = EventLogTableRenamer(transactor, logger)
-  protected lazy val eventStatusRenamer:             Migration = EventStatusRenamer(transactor, logger)
-  protected lazy val eventPayloadTableCreator:       Migration = EventPayloadTableCreator(transactor, logger)
-  protected lazy val eventPayloadSchemaVersionAdder: Migration = EventPayloadSchemaVersionAdder(transactor, logger)
-  protected lazy val subscriptionCategorySyncTimeTableCreator: Migration =
-    SubscriptionCategorySyncTimeTableCreator(transactor, logger)
-
-  protected type Migration = { def run(): IO[Unit] }
+  private val tablesToDropBeforeEachTest = List(
+    "event_payload",
+    "event_log",
+    "event",
+    "subscription_category_sync_time",
+    "project"
+  )
 
   protected val migrationsToRun: List[Migration]
 
@@ -62,5 +48,4 @@ trait DbInitSpec extends InMemoryEventLogDb with BeforeAndAfter {
       .sequence
       .void
       .unsafeRunSync()
-
 }

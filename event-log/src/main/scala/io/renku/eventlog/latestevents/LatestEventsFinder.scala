@@ -24,7 +24,7 @@ import ch.datascience.graph.model.events.{EventBody, EventId}
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
 import io.renku.eventlog.latestevents.LatestEventsFinder.IdProjectBody
-import io.renku.eventlog.{EventLogDB, EventProject, TypesSerializers}
+import io.renku.eventlog.{EventLogDB, EventProject, TypeSerializers}
 
 trait LatestEventsFinder[Interpretation[_]] {
   def findAllLatestEvents(): Interpretation[List[IdProjectBody]]
@@ -36,7 +36,7 @@ class LatestEventsFinderImpl(
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
     with LatestEventsFinder[IO]
-    with TypesSerializers {
+    with TypeSerializers {
 
   import LatestEventsFinder._
   import eu.timepit.refined.auto._
