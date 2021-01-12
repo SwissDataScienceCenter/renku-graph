@@ -65,6 +65,7 @@ trait EventLogDataProvisioning {
       """.stripMargin.update.run.map(_ => ())
     }
   }
+
   protected def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit =
     execute {
       sql"""|INSERT INTO
@@ -74,5 +75,4 @@ trait EventLogDataProvisioning {
             |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
       """.stripMargin.update.run.map(_ => ())
     }
-
 }

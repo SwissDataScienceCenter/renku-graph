@@ -23,11 +23,11 @@ import io.renku.eventlog.subscriptions.SubscriptionCategory.{CategoryName, LastS
 
 import java.time.Instant
 
-private trait SubscriptionTypeSerializers extends TypeSerializers {
+trait SubscriptionTypeSerializers extends TypeSerializers {
 
-  implicit val lastSyncedDateGet: Get[LastSyncedDate] = Get[Instant].tmap(LastSyncedDate.apply)
-  implicit val lastSyncedDatePut: Put[LastSyncedDate] = Put[Instant].contramap(_.value)
+  private[subscriptions] implicit val lastSyncedDateGet: Get[LastSyncedDate] = Get[Instant].tmap(LastSyncedDate.apply)
+  private[subscriptions] implicit val lastSyncedDatePut: Put[LastSyncedDate] = Put[Instant].contramap(_.value)
 
-  implicit val categoryNameGet: Get[CategoryName] = Get[String].tmap(CategoryName.apply)
-  implicit val categoryNamePut: Put[CategoryName] = Put[String].contramap(_.value)
+  private[subscriptions] implicit val categoryNameGet: Get[CategoryName] = Get[String].tmap(CategoryName.apply)
+  private[subscriptions] implicit val categoryNamePut: Put[CategoryName] = Put[String].contramap(_.value)
 }
