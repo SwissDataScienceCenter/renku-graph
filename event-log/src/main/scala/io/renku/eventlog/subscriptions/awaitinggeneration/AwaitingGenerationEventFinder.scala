@@ -35,7 +35,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
-import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds}
+import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds, SubscriptionTypeSerializers}
 
 import java.time.{Duration, Instant}
 import scala.language.postfixOps
@@ -55,7 +55,7 @@ private class AwaitingGenerationEventFinderImpl(
 )(implicit ME:             Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, AwaitingGenerationEvent]
-    with TypeSerializers {
+    with SubscriptionTypeSerializers {
 
   override def popEvent(): IO[Option[AwaitingGenerationEvent]] =
     for {

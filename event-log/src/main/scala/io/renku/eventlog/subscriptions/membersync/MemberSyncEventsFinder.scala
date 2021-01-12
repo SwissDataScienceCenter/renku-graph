@@ -24,9 +24,9 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import doobie.free.connection.ConnectionOp
 import eu.timepit.refined.api.Refined
-import io.renku.eventlog.subscriptions.EventFinder
+import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.SubscriptionCategory.LastSyncedDate
-import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
 
 import java.time.Instant
 
@@ -36,11 +36,10 @@ private class MemberSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
 )(implicit ME:                                            Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, MemberSyncEvent]
-    with TypeSerializers {
+    with SubscriptionTypeSerializers {
 
   import cats.free.Free
   import doobie.implicits._
-  import eu.timepit.refined.auto._
 
   override def popEvent(): IO[Option[MemberSyncEvent]] = findEventAndMarkTaken() transact transactor.get
 
