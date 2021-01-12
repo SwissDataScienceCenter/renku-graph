@@ -16,27 +16,18 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.triplesgenerator.events.awaitinggeneration.triplescuration.forks
 
-import cats.effect.{Clock, ConcurrentEffect, Resource}
-import ch.datascience.metrics.RoutesMetrics
-import ch.datascience.triplesgenerator.events.EventEndpoint
-import org.http4s.dsl.Http4sDsl
+import ch.datascience.graph.model.projects.{DateCreated, Path}
+import ch.datascience.graph.model.users
+import ch.datascience.graph.model.users.{Email, GitLabId}
 
-private class MicroserviceRoutes[F[_]: ConcurrentEffect](
-    eventEndpoint: EventEndpoint[F],
-    routesMetrics: RoutesMetrics[F]
-)(implicit clock:  Clock[F])
-    extends Http4sDsl[F] {
+private final case class GitLabProject(path:            Path,
+                                       maybeParentPath: Option[Path],
+                                       maybeCreator:    Option[GitLabCreator],
+                                       dateCreated:     DateCreated
+)
 
-  import eventEndpoint._
-  import org.http4s.HttpRoutes
-  import routesMetrics._
+private final case class GitLabCreator(gitLabId: GitLabId, name: users.Name)
 
-  // format: off
-  lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case request @ POST -> Root / "events" => processEvent(request)
-    case GET            -> Root / "ping"   => Ok("pong")
-  }.withMetrics
-  // format: on
-}
+private final case class KGCreator(resourceId: users.ResourceId, maybeEmail: Option[Email], name: users.Name)

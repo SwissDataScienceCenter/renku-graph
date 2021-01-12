@@ -16,27 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.triplesgenerator.events.awaitinggeneration.triplescuration.persondetails
 
-import cats.effect.{Clock, ConcurrentEffect, Resource}
-import ch.datascience.metrics.RoutesMetrics
-import ch.datascience.triplesgenerator.events.EventEndpoint
-import org.http4s.dsl.Http4sDsl
+import cats.syntax.all._
 
-private class MicroserviceRoutes[F[_]: ConcurrentEffect](
-    eventEndpoint: EventEndpoint[F],
-    routesMetrics: RoutesMetrics[F]
-)(implicit clock:  Clock[F])
-    extends Http4sDsl[F] {
+private class PersonsAndProjectMembersMatcher {
 
-  import eventEndpoint._
-  import org.http4s.HttpRoutes
-  import routesMetrics._
+  def merge(persons: Set[Person], projectMembers: Set[GitLabProjectMember]): Set[Person] =
+    persons map { person =>
+      projectMembers
+        .find(byNameOrUsername(person))
+        .map(addGitlabId(person))
+        .getOrElse(person)
+    }
 
-  // format: off
-  lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case request @ POST -> Root / "events" => processEvent(request)
-    case GET            -> Root / "ping"   => Ok("pong")
-  }.withMetrics
-  // format: on
+  private def byNameOrUsername(person: Person)(member: GitLabProjectMember): Boolean =
+    (member.name == person.name) || (member.username.value == person.name.value)
+
+  private def addGitlabId(person: Person)(member: GitLabProjectMember): Person =
+    person.copy(maybeGitLabId = member.id.some)
 }

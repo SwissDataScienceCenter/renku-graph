@@ -31,7 +31,7 @@ import ch.datascience.microservices.IOMicroservice
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
 import ch.datascience.triplesgenerator.config.{IOVersionCompatibilityConfig, TriplesGeneration}
-import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessingEndpoint
+import ch.datascience.triplesgenerator.events.IOEventEndpoint
 import ch.datascience.triplesgenerator.init._
 import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
@@ -73,14 +73,13 @@ object Microservice extends IOMicroservice {
       sparqlTimeRecorder       <- SparqlQueryTimeRecorder(metricsRegistry)
       reProvisioningStatus     <- ReProvisioningStatus(subscriber, ApplicationLogger, sparqlTimeRecorder)
       reProvisioning           <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)
-      eventProcessingEndpoint <- IOEventProcessingEndpoint(subscriber,
-                                                           triplesGeneration,
-                                                           reProvisioningStatus,
-                                                           renkuVersionPairs.head,
-                                                           metricsRegistry,
-                                                           gitLabThrottler,
-                                                           sparqlTimeRecorder,
-                                                           ApplicationLogger
+      eventProcessingEndpoint <- IOEventEndpoint(subscriber,
+                                                 triplesGeneration,
+                                                 reProvisioningStatus,
+                                                 metricsRegistry,
+                                                 gitLabThrottler,
+                                                 sparqlTimeRecorder,
+                                                 ApplicationLogger
                                  )
       microserviceRoutes =
         new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry)).routes
