@@ -23,6 +23,7 @@ import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.events.CategoryName
 import io.circe.Json
 import io.renku.eventlog.subscriptions.SubscriptionCategory._
 import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry._

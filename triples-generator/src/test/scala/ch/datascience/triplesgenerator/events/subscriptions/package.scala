@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.triplesgenerator.events
 
 import ch.datascience.generators.Generators.httpUrls
 import org.scalacheck.Gen

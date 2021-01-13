@@ -28,6 +28,9 @@ import java.time.{Clock, Instant}
 
 object events {
 
+  final class CategoryName private (val value: String) extends AnyVal with StringTinyType
+  implicit object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank
+
   final case class CompoundEventId(id: EventId, projectId: projects.Id) {
     override lazy val toString: String = s"id = $id, projectId = $projectId"
   }

@@ -169,8 +169,7 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
     val logger               = TestLogger[IO]()
     val processEvent = new EventEndpointImpl[IO](
       eventHandlers,
-      reProvisioningStatus,
-      logger
+      reProvisioningStatus
     ).processEvent _
 
     def givenReProvisioningStatusSet(flag: Boolean) =

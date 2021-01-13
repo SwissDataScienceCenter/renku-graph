@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.subscriptions
+package ch.datascience.triplesgenerator.events.subscriptions
 
 import java.net.NetworkInterface
 

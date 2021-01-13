@@ -31,7 +31,7 @@ import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
-import ch.datascience.triplesgenerator.subscriptions.Subscriber
+import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanism
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
@@ -48,13 +48,15 @@ private trait EventsProcessingRunner[Interpretation[_]] {
 }
 
 private class EventsProcessingRunnerImpl(
-    eventProcessor:      EventProcessor[IO],
-    generationProcesses: Long Refined Positive,
-    semaphore:           Semaphore[IO],
-    subscriber:          Subscriber[IO],
-    logger:              Logger[IO]
-)(implicit cs:           ContextShift[IO])
+    eventProcessor:        EventProcessor[IO],
+    generationProcesses:   Long Refined Positive,
+    semaphore:             Semaphore[IO],
+    subscriptionMechanism: SubscriptionMechanism[IO],
+    logger:                Logger[IO]
+)(implicit cs:             ContextShift[IO])
     extends EventsProcessingRunner[IO] {
+
+  import subscriptionMechanism._
 
   override def scheduleForProcessing(eventId:              CompoundEventId,
                                      events:               NonEmptyList[CommitEvent],
@@ -99,7 +101,7 @@ private class EventsProcessingRunnerImpl(
   private def releaseAndNotify(): IO[Unit] =
     for {
       _ <- semaphore.release
-      _ <- subscriber.notifyAvailability().start
+      _ <- renewSubscription().start
     } yield ()
 }
 
@@ -111,12 +113,12 @@ private object IOEventsProcessingRunner {
   import scala.language.postfixOps
 
   def apply(
-      metricsRegistry: MetricsRegistry[IO],
-      gitLabThrottler: Throttler[IO, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[IO],
-      subscriber:      Subscriber[IO],
-      logger:          Logger[IO],
-      config:          Config = ConfigFactory.load()
+      metricsRegistry:       MetricsRegistry[IO],
+      gitLabThrottler:       Throttler[IO, GitLab],
+      timeRecorder:          SparqlQueryTimeRecorder[IO],
+      subscriptionMechanism: SubscriptionMechanism[IO],
+      logger:                Logger[IO],
+      config:                Config = ConfigFactory.load()
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
@@ -126,5 +128,10 @@ private object IOEventsProcessingRunner {
       eventProcessor      <- IOCommitEventProcessor(metricsRegistry, gitLabThrottler, timeRecorder, logger)
       generationProcesses <- find[IO, Long Refined Positive]("generation-processes-number", config)
       semaphore           <- Semaphore(generationProcesses.value)
-    } yield new EventsProcessingRunnerImpl(eventProcessor, generationProcesses, semaphore, subscriber, logger)
+    } yield new EventsProcessingRunnerImpl(eventProcessor,
+                                           generationProcesses,
+                                           semaphore,
+                                           subscriptionMechanism,
+                                           logger
+    )
 }

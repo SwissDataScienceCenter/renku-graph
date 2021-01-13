@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.subscriptions
+package ch.datascience.triplesgenerator.events.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
+import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.http.client.IORestClient
 import io.chrisdavenport.log4cats.Logger
 
@@ -32,6 +33,7 @@ private trait SubscriptionSender[Interpretation[_]] {
 
 private class IOSubscriptionSender(
     eventLogUrl:             EventLogUrl,
+    categoryName:            CategoryName,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient(Throttler.noThrottling, logger)
@@ -54,7 +56,7 @@ private class IOSubscriptionSender(
   private implicit lazy val entityEncoder: Encoder[SubscriberUrl] =
     Encoder.instance[SubscriberUrl] { url =>
       json"""{
-        "categoryName":  "AWAITING_GENERATION",
+        "categoryName":  ${categoryName.value},
         "subscriberUrl": ${url.value}
       }"""
     }
@@ -66,7 +68,8 @@ private class IOSubscriptionSender(
 
 private object IOSubscriptionSender {
   def apply(
-      logger: Logger[IO]
+      categoryName: CategoryName,
+      logger:       Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
@@ -74,6 +77,6 @@ private object IOSubscriptionSender {
   ): IO[SubscriptionSender[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
-    } yield new IOSubscriptionSender(eventLogUrl, logger)
+    } yield new IOSubscriptionSender(eventLogUrl, categoryName, logger)
 
 }

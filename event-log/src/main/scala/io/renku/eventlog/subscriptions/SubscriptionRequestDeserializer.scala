@@ -19,8 +19,8 @@
 package io.renku.eventlog.subscriptions
 
 import cats.MonadError
+import ch.datascience.graph.model.events.CategoryName
 import io.circe.{Decoder, Json}
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
 
 private trait SubscriptionRequestDeserializer[Interpretation[_], PayloadType <: SubscriptionCategoryPayload] {
   def deserialize(payload: Json): Interpretation[Option[PayloadType]]

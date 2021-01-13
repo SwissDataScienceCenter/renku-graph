@@ -16,12 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.subscriptions
+package ch.datascience.triplesgenerator.events.subscriptions
 
 import cats.effect.{IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
+import ch.datascience.graph.model.EventsGenerators.categoryNames
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import org.scalamock.scalatest.MockFactory
@@ -34,7 +35,7 @@ import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with should.Matchers {
+class SubscriptionMechanismSpec extends AnyWordSpec with MockFactory with Eventually with should.Matchers {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(3, Seconds)),
@@ -53,7 +54,7 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .expects(subscriberUrl)
         .returning(IO.unit)
 
-      subscriber.notifyAvailability().unsafeRunSync() shouldBe ((): Unit)
+      subscriber.renewSubscription().unsafeRunSync() shouldBe ((): Unit)
     }
 
     "fail if finding the subscriber url fails" in new TestCase {
@@ -63,7 +64,7 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .returning(exception.raiseError[IO, SubscriberUrl])
 
       intercept[Exception] {
-        subscriber.notifyAvailability().unsafeRunSync()
+        subscriber.renewSubscription().unsafeRunSync()
       } shouldBe exception
     }
 
@@ -79,7 +80,7 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
         .returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
-        subscriber.notifyAvailability().unsafeRunSync()
+        subscriber.renewSubscription().unsafeRunSync()
       } shouldBe exception
     }
   }
@@ -171,10 +172,17 @@ class SubscriberSpec extends AnyWordSpec with MockFactory with Eventually with s
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
+    val categoryName       = categoryNames.generateOne
     val urlFinder          = mock[SubscriptionUrlFinder[IO]]
     val subscriptionSender = mock[SubscriptionSender[IO]]
     val logger             = TestLogger[IO]()
     val subscriber =
-      new SubscriberImpl(urlFinder, subscriptionSender, logger, initialDelay = 5 millis, renewDelay = 500 millis)
+      new SubscriptionMechanismImpl(categoryName,
+                                    urlFinder,
+                                    subscriptionSender,
+                                    logger,
+                                    initialDelay = 5 millis,
+                                    renewDelay = 500 millis
+      )
   }
 }

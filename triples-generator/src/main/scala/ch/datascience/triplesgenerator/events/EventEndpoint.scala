@@ -25,8 +25,8 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
-import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}
@@ -39,8 +39,7 @@ trait EventEndpoint[Interpretation[_]] {
 
 class EventEndpointImpl[Interpretation[_]: Effect](
     eventHandlers:        List[EventHandler[Interpretation]],
-    reProvisioningStatus: ReProvisioningStatus[Interpretation],
-    logger:               Logger[Interpretation]
+    reProvisioningStatus: ReProvisioningStatus[Interpretation]
 )(implicit ME:            MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation]
     with EventEndpoint[Interpretation] {
@@ -82,13 +81,13 @@ object IOEventEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply(
-      currentVersionPair:   RenkuVersionPair,
-      metricsRegistry:      MetricsRegistry[IO],
-      gitLabThrottler:      Throttler[IO, GitLab],
-      timeRecorder:         SparqlQueryTimeRecorder[IO],
-      subscriber:           Subscriber[IO],
-      reProvisioningStatus: ReProvisioningStatus[IO],
-      logger:               Logger[IO]
+      currentVersionPair:            RenkuVersionPair,
+      metricsRegistry:               MetricsRegistry[IO],
+      gitLabThrottler:               Throttler[IO, GitLab],
+      timeRecorder:                  SparqlQueryTimeRecorder[IO],
+      subscriptionMechanismRegistry: SubscriptionMechanismRegistry[IO],
+      reProvisioningStatus:          ReProvisioningStatus[IO],
+      logger:                        Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
@@ -99,12 +98,11 @@ object IOEventEndpoint {
                                                                    metricsRegistry,
                                                                    gitLabThrottler,
                                                                    timeRecorder,
-                                                                   subscriber,
+                                                                   subscriptionMechanismRegistry,
                                                                    logger
                                    )
     } yield new EventEndpointImpl[IO](
       List(awaitingGenerationHandler),
-      reProvisioningStatus,
-      logger
+      reProvisioningStatus
     )
 }

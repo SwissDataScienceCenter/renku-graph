@@ -32,7 +32,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
 import ch.datascience.triplesgenerator.events.awaitinggeneration.EventProcessingGenerators._
-import ch.datascience.triplesgenerator.subscriptions.Subscriber
+import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanism
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -128,12 +128,12 @@ class EventsProcessingRunnerSpec
     val processesNumber: Long Refined Positive = 2L
     val semaphore  = Semaphore[IO](processesNumber.value).unsafeRunSync()
     val logger     = TestLogger[IO]()
-    val subscriber = mock[Subscriber[IO]]
+    val subscriber = mock[SubscriptionMechanism[IO]]
     val processingRunner =
       new EventsProcessingRunnerImpl(eventProcessor, processesNumber, semaphore, subscriber, logger)
 
     def expectAvailabilityIsCommunicated =
-      (subscriber.notifyAvailability _)
+      (subscriber.renewSubscription _)
         .expects()
         .returning(IO.unit)
         .atLeastOnce()

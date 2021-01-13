@@ -25,13 +25,12 @@ import cats.effect.{ContextShift, Effect, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.RenkuVersionPair
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventId}
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody, EventId}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.EventHandler.CategoryName
 import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
-import ch.datascience.triplesgenerator.subscriptions.Subscriber
+import ch.datascience.triplesgenerator.events.subscriptions.{SubscriptionMechanism, SubscriptionMechanismRegistry}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.DecodingFailure
 
@@ -59,7 +58,7 @@ private[events] class EventHandler[Interpretation[_]: Effect](
 
   private type IdAndBody = (CompoundEventId, EventBody)
 
-  override val name: CategoryName = CategoryName("AWAITING_GENERATION")
+  override val name: CategoryName = EventHandler.name
 
   override def handle(request: Request[Interpretation]): Interpretation[EventSchedulingResult] = {
     for {
@@ -131,18 +130,22 @@ private[events] class EventHandler[Interpretation[_]: Effect](
 
 private[events] object EventHandler {
 
+  val name: CategoryName = CategoryName("AWAITING_GENERATION")
+
   def apply(
-      currentVersionPair: RenkuVersionPair,
-      metricsRegistry:    MetricsRegistry[IO],
-      gitLabThrottler:    Throttler[IO, GitLab],
-      timeRecorder:       SparqlQueryTimeRecorder[IO],
-      subscriber:         Subscriber[IO],
-      logger:             Logger[IO]
+      currentVersionPair:            RenkuVersionPair,
+      metricsRegistry:               MetricsRegistry[IO],
+      gitLabThrottler:               Throttler[IO, GitLab],
+      timeRecorder:                  SparqlQueryTimeRecorder[IO],
+      subscriptionMechanismRegistry: SubscriptionMechanismRegistry[IO],
+      logger:                        Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    processingRunner <- IOEventsProcessingRunner(metricsRegistry, gitLabThrottler, timeRecorder, subscriber, logger)
+    subscriptionMechanism <- subscriptionMechanismRegistry(name)
+    processingRunner <-
+      IOEventsProcessingRunner(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
   } yield new EventHandler[IO](processingRunner, EventBodyDeserializer(), currentVersionPair, logger)
 }

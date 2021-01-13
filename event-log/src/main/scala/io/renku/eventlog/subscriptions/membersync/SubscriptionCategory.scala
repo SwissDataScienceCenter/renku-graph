@@ -20,9 +20,9 @@ package io.renku.eventlog.subscriptions.membersync
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.metrics.LabeledHistogram
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.{EventLogDB, subscriptions}
 

@@ -16,35 +16,37 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.subscriptions
+package ch.datascience.triplesgenerator.events.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.graph.model.events.CategoryName
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal
 
-trait Subscriber[Interpretation[_]] {
-  def notifyAvailability(): Interpretation[Unit]
-
-  def run(): Interpretation[Unit]
+trait SubscriptionMechanism[Interpretation[_]] {
+  def categoryName:        CategoryName
+  def renewSubscription(): Interpretation[Unit]
+  def run():               Interpretation[Unit]
 }
 
-class SubscriberImpl(
+class SubscriptionMechanismImpl(
+    val categoryName:      CategoryName,
     subscriptionUrlFinder: SubscriptionUrlFinder[IO],
     subscriptionSender:    SubscriptionSender[IO],
     logger:                Logger[IO],
     initialDelay:          FiniteDuration,
     renewDelay:            FiniteDuration
 )(implicit timer:          Timer[IO])
-    extends Subscriber[IO] {
+    extends SubscriptionMechanism[IO] {
 
   import cats.syntax.all._
   import subscriptionSender._
   import subscriptionUrlFinder._
 
-  override def notifyAvailability(): IO[Unit] = {
+  override def renewSubscription(): IO[Unit] = {
     for {
       subscriberUrl <- findSubscriberUrl()
       _             <- postToEventLog(subscriberUrl)
@@ -79,7 +81,7 @@ class SubscriberImpl(
   }
 }
 
-object Subscriber {
+object SubscriptionMechanism {
   import ch.datascience.config.ConfigLoader.find
   import com.typesafe.config.{Config, ConfigFactory}
 
@@ -89,12 +91,17 @@ object Subscriber {
   private val RenewDelay = 5 minutes
 
   def apply(
-      logger:                  Logger[IO],
-      configuration:           Config = ConfigFactory.load()
-  )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]): IO[Subscriber[IO]] =
+      categoryName:  CategoryName,
+      logger:        Logger[IO],
+      configuration: Config = ConfigFactory.load()
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[SubscriptionMechanism[IO]] =
     for {
       initialDelay       <- find[IO, FiniteDuration]("event-subscription-initial-delay", configuration)
       urlFinder          <- IOSubscriptionUrlFinder()
-      subscriptionSender <- IOSubscriptionSender(logger)
-    } yield new SubscriberImpl(urlFinder, subscriptionSender, logger, initialDelay, RenewDelay)
+      subscriptionSender <- IOSubscriptionSender(categoryName, logger)
+    } yield new SubscriptionMechanismImpl(categoryName, urlFinder, subscriptionSender, logger, initialDelay, RenewDelay)
 }

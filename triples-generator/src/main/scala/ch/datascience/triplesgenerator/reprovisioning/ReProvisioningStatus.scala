@@ -18,9 +18,6 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-
 import cats.Applicative
 import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, IO, Timer}
@@ -29,7 +26,7 @@ import ch.datascience.graph.Schemas.rdf
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
-import ch.datascience.triplesgenerator.subscriptions.Subscriber
+import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
@@ -37,6 +34,8 @@ import io.circe.Decoder.decodeList
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.jsonld.EntityId
 
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -50,19 +49,20 @@ trait ReProvisioningStatus[Interpretation[_]] {
 }
 
 private class ReProvisioningStatusImpl(
-    subscriber:              Subscriber[IO],
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO],
-    statusRefreshInterval:   FiniteDuration,
-    cacheRefreshInterval:    FiniteDuration,
-    lastCacheCheckTimeRef:   Ref[IO, Long]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    subscriptionMechanismRegistry: SubscriptionMechanismRegistry[IO],
+    rdfStoreConfig:                RdfStoreConfig,
+    renkuBaseUrl:                  RenkuBaseUrl,
+    logger:                        Logger[IO],
+    timeRecorder:                  SparqlQueryTimeRecorder[IO],
+    statusRefreshInterval:         FiniteDuration,
+    cacheRefreshInterval:          FiniteDuration,
+    lastCacheCheckTimeRef:         Ref[IO, Long]
+)(implicit executionContext:       ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with ReProvisioningStatus[IO] {
 
   import ReProvisioningJsonLD._
+  import subscriptionMechanismRegistry._
 
   private val runningStatusCheckStarted = new AtomicBoolean(false)
 
@@ -78,11 +78,10 @@ private class ReProvisioningStatusImpl(
     )
   }
 
-  override def clear(): IO[Unit] =
-    for {
-      _ <- deleteFromDb()
-      _ <- subscriber.notifyAvailability()
-    } yield ()
+  override def clear(): IO[Unit] = for {
+    _ <- deleteFromDb()
+    _ <- renewAllSubscriptions()
+  } yield ()
 
   private def deleteFromDb() = updateWithNoResult {
     SparqlQuery.of(
@@ -132,7 +131,7 @@ private class ReProvisioningStatusImpl(
              case Some(Running) => periodicStatusCheck
              case _ =>
                runningStatusCheckStarted set false
-               subscriber.notifyAvailability()
+               renewAllSubscriptions()
            }
     } yield ()
 
@@ -168,10 +167,10 @@ object ReProvisioningStatus {
   private val StatusRefreshInterval: FiniteDuration = 15 seconds
 
   def apply(
-      subscriber:    Subscriber[IO],
-      logger:        Logger[IO],
-      timeRecorder:  SparqlQueryTimeRecorder[IO],
-      configuration: Config = ConfigFactory.load()
+      subscriptionMechanismRegistry: SubscriptionMechanismRegistry[IO],
+      logger:                        Logger[IO],
+      timeRecorder:                  SparqlQueryTimeRecorder[IO],
+      configuration:                 Config = ConfigFactory.load()
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
@@ -181,7 +180,7 @@ object ReProvisioningStatus {
       rdfStoreConfig        <- RdfStoreConfig[IO](configuration)
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
       lastCacheCheckTimeRef <- Ref.of[IO, Long](0)
-    } yield new ReProvisioningStatusImpl(subscriber,
+    } yield new ReProvisioningStatusImpl(subscriptionMechanismRegistry,
                                          rdfStoreConfig,
                                          renkuBaseUrl,
                                          logger,

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.subscriptions
+package ch.datascience.triplesgenerator.events.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._
@@ -31,6 +31,7 @@ import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.graph.model.EventsGenerators._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -69,16 +70,17 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
 
   private trait TestCase {
     val subscriberUrl = subscriberUrls.generateOne
+    val categoryName  = categoryNames.generateOne
 
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val sender      = new IOSubscriptionSender(eventLogUrl, TestLogger())
-  }
+    val sender      = new IOSubscriptionSender(eventLogUrl, categoryName, TestLogger())
 
-  private implicit lazy val payloadEncoder: Encoder[SubscriberUrl] =
-    Encoder.instance[SubscriberUrl] { url =>
-      json"""{
-        "categoryName":  "AWAITING_GENERATION",
+    implicit lazy val payloadEncoder: Encoder[SubscriberUrl] =
+      Encoder.instance[SubscriberUrl] { url =>
+        json"""{
+        "categoryName":  ${categoryName.value},
         "subscriberUrl": ${url.value}
       }"""
-    }
+      }
+  }
 }
