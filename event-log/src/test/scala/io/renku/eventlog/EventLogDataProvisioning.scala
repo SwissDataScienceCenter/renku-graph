@@ -65,6 +65,7 @@ trait EventLogDataProvisioning {
       """.stripMargin.update.run.map(_ => ())
     }
   }
+
   protected def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit =
     execute {
       sql"""|INSERT INTO

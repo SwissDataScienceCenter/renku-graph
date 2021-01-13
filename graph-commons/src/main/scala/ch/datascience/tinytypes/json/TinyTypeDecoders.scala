@@ -94,10 +94,15 @@ object TinyTypeDecoders {
     }
 
   implicit def finiteDurationDecoder[TT <: FiniteDurationTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
-    decodeString.emap { value =>
-      Either
-        .catchNonFatal(FiniteDuration.apply(Duration.create(value).toMillis, TimeUnit.MILLISECONDS))
-        .flatMap(tinyTypeFactory.from)
-        .leftMap(_.getMessage)
-    }
+    Decoder
+      .instance { hcursor =>
+        for {
+          length     <- hcursor.downField("length").as[Long]
+          unitString <- hcursor.downField("unit").as[String]
+          unit = TimeUnit.valueOf(unitString)
+        } yield FiniteDuration(length, unit)
+      }
+      .emap { value =>
+        tinyTypeFactory.from(value).leftMap(_.getMessage)
+      }
 }

@@ -16,20 +16,24 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package io.renku.eventlog.subscriptions.membersync
 
-import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings}
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
-import org.scalacheck.Gen
+import ch.datascience.graph.model.projects
+import io.circe.Encoder
 
-private object Generators {
+private final case class MemberSyncEvent(projectPath: projects.Path) {
+  override lazy val toString: String = s"$MemberSyncEvent projectPath = $projectPath"
+}
 
-  val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
-  val categoryNames:  Gen[CategoryName]  = nonBlankStrings() map (value => CategoryName(value.value))
+private object MemberSyncEventEncoder extends Encoder[MemberSyncEvent] {
 
-  implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
-    url <- subscriberUrls
-  } yield new SubscriptionCategoryPayload {
-    override def subscriberUrl: SubscriberUrl = url
-  }
+  import io.circe.Json
+  import io.circe.literal.JsonStringContext
+
+  override def apply(event: MemberSyncEvent): Json = json"""{
+    "categoryName": ${SubscriptionCategory.name.value},
+    "project": {
+      "path":       ${event.projectPath.value}
+    }
+  }"""
 }

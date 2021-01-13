@@ -21,17 +21,32 @@ package io.renku.eventlog.subscriptions
 import cats.Semigroup
 import cats.data.OptionT
 import cats.effect.Effect
+import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
+import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 import io.circe.Json
-import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RegistrationResult, RejectedRegistration}
+import io.renku.eventlog.subscriptions.SubscriptionCategory._
+
+import java.time.Instant
 
 private trait SubscriptionCategory[Interpretation[_]] {
+
+  def name: CategoryName
+
   def run(): Interpretation[Unit]
 
   def register(payload: Json): Interpretation[RegistrationResult]
-
 }
 
 private[subscriptions] object SubscriptionCategory {
+
+  final class CategoryName private (val value: String) extends AnyVal with StringTinyType
+  implicit object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank
+
+  final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
+  implicit object LastSyncedDate
+      extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_))
+      with InstantNotInTheFuture
+
   sealed trait RegistrationResult
   final case object AcceptedRegistration extends RegistrationResult
   final case object RejectedRegistration extends RegistrationResult
@@ -39,14 +54,14 @@ private[subscriptions] object SubscriptionCategory {
   implicit val registrationResultSemigroup: Semigroup[RegistrationResult] = {
     case (RejectedRegistration, RejectedRegistration) => RejectedRegistration
     case _                                            => AcceptedRegistration
-
   }
 }
 
-private class SubscriptionCategoryImpl[Interpretation[_]: Effect, T <: SubscriptionCategoryPayload](
+private class SubscriptionCategoryImpl[Interpretation[_]: Effect, PayloadType <: SubscriptionCategoryPayload](
+    val name:          CategoryName,
     subscribers:       Subscribers[Interpretation],
     eventsDistributor: EventsDistributor[Interpretation],
-    deserializer:      SubscriptionRequestDeserializer[Interpretation] { type PayloadType = T }
+    deserializer:      SubscriptionRequestDeserializer[Interpretation, PayloadType]
 ) extends SubscriptionCategory[Interpretation] {
 
   override def run(): Interpretation[Unit] = eventsDistributor.run()
@@ -55,5 +70,4 @@ private class SubscriptionCategoryImpl[Interpretation[_]: Effect, T <: Subscript
     subscriptionPayload <- OptionT(deserializer.deserialize(payload))
     _                   <- OptionT.liftF(subscribers.add(subscriptionPayload.subscriberUrl))
   } yield subscriptionPayload).map(_ => AcceptedRegistration).getOrElse(RejectedRegistration)
-
 }

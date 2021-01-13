@@ -16,20 +16,9 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings}
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
-import org.scalacheck.Gen
+import io.renku.eventlog.subscriptions
 
-private object Generators {
-
-  val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
-  val categoryNames:  Gen[CategoryName]  = nonBlankStrings() map (value => CategoryName(value.value))
-
-  implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
-    url <- subscriberUrls
-  } yield new SubscriptionCategoryPayload {
-    override def subscriberUrl: SubscriberUrl = url
-  }
-}
+private case class SubscriptionCategoryPayload(override val subscriberUrl: subscriptions.SubscriberUrl)
+    extends subscriptions.SubscriptionCategoryPayload

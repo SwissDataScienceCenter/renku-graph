@@ -31,9 +31,9 @@ import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.eventlog.TypesSerializers
+import io.renku.eventlog.TypeSerializers
 
-private trait EventsPatch[Interpretation[_]] extends Product with Serializable with TypesSerializers {
+private trait EventsPatch[Interpretation[_]] extends Product with Serializable with TypeSerializers {
   def name:               String Refined NonEmpty
   def updateGauges():     Interpretation[Unit]
   protected def sqlQuery: ConnectionIO[Int]

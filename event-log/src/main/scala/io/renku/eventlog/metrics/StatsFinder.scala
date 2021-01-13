@@ -45,7 +45,7 @@ class StatsFinderImpl(
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
     with StatsFinder[IO]
-    with TypesSerializers {
+    with TypeSerializers {
 
   override def statuses(): IO[Map[EventStatus, Long]] =
     measureExecutionTime(findStatuses)

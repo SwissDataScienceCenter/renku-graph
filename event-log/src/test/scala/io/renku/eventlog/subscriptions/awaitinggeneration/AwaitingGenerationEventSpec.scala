@@ -16,20 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings}
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
-import org.scalacheck.Gen
+import ch.datascience.generators.Generators.Implicits._
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-private object Generators {
+class AwaitingGenerationEventSpec extends AnyWordSpec with should.Matchers {
 
-  val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
-  val categoryNames:  Gen[CategoryName]  = nonBlankStrings() map (value => CategoryName(value.value))
+  "toString" should {
 
-  implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
-    url <- subscriberUrls
-  } yield new SubscriptionCategoryPayload {
-    override def subscriberUrl: SubscriberUrl = url
+    "print out the id and projectPath" in {
+      val event = awaitingGenerationEvents.generateOne
+      event.toString shouldBe s"AwaitingGenerationEvent ${event.id}, projectPath = ${event.projectPath}"
+    }
   }
 }

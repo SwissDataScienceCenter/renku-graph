@@ -21,18 +21,18 @@ package io.renku.eventlog.subscriptions
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.IORestClient.SleepAfterConnectionIssue
 import ch.datascience.http.client.RestClientError.ConnectivityException
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Encoder
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
 
-private trait EventsSender[Interpretation[_]] {
-  def sendEvent(subscriptionUrl: SubscriberUrl, id: CompoundEventId, body: EventBody): Interpretation[SendingResult]
+private trait EventsSender[Interpretation[_], CategoryEvent] {
+  def sendEvent(subscriptionUrl: SubscriberUrl, categoryEvent: CategoryEvent): Interpretation[SendingResult]
 }
 
 private object EventsSender {
@@ -44,45 +44,33 @@ private object EventsSender {
   }
 }
 
-private class IOEventsSender(
-    logger:        Logger[IO],
-    retryInterval: FiniteDuration = SleepAfterConnectionIssue
+private class EventsSenderImpl[CategoryEvent](
+    categoryEventEncoder: Encoder[CategoryEvent],
+    logger:               Logger[IO],
+    retryInterval:        FiniteDuration = SleepAfterConnectionIssue
 )(implicit
     ME:               MonadError[IO, Throwable],
     executionContext: ExecutionContext,
     contextShift:     ContextShift[IO],
     timer:            Timer[IO]
 ) extends IORestClient(Throttler.noThrottling, logger, retryInterval = retryInterval)
-    with EventsSender[IO] {
+    with EventsSender[IO, CategoryEvent] {
 
   import SendingResult._
   import cats.effect._
   import cats.syntax.all._
-  import io.circe.Encoder
-  import io.circe.literal._
   import io.circe.syntax._
   import org.http4s.Method.POST
   import org.http4s.Status._
   import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
-  def sendEvent(subscriberUrl: SubscriberUrl, id: CompoundEventId, body: EventBody): IO[SendingResult] = {
+  def sendEvent(subscriberUrl: SubscriberUrl, categoryEvent: CategoryEvent): IO[SendingResult] = {
     for {
       uri           <- validateUri(subscriberUrl.value)
-      sendingResult <- send(request(POST, uri).withEntity((id -> body).asJson))(mapResponse)
+      sendingResult <- send(request(POST, uri).withEntity(categoryEvent.asJson(categoryEventEncoder)))(mapResponse)
     } yield sendingResult
   } recoverWith connectivityException(to = Misdelivered)
-
-  private implicit lazy val entityEncoder: Encoder[(CompoundEventId, EventBody)] =
-    Encoder.instance[(CompoundEventId, EventBody)] { case (id, body) =>
-      json"""{
-        "id":      ${id.id.value},
-        "project": {
-          "id":    ${id.projectId.value}
-        },
-        "body":    ${body.value}
-      }"""
-    }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[SendingResult]] = {
     case (Accepted, _, _)           => Delivered.pure[IO]
@@ -98,13 +86,14 @@ private class IOEventsSender(
 }
 
 private object IOEventsSender {
-  def apply(
-      logger: Logger[IO]
+  def apply[CategoryEvent](
+      categoryEventEncoder: Encoder[CategoryEvent],
+      logger:               Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[EventsSender[IO]] = IO {
-    new IOEventsSender(logger)
+  ): IO[EventsSender[IO, CategoryEvent]] = IO {
+    new EventsSenderImpl(categoryEventEncoder, logger)
   }
 }

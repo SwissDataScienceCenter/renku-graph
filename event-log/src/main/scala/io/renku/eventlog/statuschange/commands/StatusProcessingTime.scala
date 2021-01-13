@@ -9,7 +9,7 @@ trait StatusProcessingTime[Interpretation[_]] {
 
   def upsertStatusProcessingTime(eventId: CompoundEventId, processingTime: EventProcessingTime) =
     sql"""|INSERT INTO
-          |status_process_time (event_id, project_id, status, processing_time)
+          |status_processing_time (event_id, project_id, status, processing_time)
           |VALUES (${eventId.id},  ${eventId.projectId}, $status, ${processingTime.value.toMillis})
           |ON CONFLICT (event_id, project_id, status)
           |DO UPDATE SET processing_time = EXCLUDED.processing_time;

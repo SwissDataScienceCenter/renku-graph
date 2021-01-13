@@ -16,19 +16,23 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.unprocessed
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.subscriptions.{IOEventsDistributor, Subscribers, SubscriptionCategoryImpl}
+import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
+import io.renku.eventlog.subscriptions.{IOEventsDistributor, Subscribers, SubscriptionCategoryImpl, SubscriptionRequestDeserializer}
 import io.renku.eventlog.{EventLogDB, subscriptions}
 
 import scala.concurrent.ExecutionContext
 
 private[subscriptions] object SubscriptionCategory {
+
+  val name: CategoryName = CategoryName("AWAITING_GENERATION")
+
   def apply(
       transactor:                  DbTransactor[IO, EventLogDB],
       waitingEventsGauge:          LabeledGauge[IO, projects.Path],
@@ -40,11 +44,23 @@ private[subscriptions] object SubscriptionCategory {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
-    subscribers <- Subscribers(logger)
+    subscribers <- Subscribers(name, logger)
     eventFetcher <-
-      IOUnprocessedEventFetcher(transactor, waitingEventsGauge, underTriplesGenerationGauge, queriesExecTimes)
-    eventsDistributor <-
-      IOEventsDistributor(transactor, subscribers, eventFetcher, underTriplesGenerationGauge, queriesExecTimes, logger)
-    deserializer = SubscriptionRequestDeserializer[IO]()
-  } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](subscribers, eventsDistributor, deserializer)
+      IOAwaitingGenerationEventFinder(transactor, waitingEventsGauge, underTriplesGenerationGauge, queriesExecTimes)
+    dispatchRecovery <- DispatchRecovery(transactor, underTriplesGenerationGauge, queriesExecTimes, logger)
+    eventsDistributor <- IOEventsDistributor(name,
+                                             transactor,
+                                             subscribers,
+                                             eventFetcher,
+                                             AwaitingGenerationEventEncoder,
+                                             dispatchRecovery,
+                                             logger
+                         )
+    deserializer <-
+      SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload](name, SubscriptionCategoryPayload.apply)
+  } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](name,
+                                                                        subscribers,
+                                                                        eventsDistributor,
+                                                                        deserializer
+  )
 }

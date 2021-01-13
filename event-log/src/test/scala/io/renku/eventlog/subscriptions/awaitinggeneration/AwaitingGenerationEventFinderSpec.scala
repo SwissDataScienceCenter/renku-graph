@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.unprocessed
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import java.time.temporal.ChronoUnit.{HOURS => H, MINUTES => MIN}
 import java.time.{Duration, Instant}
@@ -35,8 +35,8 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.ProjectIds
-import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.Priority.MaxPriority
-import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.Priority.MaxPriority
+import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -45,7 +45,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-private class UnprocessedEventFetcherSpec
+private class AwaitingGenerationEventFinderSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with MockFactory
@@ -84,7 +84,9 @@ private class UnprocessedEventFetcherSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event2Id -> event2Body)
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          AwaitingGenerationEvent(event2Id, projectPath, event2Body)
+        )
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event2Id, executionDate))
 
@@ -96,7 +98,9 @@ private class UnprocessedEventFetcherSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          AwaitingGenerationEvent(event1Id, projectPath, event1Body)
+        )
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event1Id, executionDate),
                                                                             (event2Id, executionDate)
@@ -104,11 +108,11 @@ private class UnprocessedEventFetcherSpec
 
         givenPrioritisation(takes = Nil, returns = Nil)
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe None
+        finder.popEvent().unsafeRunSync() shouldBe None
 
-        queriesExecTimes.verifyExecutionTimeMeasured("pop event - projects",
-                                                     "pop event - oldest",
-                                                     "pop event - status update"
+        queriesExecTimes.verifyExecutionTimeMeasured("awaiting_generation - find projects",
+                                                     "awaiting_generation - find oldest",
+                                                     "awaiting_generation - update status"
         )
       }
 
@@ -149,17 +153,19 @@ private class UnprocessedEventFetcherSpec
           returns = List(ProjectIds(projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(event1Id -> event1Body)
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          AwaitingGenerationEvent(event1Id, projectPath, event1Body)
+        )
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((event1Id, executionDate))
 
         givenPrioritisation(takes = Nil, returns = Nil)
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe None
+        finder.popEvent().unsafeRunSync() shouldBe None
 
-        queriesExecTimes.verifyExecutionTimeMeasured("pop event - projects",
-                                                     "pop event - oldest",
-                                                     "pop event - status update"
+        queriesExecTimes.verifyExecutionTimeMeasured("awaiting_generation - find projects",
+                                                     "awaiting_generation - find oldest",
+                                                     "awaiting_generation - update status"
         )
       }
 
@@ -179,7 +185,9 @@ private class UnprocessedEventFetcherSpec
           returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
         )
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe Some(eventId -> eventBody)
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          AwaitingGenerationEvent(eventId, projectPath, eventBody)
+        )
 
         findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((eventId, executionDate))
       }
@@ -194,7 +202,7 @@ private class UnprocessedEventFetcherSpec
 
         givenPrioritisation(takes = Nil, returns = Nil)
 
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe None
+        finder.popEvent().unsafeRunSync() shouldBe None
       }
 
     "return events from all the projects" in new TestCase {
@@ -216,7 +224,7 @@ private class UnprocessedEventFetcherSpec
       }
 
       events foreach { _ =>
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+        finder.popEvent().unsafeRunSync() shouldBe a[Some[_]]
       }
 
       findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
@@ -224,7 +232,7 @@ private class UnprocessedEventFetcherSpec
 
     "return events from all the projects - case with projectsFetchingLimit > 1" in new TestCaseCommons {
 
-      val eventLogFetch = new UnprocessedEventFetcherImpl(
+      val eventLogFind = new AwaitingGenerationEventFinderImpl(
         transactor,
         waitingEventsGauge,
         underProcessingGauge,
@@ -232,8 +240,7 @@ private class UnprocessedEventFetcherSpec
         currentTime,
         maxProcessingTime = maxProcessingTime,
         projectsFetchingLimit = 5,
-        projectPrioritisation = projectPrioritisation,
-        waitForViewRefresh = true
+        projectPrioritisation = projectPrioritisation
       )
 
       val events = readyStatuses
@@ -257,14 +264,14 @@ private class UnprocessedEventFetcherSpec
       }
 
       events foreach { _ =>
-        eventLogFetch.popEvent().unsafeRunSync() shouldBe a[Some[_]]
+        eventLogFind.popEvent().unsafeRunSync() shouldBe a[Some[_]]
       }
 
       findEvents(status = GeneratingTriples).eventIdsOnly should contain theSameElementsAs events.map(_._1)
 
       givenPrioritisation(takes = Nil, returns = Nil)
 
-      eventLogFetch.popEvent().unsafeRunSync() shouldBe None
+      eventLogFind.popEvent().unsafeRunSync() shouldBe None
     }
   }
 
@@ -303,7 +310,7 @@ private class UnprocessedEventFetcherSpec
 
   private trait TestCase extends TestCaseCommons {
 
-    val eventLogFetch = new UnprocessedEventFetcherImpl(
+    val finder = new AwaitingGenerationEventFinderImpl(
       transactor,
       waitingEventsGauge,
       underProcessingGauge,
@@ -311,8 +318,7 @@ private class UnprocessedEventFetcherSpec
       currentTime,
       maxProcessingTime = maxProcessingTime,
       projectsFetchingLimit = 1,
-      projectPrioritisation = projectPrioritisation,
-      waitForViewRefresh = true
+      projectPrioritisation = projectPrioritisation
     )
   }
 

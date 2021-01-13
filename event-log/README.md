@@ -309,15 +309,45 @@ body. Currently, event-log allows subscriptions to `NEW` and `RECOVERABLE_FAILUR
 **NOTICE:**
 As a good practice, the subscription should be renewed periodically in case of restart or URL change.
 
-**Request**
+- **AWAITING_GENERATION**
 
+**Request**
 ```json
 {
-  "subscriberUrl": "http://host/path",
-  "statuses": [
-    "NEW",
-    "RECOVERABLE_FAILURE"
-  ]
+  "categoryName":  "AWAITING_GENERATION",
+  "subscriberUrl": "http://host/path"
+}
+```
+
+**Response**
+```json
+{
+  "categoryName": "AWAITING_GENERATION",
+  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",,
+  "project": {
+  "id":           12
+  },
+  "body":         "JSON payload" 
+}
+```
+
+- **MEMBER_SYNC**
+
+**Request**
+```json
+{
+  "categoryName":  "MEMBER_SYNC",
+  "subscriberUrl": "http://host/path"
+}
+```
+
+**Response**
+```json
+{
+  "categoryName": "MEMBER_SYNC",
+  "project": {
+  "path":         "namespace/project-name"
+  } 
 }
 ```
 

@@ -47,7 +47,7 @@ class ProcessingStatusFinderImpl(
     with ProcessingStatusFinder[IO] {
 
   import eu.timepit.refined.auto._
-  import io.renku.eventlog.TypesSerializers._
+  import io.renku.eventlog.TypeSerializers._
 
   override def fetchStatus(projectId: Id): OptionT[IO, ProcessingStatus] = OptionT {
     measureExecutionTime(latestBatchStatues(projectId)) transact transactor.get flatMap toProcessingStatus

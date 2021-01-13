@@ -16,9 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.unprocessed
+package io.renku.eventlog.subscriptions.membersync
 
-import io.renku.eventlog.subscriptions
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
+import ch.datascience.generators.Generators.Implicits._
 
-private case class SubscriptionCategoryPayload(override val subscriberUrl: subscriptions.SubscriberUrl)
-    extends subscriptions.SubscriptionCategoryPayload
+class MemberSyncEventSpec extends AnyWordSpec with should.Matchers {
+
+  "toString" should {
+
+    "print out the projectPath" in {
+      val event = MemberSyncEvent(projectPaths.generateOne)
+      event.toString shouldBe s"MemberSyncEvent projectPath = ${event.projectPath}"
+    }
+  }
+}

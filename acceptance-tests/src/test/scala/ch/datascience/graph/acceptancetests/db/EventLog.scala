@@ -35,7 +35,7 @@ import org.testcontainers.utility.DockerImageName
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
 
-object EventLog extends TypesSerializers {
+object EventLog extends TypeSerializers {
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
   private val logger = TestLogger()

@@ -46,19 +46,16 @@ private class IOSubscriptionSender(
   import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
-  private val statuses = Set("NEW", "GENERATION_RECOVERABLE_FAILURE")
+  override def postToEventLog(subscriberUrl: SubscriberUrl): IO[Unit] = for {
+    uri           <- validateUri(s"$eventLogUrl/subscriptions")
+    sendingResult <- send(request(POST, uri).withEntity(subscriberUrl.asJson))(mapResponse)
+  } yield sendingResult
 
-  override def postToEventLog(subscriberUrl: SubscriberUrl): IO[Unit] =
-    for {
-      uri           <- validateUri(s"$eventLogUrl/subscriptions")
-      sendingResult <- send(request(POST, uri).withEntity((subscriberUrl -> statuses).asJson))(mapResponse)
-    } yield sendingResult
-
-  private implicit lazy val entityEncoder: Encoder[(SubscriberUrl, Set[String])] =
-    Encoder.instance[(SubscriberUrl, Set[String])] { case (url, statuses) =>
+  private implicit lazy val entityEncoder: Encoder[SubscriberUrl] =
+    Encoder.instance[SubscriberUrl] { url =>
       json"""{
-        "subscriberUrl": ${url.value},
-        "statuses": ${statuses.toList}
+        "categoryName":  "AWAITING_GENERATION",
+        "subscriberUrl": ${url.value}
       }"""
     }
 

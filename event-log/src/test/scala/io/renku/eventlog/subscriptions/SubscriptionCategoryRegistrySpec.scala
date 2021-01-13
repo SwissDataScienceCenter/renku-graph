@@ -18,7 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 
-import cats.effect.IO
+import cats.Parallel
+import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -29,9 +30,12 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import scala.concurrent.ExecutionContext.global
+
 private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
+
     "return unit when all of the categories return Unit" in new TestCase {
       val categories = Set[SubscriptionCategory[IO]](SubscriptionCategoryWithoutRegistration)
       val registry   = new SubscriptionCategoryRegistryImpl[IO](categories)
@@ -84,8 +88,14 @@ private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFact
     }
   }
 
+  private implicit lazy val cs:       ContextShift[IO] = IO.contextShift(global)
+  private implicit lazy val parallel: Parallel[IO]     = IO.ioParallel
+
   trait TestCase {
     trait TestSubscriptionCategory extends SubscriptionCategory[IO] {
+
+      override val name: CategoryName = CategoryName(nonBlankStrings().generateOne.value)
+
       override def run(): IO[Unit] = ().pure[IO]
 
       override def register(payload: Json): IO[RegistrationResult] =

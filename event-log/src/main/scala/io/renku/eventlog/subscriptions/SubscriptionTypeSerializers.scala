@@ -17,19 +17,17 @@
  */
 
 package io.renku.eventlog.subscriptions
+import doobie.util.{Get, Put}
+import io.renku.eventlog.TypeSerializers
+import io.renku.eventlog.subscriptions.SubscriptionCategory.{CategoryName, LastSyncedDate}
 
-import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings}
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
-import org.scalacheck.Gen
+import java.time.Instant
 
-private object Generators {
+trait SubscriptionTypeSerializers extends TypeSerializers {
 
-  val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
-  val categoryNames:  Gen[CategoryName]  = nonBlankStrings() map (value => CategoryName(value.value))
+  private[subscriptions] implicit val lastSyncedDateGet: Get[LastSyncedDate] = Get[Instant].tmap(LastSyncedDate.apply)
+  private[subscriptions] implicit val lastSyncedDatePut: Put[LastSyncedDate] = Put[Instant].contramap(_.value)
 
-  implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
-    url <- subscriberUrls
-  } yield new SubscriptionCategoryPayload {
-    override def subscriberUrl: SubscriberUrl = url
-  }
+  private[subscriptions] implicit val categoryNameGet: Get[CategoryName] = Get[String].tmap(CategoryName.apply)
+  private[subscriptions] implicit val categoryNamePut: Put[CategoryName] = Put[String].contramap(_.value)
 }

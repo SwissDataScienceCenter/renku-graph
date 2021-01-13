@@ -18,17 +18,15 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.MonadError
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
+import ch.datascience.db.DbTransactor
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.statuschange.commands._
-import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
+import io.circe.Encoder
+import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
-import io.renku.eventlog.{EventLogDB, EventMessage}
+import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -39,103 +37,79 @@ private trait EventsDistributor[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private class EventsDistributorImpl[Interpretation[_]: Effect](
-    subscribers:                 Subscribers[Interpretation],
-    eventsFinder:                EventFetcher[Interpretation],
-    statusUpdatesRunner:         StatusUpdatesRunner[Interpretation],
-    eventsSender:                EventsSender[Interpretation],
-    underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-    logger:                      Logger[Interpretation],
-    noEventSleep:                FiniteDuration,
-    onErrorSleep:                FiniteDuration
-)(implicit timer:                Timer[Interpretation])
+private class EventsDistributorImpl[Interpretation[_]: Effect, CategoryEvent](
+    categoryName:     CategoryName,
+    subscribers:      Subscribers[Interpretation],
+    eventsFinder:     EventFinder[Interpretation, CategoryEvent],
+    eventsSender:     EventsSender[Interpretation, CategoryEvent],
+    dispatchRecovery: DispatchRecovery[Interpretation, CategoryEvent],
+    logger:           Logger[Interpretation],
+    noEventSleep:     FiniteDuration,
+    onErrorSleep:     FiniteDuration
+)(implicit timer:     Timer[Interpretation], ME: MonadError[Interpretation, Throwable])
     extends EventsDistributor[Interpretation] {
 
   import eventsSender._
   import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
   import subscribers._
 
-  def run(): Interpretation[Unit] =
+  def run(): Interpretation[Unit] = {
     for {
-      _ <- popEvent flatMap { case (eventId, eventBody) =>
-             runOnSubscriber(dispatch(eventId, eventBody)) recoverWith tryReDispatch(eventId, eventBody)
+      _ <- ME.unit
+      _ <- popEvent flatMap { categoryEvent =>
+             runOnSubscriber(dispatch(categoryEvent)) recoverWith tryReDispatch(categoryEvent)
            }
-      _ <- run()
     } yield ()
+  }.foreverM[Unit]
 
-  private def popEvent: Interpretation[(CompoundEventId, EventBody)] =
+  private def popEvent: Interpretation[CategoryEvent] =
     eventsFinder
       .popEvent()
-      .recoverWith(loggingErrorAndRetry(retry = eventsFinder.popEvent))
+      .recoverWith(loggingErrorAndRetry(retry = () => eventsFinder.popEvent()))
       .flatMap {
         case None            => (timer sleep noEventSleep) flatMap (_ => popEvent)
         case Some(idAndBody) => idAndBody.pure[Interpretation]
       }
 
-  private def dispatch(id: CompoundEventId, body: EventBody)(subscriber: SubscriberUrl): Interpretation[Unit] = {
+  private def dispatch(categoryEvent: CategoryEvent)(subscriber: SubscriberUrl): Interpretation[Unit] = {
     for {
-      result <- sendEvent(subscriber, id, body)
-      _      <- logStatement(result, subscriber, id)
+      result <- sendEvent(subscriber, categoryEvent)
+      _      <- logStatement(result, subscriber, categoryEvent)
       _ <- result match {
              case Delivered => ().pure[Interpretation]
              case ServiceBusy =>
-               markBusy(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(id, body)))
+               markBusy(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(categoryEvent)))
              case Misdelivered =>
-               delete(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(id, body)))
+               delete(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(categoryEvent)))
            }
     } yield ()
-  } recoverWith markEventAsNonRecoverable(subscriber, id)
+  } recoverWith dispatchRecovery.recover(subscriber, categoryEvent)
 
-  private def tryReDispatch(eventId:   CompoundEventId,
-                            eventBody: EventBody
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    for {
-      _ <- logger.error(exception)("Dispatching an event failed")
-      _ <- timer sleep onErrorSleep
-      _ <- runOnSubscriber(dispatch(eventId, eventBody))
-    } yield ()
+  private def tryReDispatch(categoryEvent: CategoryEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      for {
+        _ <- logger.error(exception)(s"$categoryName: Dispatching an event failed")
+        _ <- timer sleep onErrorSleep
+        _ <- runOnSubscriber(dispatch(categoryEvent))
+      } yield ()
   }
 
-  private def logStatement(result: SendingResult, url: SubscriberUrl, id: CompoundEventId): Interpretation[Unit] =
+  private def logStatement(result: SendingResult, url: SubscriberUrl, event: CategoryEvent): Interpretation[Unit] =
     result match {
-      case result @ Delivered    => logger.info(s"Event $id, url = $url -> $result")
+      case result @ Delivered    => logger.info(s"$categoryName: $event, url = $url -> $result")
       case ServiceBusy           => ().pure[Interpretation]
-      case result @ Misdelivered => logger.error(s"Event $id, url = $url -> $result")
+      case result @ Misdelivered => logger.error(s"$categoryName: $event, url = $url -> $result")
     }
 
   private lazy val withNothing: PartialFunction[Throwable, Unit] = { case NonFatal(_) => () }
 
-  private def markEventAsNonRecoverable(
-      url: SubscriberUrl,
-      id:  CompoundEventId
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    val markEventFailed =
-      ToGenerationNonRecoverableFailure[Interpretation](id, EventMessage(exception), underTriplesGenerationGauge)
-    for {
-      _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
-      _ <- logger.error(exception)(s"Event $id, url = $url -> ${markEventFailed.status}")
-    } yield ()
-  }
-
   private def loggingErrorAndRetry[O](retry: () => Interpretation[O]): PartialFunction[Throwable, Interpretation[O]] = {
     case NonFatal(exception) =>
       for {
-        _      <- logger.error(exception)("Finding events to dispatch failed")
+        _      <- logger.error(exception)(s"$categoryName: Finding events to dispatch failed")
         _      <- timer sleep onErrorSleep
         result <- retry() recoverWith loggingErrorAndRetry(retry)
       } yield result
-  }
-
-  private def retry(
-      command: ChangeStatusCommand[Interpretation]
-  ): PartialFunction[Throwable, Interpretation[UpdateResult]] = { case NonFatal(exception) =>
-    {
-      for {
-        _      <- logger.error(exception)(s"Marking event as ${command.status} failed")
-        _      <- timer sleep onErrorSleep
-        result <- statusUpdatesRunner run command
-      } yield result
-    } recoverWith retry(command)
   }
 }
 
@@ -143,28 +117,35 @@ private object IOEventsDistributor {
   private val NoEventSleep: FiniteDuration = 1 seconds
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
-  def apply(
-      transactor:                  DbTransactor[IO, EventLogDB],
-      subscribers:                 Subscribers[IO],
-      eventsFinder:                EventFetcher[IO],
-      underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
-      logger:                      Logger[IO]
+  def apply[CategoryEvent](
+      categoryName:         CategoryName,
+      transactor:           DbTransactor[IO, EventLogDB],
+      subscribers:          Subscribers[IO],
+      eventsFinder:         EventFinder[IO, CategoryEvent],
+      categoryEventEncoder: Encoder[CategoryEvent],
+      dispatchRecovery:     DispatchRecovery[IO, CategoryEvent],
+      logger:               Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventsDistributor[IO]] =
     for {
-      eventsSender        <- IOEventsSender(logger)
-      updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
-    } yield new EventsDistributorImpl(subscribers,
+      eventsSender <- IOEventsSender[CategoryEvent](categoryEventEncoder, logger)
+    } yield new EventsDistributorImpl(categoryName,
+                                      subscribers,
                                       eventsFinder,
-                                      updateCommandRunner,
                                       eventsSender,
-                                      underTriplesGenerationGauge,
+                                      dispatchRecovery,
                                       logger,
                                       noEventSleep = NoEventSleep,
                                       onErrorSleep = OnErrorSleep
     )
+}
+
+private trait DispatchRecovery[Interpretation[_], CategoryEvent] {
+  def recover(
+      url:           SubscriberUrl,
+      categoryEvent: CategoryEvent
+  ): PartialFunction[Throwable, Interpretation[Unit]]
 }

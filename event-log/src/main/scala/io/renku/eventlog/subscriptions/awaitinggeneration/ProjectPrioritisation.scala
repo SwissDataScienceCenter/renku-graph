@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.unprocessed
+package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import java.time.Duration
 
@@ -27,7 +27,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventDate
 import io.renku.eventlog.subscriptions.ProjectIds
-import io.renku.eventlog.subscriptions.unprocessed.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
 
 private class ProjectPrioritisation {
   import ProjectPrioritisation.Priority._
