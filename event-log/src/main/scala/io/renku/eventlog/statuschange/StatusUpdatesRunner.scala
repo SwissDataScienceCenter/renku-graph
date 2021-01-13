@@ -19,15 +19,18 @@
 package io.renku.eventlog.statuschange
 
 import cats.effect.{Bracket, IO}
+import cats.free.Free
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.LabeledHistogram
-import doobie.free.connection.{ConnectionIO, setSavepoint}
+import doobie.free.connection
+import doobie.free.connection.ConnectionIO
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.statuschange.IOUpdateCommandsRunner.QueryFailedException
 import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 
@@ -57,6 +60,13 @@ class StatusUpdatesRunnerImpl(
     } yield updateResult
 
   private def errorToUpdateResult(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
+    case QueryFailedException(updateResult: UpdateResult) =>
+      logger
+        .info(
+          s"${command.query.name} failed for event ${command.eventId} to status ${command.status} with result $updateResult. Rolling back"
+        )
+        .map(_ => updateResult)
+
     case NonFatal(exception) =>
       UpdateResult
         .Failure(
@@ -72,9 +82,16 @@ class StatusUpdatesRunnerImpl(
     case _       => ME.unit
   }
 
-  private def executeCommand(command: ChangeStatusCommand[IO]) =
+  private def executeCommand(command: ChangeStatusCommand[IO]): Free[connection.ConnectionOp, UpdateResult] =
     checkIfPersisted(command.eventId).flatMap {
-      case true  => measureExecutionTime(command.query).map(command.mapResult)
+      case true =>
+        measureExecutionTime(command.query).flatMap { intResult =>
+          command.mapResult(intResult) match {
+            case result if result != Updated =>
+              QueryFailedException(result).raiseError[ConnectionIO, UpdateResult]
+            case result => result.pure[ConnectionIO]
+          }
+        }
       case false => (NotFound: commands.UpdateResult).pure[ConnectionIO]
     }
 
@@ -101,4 +118,6 @@ object IOUpdateCommandsRunner {
   ): IO[StatusUpdatesRunner[IO]] = IO {
     new StatusUpdatesRunnerImpl(transactor, queriesExecTimes, logger)
   }
+
+  case class QueryFailedException(updateResult: UpdateResult) extends Throwable()
 }

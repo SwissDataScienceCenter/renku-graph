@@ -73,4 +73,17 @@ trait EventLogDataFetching {
         .query[(ExecutionDate, EventStatus, Option[EventMessage])]
         .option
     }
+
+  protected def findProcessingTime(eventId: CompoundEventId): List[(CompoundEventId, EventProcessingTime)] =
+    execute {
+      sql"""|SELECT event_id, processing_time
+            |FROM status_processing_time
+            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}""".stripMargin
+        .query[(CompoundEventId, EventProcessingTime)]
+        .to[List]
+    }
+
+  protected implicit class FoundEventsProcessingTimeOps(events: List[(CompoundEventId, EventProcessingTime)]) {
+    lazy val eventIdsOnly: List[CompoundEventId] = events.map { case (id, _) => id }
+  }
 }

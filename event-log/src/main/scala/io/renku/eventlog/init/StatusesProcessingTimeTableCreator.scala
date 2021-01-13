@@ -73,7 +73,7 @@ private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]](
       project_id        int4      NOT NULL,
       status            varchar   NOT NULL,
       processing_time   bigint    NOT NULL,
-      PRIMARY KEY (event_id, project_id)
+      PRIMARY KEY (event_id, project_id, status)
     );
     """.update
 

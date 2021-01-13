@@ -19,6 +19,7 @@
 package io.renku.eventlog.statuschange
 
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
@@ -29,10 +30,11 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
+import doobie.ConnectionIO
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, executionDates}
+import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventProcessingTimes, executionDates}
 import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
-import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
+import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, StatusProcessingTime, UpdateResult}
 import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -66,6 +68,29 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
         findEvents(status = GeneratingTriples).eventIdsOnly shouldBe List(eventId)
 
         logger.loggedOnly(Info(s"Event $eventId got ${command.status}"))
+
+        histogram.verifyExecutionTimeMeasured(command.query.name)
+      }
+
+    "execute query from the given command, " +
+      "if the query fails rollback to the initial state" in new TestCase {
+
+        store(eventId, projectPath, New)
+
+        (gauge.increment _).expects(projectPath).returning(IO.unit)
+
+        val command = TestFailingCommand(eventId, projectPath, gauge)
+
+        runner.run(command).unsafeRunSync() shouldBe NotFound
+
+        findEvents(status = GeneratingTriples).eventIdsOnly shouldBe List()
+        findProcessingTime(eventId).eventIdsOnly            shouldBe List()
+
+        logger.loggedOnly(
+          Info(
+            s"${command.query.name} failed for event ${command.eventId} to status ${command.status} with result $NotFound. Rolling back"
+          )
+        )
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
@@ -116,4 +141,42 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
                eventBodies.generateOne,
                projectPath = projectPath
     )
+
+  private case class TestFailingCommand(eventId:     CompoundEventId,
+                                        projectPath: projects.Path,
+                                        gauge:       LabeledGauge[IO, projects.Path]
+  ) extends ChangeStatusCommand[IO]
+      with StatusProcessingTime[IO] {
+    import doobie.implicits._
+
+    override val status: EventStatus = GeneratingTriples
+    val initialQuery =
+      sql"""|UPDATE event
+            |SET status = $status
+            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${New: EventStatus}
+            |""".stripMargin.update
+
+    def lastQueryReturnsNotFound(previousResult: Int) = 0
+
+    override def query =
+      SqlQuery(
+        initialQuery.run.flatMap {
+          case 1 =>
+            upsertStatusProcessingTime(eventId, eventProcessingTimes.generateOne).run.map(lastQueryReturnsNotFound)
+          case result => result.pure[ConnectionIO]
+        },
+        name = "test_status_update"
+      )
+
+    override def mapResult: Int => UpdateResult = {
+      case 0 => UpdateResult.NotFound
+      case 1 => UpdateResult.Updated
+      case 2 => UpdateResult.Conflict
+    }
+
+    override def updateGauges(
+        updateResult:      UpdateResult
+    )(implicit transactor: DbTransactor[IO, EventLogDB]) = gauge increment projectPath
+  }
+
 }

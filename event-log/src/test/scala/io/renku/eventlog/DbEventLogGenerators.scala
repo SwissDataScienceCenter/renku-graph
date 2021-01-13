@@ -63,8 +63,6 @@ object DbEventLogGenerators {
     path <- projectPaths
   } yield EventProject(id, path)
 
-  implicit lazy val eventProcessingTimes: Gen[EventProcessingTime] = for {
-    length   <- positiveLongs()
-    timeUnit <- Gen.oneOf(TimeUnit.values().toList)
-  } yield EventProcessingTime(FiniteDuration.apply(length, timeUnit))
+  implicit lazy val eventProcessingTimes: Gen[EventProcessingTime] =
+    positiveFiniteDurations.map(EventProcessingTime.apply)
 }

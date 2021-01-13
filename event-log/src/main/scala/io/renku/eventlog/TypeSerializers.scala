@@ -24,6 +24,9 @@ import ch.datascience.graph.model.projects
 import doobie.util.meta.{LegacyInstantMetaInstance, LegacyLocalDateMetaInstance}
 import doobie.util.{Get, Put, Read}
 
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.FiniteDuration
+
 object TypeSerializers extends TypeSerializers
 
 trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMetaInstance {
@@ -58,6 +61,10 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
   implicit val eventStatusGet: Get[EventStatus] = Get[String].tmap(EventStatus.apply)
   implicit val eventStatusPut: Put[EventStatus] = Put[String].contramap(_.value)
 
+  implicit val statusProcessingTimeGet: Get[EventProcessingTime] =
+    Get[Long].tmap(length => EventProcessingTime(FiniteDuration(length, TimeUnit.MILLISECONDS)))
+  implicit val statusProcessingTimePut: Put[EventProcessingTime] = Put[Long].contramap(_.value.toMillis)
+
   implicit val compoundEventIdRead: Read[CompoundEventId] = Read[(EventId, projects.Id)].map {
     case (eventId, projectId) => CompoundEventId(eventId, projectId)
   }
@@ -65,4 +72,5 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
   implicit val projectRead: Read[EventProject] = Read[(projects.Id, projects.Path)].map { case (id, path) =>
     EventProject(id, path)
   }
+
 }
