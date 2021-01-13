@@ -129,7 +129,7 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       (handler0.handle _)
         .expects(request)
-        .returning(EventSchedulingResult.SchedulingError.pure[IO])
+        .returning(EventSchedulingResult.SchedulingError(exceptions.generateOne).pure[IO])
 
       val response = processEvent(request).unsafeRunSync()
 

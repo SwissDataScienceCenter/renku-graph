@@ -73,7 +73,7 @@ class EventEndpointImpl[Interpretation[_]: Effect](
     case EventSchedulingResult.Busy                 => TooManyRequests(InfoMessage("Too many events to handle"))
     case EventSchedulingResult.UnsupportedEventType => BadRequest(ErrorMessage("Unsupported Event Type"))
     case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
-    case EventSchedulingResult.SchedulingError      => InternalServerError(ErrorMessage("Failed to schedule event"))
+    case EventSchedulingResult.SchedulingError(_)   => InternalServerError(ErrorMessage("Failed to schedule event"))
   }
 }
 

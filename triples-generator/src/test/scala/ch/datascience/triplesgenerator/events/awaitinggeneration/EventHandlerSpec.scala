@@ -64,7 +64,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
         logger.loggedOnly(
           Info(
-            s"${handler.name}: $eventId, projectPath = ${commitEvents.head.project.path} -> $Accepted"
+            s"${handler.categoryName}: $eventId, projectPath = ${commitEvents.head.project.path} -> $Accepted"
           )
         )
       }
@@ -119,17 +119,17 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         .expects(eventBody)
         .returning(commitEvents.pure[IO])
 
-      val exception: Exception = exceptions.generateOne
+      val exception = exceptions.generateOne
       (processingRunner.scheduleForProcessing _)
         .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
         .returning(exception.raiseError[IO, EventSchedulingResult])
 
       val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
 
-      handler.handle(request).unsafeRunSync() shouldBe SchedulingError
+      handler.handle(request).unsafeRunSync() shouldBe SchedulingError(exception)
 
       logger.loggedOnly(
-        Error(s"${handler.name}: $eventId, projectPath = ${commitEvents.head.project.path} -> $SchedulingError",
+        Error(s"${handler.categoryName}: $eventId, projectPath = ${commitEvents.head.project.path} -> $SchedulingError",
               exception
         )
       )

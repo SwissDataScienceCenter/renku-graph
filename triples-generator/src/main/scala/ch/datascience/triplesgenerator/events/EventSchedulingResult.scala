@@ -25,5 +25,5 @@ private object EventSchedulingResult {
   case object Busy                 extends EventSchedulingResult
   case object UnsupportedEventType extends EventSchedulingResult
   case object BadRequest           extends EventSchedulingResult
-  case object SchedulingError      extends EventSchedulingResult
+  final case class SchedulingError(throwable: Throwable) extends EventSchedulingResult
 }
