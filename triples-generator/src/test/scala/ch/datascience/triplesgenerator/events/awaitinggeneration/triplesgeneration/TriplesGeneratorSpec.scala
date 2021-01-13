@@ -36,19 +36,25 @@ class TriplesGeneratorSpec extends AnyWordSpec with should.Matchers {
   "apply" should {
 
     s"return an instance of RenkuLogTriplesGenerator if TriplesGeneration is $RenkuLog" in {
-      TriplesGenerator(TriplesGeneration.RenkuLog).unsafeRunSync() shouldBe a[RenkuLogTriplesGenerator]
+      val config = ConfigFactory.parseMap(
+        Map(
+          "triples-generation" -> "renku-log"
+        ).asJava
+      )
+
+      TriplesGenerator(config).unsafeRunSync() shouldBe a[RenkuLogTriplesGenerator]
     }
 
     s"return an instance of RemoteTriplesGenerator if TriplesGeneration is $RemoteTriplesGeneration" in {
 
       val config = ConfigFactory.parseMap(
         Map(
-          "services" -> Map("triples-generator" -> Map("url" -> "http://host").asJava).asJava
+          "triples-generation" -> "remote-generator",
+          "services"           -> Map("triples-generator" -> Map("url" -> "http://host").asJava).asJava
         ).asJava
       )
 
-      TriplesGenerator(TriplesGeneration.RemoteTriplesGeneration, config)
-        .unsafeRunSync() shouldBe a[RemoteTriplesGenerator]
+      TriplesGenerator(config).unsafeRunSync() shouldBe a[RemoteTriplesGenerator]
     }
   }
 

@@ -38,7 +38,7 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
   "toCommitEvents" should {
 
     "produce a single CommitEvent if the Json string can be successfully deserialized and there are no parents" in new TestCase {
-      deserialiser.toCommitEvents(commitEvent(parents = Nil)) shouldBe context.pure(
+      deserializer.toCommitEvents(commitEvent(parents = Nil)) shouldBe context.pure(
         NonEmptyList.of(
           CommitEventWithoutParent(
             EventId(commitId.value),
@@ -52,7 +52,7 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
     "produce CommitEvents for all the parents if they are present" in new TestCase {
       val parentCommits = parentsIdsLists(minNumber = 1).generateOne
 
-      deserialiser.toCommitEvents(commitEvent(parentCommits)) shouldBe context.pure(
+      deserializer.toCommitEvents(commitEvent(parentCommits)) shouldBe context.pure(
         NonEmptyList.fromListUnsafe(
           parentCommits map { parentCommitId =>
             CommitEventWithParent(
@@ -67,14 +67,14 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
     }
 
     "fail if parsing fails" in new TestCase {
-      val Failure(ParsingFailure(message, underlying)) = deserialiser.toCommitEvents(EventBody("{"))
+      val Failure(ParsingFailure(message, underlying)) = deserializer.toCommitEvents(EventBody("{"))
 
       message    shouldBe "CommitEvent cannot be deserialised: '{'"
       underlying shouldBe a[ParsingFailure]
     }
 
     "fail if decoding fails" in new TestCase {
-      val Failure(DecodingFailure(message, _)) = deserialiser.toCommitEvents(EventBody("{}"))
+      val Failure(DecodingFailure(message, _)) = deserializer.toCommitEvents(EventBody("{}"))
 
       message shouldBe "CommitEvent cannot be deserialised: '{}'"
     }
@@ -87,7 +87,7 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val deserialiser = new EventBodyDeserialiserImpl[Try]
+    val deserializer = new EventBodyDeserializerImpl[Try]
 
     def commitEvent(parents: List[CommitId]): EventBody = EventBody {
       Json

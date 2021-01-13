@@ -23,9 +23,12 @@ import cats.effect.IO._
 import cats.effect._
 import cats.effect.concurrent.Semaphore
 import cats.syntax.all._
-import ch.datascience.config.ConfigLoader
+import ch.datascience.config.{ConfigLoader, GitLab}
+import ch.datascience.control.Throttler
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.metrics.MetricsRegistry
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
@@ -34,6 +37,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.chrisdavenport.log4cats.Logger
 
+import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private trait EventsProcessingRunner[Interpretation[_]] {
@@ -107,12 +111,19 @@ private object IOEventsProcessingRunner {
   import scala.language.postfixOps
 
   def apply(
-      eventProcessor:      EventProcessor[IO],
-      subscriber:          Subscriber[IO],
-      logger:              Logger[IO],
-      config:              Config = ConfigFactory.load()
-  )(implicit contextShift: ContextShift[IO]): IO[EventsProcessingRunner[IO]] =
+      metricsRegistry: MetricsRegistry[IO],
+      gitLabThrottler: Throttler[IO, GitLab],
+      timeRecorder:    SparqlQueryTimeRecorder[IO],
+      subscriber:      Subscriber[IO],
+      logger:          Logger[IO],
+      config:          Config = ConfigFactory.load()
+  )(implicit
+      contextShift:     ContextShift[IO],
+      executionContext: ExecutionContext,
+      timer:            Timer[IO]
+  ): IO[EventsProcessingRunner[IO]] =
     for {
+      eventProcessor      <- IOCommitEventProcessor(metricsRegistry, gitLabThrottler, timeRecorder, logger)
       generationProcesses <- find[IO, Long Refined Positive]("generation-processes-number", config)
       semaphore           <- Semaphore(generationProcesses.value)
     } yield new EventsProcessingRunnerImpl(eventProcessor, generationProcesses, semaphore, subscriber, logger)

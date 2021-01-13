@@ -241,7 +241,6 @@ private object CommitEventProcessor {
 private object IOCommitEventProcessor {
   import ch.datascience.config.GitLab
   import ch.datascience.control.Throttler
-  import com.typesafe.config.{Config, ConfigFactory}
 
   private[events] lazy val eventsProcessingTimesBuilder =
     Histogram
@@ -252,18 +251,17 @@ private object IOCommitEventProcessor {
         50000000, 100000000, 500000000)
 
   def apply(
-      triplesGenerator: TriplesGenerator[IO],
-      metricsRegistry:  MetricsRegistry[IO],
-      gitLabThrottler:  Throttler[IO, GitLab],
-      timeRecorder:     SparqlQueryTimeRecorder[IO],
-      logger:           Logger[IO],
-      config:           Config = ConfigFactory.load()
+      metricsRegistry: MetricsRegistry[IO],
+      gitLabThrottler: Throttler[IO, GitLab],
+      timeRecorder:    SparqlQueryTimeRecorder[IO],
+      logger:          Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
   ): IO[CommitEventProcessor[IO]] =
     for {
+      triplesGenerator      <- TriplesGenerator()
       uploader              <- IOUploader(logger, timeRecorder)
       accessTokenFinder     <- IOAccessTokenFinder(logger)
       triplesCurator        <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)

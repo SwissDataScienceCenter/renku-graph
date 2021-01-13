@@ -23,8 +23,8 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.config.TriplesGeneration.{RemoteTriplesGeneration, RenkuLog}
-import ch.datascience.triplesgenerator.events.awaitinggeneration.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.awaitinggeneration.CommitEvent
+import ch.datascience.triplesgenerator.events.awaitinggeneration.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.awaitinggeneration.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import com.typesafe.config.{Config, ConfigFactory}
 
@@ -44,15 +44,13 @@ private[awaitinggeneration] object TriplesGenerator {
       extends Exception(message)
       with ProcessingRecoverableError
 
-  def apply(
-      triplesGeneration: TriplesGeneration,
-      config:            Config = ConfigFactory.load()
-  )(implicit
+  def apply(config:     Config = ConfigFactory.load)(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
-  ): IO[TriplesGenerator[IO]] = triplesGeneration match {
-    case RenkuLog                => RenkuLogTriplesGenerator()
-    case RemoteTriplesGeneration => RemoteTriplesGenerator(config)
-  }
+  ): IO[TriplesGenerator[IO]] =
+    TriplesGeneration[IO](config) flatMap {
+      case RenkuLog                => RenkuLogTriplesGenerator()
+      case RemoteTriplesGeneration => RemoteTriplesGenerator(config)
+    }
 }

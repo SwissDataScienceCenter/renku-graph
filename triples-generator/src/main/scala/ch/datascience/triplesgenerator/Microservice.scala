@@ -73,12 +73,12 @@ object Microservice extends IOMicroservice {
       sparqlTimeRecorder       <- SparqlQueryTimeRecorder(metricsRegistry)
       reProvisioningStatus     <- ReProvisioningStatus(subscriber, ApplicationLogger, sparqlTimeRecorder)
       reProvisioning           <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)
-      eventProcessingEndpoint <- IOEventEndpoint(subscriber,
-                                                 triplesGeneration,
-                                                 reProvisioningStatus,
+      eventProcessingEndpoint <- IOEventEndpoint(renkuVersionPairs.head,
                                                  metricsRegistry,
                                                  gitLabThrottler,
                                                  sparqlTimeRecorder,
+                                                 subscriber,
+                                                 reProvisioningStatus,
                                                  ApplicationLogger
                                  )
       microserviceRoutes =

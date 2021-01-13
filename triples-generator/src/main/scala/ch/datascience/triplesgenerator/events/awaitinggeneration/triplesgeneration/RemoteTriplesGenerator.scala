@@ -29,7 +29,7 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import ch.datascience.triplesgenerator.events.awaitinggeneration.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.awaitinggeneration.CommitEvent
 import ch.datascience.triplesgenerator.events.awaitinggeneration.triplesgeneration.GenerationResult.Triples
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 
@@ -41,7 +41,7 @@ import scala.concurrent.ExecutionContext
 private[events] object RemoteTriplesGenerator extends ConfigLoader[IO] {
 
   def apply(
-      configuration: Config
+      configuration: Config = ConfigFactory.load()
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],

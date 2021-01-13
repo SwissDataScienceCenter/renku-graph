@@ -22,9 +22,9 @@ import cats.MonadError
 import cats.effect.{Effect, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
+import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.config.TriplesGeneration
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import io.chrisdavenport.log4cats.Logger
@@ -76,22 +76,18 @@ class EventEndpointImpl[Interpretation[_]: Effect](
     case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
     case EventSchedulingResult.SchedulingError      => InternalServerError(ErrorMessage("Failed to schedule event"))
   }
-
 }
-
-object EventEndpoint {}
 
 object IOEventEndpoint {
   import cats.effect.{ContextShift, IO}
 
-  // TODO: decide whether we need these dependencies
   def apply(
-      subscriber:           Subscriber[IO],
-      triplesGeneration:    TriplesGeneration,
-      reProvisioningStatus: ReProvisioningStatus[IO],
+      currentVersionPair:   RenkuVersionPair,
       metricsRegistry:      MetricsRegistry[IO],
       gitLabThrottler:      Throttler[IO, GitLab],
       timeRecorder:         SparqlQueryTimeRecorder[IO],
+      subscriber:           Subscriber[IO],
+      reProvisioningStatus: ReProvisioningStatus[IO],
       logger:               Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
@@ -99,9 +95,15 @@ object IOEventEndpoint {
       timer:            Timer[IO]
   ): IO[EventEndpoint[IO]] =
     for {
-      eventHandlers <- IO(???)
+      awaitingGenerationHandler <- awaitinggeneration.EventHandler(currentVersionPair,
+                                                                   metricsRegistry,
+                                                                   gitLabThrottler,
+                                                                   timeRecorder,
+                                                                   subscriber,
+                                                                   logger
+                                   )
     } yield new EventEndpointImpl[IO](
-      eventHandlers,
+      List(awaitingGenerationHandler),
       reProvisioningStatus,
       logger
     )

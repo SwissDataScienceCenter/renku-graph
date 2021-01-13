@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.events.awaitinggeneration
 
 import cats.data.NonEmptyList
 import cats.effect._
+import cats.effect.concurrent.Semaphore
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
@@ -32,7 +33,9 @@ import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
 import ch.datascience.triplesgenerator.events.awaitinggeneration.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.subscriptions.Subscriber
-import com.typesafe.config.ConfigFactory
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -42,7 +45,6 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.lang.Thread.sleep
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
 import scala.language.postfixOps
 
 class EventsProcessingRunnerSpec
@@ -67,7 +69,7 @@ class EventsProcessingRunnerSpec
       s"and $Accepted once some of the scheduled events are done" in new TestCase {
 
         // draining processing capacity by scheduling max number of jobs
-        (1 to processesNumber).toList map { _ =>
+        (1 to processesNumber.value.toInt).toList map { _ =>
           processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync()
         }
 
@@ -123,16 +125,12 @@ class EventsProcessingRunnerSpec
             timer sleep eventProcessingTime
         }
 
-    val processesNumber = 2
-    private val config = ConfigFactory.parseMap(
-      Map(
-        "generation-processes-number" -> processesNumber
-      ).asJava
-    )
-
-    val logger           = TestLogger[IO]()
-    val subscriber       = mock[Subscriber[IO]]
-    val processingRunner = IOEventsProcessingRunner(eventProcessor, subscriber, logger, config).unsafeRunSync()
+    val processesNumber: Long Refined Positive = 2L
+    val semaphore  = Semaphore[IO](processesNumber.value).unsafeRunSync()
+    val logger     = TestLogger[IO]()
+    val subscriber = mock[Subscriber[IO]]
+    val processingRunner =
+      new EventsProcessingRunnerImpl(eventProcessor, processesNumber, semaphore, subscriber, logger)
 
     def expectAvailabilityIsCommunicated =
       (subscriber.notifyAvailability _)

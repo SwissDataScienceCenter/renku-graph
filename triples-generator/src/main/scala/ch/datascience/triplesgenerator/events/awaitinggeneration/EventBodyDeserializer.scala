@@ -29,13 +29,13 @@ import ch.datascience.triplesgenerator.events.awaitinggeneration.CommitEvent.{Co
 import io.circe.parser._
 import io.circe.{Decoder, DecodingFailure, Error, HCursor, ParsingFailure}
 
-private trait EventBodyDeserialiser[Interpretation[_]] {
+private trait EventBodyDeserializer[Interpretation[_]] {
   def toCommitEvents(eventBody: EventBody): Interpretation[NonEmptyList[CommitEvent]]
 }
 
-private class EventBodyDeserialiserImpl[Interpretation[_]](implicit
+private class EventBodyDeserializerImpl[Interpretation[_]](implicit
     ME: MonadError[Interpretation, Throwable]
-) extends EventBodyDeserialiser[Interpretation] {
+) extends EventBodyDeserializer[Interpretation] {
 
   override def toCommitEvents(eventBody: EventBody): Interpretation[NonEmptyList[CommitEvent]] = ME.fromEither {
     parse(eventBody.value)
@@ -67,6 +67,6 @@ private class EventBodyDeserialiserImpl[Interpretation[_]](implicit
   }
 }
 
-private object EventBodyDeserialiser {
-  def apply: EventBodyDeserialiser[IO] = new EventBodyDeserialiserImpl[IO]
+private object EventBodyDeserializer {
+  def apply(): EventBodyDeserializer[IO] = new EventBodyDeserializerImpl[IO]
 }

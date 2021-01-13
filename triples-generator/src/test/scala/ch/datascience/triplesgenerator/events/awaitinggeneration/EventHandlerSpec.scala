@@ -1,3 +1,21 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.datascience.triplesgenerator.events.awaitinggeneration
 
 import cats.data.NonEmptyList
@@ -9,7 +27,7 @@ import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodie
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
+import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
 import ch.datascience.triplesgenerator.events.awaitinggeneration.EventProcessingGenerators._
@@ -81,51 +99,41 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       logger.expectNoLogs()
     }
 
-    //    s"return $BadRequest if decoding an event from the request fails" in new TestCase {
-    //
-    //      givenReProvisioningStatusSet(false)
-    //
-    //      val exception = exceptions.generateOne
-    //      (eventBodyDeserializer.toCommitEvents _)
-    //        .expects(eventBody)
-    //        .returning(exception.raiseError[IO, NonEmptyList[CommitEvent]])
-    //
-    //      val payload = (eventId -> eventBody).asJson
-    //      val request = Request(Method.POST, uri"events").withEntity(payload)
-    //
-    //      val response = processEvent(request).unsafeRunSync()
-    //
-    //      response.status                          shouldBe BadRequest
-    //      response.contentType                     shouldBe Some(`Content-Type`(application.json))
-    //      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Event body deserialization error")
-    //
-    //      logger.expectNoLogs()
-    //    }
-    //
-    //    s"return $InternalServerError when event processor fails while accepting the event" in new TestCase {
-    //
-    //      givenReProvisioningStatusSet(false)
-    //
-    //      val commitEvents = eventBody.toCommitEvents
-    //      (eventBodyDeserializer.toCommitEvents _)
-    //        .expects(eventBody)
-    //        .returning(commitEvents.pure[IO])
-    //
-    //      val exception = exceptions.generateOne
-    //      (processingRunner.scheduleForProcessing _)
-    //        .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
-    //        .returning(exception.raiseError[IO, EventSchedulingResult])
-    //
-    //      val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
-    //
-    //      val response = processEvent(request).unsafeRunSync()
-    //
-    //      response.status                   shouldBe InternalServerError
-    //      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-    //      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Scheduling Event for processing failed").asJson
-    //
-    //      logger.loggedOnly(Error("Scheduling Event for processing failed", exception))
-    //    }
+    s"return $BadRequest if event is of wrong category" in new TestCase {
+
+      val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
+
+      (eventBodyDeserializer.toCommitEvents _)
+        .expects(eventBody)
+        .returning(exceptions.generateOne.raiseError[IO, NonEmptyList[CommitEvent]])
+
+      handler.handle(request).unsafeRunSync() shouldBe BadRequest
+
+      logger.expectNoLogs()
+    }
+
+    s"return $SchedulingError when event processor fails while accepting the event" in new TestCase {
+
+      val commitEvents = eventBody.toCommitEvents
+      (eventBodyDeserializer.toCommitEvents _)
+        .expects(eventBody)
+        .returning(commitEvents.pure[IO])
+
+      val exception: Exception = exceptions.generateOne
+      (processingRunner.scheduleForProcessing _)
+        .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
+        .returning(exception.raiseError[IO, EventSchedulingResult])
+
+      val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
+
+      handler.handle(request).unsafeRunSync() shouldBe SchedulingError
+
+      logger.loggedOnly(
+        Error(s"${handler.name}: $eventId, projectPath = ${commitEvents.head.project.path} -> $SchedulingError",
+              exception
+        )
+      )
+    }
   }
 
   private trait TestCase {
@@ -134,7 +142,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val eventBody = eventBodies.generateOne
 
     val processingRunner      = mock[EventsProcessingRunner[IO]]
-    val eventBodyDeserializer = mock[EventBodyDeserialiser[IO]]
+    val eventBodyDeserializer = mock[EventBodyDeserializer[IO]]
     val renkuVersionPair      = renkuVersionPairs.generateOne
     val logger                = TestLogger[IO]()
     val handler               = new EventHandler[IO](processingRunner, eventBodyDeserializer, renkuVersionPair, logger)

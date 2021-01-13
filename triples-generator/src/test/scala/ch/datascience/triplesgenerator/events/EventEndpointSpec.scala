@@ -155,7 +155,6 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       logger.expectNoLogs()
     }
-
   }
 
   private trait TestCase {

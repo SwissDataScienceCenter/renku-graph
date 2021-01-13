@@ -407,7 +407,6 @@ class CommitEventProcessorSpec
 
       val logger = TestLogger[IO]()
       IOCommitEventProcessor(
-        mock[TriplesGenerator[IO]],
         metricsRegistry,
         Throttler.noThrottling,
         new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)),
