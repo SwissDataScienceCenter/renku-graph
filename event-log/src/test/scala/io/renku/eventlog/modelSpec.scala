@@ -21,14 +21,16 @@ package io.renku.eventlog
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
+import ch.datascience.tinytypes.constraints.{DurationNotNegative, InstantNotInTheFuture, NonBlank}
 import io.renku.eventlog.DbEventLogGenerators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
-import java.time.temporal.ChronoUnit.{HOURS, SECONDS}
+import java.time.temporal.ChronoUnit.{HOURS, MINUTES, SECONDS}
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.{Duration, FiniteDuration}
 
 class EventDateSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
@@ -113,6 +115,32 @@ class EventSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Ma
     "create a CompoundEventId from the event's id and project id" in {
       forAll { event: Event =>
         event.compoundEventId shouldBe CompoundEventId(event.id, event.project.id)
+      }
+    }
+  }
+}
+
+class EventProcessingTimeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+
+  "EventProcessingTime" should {
+
+    "have the DurationNotNegative constraint" in {
+      EventProcessingTime shouldBe an[DurationNotNegative]
+    }
+
+    "be instantiatable from any non negative finite durations" in {
+      forAll(positiveFiniteDurations) { body =>
+        EventProcessingTime.from(body).map(_.value) shouldBe Right(body)
+      }
+    }
+
+    "throw an error if it is instantiated with a negative finite duration" in {
+      forAll(
+        finiteDurations(min = FiniteDuration(-200, TimeUnit.SECONDS), max = Duration.Zero)
+      ) { duration =>
+        val Left(exception) = EventProcessingTime.from(duration).map(_.value)
+        exception          shouldBe an[IllegalArgumentException]
+        exception.getMessage should startWith(s"${EventProcessingTime.typeName} cannot have a negative duration")
       }
     }
   }

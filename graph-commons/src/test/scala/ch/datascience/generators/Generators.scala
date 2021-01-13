@@ -237,7 +237,8 @@ object Generators {
       .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
       .map(_.toLocalDate)
 
-  val durations: Gen[FiniteDuration] = finiteDurations()
+  val positiveFiniteDurations: Gen[FiniteDuration] =
+    finiteDurations(min = FiniteDuration(1, TimeUnit.MILLISECONDS), max = FiniteDuration(200, TimeUnit.SECONDS))
 
   def finiteDurations(
       min: FiniteDuration = Duration.Zero,

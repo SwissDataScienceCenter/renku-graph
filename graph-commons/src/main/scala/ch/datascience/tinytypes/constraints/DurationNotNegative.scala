@@ -24,7 +24,7 @@ import scala.concurrent.duration.FiniteDuration
 
 trait DurationNotNegative extends Constraints[FiniteDuration] {
   addConstraint(
-    check = _.toMillis >= 0,
+    check = _.toMillis > 0,
     message = (_: FiniteDuration) => s"$typeName cannot have a negative duration"
   )
 }
