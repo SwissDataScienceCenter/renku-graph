@@ -129,14 +129,14 @@ class EventProcessingTimeSpec extends AnyWordSpec with ScalaCheckPropertyChecks 
     }
 
     "be instantiatable from any non negative finite durations" in {
-      forAll(positiveDurations()) { body =>
+      forAll(positiveJavaDurations) { body =>
         EventProcessingTime.from(body).map(_.value) shouldBe Right(body)
       }
     }
 
     "throw an error if it is instantiated with a negative finite duration" in {
       forAll(
-        positiveDurations(min = -2000, max = -1)
+        javaDurations(min = -2000, max = -1)
       ) { duration =>
         val Left(exception) = EventProcessingTime.from(duration).map(_.value)
         exception          shouldBe an[IllegalArgumentException]
