@@ -19,11 +19,12 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import ch.datascience.graph.model.projects
+import ch.datascience.rdfstore.SparqlQuery
 
-private trait MemberSynchronizer[Interpretation[_]] {
-  def synchronizeMembers(projectPath: projects.Path): Interpretation[Unit]
-}
+private trait UpdatesCreator[Interpretation[_]] {
 
-private class MemberSynchronizerImpl[Interpretation[_]]() extends MemberSynchronizer[Interpretation] {
-  override def synchronizeMembers(projectPath: projects.Path): Interpretation[Unit] = ???
+  def removal(projectPath: projects.Path, members: Set[KGProjectMember]): List[SparqlQuery]
+
+  def insertion(projectPath: projects.Path, members: Set[GitLabProjectMember]): List[SparqlQuery]
+
 }

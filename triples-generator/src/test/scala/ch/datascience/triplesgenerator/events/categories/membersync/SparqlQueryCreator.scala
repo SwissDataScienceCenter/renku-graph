@@ -18,27 +18,24 @@
 
 package ch.datascience.triplesgenerator.events.categories.membersync
 
-import org.scalamock.scalatest.MockFactory
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.generators.Generators.Implicits._
-import scala.util.Try
-import cats.syntax.all._
+class SparqlQueryCreatorSpec {
 
-class MemberSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
-  "synchronizeMembers" should {
-    "pulls members from Gitlab" +
-      "AND generates triples and sends them to triplestore" in new TestCase {
+  /*
+  - one query to delete removed users and insert new ones
 
-        synchronizer.synchronizeMembers(projectPath) shouldBe ().pure[Try]
-      }
+  Difficult situation would be if the person doesn't exist in KG yet but we need to create the link to the project
+  We can fetch this information when we're fetching project members
 
-  }
+  if there are no members of this project in KG
 
-  private trait TestCase {
-    val projectPath  = projectPaths.generateOne
-    val synchronizer = new MemberSynchronizerImpl[Try]()
-  }
+  go through each of the GitLab members and find
+  if there's a person with this GitLab ID in KG but not linked in the project
+    link them to project
+  else
+    create a new person + the link
+
+  for all existing members in KG who have been removed in gitlab,
+    remove link in KG
+   */
 
 }

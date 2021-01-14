@@ -27,7 +27,7 @@ import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, B
 import io.chrisdavenport.log4cats.Logger
 
 private[events] class EventHandler[Interpretation[_]](
-    membersSynchronizer: MemberSynchronizer[Interpretation],
+    membersSynchronizer: MembersSynchronizer[Interpretation],
     logger:              Logger[Interpretation]
 )(implicit
     ME:           MonadError[Interpretation, Throwable],
