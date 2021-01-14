@@ -18,11 +18,66 @@
 
 package ch.datascience.triplesgenerator.events.categories.membersync
 
+import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.graph.Schemas.{rdf, schema}
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.users.GitLabId
+import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
+import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import io.chrisdavenport.log4cats.Logger
+
+import scala.concurrent.ExecutionContext
 
 private trait KGProjectMembersFinder[Interpretation[_]] {
   def findProjectMembers(path: projects.Path): Interpretation[Set[KGProjectMember]]
+
+}
+
+private class KGProjectMembersFinderImpl(
+    rdfStoreConfig:          RdfStoreConfig,
+    renkuBaseUrl:            RenkuBaseUrl,
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    with KGProjectMembersFinder[IO] {
+
+  import eu.timepit.refined.auto._
+  import io.circe.Decoder
+
+  def findProjectMembers(path: projects.Path): IO[Set[KGProjectMember]] =
+    queryExpecting[Set[KGProjectMember]](using = query(path))
+
+  private implicit lazy val recordsDecoder: Decoder[Set[KGProjectMember]] = { cursor =>
+    import Decoder._
+    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+
+    val member: Decoder[KGProjectMember] = { cursor =>
+      cursor.downField("gitLabId").downField("value").as[GitLabId].map(KGProjectMember)
+    }
+
+    cursor.downField("results").downField("bindings").as(decodeList(member)).map(_.toSet)
+  }
+
+  private def query(path: Path) = SparqlQuery.of(
+    name = "members by project path",
+    Prefixes.of(schema -> "schema", rdf -> "rdf"),
+    s"""|SELECT DISTINCT ?gitLabId
+        |WHERE {
+        |  ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} rdf:type      <http://schema.org/Project>;
+        |                                                        schema:member ?memberId.
+        |                                                        
+        |  ?memberId  rdf:type      schema:Person;
+        |             schema:sameAs ?sameAsId.
+        |             
+        |  ?sameAsId  schema:additionalType  'GitLab';
+        |             schema:identifier      ?gitLabId.
+        |}
+        |""".stripMargin
+  )
 
 }
 

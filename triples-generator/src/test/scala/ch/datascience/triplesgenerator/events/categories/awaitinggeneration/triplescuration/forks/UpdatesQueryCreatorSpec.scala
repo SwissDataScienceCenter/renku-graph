@@ -24,7 +24,7 @@ import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
 import ch.datascience.graph.model.projects.{DateCreated, ResourceId}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.views.RdfResource
-import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.{Person, Project}
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery}
 import eu.timepit.refined.auto._

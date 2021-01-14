@@ -26,7 +26,7 @@ import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.FusekiBaseUrl
-import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.{Person, Project}
 import org.scalacheck.Gen
 
@@ -72,5 +72,5 @@ package object forks {
     name        <- projectNames
     createdDate <- projectCreatedDates
     version     <- projectSchemaVersions
-  } yield Project(path, name, createdDate, maybeCreator, maybeParentProject, version)
+  } yield Project(path, name, createdDate, maybeCreator, maybeParentProject = maybeParentProject, version = version)
 }

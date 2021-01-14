@@ -71,16 +71,4 @@ object Person {
     case Some(email) => EntityId of s"mailto:$email"
     case None        => EntityId of (renkuBaseUrl / "persons" / UUID.nameUUIDFromBytes(person.name.value.getBytes()).toString)
   }
-
-  val persons: Gen[Person] = persons()
-
-  def persons(
-      maybeGitLabIds: Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfNones,
-      maybeEmails:    Gen[Option[Email]] = userEmails.toGeneratorOfOptions
-  ): Gen[Person] = for {
-    name             <- userNames
-    maybeEmail       <- maybeEmails
-    maybeAffiliation <- userAffiliations.toGeneratorOfOptions
-    maybeGitLabId    <- maybeGitLabIds
-  } yield Person(name, maybeEmail, maybeAffiliation, maybeGitLabId)
 }

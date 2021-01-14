@@ -58,7 +58,7 @@ class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFact
           projectPath = projectPaths.generateOne,
           maybeProjectCreator = entities.Person(userNames.generateOne, userEmails.generateOne).some
         )(
-          datasetCreators = nonEmptyList(entities.Person.persons, minElements = 5, maxElements = 10)
+          datasetCreators = nonEmptyList(entities.EntitiesGenerators.persons, minElements = 5, maxElements = 10)
             .retryUntil(atLeastOneWithoutEmail)
             .generateOne
             .toList

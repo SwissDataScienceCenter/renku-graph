@@ -18,13 +18,14 @@
 
 package ch.datascience.rdfstore.entities
 
-import Person.persons
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
-import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectPaths, projectSchemaVersions}
+import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectPaths, projectSchemaVersions, userAffiliations, userEmails, userGitLabIds, userNames}
+import ch.datascience.graph.model.users.{Email, GitLabId}
 import eu.timepit.refined.api.Refined.unsafeApply
+import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 
 object EntitiesGenerators extends EntitiesGenerators
@@ -43,8 +44,9 @@ trait EntitiesGenerators {
     name         <- projectNames
     dateCreated  <- projectCreatedDates
     maybeCreator <- persons.toGeneratorOfOptions
+    members      <- persons(userGitLabIds.toGeneratorOfSomes).toGeneratorOfSet(minElements = 0)
     version      <- projectSchemaVersions
-  } yield Project(path, name, dateCreated, maybeCreator, maybeParentProject = None, version)
+  } yield Project(path, name, dateCreated, maybeCreator, members = members, maybeParentProject = None, version)
 
   implicit val agentEntities: Gen[Agent] = cliVersions map Agent.apply
 
@@ -55,4 +57,16 @@ trait EntitiesGenerators {
     project       <- projectEntities
     agent         <- agentEntities
   } yield Activity(commitId, committedDate, committer, project, agent)
+
+  implicit lazy val persons: Gen[Person] = persons()
+
+  def persons(
+      maybeGitLabIds: Gen[Option[GitLabId]] = userGitLabIds.toGeneratorOfNones,
+      maybeEmails:    Gen[Option[Email]] = userEmails.toGeneratorOfOptions
+  ): Gen[Person] = for {
+    name             <- userNames
+    maybeEmail       <- maybeEmails
+    maybeAffiliation <- userAffiliations.toGeneratorOfOptions
+    maybeGitLabId    <- maybeGitLabIds
+  } yield Person(name, maybeEmail, maybeAffiliation, maybeGitLabId)
 }
