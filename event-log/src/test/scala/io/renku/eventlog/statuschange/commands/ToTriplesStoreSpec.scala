@@ -43,7 +43,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
   "command" should {
 
     s"set status $TriplesStore on the event with the given id and $GeneratingTriples status, " +
-      "decrement waiting events and under processing gauges for the project " +
+      "decrement waiting events and under processing gauges for the project, insert the processingTime " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         val projectPath           = projectPaths.generateOne

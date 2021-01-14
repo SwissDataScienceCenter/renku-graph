@@ -49,7 +49,7 @@ class ToGenerationRecoverableFailureSpec
   "command" should {
 
     s"set status $GenerationRecoverableFailure on the event with the given id and $GeneratingTriples status, " +
-      "increment waiting events gauge and decrement under processing gauge for the project " +
+      "increment waiting events gauge and decrement under processing gauge for the project, insert the processingTime " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         storeEvent(

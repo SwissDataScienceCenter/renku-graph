@@ -27,8 +27,8 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
-import doobie.syntax.all._
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
+import doobie.syntax.all._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
 import io.renku.eventlog._
@@ -50,7 +50,7 @@ class ToGenerationNonRecoverableFailureSpec
   "command" should {
 
     s"set status $GenerationNonRecoverableFailure on the event with the given id and $GeneratingTriples status" +
-      "decrement waiting events and under processing gauges for the project " +
+      "decrement waiting events and under processing gauges for the project, insert the processingTime" +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         storeEvent(

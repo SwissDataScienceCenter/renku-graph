@@ -43,7 +43,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
   "command" should {
 
     s"set status $Skipped on the event with the given id and $GeneratingTriples status, " +
-      "decrement under processing gauge for the project " +
+      "decrement under processing gauge for the project, insert the processingTime " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         storeEvent(

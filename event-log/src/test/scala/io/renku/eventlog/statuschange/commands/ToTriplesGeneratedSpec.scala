@@ -44,7 +44,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
     s"set status $TriplesGenerated on the event with the given id and $GeneratingTriples status, " +
       "insert the payload in the event_payload table" +
-      "increment awaiting transformation gauge and decrement under triples generation gauge for the project " +
+      "increment awaiting transformation gauge and decrement under triples generation gauge for the project, insert the processingTime " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         val projectPath = projectPaths.generateOne

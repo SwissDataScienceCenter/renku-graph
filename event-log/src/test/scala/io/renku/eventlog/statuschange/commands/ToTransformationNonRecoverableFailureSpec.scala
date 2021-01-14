@@ -48,7 +48,7 @@ class ToTransformationNonRecoverableFailureSpec
   "command" should {
 
     s"set status $TransformationNonRecoverableFailure on the event with the given id and $TransformingTriples status" +
-      "decrement waiting events and under processing gauges for the project " +
+      "decrement waiting events and under processing gauges for the project, insert the processingTime " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         storeEvent(
