@@ -1,17 +1,21 @@
 package ch.datascience.triplesgenerator.events.membersync
 
 import cats.MonadError
-import cats.effect.Effect
+import cats.effect.{Concurrent, ContextShift}
+import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.triplesgenerator.events
 import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import io.chrisdavenport.log4cats.Logger
 
-private[events] class EventHandler[Interpretation[_]: Effect](
-    membersSynchronizer: MembersSynchronizer[Interpretation],
+private[events] class EventHandler[Interpretation[_]](
+    membersSynchronizer: MemberSynchronizer[Interpretation],
     logger:              Logger[Interpretation]
-)(implicit ME:           MonadError[Interpretation, Throwable])
-    extends events.EventHandler[Interpretation] {
+)(implicit
+    ME:           MonadError[Interpretation, Throwable],
+    contextShift: ContextShift[Interpretation],
+    concurrent:   Concurrent[Interpretation]
+) extends events.EventHandler[Interpretation] {
 
   import ch.datascience.graph.model.projects
   import io.circe.Decoder
@@ -25,7 +29,8 @@ private[events] class EventHandler[Interpretation[_]: Effect](
     for {
       _           <- request.as[CategoryName].toRightT(recoverTo = UnsupportedEventType)
       projectPath <- request.as[projects.Path].toRightT(recoverTo = BadRequest)
-      result <- synchronizeMembers(projectPath).toRightT
+      result <- (contextShift.shift *> concurrent
+                  .start(synchronizeMembers(projectPath))).toRightT
                   .map(_ => Accepted)
                   .semiflatTap(logger.log(projectPath))
                   .leftSemiflatTap(logger.log(projectPath))

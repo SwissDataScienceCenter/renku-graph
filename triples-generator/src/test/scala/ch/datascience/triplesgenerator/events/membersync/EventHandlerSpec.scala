@@ -69,7 +69,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
   private trait TestCase {
     val projectPath = projectPaths.generateOne
 
-    val membersSynchronizer = mock[MembersSynchronizer[IO]]
+    val membersSynchronizer = mock[MemberSynchronizer[IO]]
     val logger              = TestLogger[IO]()
     val handler             = new EventHandler[IO](membersSynchronizer, logger)
   }
