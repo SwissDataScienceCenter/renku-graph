@@ -89,7 +89,7 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
 
     EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.Conflict}" in new TestCase {
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
 
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
@@ -104,7 +104,7 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
 
           val command = ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, currentTime)
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
           val expectedEvents =
             if (eventStatus != New) List.empty

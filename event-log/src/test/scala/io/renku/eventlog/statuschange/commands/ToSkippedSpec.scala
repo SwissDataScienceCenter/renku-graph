@@ -83,7 +83,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
 
     EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.Conflict}" in new TestCase {
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
 
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
@@ -99,7 +99,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
           val message = eventMessages.generateOne
           val command = ToSkipped[IO](eventId, message, underTriplesGenerationGauge, currentTime)
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
           findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 

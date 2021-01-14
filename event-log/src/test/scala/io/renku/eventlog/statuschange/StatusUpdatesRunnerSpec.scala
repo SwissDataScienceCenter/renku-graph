@@ -123,9 +123,9 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     )
 
     override def mapResult: Int => UpdateResult = {
-      case 0 => UpdateResult.Conflict
+      case 0 => UpdateResult.NotFound
       case 1 => UpdateResult.Updated
-      case _ => UpdateResult.Failure("error message")
+      case _ => UpdateResult.Conflict
     }
 
     override def updateGauges(

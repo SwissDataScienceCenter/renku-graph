@@ -100,7 +100,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
     EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.Conflict}" in new TestCase {
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
                      eventStatus,
@@ -122,7 +122,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
                                    currentTime
             )
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
           val expectedEvents =
             if (eventStatus != TriplesGenerated) List.empty
