@@ -70,6 +70,7 @@ class StatusesProcessingTimeTableCreatorSpec extends AnyWordSpec with DbInitSpec
 
       verifyTrue(sql"DROP INDEX idx_event_id;")
       verifyTrue(sql"DROP INDEX idx_project_id;")
+      verifyTrue(sql"DROP INDEX idx_status;")
 
     }
   }

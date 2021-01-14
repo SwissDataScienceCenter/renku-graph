@@ -27,7 +27,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.{EventLogDB, EventProcessingTime}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 
 import java.time.Instant
@@ -36,6 +36,7 @@ final case class ToNew[Interpretation[_]](
     eventId:                        CompoundEventId,
     awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
+    maybeProcessingTime:            Option[EventProcessingTime],
     now:                            () => Instant = () => Instant.now
 )(implicit ME:                      Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {

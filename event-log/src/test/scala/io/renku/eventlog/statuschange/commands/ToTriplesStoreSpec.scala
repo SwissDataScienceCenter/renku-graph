@@ -88,18 +88,19 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-        val command = ToTriplesStore[IO](eventId, processingTime, underTriplesGenerationGauge, currentTime)
+        val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, processingTime, currentTime)
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
         val transformingTriplesCommand =
-          ToTriplesStore[IO](transfromingTriplesId, processingTime, underTriplesGenerationGauge, currentTime)
+          ToTriplesStore[IO](transfromingTriplesId, underTriplesGenerationGauge, processingTime, currentTime)
         (commandRunner run transformingTriplesCommand).unsafeRunSync() shouldBe UpdateResult.Updated
 
         findEvents(status = TriplesStore) shouldBe List((eventId, ExecutionDate(now), eventBatchDate),
                                                         (transfromingTriplesId, ExecutionDate(now), eventBatchDate)
         )
+        findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
@@ -120,14 +121,15 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
             findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-            val command = ToTriplesStore[IO](eventId, processingTime, underTriplesGenerationGauge, currentTime)
+            val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, processingTime, currentTime)
 
             (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
             val expectedEvents =
               if (eventStatus != TriplesStore) List.empty
               else List((eventId, executionDate, eventBatchDate))
-            findEvents(status = TriplesStore) shouldBe expectedEvents
+            findEvents(status = TriplesStore)        shouldBe expectedEvents
+            findProcessingTime(eventId).eventIdsOnly shouldBe List()
 
             histogram.verifyExecutionTimeMeasured(command.query.name)
           }
@@ -139,7 +141,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
     val histogram                   = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val currentTime                 = mockFunction[Instant]
     val eventId                     = compoundEventIds.generateOne
-    val processingTime              = eventProcessingTimes.generateOne
+    val processingTime              = eventProcessingTimes.generateSome
     val eventBatchDate              = batchDates.generateOne
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())

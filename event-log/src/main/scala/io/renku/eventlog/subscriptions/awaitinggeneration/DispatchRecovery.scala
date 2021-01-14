@@ -48,7 +48,8 @@ private class DispatchRecoveryImpl[Interpretation[_]](
     val markEventFailed = ToGenerationNonRecoverableFailure[Interpretation](
       event.id,
       EventMessage(exception),
-      underTriplesGenerationGauge
+      underTriplesGenerationGauge,
+      None
     )
     for {
       _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)

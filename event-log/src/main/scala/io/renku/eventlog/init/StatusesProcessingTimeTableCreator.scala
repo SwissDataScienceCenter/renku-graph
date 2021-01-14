@@ -63,6 +63,7 @@ private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]](
     _ <- createTableSql.run transact transactor.get
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_processing_time(event_id)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_processing_time(project_id)")
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status         ON status_processing_time(status)")
     _ <- logger info "'status_processing_time' table created"
     _ <- foreignKeySql.run transact transactor.get
   } yield ()

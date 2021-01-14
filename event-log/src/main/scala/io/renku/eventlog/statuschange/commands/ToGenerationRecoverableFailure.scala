@@ -28,7 +28,7 @@ import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.{EventLogDB, EventMessage}
+import io.renku.eventlog.{EventLogDB, EventMessage, EventProcessingTime}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.MINUTES
@@ -38,6 +38,7 @@ final case class ToGenerationRecoverableFailure[Interpretation[_]](
     maybeMessage:                   Option[EventMessage],
     awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
+    maybeProcessingTime:            Option[EventProcessingTime],
     now:                            () => Instant = () => Instant.now
 )(implicit ME:                      Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {

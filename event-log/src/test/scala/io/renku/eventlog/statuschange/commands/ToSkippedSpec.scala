@@ -19,7 +19,6 @@
 package io.renku.eventlog.statuschange.commands
 
 import java.time.Instant
-
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
@@ -32,7 +31,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
+import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import org.scalamock.scalatest.MockFactory
@@ -72,7 +71,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
         val message = eventMessages.generateOne
-        val command = ToSkipped[IO](eventId, message, underTriplesGenerationGauge, currentTime)
+        val command = ToSkipped[IO](eventId, message, underTriplesGenerationGauge, processingTime, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -97,11 +96,12 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
           findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
           val message = eventMessages.generateOne
-          val command = ToSkipped[IO](eventId, message, underTriplesGenerationGauge, currentTime)
+          val command = ToSkipped[IO](eventId, message, underTriplesGenerationGauge, processingTime, currentTime)
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
-          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+          findEvent(eventId)                       shouldBe Some((executionDate, eventStatus, None))
+          findProcessingTime(eventId).eventIdsOnly shouldBe List()
 
           histogram.verifyExecutionTimeMeasured(command.query.name)
         }
@@ -114,6 +114,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
     val currentTime                 = mockFunction[Instant]
     val eventId                     = compoundEventIds.generateOne
     val eventBatchDate              = batchDates.generateOne
+    val processingTime              = eventProcessingTimes.generateSome
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 

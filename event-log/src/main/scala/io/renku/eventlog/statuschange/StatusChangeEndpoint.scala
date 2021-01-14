@@ -91,7 +91,6 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
     import ch.datascience.graph.model.events.EventStatus._
     import commands._
     import io.circe.{Decoder, HCursor}
-
     implicit val commandDecoder: Decoder[ChangeStatusCommand[Interpretation]] = (cursor: HCursor) =>
       for {
         status              <- cursor.downField("status").as[EventStatus]
@@ -101,38 +100,54 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
         maybeProcessingTime <- cursor.downField("processingTime").as[Option[EventProcessingTime]]
       } yield status match {
         case TriplesStore =>
-          ToTriplesStore[Interpretation](eventId, maybeProcessingTime.get, underTriplesGenerationGauge)
-        case New => ToNew[Interpretation](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
+          ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge, maybeProcessingTime)
+        case New =>
+          ToNew[Interpretation](eventId,
+                                awaitingTriplesGenerationGauge,
+                                underTriplesGenerationGauge,
+                                maybeProcessingTime
+          )
         case TriplesGenerated =>
           ToTriplesGenerated[Interpretation](
             eventId,
             maybePayload getOrElse (throw new Exception(s"$status status needs a payload")),
             maybeSchemaVersion getOrElse (throw new Exception(s"$status status needs a schemaVersion")),
-            maybeProcessingTime.get,
             underTriplesGenerationGauge,
-            awaitingTriplesTransformationGauge
+            awaitingTriplesTransformationGauge,
+            maybeProcessingTime
           )
         case Skipped =>
           ToSkipped[Interpretation](eventId,
                                     maybeMessage getOrElse (throw new Exception(s"$status status needs a message")),
-                                    underTriplesGenerationGauge
+                                    underTriplesGenerationGauge,
+                                    maybeProcessingTime
           )
         case GenerationRecoverableFailure =>
           ToGenerationRecoverableFailure[Interpretation](eventId,
                                                          maybeMessage,
                                                          awaitingTriplesGenerationGauge,
-                                                         underTriplesGenerationGauge
+                                                         underTriplesGenerationGauge,
+                                                         maybeProcessingTime
           )
         case GenerationNonRecoverableFailure =>
-          ToGenerationNonRecoverableFailure[Interpretation](eventId, maybeMessage, underTriplesGenerationGauge)
+          ToGenerationNonRecoverableFailure[Interpretation](eventId,
+                                                            maybeMessage,
+                                                            underTriplesGenerationGauge,
+                                                            maybeProcessingTime
+          )
         case TransformationRecoverableFailure =>
           ToTransformationRecoverableFailure[Interpretation](eventId,
                                                              maybeMessage,
                                                              awaitingTriplesTransformationGauge,
-                                                             underTriplesTransformationGauge
+                                                             underTriplesTransformationGauge,
+                                                             maybeProcessingTime
           )
         case TransformationNonRecoverableFailure =>
-          ToTransformationNonRecoverableFailure[Interpretation](eventId, maybeMessage, underTriplesTransformationGauge)
+          ToTransformationNonRecoverableFailure[Interpretation](eventId,
+                                                                maybeMessage,
+                                                                underTriplesTransformationGauge,
+                                                                maybeProcessingTime
+          )
         case other => throw new Exception(s"Transition to '$other' status unsupported")
       }
 

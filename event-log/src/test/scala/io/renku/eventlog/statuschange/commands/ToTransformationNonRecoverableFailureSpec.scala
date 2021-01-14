@@ -29,7 +29,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
+import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import org.scalacheck.Gen
@@ -77,11 +77,17 @@ class ToTransformationNonRecoverableFailureSpec
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
-          ToTransformationNonRecoverableFailure[IO](eventId, maybeMessage, underTriplesTransformationGauge, currentTime)
+          ToTransformationNonRecoverableFailure[IO](eventId,
+                                                    maybeMessage,
+                                                    underTriplesTransformationGauge,
+                                                    processingTime,
+                                                    currentTime
+          )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvent(eventId) shouldBe Some((ExecutionDate(now), TransformationNonRecoverableFailure, maybeMessage))
+        findEvent(eventId)                       shouldBe Some((ExecutionDate(now), TransformationNonRecoverableFailure, maybeMessage))
+        findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
@@ -106,12 +112,14 @@ class ToTransformationNonRecoverableFailureSpec
             ToTransformationNonRecoverableFailure[IO](eventId,
                                                       maybeMessage,
                                                       underTriplesTransformationGauge,
+                                                      processingTime,
                                                       currentTime
             )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
-          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+          findEvent(eventId)                       shouldBe Some((executionDate, eventStatus, None))
+          findProcessingTime(eventId).eventIdsOnly shouldBe List()
 
           histogram.verifyExecutionTimeMeasured(command.query.name)
         }
@@ -124,6 +132,7 @@ class ToTransformationNonRecoverableFailureSpec
     val currentTime                     = mockFunction[Instant]
     val eventId                         = compoundEventIds.generateOne
     val eventBatchDate                  = batchDates.generateOne
+    val processingTime                  = eventProcessingTimes.generateSome
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 

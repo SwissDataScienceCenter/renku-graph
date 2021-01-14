@@ -76,9 +76,9 @@ trait EventLogDataFetching {
 
   protected def findProcessingTime(eventId: CompoundEventId): List[(CompoundEventId, EventProcessingTime)] =
     execute {
-      sql"""|SELECT event_id, processing_time
+      sql"""|SELECT event_id, project_id, processing_time
             |FROM status_processing_time
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}""".stripMargin
+            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId};""".stripMargin
         .query[(CompoundEventId, EventProcessingTime)]
         .to[List]
     }

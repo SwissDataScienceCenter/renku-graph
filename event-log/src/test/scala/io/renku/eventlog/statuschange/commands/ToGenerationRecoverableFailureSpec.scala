@@ -29,7 +29,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
+import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import org.scalacheck.Gen
@@ -84,6 +84,7 @@ class ToGenerationRecoverableFailureSpec
                                              maybeMessage,
                                              awaitingTriplesGenerationGauge,
                                              underTriplesGenerationGauge,
+                                             processingTime,
                                              currentTime
           )
 
@@ -92,6 +93,7 @@ class ToGenerationRecoverableFailureSpec
         findEvent(eventId) shouldBe Some(
           (ExecutionDate(now.plus(10, MINUTES)), GenerationRecoverableFailure, maybeMessage)
         )
+        findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
         histogram.verifyExecutionTimeMeasured(command.query.name)
       }
@@ -117,12 +119,14 @@ class ToGenerationRecoverableFailureSpec
                                                maybeMessage,
                                                awaitingTriplesGenerationGauge,
                                                underTriplesGenerationGauge,
+                                               processingTime,
                                                currentTime
             )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
-          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+          findEvent(eventId)          shouldBe Some((executionDate, eventStatus, None))
+          findProcessingTime(eventId) shouldBe List()
 
           histogram.verifyExecutionTimeMeasured(command.query.name)
         }
@@ -136,8 +140,8 @@ class ToGenerationRecoverableFailureSpec
     val currentTime                    = mockFunction[Instant]
     val eventId                        = compoundEventIds.generateOne
     val eventBatchDate                 = batchDates.generateOne
-
-    val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
+    val processingTime                 = eventProcessingTimes.generateSome
+    val commandRunner                  = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()

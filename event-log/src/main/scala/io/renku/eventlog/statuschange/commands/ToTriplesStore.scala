@@ -35,21 +35,18 @@ import java.time.Instant
 
 final case class ToTriplesStore[Interpretation[_]](
     eventId:                     CompoundEventId,
-    processingTime:              EventProcessingTime,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
+    maybeProcessingTime:         Option[EventProcessingTime],
     now:                         () => Instant = () => Instant.now
 )(implicit ME:                   Bracket[Interpretation, Throwable])
-    extends ChangeStatusCommand[Interpretation]
-    with StatusProcessingTime[Interpretation] {
+    extends ChangeStatusCommand[Interpretation] {
 
   override lazy val status: EventStatus = TriplesStore
-
-  lazy val queries = NonEmptyList(upsertEventStatus, List(upsertStatusProcessingTime(eventId, processingTime)))
 
 // TODO temporary status change from TriplesGenerated to triples store in the end only TransformingTriples can be transformed to TriplesStore
   override def query: SqlQuery[Int] =
     SqlQuery(
-      query = runUpdateQueriesIfSuccessful(queries),
+      query = upsertEventStatus.run,
       name = "triples_generated-transforming_triples->triples_store"
     )
 

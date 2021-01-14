@@ -85,7 +85,7 @@ class StatusUpdatesRunnerImpl(
   private def executeCommand(command: ChangeStatusCommand[IO]): Free[connection.ConnectionOp, UpdateResult] =
     checkIfPersisted(command.eventId).flatMap {
       case true =>
-        measureExecutionTime(command.query).flatMap { intResult =>
+        measureExecutionTime(command.queryWithProcessingTimeUpdate).flatMap { intResult =>
           command.mapResult(intResult) match {
             case result if result != Updated =>
               QueryFailedException(result).raiseError[ConnectionIO, UpdateResult]

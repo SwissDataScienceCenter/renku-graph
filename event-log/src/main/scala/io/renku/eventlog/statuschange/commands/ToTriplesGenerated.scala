@@ -39,17 +39,16 @@ private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
     eventId:                     CompoundEventId,
     payload:                     EventPayload,
     schemaVersion:               SchemaVersion,
-    processingTime:              EventProcessingTime,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+    maybeProcessingTime:         Option[EventProcessingTime],
     now:                         () => Instant = () => Instant.now
 )(implicit ME:                   Bracket[Interpretation, Throwable])
-    extends ChangeStatusCommand[Interpretation]
-    with StatusProcessingTime[Interpretation] {
+    extends ChangeStatusCommand[Interpretation] {
   override lazy val status: events.EventStatus = TriplesGenerated
 
   lazy val queries =
-    NonEmptyList(updateStatus, List(upsertEventPayload, upsertStatusProcessingTime(eventId, processingTime)))
+    NonEmptyList(updateStatus, List(upsertEventPayload))
 
   override def query: SqlQuery[Int] = SqlQuery(
     query = runUpdateQueriesIfSuccessful(queries),

@@ -19,7 +19,6 @@
 package io.renku.eventlog.statuschange
 
 import cats.effect.IO
-import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
@@ -30,12 +29,11 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
-import doobie.ConnectionIO
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventProcessingTimes, executionDates}
 import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, StatusProcessingTime, UpdateResult}
-import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
+import io.renku.eventlog.{EventLogDB, EventProcessingTime, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -66,6 +64,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
         runner.run(command).unsafeRunSync() shouldBe Updated
 
         findEvents(status = GeneratingTriples).eventIdsOnly shouldBe List(eventId)
+        findProcessingTime(eventId).eventIdsOnly            shouldBe List(eventId)
 
         logger.loggedOnly(Info(s"Event $eventId got ${command.status}"))
 
@@ -79,7 +78,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
         (gauge.increment _).expects(projectPath).returning(IO.unit)
 
-        val command = TestFailingCommand(eventId, projectPath, gauge)
+        val command = TestFailingCommand(eventId, projectPath, gauge, eventProcessingTimes.generateSome)
 
         runner.run(command).unsafeRunSync() shouldBe NotFound
 
@@ -106,13 +105,14 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     val runner    = new StatusUpdatesRunnerImpl(transactor, histogram, logger)
   }
 
-  private case class TestCommand(eventId:     CompoundEventId,
-                                 projectPath: projects.Path,
-                                 gauge:       LabeledGauge[IO, projects.Path]
+  private case class TestCommand(eventId:             CompoundEventId,
+                                 projectPath:         projects.Path,
+                                 gauge:               LabeledGauge[IO, projects.Path],
+                                 maybeProcessingTime: Option[EventProcessingTime] = eventProcessingTimes.generateSome
   ) extends ChangeStatusCommand[IO] {
     import doobie.implicits._
 
-    override val status: EventStatus = GeneratingTriples
+    override def status: EventStatus = GeneratingTriples
 
     override def query = SqlQuery(
       sql"""|UPDATE event 
@@ -142,41 +142,34 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
                projectPath = projectPath
     )
 
-  private case class TestFailingCommand(eventId:     CompoundEventId,
-                                        projectPath: projects.Path,
-                                        gauge:       LabeledGauge[IO, projects.Path]
-  ) extends ChangeStatusCommand[IO]
-      with StatusProcessingTime[IO] {
+  private case class TestFailingCommand(eventId:             CompoundEventId,
+                                        projectPath:         projects.Path,
+                                        gauge:               LabeledGauge[IO, projects.Path],
+                                        maybeProcessingTime: Option[EventProcessingTime]
+  ) extends ChangeStatusCommand[IO] {
     import doobie.implicits._
 
-    override val status: EventStatus = GeneratingTriples
-    val initialQuery =
-      sql"""|UPDATE event
-            |SET status = $status
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${New: EventStatus}
-            |""".stripMargin.update
-
-    def lastQueryReturnsNotFound(previousResult: Int) = 0
+    override def status: EventStatus = GeneratingTriples
 
     override def query =
       SqlQuery(
-        initialQuery.run.flatMap {
-          case 1 =>
-            upsertStatusProcessingTime(eventId, eventProcessingTimes.generateOne).run.map(lastQueryReturnsNotFound)
-          case result => result.pure[ConnectionIO]
-        },
-        name = "test_status_update"
+        sql"""|UPDATE event
+              |SET status = $status
+              |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${New: EventStatus}
+              |""".stripMargin.update.run.map(_ => 0),
+        name = "test_failure_status_update"
       )
 
     override def mapResult: Int => UpdateResult = {
       case 0 => UpdateResult.NotFound
       case 1 => UpdateResult.Updated
-      case 2 => UpdateResult.Conflict
+      case _ => UpdateResult.Conflict
     }
 
     override def updateGauges(
         updateResult:      UpdateResult
     )(implicit transactor: DbTransactor[IO, EventLogDB]) = gauge increment projectPath
+
   }
 
 }

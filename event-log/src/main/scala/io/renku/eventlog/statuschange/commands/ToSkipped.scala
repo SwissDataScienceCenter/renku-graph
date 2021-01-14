@@ -28,7 +28,7 @@ import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.{EventLogDB, EventMessage}
+import io.renku.eventlog.{EventLogDB, EventMessage, EventProcessingTime}
 
 import java.time.Instant
 
@@ -36,6 +36,7 @@ final case class ToSkipped[Interpretation[_]](
     eventId:              CompoundEventId,
     message:              EventMessage,
     underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
+    maybeProcessingTime:  Option[EventProcessingTime],
     now:                  () => Instant = () => Instant.now
 )(implicit ME:            Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {

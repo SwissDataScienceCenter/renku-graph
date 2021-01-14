@@ -61,38 +61,51 @@ class StatusChangeEndpointSpec
     val scenarios = Table(
       "status" -> "command builder",
       TriplesStore -> ToTriplesStore[IO](compoundEventIds.generateOne,
-                                         eventProcessingTimes.generateOne,
-                                         underTriplesGenerationGauge
+                                         underTriplesGenerationGauge,
+                                         eventProcessingTimes.generateOption
       ),
-      Skipped -> ToSkipped[IO](compoundEventIds.generateOne, eventMessages.generateOne, underTriplesGenerationGauge),
-      New     -> ToNew[IO](compoundEventIds.generateOne, awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
+      Skipped -> ToSkipped[IO](compoundEventIds.generateOne,
+                               eventMessages.generateOne,
+                               underTriplesGenerationGauge,
+                               eventProcessingTimes.generateOption
+      ),
+      New -> ToNew[IO](compoundEventIds.generateOne,
+                       awaitingTriplesGenerationGauge,
+                       underTriplesGenerationGauge,
+                       eventProcessingTimes.generateOption
+      ),
       TriplesGenerated -> ToTriplesGenerated[IO](
         compoundEventIds.generateOne,
         eventPayloads.generateOne,
         projectSchemaVersions.generateOne,
-        eventProcessingTimes.generateOne,
         underTriplesGenerationGauge,
-        awaitingTriplesTransformationGauge
+        awaitingTriplesTransformationGauge,
+        eventProcessingTimes.generateOption
       ),
       GenerationRecoverableFailure -> ToGenerationRecoverableFailure[IO](
         compoundEventIds.generateOne,
         eventMessages.generateOption,
         awaitingTriplesGenerationGauge,
-        underTriplesGenerationGauge
+        underTriplesGenerationGauge,
+        eventProcessingTimes.generateOption
       ),
       GenerationNonRecoverableFailure -> ToGenerationNonRecoverableFailure[IO](compoundEventIds.generateOne,
                                                                                eventMessages.generateOption,
-                                                                               underTriplesGenerationGauge
+                                                                               underTriplesGenerationGauge,
+                                                                               eventProcessingTimes.generateOption
       ),
       TransformationRecoverableFailure -> ToTransformationRecoverableFailure[IO](
         compoundEventIds.generateOne,
         eventMessages.generateOption,
         awaitingTriplesTransformationGauge,
-        underTriplesTransformationGauge
+        underTriplesTransformationGauge,
+        eventProcessingTimes.generateOption
       ),
-      TransformationNonRecoverableFailure -> ToTransformationNonRecoverableFailure[IO](compoundEventIds.generateOne,
-                                                                                       eventMessages.generateOption,
-                                                                                       underTriplesTransformationGauge
+      TransformationNonRecoverableFailure -> ToTransformationNonRecoverableFailure[IO](
+        compoundEventIds.generateOne,
+        eventMessages.generateOption,
+        underTriplesTransformationGauge,
+        eventProcessingTimes.generateOption
       )
     )
     forAll(scenarios) { (status, command) =>
@@ -275,9 +288,9 @@ class StatusChangeEndpointSpec
     s"return $InternalServerError when updating event status fails" in new TestCase {
 
       val eventId        = compoundEventIds.generateOne
-      val processingTime = eventProcessingTimes.generateOne
+      val processingTime = eventProcessingTimes.generateSome
 
-      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, processingTime, underTriplesGenerationGauge)
+      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, underTriplesGenerationGauge, processingTime)
       val exception = exceptions.generateOne
       (commandsRunner.run _)
         .expects(command)
@@ -312,39 +325,89 @@ class StatusChangeEndpointSpec
   }
 
   implicit val commandEncoder: Encoder[ChangeStatusCommand[IO]] = Encoder.instance[ChangeStatusCommand[IO]] {
-    case command: ToNew[IO] => json"""{
+    case command: ToNew[IO] =>
+      json"""{
         "status": ${command.status.value}
-      }"""
+      }""" deepMerge command.maybeProcessingTime
+        .map { processingTime =>
+          json"""{"processingTime": { "length": ${processingTime.value.length}, "unit": 
+                 ${processingTime.value.unit.name()} }}"""
+        }
+        .getOrElse(Json.obj())
     case command: ToTriplesStore[IO] =>
       json"""{
-        "status": ${command.status.value},
-        "processingTime": { "length": ${command.processingTime.value.length}, "unit": ${command.processingTime.value.unit
-        .name()} }
-      }"""
-    case command: ToSkipped[IO] => json"""{
+        "status": ${command.status.value} 
+      }""" deepMerge command.maybeProcessingTime
+        .map(processingTime =>
+          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
+            .name()}  }}"""
+        )
+        .getOrElse(Json.obj())
+    case command: ToSkipped[IO] =>
+      json"""{
         "status": ${command.status.value},
         "message": ${command.message.value}
-      }"""
+      }""" deepMerge command.maybeProcessingTime
+        .map(processingTime =>
+          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
+            .name()} }}"""
+        )
+        .getOrElse(Json.obj())
     case command: ToTriplesGenerated[IO] =>
       json"""{
         "status": ${command.status.value},
         "payload": ${command.payload.value},
-        "schemaVersion": ${command.schemaVersion.value},
-        "processingTime": { "length": ${command.processingTime.value.length}, "unit": ${command.processingTime.value.unit
-        .name()}  }
-      }"""
-    case command: ToGenerationRecoverableFailure[IO]        => json"""{
+        "schemaVersion": ${command.schemaVersion.value} 
+      }""" deepMerge command.maybeProcessingTime
+        .map(processingTime =>
+          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
+            .name()} }}"""
+        )
+        .getOrElse(Json.obj())
+    case command: ToGenerationRecoverableFailure[IO] =>
+      json"""{
         "status": ${command.status.value}
-      }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
-    case command: ToGenerationNonRecoverableFailure[IO]     => json"""{
+      }""" deepMerge command.maybeMessage
+        .map(m => json"""{"message": ${m.value}}""")
+        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
+        .map(processingTime =>
+          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
+            .name()} }}"""
+        )
+        .getOrElse(Json.obj())
+    case command: ToGenerationNonRecoverableFailure[IO] =>
+      json"""{
         "status": ${command.status.value}
-      }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
-    case command: ToTransformationRecoverableFailure[IO]    => json"""{
+      }""" deepMerge command.maybeMessage
+        .map(m => json"""{"message": ${m.value}}""")
+        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
+        .map(processingTime =>
+          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
+            .name()} }}"""
+        )
+        .getOrElse(Json.obj())
+    case command: ToTransformationRecoverableFailure[IO] =>
+      json"""{
         "status": ${command.status.value}
-      }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
-    case command: ToTransformationNonRecoverableFailure[IO] => json"""{
+      }""" deepMerge command.maybeMessage
+        .map(m => json"""{"message": ${m.value}}""")
+        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
+        .map(processingTime =>
+          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
+            .name()} }}"""
+        )
+        .getOrElse(Json.obj())
+    case command: ToTransformationNonRecoverableFailure[IO] =>
+      json"""{
         "status": ${command.status.value}
-      }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
+      }""" deepMerge command.maybeMessage
+        .map(m => json"""{"message": ${m.value}}""")
+        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
+        .map(processingTime =>
+          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
+            .name()} }}"""
+        )
+        .getOrElse(Json.obj())
   }
 
   private lazy val awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path] = new GaugeStub
