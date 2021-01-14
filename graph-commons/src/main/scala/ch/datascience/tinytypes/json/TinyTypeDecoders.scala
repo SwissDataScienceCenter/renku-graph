@@ -19,7 +19,7 @@
 package ch.datascience.tinytypes.json
 
 import java.time.ZoneOffset.UTC
-import java.time.{Instant, LocalDate, OffsetDateTime}
+import java.time.{Duration, Instant, LocalDate, OffsetDateTime}
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import eu.timepit.refined.api.{RefType, Refined}
@@ -27,16 +27,20 @@ import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder._
 import io.circe.{Decoder, DecodingFailure}
 
-import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.{Duration, FiniteDuration}
-
 object TinyTypeDecoders {
 
   type NonBlank = String Refined NonEmpty
 
   def blankToNone(maybeValue: Option[String]): Option[NonBlank] = maybeValue.map(_.trim).flatMap {
-    case ""       => None
-    case nonBlank => RefType.applyRef[NonBlank](nonBlank).fold(e => { print(e); None }, Option.apply)
+    case "" => None
+    case nonBlank =>
+      RefType
+        .applyRef[NonBlank](nonBlank)
+        .fold(e => {
+                print(e); None
+              },
+              Option.apply
+        )
   }
 
   def toOption[TT <: TinyType { type V = String }](implicit
@@ -93,16 +97,11 @@ object TinyTypeDecoders {
         .leftMap(_.getMessage)
     }
 
-  implicit def finiteDurationDecoder[TT <: FiniteDurationTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
-    Decoder
-      .instance { hcursor =>
-        for {
-          length     <- hcursor.downField("length").as[Long]
-          unitString <- hcursor.downField("unit").as[String]
-          unit = TimeUnit.valueOf(unitString)
-        } yield FiniteDuration(length, unit)
-      }
-      .emap { value =>
-        tinyTypeFactory.from(value).leftMap(_.getMessage)
-      }
+  implicit def durationDecoder[TT <: DurationTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+    decodeString.emap { value =>
+      Either
+        .catchNonFatal(Duration.parse(value))
+        .flatMap(tinyTypeFactory.from)
+        .leftMap(_.getMessage)
+    }
 }

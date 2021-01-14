@@ -329,29 +329,20 @@ class StatusChangeEndpointSpec
       json"""{
         "status": ${command.status.value}
       }""" deepMerge command.maybeProcessingTime
-        .map { processingTime =>
-          json"""{"processingTime": { "length": ${processingTime.value.length}, "unit": 
-                 ${processingTime.value.unit.name()} }}"""
-        }
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
         .getOrElse(Json.obj())
     case command: ToTriplesStore[IO] =>
       json"""{
         "status": ${command.status.value} 
       }""" deepMerge command.maybeProcessingTime
-        .map(processingTime =>
-          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
-            .name()}  }}"""
-        )
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
         .getOrElse(Json.obj())
     case command: ToSkipped[IO] =>
       json"""{
         "status": ${command.status.value},
         "message": ${command.message.value}
       }""" deepMerge command.maybeProcessingTime
-        .map(processingTime =>
-          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
-            .name()} }}"""
-        )
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
         .getOrElse(Json.obj())
     case command: ToTriplesGenerated[IO] =>
       json"""{
@@ -359,10 +350,7 @@ class StatusChangeEndpointSpec
         "payload": ${command.payload.value},
         "schemaVersion": ${command.schemaVersion.value} 
       }""" deepMerge command.maybeProcessingTime
-        .map(processingTime =>
-          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
-            .name()} }}"""
-        )
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
         .getOrElse(Json.obj())
     case command: ToGenerationRecoverableFailure[IO] =>
       json"""{
@@ -370,10 +358,7 @@ class StatusChangeEndpointSpec
       }""" deepMerge command.maybeMessage
         .map(m => json"""{"message": ${m.value}}""")
         .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
-        .map(processingTime =>
-          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
-            .name()} }}"""
-        )
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
         .getOrElse(Json.obj())
     case command: ToGenerationNonRecoverableFailure[IO] =>
       json"""{
@@ -381,10 +366,7 @@ class StatusChangeEndpointSpec
       }""" deepMerge command.maybeMessage
         .map(m => json"""{"message": ${m.value}}""")
         .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
-        .map(processingTime =>
-          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
-            .name()} }}"""
-        )
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
         .getOrElse(Json.obj())
     case command: ToTransformationRecoverableFailure[IO] =>
       json"""{
@@ -392,10 +374,7 @@ class StatusChangeEndpointSpec
       }""" deepMerge command.maybeMessage
         .map(m => json"""{"message": ${m.value}}""")
         .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
-        .map(processingTime =>
-          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
-            .name()} }}"""
-        )
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
         .getOrElse(Json.obj())
     case command: ToTransformationNonRecoverableFailure[IO] =>
       json"""{
@@ -403,10 +382,7 @@ class StatusChangeEndpointSpec
       }""" deepMerge command.maybeMessage
         .map(m => json"""{"message": ${m.value}}""")
         .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
-        .map(processingTime =>
-          json""" {"processingTime": { "length": ${processingTime.value.length}, "unit": ${processingTime.value.unit
-            .name()} }}"""
-        )
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
         .getOrElse(Json.obj())
   }
 

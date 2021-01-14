@@ -84,8 +84,8 @@ class TinyTypeEncodersSpec extends AnyWordSpec with should.Matchers {
   "finiteDurationEncoder" should {
 
     "encode DurationTinyType to Json" in {
-      val value = positiveFiniteDurations.generateOne
-      FiniteDurationTestType(value).asJson shouldBe Json.fromString(value.toString)
+      val value = positiveDurations().generateOne
+      DurationTestType(value).asJson shouldBe Json.fromString(value.toString)
     }
   }
 }

@@ -18,14 +18,18 @@
 
 package io.renku.eventlog
 
-import java.time.Instant
+import cats.data.NonEmptyList
+import doobie.syntax.all._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
+import doobie.Meta
 import doobie.util.meta.{LegacyInstantMetaInstance, LegacyLocalDateMetaInstance}
 import doobie.util.{Get, Put, Read}
+import org.postgresql.util.PGInterval
 
+import java.time.{Duration, Instant}
+import java.util.GregorianCalendar
 import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.FiniteDuration
 
 object TypeSerializers extends TypeSerializers
 
@@ -61,9 +65,47 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
   implicit val eventStatusGet: Get[EventStatus] = Get[String].tmap(EventStatus.apply)
   implicit val eventStatusPut: Put[EventStatus] = Put[String].contramap(_.value)
 
+  val nanosPerSecond = 1000000000L
+  val secsPerMinute  = 60
+  val secsPerHour    = 3600
+  val secsPerDay     = 86400
+  val secsPerMonth   = 30 * secsPerDay
+  val secsPerYear    = (365.25 * secsPerDay).toInt
+
   implicit val statusProcessingTimeGet: Get[EventProcessingTime] =
-    Get[Long].tmap(length => EventProcessingTime(FiniteDuration(length, TimeUnit.MILLISECONDS)))
-  implicit val statusProcessingTimePut: Put[EventProcessingTime] = Put[Long].contramap(_.value.toMillis)
+    Get.Advanced.other[PGInterval](NonEmptyList.of("interval")).tmap { pgInterval =>
+      val nanos = (pgInterval.getSeconds - pgInterval.getSeconds.floor) * nanosPerSecond
+      val seconds = pgInterval.getSeconds.toLong +
+        pgInterval.getMinutes * secsPerMinute +
+        pgInterval.getHours * secsPerHour +
+        pgInterval.getDays * secsPerDay +
+        pgInterval.getMonths * secsPerMonth +
+        pgInterval.getYears * secsPerYear
+      EventProcessingTime(Duration.ofSeconds(seconds, nanos.toLong))
+    }
+  implicit val statusProcessingTimePut: Put[EventProcessingTime] =
+    Put.Advanced.other[PGInterval](NonEmptyList.of("interval")).tcontramap[EventProcessingTime] { processingTime =>
+      val nano         = processingTime.value.getNano.toDouble / nanosPerSecond.toDouble
+      val totalSeconds = processingTime.value.getSeconds
+      val years        = totalSeconds / secsPerYear
+      val yearLeft     = totalSeconds % secsPerYear
+      val months       = yearLeft / secsPerMonth
+      val monthLeft    = yearLeft     % secsPerMonth
+      val days         = monthLeft / secsPerDay
+      val dayLeft      = monthLeft    % secsPerDay
+      val hours        = dayLeft / secsPerHour
+      val hoursLeft    = dayLeft      % secsPerHour
+      val minutes      = hoursLeft / secsPerMinute
+      val seconds      = (hoursLeft % secsPerMinute).toDouble + nano
+      new PGInterval(
+        years.toInt,
+        months.toInt,
+        days.toInt,
+        hours.toInt,
+        minutes.toInt,
+        seconds
+      )
+    }
 
   implicit val compoundEventIdRead: Read[CompoundEventId] = Read[(EventId, projects.Id)].map {
     case (eventId, projectId) => CompoundEventId(eventId, projectId)

@@ -20,11 +20,11 @@ package ch.datascience.tinytypes.constraints
 
 import ch.datascience.tinytypes.Constraints
 
-import scala.concurrent.duration.FiniteDuration
+import java.time.Duration
 
-trait DurationNotNegative extends Constraints[FiniteDuration] {
+trait DurationNotNegative extends Constraints[Duration] {
   addConstraint(
     check = _.toMillis > 0,
-    message = (_: FiniteDuration) => s"$typeName cannot have a negative duration"
+    message = (_: Duration) => s"$typeName cannot have a negative duration"
   )
 }

@@ -19,12 +19,12 @@
 package ch.datascience.tinytypes.constraints
 
 import ch.datascience.generators.Generators._
-import ch.datascience.tinytypes.{FiniteDurationTinyType, InstantTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{DurationTinyType, InstantTinyType, TinyTypeFactory}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import java.time.{Clock, Instant, ZoneId}
+import java.time.{Clock, Duration, Instant, ZoneId}
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import ch.datascience.generators.Generators.Implicits._
@@ -34,20 +34,20 @@ class DurationNotNegativeSpec extends AnyWordSpec with ScalaCheckPropertyChecks 
   "DurationNotNegative" should {
 
     "be instantiatable when values are positive durations" in {
-      forAll(finiteDurations()) { someValue =>
+      forAll(positiveDurations()) { someValue =>
         DurationNotNegativeType(someValue).value shouldBe someValue
       }
     }
 
     "throw an IllegalArgumentException for negative duration" in {
       intercept[IllegalArgumentException] {
-        DurationNotNegativeType(FiniteDuration.apply(negativeInts().generateOne, TimeUnit.MILLISECONDS))
+        DurationNotNegativeType(Duration.ofMillis(negativeInts().generateOne))
       }.getMessage shouldBe "ch.datascience.tinytypes.constraints.DurationNotNegativeType cannot have a negative duration"
     }
   }
 }
 
-private class DurationNotNegativeType private (val value: FiniteDuration) extends AnyVal with FiniteDurationTinyType
+private class DurationNotNegativeType private (val value: Duration) extends AnyVal with DurationTinyType
 
 private object DurationNotNegativeType
     extends TinyTypeFactory[DurationNotNegativeType](new DurationNotNegativeType(_))

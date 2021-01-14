@@ -41,6 +41,6 @@ object TinyTypeEncoders {
   implicit def instantEncoder[TT <: InstantTinyType]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromString(ttValue.value.toString))
 
-  implicit def finiteDurationEncoder[TT <: FiniteDurationTinyType]: Encoder[TT] =
+  implicit def finiteDurationEncoder[TT <: DurationTinyType]: Encoder[TT] =
     Encoder.instance[TT](ttValue => Json.fromString(ttValue.value.toString))
 }
