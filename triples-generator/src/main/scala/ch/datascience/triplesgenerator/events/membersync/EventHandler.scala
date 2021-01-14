@@ -4,7 +4,7 @@ import cats.MonadError
 import cats.effect.Effect
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.triplesgenerator.events
-import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, UnsupportedEventType}
+import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import io.chrisdavenport.log4cats.Logger
 
 private[events] class EventHandler[Interpretation[_]: Effect](
@@ -23,7 +23,8 @@ private[events] class EventHandler[Interpretation[_]: Effect](
 
   override def handle(request: Request[Interpretation]) = {
     for {
-      projectPath <- request.as[projects.Path].toRightT(recoverTo = UnsupportedEventType)
+      _           <- request.as[CategoryName].toRightT(recoverTo = UnsupportedEventType)
+      projectPath <- request.as[projects.Path].toRightT(recoverTo = BadRequest)
       result <- synchronizeMembers(projectPath).toRightT
                   .map(_ => Accepted)
                   .semiflatTap(logger.log(projectPath))
@@ -35,17 +36,23 @@ private[events] class EventHandler[Interpretation[_]: Effect](
     s"projectPath = $path"
   }
 
-  private implicit lazy val payloadDecoder: EntityDecoder[Interpretation, projects.Path] =
-    jsonOf[Interpretation, projects.Path]
+  private implicit lazy val categoryDecoder: EntityDecoder[Interpretation, CategoryName] = {
 
-  private implicit lazy val eventDecoder: Decoder[projects.Path] = { implicit cursor =>
-    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    implicit lazy val categoryNameDecoder: Decoder[CategoryName] = { implicit cursor => validateCategoryName }
 
-    for {
-      _           <- validateCategoryName
-      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
-    } yield projectPath
+    jsonOf[Interpretation, CategoryName]
   }
+
+  private implicit lazy val payloadDecoder: EntityDecoder[Interpretation, projects.Path] = {
+
+    implicit lazy val eventDecoder: Decoder[projects.Path] = { implicit cursor =>
+      import ch.datascience.tinytypes.json.TinyTypeDecoders._
+      cursor.downField("project").downField("path").as[projects.Path](relativePathDecoder(projects.Path))
+    }
+
+    jsonOf[Interpretation, projects.Path]
+  }
+
 }
 
 private[events] object EventHandler {

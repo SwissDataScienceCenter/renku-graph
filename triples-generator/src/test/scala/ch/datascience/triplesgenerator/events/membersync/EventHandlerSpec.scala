@@ -1,25 +1,22 @@
 package ch.datascience.triplesgenerator.events.membersync
 
 import cats.effect.IO
-import cats.syntax.all._
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.projects
+import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import ch.datascience.triplesgenerator.events.EventSchedulingResult
-import ch.datascience.triplesgenerator.events.EventSchedulingResult.Accepted
+import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import io.circe.Encoder
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.generators.Generators.Implicits._
+import io.circe.literal._
+import io.circe.syntax._
+import org.http4s.syntax.all._
 import org.http4s.{Method, Request}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.http4s.syntax.all._
-import io.circe.syntax._
-import ch.datascience.http.server.EndpointTester._
-import io.circe.literal._
-import org.http4s.{Method, Request}
 
 class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
@@ -43,6 +40,30 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           )
         )
       }
+
+    s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
+
+      val payload = jsons.generateOne.asJson
+      val request = Request(Method.POST, uri"events").withEntity(payload)
+
+      handler.handle(request).unsafeRunSync() shouldBe UnsupportedEventType
+
+      logger.expectNoLogs()
+    }
+
+    s"return $BadRequest if project path is malformed" in new TestCase {
+
+      val request = Request(Method.POST, uri"events").withEntity(json"""{
+        "categoryName": "MEMBER_SYNC",
+        "project": {
+          "path" :      ${nonNegativeInts().generateOne.value}
+        }
+      }""")
+
+      handler.handle(request).unsafeRunSync() shouldBe BadRequest
+
+      logger.expectNoLogs()
+    }
   }
 
   private trait TestCase {

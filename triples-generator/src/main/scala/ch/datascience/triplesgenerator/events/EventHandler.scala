@@ -59,7 +59,6 @@ private trait EventHandler[Interpretation[_]] {
     private def as(
         result: EventSchedulingResult
     ): PartialFunction[Throwable, Either[EventSchedulingResult, T]] = { case NonFatal(e) =>
-      e.printStackTrace()
       Left(result)
     }
 
