@@ -94,12 +94,12 @@ object IOEventEndpoint {
       timer:            Timer[IO]
   ): IO[EventEndpoint[IO]] =
     for {
-      awaitingGenerationHandler <- awaitinggeneration.EventHandler(currentVersionPair,
-                                                                   metricsRegistry,
-                                                                   gitLabThrottler,
-                                                                   timeRecorder,
-                                                                   subscriptionMechanismRegistry,
-                                                                   logger
+      awaitingGenerationHandler <- categories.awaitinggeneration.EventHandler(currentVersionPair,
+                                                                              metricsRegistry,
+                                                                              gitLabThrottler,
+                                                                              timeRecorder,
+                                                                              subscriptionMechanismRegistry,
+                                                                              logger
                                    )
     } yield new EventEndpointImpl[IO](
       List(awaitingGenerationHandler),

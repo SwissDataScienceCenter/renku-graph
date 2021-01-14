@@ -57,6 +57,7 @@ object SubscriptionMechanismRegistry {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[SubscriptionMechanismRegistry[IO]] = for {
-    awaitingGenerationSubscription <- SubscriptionMechanism(awaitinggeneration.EventHandler.categoryName, logger)
+    awaitingGenerationSubscription <-
+      SubscriptionMechanism(categories.awaitinggeneration.EventHandler.categoryName, logger)
   } yield new SubscriptionMechanismRegistryImpl[IO](awaitingGenerationSubscription)
 }
