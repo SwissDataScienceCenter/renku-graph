@@ -153,11 +153,6 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
 
     jsonOf[Interpretation, ChangeStatusCommand[Interpretation]]
   }
-
-  implicit class MaybeEventProcessingTimeOps(maybeEventProcessingTime: Option[EventProcessingTime]) {
-    def getOrCompute(from: ExecutionDate, upTo: Instant = Instant.now()): EventProcessingTime =
-      maybeEventProcessingTime.getOrElse(EventProcessingTime.fromMillis(upTo.toEpochMilli - from.value.toEpochMilli))
-  }
 }
 
 object IOStatusChangeEndpoint {

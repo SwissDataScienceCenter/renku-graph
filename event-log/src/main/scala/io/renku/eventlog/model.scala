@@ -122,6 +122,4 @@ object EventProcessingTime
     extends TinyTypeFactory[EventProcessingTime](new EventProcessingTime(_))
     with DurationNotNegative {
   implicit val decoder: Decoder[EventProcessingTime] = durationDecoder(EventProcessingTime)
-
-  def fromMillis(length: Long) = new EventProcessingTime(Duration.ofMillis(length))
 }
