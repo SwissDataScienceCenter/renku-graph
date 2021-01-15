@@ -18,6 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.subscriptions
 
+import cats.Applicative
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.events.CategoryName
 import io.chrisdavenport.log4cats.Logger
@@ -42,7 +43,11 @@ class SubscriptionMechanismImpl(
 )(implicit timer:          Timer[IO])
     extends SubscriptionMechanism[IO] {
 
+  private val applicative = Applicative[IO]
+
+  import applicative._
   import cats.syntax.all._
+  import cats.effect.concurrent.Ref
   import subscriptionSender._
   import subscriptionUrlFinder._
 
@@ -52,32 +57,39 @@ class SubscriptionMechanismImpl(
       _             <- postToEventLog(subscriberUrl)
     } yield ()
   } recoverWith { case NonFatal(exception) =>
-    logger.error(exception)("Problem with notifying event-log")
+    logger.error(exception)(s"$categoryName: Problem with notifying event-log")
     exception.raiseError[IO, Unit]
   }
 
   override def run(): IO[Unit] =
     for {
-      _ <- timer sleep initialDelay
-      _ <- subscribeForEvents(initOrError = true)
+      _    <- timer sleep initialDelay
+      init <- Ref.of[IO, Boolean](true)
+      _    <- subscribeForEvents(init).foreverM
     } yield ()
 
-  private def subscribeForEvents(initOrError: Boolean): IO[Unit] = {
+  private def subscribeForEvents(initOrError: Ref[IO, Boolean]): IO[Unit] = {
     for {
-      subscriberUrl <- findSubscriberUrl()
-      _             <- postToEventLog(subscriberUrl) recoverWith errorLoggedAndRetry("Subscribing for events failed")
-      _             <- if (initOrError) logger.info(s"Subscribed for events with $subscriberUrl") else IO.unit
       _             <- timer sleep renewDelay
-      _             <- subscribeForEvents(initOrError = false)
+      subscriberUrl <- findSubscriberUrl()
+      postingError  <- postToEventLog(subscriberUrl).map(_ => false).recoverWith(logPostError)
+      shouldLog     <- initOrError getAndSet postingError
+      _             <- whenA(shouldLog && !postingError)(logger.info(s"$categoryName: Subscribed for events with $subscriberUrl"))
     } yield ()
-  } recoverWith errorLoggedAndRetry("Finding subscriber URL failed")
+  } recoverWith logSubscriberUrlError
 
-  private def errorLoggedAndRetry(message: String): PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+  private lazy val logSubscriberUrlError: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
     for {
-      _ <- logger.error(exception)(message)
+      _ <- logger.error(exception)(s"$categoryName: Finding subscriber URL failed")
       _ <- timer sleep initialDelay
-      _ <- subscribeForEvents(initOrError = true)
     } yield ()
+  }
+
+  private lazy val logPostError: PartialFunction[Throwable, IO[Boolean]] = { case NonFatal(exception) =>
+    for {
+      _ <- logger.error(exception)(s"$categoryName: Subscribing for events failed")
+      _ <- timer sleep initialDelay
+    } yield true
   }
 }
 

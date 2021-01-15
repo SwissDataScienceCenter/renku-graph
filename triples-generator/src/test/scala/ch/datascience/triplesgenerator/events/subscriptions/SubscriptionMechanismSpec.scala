@@ -31,6 +31,7 @@ import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.lang.Thread.sleep
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
@@ -100,11 +101,13 @@ class SubscriptionMechanismSpec extends AnyWordSpec with MockFactory with Eventu
         .returning(IO.unit)
         .atLeastOnce()
 
+      sleep(500)
+
       subscriber.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
-          Info(s"Subscribed for events with $subscriberUrl")
+          Info(s"$categoryName: Subscribed for events with $subscriberUrl")
         )
       }
     }
@@ -131,8 +134,8 @@ class SubscriptionMechanismSpec extends AnyWordSpec with MockFactory with Eventu
 
       eventually {
         logger.loggedOnly(
-          Error("Finding subscriber URL failed", exception),
-          Info(s"Subscribed for events with $subscriberUrl")
+          Error(s"$categoryName: Finding subscriber URL failed", exception),
+          Info(s"$categoryName: Subscribed for events with $subscriberUrl")
         )
       }
     }
@@ -143,7 +146,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with MockFactory with Eventu
       (urlFinder.findSubscriberUrl _)
         .expects()
         .returning(subscriberUrl.pure[IO])
-        .atLeastTwice()
+        .atLeastOnce()
 
       val exception = exceptions.generateOne
       (subscriptionSender.postToEventLog _)
@@ -157,13 +160,15 @@ class SubscriptionMechanismSpec extends AnyWordSpec with MockFactory with Eventu
         .returning(IO.unit)
         .atLeastOnce()
 
+      sleep(500)
+
       subscriber.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
-          Error("Subscribing for events failed", exception),
-          Error("Subscribing for events failed", exception),
-          Info(s"Subscribed for events with $subscriberUrl")
+          Error(s"$categoryName: Subscribing for events failed", exception),
+          Error(s"$categoryName: Subscribing for events failed", exception),
+          Info(s"$categoryName: Subscribed for events with $subscriberUrl")
         )
       }
     }
