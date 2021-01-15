@@ -129,4 +129,4 @@ private object IOGitLabProjectMembersFinder {
   } yield new IOGitLabProjectMembersFinder(gitLabUrl.apiV4, gitLabThrottler, logger)
 }
 
-private final case class GitLabProjectMember(id: GitLabId, name: Name)
+private final case class GitLabProjectMember(gitLabId: GitLabId, name: Name)

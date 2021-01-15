@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.events.categories.membersync
 
 import ch.datascience.graph.Schemas.{rdf, schema}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{projects, users}
 import ch.datascience.graph.model.projects.ResourceId
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery
@@ -29,7 +29,10 @@ import eu.timepit.refined.auto._
 
 private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
 
-  def insertion(projectPath: projects.Path, members: Set[GitLabProjectMember]): List[SparqlQuery] = ???
+  def insertion(
+      projectPath: projects.Path,
+      members:     Set[(GitLabProjectMember, Option[users.ResourceId])]
+  ): List[SparqlQuery] = ???
 
   def removal(projectPath: projects.Path, members: Set[KGProjectMember]): SparqlQuery =
     SparqlQuery.of(

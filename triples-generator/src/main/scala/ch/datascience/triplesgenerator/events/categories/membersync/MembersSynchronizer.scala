@@ -34,6 +34,7 @@ private class MembersSynchronizerImpl[Interpretation[_]](
     accessTokenFinder:          AccessTokenFinder[Interpretation],
     gitLabProjectMembersFinder: GitLabProjectMembersFinder[Interpretation],
     kGProjectMembersFinder:     KGProjectMembersFinder[Interpretation],
+    kGPersonFinder:             KGPersonFinder[Interpretation],
     updatesCreator:             UpdatesCreator,
     querySender:                QuerySender[Interpretation],
     logger:                     Logger[Interpretation]
@@ -46,9 +47,10 @@ private class MembersSynchronizerImpl[Interpretation[_]](
       maybeAccessToken <- accessTokenFinder.findAccessToken(projectPath)
       membersInGitLab  <- gitLabProjectMembersFinder.findProjectMembers(projectPath)(maybeAccessToken)
       membersInKG      <- kGProjectMembersFinder.findProjectMembers(projectPath)
-      membersToAdd     = findMembersToAdd(membersInGitLab, membersInKG)
+      membersToAdd = findMembersToAdd(membersInGitLab, membersInKG)
+      membersToAddWithIds <- kGPersonFinder.findPersonIds(membersToAdd)
+      insertionUpdates = updatesCreator.insertion(projectPath, membersToAddWithIds)
       membersToRemove  = findMembersToRemove(membersInGitLab, membersInKG)
-      insertionUpdates = updatesCreator.insertion(projectPath, membersToAdd)
       removalUpdates   = updatesCreator.removal(projectPath, membersToRemove)
       _ <- (insertionUpdates :+ removalUpdates).map(querySender.send).sequence
       _ <- logger.info(s"${EventHandler.categoryName}: Members synchronized for project: $projectPath")
@@ -66,6 +68,6 @@ private class MembersSynchronizerImpl[Interpretation[_]](
   def findMembersToRemove(membersInGitLab: Set[GitLabProjectMember],
                           membersInKG:     Set[KGProjectMember]
   ): Set[KGProjectMember] = membersInKG.collect {
-    case member @ KGProjectMember(_, gitlabId) if !membersInGitLab.exists(_.id == gitlabId) => member
+    case member @ KGProjectMember(_, gitlabId) if !membersInGitLab.exists(_.gitLabId == gitlabId) => member
   }
 }

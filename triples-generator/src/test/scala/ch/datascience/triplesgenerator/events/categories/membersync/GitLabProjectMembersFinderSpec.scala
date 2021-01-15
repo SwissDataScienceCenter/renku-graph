@@ -36,12 +36,13 @@ package ch.datascience.triplesgenerator.events.categories.membersync
  * limitations under the License.
  */
 
+import Generators._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, userGitLabIds, userNames, usernames}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
@@ -52,14 +53,12 @@ import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status.{Forbidden, Unauthorized}
-import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
-import Generators._
 
 class GitLabProjectMembersFinderSpec
     extends AnyWordSpec
@@ -156,8 +155,8 @@ class GitLabProjectMembersFinderSpec
   private implicit val projectMemberEncoder: Encoder[GitLabProjectMember] = Encoder.instance[GitLabProjectMember] {
     member =>
       json"""{
-              "id":        ${member.id.value},
-              "name":      ${member.name.value}
-             }"""
+      "id":        ${member.gitLabId.value},
+      "name":      ${member.name.value}
+    }"""
   }
 }

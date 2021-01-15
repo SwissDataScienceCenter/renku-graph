@@ -45,13 +45,13 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
 
         val gitLabMemberMissingInKG = gitLabProjectMembers.generateOne
         val gitLabMemberAlsoInKG    = gitLabProjectMembers.generateOne
-        val kgMemberAlsoInGitLab    = kgProjectMembers.generateOne.copy(gitLabId = gitLabMemberAlsoInKG.id)
+        val kgMemberAlsoInGitLab    = kgProjectMembers.generateOne.copy(gitLabId = gitLabMemberAlsoInKG.gitLabId)
         val kgMemberMissingInGitLab = kgProjectMembers.generateOne
 
         val membersInGitLab = Set(gitLabMemberMissingInKG, gitLabMemberAlsoInKG)
         val membersInKG     = Set(kgMemberAlsoInGitLab, kgMemberMissingInGitLab)
 
-        implicit val maybeAccessToken = accessTokens.generateOption
+        val maybeAccessToken = accessTokens.generateOption
         (accessTokenFinder
           .findAccessToken(_: Path)(_: Path => String))
           .expects(projectPath, projectPathToPath)
@@ -67,11 +67,17 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
           .expects(projectPath)
           .returning(membersInKG.pure[Try])
 
+        val missingMembersWithIds = Set(gitLabMemberMissingInKG -> userResourceIds.generateOption)
+        (kGPersonFinder
+          .findPersonIds(_: Set[GitLabProjectMember]))
+          .expects(Set(gitLabMemberMissingInKG))
+          .returning(missingMembersWithIds.pure[Try])
+
         val removalQuery     = sparqlQueries.generateOne
         val insertionQueries = sparqlQueries.generateNonEmptyList().toList
 
         (updatesCreator.insertion _)
-          .expects(projectPath, Set(gitLabMemberMissingInKG))
+          .expects(projectPath, missingMembersWithIds)
           .returning(insertionQueries)
 
         (updatesCreator.removal _)
@@ -91,7 +97,7 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
 
     "recover with log statement if collaborator fails" in new TestCase {
 
-      implicit val maybeAccessToken = accessTokens.generateOption
+      val maybeAccessToken = accessTokens.generateOption
       (accessTokenFinder
         .findAccessToken(_: Path)(_: Path => String))
         .expects(projectPath, projectPathToPath)
@@ -113,9 +119,10 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
   }
 
   private trait TestCase {
+    val accessTokenFinder          = mock[AccessTokenFinder[Try]]
     val gitLabProjectMembersFinder = mock[GitLabProjectMembersFinder[Try]]
     val kGProjectMembersFinder     = mock[KGProjectMembersFinder[Try]]
-    val accessTokenFinder          = mock[AccessTokenFinder[Try]]
+    val kGPersonFinder             = mock[KGPersonFinder[Try]]
     val updatesCreator             = mock[UpdatesCreator]
     val querySender                = mock[QuerySender[Try]]
     val logger                     = TestLogger[Try]()
@@ -125,10 +132,10 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
       accessTokenFinder,
       gitLabProjectMembersFinder,
       kGProjectMembersFinder,
+      kGPersonFinder,
       updatesCreator,
       querySender,
       logger
     )
   }
-
 }
