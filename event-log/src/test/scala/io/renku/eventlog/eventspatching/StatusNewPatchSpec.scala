@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.eventspatching
 
-import java.time.Instant
+import cats.data.NonEmptyList
 
+import java.time.Instant
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
@@ -82,7 +83,9 @@ class StatusNewPatchSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
       )
       findEventMessage(event4Id) shouldBe None
 
-      queriesExecTimes.verifyExecutionTimeMeasured(Refined.unsafeApply(s"status $New patch"))
+      queriesExecTimes.verifyExecutionTimeMeasured(
+        NonEmptyList[SqlQuery.Name](Refined.unsafeApply(s"status $New patch"), Nil)
+      )
     }
   }
 

@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.statuschange
 
+import cats.data.NonEmptyList
 import cats.effect.{Bracket, IO}
 import cats.free.Free
 import cats.syntax.all._
@@ -46,7 +47,8 @@ class StatusUpdatesRunnerImpl(
     logger:           Logger[IO]
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
-    with StatusUpdatesRunner[IO] {
+    with StatusUpdatesRunner[IO]
+    with StatusProcessingTime {
 
   private implicit val transact: DbTransactor[IO, EventLogDB] = transactor
 
@@ -60,10 +62,11 @@ class StatusUpdatesRunnerImpl(
     } yield updateResult
 
   private def errorToUpdateResult(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
-    case QueryFailedException(updateResult: UpdateResult) =>
+    case QueryFailedException(failedQueryName: SqlQuery.Name, updateResult: UpdateResult) =>
       logger
         .info(
-          s"${command.query.name} failed for event ${command.eventId} to status ${command.status} with result $updateResult. Rolling back"
+          s"$failedQueryName failed for event ${command.eventId} to status ${command.status} with result $updateResult. " +
+            s"Rolling back queries: ${command.queries.map(_.name.toString).toList.mkString(", ")}"
         )
         .map(_ => updateResult)
 
@@ -71,7 +74,8 @@ class StatusUpdatesRunnerImpl(
       UpdateResult
         .Failure(
           Refined.unsafeApply(
-            s"${command.query.name} failed for event ${command.eventId} to status ${command.status} with ${exception.getMessage}"
+            s"${command.queries.map(_.name.toString).toList.mkString(", ")} failed for event ${command.eventId} to status ${command.status} with ${exception.getMessage}. " +
+              s"Rolling back queries: ${command.queries.map(_.name.toString).toList.mkString(", ")}"
           )
         )
         .pure[IO]
@@ -85,10 +89,10 @@ class StatusUpdatesRunnerImpl(
   private def executeCommand(command: ChangeStatusCommand[IO]): Free[connection.ConnectionOp, UpdateResult] =
     checkIfPersisted(command.eventId).flatMap {
       case true =>
-        measureExecutionTime(command.queryWithProcessingTimeUpdate).flatMap { intResult =>
+        runUpdateQueriesIfSuccessful(command).flatMap { case (intResult, lastQuery) =>
           command.mapResult(intResult) match {
             case result if result != Updated =>
-              QueryFailedException(result).raiseError[ConnectionIO, UpdateResult]
+              QueryFailedException(lastQuery.name, result).raiseError[ConnectionIO, UpdateResult]
             case result => result.pure[ConnectionIO]
           }
         }
@@ -106,6 +110,23 @@ class StatusUpdatesRunnerImpl(
       name = "Event update check existence"
     )
   }
+
+  private def runUpdateQueriesIfSuccessful(command: ChangeStatusCommand[IO]): ConnectionIO[(Int, SqlQuery[Int])] =
+    measureExecutionTime(command.queries.head).flatMap { result =>
+      val queries =
+        upsertStatusProcessingTime(command.eventId, command.status, command.maybeProcessingTime)
+          .map(processingTimeQuery => command.queries.tail :+ processingTimeQuery)
+          .getOrElse(command.queries.tail)
+      (result, command.queries.head, queries)
+        .iterateWhileM {
+          case (_, _, query :: remainingQueries) =>
+            measureExecutionTime(query).map(result => (result, query, remainingQueries))
+          case (previousResult, previousQuery, Nil) =>
+            (previousResult, previousQuery, List.empty[SqlQuery[Int]]).pure[ConnectionIO]
+        } { case (previsousResult, _, queries) => previsousResult == 1 && queries.nonEmpty }
+        .map { case (lastResult, lastQuery, _) => (lastResult, lastQuery) }
+    }
+
 }
 
 object IOUpdateCommandsRunner {
@@ -119,5 +140,5 @@ object IOUpdateCommandsRunner {
     new StatusUpdatesRunnerImpl(transactor, queriesExecTimes, logger)
   }
 
-  case class QueryFailedException(updateResult: UpdateResult) extends Throwable()
+  case class QueryFailedException(failingQueryName: SqlQuery.Name, updateResult: UpdateResult) extends Throwable()
 }

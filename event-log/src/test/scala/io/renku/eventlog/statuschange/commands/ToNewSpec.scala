@@ -86,7 +86,7 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
         findEvents(status = New)                 shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
+        histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
       }
 
     EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
@@ -115,7 +115,7 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
           findEvents(status = New)    shouldBe expectedEvents
           findProcessingTime(eventId) shouldBe List()
 
-          histogram.verifyExecutionTimeMeasured(command.query.name)
+          histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
     }
   }

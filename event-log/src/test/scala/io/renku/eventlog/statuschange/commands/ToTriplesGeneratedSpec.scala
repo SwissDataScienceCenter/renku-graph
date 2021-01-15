@@ -96,7 +96,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
         findPayload(eventId)                     shouldBe Some((eventId, payload))
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
+        histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
       }
 
     EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
@@ -132,7 +132,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           findPayload(eventId)                     shouldBe None
           findProcessingTime(eventId).eventIdsOnly shouldBe List()
 
-          histogram.verifyExecutionTimeMeasured(command.query.name)
+          histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
     }
   }

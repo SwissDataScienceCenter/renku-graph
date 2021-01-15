@@ -24,7 +24,7 @@ import java.time.Duration
 
 trait DurationNotNegative extends Constraints[Duration] {
   addConstraint(
-    check = _.toMillis > 0,
+    check = _.toMillis >= 0,
     message = (_: Duration) => s"$typeName cannot have a negative duration"
   )
 }

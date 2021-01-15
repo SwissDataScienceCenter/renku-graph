@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.statuschange.commands
 
+import cats.data.NonEmptyList
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
@@ -43,12 +44,15 @@ final case class ToSkipped[Interpretation[_]](
 
   override lazy val status: EventStatus = Skipped
 
-  override def query: SqlQuery[Int] = SqlQuery(
-    sql"""|UPDATE event 
-          |SET status = $status, execution_date = ${now()}, message = $message
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
-          |""".stripMargin.update.run,
-    name = "generating_triples->skipped"
+  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
+    SqlQuery(
+      sql"""|UPDATE event 
+            |SET status = $status, execution_date = ${now()}, message = $message
+            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
+            |""".stripMargin.update.run,
+      name = "generating_triples->skipped"
+    ),
+    Nil
   )
 
   override def updateGauges(

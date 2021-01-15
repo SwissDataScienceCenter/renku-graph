@@ -44,17 +44,19 @@ final case class ToTriplesStore[Interpretation[_]](
   override lazy val status: EventStatus = TriplesStore
 
 // TODO temporary status change from TriplesGenerated to triples store in the end only TransformingTriples can be transformed to TriplesStore
-  override def query: SqlQuery[Int] =
+  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
     SqlQuery(
-      query = upsertEventStatus.run,
+      query = upsertEventStatus,
       name = "triples_generated-transforming_triples->triples_store"
-    )
+    ),
+    Nil
+  )
 
   lazy val upsertEventStatus =
     sql"""|UPDATE event
           |SET status = $status, execution_date = ${now()}
           |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND (status = ${TriplesGenerated: EventStatus} OR status = ${TransformingTriples: EventStatus})
-          |""".stripMargin.update
+          |""".stripMargin.update.run
 
   override def updateGauges(
       updateResult:      UpdateResult

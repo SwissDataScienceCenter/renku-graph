@@ -77,7 +77,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
 
         findEvent(eventId) shouldBe Some((ExecutionDate(now), Skipped, Some(message)))
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
+        histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
       }
 
     EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
@@ -103,7 +103,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
           findEvent(eventId)                       shouldBe Some((executionDate, eventStatus, None))
           findProcessingTime(eventId).eventIdsOnly shouldBe List()
 
-          histogram.verifyExecutionTimeMeasured(command.query.name)
+          histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
     }
   }

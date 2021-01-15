@@ -47,25 +47,30 @@ private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
     extends ChangeStatusCommand[Interpretation] {
   override lazy val status: events.EventStatus = TriplesGenerated
 
-  lazy val queries =
-    NonEmptyList(updateStatus, List(upsertEventPayload))
-
-  override def query: SqlQuery[Int] = SqlQuery(
-    query = runUpdateQueriesIfSuccessful(queries),
-    name = "generating_triples->triples_generated"
+  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
+    SqlQuery(
+      query = updateStatus,
+      name = "generating_triples->triples_generated"
+    ),
+    List(
+      SqlQuery(
+        query = upsertEventPayload,
+        name = "upsert_generated_triples"
+      )
+    )
   )
 
   private lazy val updateStatus = sql"""|UPDATE event
                                         |SET status = $status, execution_date = ${now()}
                                         |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus};
-                                        |""".stripMargin.update
+                                        |""".stripMargin.update.run
 
   private lazy val upsertEventPayload = sql"""|INSERT INTO
                                               |event_payload (event_id, project_id, payload, schema_version)
                                               |VALUES (${eventId.id},  ${eventId.projectId}, $payload, $schemaVersion)
                                               |ON CONFLICT (event_id, project_id, schema_version)
                                               |DO UPDATE SET payload = EXCLUDED.payload;
-                                              |""".stripMargin.update
+                                              |""".stripMargin.update.run
 
   override def updateGauges(updateResult: UpdateResult)(implicit
       transactor:                         DbTransactor[Interpretation, EventLogDB]

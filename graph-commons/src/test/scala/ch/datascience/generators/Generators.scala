@@ -236,9 +236,9 @@ object Generators {
       .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
       .map(_.toLocalDate)
 
-  val positiveJavaDurations = javaDurations()
+  val notNegativeJavaDurations = javaDurations(min = 0, max = 20000)
 
-  def javaDurations(min: Long = 1, max: Long = 20000): Gen[Duration] =
+  def javaDurations(min: Long, max: Long): Gen[Duration] =
     Gen
       .choose(min, max)
       .map(Duration.ofMillis)

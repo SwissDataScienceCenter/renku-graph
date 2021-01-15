@@ -64,5 +64,5 @@ object DbEventLogGenerators {
   } yield EventProject(id, path)
 
   implicit lazy val eventProcessingTimes: Gen[EventProcessingTime] =
-    positiveJavaDurations.map(EventProcessingTime.apply)
+    notNegativeJavaDurations.map(EventProcessingTime.apply)
 }

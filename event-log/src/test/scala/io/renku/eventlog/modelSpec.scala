@@ -129,7 +129,7 @@ class EventProcessingTimeSpec extends AnyWordSpec with ScalaCheckPropertyChecks 
     }
 
     "be instantiatable from any non negative finite durations" in {
-      forAll(positiveJavaDurations) { body =>
+      forAll(notNegativeJavaDurations) { body =>
         EventProcessingTime.from(body).map(_.value) shouldBe Right(body)
       }
     }

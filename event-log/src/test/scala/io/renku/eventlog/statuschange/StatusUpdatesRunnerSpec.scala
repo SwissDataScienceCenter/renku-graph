@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.statuschange
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.generators.Generators.Implicits._
@@ -32,7 +33,7 @@ import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventProcessingTimes, executionDates}
 import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
-import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, StatusProcessingTime, UpdateResult}
+import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 import io.renku.eventlog.{EventLogDB, EventProcessingTime, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -68,7 +69,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
         logger.loggedOnly(Info(s"Event $eventId got ${command.status}"))
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
+        histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
       }
 
     "execute query from the given command, " +
@@ -87,11 +88,11 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
         logger.loggedOnly(
           Info(
-            s"${command.query.name} failed for event ${command.eventId} to status ${command.status} with result $NotFound. Rolling back"
+            s"${command.queries.head.name} failed for event ${command.eventId} to status ${command.status} with result $NotFound. Rolling back queries: ${command.queries.map(_.name.toString).toList.mkString(", ")}"
           )
         )
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
+        histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
       }
   }
 
@@ -114,12 +115,15 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
     override def status: EventStatus = GeneratingTriples
 
-    override def query = SqlQuery(
-      sql"""|UPDATE event 
-            |SET status = $status
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${New: EventStatus}
-            |""".stripMargin.update.run,
-      name = "test_status_update"
+    override def queries = NonEmptyList(
+      SqlQuery(
+        sql"""|UPDATE event 
+              |SET status = $status
+              |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${New: EventStatus}
+              |""".stripMargin.update.run,
+        name = "test_status_update"
+      ),
+      Nil
     )
 
     override def mapResult: Int => UpdateResult = {
@@ -151,14 +155,16 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
     override def status: EventStatus = GeneratingTriples
 
-    override def query =
+    override def queries = NonEmptyList(
       SqlQuery(
         sql"""|UPDATE event
               |SET status = $status
               |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${New: EventStatus}
               |""".stripMargin.update.run.map(_ => 0),
         name = "test_failure_status_update"
-      )
+      ),
+      Nil
+    )
 
     override def mapResult: Int => UpdateResult = {
       case 0 => UpdateResult.NotFound

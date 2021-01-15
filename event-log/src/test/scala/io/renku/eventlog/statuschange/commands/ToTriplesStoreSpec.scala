@@ -102,7 +102,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
         )
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
+        histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
       }
 
     EventStatus.all.filterNot(status => status == TriplesGenerated || status == TransformingTriples) foreach {
@@ -131,7 +131,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
             findEvents(status = TriplesStore)        shouldBe expectedEvents
             findProcessingTime(eventId).eventIdsOnly shouldBe List()
 
-            histogram.verifyExecutionTimeMeasured(command.query.name)
+            histogram.verifyExecutionTimeMeasured(command.queries.head.name)
           }
     }
   }

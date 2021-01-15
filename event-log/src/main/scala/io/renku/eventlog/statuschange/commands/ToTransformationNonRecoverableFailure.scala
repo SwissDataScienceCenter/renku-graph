@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.statuschange.commands
 
+import cats.data.NonEmptyList
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
@@ -43,12 +44,15 @@ final case class ToTransformationNonRecoverableFailure[Interpretation[_]](
 
   override lazy val status: EventStatus = TransformationNonRecoverableFailure
 
-  override def query: SqlQuery[Int] = SqlQuery(
-    sql"""|UPDATE event
-          |SET status = $status, execution_date = ${now()}, message = $maybeMessage
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
-          |""".stripMargin.update.run,
-    name = "transforming_triples->transformation_non_recoverable_fail"
+  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
+    SqlQuery(
+      sql"""|UPDATE event
+            |SET status = $status, execution_date = ${now()}, message = $maybeMessage
+            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
+            |""".stripMargin.update.run,
+      name = "transforming_triples->transformation_non_recoverable_fail"
+    ),
+    Nil
   )
 
   override def updateGauges(

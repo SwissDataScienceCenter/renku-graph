@@ -96,7 +96,7 @@ class ToTransformationRecoverableFailureSpec
         )
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
+        histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
       }
 
     EventStatus.all.filterNot(status => status == TransformingTriples) foreach { eventStatus =>
@@ -130,7 +130,7 @@ class ToTransformationRecoverableFailureSpec
           findEvent(eventId)                       shouldBe Some((executionDate, eventStatus, None))
           findProcessingTime(eventId).eventIdsOnly shouldBe List()
 
-          histogram.verifyExecutionTimeMeasured(command.query.name)
+          histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
     }
   }
