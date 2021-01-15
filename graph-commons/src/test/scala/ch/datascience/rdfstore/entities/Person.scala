@@ -18,11 +18,8 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Affiliation, Email, GitLabId, Name}
-import org.scalacheck.Gen
 
 import java.util.UUID
 

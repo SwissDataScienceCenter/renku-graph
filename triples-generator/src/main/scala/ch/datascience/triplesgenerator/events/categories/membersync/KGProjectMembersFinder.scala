@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.events.categories.membersync
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.Schemas.{rdf, schema}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{projects, users}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.graph.model.views.RdfResource
@@ -56,7 +56,10 @@ private class KGProjectMembersFinderImpl(
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
     val member: Decoder[KGProjectMember] = { cursor =>
-      cursor.downField("gitLabId").downField("value").as[GitLabId].map(KGProjectMember)
+      for {
+        memberId <- cursor.downField("memberId").downField("value").as[users.ResourceId]
+        gitLabId <- cursor.downField("gitLabId").downField("value").as[GitLabId]
+      } yield KGProjectMember(memberId, gitLabId)
     }
 
     cursor.downField("results").downField("bindings").as(decodeList(member)).map(_.toSet)
@@ -65,7 +68,7 @@ private class KGProjectMembersFinderImpl(
   private def query(path: Path) = SparqlQuery.of(
     name = "members by project path",
     Prefixes.of(schema -> "schema", rdf -> "rdf"),
-    s"""|SELECT DISTINCT ?gitLabId
+    s"""|SELECT DISTINCT ?memberId ?gitLabId
         |WHERE {
         |  ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]} rdf:type      <http://schema.org/Project>;
         |                                                        schema:member ?memberId.
@@ -81,4 +84,4 @@ private class KGProjectMembersFinderImpl(
 
 }
 
-private final case class KGProjectMember(gitLabId: GitLabId)
+private final case class KGProjectMember(id: users.ResourceId, gitLabId: users.GitLabId)

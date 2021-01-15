@@ -17,6 +17,7 @@
  */
 
 package ch.datascience.triplesgenerator.events.categories.membersync
+
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, userGitLabIds}
@@ -44,7 +45,7 @@ class KGProjectMembersFinderSpec
 
       loadToStore(project.asJsonLD)
 
-      val expectedMembers = members.flatMap(_.maybeGitLabId).map(id => KGProjectMember(id))
+      val expectedMembers = members.toKGProjectMembers
 
       finder.findProjectMembers(project.path).unsafeRunSync() shouldBe expectedMembers
     }

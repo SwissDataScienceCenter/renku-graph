@@ -38,13 +38,14 @@ import ch.datascience.generators.Generators._
 import scala.util.Try
 
 class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.Matchers {
+
   "synchronizeMembers" should {
     "pulls members from Gitlab & KG" +
       "AND applies diff in triplestore" in new TestCase {
 
         val gitLabMemberMissingInKG = gitLabProjectMembers.generateOne
         val gitLabMemberAlsoInKG    = gitLabProjectMembers.generateOne
-        val kgMemberAlsoInGitLab    = KGProjectMember(gitLabMemberAlsoInKG.id)
+        val kgMemberAlsoInGitLab    = kgProjectMembers.generateOne.copy(gitLabId = gitLabMemberAlsoInKG.id)
         val kgMemberMissingInGitLab = kgProjectMembers.generateOne
 
         val membersInGitLab = Set(gitLabMemberMissingInKG, gitLabMemberAlsoInKG)
@@ -66,7 +67,7 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
           .expects(projectPath)
           .returning(membersInKG.pure[Try])
 
-        val removalQueries   = sparqlQueries.generateNonEmptyList().toList
+        val removalQuery     = sparqlQueries.generateOne
         val insertionQueries = sparqlQueries.generateNonEmptyList().toList
 
         (updatesCreator.insertion _)
@@ -75,9 +76,9 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
 
         (updatesCreator.removal _)
           .expects(projectPath, Set(kgMemberMissingInGitLab))
-          .returning(removalQueries)
+          .returning(removalQuery)
 
-        (removalQueries ++ insertionQueries).foreach { query =>
+        (removalQuery +: insertionQueries).foreach { query =>
           (querySender.send _)
             .expects(query)
             .returning(().pure[Try])
@@ -115,7 +116,7 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
     val gitLabProjectMembersFinder = mock[GitLabProjectMembersFinder[Try]]
     val kGProjectMembersFinder     = mock[KGProjectMembersFinder[Try]]
     val accessTokenFinder          = mock[AccessTokenFinder[Try]]
-    val updatesCreator             = mock[UpdatesCreator[Try]]
+    val updatesCreator             = mock[UpdatesCreator]
     val querySender                = mock[QuerySender[Try]]
     val logger                     = TestLogger[Try]()
     val projectPath                = projectPaths.generateOne

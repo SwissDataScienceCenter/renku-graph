@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.categories.membersync
 
-import ch.datascience.graph.model.GraphModelGenerators.{userGitLabIds, userNames, usernames}
+import ch.datascience.graph.model.GraphModelGenerators.{userGitLabIds, userNames, userResourceIds}
 import org.scalacheck.Gen
 
 private object Generators {
@@ -28,5 +28,8 @@ private object Generators {
     name <- userNames
   } yield GitLabProjectMember(id, name)
 
-  implicit val kgProjectMembers: Gen[KGProjectMember] = userGitLabIds.map(KGProjectMember)
+  implicit val kgProjectMembers: Gen[KGProjectMember] = for {
+    memberId <- userResourceIds
+    gitLabId <- userGitLabIds
+  } yield KGProjectMember(memberId, gitLabId)
 }

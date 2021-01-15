@@ -34,7 +34,7 @@ private class MembersSynchronizerImpl[Interpretation[_]](
     accessTokenFinder:          AccessTokenFinder[Interpretation],
     gitLabProjectMembersFinder: GitLabProjectMembersFinder[Interpretation],
     kGProjectMembersFinder:     KGProjectMembersFinder[Interpretation],
-    updatesCreator:             UpdatesCreator[Interpretation],
+    updatesCreator:             UpdatesCreator,
     querySender:                QuerySender[Interpretation],
     logger:                     Logger[Interpretation]
 )(implicit ME:                  MonadError[Interpretation, Throwable])
@@ -50,7 +50,7 @@ private class MembersSynchronizerImpl[Interpretation[_]](
       membersToRemove  = findMembersToRemove(membersInGitLab, membersInKG)
       insertionUpdates = updatesCreator.insertion(projectPath, membersToAdd)
       removalUpdates   = updatesCreator.removal(projectPath, membersToRemove)
-      _ <- (insertionUpdates ++ removalUpdates).map(querySender.send).sequence
+      _ <- (insertionUpdates :+ removalUpdates).map(querySender.send).sequence
       _ <- logger.info(s"${EventHandler.categoryName}: Members synchronized for project: $projectPath")
     } yield ()
   } recoverWith { case NonFatal(exception) =>
@@ -66,7 +66,6 @@ private class MembersSynchronizerImpl[Interpretation[_]](
   def findMembersToRemove(membersInGitLab: Set[GitLabProjectMember],
                           membersInKG:     Set[KGProjectMember]
   ): Set[KGProjectMember] = membersInKG.collect {
-    case member @ KGProjectMember(gitlabId) if !membersInGitLab.exists(_.id == gitlabId) => member
+    case member @ KGProjectMember(_, gitlabId) if !membersInGitLab.exists(_.id == gitlabId) => member
   }
-
 }

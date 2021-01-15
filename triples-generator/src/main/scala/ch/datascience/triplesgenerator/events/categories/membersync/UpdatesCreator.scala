@@ -18,13 +18,31 @@
 
 package ch.datascience.triplesgenerator.events.categories.membersync
 
+import ch.datascience.graph.Schemas.{rdf, schema}
+import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.projects.ResourceId
+import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery
+import ch.datascience.rdfstore.SparqlQuery.Prefixes
+import eu.timepit.refined.auto._
 
-private trait UpdatesCreator[Interpretation[_]] {
+private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
 
-  def removal(projectPath: projects.Path, members: Set[KGProjectMember]): List[SparqlQuery]
+  def insertion(projectPath: projects.Path, members: Set[GitLabProjectMember]): List[SparqlQuery] = ???
 
-  def insertion(projectPath: projects.Path, members: Set[GitLabProjectMember]): List[SparqlQuery]
+  def removal(projectPath: projects.Path, members: Set[KGProjectMember]): SparqlQuery =
+    SparqlQuery.of(
+      name = "unlink project members",
+      Prefixes.of(schema -> "schema", rdf -> "rdf"),
+      s"""|DELETE DATA { 
+          |  ${generateTriples(projectPath, members).mkString("\n")} 
+          |}
+          |""".stripMargin
+    )
 
+  private def generateTriples(projectPath: projects.Path, members: Set[KGProjectMember]) =
+    members map { member =>
+      s"${ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]} schema:member ${member.id.showAs[RdfResource]}."
+    }
 }
