@@ -70,11 +70,12 @@ class SubscriptionMechanismImpl(
 
   private def subscribeForEvents(initOrError: Ref[IO, Boolean]): IO[Unit] = {
     for {
-      _             <- timer sleep renewDelay
+      _             <- IO.unit
       subscriberUrl <- findSubscriberUrl()
       postingError  <- postToEventLog(subscriberUrl).map(_ => false).recoverWith(logPostError)
       shouldLog     <- initOrError getAndSet postingError
       _             <- whenA(shouldLog && !postingError)(logger.info(s"$categoryName: Subscribed for events with $subscriberUrl"))
+      _             <- timer sleep renewDelay
     } yield ()
   } recoverWith logSubscriberUrlError
 
