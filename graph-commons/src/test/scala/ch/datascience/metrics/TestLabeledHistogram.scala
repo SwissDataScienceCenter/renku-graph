@@ -18,6 +18,7 @@
 
 package ch.datascience.metrics
 
+import cats.data.NonEmptyList
 import cats.effect.IO
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
@@ -35,6 +36,9 @@ class TestLabeledHistogram[LabelValue](
       case Nil     => ()
       case missing => fail(s"Execution time was not measured for '${missing.mkString(", ")}'")
     }
+
+  def verifyExecutionTimeMeasured(forLabelValues: NonEmptyList[LabelValue]): Unit =
+    verifyExecutionTimeMeasured(forLabelValues.head, forLabelValues.tail: _*)
 
   def verifyNoInteractions(): Unit = {
     if (histogram.collectAllSamples.nonEmpty)

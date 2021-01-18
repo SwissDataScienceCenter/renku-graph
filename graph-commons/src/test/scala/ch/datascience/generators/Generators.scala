@@ -18,9 +18,8 @@
 
 package ch.datascience.generators
 
-import java.time._
+import java.time.{Duration, Instant, LocalDate, LocalDateTime, ZoneId, ZoneOffset, ZonedDateTime}
 import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
-
 import cats.data.NonEmptyList
 import ch.datascience.config.ServiceUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
@@ -236,6 +235,13 @@ object Generators {
     timestampsNotInTheFuture
       .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
       .map(_.toLocalDate)
+
+  val notNegativeJavaDurations = javaDurations(min = 0, max = 20000)
+
+  def javaDurations(min: Long, max: Long): Gen[Duration] =
+    Gen
+      .choose(min, max)
+      .map(Duration.ofMillis)
 
   implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls() map ServiceUrl.apply
   implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply

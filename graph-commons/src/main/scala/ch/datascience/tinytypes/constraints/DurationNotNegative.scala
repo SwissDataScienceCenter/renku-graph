@@ -16,28 +16,15 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog
+package ch.datascience.tinytypes.constraints
 
-import cats.syntax.all._
-import ch.datascience.db.DbSpec
-import doobie.util.fragment.Fragment
-import io.renku.eventlog.init.EventLogDbMigrations
-import org.scalatest.TestSuite
+import ch.datascience.tinytypes.Constraints
 
-import scala.language.reflectiveCalls
+import java.time.Duration
 
-trait InMemoryEventLogDbSpec
-    extends DbSpec
-    with EventLogDbMigrations
-    with InMemoryEventLogDb
-    with EventLogDataProvisioning
-    with EventLogDataFetching {
-  self: TestSuite =>
-
-  protected def initDb(): Unit =
-    allMigrations.map(_.run()).sequence.void.unsafeRunSync()
-
-  protected def prepareDbForTest(): Unit = execute {
-    Fragment.const(s"TRUNCATE TABLE ${Tables.all.mkString(", ")} CASCADE").update.run.void
-  }
+trait DurationNotNegative extends Constraints[Duration] {
+  addConstraint(
+    check = _.toMillis >= 0,
+    message = (_: Duration) => s"$typeName cannot have a negative duration"
+  )
 }
