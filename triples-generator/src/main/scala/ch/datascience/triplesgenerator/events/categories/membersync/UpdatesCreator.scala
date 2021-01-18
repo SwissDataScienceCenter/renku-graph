@@ -18,34 +18,99 @@
 
 package ch.datascience.triplesgenerator.events.categories.membersync
 
+import cats.syntax.all._
 import ch.datascience.graph.Schemas.{rdf, schema}
-import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.{projects, users}
+import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.projects.ResourceId
+import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.graph.model.{projects, users}
 import ch.datascience.rdfstore.SparqlQuery
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
+import ch.datascience.rdfstore.SparqlValueEncoder.sparqlEncode
 import eu.timepit.refined.auto._
 
-private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl) {
+private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl) {
 
   def insertion(
       projectPath: projects.Path,
       members:     Set[(GitLabProjectMember, Option[users.ResourceId])]
-  ): List[SparqlQuery] = ???
+  ): List[SparqlQuery] = {
+    val (queryForNewPersons, queryForExistingPersons) =
+      (separateUsersNotYetInKG.pure[List] ap members.toList).separate
+        .bimap(createPersonsAndMemberLinks(projectPath, _), createMemberLinks(projectPath, _))
+    List(queryForNewPersons, queryForExistingPersons)
+  }
 
-  def removal(projectPath: projects.Path, members: Set[KGProjectMember]): SparqlQuery =
+  def removal(projectPath: projects.Path, members: Set[KGProjectMember]): SparqlQuery = {
+    val linkTriples = members.map(member => generateLinkTriple(projectPath, member.resourceId)).mkString("\n")
+
     SparqlQuery.of(
       name = "unlink project members",
       Prefixes.of(schema -> "schema", rdf -> "rdf"),
       s"""|DELETE DATA { 
-          |  ${generateTriples(projectPath, members).mkString("\n")} 
+          |  $linkTriples
           |}
           |""".stripMargin
     )
+  }
 
-  private def generateTriples(projectPath: projects.Path, members: Set[KGProjectMember]) =
-    members map { member =>
-      s"${ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]} schema:member ${member.id.showAs[RdfResource]}."
-    }
+  private def createPersonsAndMemberLinks(projectPath:       projects.Path,
+                                          membersNotYetInKG: List[GitLabProjectMember]
+  ): SparqlQuery = {
+    val resourceIdsAndMembers = membersNotYetInKG.map(member => (generateResourceId(member.gitLabId), member))
+    val linkTriples =
+      resourceIdsAndMembers.map { case (resourceId, _) => generateLinkTriple(projectPath, resourceId) }.mkString("\n")
+    SparqlQuery.of(
+      name = "link project members",
+      Prefixes.of(schema -> "schema", rdf -> "rdf"),
+      s"""|INSERT DATA { 
+          |  ${resourceIdsAndMembers.map(generatePersonTriples).mkString("\n")}
+          |  $linkTriples
+          |}
+          |  """.stripMargin
+    )
+  }
+
+  private def generateResourceId(gitLabId: GitLabId): users.ResourceId = users.ResourceId(
+    (renkuBaseUrl / "persons" / s"gitlabid$gitLabId").toString
+  )
+
+  private def createMemberLinks(projectPath:        projects.Path,
+                                membersAlreadyInKG: List[(GitLabProjectMember, users.ResourceId)]
+  ): SparqlQuery = {
+    val linkTriples =
+      membersAlreadyInKG.map { case (_, resourceId) => generateLinkTriple(projectPath, resourceId) }.mkString("\n")
+    SparqlQuery.of(
+      name = "link project members",
+      Prefixes.of(schema -> "schema", rdf -> "rdf"),
+      s"""|INSERT DATA {
+          |  $linkTriples
+          |}
+          |""".stripMargin
+    )
+  }
+
+  private def generateLinkTriple(projectPath: projects.Path, memberResourceId: users.ResourceId) =
+    s"${ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]} schema:member ${memberResourceId.showAs[RdfResource]}."
+
+  private lazy val generatePersonTriples: ((users.ResourceId, GitLabProjectMember)) => String = {
+    case (resourceId, member) =>
+      val creatorResource = resourceId.showAs[RdfResource]
+      val sameAsId        = (gitLabApiUrl / "users" / member.gitLabId).showAs[RdfResource]
+      s"""|  $creatorResource rdf:type <http://schema.org/Person>;
+          |                   schema:name '${sparqlEncode(member.name.value)}';
+          |                   schema:sameAs $sameAsId.
+          |  $sameAsId rdf:type schema:URL;
+          |            schema:identifier ${member.gitLabId};
+          |            schema:additionalType 'GitLab'.
+          |""".stripMargin
+  }
+
+  private lazy val separateUsersNotYetInKG: (
+      (GitLabProjectMember, Option[users.ResourceId])
+  ) => Either[GitLabProjectMember, (GitLabProjectMember, users.ResourceId)] = {
+    case (member, Some(resourceId)) => Right(member -> resourceId)
+    case (member, None)             => Left(member)
+  }
 }

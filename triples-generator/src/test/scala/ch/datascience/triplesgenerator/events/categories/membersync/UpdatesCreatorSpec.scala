@@ -18,16 +18,16 @@
 
 package ch.datascience.triplesgenerator.events.categories.membersync
 
-import Generators._
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.{userEmails, userGitLabIds}
+import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, userEmails, userGitLabIds}
 import ch.datascience.graph.model.users.{Email, GitLabId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.graph.model.{projects, users}
 import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.EntitiesGenerators.{persons, projectEntities}
 import ch.datascience.rdfstore.entities.bundles.{gitLabApiUrl, renkuBaseUrl}
+import ch.datascience.triplesgenerator.events.categories.membersync.Generators._
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -81,16 +81,72 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       queries.map(runUpdate).sequence.unsafeRunSync()
 
       findMembersEmails(project.path) shouldBe Set(
-        member.gitLabId -> personInKG.maybeGitLabId.getOrElse(fail("email should be present"))
+        member.gitLabId -> personInKG.maybeEmail
       )
     }
 
     "prepare queries to insert links and new person for members non-existing in KG" in new TestCase {
-      fail("boom!")
+      val member = gitLabProjectMembers.generateOne
+
+      val project = projectEntities.generateOne.copy(members = Set.empty)
+
+      loadToStore(project.asJsonLD)
+
+      findMembers(project.path) shouldBe Set.empty
+
+      val queries = updatesCreator.insertion(
+        project.path,
+        Set(member -> Option.empty[users.ResourceId])
+      )
+
+      queries.map(runUpdate).sequence.unsafeRunSync()
+
+      findMembersEmails(project.path) shouldBe Set(
+        member.gitLabId -> Option.empty[users.Email]
+      )
     }
 
-    "two cases from above when there's no project in KG" in new TestCase {
-      fail("boom!")
+    "prepare queries to insert the project and then the members when neither exists in KG" in new TestCase {
+      val member = gitLabProjectMembers.generateOne
+
+      val projectPath = projectPaths.generateOne
+
+      findMembers(projectPath) shouldBe Set.empty
+
+      val queries = updatesCreator.insertion(
+        projectPath,
+        Set(member -> Option.empty[users.ResourceId])
+      )
+
+      queries.map(runUpdate).sequence.unsafeRunSync()
+
+      findMembersEmails(projectPath) shouldBe Set(
+        member.gitLabId -> Option.empty[users.Email]
+      )
+    }
+
+    "prepare queries to insert a project and attach a member already in KG when the project didn't previously exist" in new TestCase {
+      val member = gitLabProjectMembers.generateOne
+
+      val projectPath = projectPaths.generateOne
+      val personInKG = persons(maybeEmails = userEmails.toGeneratorOfSomes).generateOne.copy(
+        maybeGitLabId = Some(member.gitLabId)
+      )
+      val personJsonLD = personInKG.asJsonLD
+      loadToStore(personJsonLD)
+
+      findMembers(projectPath) shouldBe Set.empty
+
+      val queries = updatesCreator.insertion(
+        projectPath,
+        Set(member -> personJsonLD.entityId.map(users.ResourceId.apply))
+      )
+
+      queries.map(runUpdate).sequence.unsafeRunSync()
+
+      findMembersEmails(projectPath) shouldBe Set(
+        member.gitLabId -> personInKG.maybeEmail
+      )
     }
   }
 
@@ -123,7 +179,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
    */
 
   private trait TestCase {
-    val updatesCreator = new UpdatesCreator(renkuBaseUrl)
+    val updatesCreator = new UpdatesCreator(renkuBaseUrl, gitLabApiUrl)
   }
 
   private def findMembers(path: projects.Path): Set[GitLabId] =
@@ -144,24 +200,24 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with should.M
       .flatMap(row => row.get("gitLabId").map(_.toInt).map(GitLabId.apply))
       .toSet
 
-  private def findMembersEmails(path: projects.Path): Set[(GitLabId, Email)] =
+  private def findMembersEmails(path: projects.Path): Set[(GitLabId, Option[Email])] =
     runQuery(
-      s"""|SELECT DISTINCT ?email
+      s"""|SELECT DISTINCT ?gitLabId ?email
           |WHERE {
           |  ${projects.ResourceId(renkuBaseUrl, path).showAs[RdfResource]} schema:member ?memberId.
           |  ?memberId  rdf:type     schema:Person;
-          |             schema:email ?email; 
           |             schema:sameAs ?sameAsId. 
           |             
           |  ?sameAsId  schema:additionalType  'GitLab';
-          |             schema:identifier      ?gitLabId.
+          |             schema:identifier      ?gitLabId. 
+          |             
+          |  OPTIONAL {
+          |    ?memberId  schema:email ?email. 
+          |  }
           |}
           |""".stripMargin
     )
       .unsafeRunSync()
-      .flatMap(row =>
-        (row.get("gitLabId").map(_.toInt).map(GitLabId.apply) -> row.get("email").map(Email.apply))
-          .mapN { case (gitLabId, email) => gitLabId -> email }
-      )
+      .map(row => GitLabId(row("gitLabId").toInt) -> row.get("email").map(Email.apply))
       .toSet
 }

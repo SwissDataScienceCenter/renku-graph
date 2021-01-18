@@ -84,4 +84,4 @@ private class KGProjectMembersFinderImpl(
 
 }
 
-private final case class KGProjectMember(id: users.ResourceId, gitLabId: users.GitLabId)
+private final case class KGProjectMember(resourceId: users.ResourceId, gitLabId: users.GitLabId)
