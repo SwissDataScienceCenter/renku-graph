@@ -83,5 +83,16 @@ private class KGProjectMembersFinderImpl(
   )
 
 }
+private object KGProjectMembersFinder {
+  def apply(logger:     Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[KGProjectMembersFinder[IO]] = for {
+    rdfStoreConfig <- RdfStoreConfig[IO]()
+    renkuBaseUrl   <- RenkuBaseUrl[IO]()
+
+  } yield new KGProjectMembersFinderImpl(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder)
+}
 
 private final case class KGProjectMember(resourceId: users.ResourceId, gitLabId: users.GitLabId)

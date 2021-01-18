@@ -147,8 +147,10 @@ class UpdatesCreatorSpec extends AnyWordSpec with InMemoryRdfStore with ScalaChe
       // This could happen if a user changes their email
       val gitLabId = userGitLabIds.generateOne
       val person   = persons(gitLabId.some).generateOne
-      val project1 = projectEntities.generateOne.copy(maybeCreator = Some(person.toEntitiesPerson))
-      val project2 = projectEntities.generateOne.copy(maybeCreator = Some(person.toEntitiesPerson))
+      val project1 = projectEntities.generateOne.copy(maybeCreator = Some(person.toEntitiesPerson),
+                                                      members = Set(person.toEntitiesPerson)
+      )
+      val project2 = projectEntities.generateOne.copy(maybeCreator = Some(person.toEntitiesPerson), members = Set.empty)
       val activity = activityEntities.generateOne.copy(committer = person.toEntitiesPerson, project = project1)
 
       loadToStore(person.toJsonLd, project1.asJsonLD, project2.asJsonLD, activity.asJsonLD)

@@ -19,11 +19,16 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.MonadError
+import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.config.GitLab
+import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects
-import ch.datascience.graph.tokenrepository.AccessTokenFinder
+import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import io.chrisdavenport.log4cats.Logger
 
+import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private trait MembersSynchronizer[Interpretation[_]] {
@@ -70,4 +75,31 @@ private class MembersSynchronizerImpl[Interpretation[_]](
   ): Set[KGProjectMember] = membersInKG.collect {
     case member @ KGProjectMember(_, gitlabId) if !membersInGitLab.exists(_.gitLabId == gitlabId) => member
   }
+}
+
+private object MembersSynchronizer {
+  def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(
+      implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[MembersSynchronizer[IO]] = for {
+    accessTokenFinder          <- IOAccessTokenFinder(logger)
+    gitLabProjectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
+    kGProjectMembersFinder     <- KGProjectMembersFinder(logger, timeRecorder)
+    kGPersonFinder             <- KGPersonFinder(logger, timeRecorder)
+    updatesCreator             <- UpdatesCreator()
+    rdfStoreConfig             <- RdfStoreConfig[IO]()
+    querySender <- IO(new IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) with QuerySender[IO] {
+                     override def send(query: SparqlQuery): IO[Unit] = updateWithNoResult(query)
+                   })
+
+  } yield new MembersSynchronizerImpl[IO](accessTokenFinder,
+                                          gitLabProjectMembersFinder,
+                                          kGProjectMembersFinder,
+                                          kGPersonFinder,
+                                          updatesCreator,
+                                          querySender,
+                                          logger
+  )
 }

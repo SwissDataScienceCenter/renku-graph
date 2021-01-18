@@ -18,9 +18,10 @@
 
 package ch.datascience.triplesgenerator.events.categories.membersync
 
+import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.graph.Schemas.{rdf, schema}
-import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
+import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.projects.ResourceId
 import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.graph.model.views.RdfResource
@@ -113,4 +114,11 @@ private class UpdatesCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApi
     case (member, Some(resourceId)) => Right(member -> resourceId)
     case (member, None)             => Left(member)
   }
+}
+
+private object UpdatesCreator {
+  def apply(): IO[UpdatesCreator] = for {
+    renkuBaseUrl <- RenkuBaseUrl[IO]()
+    gitLabUrl    <- GitLabUrl[IO]()
+  } yield new UpdatesCreator(renkuBaseUrl, gitLabUrl.apiV4)
 }

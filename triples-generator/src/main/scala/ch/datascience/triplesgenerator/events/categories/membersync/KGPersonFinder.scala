@@ -81,3 +81,13 @@ private class KGPersonFinderImpl(
         |""".stripMargin
   )
 }
+
+private object KGPersonFinder {
+  def apply(logger:     Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[KGPersonFinderImpl] = for {
+    rdfStoreConfig <- RdfStoreConfig[IO]()
+  } yield new KGPersonFinderImpl(rdfStoreConfig, logger, timeRecorder)
+}

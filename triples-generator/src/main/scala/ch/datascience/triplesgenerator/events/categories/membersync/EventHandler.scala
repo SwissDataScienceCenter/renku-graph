@@ -19,12 +19,17 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.MonadError
-import cats.effect.{Concurrent, ContextShift}
+import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.config.GitLab
+import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events
 import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
 import io.chrisdavenport.log4cats.Logger
+
+import scala.concurrent.ExecutionContext
 
 private[events] class EventHandler[Interpretation[_]](
     membersSynchronizer: MembersSynchronizer[Interpretation],
@@ -80,4 +85,13 @@ private[events] class EventHandler[Interpretation[_]](
 
 private[events] object EventHandler {
   val categoryName: CategoryName = CategoryName("MEMBER_SYNC")
+
+  def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(
+      implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[EventHandler[IO]] = for {
+    membersSynchronizer <- MembersSynchronizer(gitLabThrottler, logger, timeRecorder)
+  } yield new EventHandler[IO](membersSynchronizer, logger)
 }

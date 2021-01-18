@@ -101,8 +101,10 @@ object IOEventEndpoint {
                                                                               subscriptionMechanismRegistry,
                                                                               logger
                                    )
+
+      membersSyncHandler <- categories.membersync.EventHandler(gitLabThrottler, logger, timeRecorder)
     } yield new EventEndpointImpl[IO](
-      List(awaitingGenerationHandler),
+      List(awaitingGenerationHandler, membersSyncHandler),
       reProvisioningStatus
     )
 }
