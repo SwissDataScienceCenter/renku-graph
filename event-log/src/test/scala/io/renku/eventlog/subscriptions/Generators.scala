@@ -18,7 +18,8 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings}
+import ch.datascience.generators.Generators.{httpUrls, jsons, nonBlankStrings}
+import io.renku.eventlog.EventPayload
 import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
 import org.scalacheck.Gen
 
@@ -32,4 +33,5 @@ private object Generators {
   } yield new SubscriptionCategoryPayload {
     override def subscriberUrl: SubscriberUrl = url
   }
+
 }

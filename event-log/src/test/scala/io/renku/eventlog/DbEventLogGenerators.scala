@@ -36,7 +36,6 @@ object DbEventLogGenerators {
   implicit val executionDates: Gen[ExecutionDate] = timestamps map ExecutionDate.apply
 
   implicit val eventMessages: Gen[EventMessage] = nonEmptyStrings() map EventMessage.apply
-  implicit val eventPayloads: Gen[EventPayload] = nonEmptyStrings() map EventPayload.apply
 
   lazy val newEvents: Gen[NewEvent] = for {
     eventId   <- eventIds

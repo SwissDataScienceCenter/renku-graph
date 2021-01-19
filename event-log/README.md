@@ -343,6 +343,31 @@ As a good practice, the subscription should be renewed periodically in case of r
 }
 ```
 
+- **TRIPLES_GENERATED**
+
+**Request**
+
+```json
+{
+  "categoryName": "TRIPLES_GENERATED",
+  "subscriberUrl": "http://host/path"
+}
+```
+
+**Response**
+
+```json
+{
+  "categoryName": "TRIPLES_GENERATED",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12
+  },
+  "body": "JSON payload",
+  "schemaVersion": 8
+}
+```
+
 - **MEMBER_SYNC**
 
 **Request**

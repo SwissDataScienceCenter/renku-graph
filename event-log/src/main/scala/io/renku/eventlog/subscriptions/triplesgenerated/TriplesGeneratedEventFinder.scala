@@ -43,16 +43,16 @@ import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
 private class TriplesGeneratedEventFinderImpl(
-    transactor:            DbTransactor[IO, EventLogDB],
-    waitingEventsGauge:    LabeledGauge[IO, projects.Path],
-    underProcessingGauge:  LabeledGauge[IO, projects.Path],
-    queriesExecTimes:      LabeledHistogram[IO, SqlQuery.Name],
-    now:                   () => Instant = () => Instant.now,
-    maxProcessingTime:     Duration,
-    projectsFetchingLimit: Int Refined Positive,
-    projectPrioritisation: ProjectPrioritisation,
-    pickRandomlyFrom:      List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size)
-)(implicit ME:             Bracket[IO, Throwable], contextShift: ContextShift[IO])
+    transactor:               DbTransactor[IO, EventLogDB],
+    waitingEventsGauge:       LabeledGauge[IO, projects.Path],
+    underTransformationGauge: LabeledGauge[IO, projects.Path],
+    queriesExecTimes:         LabeledHistogram[IO, SqlQuery.Name],
+    now:                      () => Instant = () => Instant.now,
+    maxProcessingTime:        Duration,
+    projectsFetchingLimit:    Int Refined Positive,
+    projectPrioritisation:    ProjectPrioritisation,
+    pickRandomlyFrom:         List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size)
+)(implicit ME:                Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, TriplesGeneratedEvent]
     with SubscriptionTypeSerializers {
@@ -72,7 +72,7 @@ private class TriplesGeneratedEventFinderImpl(
       maybeIdAndProjectAndBody <- maybeProject
                                     .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
                                     .getOrElse(Free.pure[ConnectionOp, Option[TriplesGeneratedEvent]](None))
-      maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
+      maybeBody <- markAsTransformingTriples(maybeIdAndProjectAndBody)
     } yield maybeProject -> maybeBody
 
   // format: off
@@ -80,8 +80,7 @@ private class TriplesGeneratedEventFinderImpl(
       SELECT
         proj.project_id,
         proj.project_path,
-        proj.latest_event_date,
-        (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = ${GeneratingTriples: EventStatus}) as current_occupancy
+        proj.latest_event_date
       FROM (
         SELECT DISTINCT
           proj.project_id,
@@ -89,15 +88,15 @@ private class TriplesGeneratedEventFinderImpl(
           proj.latest_event_date
         FROM event evt
         JOIN project proj on evt.project_id = proj.project_id
-        WHERE ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
-          OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
+        WHERE ((""" ++ `status IN`(TriplesGenerated, TransformationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
+          OR (status = ${TransformingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
         )
         ORDER BY proj.latest_event_date DESC
         LIMIT ${projectsFetchingLimit.value}
       ) proj
       """ 
-    }.query[(projects.Id, projects.Path, EventDate, Int)]
-    .map { case (projectId, projectPath, eventDate, currentOccupancy) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy)) }
+    }.query[(projects.Id, projects.Path, EventDate)]
+    .map{case (projectId, projectPath, eventDate) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(1))}
     .to[List],
     name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
   )
@@ -105,19 +104,21 @@ private class TriplesGeneratedEventFinderImpl(
 
   // format: off
   private def findOldestEvent(idAndPath: ProjectIds) = SqlQuery({
-    fr"""SELECT evt.event_id, evt.project_id, ${idAndPath.path} AS project_path, evt.event_body
+    fr"""SELECT evt.event_id, evt.project_id, ${idAndPath.path} AS project_path, event_payload.schema_version, event_payload.payload
          FROM (
            SELECT project_id, min(event_date) AS min_event_date
            FROM event
            WHERE project_id = ${idAndPath.id}
-             AND ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
-               OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
+             AND ((""" ++ `status IN`(TriplesGenerated, TransformationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
+               OR (status = ${TransformingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
            GROUP BY project_id
          ) oldest_event_date
          JOIN event evt ON oldest_event_date.project_id = evt.project_id 
            AND oldest_event_date.min_event_date = evt.event_date
-           AND ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
-               OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})) 
+           AND ((""" ++ `status IN`(TriplesGenerated, TransformationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
+               OR (status = ${TransformingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
+         JOIN event_payload ON event_payload.event_id = evt.event_id
+           AND event_payload.project_id = evt.project_id
          LIMIT 1
          """
     }.query[TriplesGeneratedEvent].option, 
@@ -139,19 +140,19 @@ private class TriplesGeneratedEventFinderImpl(
       acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
     }
 
-  private lazy val markAsProcessing
+  private lazy val markAsTransformingTriples
       : Option[TriplesGeneratedEvent] => Free[ConnectionOp, Option[TriplesGeneratedEvent]] = {
     case None =>
       Free.pure[ConnectionOp, Option[TriplesGeneratedEvent]](None)
-    case Some(event @ TriplesGeneratedEvent(id, _, _)) =>
+    case Some(event @ TriplesGeneratedEvent(id, _, _, _)) =>
       measureExecutionTime(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
   }
 
   private def updateStatus(commitEventId: CompoundEventId) = SqlQuery(
     sql"""|UPDATE event 
-          |SET status = ${GeneratingTriples: EventStatus}, execution_date = ${now()}
-          |WHERE (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status <> ${GeneratingTriples: EventStatus})
-          |  OR (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
+          |SET status = ${TransformingTriples: EventStatus}, execution_date = ${now()}
+          |WHERE (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status <> ${TriplesGenerated: EventStatus})
+          |  OR (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status = ${TriplesGenerated: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
           |""".stripMargin.update.run,
     name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update status")
   )
@@ -165,7 +166,7 @@ private class TriplesGeneratedEventFinderImpl(
     (maybeBody, maybeProject) mapN { case (_, ProjectIds(_, projectPath)) =>
       for {
         _ <- waitingEventsGauge decrement projectPath
-        _ <- underProcessingGauge increment projectPath
+        _ <- underTransformationGauge increment projectPath
       } yield ()
     } getOrElse ME.unit
 }
