@@ -363,8 +363,7 @@ As a good practice, the subscription should be renewed periodically in case of r
   "project": {
     "id": 12
   },
-  "body": "JSON payload",
-  "schemaVersion": 8
+  "body": "JSON payload"
 }
 ```
 
