@@ -43,16 +43,16 @@ import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
 private class TriplesGeneratedEventFinderImpl(
-    transactor:               DbTransactor[IO, EventLogDB],
-    waitingEventsGauge:       LabeledGauge[IO, projects.Path],
-    underTransformationGauge: LabeledGauge[IO, projects.Path],
-    queriesExecTimes:         LabeledHistogram[IO, SqlQuery.Name],
-    now:                      () => Instant = () => Instant.now,
-    maxProcessingTime:        Duration,
-    projectsFetchingLimit:    Int Refined Positive,
-    projectPrioritisation:    ProjectPrioritisation,
-    pickRandomlyFrom:         List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size)
-)(implicit ME:                Bracket[IO, Throwable], contextShift: ContextShift[IO])
+    transactor:                  DbTransactor[IO, EventLogDB],
+    awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
+    underTransformationGauge:    LabeledGauge[IO, projects.Path],
+    queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
+    now:                         () => Instant = () => Instant.now,
+    maxProcessingTime:           Duration,
+    projectsFetchingLimit:       Int Refined Positive,
+    projectPrioritisation:       ProjectPrioritisation,
+    pickRandomlyFrom:            List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size)
+)(implicit ME:                   Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, TriplesGeneratedEvent]
     with SubscriptionTypeSerializers {
@@ -165,7 +165,7 @@ private class TriplesGeneratedEventFinderImpl(
   private def maybeUpdateMetrics(maybeProject: Option[ProjectIds], maybeBody: Option[TriplesGeneratedEvent]) =
     (maybeBody, maybeProject) mapN { case (_, ProjectIds(_, projectPath)) =>
       for {
-        _ <- waitingEventsGauge decrement projectPath
+        _ <- awaitingTransformationGauge decrement projectPath
         _ <- underTransformationGauge increment projectPath
       } yield ()
     } getOrElse ME.unit
@@ -177,14 +177,14 @@ private object IOTriplesGeneratedEventFinder {
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
   def apply(
-      transactor:           DbTransactor[IO, EventLogDB],
-      waitingEventsGauge:   LabeledGauge[IO, projects.Path],
-      underProcessingGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name]
-  )(implicit contextShift:  ContextShift[IO]): IO[EventFinder[IO, TriplesGeneratedEvent]] = IO {
+      transactor:                  DbTransactor[IO, EventLogDB],
+      awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
+      underTransformationGauge:    LabeledGauge[IO, projects.Path],
+      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name]
+  )(implicit contextShift:         ContextShift[IO]): IO[EventFinder[IO, TriplesGeneratedEvent]] = IO {
     new TriplesGeneratedEventFinderImpl(transactor,
-                                        waitingEventsGauge,
-                                        underProcessingGauge,
+                                        awaitingTransformationGauge,
+                                        underTransformationGauge,
                                         queriesExecTimes,
                                         maxProcessingTime = MaxProcessingTime,
                                         projectsFetchingLimit = ProjectsFetchingLimit,

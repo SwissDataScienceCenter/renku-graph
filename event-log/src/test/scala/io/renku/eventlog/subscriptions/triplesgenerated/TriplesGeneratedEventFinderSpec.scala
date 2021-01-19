@@ -78,8 +78,8 @@ private class TriplesGeneratedEventFinderSpec
 
         findEvents(TransformingTriples) shouldBe List.empty
 
-        expectWaitingEventsGaugeDecrement(projectPath)
-        expectUnderProcessingGaugeIncrement(projectPath)
+        expectAwaitingTransformationGaugeDecrement(projectPath)
+        expectUnderTransformationGaugeIncrement(projectPath)
 
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 1)),
@@ -92,8 +92,8 @@ private class TriplesGeneratedEventFinderSpec
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event2Id, executionDate))
 
-        expectWaitingEventsGaugeDecrement(projectPath)
-        expectUnderProcessingGaugeIncrement(projectPath)
+        expectAwaitingTransformationGaugeDecrement(projectPath)
+        expectUnderTransformationGaugeIncrement(projectPath)
 
         givenPrioritisation(
           takes = List(ProjectInfo(projectId, projectPath, latestEventDate, 1)),
@@ -144,8 +144,8 @@ private class TriplesGeneratedEventFinderSpec
 
         findEvents(TransformingTriples) shouldBe List.empty
 
-        expectWaitingEventsGaugeDecrement(projectPath)
-        expectUnderProcessingGaugeIncrement(projectPath)
+        expectAwaitingTransformationGaugeDecrement(projectPath)
+        expectUnderTransformationGaugeIncrement(projectPath)
 
         val latestEventDate = List(event1Date, event2Date, event3Date).max
         givenPrioritisation(
@@ -177,8 +177,8 @@ private class TriplesGeneratedEventFinderSpec
           executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes + 1, MIN))
         )
 
-        expectWaitingEventsGaugeDecrement(projectPath)
-        expectUnderProcessingGaugeIncrement(projectPath)
+        expectAwaitingTransformationGaugeDecrement(projectPath)
+        expectUnderTransformationGaugeIncrement(projectPath)
 
         givenPrioritisation(
           takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 1)),
@@ -287,12 +287,12 @@ private class TriplesGeneratedEventFinderSpec
     val queriesExecTimes            = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val maxProcessingTime           = Duration.ofMillis(durations(max = 10 hours).generateOne.toMillis)
 
-    def expectWaitingEventsGaugeDecrement(projectPath: Path) =
+    def expectAwaitingTransformationGaugeDecrement(projectPath: Path) =
       (awaitingTransformationGauge.decrement _)
         .expects(projectPath)
         .returning(IO.unit)
 
-    def expectUnderProcessingGaugeIncrement(projectPath: Path) =
+    def expectUnderTransformationGaugeIncrement(projectPath: Path) =
       (underTransformationGauge.increment _)
         .expects(projectPath)
         .returning(IO.unit)
