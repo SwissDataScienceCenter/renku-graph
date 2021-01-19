@@ -158,10 +158,13 @@ Updates event's data with the given payload.
 Currently, only status changing payloads are allowed:
 
 - for transitioning event from status `GENERATING_TRIPLES` to `NEW`
+- each status transition can optionally provide a processing_time for the status change in the ISO_8601 format
+  PnDTnHnMn.nS
 
 ```json
 {
-  "status": "NEW"
+  "status": "NEW",
+  "processing_time (optional)": "PT2.023S"
 }
 ```
 
@@ -171,7 +174,8 @@ Currently, only status changing payloads are allowed:
 
 ```json
 {
-  "status": "TRIPLES_STORE"
+  "status": "TRIPLES_STORE",
+  "processing_time (optional)": "PT2.023S"
 }
 ```
 
@@ -183,7 +187,8 @@ Currently, only status changing payloads are allowed:
 {
   "status": "TRIPLES_GENERATED",
   "payload": "json-ld as string",
-  "schemaVersion": "schema version of the triples"
+  "schemaVersion": "schema version of the triples",
+  "processing_time (optional)": "PT2.023S"
 }
 ```
 
@@ -194,7 +199,8 @@ Currently, only status changing payloads are allowed:
 ```json
 {
   "status": "GENERATION_RECOVERABLE_FAILURE",
-  "message": "error message"
+  "message": "error message",
+  "processing_time (optional)": "PT2.023S"
 }
 ```
 
@@ -205,7 +211,8 @@ Currently, only status changing payloads are allowed:
 ```json
 {
   "status": "SKIPPED",
-  "message": "MigrationEvent"
+  "message": "MigrationEvent",
+  "processing_time (optional)": "P2DT3H4M"
 }
 ```
 
@@ -216,7 +223,8 @@ Currently, only status changing payloads are allowed:
 ```json
 {
   "status": "GENERATION_NON_RECOVERABLE_FAILURE",
-  "message": "error message"
+  "message": "error message",
+  "processing_time (optional)": "PT2.023S"
 }
 ```
 
@@ -227,7 +235,8 @@ Currently, only status changing payloads are allowed:
 ```json
 {
   "status": "TRANSFORMATION_RECOVERABLE_FAILURE",
-  "message": "error message"
+  "message": "error message",
+  "processing_time (optional)": "PT15M"
 }
 ```
 
@@ -238,7 +247,8 @@ Currently, only status changing payloads are allowed:
 ```json
 {
   "status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE",
-  "message": "error message"
+  "message": "error message",
+  "processing_time (optional)": "P2DT3H4M"
 }
 ```
 
@@ -312,36 +322,40 @@ As a good practice, the subscription should be renewed periodically in case of r
 - **AWAITING_GENERATION**
 
 **Request**
+
 ```json
 {
-  "categoryName":  "AWAITING_GENERATION",
+  "categoryName": "AWAITING_GENERATION",
   "subscriberUrl": "http://host/path"
 }
 ```
 
 **Response**
+
 ```json
 {
   "categoryName": "AWAITING_GENERATION",
-  "id":           "df654c3b1bd105a29d658f78f6380a842feac879",,
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-  "id":           12
+    "id": 12
   },
-  "body":         "JSON payload" 
+  "body": "JSON payload"
 }
 ```
 
 - **MEMBER_SYNC**
 
 **Request**
+
 ```json
 {
-  "categoryName":  "MEMBER_SYNC",
+  "categoryName": "MEMBER_SYNC",
   "subscriberUrl": "http://host/path"
 }
 ```
 
 **Response**
+
 ```json
 {
   "categoryName": "MEMBER_SYNC",
@@ -387,11 +401,18 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | payload    TEXT             NOT NULL |
 | schema_version TEXT   PK    NOT NULL |
 
-| subscription_category_sync_time      |
-|--------------------------------------|
+| subscription_category_sync_time       |
+|---------------------------------------|
 | project_id       INT4  PK FK NOT NULL |
 | category_name    TEXT  PK    NOT NULL |
 | last_synced      TIMESTAMP   NOT NULL |
+
+| status_processing_time                    |
+|-------------------------------------------|
+| event_id        VARCHAR    PK FK NOT NULL |
+| project_id      INT4       PK FK NOT NULL |
+| status          VARCHAR          NOT NULL |
+| processing_time INTERVAL         NOT NULL |
 
 ## Trying out
 

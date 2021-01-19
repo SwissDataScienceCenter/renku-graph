@@ -29,7 +29,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, executionDates}
+import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventProcessingTimes, executionDates}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
@@ -43,7 +43,7 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
   "command" should {
 
     s"set status $New on the event with the given id and $GeneratingTriples status, " +
-      "increment waiting events gauge and decrement under processing gauge for the project " +
+      "increment waiting events gauge and decrement under processing gauge for the project, insert the processingTime " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         val projectPath = projectPaths.generateOne
@@ -78,18 +78,20 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
         (awaitingTriplesGenerationGauge.increment _).expects(projectPath).returning(IO.unit)
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-        val command = ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, currentTime)
+        val command =
+          ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, processingTime, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvents(status = New) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
+        findEvents(status = New)                 shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
+        findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
+        histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
       }
 
     EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.Conflict}" in new TestCase {
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
 
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
@@ -102,16 +104,18 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
 
           findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-          val command = ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, currentTime)
+          val command =
+            ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, processingTime, currentTime)
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
           val expectedEvents =
             if (eventStatus != New) List.empty
             else List((eventId, executionDate, eventBatchDate))
-          findEvents(status = New) shouldBe expectedEvents
+          findEvents(status = New)    shouldBe expectedEvents
+          findProcessingTime(eventId) shouldBe List()
 
-          histogram.verifyExecutionTimeMeasured(command.query.name)
+          histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
     }
   }
@@ -124,6 +128,7 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
     val currentTime    = mockFunction[Instant]
     val eventId        = compoundEventIds.generateOne
     val eventBatchDate = batchDates.generateOne
+    val processingTime = eventProcessingTimes.generateSome
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 

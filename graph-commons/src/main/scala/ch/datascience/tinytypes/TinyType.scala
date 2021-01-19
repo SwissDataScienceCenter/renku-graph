@@ -24,6 +24,7 @@ import ch.datascience.tinytypes.constraints.PathSegment
 import io.circe.Json
 
 import java.time.{Instant, LocalDate}
+import java.time.Duration
 
 trait TinyType extends Any {
 
@@ -42,6 +43,7 @@ trait LongTinyType         extends Any with TinyType { type V = Long }
 trait BigDecimalTinyType   extends Any with TinyType { type V = BigDecimal }
 trait JsonTinyType         extends Any with TinyType { type V = Json }
 trait InstantTinyType      extends Any with TinyType { type V = Instant }
+trait DurationTinyType     extends Any with TinyType { type V = Duration }
 trait LocalDateTinyType    extends Any with TinyType { type V = LocalDate }
 trait BooleanTinyType      extends Any with TinyType { type V = Boolean }
 

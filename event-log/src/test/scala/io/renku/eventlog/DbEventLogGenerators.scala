@@ -23,7 +23,10 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import org.scalacheck.Gen
+import eu.timepit.refined.auto._
 
+import java.util.concurrent.TimeUnit
+import scala.concurrent.duration.FiniteDuration
 import scala.language.postfixOps
 
 object DbEventLogGenerators {
@@ -59,4 +62,7 @@ object DbEventLogGenerators {
     id   <- projectIds
     path <- projectPaths
   } yield EventProject(id, path)
+
+  implicit lazy val eventProcessingTimes: Gen[EventProcessingTime] =
+    notNegativeJavaDurations.map(EventProcessingTime.apply)
 }

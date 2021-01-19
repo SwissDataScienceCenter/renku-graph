@@ -18,26 +18,29 @@
 
 package io.renku.eventlog.statuschange.commands
 
+import cats.data.NonEmptyList
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.eventlog.{EventLogDB, EventProcessingTime, TypeSerializers}
 
 trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable with TypeSerializers {
   def eventId: CompoundEventId
   def status:  EventStatus
-  def query:   SqlQuery[Int]
+  def queries: NonEmptyList[SqlQuery[Int]]
   def updateGauges(updateResult: UpdateResult)(implicit
       transactor:                DbTransactor[Interpretation, EventLogDB]
   ): Interpretation[Unit]
 
+  def maybeProcessingTime: Option[EventProcessingTime]
+
   def mapResult: Int => UpdateResult = {
-    case 0 => UpdateResult.Conflict
+    case 0 => UpdateResult.NotFound
     case 1 => UpdateResult.Updated
-    case 2 => UpdateResult.NotFound
-    case _ => UpdateResult.Failure(Refined.unsafeApply(s"An attempt to set status $status on $eventId failed"))
+    case _ => UpdateResult.Conflict
   }
+
 }
 
 sealed trait UpdateResult extends Product with Serializable
@@ -47,4 +50,5 @@ object UpdateResult {
   case object Updated  extends UpdateResult
   case object NotFound extends UpdateResult
   case class Failure(message: String Refined NonEmpty) extends UpdateResult
+
 }
