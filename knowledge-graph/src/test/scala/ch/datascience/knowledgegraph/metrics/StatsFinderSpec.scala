@@ -26,7 +26,7 @@ import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
 import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.entities.bundles.{generateProject, gitLabApiUrl, nonModifiedDataSetCommit, renkuBaseUrl}

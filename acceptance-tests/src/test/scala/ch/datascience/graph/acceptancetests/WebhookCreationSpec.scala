@@ -31,7 +31,7 @@ import ch.datascience.graph.model.projects.Visibility.Public
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
-import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import io.circe.literal._
 import org.http4s.Status._
 import org.scalatest.GivenWhenThen

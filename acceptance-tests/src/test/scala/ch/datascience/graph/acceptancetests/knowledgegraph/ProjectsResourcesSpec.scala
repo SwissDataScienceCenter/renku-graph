@@ -41,7 +41,7 @@ import ch.datascience.knowledgegraph.projects.model.Permissions.{GroupPermission
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.Person
-import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.rdfstore.entities.bundles._
 import io.circe.Json
 import io.circe.literal._

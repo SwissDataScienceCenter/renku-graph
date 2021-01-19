@@ -19,10 +19,12 @@
 package io.renku.eventlog.subscriptions
 
 import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.constraints.Url
+import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, Url}
 import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
+
+import java.time.Instant
 
 private final case class ProjectIds(id: projects.Id, path: projects.Path)
 
@@ -30,6 +32,9 @@ private final class SubscriberUrl private (val value: String) extends AnyVal wit
 private object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url {
   implicit val subscriberUrlDecoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
 }
+
+final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
+object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_)) with InstantNotInTheFuture
 
 private trait SubscriptionCategoryPayload {
   def subscriberUrl: SubscriberUrl

@@ -18,28 +18,23 @@
 
 package io.renku.eventlog
 
-import java.util.concurrent.ConcurrentHashMap
-
-import cats.MonadError
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
-import ch.datascience.metrics.{GaugeResetScheduler, LabeledGauge, SingleValueGauge}
+import ch.datascience.metrics.GaugeResetScheduler
 import ch.datascience.testtools.MockedRunnableCollaborators
-import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.init.DbInitializer
-import io.renku.eventlog.metrics.{EventLogMetrics, StatsFinder}
-import io.renku.eventlog.subscriptions.{SubscriptionCategory, SubscriptionCategoryPayload, SubscriptionCategoryRegistry}
+import io.renku.eventlog.metrics.EventLogMetrics
+import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.FiniteDuration
 
 class MicroserviceRunnerSpec
     extends AnyWordSpec
@@ -161,7 +156,7 @@ class MicroserviceRunnerSpec
     val sentryInitializer            = mock[IOSentryInitializer]
     val dbInitializer                = mock[DbInitializer[IO]]
     val subscriptionCategoryRegistry = mock[SubscriptionCategoryRegistry[IO]]
-    val metrics                      = mock[TestEventLogMetrics]
+    val metrics                      = mock[EventLogMetrics[IO]]
     val httpServer                   = mock[IOHttpServer]
     val gaugeScheduler               = mock[GaugeResetScheduler[IO]]
     val runner = new MicroserviceRunner(
@@ -174,20 +169,5 @@ class MicroserviceRunnerSpec
       httpServer,
       new ConcurrentHashMap[CancelToken[IO], Unit]()
     )
-
-    class TestEventLogMetrics(
-        statsFinder:   StatsFinder[IO],
-        logger:        Logger[IO],
-        statusesGauge: LabeledGauge[IO, EventStatus],
-        totalGauge:    SingleValueGauge[IO],
-        interval:      FiniteDuration
-    )(implicit ME:     MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
-        extends EventLogMetrics(
-          statsFinder,
-          logger,
-          statusesGauge,
-          totalGauge,
-          interval
-        )
   }
 }

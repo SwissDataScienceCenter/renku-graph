@@ -18,8 +18,6 @@
 
 package ch.datascience.triplesgenerator.reprovisioning
 
-import java.lang.Thread.sleep
-
 import cats.effect.IO
 import cats.effect.concurrent.Ref
 import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
@@ -29,13 +27,14 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
+import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningJsonLD.{Running, objectType}
-import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.lang.Thread.sleep
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
@@ -125,9 +124,9 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     private val logger                  = TestLogger[IO]()
     private val timeRecorder            = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     private val statusCacheCheckTimeRef = Ref.of[IO, Long](0L).unsafeRunSync()
-    val subscriber                      = mock[Subscriber[IO]]
+    val subscriptionMechanismRegistry   = mock[SubscriptionMechanismRegistry[IO]]
 
-    val reProvisioningStatus = new ReProvisioningStatusImpl(subscriber,
+    val reProvisioningStatus = new ReProvisioningStatusImpl(subscriptionMechanismRegistry,
                                                             rdfStoreConfig,
                                                             renkuBaseUrl,
                                                             logger,
@@ -138,7 +137,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     )
 
     def expectNotificationSent =
-      (subscriber.notifyAvailability _)
+      (subscriptionMechanismRegistry.renewAllSubscriptions _)
         .expects()
         .returning(IO.unit)
   }

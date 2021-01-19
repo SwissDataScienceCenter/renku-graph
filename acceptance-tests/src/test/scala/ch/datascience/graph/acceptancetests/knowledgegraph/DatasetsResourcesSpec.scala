@@ -43,7 +43,7 @@ import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
 import ch.datascience.knowledgegraph.projects.model.{Creator, Project}
 import ch.datascience.rdfstore.entities.Person
-import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._

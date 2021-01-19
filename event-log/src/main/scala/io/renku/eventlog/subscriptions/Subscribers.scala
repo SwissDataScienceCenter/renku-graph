@@ -20,8 +20,8 @@ package io.renku.eventlog.subscriptions
 
 import cats.Applicative
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.graph.model.events.CategoryName
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
 
 import scala.concurrent.ExecutionContext
 import scala.language.postfixOps

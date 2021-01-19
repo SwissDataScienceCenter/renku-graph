@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings}
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
+import ch.datascience.graph.model.events.CategoryName
 import org.scalacheck.Gen
 
 private object Generators {

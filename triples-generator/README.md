@@ -16,6 +16,10 @@ This is a microservice which:
 
 Accepts an event for triples generation.
 
+##### Supported event categories:
+
+- **AWAITING_GENERATION**
+
 **Request**
 
 ```json
@@ -44,7 +48,21 @@ Event Body example:
 }
 ```
 
-**Response**
+- **MEMBER_SYNC**
+
+**Request**
+
+```json
+{
+  "categoryName": "MEMBER_SYNC",
+  "project": {
+    "path":       "namespace/project-name"
+  }
+}
+```
+
+
+##### Response
 
 | Status                     | Description                                                                  |
 |----------------------------|------------------------------------------------------------------------------|

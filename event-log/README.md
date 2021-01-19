@@ -360,8 +360,8 @@ As a good practice, the subscription should be renewed periodically in case of r
 {
   "categoryName": "MEMBER_SYNC",
   "project": {
-    "path": "namespace/project-name"
-  }
+    "path":       "namespace/project-name"
+  } 
 }
 ```
 

@@ -31,7 +31,7 @@ private object MemberSyncEventEncoder extends Encoder[MemberSyncEvent] {
   import io.circe.literal.JsonStringContext
 
   override def apply(event: MemberSyncEvent): Json = json"""{
-    "categoryName": ${SubscriptionCategory.name.value},
+    "categoryName": ${categoryName.value},
     "project": {
       "path":       ${event.projectPath.value}
     }

@@ -32,7 +32,7 @@ import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream._
 import ch.datascience.rdfstore.entities.CommandParameter.Output.OutputFactory
 import ch.datascience.rdfstore.entities.CommandParameter.{Input, Output}
-import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.rdfstore.entities.RunPlan.Command
 import ch.datascience.rdfstore.entities._
 import ch.datascience.rdfstore.entities.bundles._

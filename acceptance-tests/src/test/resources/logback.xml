@@ -23,6 +23,10 @@
         <appender-ref ref="ASYNC_STDOUT"/>
     </logger>
 
+    <logger name="org.http4s.blaze.channel.nio1.NIO1SocketServerGroup" level="ERROR" additivity="false">
+        <appender-ref ref="ASYNC_STDOUT"/>
+    </logger>
+
     <root level="ERROR">
         <appender-ref ref="ASYNC_STDOUT"/>
     </root>
