@@ -144,7 +144,7 @@ private class TriplesGeneratedEventFinderImpl(
       : Option[TriplesGeneratedEvent] => Free[ConnectionOp, Option[TriplesGeneratedEvent]] = {
     case None =>
       Free.pure[ConnectionOp, Option[TriplesGeneratedEvent]](None)
-    case Some(event @ TriplesGeneratedEvent(id, _, _, _)) =>
+    case Some(event @ TriplesGeneratedEvent(id, _, _)) =>
       measureExecutionTime(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
   }
 

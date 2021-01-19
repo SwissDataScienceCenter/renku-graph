@@ -32,8 +32,8 @@ import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog._
 import io.renku.eventlog.Generators._
+import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.ProjectIds
 import io.renku.eventlog.subscriptions.triplesgenerated.ProjectPrioritisation.Priority.MaxPriority
 import io.renku.eventlog.subscriptions.triplesgenerated.ProjectPrioritisation.{Priority, ProjectInfo}
@@ -62,14 +62,14 @@ private class TriplesGeneratedEventFinderSpec
         val projectId   = projectIds.generateOne
         val projectPath = projectPaths.generateOne
 
-        val (event1Id, _, latestEventDate, _, schemaVersion1, eventPayload1) = createEvent(
+        val (event1Id, _, latestEventDate, _, eventPayload1) = createEvent(
           status = TriplesGenerated,
           eventDate = EventDate(now.minus(1, H)),
           projectId = projectId,
           projectPath = projectPath
         )
 
-        val (event2Id, _, _, _, schemaVersion2, eventPayload2) = createEvent(
+        val (event2Id, _, _, _, eventPayload2) = createEvent(
           status = TransformationRecoverableFailure,
           EventDate(now.minus(5, H)),
           projectId = projectId,
@@ -87,7 +87,7 @@ private class TriplesGeneratedEventFinderSpec
         )
 
         finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(event2Id, projectPath, schemaVersion2, eventPayload2)
+          TriplesGeneratedEvent(event2Id, projectPath, eventPayload2)
         )
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event2Id, executionDate))
@@ -101,7 +101,7 @@ private class TriplesGeneratedEventFinderSpec
         )
 
         finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(event1Id, projectPath, schemaVersion1, eventPayload1)
+          TriplesGeneratedEvent(event1Id, projectPath, eventPayload1)
         )
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate), (event2Id, executionDate))
@@ -122,20 +122,20 @@ private class TriplesGeneratedEventFinderSpec
         val projectId   = projectIds.generateOne
         val projectPath = projectPaths.generateOne
 
-        val (event1Id, _, event1Date, _, schemaVersion1, eventPayload1) = createEvent(
+        val (event1Id, _, event1Date, _, eventPayload1) = createEvent(
           status = TriplesGenerated,
           projectId = projectId,
           projectPath = projectPath
         )
 
-        val (_, _, event2Date, _, _, _) = createEvent(
+        val (_, _, event2Date, _, _) = createEvent(
           status = TransformationRecoverableFailure,
           executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
           projectId = projectId,
           projectPath = projectPath
         )
 
-        val (_, _, event3Date, _, _, _) = createEvent(
+        val (_, _, event3Date, _, _) = createEvent(
           status = TriplesGenerated,
           executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
           projectId = projectId,
@@ -154,7 +154,7 @@ private class TriplesGeneratedEventFinderSpec
         )
 
         finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(event1Id, projectPath, schemaVersion1, eventPayload1)
+          TriplesGeneratedEvent(event1Id, projectPath, eventPayload1)
         )
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate))
@@ -172,7 +172,7 @@ private class TriplesGeneratedEventFinderSpec
     s"return an event with the $TransformingTriples status " +
       "if execution date is longer than MaxProcessingTime" in new TestCase {
 
-        val (eventId, _, eventDate, projectPath, schemaVersion1, eventPayload1) = createEvent(
+        val (eventId, _, eventDate, projectPath, eventPayload1) = createEvent(
           status = TransformingTriples,
           executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes + 1, MIN))
         )
@@ -186,7 +186,7 @@ private class TriplesGeneratedEventFinderSpec
         )
 
         finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(eventId, projectPath, schemaVersion1, eventPayload1)
+          TriplesGeneratedEvent(eventId, projectPath, eventPayload1)
         )
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((eventId, executionDate))
@@ -216,7 +216,7 @@ private class TriplesGeneratedEventFinderSpec
 
       expectGaugeUpdated(times = events.size)
 
-      events foreach { case (eventId, _, eventDate, projectPath, _, _) =>
+      events foreach { case (eventId, _, eventDate, projectPath, _) =>
         givenPrioritisation(
           takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 1)),
           returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
@@ -257,7 +257,7 @@ private class TriplesGeneratedEventFinderSpec
 
       expectGaugeUpdated(times = events.size)
 
-      events foreach { case (eventId, _, _, projectPath, _, _) =>
+      events foreach { case (eventId, _, _, projectPath, _) =>
         (projectPrioritisation.prioritise _)
           .expects(*)
           .returning(List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority))
@@ -335,7 +335,7 @@ private class TriplesGeneratedEventFinderSpec
                           projectPath:          Path = projectPaths.generateOne,
                           payloadSchemaVersion: SchemaVersion = projectSchemaVersions.generateOne,
                           eventPayload:         EventPayload = eventPayloads.generateOne
-  ): (CompoundEventId, EventBody, EventDate, Path, SchemaVersion, EventPayload) = {
+  ): (CompoundEventId, EventBody, EventDate, Path, EventPayload) = {
     val eventId   = compoundEventIds.generateOne.copy(projectId = projectId)
     val eventBody = eventBodies.generateOne
 
@@ -351,6 +351,6 @@ private class TriplesGeneratedEventFinderSpec
       maybeEventPayload = eventPayload.some
     )
 
-    (eventId, eventBody, eventDate, projectPath, payloadSchemaVersion, eventPayload)
+    (eventId, eventBody, eventDate, projectPath, eventPayload)
   }
 }

@@ -1,3 +1,21 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.effect.{ContextShift, IO, Timer}
@@ -5,10 +23,10 @@ import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
 import io.renku.eventlog.subscriptions.{IOEventsDistributor, Subscribers, SubscriptionCategoryImpl, SubscriptionCategoryPayload, SubscriptionRequestDeserializer}
 import io.renku.eventlog.{EventLogDB, subscriptions}
+
 import scala.concurrent.ExecutionContext
 
 private[subscriptions] object SubscriptionCategory {
@@ -16,8 +34,8 @@ private[subscriptions] object SubscriptionCategory {
 
   def apply(
       transactor:                  DbTransactor[IO, EventLogDB],
-      waitingEventsGauge:          LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+      awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
+      underTransformationGauge:    LabeledGauge[IO, projects.Path],
       queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
       logger:                      Logger[IO]
   )(implicit
@@ -27,8 +45,8 @@ private[subscriptions] object SubscriptionCategory {
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers <- Subscribers(name, logger)
     eventFetcher <-
-      IOTriplesGeneratedEventFinder(transactor, waitingEventsGauge, underTriplesGenerationGauge, queriesExecTimes)
-    dispatchRecovery <- DispatchRecovery(transactor, underTriplesGenerationGauge, queriesExecTimes, logger)
+      IOTriplesGeneratedEventFinder(transactor, awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
+    dispatchRecovery <- DispatchRecovery(transactor, underTransformationGauge, queriesExecTimes, logger)
     eventsDistributor <- IOEventsDistributor(name,
                                              transactor,
                                              subscribers,

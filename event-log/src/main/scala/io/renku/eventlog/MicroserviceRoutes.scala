@@ -32,7 +32,7 @@ import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.LatestEventsEndpoint
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.StatusChangeEndpoint
-import io.renku.eventlog.subscriptions.{SubscriptionCategoryPayload, SubscriptionsEndpoint}
+import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Response}
 

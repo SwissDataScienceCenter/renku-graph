@@ -26,9 +26,8 @@ import org.scalacheck.Gen
 package object triplesgenerated {
 
   private[triplesgenerated] lazy val triplesGeneratedEvents: Gen[TriplesGeneratedEvent] = for {
-    eventId       <- compoundEventIds
-    projectPath   <- projectPaths
-    schemaVersion <- projectSchemaVersions
-    payload       <- eventPayloads
-  } yield TriplesGeneratedEvent(eventId, projectPath, schemaVersion, payload)
+    eventId     <- compoundEventIds
+    projectPath <- projectPaths
+    payload     <- eventPayloads
+  } yield TriplesGeneratedEvent(eventId, projectPath, payload)
 }

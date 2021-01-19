@@ -40,8 +40,7 @@ class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers 
         "project": {
           "id":         ${event.id.projectId.value}
         },
-        "body":         ${event.payload.value},
-        "schemaVersion": ${event.schemaVersion.value}
+        "body":         ${event.payload.value}
       }"""
     }
   }
