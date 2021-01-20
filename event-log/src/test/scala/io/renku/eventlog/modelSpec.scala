@@ -22,7 +22,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.tinytypes.constraints.{DurationNotNegative, InstantNotInTheFuture, NonBlank}
-import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.EventContentGenerators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks

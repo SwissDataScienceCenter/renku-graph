@@ -26,7 +26,7 @@ import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import doobie.implicits._
-import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.EventDate
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

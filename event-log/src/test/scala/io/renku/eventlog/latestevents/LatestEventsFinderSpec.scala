@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

@@ -31,7 +31,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventProcessingTimes, executionDates}
+import io.renku.eventlog.EventContentGenerators.{eventDates, eventProcessingTimes, executionDates}
 import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 import io.renku.eventlog.{EventLogDB, EventProcessingTime, InMemoryEventLogDbSpec}

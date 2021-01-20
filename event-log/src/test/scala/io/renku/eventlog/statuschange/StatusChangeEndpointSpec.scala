@@ -26,6 +26,7 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.http.server.EndpointTester._
@@ -36,7 +37,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.prometheus.client.Gauge
-import io.renku.eventlog.DbEventLogGenerators.{eventMessages, eventPayloads, eventProcessingTimes}
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
 import org.http4s.MediaType._
@@ -48,7 +49,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.graph.model.GraphModelGenerators._
 
 class StatusChangeEndpointSpec
     extends AnyWordSpec

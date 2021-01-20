@@ -30,7 +30,7 @@ import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.{LastSyncedDate, SubscriptionDataProvisioning}
 import org.scalatest.matchers.should

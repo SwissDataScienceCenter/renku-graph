@@ -102,11 +102,14 @@ object Microservice extends IOMicroservice {
                                   queriesExecTimes,
                                   ApplicationLogger
                                 )
-        subscriptionCategoryRegistry <- IOSubscriptionCategoryRegistry(transactor,
-                                                                       awaitingGenerationGauge,
-                                                                       underTriplesGenerationGauge,
-                                                                       queriesExecTimes,
-                                                                       ApplicationLogger
+        subscriptionCategoryRegistry <- IOSubscriptionCategoryRegistry(
+                                          transactor,
+                                          awaitingGenerationGauge,
+                                          underTriplesGenerationGauge,
+                                          awaitingTransformationGauge,
+                                          underTransformationGauge,
+                                          queriesExecTimes,
+                                          ApplicationLogger
                                         )
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptionCategoryRegistry, ApplicationLogger)
         microserviceRoutes =
