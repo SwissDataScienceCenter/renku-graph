@@ -29,7 +29,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
+import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import org.scalacheck.Gen

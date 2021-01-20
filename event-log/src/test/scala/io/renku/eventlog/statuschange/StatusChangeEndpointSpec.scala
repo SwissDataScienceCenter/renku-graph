@@ -37,8 +37,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.prometheus.client.Gauge
-import io.renku.eventlog.DbEventLogGenerators.{eventMessages, eventProcessingTimes}
-import io.renku.eventlog.Generators._
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
 import org.http4s.MediaType._

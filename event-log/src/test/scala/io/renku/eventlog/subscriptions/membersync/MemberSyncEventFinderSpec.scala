@@ -25,7 +25,7 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.subscriptions.{LastSyncedDate, SubscriptionDataProvisioning}
 import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory

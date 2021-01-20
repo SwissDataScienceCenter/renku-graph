@@ -32,7 +32,7 @@ import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
-import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.creation.EventPersister.Result
 import io.renku.eventlog.{Event, EventProject}

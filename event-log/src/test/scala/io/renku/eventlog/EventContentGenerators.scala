@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import scala.language.postfixOps
 
-object DbEventLogGenerators {
+object EventContentGenerators {
 
   implicit val eventDates:     Gen[EventDate]     = timestampsNotInTheFuture map EventDate.apply
   implicit val createdDates:   Gen[CreatedDate]   = timestampsNotInTheFuture map CreatedDate.apply
@@ -64,4 +64,8 @@ object DbEventLogGenerators {
 
   implicit lazy val eventProcessingTimes: Gen[EventProcessingTime] =
     notNegativeJavaDurations.map(EventProcessingTime.apply)
+
+  implicit val eventPayloads: Gen[EventPayload] = for {
+    content <- jsons
+  } yield EventPayload(content.noSpaces)
 }

@@ -29,8 +29,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.Generators._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventProcessingTimes, executionDates}
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory

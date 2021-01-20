@@ -31,8 +31,7 @@ import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody,
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.Generators._
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.ProjectIds
 import io.renku.eventlog.subscriptions.triplesgenerated.ProjectPrioritisation.Priority.MaxPriority

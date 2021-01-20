@@ -34,7 +34,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
