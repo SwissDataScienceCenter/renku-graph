@@ -338,7 +338,9 @@ object Generators {
       ): Gen[NonEmptyList[T]] =
         nonEmptyList(generator, minElements, maxElements)
 
-      def toGeneratorOfSet(minElements: Int Refined Positive = 1, maxElements: Int Refined Positive = 5): Gen[Set[T]] =
+      def toGeneratorOfSet(minElements: Int Refined NonNegative = 1,
+                           maxElements: Int Refined Positive = 5
+      ): Gen[Set[T]] =
         setOf(generator, minElements, maxElements)
 
       private def generateExample[O](generator: Gen[O]): O =

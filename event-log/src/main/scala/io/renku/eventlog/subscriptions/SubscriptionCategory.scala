@@ -21,12 +21,9 @@ package io.renku.eventlog.subscriptions
 import cats.Semigroup
 import cats.data.OptionT
 import cats.effect.Effect
-import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonBlank}
-import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
+import ch.datascience.graph.model.events.CategoryName
 import io.circe.Json
 import io.renku.eventlog.subscriptions.SubscriptionCategory._
-
-import java.time.Instant
 
 private trait SubscriptionCategory[Interpretation[_]] {
 
@@ -38,14 +35,6 @@ private trait SubscriptionCategory[Interpretation[_]] {
 }
 
 private[subscriptions] object SubscriptionCategory {
-
-  final class CategoryName private (val value: String) extends AnyVal with StringTinyType
-  implicit object CategoryName extends TinyTypeFactory[CategoryName](new CategoryName(_)) with NonBlank
-
-  final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
-  implicit object LastSyncedDate
-      extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_))
-      with InstantNotInTheFuture
 
   sealed trait RegistrationResult
   final case object AcceptedRegistration extends RegistrationResult

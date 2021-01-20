@@ -25,8 +25,7 @@ import ch.datascience.metrics.LabeledHistogram
 import doobie.free.connection.ConnectionOp
 import eu.timepit.refined.api.Refined
 import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.subscriptions.SubscriptionCategory.LastSyncedDate
-import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
+import io.renku.eventlog.subscriptions.{EventFinder, LastSyncedDate, SubscriptionTypeSerializers}
 
 import java.time.Instant
 
@@ -55,7 +54,7 @@ private class MemberSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
       sql"""|SELECT proj.project_id, sync_time.last_synced, proj.project_path
             |FROM project proj
             |LEFT JOIN subscription_category_sync_time sync_time 
-            |  ON sync_time.project_id = proj.project_id AND sync_time.category_name = ${SubscriptionCategory.name}
+            |  ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryName
             |WHERE
             |  sync_time.last_synced IS NULL
             |  OR (
@@ -68,7 +67,7 @@ private class MemberSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
       """.stripMargin
         .query[(projects.Id, Option[LastSyncedDate], MemberSyncEvent)]
         .option,
-      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find event")
+      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event")
     )
   }
 
@@ -80,21 +79,21 @@ private class MemberSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
     SqlQuery(
       sql"""|UPDATE subscription_category_sync_time 
             |SET last_synced = ${now()}
-            |WHERE project_id = $projectId AND category_name = ${SubscriptionCategory.name}
+            |WHERE project_id = $projectId AND category_name = $categoryName
             |""".stripMargin.update.run,
-      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update last_synced")
+      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced")
     )
   }
 
   private def insertLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
     SqlQuery(
       sql"""|INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
-            |VALUES ($projectId, ${SubscriptionCategory.name}, ${now()})
+            |VALUES ($projectId, $categoryName, ${now()})
             |ON CONFLICT (project_id, category_name)
             |DO 
             |  UPDATE SET last_synced = EXCLUDED.last_synced
             |""".stripMargin.update.run,
-      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - insert last_synced")
+      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced")
     )
   }
 

@@ -31,7 +31,7 @@ import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
-import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.literal._
 import org.http4s.Status._

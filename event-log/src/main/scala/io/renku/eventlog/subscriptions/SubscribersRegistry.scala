@@ -18,16 +18,16 @@
 
 package io.renku.eventlog.subscriptions
 
-import java.time.Instant
-import java.util.concurrent.ConcurrentHashMap
 import cats.Applicative
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
 
+import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps

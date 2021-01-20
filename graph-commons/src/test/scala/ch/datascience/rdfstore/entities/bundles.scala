@@ -35,7 +35,6 @@ import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream
 import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
 import ch.datascience.rdfstore.entities.CommandParameter._
 import ch.datascience.rdfstore.entities.DataSetPart.{DataSetPartArtifact, dataSetParts}
-import ch.datascience.rdfstore.entities.Person.persons
 import ch.datascience.rdfstore.entities.ProcessRun.StandAloneProcessRun
 import ch.datascience.rdfstore.entities.RunPlan.{Command, ProcessRunPlan}
 import eu.timepit.refined.auto._
@@ -75,7 +74,13 @@ object bundles extends Schemas {
     commitId,
     committedDate,
     committer,
-    Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion),
+    Project(projectPath,
+            projectName,
+            projectDateCreated,
+            maybeProjectCreator,
+            maybeParentProject = maybeParent,
+            version = projectVersion
+    ),
     Agent(cliVersion),
     maybeGenerationFactories = List(
       Generation.factory(Entity.factory(location))
@@ -166,7 +171,13 @@ object bundles extends Schemas {
     commitId,
     committedDate,
     committer,
-    Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion),
+    Project(projectPath,
+            projectName,
+            projectDateCreated,
+            maybeProjectCreator,
+            maybeParentProject = maybeParent,
+            version = projectVersion
+    ),
     Agent(cliVersion),
     maybeGenerationFactories = List(
       Generation.factory(
@@ -269,7 +280,13 @@ object bundles extends Schemas {
     commitId,
     committedDate,
     committer,
-    Project(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion),
+    Project(projectPath,
+            projectName,
+            projectDateCreated,
+            maybeProjectCreator,
+            maybeParentProject = maybeParent,
+            version = projectVersion
+    ),
     Agent(cliVersion),
     maybeGenerationFactories = List(
       Generation.factory(

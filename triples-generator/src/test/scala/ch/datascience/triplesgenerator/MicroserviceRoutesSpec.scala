@@ -22,7 +22,7 @@ import cats.effect.{Clock, IO}
 import cats.syntax.all._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestRoutesMetrics
-import ch.datascience.triplesgenerator.eventprocessing.IOEventProcessingEndpoint
+import ch.datascience.triplesgenerator.events.EventEndpoint
 import org.http4s.Method.POST
 import org.http4s.Status._
 import org.http4s._
@@ -41,7 +41,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     "define a POST /events endpoint" in new TestCase {
       val request        = Request[IO](POST, uri"events")
       val expectedStatus = Accepted
-      (eventProcessingEndpoint.processEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
+      (eventEndpoint.processEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
 
       val response = routes.call(request)
 
@@ -70,10 +70,10 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
   private trait TestCase {
 
-    val eventProcessingEndpoint = mock[IOEventProcessingEndpoint]
-    val routesMetrics           = TestRoutesMetrics()
+    val eventEndpoint = mock[EventEndpoint[IO]]
+    val routesMetrics = TestRoutesMetrics()
     val routes = new MicroserviceRoutes[IO](
-      eventProcessingEndpoint,
+      eventEndpoint,
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))
   }

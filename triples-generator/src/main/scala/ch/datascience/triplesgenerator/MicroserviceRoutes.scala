@@ -20,16 +20,16 @@ package ch.datascience.triplesgenerator
 
 import cats.effect.{Clock, ConcurrentEffect, Resource}
 import ch.datascience.metrics.RoutesMetrics
-import ch.datascience.triplesgenerator.eventprocessing.EventProcessingEndpoint
+import ch.datascience.triplesgenerator.events.EventEndpoint
 import org.http4s.dsl.Http4sDsl
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
-    eventProcessingEndpoint: EventProcessingEndpoint[F],
-    routesMetrics:           RoutesMetrics[F]
-)(implicit clock:            Clock[F])
+    eventEndpoint: EventEndpoint[F],
+    routesMetrics: RoutesMetrics[F]
+)(implicit clock:  Clock[F])
     extends Http4sDsl[F] {
 
-  import eventProcessingEndpoint._
+  import eventEndpoint._
   import org.http4s.HttpRoutes
   import routesMetrics._
 

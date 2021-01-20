@@ -144,7 +144,7 @@ private class MicroserviceRunner(
     certificateLoader:            CertificateLoader[IO],
     sentryInitializer:            SentryInitializer[IO],
     dbInitializer:                DbInitializer[IO],
-    metrics:                      EventLogMetrics,
+    metrics:                      EventLogMetrics[IO],
     subscriptionCategoryRegistry: SubscriptionCategoryRegistry[IO],
     metricsResetScheduler:        GaugeResetScheduler[IO],
     httpServer:                   HttpServer[IO],

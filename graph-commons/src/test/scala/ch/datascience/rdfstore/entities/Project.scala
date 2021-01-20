@@ -27,6 +27,7 @@ final case class Project(path:               Path,
                          name:               Name,
                          dateCreated:        DateCreated,
                          maybeCreator:       Option[Person],
+                         members:            Set[Person] = Set.empty,
                          maybeParentProject: Option[Project] = None,
                          version:            SchemaVersion
 )
@@ -51,6 +52,7 @@ object Project {
               schema / "name"          -> entity.name.asJsonLD,
               schema / "dateCreated"   -> entity.dateCreated.asJsonLD,
               schema / "creator"       -> entity.maybeCreator.asJsonLD,
+              schema / "member"        -> entity.members.toList.asJsonLD,
               schema / "schemaVersion" -> entity.version.asJsonLD,
               prov / "wasDerivedFrom"  -> entity.maybeParentProject.asJsonLD
             )

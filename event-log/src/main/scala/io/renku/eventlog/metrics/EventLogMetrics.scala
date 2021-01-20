@@ -21,7 +21,7 @@ package io.renku.eventlog.metrics
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.{CategoryName, EventStatus}
 import ch.datascience.metrics._
 import io.chrisdavenport.log4cats.Logger
 
@@ -29,36 +29,54 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-class EventLogMetrics(
-    statsFinder:   StatsFinder[IO],
-    logger:        Logger[IO],
-    statusesGauge: LabeledGauge[IO, EventStatus],
-    totalGauge:    SingleValueGauge[IO],
-    interval:      FiniteDuration = EventLogMetrics.interval
-)(implicit ME:     MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO]) {
+trait EventLogMetrics[Interpretation[_]] {
+  def run(): Interpretation[Unit]
+}
 
-  def run(): IO[Unit] = updateStatuses().foreverM[Unit]
+class EventLogMetricsImpl(
+    statsFinder:             StatsFinder[IO],
+    logger:                  Logger[IO],
+    categoryNameEventsGauge: LabeledGauge[IO, CategoryName],
+    statusesGauge:           LabeledGauge[IO, EventStatus],
+    totalGauge:              SingleValueGauge[IO],
+    interval:                FiniteDuration = EventLogMetrics.interval
+)(implicit ME:               MonadError[IO, Throwable], timer: Timer[IO], cs: ContextShift[IO])
+    extends EventLogMetrics[IO] {
 
-  private def updateStatuses(): IO[Unit] = {
-    for {
-      _        <- timer sleep interval
-      statuses <- statsFinder.statuses()
-      _        <- (statuses map toStatusesGauge).toList.sequence
-      _        <- totalGauge set statuses.values.sum.toDouble
-    } yield ()
-  } recoverWith logError
+  override def run(): IO[Unit] = updateStatuses().foreverM[Unit]
 
-  private lazy val toStatusesGauge: ((EventStatus, Long)) => IO[Unit] = { case (status, count) =>
-    statusesGauge set status -> count.toDouble
+  private def updateStatuses(): IO[Unit] = for {
+    _ <- timer sleep interval
+    _ <- provisionCategoryNames recoverWith logError(categoryNameEventsGauge.name)
+    _ <- provisionStatuses recoverWith logError(statusesGauge.name)
+  } yield ()
+
+  private def provisionCategoryNames = for {
+    eventsByCategoryName <- statsFinder.countEventsByCategoryName()
+    _                    <- (eventsByCategoryName map toCategoryNameEventsGauge).toList.sequence
+  } yield ()
+
+  private lazy val toCategoryNameEventsGauge: ((CategoryName, Long)) => IO[Unit] = { case (categoryName, count) =>
+    categoryNameEventsGauge set (categoryName -> count.toDouble)
   }
 
-  private lazy val logError: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)("Problem with gathering metrics")
+  private def provisionStatuses = for {
+    statuses <- statsFinder.statuses()
+    _        <- (statuses map toStatusesGauge).toList.sequence
+    _        <- totalGauge set statuses.values.sum.toDouble
+  } yield ()
+
+  private lazy val toStatusesGauge: ((EventStatus, Long)) => IO[Unit] = { case (status, count) =>
+    statusesGauge set (status -> count.toDouble)
+  }
+
+  private def logError(gaugeName: String): PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)(s"Problem with gathering metrics for $gaugeName")
   }
 }
 
 object EventLogMetrics {
-  private val interval: FiniteDuration = 10 seconds
+  private[metrics] val interval: FiniteDuration = 10 seconds
 }
 
 object IOEventLogMetrics {
@@ -70,8 +88,13 @@ object IOEventLogMetrics {
       statsFinder:         StatsFinder[IO],
       logger:              Logger[IO],
       metricsRegistry:     MetricsRegistry[IO]
-  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[EventLogMetrics] =
+  )(implicit contextShift: ContextShift[IO], timer: Timer[IO]): IO[EventLogMetrics[IO]] =
     for {
+      categoryNameEventsGauge <- Gauge[IO, CategoryName](
+                                   name = "category_name_events_count",
+                                   help = "Number of events waiting for processing per Category Name.",
+                                   labelName = "category_name"
+                                 )(metricsRegistry)
       statusesGauge <- Gauge[IO, EventStatus](name = "events_statuses_count",
                                               help = "Total Commit Events by status.",
                                               labelName = "status"
@@ -80,5 +103,5 @@ object IOEventLogMetrics {
                       name = "events_count",
                       help = "Total Commit Events."
                     )(metricsRegistry)
-    } yield new EventLogMetrics(statsFinder, logger, statusesGauge, totalGauge)
+    } yield new EventLogMetricsImpl(statsFinder, logger, categoryNameEventsGauge, statusesGauge, totalGauge)
 }

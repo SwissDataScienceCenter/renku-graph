@@ -25,7 +25,7 @@ import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.datasets.{Identifier, TopmostDerivedFrom}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.addedToProjectObjects
 import ch.datascience.knowledgegraph.datasets.model.DatasetProject
-import ch.datascience.rdfstore.entities.Person.persons
+import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
 import ch.datascience.rdfstore.entities.{Activity, Agent, InvalidationEntity, Project}
 import org.scalacheck.Gen
 

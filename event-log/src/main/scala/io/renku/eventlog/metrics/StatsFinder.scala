@@ -22,18 +22,22 @@ import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.{CategoryName, EventStatus}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
 import doobie.util.fragment.Fragment
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
 
+import java.time.Instant
+
 trait StatsFinder[Interpretation[_]] {
-  def statuses(): Interpretation[Map[EventStatus, Long]]
+  def countEventsByCategoryName(): Interpretation[Map[CategoryName, Long]]
+  def statuses():                  Interpretation[Map[EventStatus, Long]]
   def countEvents(statuses:   Set[EventStatus],
                   maybeLimit: Option[Int Refined Positive] = None
   ): Interpretation[Map[Path, Long]]
@@ -41,11 +45,53 @@ trait StatsFinder[Interpretation[_]] {
 
 class StatsFinderImpl(
     transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
+    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+    categoryNames:    Set[CategoryName] Refined NonEmpty,
+    now:              () => Instant = () => Instant.now
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
     with StatsFinder[IO]
     with TypeSerializers {
+
+  override def countEventsByCategoryName(): IO[Map[CategoryName, Long]] =
+    measureExecutionTime(countEventsPerCategoryName)
+      .transact(transactor.get)
+      .map(_.toMap)
+
+  // format: off
+  private lazy val countEventsPerCategoryName = SqlQuery(
+    (fr"""SELECT all_counts.category_name, SUM(all_counts.count)
+          FROM (
+            (
+              SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id)
+              FROM project proj
+              JOIN subscription_category_sync_time sync_time ON sync_time.project_id = proj.project_id
+              WHERE
+                   ((${now()} - proj.latest_event_date) < INTERVAL '1 hour' AND (${now()} - sync_time.last_synced) > INTERVAL '1 minute')
+                OR ((${now()} - proj.latest_event_date) < INTERVAL '1 day'  AND (${now()} - sync_time.last_synced) > INTERVAL '1 hour')
+                OR ((${now()} - proj.latest_event_date) > INTERVAL '1 day'  AND (${now()} - sync_time.last_synced) > INTERVAL '1 day')
+              GROUP BY sync_time.category_name
+            ) UNION """ ++ (categoryNames map generateUnions).reduce(_ ++ fr" UNION " ++ _) ++ fr"""
+          ) all_counts
+          GROUP BY all_counts.category_name;
+          """)
+      .query[(CategoryName, Long)]
+      .to[List],
+    name = "category name events count"
+  )
+  // format: on
+
+  private def generateUnions(categoryName: CategoryName) = Fragment.const {
+    s"""  (
+            SELECT '$categoryName' AS category_name, COUNT(DISTINCT proj.project_id)
+            FROM project proj
+            WHERE
+              proj.project_id NOT IN (
+                SELECT project_id from subscription_category_sync_time WHERE category_name = '$categoryName'
+              )
+          )
+    """
+  }
 
   override def statuses(): IO[Map[EventStatus, Long]] =
     measureExecutionTime(findStatuses)
@@ -54,7 +100,7 @@ class StatsFinderImpl(
       .map(addMissingStatues)
 
   private lazy val findStatuses = SqlQuery(
-    sql"""SELECT status, count(event_id) FROM event GROUP BY status;""".stripMargin
+    sql"""SELECT status, COUNT(event_id) FROM event GROUP BY status;""".stripMargin
       .query[(EventStatus, Long)]
       .to[List],
     name = "statuses count"
@@ -128,10 +174,17 @@ class StatsFinderImpl(
 }
 
 object IOStatsFinder {
+
+  import io.renku.eventlog.subscriptions.membersync
+
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[StatsFinder[IO]] = IO {
-    new StatsFinderImpl(transactor, queriesExecTimes)
+    new StatsFinderImpl(
+      transactor,
+      queriesExecTimes,
+      categoryNames = Refined.unsafeApply(Set(membersync.categoryName))
+    )
   }
 }

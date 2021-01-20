@@ -26,8 +26,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.DbEventLogGenerators._
-import io.renku.eventlog.subscriptions.SubscriptionCategory.LastSyncedDate
-import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
+import io.renku.eventlog.subscriptions.{LastSyncedDate, SubscriptionDataProvisioning}
 import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -65,67 +64,67 @@ class MemberSyncEventFinderSpec
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
-    "return projects with a latest event date less than an hour ago" +
-      "and a last sync time more than a minute ago" +
-      "AND not projects with a latest event date less than an hour ago" +
+    "return projects with a latest event date less than an hour ago " +
+      "and a last sync time more than a minute ago " +
+      "AND not projects with a latest event date less than an hour ago " +
       "and a last sync time less than a minute ago" in new TestCase {
         val compoundId0  = compoundEventIds.generateOne
         val projectPath0 = projectPaths.generateOne
         val eventDate0   = EventDate(generateInstant(lessThanAgo = Duration.ofMinutes(59)))
-        val lastSynced0  = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofSeconds(61)))
+        val lastSynced0  = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofSeconds(62)))
         upsertProject(compoundId0, projectPath0, eventDate0)
-        upsertLastSynced(compoundId0.projectId, SubscriptionCategory.name, lastSynced0)
+        upsertLastSynced(compoundId0.projectId, categoryName, lastSynced0)
 
         val compoundId1  = compoundEventIds.generateOne
         val projectPath1 = projectPaths.generateOne
         val eventDate1   = EventDate(generateInstant(lessThanAgo = Duration.ofMinutes(59)))
-        val lastSynced1  = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofSeconds(59)))
+        val lastSynced1  = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofSeconds(58)))
         upsertProject(compoundId1, projectPath1, eventDate1)
-        upsertLastSynced(compoundId1.projectId, SubscriptionCategory.name, lastSynced1)
+        upsertLastSynced(compoundId1.projectId, categoryName, lastSynced1)
 
         finder.popEvent().unsafeRunSync() shouldBe Some(MemberSyncEvent(projectPath0))
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
-    "return projects with a latest event date less than an day ago" +
-      "and a last sync time more than a hour ago" +
-      "AND not projects with a latest event date less than an day ago" +
-      "and a last sync time less than a hour ago" in new TestCase {
+    "return projects with a latest event date less than an day ago " +
+      "and a last sync time more than a hour ago " +
+      "but not projects with a latest event date less than a day ago " +
+      "and a last sync time less than an hour ago" in new TestCase {
         val compoundId0  = compoundEventIds.generateOne
         val projectPath0 = projectPaths.generateOne
         val eventDate0   = EventDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
-        val lastSynced0  = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(61)))
+        val lastSynced0  = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(65)))
         upsertProject(compoundId0, projectPath0, eventDate0)
-        upsertLastSynced(compoundId0.projectId, SubscriptionCategory.name, lastSynced0)
+        upsertLastSynced(compoundId0.projectId, categoryName, lastSynced0)
 
         val compoundId1  = compoundEventIds.generateOne
         val projectPath1 = projectPaths.generateOne
         val eventDate1   = EventDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
-        val lastSynced1  = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofMinutes(59)))
+        val lastSynced1  = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofMinutes(55)))
         upsertProject(compoundId1, projectPath1, eventDate1)
-        upsertLastSynced(compoundId1.projectId, SubscriptionCategory.name, lastSynced1)
+        upsertLastSynced(compoundId1.projectId, categoryName, lastSynced1)
 
         finder.popEvent().unsafeRunSync() shouldBe Some(MemberSyncEvent(projectPath0))
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
-    "return projects with a latest event date more than a day ago" +
-      "and a last sync time more than a day ago" +
-      "AND not projects with a latest event date more than a day ago" +
+    "return projects with a latest event date more than a day ago " +
+      "and a last sync time more than a day ago " +
+      "but not projects with a latest event date more than a day ago " +
       "and a last sync time less than a day ago" in new TestCase {
         val compoundId0  = compoundEventIds.generateOne
         val projectPath0 = projectPaths.generateOne
         val eventDate0   = EventDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
         val lastSynced0  = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
         upsertProject(compoundId0, projectPath0, eventDate0)
-        upsertLastSynced(compoundId0.projectId, SubscriptionCategory.name, lastSynced0)
+        upsertLastSynced(compoundId0.projectId, categoryName, lastSynced0)
 
         val compoundId1  = compoundEventIds.generateOne
         val projectPath1 = projectPaths.generateOne
         val eventDate1   = EventDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
         val lastSynced1  = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
         upsertProject(compoundId1, projectPath1, eventDate1)
-        upsertLastSynced(compoundId1.projectId, SubscriptionCategory.name, lastSynced1)
+        upsertLastSynced(compoundId1.projectId, categoryName, lastSynced1)
 
         finder.popEvent().unsafeRunSync() shouldBe Some(MemberSyncEvent(projectPath0))
         finder.popEvent().unsafeRunSync() shouldBe None

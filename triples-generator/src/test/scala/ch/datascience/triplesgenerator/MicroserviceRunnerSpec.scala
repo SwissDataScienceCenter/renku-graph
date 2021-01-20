@@ -26,11 +26,10 @@ import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.interpreters.{IOSentryInitializer, TestLogger}
 import ch.datascience.testtools.MockedRunnableCollaborators
-import ch.datascience.triplesgenerator.config.RenkuPythonDevVersion
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
+import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import ch.datascience.triplesgenerator.init.{CliVersionCompatibilityVerifier, IOFusekiDatasetInitializer}
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioning
-import ch.datascience.triplesgenerator.subscriptions.Subscriber
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -55,7 +54,7 @@ class MicroserviceRunnerSpec
         given(sentryInitializer).succeeds(returning = ())
         given(cliVersionCompatChecker).succeeds(returning = ())
         given(datasetInitializer).succeeds(returning = ())
-        given(subscriber).succeeds(returning = ())
+        given(subscriptionMechanismRegistry).succeeds(returning = ())
         given(reProvisioning).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -148,7 +147,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
-      given(subscriber).succeeds(returning = ())
+      given(subscriptionMechanismRegistry).succeeds(returning = ())
       given(reProvisioning).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(httpServer).fails(becauseOf = exception)
@@ -162,14 +161,14 @@ class MicroserviceRunnerSpec
       )
     }
 
-    "return Success ExitCode even if running Subscriber fails" in new TestCase {
+    "return Success ExitCode even if running subscriptionMechanismRegistry fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
       given(gitCertificateInstaller).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
-      given(subscriber).fails(becauseOf = exceptions.generateOne)
+      given(subscriptionMechanismRegistry).fails(becauseOf = exceptions.generateOne)
       given(reProvisioning).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -183,7 +182,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
-      given(subscriber).succeeds(returning = ())
+      given(subscriptionMechanismRegistry).succeeds(returning = ())
       given(reProvisioning).fails(becauseOf = exceptions.generateOne)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -193,15 +192,15 @@ class MicroserviceRunnerSpec
   }
 
   private trait TestCase {
-    val certificateLoader       = mock[CertificateLoader[IO]]
-    val gitCertificateInstaller = mock[GitCertificateInstaller[IO]]
-    val sentryInitializer       = mock[IOSentryInitializer]
-    val cliVersionCompatChecker = mock[CliVersionCompatibilityVerifier[IO]]
-    val datasetInitializer      = mock[IOFusekiDatasetInitializer]
-    val subscriber              = mock[Subscriber[IO]]
-    val reProvisioning          = mock[ReProvisioning[IO]]
-    val httpServer              = mock[IOHttpServer]
-    val logger                  = TestLogger[IO]()
+    val certificateLoader             = mock[CertificateLoader[IO]]
+    val gitCertificateInstaller       = mock[GitCertificateInstaller[IO]]
+    val sentryInitializer             = mock[IOSentryInitializer]
+    val cliVersionCompatChecker       = mock[CliVersionCompatibilityVerifier[IO]]
+    val datasetInitializer            = mock[IOFusekiDatasetInitializer]
+    val subscriptionMechanismRegistry = mock[SubscriptionMechanismRegistry[IO]]
+    val reProvisioning                = mock[ReProvisioning[IO]]
+    val httpServer                    = mock[IOHttpServer]
+    val logger                        = TestLogger[IO]()
 
     val runner = new MicroserviceRunner(
       certificateLoader,
@@ -209,7 +208,7 @@ class MicroserviceRunnerSpec
       sentryInitializer,
       cliVersionCompatChecker,
       datasetInitializer,
-      subscriber,
+      subscriptionMechanismRegistry,
       reProvisioning,
       httpServer,
       new ConcurrentHashMap[CancelToken[IO], Unit](),

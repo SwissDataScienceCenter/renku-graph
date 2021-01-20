@@ -20,10 +20,10 @@ package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.subscriptions.SubscriptionCategory.CategoryName
 import io.renku.eventlog.subscriptions.{IOEventsDistributor, Subscribers, SubscriptionCategoryImpl, SubscriptionCategoryPayload, SubscriptionRequestDeserializer}
 import io.renku.eventlog.{EventLogDB, subscriptions}
 
