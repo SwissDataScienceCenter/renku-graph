@@ -17,7 +17,7 @@
  */
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration
-package forks
+package projects
 
 import ch.datascience.graph.Schemas._
 import ch.datascience.rdfstore.JsonLDTriples

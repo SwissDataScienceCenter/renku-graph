@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.projects
 
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
@@ -24,7 +24,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.{DateCreated, Path}
+import ch.datascience.graph.model.projects.{DateCreated, Path, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError._
@@ -55,7 +55,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
       )
     }
 
-    "update the wasDerivedFrom triple, recreate dateCreated and update the project creator" +
+    "update the wasDerivedFrom triple, recreate dateCreated and update the project creator & visibility" +
       "if user with GitLabId exists in KG" in new TestCase {
 
         val gitLabId = userGitLabIds.generateOne
@@ -83,16 +83,21 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .returningUpdates
 
         val recreateDateCreated = (updatesQueryCreator
-          .recreateDateCreated(_: Path, _: DateCreated))
+          .updateDateCreated(_: Path, _: DateCreated))
           .expects(gitLabProject.path, gitLabProject.dateCreated)
           .returningUpdates
 
+        val visibilityUpsert = (updatesQueryCreator
+          .upsertVisibility(_: Path, _: Visibility))
+          .expects(gitLabProject.path, gitLabProject.visibility)
+          .returningUpdates
+
         updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-          List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
+          List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated, visibilityUpsert).flatten
         )
       }
 
-    "update the wasDerivedFrom triple, recreate dateCreated, create a new creator and update the project creator" +
+    "update the wasDerivedFrom triple, recreate dateCreated, create a new creator and update the project creator & visibility" +
       "if Gitlab project's creator has an email and the user does not exist in KG" in new TestCase {
 
         val gitLabId = userGitLabIds.generateOne
@@ -109,7 +114,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .returningUpdates
 
         val recreateDateCreated = (updatesQueryCreator
-          .recreateDateCreated(_: Path, _: DateCreated))
+          .updateDateCreated(_: Path, _: DateCreated))
           .expects(gitLabProject.path, gitLabProject.dateCreated)
           .returningUpdates
 
@@ -118,12 +123,17 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects(gitLabProject.path, creator)
           .returningUpdates
 
+        val visibilityUpsert = (updatesQueryCreator
+          .upsertVisibility(_: Path, _: Visibility))
+          .expects(gitLabProject.path, gitLabProject.visibility)
+          .returningUpdates
+
         updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-          List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated).flatten
+          List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated, visibilityUpsert).flatten
         )
       }
 
-    "update the wasDerivedFrom triple, recreate dateCreated and remove project creator " +
+    "update the wasDerivedFrom triple, upsert dateCreated & visibility and remove project creator" +
       "if Gitlab project does not have creator" in new TestCase {
 
         val gitLabProject = given {
@@ -136,7 +146,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .returningUpdates
 
         val recreateDateCreated = (updatesQueryCreator
-          .recreateDateCreated(_: Path, _: DateCreated))
+          .updateDateCreated(_: Path, _: DateCreated))
           .expects(gitLabProject.path, gitLabProject.dateCreated)
           .returningUpdates
 
@@ -145,8 +155,13 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .expects(gitLabProject.path)
           .returningUpdates
 
+        val visibilityUpsert = (updatesQueryCreator
+          .upsertVisibility(_: Path, _: Visibility))
+          .expects(gitLabProject.path, gitLabProject.visibility)
+          .returningUpdates
+
         updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-          List(wasDerivedFromUpdates, unlinkCreatorUpdates, recreateDateCreated).flatten
+          List(wasDerivedFromUpdates, unlinkCreatorUpdates, recreateDateCreated, visibilityUpsert).flatten
         )
       }
 

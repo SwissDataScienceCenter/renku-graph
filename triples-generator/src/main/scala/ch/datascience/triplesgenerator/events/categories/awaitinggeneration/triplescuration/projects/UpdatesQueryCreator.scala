@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.projects
 
 import ch.datascience.graph.Schemas._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
-import ch.datascience.graph.model.projects.{DateCreated, Path, ResourceId}
+import ch.datascience.graph.model.projects.{DateCreated, Path, ResourceId, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery
@@ -120,7 +120,7 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
     )
   }
 
-  def recreateDateCreated(projectPath: Path, dateCreated: DateCreated): List[SparqlQuery] = {
+  def updateDateCreated(projectPath: Path, dateCreated: DateCreated): List[SparqlQuery] = {
     val rdfResource = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]
     List(
       SparqlQuery(
@@ -131,6 +131,23 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
             |WHERE  {
             |  OPTIONAL { $rdfResource schema:dateCreated ?maybeDate } 
             |  BIND (IF(BOUND(?maybeDate), ?maybeDate, "nonexisting") AS ?date)
+            |}
+            |""".stripMargin
+      )
+    )
+  }
+
+  def upsertVisibility(projectPath: Path, visibility: Visibility): List[SparqlQuery] = {
+    val rdfResource = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]
+    List(
+      SparqlQuery.of(
+        name = "upsert - project visibility",
+        Prefixes.of(schema -> "schema"),
+        s"""|DELETE { $rdfResource schema:additionalType ?visibility }
+            |INSERT { $rdfResource schema:additionalType '$visibility' }
+            |WHERE  {
+            |  OPTIONAL { $rdfResource schema:additionalType ?maybeVisibility } 
+            |  BIND (IF(BOUND(?maybeVisibility), ?maybeVisibility, "nonexisting") AS ?visibility)
             |}
             |""".stripMargin
       )

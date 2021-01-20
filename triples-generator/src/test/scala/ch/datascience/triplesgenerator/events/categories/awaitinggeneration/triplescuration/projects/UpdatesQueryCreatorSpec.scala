@@ -16,13 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.projects
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.projectCreatedDates
-import ch.datascience.graph.model.projects.{DateCreated, ResourceId}
-import ch.datascience.graph.model.users
+import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectVisibilities}
+import ch.datascience.graph.model.projects.{DateCreated, ResourceId, Visibility}
+import ch.datascience.graph.model.{projects, users}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.{Person, Project}
@@ -218,7 +218,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
       val newDateCreated = projectCreatedDates.generateOne
 
-      updatesQueryCreator.recreateDateCreated(project1.path, newDateCreated).runAll.unsafeRunSync()
+      updatesQueryCreator.updateDateCreated(project1.path, newDateCreated).runAll.unsafeRunSync()
 
       findDateCreated should contain theSameElementsAs Set(
         (project1.resourceId.value, newDateCreated.some),
@@ -241,13 +241,45 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
       val newDateCreated = projectCreatedDates.generateOne
 
-      updatesQueryCreator.recreateDateCreated(project1.path, newDateCreated).runAll.unsafeRunSync()
+      updatesQueryCreator.updateDateCreated(project1.path, newDateCreated).runAll.unsafeRunSync()
 
       findDateCreated should contain theSameElementsAs Set(
         (project1.resourceId.value, newDateCreated.some),
         (project2.resourceId.value, project2.dateCreated.some)
       )
     }
+  }
+  "upsertVisibility" should {
+    "update the Project's visibility - case when visibility exists on project already" in new TestCase {
+      val initialVisibility: projects.Visibility = projectVisibilities.generateOne
+      val project = entitiesProjects(maybeVisibility = Some(initialVisibility)).generateOne
+      loadToStore(project.asJsonLD)
+
+      val newVisibility = projectVisibilities.generateDifferentThan(initialVisibility)
+
+      findVisibility(project.resourceId) shouldBe Some(initialVisibility)
+
+      updatesQueryCreator.upsertVisibility(project.path, newVisibility).runAll.unsafeRunSync()
+
+      findVisibility(project.resourceId) shouldBe Some(newVisibility)
+
+    }
+
+    "insert the Project's visibility - case when it didn't previously exist" in new TestCase {
+
+      val project = entitiesProjects(maybeVisibility = None).generateOne
+      loadToStore(project.asJsonLD)
+
+      val newVisibility = projectVisibilities.generateOne
+
+      findVisibility(project.resourceId) shouldBe None
+
+      updatesQueryCreator.upsertVisibility(project.path, newVisibility).runAll.unsafeRunSync()
+
+      findVisibility(project.resourceId) shouldBe Some(newVisibility)
+
+    }
+
   }
 
   private trait TestCase {
@@ -317,4 +349,15 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
             |""".stripMargin
       )
     ).unsafeRunSync()
+
+  private def findVisibility(projectId: ResourceId): Option[Visibility] =
+    runQuery(
+      s"""|SELECT ?visibility
+          |WHERE {
+          |  OPTIONAL {  ${projectId.showAs[RdfResource]} schema:additionalType ?visibility }
+          |}
+          |""".stripMargin
+    ).unsafeRunSync()
+      .flatMap(row => row.get("visibility").map(visibility => Visibility.apply(visibility.toLowerCase)))
+      .headOption
 }
