@@ -83,6 +83,7 @@ class IOKGProjectFinderSpec
                 parent.name,
                 parent.created.date,
                 maybeCreator = parent.created.maybeCreator.toMaybePerson,
+                maybeVisibility = None,
                 maybeParentProject = None,
                 version = projectSchemaVersions.generateOne
               )

@@ -24,7 +24,7 @@ import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.datasets.{DataSetInfoEnricher, IODataSetInfoEnricher}
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.forks.{ForkInfoUpdater, IOForkInfoUpdater}
+import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.projects.{IOForkInfoUpdater, ProjectInfoUpdater}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.persondetails.PersonDetailsUpdater
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.CurationResults
 import io.chrisdavenport.log4cats.Logger
@@ -40,7 +40,7 @@ trait TriplesCurator[Interpretation[_]] {
 
 private[events] class TriplesCuratorImpl[Interpretation[_]](
     personDetailsUpdater: PersonDetailsUpdater[Interpretation],
-    forkInfoUpdater:      ForkInfoUpdater[Interpretation],
+    forkInfoUpdater:      ProjectInfoUpdater[Interpretation],
     dataSetInfoEnricher:  DataSetInfoEnricher[Interpretation]
 )(implicit ME:            MonadError[Interpretation, Throwable])
     extends TriplesCurator[Interpretation] {
@@ -54,7 +54,7 @@ private[events] class TriplesCuratorImpl[Interpretation[_]](
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] =
     for {
       triplesWithPersonDetails    <- updatePersonDetails(CuratedTriples(triples, updatesGroups = Nil), commit.project)
-      triplesWithForkInfo         <- updateForkInfo(commit, triplesWithPersonDetails)
+      triplesWithForkInfo         <- updateProjectInfo(commit, triplesWithPersonDetails)
       triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithForkInfo)
     } yield triplesWithEnrichedDatasets
 }

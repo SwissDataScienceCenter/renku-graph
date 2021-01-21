@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.projects
 
 import cats.effect.IO._
 import cats.effect._
@@ -30,19 +30,19 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait ForkInfoUpdater[Interpretation[_]] {
-  def updateForkInfo(
+trait ProjectInfoUpdater[Interpretation[_]] {
+  def updateProjectInfo(
       commit:                  CommitEvent,
       givenCuratedTriples:     CuratedTriples[Interpretation]
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
 }
 
-class ForkInfoUpdaterImpl(
+class ProjectInfoUpdaterImpl(
     payloadTransformer:     PayloadTransformer[IO],
     updateFunctionsCreator: UpdatesCreator[IO]
-) extends ForkInfoUpdater[IO] {
+) extends ProjectInfoUpdater[IO] {
 
-  override def updateForkInfo(
+  override def updateProjectInfo(
       commit:                  CommitEvent,
       curatedTriples:          CuratedTriples[IO]
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[IO] =
@@ -58,9 +58,9 @@ object IOForkInfoUpdater {
       gitLabThrottler:         Throttler[IO, GitLab],
       logger:                  Logger[IO],
       timeRecorder:            SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[ForkInfoUpdater[IO]] =
+  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[ProjectInfoUpdater[IO]] =
     for {
       payloadTransformer     <- IOPayloadTransformer(gitLabThrottler, logger)
       updateFunctionsCreator <- IOUpdateFunctionsCreator(gitLabThrottler, logger, timeRecorder)
-    } yield new ForkInfoUpdaterImpl(payloadTransformer, updateFunctionsCreator)
+    } yield new ProjectInfoUpdaterImpl(payloadTransformer, updateFunctionsCreator)
 }

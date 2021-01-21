@@ -30,7 +30,7 @@ import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.Comm
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.datasets.DataSetInfoEnricher
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.forks.ForkInfoUpdater
+import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.projects.ProjectInfoUpdater
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.persondetails.PersonDetailsUpdater
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -51,7 +51,7 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
 
       val triplesWithForkInfo = curatedTriplesObjects[Try].generateOne
       (forkInfoUpdater
-        .updateForkInfo(_: CommitEvent, _: CuratedTriples[Try])(_: Option[AccessToken]))
+        .updateProjectInfo(_: CommitEvent, _: CuratedTriples[Try])(_: Option[AccessToken]))
         .expects(event, triplesWithPersonDetails, maybeAccessToken)
         .returning(triplesWithForkInfo.toRightT)
 
@@ -82,7 +82,7 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
 
       val exception = exceptions.generateOne
       (forkInfoUpdater
-        .updateForkInfo(_: CommitEvent, _: CuratedTriples[Try])(_: Option[AccessToken]))
+        .updateProjectInfo(_: CommitEvent, _: CuratedTriples[Try])(_: Option[AccessToken]))
         .expects(event, triplesWithPersonDetails, maybeAccessToken)
         .returning(exception.toEitherTError)
 
@@ -98,7 +98,7 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
 
       val triplesWithForkInfo = curatedTriplesObjects[Try].generateOne
       (forkInfoUpdater
-        .updateForkInfo(_: CommitEvent, _: CuratedTriples[Try])(_: Option[AccessToken]))
+        .updateProjectInfo(_: CommitEvent, _: CuratedTriples[Try])(_: Option[AccessToken]))
         .expects(event, triplesWithPersonDetails, maybeAccessToken)
         .returning(triplesWithForkInfo.toRightT)
 
@@ -129,7 +129,7 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
 
       val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
       (forkInfoUpdater
-        .updateForkInfo(_: CommitEvent, _: CuratedTriples[Try])(_: Option[AccessToken]))
+        .updateProjectInfo(_: CommitEvent, _: CuratedTriples[Try])(_: Option[AccessToken]))
         .expects(event, triplesWithPersonDetails, maybeAccessToken)
         .returning(exception.toLeftT)
 
@@ -143,7 +143,7 @@ class TriplesCuratorSpec extends AnyWordSpec with MockFactory with should.Matche
     val event   = commitEvents.generateOne
 
     val personDetailsUpdater = mock[PersonDetailsUpdater[Try]]
-    val forkInfoUpdater      = mock[ForkInfoUpdater[Try]]
+    val forkInfoUpdater      = mock[ProjectInfoUpdater[Try]]
     val dataSetInfoEnricher  = mock[DataSetInfoEnricher[Try]]
     val curator              = new TriplesCuratorImpl[Try](personDetailsUpdater, forkInfoUpdater, dataSetInfoEnricher)
   }

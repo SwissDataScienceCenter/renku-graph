@@ -20,7 +20,6 @@ package io.renku.eventlog.subscriptions
 import ch.datascience.graph.model.events.CategoryName
 import doobie.util.{Get, Put}
 import io.renku.eventlog.TypeSerializers
-import io.renku.eventlog.subscriptions.LastSyncedDate
 
 import java.time.Instant
 

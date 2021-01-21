@@ -19,11 +19,12 @@
 package ch.datascience.rdfstore
 
 import java.time.{Instant, LocalDate}
-
 import cats.kernel.Semigroup
 import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{IdSameAs, SameAs, UrlSameAs}
+import ch.datascience.graph.model.projects.Visibility
+import ch.datascience.graph.model.projects.Visibility.{Internal, Private, Public}
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.PathSegment
 import io.renku.jsonld._
@@ -33,6 +34,12 @@ package object entities extends Schemas with EntitiesGenerators {
 
   implicit val fusekiBaseUrlToEntityId: FusekiBaseUrl => EntityId = url => EntityId of url.value
   implicit val renkuBaseUrlToEntityId:  RenkuBaseUrl => EntityId  = url => EntityId of url.value
+
+  implicit lazy val visibilityEncoder: JsonLDEncoder[Visibility] = JsonLDEncoder.instance {
+    case Private  => JsonLDEncoder.encodeString("Private")
+    case Public   => JsonLDEncoder.encodeString("Public")
+    case Internal => JsonLDEncoder.encodeString("Internal")
+  }
 
   implicit def sameAsEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[SameAs] = JsonLDEncoder.instance {
     case v: IdSameAs  => idSameAsEncoder(renkuBaseUrl)(v)

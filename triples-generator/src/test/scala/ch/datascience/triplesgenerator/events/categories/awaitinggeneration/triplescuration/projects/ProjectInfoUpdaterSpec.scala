@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.projects
 
 import cats.data.EitherT
 import cats.effect.IO
@@ -35,7 +35,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class ProjectInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Matchers {
   import EitherT._
 
   "updateForkInfo" should {
@@ -53,7 +53,7 @@ class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Match
         .returning(updateGroup)
 
       forkInfoUpdater
-        .updateForkInfo(event, givenCuratedTriples)
+        .updateProjectInfo(event, givenCuratedTriples)
         .value
         .unsafeRunSync() shouldBe Right(
         CuratedTriples[IO](triples = transformedTriples,
@@ -69,7 +69,7 @@ class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Match
         .expects(event, givenCuratedTriples.triples, maybeAccessToken)
         .returning(leftT[IO, JsonLDTriples](error))
 
-      forkInfoUpdater.updateForkInfo(event, givenCuratedTriples).value.unsafeRunSync() shouldBe Left(error)
+      forkInfoUpdater.updateProjectInfo(event, givenCuratedTriples).value.unsafeRunSync() shouldBe Left(error)
     }
 
     "fail if an error is raised when transforming the triples" in new TestCase {
@@ -82,7 +82,7 @@ class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Match
         .returning(EitherT(exception.raiseError[IO, Either[ProcessingRecoverableError, JsonLDTriples]]))
 
       intercept[Exception] {
-        forkInfoUpdater.updateForkInfo(event, givenCuratedTriples).value.unsafeRunSync()
+        forkInfoUpdater.updateProjectInfo(event, givenCuratedTriples).value.unsafeRunSync()
       } shouldBe exception
     }
   }
@@ -93,6 +93,6 @@ class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Match
 
     val payloadTransformer = mock[PayloadTransformer[IO]]
     val updatesCreator     = mock[UpdatesCreator[IO]]
-    val forkInfoUpdater    = new ForkInfoUpdaterImpl(payloadTransformer, updatesCreator)
+    val forkInfoUpdater    = new ProjectInfoUpdaterImpl(payloadTransformer, updatesCreator)
   }
 }

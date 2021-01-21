@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.projects
 
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._

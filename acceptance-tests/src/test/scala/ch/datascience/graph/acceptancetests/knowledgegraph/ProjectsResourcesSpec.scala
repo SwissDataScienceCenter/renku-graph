@@ -106,6 +106,7 @@ class ProjectsResourcesSpec
           parentProject.created.date,
           maybeCreator =
             parentProject.created.maybeCreator.map(creator => entities.Person(creator.name, creator.maybeEmail)),
+          maybeVisibility = None,
           version = projectSchemaVersions.generateOne
         )
 

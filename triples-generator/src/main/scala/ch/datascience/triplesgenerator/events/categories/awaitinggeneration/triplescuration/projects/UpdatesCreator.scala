@@ -17,7 +17,7 @@
  */
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration
-package forks
+package projects
 
 import cats.MonadError
 import cats.data.{EitherT, OptionT}
@@ -80,32 +80,35 @@ private class UpdatesCreatorImpl(
 
   private object `when project has a creator` {
     def unapply(maybeProject: Option[GitLabProject]): Option[(GitLabCreator, GitLabProject)] = maybeProject match {
-      case Some(project @ GitLabProject(_, _, Some(creator), _)) => (creator -> project).some
-      case _                                                     => None
+      case Some(project @ GitLabProject(_, _, _, _, Some(creator))) => (creator -> project).some
+      case _                                                        => None
     }
   }
 
   private object `when project has no creator` {
     def unapply(maybeProject: Option[GitLabProject]): Option[GitLabProject] = maybeProject match {
-      case Some(project @ GitLabProject(_, _, None, _)) => project.some
-      case _                                            => None
+      case Some(project @ GitLabProject(_, _, _, _, None)) => project.some
+      case _                                               => None
     }
   }
 
   private def updateProjectAndSwapCreator(gitLabProject: GitLabProject, existingUserResource: users.ResourceId) =
     updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
       swapCreator(gitLabProject.path, existingUserResource) ++
-      recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
+      updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
+      upsertVisibility(gitLabProject.path, gitLabProject.visibility)
 
   private def updateProjectAndAddCreator(gitLabProject: GitLabProject, creator: GitLabCreator) =
     updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
       addNewCreator(gitLabProject.path, creator) ++
-      recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
+      updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
+      upsertVisibility(gitLabProject.path, gitLabProject.visibility)
 
   private def updateProjectAndUnlinkCreator(gitLabProject: GitLabProject) =
     updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
       unlinkCreator(gitLabProject.path) ++
-      recreateDateCreated(gitLabProject.path, gitLabProject.dateCreated)
+      updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
+      upsertVisibility(gitLabProject.path, gitLabProject.visibility)
 
   private lazy val maybeToRecoverableError
       : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[SparqlQuery]]] = {
