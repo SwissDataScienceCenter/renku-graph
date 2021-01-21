@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator.events.categories.membersync
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.{accessTokens, sparqlQueries}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
@@ -29,11 +30,12 @@ import ch.datascience.graph.tokenrepository.IOAccessTokenFinder.projectPathToPat
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import ch.datascience.logging.TestExecutionTimeRecorder
+import ch.datascience.triplesgenerator.events.categories.membersync.EventHandler.categoryName
 import ch.datascience.triplesgenerator.events.categories.membersync.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.generators.Generators._
 
 import scala.util.Try
 
@@ -73,15 +75,15 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
           .expects(Set(gitLabMemberMissingInKG))
           .returning(missingMembersWithIds.pure[Try])
 
-        val removalQuery     = sparqlQueries.generateOne
         val insertionQueries = sparqlQueries.generateNonEmptyList().toList
-
         (updatesCreator.insertion _)
           .expects(projectPath, missingMembersWithIds)
           .returning(insertionQueries)
 
+        val removalQuery    = sparqlQueries.generateOne
+        val membersToRemove = Set(kgMemberMissingInGitLab)
         (updatesCreator.removal _)
-          .expects(projectPath, Set(kgMemberMissingInGitLab))
+          .expects(projectPath, membersToRemove)
           .returning(removalQuery)
 
         (removalQuery +: insertionQueries).foreach { query =>
@@ -92,7 +94,12 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
 
         synchronizer.synchronizeMembers(projectPath) shouldBe ().pure[Try]
 
-        logger.loggedOnly(Info(s"${EventHandler.categoryName}: Members synchronized for project: $projectPath"))
+        logger.loggedOnly(
+          Info(
+            s"$categoryName: Members for project: $projectPath synchronized in ${executionTimeRecorder.elapsedTime}ms: " +
+              s"${missingMembersWithIds.size} member(s) added, ${membersToRemove.size} member(s) removed"
+          )
+        )
       }
 
     "recover with log statement if collaborator fails" in new TestCase {
@@ -112,13 +119,14 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
       synchronizer.synchronizeMembers(projectPath) shouldBe ().pure[Try]
 
       logger.loggedOnly(
-        Error(s"${EventHandler.categoryName}: Members synchronized for project $projectPath FAILED", exception)
+        Error(s"$categoryName: Members synchronized for project $projectPath FAILED", exception)
       )
     }
-
   }
 
   private trait TestCase {
+    val projectPath = projectPaths.generateOne
+
     val accessTokenFinder          = mock[AccessTokenFinder[Try]]
     val gitLabProjectMembersFinder = mock[GitLabProjectMembersFinder[Try]]
     val kGProjectMembersFinder     = mock[KGProjectMembersFinder[Try]]
@@ -126,7 +134,7 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
     val updatesCreator             = mock[UpdatesCreator]
     val querySender                = mock[QuerySender[Try]]
     val logger                     = TestLogger[Try]()
-    val projectPath                = projectPaths.generateOne
+    val executionTimeRecorder      = TestExecutionTimeRecorder[Try](logger, maybeHistogram = None)
 
     val synchronizer = new MembersSynchronizerImpl[Try](
       accessTokenFinder,
@@ -135,7 +143,8 @@ class MembersSynchronizerSpec extends AnyWordSpec with MockFactory with should.M
       kGPersonFinder,
       updatesCreator,
       querySender,
-      logger
+      logger,
+      executionTimeRecorder
     )
   }
 }
