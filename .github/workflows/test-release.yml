@@ -10,7 +10,7 @@ on:
       - synchronize
       - reopened
 env:
-  SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx1G"
+  SBT_OPTS: "-XX:+CMSClassUnloadingEnabled -Xmx2G"
 jobs:
   cleanup-previous-runs:
     name: Cleanup previous runs
