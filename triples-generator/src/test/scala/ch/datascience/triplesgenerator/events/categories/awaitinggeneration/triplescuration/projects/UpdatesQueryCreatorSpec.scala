@@ -354,7 +354,7 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
     runQuery(
       s"""|SELECT ?visibility
           |WHERE {
-          |  OPTIONAL {  ${projectId.showAs[RdfResource]} schema:additionalType ?visibility }
+          |  OPTIONAL {  ${projectId.showAs[RdfResource]} renku:projectVisibility ?visibility }
           |}
           |""".stripMargin
     ).unsafeRunSync()
