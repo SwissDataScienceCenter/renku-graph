@@ -31,6 +31,7 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.EventHandler.categoryName
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.{IOTriplesCurator, TriplesCurator}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.GenerationResult._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
@@ -84,7 +85,7 @@ private class CommitEventProcessor[Interpretation[_]](
   private def logError(eventId:     CompoundEventId,
                        projectPath: projects.Path
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)(s"Commit Event processing failure: $eventId, projectPath: $projectPath")
+    logger.error(exception)(s"$categoryName: Commit Event processing failure: $eventId, projectPath: $projectPath")
     ME.unit
   }
 
@@ -212,12 +213,14 @@ private class CommitEventProcessor[Interpretation[_]](
   }
 
   private def logMessageCommon(event: CommitEvent): String =
-    s"Commit Event id: ${event.compoundEventId}, ${event.project.path}"
+    s"$categoryName: Commit Event id: ${event.compoundEventId}, ${event.project.path}"
 
   private def rollback(commit: CommitEvent): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = {
     case NonFatal(exception) =>
       markEventNew(commit.compoundEventId)
-        .flatMap(_ => ME.raiseError(new Exception("processing failure -> Event rolled back", exception)))
+        .flatMap(_ =>
+          ME.raiseError(new Exception(s"$categoryName: processing failure -> Event rolled back", exception))
+        )
   }
 
   private sealed trait UploadingResult extends Product with Serializable {

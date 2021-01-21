@@ -18,6 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
+import EventProcessingGenerators._
 import cats.MonadError
 import cats.data.EitherT.{leftT, rightT}
 import cats.data.{EitherT, NonEmptyList}
@@ -39,9 +40,9 @@ import ch.datascience.interpreters.TestLogger.Matcher.NotRefEqual
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
-import EventProcessingGenerators._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.EventHandler.categoryName
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.IOCommitEventProcessor.eventsProcessingTimesBuilder
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.IOTriplesCurator.CurationRecoverableError
@@ -379,8 +380,10 @@ class CommitEventProcessorSpec
 
       logger.loggedOnly(
         Error(
-          message = s"Commit Event processing failure: $eventId, projectPath: ${commitEvents.head.project.path}",
-          throwableMatcher = NotRefEqual(new Exception("processing failure -> Event rolled back", exception))
+          message =
+            s"$categoryName: Commit Event processing failure: $eventId, projectPath: ${commitEvents.head.project.path}",
+          throwableMatcher =
+            NotRefEqual(new Exception(s"$categoryName: processing failure -> Event rolled back", exception))
         )
       )
     }
@@ -521,7 +524,7 @@ class CommitEventProcessorSpec
       logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))
 
     def commonLogMessage(event: CommitEvent): String =
-      s"Commit Event id: ${event.compoundEventId}, ${event.project.path}"
+      s"$categoryName: Commit Event id: ${event.compoundEventId}, ${event.project.path}"
 
     def verifyMetricsCollected() =
       eventsProcessingTimes
