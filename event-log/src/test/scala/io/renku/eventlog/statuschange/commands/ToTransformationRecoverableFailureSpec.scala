@@ -29,7 +29,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
+import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import org.scalacheck.Gen
@@ -49,7 +49,7 @@ class ToTransformationRecoverableFailureSpec
   "command" should {
 
     s"set status $TransformationRecoverableFailure on the event with the given id and $TransformingTriples status, " +
-      "increment waiting events gauge and decrement under processing gauge for the project " +
+      "increment waiting events gauge and decrement under processing gauge for the project, insert the processingTime " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         storeEvent(
@@ -85,6 +85,7 @@ class ToTransformationRecoverableFailureSpec
             maybeMessage,
             awaitingTriplesTransformationGauge,
             underTriplesTransformationGauge,
+            processingTime,
             currentTime
           )
 
@@ -93,13 +94,14 @@ class ToTransformationRecoverableFailureSpec
         findEvent(eventId) shouldBe Some(
           (ExecutionDate(now.plus(10, MINUTES)), TransformationRecoverableFailure, maybeMessage)
         )
+        findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
+        histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
       }
 
     EventStatus.all.filterNot(status => status == TransformingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.Conflict}" in new TestCase {
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
 
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
@@ -119,14 +121,16 @@ class ToTransformationRecoverableFailureSpec
               maybeMessage,
               awaitingTriplesTransformationGauge,
               underTriplesTransformationGauge,
+              processingTime,
               currentTime
             )
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
-          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+          findEvent(eventId)                       shouldBe Some((executionDate, eventStatus, None))
+          findProcessingTime(eventId).eventIdsOnly shouldBe List()
 
-          histogram.verifyExecutionTimeMeasured(command.query.name)
+          histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
     }
   }
@@ -138,6 +142,7 @@ class ToTransformationRecoverableFailureSpec
     val currentTime                        = mockFunction[Instant]
     val eventId                            = compoundEventIds.generateOne
     val eventBatchDate                     = batchDates.generateOne
+    val processingTime                     = eventProcessingTimes.generateSome
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 

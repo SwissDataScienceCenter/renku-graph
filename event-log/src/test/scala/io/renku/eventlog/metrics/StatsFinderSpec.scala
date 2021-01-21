@@ -20,7 +20,7 @@ package io.renku.eventlog.metrics
 
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonEmptyList
+import ch.datascience.generators.Generators.{nonEmptyList, timestamps}
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.EventStatus._
@@ -30,65 +30,104 @@ import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
+import io.renku.eventlog.subscriptions.{LastSyncedDate, SubscriptionDataProvisioning}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
+import java.time.{Duration, Instant}
 
 class StatsFinderSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
-    with ScalaCheckPropertyChecks
+    with SubscriptionDataProvisioning
     with should.Matchers {
+
+  "countEventsByCategoryName" should {
+
+    "return info about number of events grouped by categoryName" in {
+
+      val projectPath0 = projectPaths.generateOne
+      val eventDate0   = eventDates.generateOne
+      upsertProject(compoundEventIds.generateOne, projectPath0, eventDate0)
+
+      val compoundId1  = compoundEventIds.generateOne
+      val projectPath1 = projectPaths.generateOne
+      val eventDate1   = EventDate(generateInstant(lessThanAgo = Duration.ofMinutes(59)))
+      val lastSynced1  = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofSeconds(61)))
+      upsertProject(compoundId1, projectPath1, eventDate1)
+      upsertLastSynced(compoundId1.projectId, categoryName, lastSynced1)
+
+      val compoundId2  = compoundEventIds.generateOne
+      val projectPath2 = projectPaths.generateOne
+      val eventDate2   = EventDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
+      val lastSynced2  = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(61)))
+      upsertProject(compoundId2, projectPath2, eventDate2)
+      upsertLastSynced(compoundId2.projectId, categoryName, lastSynced2)
+
+      val compoundId3  = compoundEventIds.generateOne
+      val projectPath3 = projectPaths.generateOne
+      val eventDate3   = EventDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
+      val lastSynced3  = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
+      upsertProject(compoundId3, projectPath3, eventDate3)
+      upsertLastSynced(compoundId3.projectId, categoryName, lastSynced3)
+
+      // doesn't need an update
+      val compoundId4  = compoundEventIds.generateOne
+      val projectPath4 = projectPaths.generateOne
+      val eventDate4   = EventDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
+      val lastSynced4  = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
+      upsertProject(compoundId4, projectPath4, eventDate4)
+      upsertLastSynced(compoundId4.projectId, categoryName, lastSynced4)
+
+      stats.countEventsByCategoryName().unsafeRunSync() shouldBe Map(categoryName -> 4L)
+    }
+  }
 
   "statuses" should {
 
     "return info about number of events grouped by status" in {
-      forAll { statuses: List[EventStatus] =>
-        prepareDbForTest()
+      val statuses = eventStatuses.generateNonEmptyList().toList
 
-        statuses foreach store
+      statuses foreach store
 
-        stats.statuses().unsafeRunSync() shouldBe Map(
-          New                                 -> statuses.count(_ == New),
-          GeneratingTriples                   -> statuses.count(_ == GeneratingTriples),
-          TriplesGenerated                    -> statuses.count(_ == TriplesGenerated),
-          TransformingTriples                 -> statuses.count(_ == TransformingTriples),
-          TriplesStore                        -> statuses.count(_ == TriplesStore),
-          Skipped                             -> statuses.count(_ == Skipped),
-          GenerationRecoverableFailure        -> statuses.count(_ == GenerationRecoverableFailure),
-          GenerationNonRecoverableFailure     -> statuses.count(_ == GenerationNonRecoverableFailure),
-          TransformationRecoverableFailure    -> statuses.count(_ == TransformationRecoverableFailure),
-          TransformationNonRecoverableFailure -> statuses.count(_ == TransformationNonRecoverableFailure)
-        )
+      stats.statuses().unsafeRunSync() shouldBe Map(
+        New                                 -> statuses.count(_ == New),
+        GeneratingTriples                   -> statuses.count(_ == GeneratingTriples),
+        TriplesGenerated                    -> statuses.count(_ == TriplesGenerated),
+        TransformingTriples                 -> statuses.count(_ == TransformingTriples),
+        TriplesStore                        -> statuses.count(_ == TriplesStore),
+        Skipped                             -> statuses.count(_ == Skipped),
+        GenerationRecoverableFailure        -> statuses.count(_ == GenerationRecoverableFailure),
+        GenerationNonRecoverableFailure     -> statuses.count(_ == GenerationNonRecoverableFailure),
+        TransformationRecoverableFailure    -> statuses.count(_ == TransformationRecoverableFailure),
+        TransformationNonRecoverableFailure -> statuses.count(_ == TransformationNonRecoverableFailure)
+      )
 
-        queriesExecTimes.verifyExecutionTimeMeasured("statuses count")
-      }
+      queriesExecTimes.verifyExecutionTimeMeasured("statuses count")
     }
   }
 
   "countEvents" should {
 
     "return info about number of events with the given status in the queue grouped by projects" in {
-      forAll(nonEmptyList(projectPaths, minElements = 2, maxElements = 8)) { projectPaths =>
-        prepareDbForTest()
+      val events = generateEventsFor(
+        projectPaths.generateNonEmptyList(minElements = 2, maxElements = 8).toList
+      )
 
-        val events = generateEventsFor(projectPaths.toList)
+      events foreach store
 
-        events foreach store
-
-        stats.countEvents(Set(New, GenerationRecoverableFailure)).unsafeRunSync() shouldBe events
-          .groupBy(_._1)
-          .map { case (projectPath, sameProjectGroup) =>
-            projectPath -> sameProjectGroup.count { case (_, _, status, _) =>
-              Set(New, GenerationRecoverableFailure) contains status
-            }
+      stats.countEvents(Set(New, GenerationRecoverableFailure)).unsafeRunSync() shouldBe events
+        .groupBy(_._1)
+        .map { case (projectPath, sameProjectGroup) =>
+          projectPath -> sameProjectGroup.count { case (_, _, status, _) =>
+            Set(New, GenerationRecoverableFailure) contains status
           }
-          .filter { case (_, count) => count > 0 }
+        }
+        .filter { case (_, count) => count > 0 }
 
-        queriesExecTimes.verifyExecutionTimeMeasured("projects events count")
-      }
+      queriesExecTimes.verifyExecutionTimeMeasured("projects events count")
     }
 
     "return info about number of events with the given status in the queue from the first given number of projects" in {
@@ -120,8 +159,13 @@ class StatsFinderSpec
     }
   }
 
+  private lazy val categoryName     = io.renku.eventlog.subscriptions.membersync.categoryName
   private lazy val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-  private lazy val stats            = new StatsFinderImpl(transactor, queriesExecTimes)
+  private lazy val stats = new StatsFinderImpl(
+    transactor,
+    queriesExecTimes,
+    categoryNames = Refined.unsafeApply(Set(categoryName))
+  )
 
   private def store: ((Path, EventId, EventStatus, EventDate)) => Unit = {
     case (projectPath, eventId, status, eventDate) =>
@@ -155,4 +199,7 @@ class StatsFinderSpec
     status    <- eventStatuses
     eventDate <- eventDates
   } yield (eventId, status, eventDate)
+
+  private def generateInstant(lessThanAgo: Duration = Duration.ofDays(365 * 5), moreThanAgo: Duration = Duration.ZERO) =
+    timestamps(min = Instant.now.minus(lessThanAgo), max = Instant.now.minus(moreThanAgo)).generateOne
 }

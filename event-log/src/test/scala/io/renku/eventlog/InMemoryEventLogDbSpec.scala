@@ -38,6 +38,6 @@ trait InMemoryEventLogDbSpec
     allMigrations.map(_.run()).sequence.void.unsafeRunSync()
 
   protected def prepareDbForTest(): Unit = execute {
-    Fragment.const(s"TRUNCATE TABLE ${Tables.all.mkString(", ")}").update.run.void
+    Fragment.const(s"TRUNCATE TABLE ${Tables.all.mkString(", ")} CASCADE").update.run.void
   }
 }

@@ -71,6 +71,8 @@ object IOSubscriptionCategoryRegistry {
       transactor:                  DbTransactor[IO, EventLogDB],
       waitingEventsGauge:          LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+      awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
+      underTransformationGauge:    LabeledGauge[IO, projects.Path],
       queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
       logger:                      Logger[IO]
   )(implicit
@@ -88,10 +90,19 @@ object IOSubscriptionCategoryRegistry {
         )
       memberSyncCategory <-
         membersync.SubscriptionCategory(transactor, queriesExecTimes, logger)
+
+      triplesGeneratedCategory <-
+        triplesgenerated.SubscriptionCategory(transactor,
+                                              awaitingTransformationGauge,
+                                              underTransformationGauge,
+                                              queriesExecTimes,
+                                              logger
+        )
     } yield new SubscriptionCategoryRegistryImpl(
       Set[SubscriptionCategory[IO]](
         awaitingGenerationCategory,
-        memberSyncCategory
+        memberSyncCategory,
+        triplesGeneratedCategory
       )
     )
 }

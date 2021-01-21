@@ -18,7 +18,8 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import cats.effect.{Bracket, IO}
+import cats.data.NonEmptyList
+import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TriplesGenerated}
@@ -28,9 +29,9 @@ import ch.datascience.metrics.LabeledGauge
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.{EventLogDB, EventPayload}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
+import io.renku.eventlog.{EventLogDB, EventPayload, EventProcessingTime}
 
 import java.time.Instant
 
@@ -40,19 +41,23 @@ private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
     schemaVersion:               SchemaVersion,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+    maybeProcessingTime:         Option[EventProcessingTime],
     now:                         () => Instant = () => Instant.now
 )(implicit ME:                   Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
   override lazy val status: events.EventStatus = TriplesGenerated
 
-  override def query: SqlQuery[Int] = SqlQuery(
-    query = updateStatus.flatMap { result =>
-      mapResult(result) match {
-        case Updated => upsertEventPayload
-        case _       => result.pure[ConnectionIO]
-      }
-    },
-    name = "generating_triples->triples_generated"
+  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
+    SqlQuery(
+      query = updateStatus,
+      name = "generating_triples->triples_generated"
+    ),
+    List(
+      SqlQuery(
+        query = upsertEventPayload,
+        name = "upsert_generated_triples"
+      )
+    )
   )
 
   private lazy val updateStatus = sql"""|UPDATE event

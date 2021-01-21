@@ -19,8 +19,7 @@
 package ch.datascience.tinytypes.json
 
 import java.time.ZoneOffset.UTC
-import java.time.{Instant, LocalDate, OffsetDateTime}
-
+import java.time.{Duration, Instant, LocalDate, OffsetDateTime}
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import eu.timepit.refined.api.{RefType, Refined}
@@ -33,8 +32,15 @@ object TinyTypeDecoders {
   type NonBlank = String Refined NonEmpty
 
   def blankToNone(maybeValue: Option[String]): Option[NonBlank] = maybeValue.map(_.trim).flatMap {
-    case ""       => None
-    case nonBlank => RefType.applyRef[NonBlank](nonBlank).fold(e => { print(e); None }, Option.apply)
+    case "" => None
+    case nonBlank =>
+      RefType
+        .applyRef[NonBlank](nonBlank)
+        .fold(e => {
+                print(e); None
+              },
+              Option.apply
+        )
   }
 
   def toOption[TT <: TinyType { type V = String }](implicit
@@ -87,6 +93,14 @@ object TinyTypeDecoders {
         .catchNonFatal(OffsetDateTime.parse(value))
         .flatMap(offsetDateTime => Either.catchNonFatal(offsetDateTime.atZoneSameInstant(UTC).toInstant))
         .orElse(Either.catchNonFatal(Instant.parse(value)))
+        .flatMap(tinyTypeFactory.from)
+        .leftMap(_.getMessage)
+    }
+
+  implicit def durationDecoder[TT <: DurationTinyType](implicit tinyTypeFactory: From[TT]): Decoder[TT] =
+    decodeString.emap { value =>
+      Either
+        .catchNonFatal(Duration.parse(value))
         .flatMap(tinyTypeFactory.from)
         .leftMap(_.getMessage)
     }

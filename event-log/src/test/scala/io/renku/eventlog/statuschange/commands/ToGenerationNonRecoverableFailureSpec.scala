@@ -23,13 +23,14 @@ import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
+import doobie.syntax.all._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventMessages, executionDates}
+import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import org.scalacheck.Gen
@@ -43,12 +44,13 @@ class ToGenerationNonRecoverableFailureSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with MockFactory
-    with should.Matchers {
+    with should.Matchers
+    with TypeSerializers {
 
   "command" should {
 
     s"set status $GenerationNonRecoverableFailure on the event with the given id and $GeneratingTriples status" +
-      "decrement waiting events and under processing gauges for the project " +
+      "decrement waiting events and under processing gauges for the project, insert the processingTime" +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         storeEvent(
@@ -77,18 +79,25 @@ class ToGenerationNonRecoverableFailureSpec
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
-          ToGenerationNonRecoverableFailure[IO](eventId, maybeMessage, underTriplesGenerationGauge, currentTime)
+          ToGenerationNonRecoverableFailure[IO](eventId,
+                                                maybeMessage,
+                                                underTriplesGenerationGauge,
+                                                processingTime,
+                                                currentTime
+          )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
         findEvent(eventId) shouldBe Some((ExecutionDate(now), GenerationNonRecoverableFailure, maybeMessage))
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
+        findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
+
+        histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
       }
 
     EventStatus.all.filterNot(status => status == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.Conflict}" in new TestCase {
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
 
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
@@ -103,13 +112,19 @@ class ToGenerationNonRecoverableFailureSpec
 
           val maybeMessage = Gen.option(eventMessages).generateOne
           val command =
-            ToGenerationNonRecoverableFailure[IO](eventId, maybeMessage, underTriplesGenerationGauge, currentTime)
+            ToGenerationNonRecoverableFailure[IO](eventId,
+                                                  maybeMessage,
+                                                  underTriplesGenerationGauge,
+                                                  processingTime,
+                                                  currentTime
+            )
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
-          findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
+          findEvent(eventId)          shouldBe Some((executionDate, eventStatus, None))
+          findProcessingTime(eventId) shouldBe List()
 
-          histogram.verifyExecutionTimeMeasured(command.query.name)
+          histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
     }
   }
@@ -120,6 +135,7 @@ class ToGenerationNonRecoverableFailureSpec
     val currentTime                 = mockFunction[Instant]
     val eventId                     = compoundEventIds.generateOne
     val eventBatchDate              = batchDates.generateOne
+    val processingTime              = eventProcessingTimes.generateSome
 
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 

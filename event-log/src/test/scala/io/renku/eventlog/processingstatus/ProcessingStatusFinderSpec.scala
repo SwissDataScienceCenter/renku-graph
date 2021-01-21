@@ -29,7 +29,7 @@ import ch.datascience.graph.model.events.{BatchDate, EventStatus}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import org.scalacheck.Gen
 import org.scalatest.matchers.should

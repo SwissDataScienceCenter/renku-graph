@@ -29,7 +29,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.DbEventLogGenerators.{eventDates, eventPayloads, executionDates}
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
@@ -44,7 +44,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
     s"set status $TriplesGenerated on the event with the given id and $GeneratingTriples status, " +
       "insert the payload in the event_payload table" +
-      "increment awaiting transformation gauge and decrement under triples generation gauge for the project " +
+      "increment awaiting transformation gauge and decrement under triples generation gauge for the project, insert the processingTime " +
       s"and return ${UpdateResult.Updated}" in new TestCase {
 
         val projectPath = projectPaths.generateOne
@@ -86,20 +86,22 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
                                  schemaVersion,
                                  underTriplesGenerationGauge,
                                  awaitingTransformationGauge,
+                                 processingTime,
                                  currentTime
           )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvents(status = TriplesGenerated) shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
-        findPayload(eventId)                  shouldBe Some((eventId, payload))
+        findEvents(status = TriplesGenerated)    shouldBe List((eventId, ExecutionDate(now), eventBatchDate))
+        findPayload(eventId)                     shouldBe Some((eventId, payload))
+        findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
-        histogram.verifyExecutionTimeMeasured(command.query.name)
+        histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
       }
 
     EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.Conflict}" in new TestCase {
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
                      eventStatus,
@@ -117,18 +119,20 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
                                    schemaVersion,
                                    awaitingTransformationGauge,
                                    underTriplesGenerationGauge,
+                                   processingTime,
                                    currentTime
             )
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Conflict
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
           val expectedEvents =
             if (eventStatus != TriplesGenerated) List.empty
             else List((eventId, executionDate, eventBatchDate))
-          findEvents(status = TriplesGenerated) shouldBe expectedEvents
-          findPayload(eventId)                  shouldBe None
+          findEvents(status = TriplesGenerated)    shouldBe expectedEvents
+          findPayload(eventId)                     shouldBe None
+          findProcessingTime(eventId).eventIdsOnly shouldBe List()
 
-          histogram.verifyExecutionTimeMeasured(command.query.name)
+          histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
     }
   }
@@ -141,6 +145,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     val currentTime    = mockFunction[Instant]
     val eventId        = compoundEventIds.generateOne
     val eventBatchDate = batchDates.generateOne
+    val processingTime = eventProcessingTimes.generateSome
 
     val payload       = eventPayloads.generateOne
     val schemaVersion = projectSchemaVersions.generateOne

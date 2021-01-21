@@ -21,7 +21,6 @@ package io.renku.eventlog.subscriptions
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import doobie.implicits._
-import io.renku.eventlog.subscriptions.SubscriptionCategory.LastSyncedDate
 import io.renku.eventlog.{EventLogDataProvisioning, InMemoryEventLogDb}
 
 trait SubscriptionDataProvisioning extends EventLogDataProvisioning with SubscriptionTypeSerializers {

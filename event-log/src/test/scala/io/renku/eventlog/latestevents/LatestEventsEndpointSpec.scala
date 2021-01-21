@@ -31,7 +31,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.syntax._
 import io.circe.{Decoder, Json}
-import io.renku.eventlog.DbEventLogGenerators._
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.latestevents.LatestEventsFinder._
 import io.renku.eventlog.{Event, EventProject}
 import org.http4s.MediaType._

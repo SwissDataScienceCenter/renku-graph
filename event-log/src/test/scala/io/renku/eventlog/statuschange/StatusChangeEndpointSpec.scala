@@ -26,6 +26,7 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.http.server.EndpointTester._
@@ -36,7 +37,7 @@ import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.prometheus.client.Gauge
-import io.renku.eventlog.DbEventLogGenerators.{eventMessages, eventPayloads}
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
 import org.http4s.MediaType._
@@ -48,7 +49,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.graph.model.GraphModelGenerators._
 
 class StatusChangeEndpointSpec
     extends AnyWordSpec
@@ -59,36 +59,53 @@ class StatusChangeEndpointSpec
   "changeStatus" should {
 
     val scenarios = Table(
-      "status"     -> "command builder",
-      TriplesStore -> ToTriplesStore[IO](compoundEventIds.generateOne, underTriplesGenerationGauge),
-      Skipped      -> ToSkipped[IO](compoundEventIds.generateOne, eventMessages.generateOne, underTriplesGenerationGauge),
-      New          -> ToNew[IO](compoundEventIds.generateOne, awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
+      "status" -> "command builder",
+      TriplesStore -> ToTriplesStore[IO](compoundEventIds.generateOne,
+                                         underTriplesGenerationGauge,
+                                         eventProcessingTimes.generateOption
+      ),
+      Skipped -> ToSkipped[IO](compoundEventIds.generateOne,
+                               eventMessages.generateOne,
+                               underTriplesGenerationGauge,
+                               eventProcessingTimes.generateOption
+      ),
+      New -> ToNew[IO](compoundEventIds.generateOne,
+                       awaitingTriplesGenerationGauge,
+                       underTriplesGenerationGauge,
+                       eventProcessingTimes.generateOption
+      ),
       TriplesGenerated -> ToTriplesGenerated[IO](
         compoundEventIds.generateOne,
         eventPayloads.generateOne,
         projectSchemaVersions.generateOne,
         underTriplesGenerationGauge,
-        awaitingTriplesTransformationGauge
+        awaitingTriplesTransformationGauge,
+        eventProcessingTimes.generateOption
       ),
       GenerationRecoverableFailure -> ToGenerationRecoverableFailure[IO](
         compoundEventIds.generateOne,
         eventMessages.generateOption,
         awaitingTriplesGenerationGauge,
-        underTriplesGenerationGauge
+        underTriplesGenerationGauge,
+        eventProcessingTimes.generateOption
       ),
       GenerationNonRecoverableFailure -> ToGenerationNonRecoverableFailure[IO](compoundEventIds.generateOne,
                                                                                eventMessages.generateOption,
-                                                                               underTriplesGenerationGauge
+                                                                               underTriplesGenerationGauge,
+                                                                               eventProcessingTimes.generateOption
       ),
       TransformationRecoverableFailure -> ToTransformationRecoverableFailure[IO](
         compoundEventIds.generateOne,
         eventMessages.generateOption,
         awaitingTriplesTransformationGauge,
-        underTriplesTransformationGauge
+        underTriplesTransformationGauge,
+        eventProcessingTimes.generateOption
       ),
-      TransformationNonRecoverableFailure -> ToTransformationNonRecoverableFailure[IO](compoundEventIds.generateOne,
-                                                                                       eventMessages.generateOption,
-                                                                                       underTriplesTransformationGauge
+      TransformationNonRecoverableFailure -> ToTransformationNonRecoverableFailure[IO](
+        compoundEventIds.generateOne,
+        eventMessages.generateOption,
+        underTriplesTransformationGauge,
+        eventProcessingTimes.generateOption
       )
     )
     forAll(scenarios) { (status, command) =>
@@ -270,9 +287,10 @@ class StatusChangeEndpointSpec
 
     s"return $InternalServerError when updating event status fails" in new TestCase {
 
-      val eventId = compoundEventIds.generateOne
+      val eventId        = compoundEventIds.generateOne
+      val processingTime = eventProcessingTimes.generateSome
 
-      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, underTriplesGenerationGauge)
+      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, underTriplesGenerationGauge, processingTime)
       val exception = exceptions.generateOne
       (commandsRunner.run _)
         .expects(command)
@@ -307,33 +325,65 @@ class StatusChangeEndpointSpec
   }
 
   implicit val commandEncoder: Encoder[ChangeStatusCommand[IO]] = Encoder.instance[ChangeStatusCommand[IO]] {
-    case command: ToNew[IO]                                 => json"""{
+    case command: ToNew[IO] =>
+      json"""{
         "status": ${command.status.value}
-      }"""
-    case command: ToTriplesStore[IO]                        => json"""{
-        "status": ${command.status.value}
-      }"""
-    case command: ToSkipped[IO]                             => json"""{
+      }""" deepMerge command.maybeProcessingTime
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+        .getOrElse(Json.obj())
+    case command: ToTriplesStore[IO] =>
+      json"""{
+        "status": ${command.status.value} 
+      }""" deepMerge command.maybeProcessingTime
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+        .getOrElse(Json.obj())
+    case command: ToSkipped[IO] =>
+      json"""{
         "status": ${command.status.value},
         "message": ${command.message.value}
-      }"""
-    case command: ToTriplesGenerated[IO]                    => json"""{
+      }""" deepMerge command.maybeProcessingTime
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+        .getOrElse(Json.obj())
+    case command: ToTriplesGenerated[IO] =>
+      json"""{
         "status": ${command.status.value},
         "payload": ${command.payload.value},
-        "schemaVersion": ${command.schemaVersion.value}
-      }"""
-    case command: ToGenerationRecoverableFailure[IO]        => json"""{
+        "schemaVersion": ${command.schemaVersion.value} 
+      }""" deepMerge command.maybeProcessingTime
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+        .getOrElse(Json.obj())
+    case command: ToGenerationRecoverableFailure[IO] =>
+      json"""{
         "status": ${command.status.value}
-      }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
-    case command: ToGenerationNonRecoverableFailure[IO]     => json"""{
+      }""" deepMerge command.maybeMessage
+        .map(m => json"""{"message": ${m.value}}""")
+        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+        .getOrElse(Json.obj())
+    case command: ToGenerationNonRecoverableFailure[IO] =>
+      json"""{
         "status": ${command.status.value}
-      }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
-    case command: ToTransformationRecoverableFailure[IO]    => json"""{
+      }""" deepMerge command.maybeMessage
+        .map(m => json"""{"message": ${m.value}}""")
+        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+        .getOrElse(Json.obj())
+    case command: ToTransformationRecoverableFailure[IO] =>
+      json"""{
         "status": ${command.status.value}
-      }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
-    case command: ToTransformationNonRecoverableFailure[IO] => json"""{
+      }""" deepMerge command.maybeMessage
+        .map(m => json"""{"message": ${m.value}}""")
+        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+        .getOrElse(Json.obj())
+    case command: ToTransformationNonRecoverableFailure[IO] =>
+      json"""{
         "status": ${command.status.value}
-      }""" deepMerge command.maybeMessage.map(m => json"""{"message": ${m.value}}""").getOrElse(Json.obj())
+      }""" deepMerge command.maybeMessage
+        .map(m => json"""{"message": ${m.value}}""")
+        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
+        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+        .getOrElse(Json.obj())
   }
 
   private lazy val awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path] = new GaugeStub

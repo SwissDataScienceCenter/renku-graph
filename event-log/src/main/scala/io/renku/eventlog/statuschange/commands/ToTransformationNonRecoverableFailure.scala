@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.statuschange.commands
 
+import cats.data.NonEmptyList
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
@@ -28,7 +29,7 @@ import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.{EventLogDB, EventMessage}
+import io.renku.eventlog.{EventLogDB, EventMessage, EventProcessingTime}
 
 import java.time.Instant
 
@@ -36,18 +37,22 @@ final case class ToTransformationNonRecoverableFailure[Interpretation[_]](
     eventId:                         CompoundEventId,
     maybeMessage:                    Option[EventMessage],
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+    maybeProcessingTime:             Option[EventProcessingTime],
     now:                             () => Instant = () => Instant.now
 )(implicit ME:                       Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
   override lazy val status: EventStatus = TransformationNonRecoverableFailure
 
-  override def query: SqlQuery[Int] = SqlQuery(
-    sql"""|UPDATE event
-          |SET status = $status, execution_date = ${now()}, message = $maybeMessage
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
-          |""".stripMargin.update.run,
-    name = "transforming_triples->transformation_non_recoverable_fail"
+  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
+    SqlQuery(
+      sql"""|UPDATE event
+            |SET status = $status, execution_date = ${now()}, message = $maybeMessage
+            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
+            |""".stripMargin.update.run,
+      name = "transforming_triples->transformation_non_recoverable_fail"
+    ),
+    Nil
   )
 
   override def updateGauges(

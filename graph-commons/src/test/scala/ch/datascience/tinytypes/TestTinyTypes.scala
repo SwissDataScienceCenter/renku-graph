@@ -18,7 +18,8 @@
 
 package ch.datascience.tinytypes
 
-import java.time.{Instant, LocalDate}
+import java.time.{Duration, Instant, LocalDate}
+import scala.concurrent.duration.FiniteDuration
 
 private object TestTinyTypes {
 
@@ -48,4 +49,7 @@ private object TestTinyTypes {
 
   class InstantTestType private (val value: Instant) extends AnyVal with InstantTinyType
   implicit object InstantTestType extends TinyTypeFactory[InstantTestType](new InstantTestType(_))
+
+  class DurationTestType private (val value: Duration) extends AnyVal with DurationTinyType
+  implicit object DurationTestType extends TinyTypeFactory[DurationTestType](new DurationTestType(_))
 }
