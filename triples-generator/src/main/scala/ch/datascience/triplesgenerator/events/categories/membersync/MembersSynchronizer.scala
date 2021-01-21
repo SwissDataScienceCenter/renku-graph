@@ -25,7 +25,10 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
-import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
+import ch.datascience.logging.ExecutionTimeRecorder
+import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
+import ch.datascience.rdfstore._
+import ch.datascience.triplesgenerator.events.categories.membersync.EventHandler.categoryName
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -42,12 +45,15 @@ private class MembersSynchronizerImpl[Interpretation[_]](
     kGPersonFinder:             KGPersonFinder[Interpretation],
     updatesCreator:             UpdatesCreator,
     querySender:                QuerySender[Interpretation],
-    logger:                     Logger[Interpretation]
+    logger:                     Logger[Interpretation],
+    executionTimeRecorder:      ExecutionTimeRecorder[Interpretation]
 )(implicit ME:                  MonadError[Interpretation, Throwable])
     extends MembersSynchronizer[Interpretation] {
-  import ch.datascience.graph.tokenrepository.IOAccessTokenFinder._
 
-  override def synchronizeMembers(projectPath: projects.Path): Interpretation[Unit] = {
+  import ch.datascience.graph.tokenrepository.IOAccessTokenFinder._
+  import executionTimeRecorder._
+
+  override def synchronizeMembers(projectPath: projects.Path): Interpretation[Unit] = measureExecutionTime {
     for {
       maybeAccessToken <- accessTokenFinder.findAccessToken(projectPath)
       membersInGitLab  <- gitLabProjectMembersFinder.findProjectMembers(projectPath)(maybeAccessToken)
@@ -58,10 +64,9 @@ private class MembersSynchronizerImpl[Interpretation[_]](
       membersToRemove  = findMembersToRemove(membersInGitLab, membersInKG)
       removalUpdates   = updatesCreator.removal(projectPath, membersToRemove)
       _ <- (insertionUpdates :+ removalUpdates).map(querySender.send).sequence
-      _ <- logger.info(s"${EventHandler.categoryName}: Members synchronized for project: $projectPath")
-    } yield ()
-  } recoverWith { case NonFatal(exception) =>
-    logger.error(exception)(s"${EventHandler.categoryName}: Members synchronized for project $projectPath FAILED")
+    } yield SyncSummary(projectPath, membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
+  } flatMap logSummary recoverWith { case NonFatal(exception) =>
+    logger.error(exception)(s"$categoryName: Members synchronized for project $projectPath FAILED")
   }
 
   def findMembersToAdd(membersInGitLab: Set[GitLabProjectMember],
@@ -74,6 +79,16 @@ private class MembersSynchronizerImpl[Interpretation[_]](
                           membersInKG:     Set[KGProjectMember]
   ): Set[KGProjectMember] = membersInKG.collect {
     case member @ KGProjectMember(_, gitlabId) if !membersInGitLab.exists(_.gitLabId == gitlabId) => member
+  }
+
+  private case class SyncSummary(projectPath: projects.Path, membersAdded: Int, membersRemoved: Int)
+
+  private def logSummary: ((ElapsedTime, SyncSummary)) => Interpretation[Unit] = {
+    case (elapsedTime, SyncSummary(projectPath, membersAdded, membersRemoved)) =>
+      logger.info(
+        s"$categoryName: Members for project: $projectPath synchronized in ${elapsedTime}ms: " +
+          s"$membersAdded member(s) added, $membersRemoved member(s) removed"
+      )
   }
 }
 
@@ -93,13 +108,14 @@ private object MembersSynchronizer {
     querySender <- IO(new IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) with QuerySender[IO] {
                      override def send(query: SparqlQuery): IO[Unit] = updateWithNoResult(query)
                    })
-
+    executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = None)
   } yield new MembersSynchronizerImpl[IO](accessTokenFinder,
                                           gitLabProjectMembersFinder,
                                           kGProjectMembersFinder,
                                           kGPersonFinder,
                                           updatesCreator,
                                           querySender,
-                                          logger
+                                          logger,
+                                          executionTimeRecorder
   )
 }
