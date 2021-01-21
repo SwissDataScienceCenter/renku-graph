@@ -142,11 +142,11 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
     List(
       SparqlQuery.of(
         name = "upsert - project visibility",
-        Prefixes.of(schema -> "schema"),
-        s"""|DELETE { $rdfResource schema:additionalType ?visibility }
-            |INSERT { $rdfResource schema:additionalType '$visibility' }
+        Prefixes.of(schema -> "schema", renku -> "renku"),
+        s"""|DELETE { $rdfResource renku:projectVisibility ?visibility }
+            |INSERT { $rdfResource renku:projectVisibility '$visibility' }
             |WHERE  {
-            |  OPTIONAL { $rdfResource schema:additionalType ?maybeVisibility } 
+            |  OPTIONAL { $rdfResource renku:projectVisibility ?maybeVisibility } 
             |  BIND (IF(BOUND(?maybeVisibility), ?maybeVisibility, "nonexisting") AS ?visibility)
             |}
             |""".stripMargin

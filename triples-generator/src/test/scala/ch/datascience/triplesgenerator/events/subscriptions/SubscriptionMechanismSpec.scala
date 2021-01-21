@@ -25,18 +25,19 @@ import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.EventsGenerators.categoryNames
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.lang.Thread.sleep
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-import scala.language.postfixOps
+import scala.jdk.CollectionConverters._
+import scala.language.{postfixOps, reflectiveCalls}
 
-class SubscriptionMechanismSpec extends AnyWordSpec with MockFactory with Eventually with should.Matchers {
+class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.Matchers {
 
   implicit override val patienceConfig: PatienceConfig = PatienceConfig(
     timeout = scaled(Span(3, Seconds)),
@@ -47,22 +48,16 @@ class SubscriptionMechanismSpec extends AnyWordSpec with MockFactory with Eventu
 
     "send subscription for events" in new TestCase {
       val subscriberUrl = subscriberUrls.generateOne
-      (urlFinder.findSubscriberUrl _)
-        .expects()
-        .returning(subscriberUrl.pure[IO])
+      urlFinder.`expected findSubscriberUrl responses`.add(subscriberUrl.pure[IO])
 
-      (subscriptionSender.postToEventLog _)
-        .expects(subscriberUrl)
-        .returning(IO.unit)
+      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> IO.unit)
 
       subscriber.renewSubscription().unsafeRunSync() shouldBe ((): Unit)
     }
 
     "fail if finding the subscriber url fails" in new TestCase {
       val exception = exceptions.generateOne
-      (urlFinder.findSubscriberUrl _)
-        .expects()
-        .returning(exception.raiseError[IO, SubscriberUrl])
+      urlFinder.`expected findSubscriberUrl responses`.add(exception.raiseError[IO, SubscriberUrl])
 
       intercept[Exception] {
         subscriber.renewSubscription().unsafeRunSync()
@@ -71,14 +66,10 @@ class SubscriptionMechanismSpec extends AnyWordSpec with MockFactory with Eventu
 
     "fail if posting the subscriber url fails" in new TestCase {
       val subscriberUrl = subscriberUrls.generateOne
-      (urlFinder.findSubscriberUrl _)
-        .expects()
-        .returning(subscriberUrl.pure[IO])
+      urlFinder.`expected findSubscriberUrl responses`.add(subscriberUrl.pure[IO])
 
       val exception = exceptions.generateOne
-      (subscriptionSender.postToEventLog _)
-        .expects(subscriberUrl)
-        .returning(exception.raiseError[IO, Unit])
+      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> exception.raiseError[IO, Unit])
 
       intercept[Exception] {
         subscriber.renewSubscription().unsafeRunSync()
@@ -91,17 +82,9 @@ class SubscriptionMechanismSpec extends AnyWordSpec with MockFactory with Eventu
     "send/resend subscription for events" in new TestCase {
 
       val subscriberUrl = subscriberUrls.generateOne
-      (urlFinder.findSubscriberUrl _)
-        .expects()
-        .returning(subscriberUrl.pure[IO])
-        .atLeastOnce()
+      urlFinder.`expected findSubscriberUrl responses`.add(subscriberUrl.pure[IO])
 
-      (subscriptionSender.postToEventLog _)
-        .expects(subscriberUrl)
-        .returning(IO.unit)
-        .atLeastOnce()
-
-      sleep(500)
+      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> IO.unit)
 
       subscriber.run().unsafeRunAsyncAndForget()
 
@@ -115,20 +98,11 @@ class SubscriptionMechanismSpec extends AnyWordSpec with MockFactory with Eventu
     "log an error and retry if finding Subscriber URL fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      (urlFinder.findSubscriberUrl _)
-        .expects()
-        .returning(exception.raiseError[IO, SubscriberUrl])
-
+      urlFinder.`expected findSubscriberUrl responses`.add(exception.raiseError[IO, SubscriberUrl])
       val subscriberUrl = subscriberUrls.generateOne
-      (urlFinder.findSubscriberUrl _)
-        .expects()
-        .returning(subscriberUrl.pure[IO])
-        .atLeastOnce()
+      urlFinder.`expected findSubscriberUrl responses`.add(subscriberUrl.pure[IO])
 
-      (subscriptionSender.postToEventLog _)
-        .expects(subscriberUrl)
-        .returning(IO.unit)
-        .atLeastOnce()
+      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> IO.unit)
 
       subscriber.run().unsafeRunAsyncAndForget()
 
@@ -143,24 +117,12 @@ class SubscriptionMechanismSpec extends AnyWordSpec with MockFactory with Eventu
     "log an error and retry if sending Subscription URL fails" in new TestCase {
 
       val subscriberUrl = subscriberUrls.generateOne
-      (urlFinder.findSubscriberUrl _)
-        .expects()
-        .returning(subscriberUrl.pure[IO])
-        .atLeastOnce()
+      urlFinder.`expected findSubscriberUrl default response`.set(subscriberUrl.pure[IO])
 
       val exception = exceptions.generateOne
-      (subscriptionSender.postToEventLog _)
-        .expects(subscriberUrl)
-        .returning(exception.raiseError[IO, Unit])
-      (subscriptionSender.postToEventLog _)
-        .expects(subscriberUrl)
-        .returning(exception.raiseError[IO, Unit])
-      (subscriptionSender.postToEventLog _)
-        .expects(subscriberUrl)
-        .returning(IO.unit)
-        .atLeastOnce()
-
-      sleep(500)
+      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> exception.raiseError[IO, Unit])
+      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> exception.raiseError[IO, Unit])
+      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> IO.unit)
 
       subscriber.run().unsafeRunAsyncAndForget()
 
@@ -177,17 +139,36 @@ class SubscriptionMechanismSpec extends AnyWordSpec with MockFactory with Eventu
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
-    val categoryName       = categoryNames.generateOne
-    val urlFinder          = mock[SubscriptionUrlFinder[IO]]
-    val subscriptionSender = mock[SubscriptionSender[IO]]
-    val logger             = TestLogger[IO]()
-    val subscriber =
-      new SubscriptionMechanismImpl(categoryName,
-                                    urlFinder,
-                                    subscriptionSender,
-                                    logger,
-                                    initialDelay = 5 millis,
-                                    renewDelay = 500 millis
-      )
+    val categoryName = categoryNames.generateOne
+
+    val urlFinder = new SubscriptionUrlFinder[IO] {
+      val `expected findSubscriberUrl responses`        = new ConcurrentLinkedQueue[IO[SubscriberUrl]]()
+      val `expected findSubscriberUrl default response` = new AtomicReference[IO[SubscriberUrl]]()
+
+      override def findSubscriberUrl(): IO[SubscriberUrl] =
+        Option(`expected findSubscriberUrl responses`.poll())
+          .getOrElse(`expected findSubscriberUrl default response`.get())
+    }
+
+    val subscriptionSender = new SubscriptionSender[IO] {
+      val `expected postToEventLog responses` = new ConcurrentLinkedQueue[(SubscriberUrl, IO[Unit])]()
+
+      override def postToEventLog(subscriberUrl: SubscriberUrl): IO[Unit] =
+        Option {
+          val (expectedSubscriberUrl, response) = `expected postToEventLog responses`.poll()
+          if (subscriberUrl == expectedSubscriberUrl) response
+          else fail(s"Expected $expectedSubscriberUrl in the postToEventLog but got $subscriberUrl")
+        }
+          .getOrElse(`expected postToEventLog responses`.asScala.last._2)
+    }
+
+    val logger = TestLogger[IO]()
+    val subscriber = new SubscriptionMechanismImpl(categoryName,
+                                                   urlFinder,
+                                                   subscriptionSender,
+                                                   logger,
+                                                   initialDelay = 5 millis,
+                                                   renewDelay = 500 millis
+    )
   }
 }

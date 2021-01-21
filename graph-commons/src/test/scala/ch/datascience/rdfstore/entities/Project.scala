@@ -50,13 +50,13 @@ object Project {
           Right(
             PartialEntity(
               EntityTypes.of(prov / "Location", schema / "Project"),
-              schema / "name"           -> entity.name.asJsonLD,
-              schema / "dateCreated"    -> entity.dateCreated.asJsonLD,
-              schema / "creator"        -> entity.maybeCreator.asJsonLD,
-              schema / "additionalType" -> entity.maybeVisibility.asJsonLD,
-              schema / "member"         -> entity.members.toList.asJsonLD,
-              schema / "schemaVersion"  -> entity.version.asJsonLD,
-              prov / "wasDerivedFrom"   -> entity.maybeParentProject.asJsonLD
+              schema / "name"          -> entity.name.asJsonLD,
+              schema / "dateCreated"   -> entity.dateCreated.asJsonLD,
+              schema / "creator"       -> entity.maybeCreator.asJsonLD,
+              renku / "visibility"     -> entity.maybeVisibility.asJsonLD,
+              schema / "member"        -> entity.members.toList.asJsonLD,
+              schema / "schemaVersion" -> entity.version.asJsonLD,
+              prov / "wasDerivedFrom"  -> entity.maybeParentProject.asJsonLD
             )
           )
 
