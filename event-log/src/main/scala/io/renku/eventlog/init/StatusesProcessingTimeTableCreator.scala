@@ -52,11 +52,10 @@ private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]](
     }
 
   private def checkTableExists: Interpretation[Boolean] =
-    sql"select event_id from status_processing_time limit 1"
-      .query[String]
-      .option
+    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'status_processing_time')"
+      .query[Boolean]
+      .unique
       .transact(transactor.get)
-      .map(_ => true)
       .recover { case _ => false }
 
   private def createTable = for {
