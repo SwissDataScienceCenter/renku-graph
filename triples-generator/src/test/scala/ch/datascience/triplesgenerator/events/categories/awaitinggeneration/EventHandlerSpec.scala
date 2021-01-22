@@ -49,45 +49,45 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       "schedule triples generation " +
       s"and return $Accepted if event processor accepted the event" in new TestCase {
 
-        val commitEvents = eventBody.toCommitEvents
-        (eventBodyDeserializer.toCommitEvents _)
-          .expects(eventBody)
-          .returning(commitEvents.pure[IO])
+      val commitEvents = eventBody.toCommitEvents
+      (eventBodyDeserializer.toCommitEvents _)
+        .expects(eventBody)
+        .returning(commitEvents.pure[IO])
 
-        (processingRunner.scheduleForProcessing _)
-          .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
-          .returning(EventSchedulingResult.Accepted.pure[IO])
+      (processingRunner.scheduleForProcessing _)
+        .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
+        .returning(EventSchedulingResult.Accepted.pure[IO])
 
-        val request = Request[IO](Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
+      val request = Request[IO](Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
 
-        handler.handle(request).unsafeRunSync() shouldBe Accepted
+      handler.handle(request).unsafeRunSync() shouldBe Accepted
 
-        logger.loggedOnly(
-          Info(
-            s"${handler.categoryName}: $eventId, projectPath = ${commitEvents.head.project.path} -> $Accepted"
-          )
+      logger.loggedOnly(
+        Info(
+          s"${handler.categoryName}: $eventId, projectPath = ${commitEvents.head.project.path} -> $Accepted"
         )
-      }
+      )
+    }
 
     "decode an event from the request, " +
       "schedule triples generation " +
       s"and return $Busy if event processor returned $Busy" in new TestCase {
 
-        val commitEvents = eventBody.toCommitEvents
-        (eventBodyDeserializer.toCommitEvents _)
-          .expects(eventBody)
-          .returning(commitEvents.pure[IO])
+      val commitEvents = eventBody.toCommitEvents
+      (eventBodyDeserializer.toCommitEvents _)
+        .expects(eventBody)
+        .returning(commitEvents.pure[IO])
 
-        (processingRunner.scheduleForProcessing _)
-          .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
-          .returning(EventSchedulingResult.Busy.pure[IO])
+      (processingRunner.scheduleForProcessing _)
+        .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
+        .returning(EventSchedulingResult.Busy.pure[IO])
 
-        val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
+      val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
 
-        handler.handle(request).unsafeRunSync() shouldBe Busy
+      handler.handle(request).unsafeRunSync() shouldBe Busy
 
-        logger.expectNoLogs()
-      }
+      logger.expectNoLogs()
+    }
 
     s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
 
@@ -130,7 +130,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       logger.loggedOnly(
         Error(s"${handler.categoryName}: $eventId, projectPath = ${commitEvents.head.project.path} -> $SchedulingError",
-              exception
+          exception
         )
       )
     }
@@ -138,14 +138,14 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
   private trait TestCase {
 
-    val eventId   = compoundEventIds.generateOne
+    val eventId = compoundEventIds.generateOne
     val eventBody = eventBodies.generateOne
 
-    val processingRunner      = mock[EventsProcessingRunner[IO]]
+    val processingRunner = mock[EventsProcessingRunner[IO]]
     val eventBodyDeserializer = mock[EventBodyDeserializer[IO]]
-    val renkuVersionPair      = renkuVersionPairs.generateOne
-    val logger                = TestLogger[IO]()
-    val handler               = new EventHandler[IO](processingRunner, eventBodyDeserializer, renkuVersionPair, logger)
+    val renkuVersionPair = renkuVersionPairs.generateOne
+    val logger = TestLogger[IO]()
+    val handler = new EventHandler[IO](processingRunner, eventBodyDeserializer, renkuVersionPair, logger)
   }
 
   private implicit lazy val eventEncoder: Encoder[(CompoundEventId, EventBody)] =

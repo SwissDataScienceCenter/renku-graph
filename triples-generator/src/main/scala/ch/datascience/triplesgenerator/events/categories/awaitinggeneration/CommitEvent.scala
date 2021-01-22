@@ -19,15 +19,13 @@
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects
+import ch.datascience.triplesgenerator.events.categories.models.Project
 
 private sealed trait CommitEvent extends Product with Serializable {
   val eventId:  EventId
   val project:  Project
   val commitId: CommitId
 }
-
-final case class Project(id: projects.Id, path: projects.Path)
 
 private object CommitEvent {
 

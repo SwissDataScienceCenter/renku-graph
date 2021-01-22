@@ -48,7 +48,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class EventsProcessingRunnerSpec
-    extends AnyWordSpec
+  extends AnyWordSpec
     with MockFactory
     with Eventually
     with IntegrationPatience
@@ -68,20 +68,20 @@ class EventsProcessingRunnerSpec
     s"return $Busy when processing capacity is reached " +
       s"and $Accepted once some of the scheduled events are done" in new TestCase {
 
-        // draining processing capacity by scheduling max number of jobs
-        (1 to processesNumber.value.toInt).toList map { _ =>
-          processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync()
-        }
-
-        // any new job to get the Busy status
-        processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync() shouldBe Busy
-
-        expectAvailabilityIsCommunicated
-
-        // once at least one process is done, new events should be accepted again
-        sleep(eventProcessingTime.toMillis + 250)
-        processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync() shouldBe Accepted
+      // draining processing capacity by scheduling max number of jobs
+      (1 to processesNumber.value.toInt).toList map { _ =>
+        processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync()
       }
+
+      // any new job to get the Busy status
+      processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync() shouldBe Busy
+
+      expectAvailabilityIsCommunicated
+
+      // once at least one process is done, new events should be accepted again
+      sleep(eventProcessingTime.toMillis + 250)
+      processingRunner.scheduleForProcessing(eventId, events, schemaVersion).unsafeRunSync() shouldBe Accepted
+    }
 
     "release the processing resource on processing failure" in new TestCase {
 
@@ -105,15 +105,15 @@ class EventsProcessingRunnerSpec
   }
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
-  private implicit val timer:        Timer[IO]        = IO.timer(ExecutionContext.global)
+  private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
 
-    val eventId               = compoundEventIds.generateOne
+    val eventId = compoundEventIds.generateOne
     val eventIdCausingFailure = compoundEventIds.generateOne
-    val events                = commitEvents.generateNonEmptyList()
-    val exception             = exceptions.generateOne
-    val schemaVersion         = projectSchemaVersions.generateOne
+    val events = commitEvents.generateNonEmptyList()
+    val exception = exceptions.generateOne
+    val schemaVersion = projectSchemaVersions.generateOne
 
     val eventProcessingTime = 500 millis
     val eventProcessor: EventProcessor[IO] =
@@ -126,8 +126,8 @@ class EventsProcessingRunnerSpec
         }
 
     val processesNumber: Long Refined Positive = 2L
-    val semaphore  = Semaphore[IO](processesNumber.value).unsafeRunSync()
-    val logger     = TestLogger[IO]()
+    val semaphore = Semaphore[IO](processesNumber.value).unsafeRunSync()
+    val logger = TestLogger[IO]()
     val subscriber = mock[SubscriptionMechanism[IO]]
     val processingRunner =
       new EventsProcessingRunnerImpl(eventProcessor, processesNumber, semaphore, subscriber, logger)

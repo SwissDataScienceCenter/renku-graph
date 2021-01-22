@@ -30,9 +30,9 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent._
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
+import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
 import scala.concurrent.ExecutionContext
