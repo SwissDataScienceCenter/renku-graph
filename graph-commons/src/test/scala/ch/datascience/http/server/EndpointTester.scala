@@ -18,17 +18,19 @@
 
 package ch.datascience.http.server
 
-import cats.data.Kleisli
+import cats.data.{Kleisli, OptionT}
 import cats.effect.{ContextShift, IO, Resource, Sync}
 import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.{Href, Rel}
+import ch.datascience.http.server.security.model.AuthUser
 import eu.timepit.refined.api.RefType
 import io.circe._
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.headers.`Content-Type`
 import org.http4s._
+import org.http4s.server.AuthMiddleware
 
 import scala.concurrent.ExecutionContext
 
@@ -91,4 +93,9 @@ object EndpointTester {
         link      <- linksJson get rel
       } yield link.href
   }
+
+  def givenAuthMiddleware(returning: Option[AuthUser]): AuthMiddleware[IO, Option[AuthUser]] =
+    AuthMiddleware.withFallThrough {
+      Kleisli.liftF(OptionT.liftF(returning.pure[IO]))
+    }
 }

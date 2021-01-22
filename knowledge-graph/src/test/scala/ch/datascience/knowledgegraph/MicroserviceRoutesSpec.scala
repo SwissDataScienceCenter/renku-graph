@@ -56,6 +56,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
   "routes" should {
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
+
       val response = routes.call(
         Request(Method.GET, uri"ping")
       )
@@ -287,6 +288,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       projectDatasetsEndpoint,
       datasetsEndpoint,
       datasetsSearchEndpoint,
+      givenAuthMiddleware(returning = None),
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))
   }

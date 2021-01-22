@@ -671,7 +671,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
     val datasetFinder = new IODatasetFinder(
       new BaseDetailsFinder(rdfStoreConfig, logger, timeRecorder),
       new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
-      new PartsFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
+      new PartsFinder(rdfStoreConfig, logger, timeRecorder),
       new ProjectsFinder(rdfStoreConfig, logger, timeRecorder)
     )
   }
