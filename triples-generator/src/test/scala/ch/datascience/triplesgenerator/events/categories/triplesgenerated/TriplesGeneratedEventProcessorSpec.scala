@@ -84,6 +84,8 @@ class TriplesGeneratedEventProcessorSpec
       eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
 
       logSummary(triplesGeneratedEvent, isSuccessful = true)
+
+      verifyMetricsCollected()
     }
 
     s"mark event with TransformationRecoverableFailure if transforming triples fails with $CurationRecoverableError" in new TestCase {
@@ -101,7 +103,7 @@ class TriplesGeneratedEventProcessorSpec
 
       eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
 
-      logError(triplesGeneratedEvent, exception, exception.getMessage)
+      logError(triplesGeneratedEvent, exception)
       logSummary(triplesGeneratedEvent, isSuccessful = false)
     }
 
@@ -120,7 +122,7 @@ class TriplesGeneratedEventProcessorSpec
 
       eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
 
-      logError(triplesGeneratedEvent, exception)
+      logError(triplesGeneratedEvent, exception, exception.getMessage)
       logSummary(triplesGeneratedEvent, isSuccessful = false)
     }
 
@@ -217,7 +219,7 @@ class TriplesGeneratedEventProcessorSpec
         Error(
           message =
             s"Triples Generated Event processing failure: ${triplesGeneratedEvent.compoundEventId}, projectPath: ${triplesGeneratedEvent.project.path}",
-          new Exception("transformation failure -> Event rolled back", exception)
+          throwableMatcher = NotRefEqual(new Exception("transformation failure -> Event rolled back", exception))
         )
       )
     }
@@ -328,11 +330,11 @@ class TriplesGeneratedEventProcessorSpec
         )
       )
 
-    def logError(commit: TriplesGeneratedEvent, exception: Exception, message: String = "failed"): Assertion =
-      logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))
+    def logError(event: TriplesGeneratedEvent, exception: Exception, message: String = "failed"): Assertion =
+      logger.logged(Error(s"${commonLogMessage(event)} $message", NotRefEqual(exception)))
 
     def commonLogMessage(event: TriplesGeneratedEvent): String =
-      s"Triples Generated Event id: ${event.compoundEventId}, ${event.project.path}"
+      s"Triples Generated Event: ${event.compoundEventId}, projectPath: ${event.project.path}"
 
     def verifyMetricsCollected() =
       eventsProcessingTimes

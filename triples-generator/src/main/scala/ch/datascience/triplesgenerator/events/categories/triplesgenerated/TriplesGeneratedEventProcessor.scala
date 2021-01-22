@@ -76,21 +76,17 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
                             )
         results <-
           transformTriplesAndUpload(triplesGeneratedEvent, currentSchemaVersion)(maybeAccessToken)
-        uploadingResults <-
-          updateEventLog(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.project.path, results)
+        uploadingResults <- updateEventLog(triplesGeneratedEvent, results)
       } yield uploadingResults
     }.flatMap(
-      logSummary(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.project.path)
-    ) recoverWith logError(
-      triplesGeneratedEvent.compoundEventId,
-      triplesGeneratedEvent.project.path
-    )
+      logSummary(triplesGeneratedEvent)
+    ) recoverWith logError(triplesGeneratedEvent)
 
-  private def logError(eventId:     CompoundEventId,
-                       projectPath: projects.Path
-  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)(s"Triples Generated Event processing failure: $eventId, projectPath: $projectPath")
-    ME.unit
+  private def logError(event: TriplesGeneratedEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(
+        s"Triples Generated Event processing failure: ${event.compoundEventId}, projectPath: ${event.project.path}"
+      )
   }
   private def transformTriplesAndUpload(
       triplesGeneratedEvent:   TriplesGeneratedEvent,
@@ -99,49 +95,37 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
     for {
       curatedTriples <- transform(triplesGeneratedEvent)
       result <- EitherT.liftF[Interpretation, ProcessingRecoverableError, UploadingResult](
-                  upload(curatedTriples).map(toUploadingResult(triplesGeneratedEvent, _))
+                  upload(curatedTriples).flatMap(toUploadingResult(triplesGeneratedEvent, _))
                 )
     } yield result
-  }.leftSemiflatMap(toRecoverableError(triplesGeneratedEvent))
+  }.leftSemiflatMap(toUploadingError(triplesGeneratedEvent))
     .merge
     .recoverWith(nonRecoverableFailure(triplesGeneratedEvent))
 
   private def toUploadingResult(triplesGeneratedEvent: TriplesGeneratedEvent,
                                 triplesUploadResult:   TriplesUploadResult
-  ): UploadingResult = triplesUploadResult match {
-    case DeliverySuccess => Uploaded(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.triples)
+  ): Interpretation[UploadingResult] = triplesUploadResult match {
+    case DeliverySuccess =>
+      (Uploaded(triplesGeneratedEvent): UploadingResult)
+        .pure[Interpretation]
     case error @ RecoverableFailure(message) =>
-      logger.error(
-        s"${logMessageCommon(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.project.path)} $message"
-      )
-      RecoverableError(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.triples, error)
+      logger
+        .error(
+          s"${logMessageCommon(triplesGeneratedEvent)} $message"
+        )
+        .map(_ => RecoverableError(triplesGeneratedEvent, error))
     case error @ InvalidTriplesFailure(message) =>
-      logger.error(
-        s"${logMessageCommon(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.project.path)} $message"
-      )
-      NonRecoverableError(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.triples, error: Throwable)
+      logger
+        .error(
+          s"${logMessageCommon(triplesGeneratedEvent)} $message"
+        )
+        .map(_ => NonRecoverableError(triplesGeneratedEvent, error: Throwable))
     case error @ InvalidUpdatesFailure(message) =>
-      logger.error(
-        s"${logMessageCommon(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.project.path)} $message"
-      )
-      NonRecoverableError(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.triples, error: Throwable)
-  }
-
-  private def toRecoverableError(
-      triplesGeneratedEvent: TriplesGeneratedEvent
-  ): ProcessingRecoverableError => Interpretation[UploadingResult] = {
-    case error @ CurationRecoverableError(_, _) =>
       logger
-        .error(error)(
-          s"${logMessageCommon(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.project.path)} ${error.getMessage}"
+        .error(
+          s"${logMessageCommon(triplesGeneratedEvent)} $message"
         )
-        .map(_ => RecoverableError(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.triples, error))
-    case error =>
-      logger
-        .error(error)(
-          s"${logMessageCommon(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.project.path)} ${error.getMessage}"
-        )
-        .map(_ => RecoverableError(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.triples, error))
+        .map(_ => NonRecoverableError(triplesGeneratedEvent, error: Throwable))
   }
 
   private def nonRecoverableFailure(
@@ -149,50 +133,63 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   ): PartialFunction[Throwable, Interpretation[UploadingResult]] = { case NonFatal(exception) =>
     logger
       .error(exception)(
-        s"${logMessageCommon(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.project.path)} ${exception.getMessage}"
+        s"${logMessageCommon(triplesGeneratedEvent)} ${exception.getMessage}"
       )
-      .map(_ => NonRecoverableError(triplesGeneratedEvent.compoundEventId, triplesGeneratedEvent.triples, exception))
+      .map(_ => NonRecoverableError(triplesGeneratedEvent, exception))
   }
 
-  private def updateEventLog(eventId:          CompoundEventId,
-                             projectPath:      projects.Path,
-                             uploadingResults: UploadingResult
-  ) = {
+  private def toUploadingError(
+      triplesGeneratedEvent: TriplesGeneratedEvent
+  ): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
+    case CurationRecoverableError(message, exception) =>
+      logger
+        .error(exception)(
+          s"${logMessageCommon(triplesGeneratedEvent)} $message"
+        )
+        .map(_ => RecoverableError(triplesGeneratedEvent, exception))
+    case NonFatal(exception) =>
+      logger
+        .error(exception)(
+          s"${logMessageCommon(triplesGeneratedEvent)} ${exception.getMessage}"
+        )
+        .map(_ => NonRecoverableError(triplesGeneratedEvent, exception))
+  }
+
+  private def updateEventLog(event: TriplesGeneratedEvent, uploadingResults: UploadingResult) = {
     for {
       _ <- uploadingResults match {
-             case Uploaded(eventId, _)         => markEventDone(eventId)
-             case Skipped(eventId, _, message) => markEventSkipped(eventId, message)
-             case RecoverableError(eventId, _, message) =>
-               markEventTransformationFailedRecoverably(eventId, message)
-             case NonRecoverableError(eventId, _, cause) => markEventTransformationFailedNonRecoverably(eventId, cause)
+             case Uploaded(event) => markEventDone(event.compoundEventId)
+             case RecoverableError(event, message) =>
+               markEventTransformationFailedRecoverably(event.compoundEventId, message)
+             case NonRecoverableError(event, cause) =>
+               markEventTransformationFailedNonRecoverably(event.compoundEventId, cause)
            }
     } yield uploadingResults
-  } recoverWith logEventLogUpdateError(eventId, projectPath, uploadingResults)
+  } recoverWith logEventLogUpdateError(event, uploadingResults)
 
   private def logEventLogUpdateError(
-      eventId:          CompoundEventId,
-      projectPath:      projects.Path,
+      event:            TriplesGeneratedEvent,
       uploadingResults: UploadingResult
   ): PartialFunction[Throwable, Interpretation[UploadingResult]] = { case NonFatal(exception) =>
     logger
       .error(exception)(
-        s"${logMessageCommon(eventId, projectPath)} failed to mark as TriplesStore in the Event Log"
+        s"${logMessageCommon(event)} failed to mark as TriplesStore in the Event Log"
       )
       .map(_ => uploadingResults)
   }
 
-  private def logSummary(eventId:     CompoundEventId,
-                         projectPath: projects.Path
+  private def logSummary(
+      triplesGeneratedEvent: TriplesGeneratedEvent
   ): ((ElapsedTime, UploadingResult)) => Interpretation[Unit] = { case (elapsedTime, uploadingResult) =>
     val message = uploadingResult match {
-      case Uploaded(_, _) => "was successfully uploaded"
-      case _              => "failed to upload"
+      case Uploaded(_) => "was successfully uploaded"
+      case _           => "failed to upload"
     }
-    logger.info(s"${logMessageCommon(eventId, projectPath)} processed in ${elapsedTime}ms: ${message}")
+    logger.info(s"${logMessageCommon(triplesGeneratedEvent)} processed in ${elapsedTime}ms: $message")
   }
 
-  private def logMessageCommon(eventId: CompoundEventId, projectPath: projects.Path): String =
-    s"Triples Generated Event id: $eventId, $projectPath"
+  private def logMessageCommon(event: TriplesGeneratedEvent): String =
+    s"Triples Generated Event: ${event.compoundEventId}, projectPath: ${event.project.path}"
 
   private def rollback(triplesGeneratedEvent: TriplesGeneratedEvent,
                        schemaVersion:         SchemaVersion
@@ -202,18 +199,15 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   }
 
   private sealed trait UploadingResult extends Product with Serializable {
-    val triples: JsonLDTriples
+    val event: TriplesGeneratedEvent
   }
   private sealed trait UploadingError extends UploadingResult {
     val cause: Throwable
   }
   private object UploadingResult {
-    case class Uploaded(eventId: CompoundEventId, triples: JsonLDTriples) extends UploadingResult
-    case class Skipped(eventId: CompoundEventId, triples: JsonLDTriples, message: String) extends UploadingResult
-    case class RecoverableError(eventId: CompoundEventId, triples: JsonLDTriples, cause: Throwable)
-        extends UploadingError
-    case class NonRecoverableError(eventId: CompoundEventId, triples: JsonLDTriples, cause: Throwable)
-        extends UploadingError
+    case class Uploaded(event: TriplesGeneratedEvent) extends UploadingResult
+    case class RecoverableError(event: TriplesGeneratedEvent, cause: Throwable) extends UploadingError
+    case class NonRecoverableError(event: TriplesGeneratedEvent, cause: Throwable) extends UploadingError
   }
 }
 
