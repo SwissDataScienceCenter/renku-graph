@@ -72,14 +72,21 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
   }
 
   def tableExists(tableName: String): Boolean =
-    Fragment
-      .const(s"select exists (select * from $tableName);")
+    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = $tableName)"
       .query[Boolean]
-      .option
+      .unique
       .transact(transactor.get)
-      .recover { case _ => None }
+      .recover { case _ => false }
       .unsafeRunSync()
-      .isDefined
+
+  def viewExists(viewName: String): Boolean =
+    Fragment
+      .const(s"select exists (select * from $viewName)")
+      .query[Boolean]
+      .unique
+      .transact(transactor.get)
+      .recover { case _ => false }
+      .unsafeRunSync()
 
   def dropTable(tableName: String): Unit = execute {
     Fragment.const(s"DROP TABLE IF EXISTS $tableName").update.run.map(_ => ())

@@ -52,5 +52,5 @@ private[eventlog] class LatestEventDatesViewRemoverImpl[Interpretation[_]](
   } yield ()
 
   private lazy val dropView =
-    sql""" DROP MATERIALIZED VIEW IF EXISTS project_latest_event_date""".update
+    sql"""DROP MATERIALIZED VIEW IF EXISTS project_latest_event_date""".update
 }

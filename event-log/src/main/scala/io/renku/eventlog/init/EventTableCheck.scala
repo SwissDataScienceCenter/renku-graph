@@ -41,10 +41,9 @@ private trait EventTableCheck[Interpretation[_]] {
       transactor: DbTransactor[Interpretation, EventLogDB],
       ME:         Bracket[Interpretation, Throwable]
   ): Interpretation[Boolean] =
-    sql"select event_id from event limit 1"
-      .query[String]
-      .option
+    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event')"
+      .query[Boolean]
+      .unique
       .transact(transactor.get)
-      .map(_ => true)
       .recover { case _ => false }
 }
