@@ -50,12 +50,13 @@ class ProjectEndpoint[Interpretation[_]: Effect](
   import io.circe.{Encoder, Json}
   import org.http4s.circe._
 
-  def getProject(path: projects.Path): Interpretation[Response[Interpretation]] = measureExecutionTime {
-    projectFinder
-      .findProject(path)
-      .flatMap(toHttpResult(path))
-      .recoverWith(httpResult(path))
-  } map logExecutionTimeWhen(finishedSuccessfully(path))
+  def getProject(path: projects.Path): Interpretation[Response[Interpretation]] =
+    measureExecutionTime {
+      projectFinder
+        .findProject(path)
+        .flatMap(toHttpResult(path))
+        .recoverWith(httpResult(path))
+    } map logExecutionTimeWhen(finishedSuccessfully(path))
 
   private def toHttpResult(
       path: projects.Path
