@@ -31,5 +31,5 @@ libraryDependencies += "org.typelevel" %% "cats-core" % "2.3.1"
 libraryDependencies += "eu.timepit"        %% "refined"         % "0.9.20"  % Test
 libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.1.0"   % Test
 libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.1 is broken
-libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
+libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test //3.2.3  breaks list comparison
 libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.2"   % Test
