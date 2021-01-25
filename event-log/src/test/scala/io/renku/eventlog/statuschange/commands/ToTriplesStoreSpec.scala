@@ -51,7 +51,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
         storeEvent(
           eventId,
-          EventStatus.TriplesGenerated,
+          EventStatus.TransformingTriples,
           executionDates.generateOne,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -60,7 +60,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
         )
         storeEvent(
           compoundEventIds.generateOne.copy(id = eventId.id),
-          EventStatus.TriplesGenerated,
+          EventStatus.TransformingTriples,
           executionDates.generateOne,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -68,7 +68,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
         )
         storeEvent(
           compoundEventIds.generateOne,
-          EventStatus.TriplesGenerated,
+          EventStatus.TransformingTriples,
           executionDates.generateOne,
           eventDates.generateOne,
           eventBodies.generateOne,
@@ -105,34 +105,33 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
         histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
       }
 
-    EventStatus.all.filterNot(status => status == TriplesGenerated || status == TransformingTriples) foreach {
-      eventStatus =>
-        s"do nothing when updating event with $eventStatus status " +
-          s"and return ${UpdateResult.NotFound}" in new TestCase {
+    EventStatus.all.filterNot(status => status == TransformingTriples) foreach { eventStatus =>
+      s"do nothing when updating event with $eventStatus status " +
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
 
-            val executionDate = executionDates.generateOne
-            storeEvent(eventId,
-                       eventStatus,
-                       executionDate,
-                       eventDates.generateOne,
-                       eventBodies.generateOne,
-                       batchDate = eventBatchDate
-            )
+          val executionDate = executionDates.generateOne
+          storeEvent(eventId,
+                     eventStatus,
+                     executionDate,
+                     eventDates.generateOne,
+                     eventBodies.generateOne,
+                     batchDate = eventBatchDate
+          )
 
-            findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
+          findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
-            val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, processingTime, currentTime)
+          val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, processingTime, currentTime)
 
-            (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
-            val expectedEvents =
-              if (eventStatus != TriplesStore) List.empty
-              else List((eventId, executionDate, eventBatchDate))
-            findEvents(status = TriplesStore)        shouldBe expectedEvents
-            findProcessingTime(eventId).eventIdsOnly shouldBe List()
+          val expectedEvents =
+            if (eventStatus != TriplesStore) List.empty
+            else List((eventId, executionDate, eventBatchDate))
+          findEvents(status = TriplesStore)        shouldBe expectedEvents
+          findProcessingTime(eventId).eventIdsOnly shouldBe List()
 
-            histogram.verifyExecutionTimeMeasured(command.queries.head.name)
-          }
+          histogram.verifyExecutionTimeMeasured(command.queries.head.name)
+        }
     }
   }
 
