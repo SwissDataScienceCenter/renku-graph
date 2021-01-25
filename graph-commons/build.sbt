@@ -65,7 +65,7 @@ libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % 
 libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.1.0"   % Test
 libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.2 is broken
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
-libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.3"   % Test // 3.2.3 seems to break List comparison
+libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.2"   % Test // 3.2.3 seems to break List comparison
 
 val testContainersScalaVersion = "0.38.8"
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
