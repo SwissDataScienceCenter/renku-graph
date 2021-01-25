@@ -93,17 +93,18 @@ class TriplesGeneratedEventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.pure(maybeAccessToken))
 
-      val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
+      val exeption          = exceptions.generateOne
+      val curationException = CurationRecoverableError(nonBlankStrings().generateOne.value, exeption)
       (triplesTransformer
         .transform(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
         .expects(triplesGeneratedEvent, maybeAccessToken)
-        .returning(leftT[Try, CuratedTriples[Try]](exception))
+        .returning(leftT[Try, CuratedTriples[Try]](curationException))
 
-      expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent.compoundEventId, exception)
+      expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent.compoundEventId, curationException)
 
       eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
 
-      logError(triplesGeneratedEvent, exception)
+      logError(triplesGeneratedEvent, curationException, curationException.message)
       logSummary(triplesGeneratedEvent, isSuccessful = false)
     }
 
@@ -148,7 +149,7 @@ class TriplesGeneratedEventProcessorSpec
 
         eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
 
-        logError(triplesGeneratedEvent, uploadingError)
+        logError(triplesGeneratedEvent, uploadingError, uploadingError.message)
         logSummary(triplesGeneratedEvent, isSuccessful = false)
       }
 
@@ -174,13 +175,7 @@ class TriplesGeneratedEventProcessorSpec
 
           eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
 
-          logger.logged(
-            Error(
-              message =
-                s"Triples Generated Event processing failure: ${triplesGeneratedEvent.compoundEventId}, projectPath: ${triplesGeneratedEvent.project.path}",
-              throwableMatcher = NotRefEqual(failure)
-            )
-          )
+          logError(triplesGeneratedEvent, failure, failure.message)
           logSummary(triplesGeneratedEvent, isSuccessful = false)
           logger.reset()
         }

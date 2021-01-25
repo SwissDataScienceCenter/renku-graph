@@ -93,14 +93,14 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
       currentSchemaVersion:    SchemaVersion
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
-      curatedTriples <- transform(triplesGeneratedEvent)
-      result <- EitherT.liftF[Interpretation, ProcessingRecoverableError, UploadingResult](
-                  upload(curatedTriples).flatMap(toUploadingResult(triplesGeneratedEvent, _))
-                )
+      curatedTriples <- transform(triplesGeneratedEvent).leftSemiflatMap(toUploadingError(triplesGeneratedEvent))
+      result <- EitherT
+                  .liftF[Interpretation, UploadingResult, UploadingResult](
+                    upload(curatedTriples).flatMap(toUploadingResult(triplesGeneratedEvent, _))
+                  )
+
     } yield result
-  }.leftSemiflatMap(toUploadingError(triplesGeneratedEvent))
-    .merge
-    .recoverWith(nonRecoverableFailure(triplesGeneratedEvent))
+  }.merge recoverWith nonRecoverableFailure(triplesGeneratedEvent)
 
   private def toUploadingResult(triplesGeneratedEvent: TriplesGeneratedEvent,
                                 triplesUploadResult:   TriplesUploadResult
@@ -110,19 +110,19 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
         .pure[Interpretation]
     case error @ RecoverableFailure(message) =>
       logger
-        .error(
+        .error(error)(
           s"${logMessageCommon(triplesGeneratedEvent)} $message"
         )
         .map(_ => RecoverableError(triplesGeneratedEvent, error))
     case error @ InvalidTriplesFailure(message) =>
       logger
-        .error(
+        .error(error)(
           s"${logMessageCommon(triplesGeneratedEvent)} $message"
         )
         .map(_ => NonRecoverableError(triplesGeneratedEvent, error: Throwable))
     case error @ InvalidUpdatesFailure(message) =>
       logger
-        .error(
+        .error(error)(
           s"${logMessageCommon(triplesGeneratedEvent)} $message"
         )
         .map(_ => NonRecoverableError(triplesGeneratedEvent, error: Throwable))
@@ -132,35 +132,27 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
       triplesGeneratedEvent: TriplesGeneratedEvent
   ): PartialFunction[Throwable, Interpretation[UploadingResult]] = { case NonFatal(exception) =>
     logger
-      .error(exception)(
-        s"${logMessageCommon(triplesGeneratedEvent)} ${exception.getMessage}"
-      )
+      .error(exception)(s"${logMessageCommon(triplesGeneratedEvent)} ${exception.getMessage}")
       .map(_ => NonRecoverableError(triplesGeneratedEvent, exception))
   }
 
   private def toUploadingError(
       triplesGeneratedEvent: TriplesGeneratedEvent
   ): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
-    case CurationRecoverableError(message, exception) =>
+    case curationError @ CurationRecoverableError(message, _) =>
       logger
-        .error(exception)(
+        .error(curationError)(
           s"${logMessageCommon(triplesGeneratedEvent)} $message"
         )
-        .map(_ => RecoverableError(triplesGeneratedEvent, exception))
-    case NonFatal(exception) =>
-      logger
-        .error(exception)(
-          s"${logMessageCommon(triplesGeneratedEvent)} ${exception.getMessage}"
-        )
-        .map(_ => NonRecoverableError(triplesGeneratedEvent, exception))
+        .map(_ => RecoverableError(triplesGeneratedEvent, curationError))
   }
 
   private def updateEventLog(event: TriplesGeneratedEvent, uploadingResults: UploadingResult) = {
     for {
       _ <- uploadingResults match {
              case Uploaded(event) => markEventDone(event.compoundEventId)
-             case RecoverableError(event, message) =>
-               markEventTransformationFailedRecoverably(event.compoundEventId, message)
+             case RecoverableError(event, cause) =>
+               markEventTransformationFailedRecoverably(event.compoundEventId, cause)
              case NonRecoverableError(event, cause) =>
                markEventTransformationFailedNonRecoverably(event.compoundEventId, cause)
            }
@@ -172,9 +164,7 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
       uploadingResults: UploadingResult
   ): PartialFunction[Throwable, Interpretation[UploadingResult]] = { case NonFatal(exception) =>
     logger
-      .error(exception)(
-        s"${logMessageCommon(event)} failed to mark as TriplesStore in the Event Log"
-      )
+      .error(exception)(s"${logMessageCommon(event)} failed to mark as TriplesStore in the Event Log")
       .map(_ => uploadingResults)
   }
 
