@@ -18,18 +18,18 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.events.categories.models.Project
+import ch.datascience.triplesgenerator.events.categories.models.{CategoryEvent, Project}
 
-case class TriplesGeneratedEvent(eventId: EventId, project: Project, triples: JsonLDTriples)
-    extends Product
+final case class TriplesGeneratedEvent(eventId:       EventId,
+                                       project:       Project,
+                                       triples:       JsonLDTriples,
+                                       schemaVersion: SchemaVersion
+) extends Product
     with Serializable
-
-object TriplesGeneratedEvent {
-  implicit class TriplesGeneratedEventOps(tripleGeneratedEvent: TriplesGeneratedEvent) {
-    lazy val compoundEventId: CompoundEventId =
-      CompoundEventId(tripleGeneratedEvent.eventId, tripleGeneratedEvent.project.id)
-  }
-
+    with CategoryEvent {
+  override val compoundEventId: CompoundEventId =
+    CompoundEventId(eventId, project.id)
 }

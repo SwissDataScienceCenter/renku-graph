@@ -42,7 +42,8 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
           TriplesGeneratedEvent(
             compoundEventId.id,
             Project(projectId, projectPath),
-            jsonldTriples
+            jsonldTriples,
+            schemaVersion
           )
         )
 
@@ -68,6 +69,7 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
     val compoundEventId = compoundEventIds.generateOne
 
     val jsonldTriples = jsonLDTriples.generateOne
+    val schemaVersion = projectSchemaVersions.generateOne
 
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
@@ -82,7 +84,8 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
             "id"   -> Json.fromInt(projectId.value),
             "path" -> Json.fromString(projectPath.value)
           ),
-          "body" -> Json.fromString(jsonldTriples.value.noSpaces)
+          "body"          -> Json.fromString(jsonldTriples.value.noSpaces),
+          "schemaVersion" -> Json.fromString(schemaVersion.value)
         )
         .noSpaces
     }

@@ -55,7 +55,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .returning(triplesGeneratedEvent.pure[IO])
 
         (processingRunner.scheduleForProcessing _)
-          .expects(triplesGeneratedEvent, renkuVersionPair.schemaVersion)
+          .expects(triplesGeneratedEvent)
           .returning(EventSchedulingResult.Accepted.pure[IO])
 
         val request = Request[IO](Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
@@ -79,7 +79,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .returning(triplesGeneratedEvent.pure[IO])
 
         (processingRunner.scheduleForProcessing _)
-          .expects(triplesGeneratedEvent, renkuVersionPair.schemaVersion)
+          .expects(triplesGeneratedEvent)
           .returning(EventSchedulingResult.Busy.pure[IO])
 
         val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
@@ -121,7 +121,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       val exception = exceptions.generateOne
       (processingRunner.scheduleForProcessing _)
-        .expects(triplesGeneratedEvent, renkuVersionPair.schemaVersion)
+        .expects(triplesGeneratedEvent)
         .returning(exception.raiseError[IO, EventSchedulingResult])
 
       val request = Request(Method.POST, uri"events").withEntity((eventId -> eventBody).asJson)
@@ -144,9 +144,8 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     val processingRunner      = mock[EventsProcessingRunner[IO]]
     val eventBodyDeserializer = mock[EventBodyDeserializer[IO]]
-    val renkuVersionPair      = renkuVersionPairs.generateOne
     val logger                = TestLogger[IO]()
-    val handler               = new EventHandler[IO](processingRunner, eventBodyDeserializer, renkuVersionPair, logger)
+    val handler               = new EventHandler[IO](processingRunner, eventBodyDeserializer, logger)
   }
 
   private implicit lazy val eventEncoder: Encoder[(CompoundEventId, EventBody)] =

@@ -82,7 +82,7 @@ class TriplesGeneratedEventProcessorSpec
 
       expectEventMarkedAsDone(triplesGeneratedEvent.compoundEventId)
 
-      eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
+      eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
       logSummary(triplesGeneratedEvent, isSuccessful = true)
 
@@ -103,7 +103,7 @@ class TriplesGeneratedEventProcessorSpec
 
       expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent.compoundEventId, curationException)
 
-      eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
+      eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
       logError(triplesGeneratedEvent, curationException, curationException.message)
       logSummary(triplesGeneratedEvent, isSuccessful = false)
@@ -122,7 +122,7 @@ class TriplesGeneratedEventProcessorSpec
 
       expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent.compoundEventId, exception)
 
-      eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
+      eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
       logError(triplesGeneratedEvent, exception, exception.getMessage)
       logSummary(triplesGeneratedEvent, isSuccessful = false)
@@ -148,7 +148,7 @@ class TriplesGeneratedEventProcessorSpec
 
         expectEventMarkedAsRecoverableFailure(triplesGeneratedEvent.compoundEventId, uploadingError)
 
-        eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
+        eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
         logError(triplesGeneratedEvent, uploadingError, uploadingError.message)
         logSummary(triplesGeneratedEvent, isSuccessful = false)
@@ -174,7 +174,7 @@ class TriplesGeneratedEventProcessorSpec
 
           expectEventMarkedAsNonRecoverableFailure(triplesGeneratedEvent.compoundEventId, failure)
 
-          eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
+          eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
           logError(triplesGeneratedEvent, failure, failure.message)
           logSummary(triplesGeneratedEvent, isSuccessful = false)
@@ -195,7 +195,7 @@ class TriplesGeneratedEventProcessorSpec
         .expects(triplesGeneratedEvent.compoundEventId)
         .returning(context.raiseError(exception))
 
-      eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
+      eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
       logError(triplesGeneratedEvent, exception, "failed to mark as TriplesStore in the Event Log")
       logSummary(triplesGeneratedEvent, isSuccessful = true)
@@ -207,9 +207,9 @@ class TriplesGeneratedEventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.raiseError(exception))
 
-      expectEventMarkedAsTriplesGenerated(triplesGeneratedEvent, schemaVersion)
+      expectEventMarkedAsTriplesGenerated(triplesGeneratedEvent)
 
-      eventProcessor.process(triplesGeneratedEvent, schemaVersion) shouldBe context.unit
+      eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
       logger.loggedOnly(
         Error(
@@ -259,7 +259,6 @@ class TriplesGeneratedEventProcessorSpec
     val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
 
     val maybeAccessToken = Gen.option(accessTokens).generateOne
-    val schemaVersion    = projectSchemaVersions.generateOne
 
     val accessTokenFinder     = mock[AccessTokenFinder[Try]]
     val triplesTransformer    = mock[TriplesTransformer[Try]]
@@ -312,10 +311,10 @@ class TriplesGeneratedEventProcessorSpec
         .expects(compoundEventId)
         .returning(context.unit)
 
-    def expectEventMarkedAsTriplesGenerated(event: TriplesGeneratedEvent, schemaVersion: SchemaVersion) =
+    def expectEventMarkedAsTriplesGenerated(event: TriplesGeneratedEvent) =
       (eventStatusUpdater
         .markTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion))
-        .expects(event.compoundEventId, event.triples, schemaVersion)
+        .expects(event.compoundEventId, event.triples, event.schemaVersion)
         .returning(context.unit)
 
     def logSummary(triplesGeneratedEvent: TriplesGeneratedEvent, isSuccessful: Boolean): Assertion =

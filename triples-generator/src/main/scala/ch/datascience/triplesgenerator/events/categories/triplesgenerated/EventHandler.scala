@@ -36,7 +36,6 @@ import scala.concurrent.ExecutionContext
 private[events] class EventHandler[Interpretation[_]: Effect](
     eventsProcessingRunner: EventsProcessingRunner[Interpretation],
     eventBodyDeserializer:  EventBodyDeserializer[Interpretation],
-    currentVersionPair:     RenkuVersionPair,
     logger:                 Logger[Interpretation]
 )(implicit
     ME: MonadError[Interpretation, Throwable]
@@ -44,7 +43,6 @@ private[events] class EventHandler[Interpretation[_]: Effect](
 
   import ch.datascience.graph.model.projects
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  import currentVersionPair.schemaVersion
   import eventsProcessingRunner.scheduleForProcessing
   import io.circe.Decoder
   import org.http4s._
@@ -59,8 +57,10 @@ private[events] class EventHandler[Interpretation[_]: Effect](
       eventAndBody <- request.as[IdAndBody].toRightT(recoverTo = UnsupportedEventType)
       (eventId, eventBody) = eventAndBody
       triplesGeneratedEvent <-
-        eventBodyDeserializer.toTriplesGeneratedEvent(eventId, eventBody).toRightT(recoverTo = BadRequest)
-      result <- scheduleForProcessing(triplesGeneratedEvent, schemaVersion).toRightT
+        eventBodyDeserializer
+          .toTriplesGeneratedEvent(eventId, eventBody)
+          .toRightT(recoverTo = BadRequest)
+      result <- scheduleForProcessing(triplesGeneratedEvent).toRightT
                   .semiflatTap(logger.log(eventId -> triplesGeneratedEvent.project.path))
                   .leftSemiflatTap(logger.log(eventId -> triplesGeneratedEvent.project.path))
     } yield result
@@ -87,7 +87,6 @@ private[events] object EventHandler {
   val categoryName: CategoryName = CategoryName("TRIPLES_GENERATED")
 
   def apply(
-      currentVersionPair:            RenkuVersionPair,
       metricsRegistry:               MetricsRegistry[IO],
       gitLabThrottler:               Throttler[IO, GitLab],
       timeRecorder:                  SparqlQueryTimeRecorder[IO],
@@ -101,5 +100,5 @@ private[events] object EventHandler {
     subscriptionMechanism <- subscriptionMechanismRegistry(categoryName)
     processingRunner <-
       IOEventsProcessingRunner(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
-  } yield new EventHandler[IO](processingRunner, EventBodyDeserializer(), currentVersionPair, logger)
+  } yield new EventHandler[IO](processingRunner, EventBodyDeserializer(), logger)
 }

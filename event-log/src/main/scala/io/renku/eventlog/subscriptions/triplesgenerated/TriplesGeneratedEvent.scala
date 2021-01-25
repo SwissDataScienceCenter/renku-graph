@@ -19,11 +19,15 @@
 package io.renku.eventlog.subscriptions.triplesgenerated
 
 import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import io.circe.Encoder
 import io.renku.eventlog.EventPayload
 
-private final case class TriplesGeneratedEvent(id: CompoundEventId, projectPath: projects.Path, payload: EventPayload) {
+private final case class TriplesGeneratedEvent(id:            CompoundEventId,
+                                               projectPath:   projects.Path,
+                                               payload:       EventPayload,
+                                               schemaVersion: SchemaVersion
+) {
   override lazy val toString: String =
     s"$TriplesGeneratedEvent $id, projectPath = $projectPath"
 }
@@ -39,6 +43,7 @@ private object TriplesGeneratedEventEncoder extends Encoder[TriplesGeneratedEven
     "project": {
       "id":         ${event.id.projectId.value}
     },
-    "body":${event.payload.value}
+    "body":${event.payload.value},
+    "schemaVersion":${event.schemaVersion.value}
   }"""
 }

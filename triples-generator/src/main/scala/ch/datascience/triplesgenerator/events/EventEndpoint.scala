@@ -103,8 +103,7 @@ object IOEventEndpoint {
                                    )
 
       membersSyncHandler <- categories.membersync.EventHandler(gitLabThrottler, logger, timeRecorder)
-      triplesGeneratedHandler <- categories.triplesgenerated.EventHandler(currentVersionPair,
-                                                                          metricsRegistry,
+      triplesGeneratedHandler <- categories.triplesgenerated.EventHandler(metricsRegistry,
                                                                           gitLabThrottler,
                                                                           timeRecorder,
                                                                           subscriptionMechanismRegistry,

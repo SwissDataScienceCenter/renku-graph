@@ -63,7 +63,7 @@ class EventsProcessingRunnerSpec
 
     s"return $Accepted if there is enough capacity to process an event" in new TestCase {
       processingRunner
-        .scheduleForProcessing(triplesGeneratedEvent, schemaVersion)
+        .scheduleForProcessing(triplesGeneratedEvent)
         .unsafeRunSync() shouldBe Accepted
     }
 
@@ -72,12 +72,12 @@ class EventsProcessingRunnerSpec
 
         // draining processing capacity by scheduling max number of jobs
         (1 to processesNumber.value.toInt).toList map { _ =>
-          processingRunner.scheduleForProcessing(triplesGeneratedEvent, schemaVersion).unsafeRunSync()
+          processingRunner.scheduleForProcessing(triplesGeneratedEvent).unsafeRunSync()
         }
 
         // any new job to get the Busy status
         processingRunner
-          .scheduleForProcessing(triplesGeneratedEvent, schemaVersion)
+          .scheduleForProcessing(triplesGeneratedEvent)
           .unsafeRunSync() shouldBe Busy
 
         expectAvailabilityIsCommunicated
@@ -85,7 +85,7 @@ class EventsProcessingRunnerSpec
         // once at least one process is done, new events should be accepted again
         sleep(eventProcessingTime.toMillis + 250)
         processingRunner
-          .scheduleForProcessing(triplesGeneratedEvent, schemaVersion)
+          .scheduleForProcessing(triplesGeneratedEvent)
           .unsafeRunSync() shouldBe Accepted
       }
 
@@ -93,15 +93,15 @@ class EventsProcessingRunnerSpec
 
       // draining processing capacity by scheduling max number of jobs
       processingRunner
-        .scheduleForProcessing(triplesGeneratedEventCausingFailure, schemaVersion)
+        .scheduleForProcessing(triplesGeneratedEventCausingFailure)
         .unsafeRunSync()
       processingRunner
-        .scheduleForProcessing(triplesGeneratedEventCausingFailure, schemaVersion)
+        .scheduleForProcessing(triplesGeneratedEventCausingFailure)
         .unsafeRunSync()
 
       // any new job to get the Busy status
       processingRunner
-        .scheduleForProcessing(triplesGeneratedEvent, schemaVersion)
+        .scheduleForProcessing(triplesGeneratedEvent)
         .unsafeRunSync() shouldBe Busy
 
       expectAvailabilityIsCommunicated
@@ -109,7 +109,7 @@ class EventsProcessingRunnerSpec
       // once at least one process is done, new events should be accepted again
       sleep(eventProcessingTime.toMillis + 250)
       processingRunner
-        .scheduleForProcessing(triplesGeneratedEvent, schemaVersion)
+        .scheduleForProcessing(triplesGeneratedEvent)
         .unsafeRunSync() shouldBe Accepted
 
       eventually {
@@ -130,11 +130,10 @@ class EventsProcessingRunnerSpec
     )
     val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
     val exception             = exceptions.generateOne
-    val schemaVersion         = projectSchemaVersions.generateOne
 
     val eventProcessingTime = 500 millis
     val eventProcessor: EventProcessor[IO] =
-      (event: TriplesGeneratedEvent, _: SchemaVersion) =>
+      (event: TriplesGeneratedEvent) =>
         CompoundEventId(event.eventId, event.project.id) match {
           case `eventIdCausingFailure` =>
             timer sleep eventProcessingTime flatMap (_ => exception.raiseError[IO, Unit])

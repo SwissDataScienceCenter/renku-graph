@@ -104,7 +104,7 @@ private class TriplesGeneratedEventFinderImpl(
 
   // format: off
   private def findOldestEvent(idAndPath: ProjectIds) = SqlQuery({
-    fr"""SELECT evt.event_id, evt.project_id, ${idAndPath.path} AS project_path, event_payload.schema_version, event_payload.payload
+    fr"""SELECT evt.event_id, evt.project_id, ${idAndPath.path} AS project_path, event_payload.payload,  event_payload.schema_version
          FROM (
            SELECT project_id, min(event_date) AS min_event_date
            FROM event
@@ -144,7 +144,7 @@ private class TriplesGeneratedEventFinderImpl(
       : Option[TriplesGeneratedEvent] => Free[ConnectionOp, Option[TriplesGeneratedEvent]] = {
     case None =>
       Free.pure[ConnectionOp, Option[TriplesGeneratedEvent]](None)
-    case Some(event @ TriplesGeneratedEvent(id, _, _)) =>
+    case Some(event @ TriplesGeneratedEvent(id, _, _, _)) =>
       measureExecutionTime(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
   }
 

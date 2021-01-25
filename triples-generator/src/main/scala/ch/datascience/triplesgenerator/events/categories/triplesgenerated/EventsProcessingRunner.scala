@@ -40,10 +40,7 @@ import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private trait EventsProcessingRunner[Interpretation[_]] {
-  def scheduleForProcessing(
-      triplesGeneratedEvent: TriplesGeneratedEvent,
-      currentSchemaVersion:  SchemaVersion
-  ): Interpretation[EventSchedulingResult]
+  def scheduleForProcessing(triplesGeneratedEvent: TriplesGeneratedEvent): Interpretation[EventSchedulingResult]
 }
 
 private class EventsProcessingRunnerImpl(
@@ -58,8 +55,7 @@ private class EventsProcessingRunnerImpl(
   import subscriptionMechanism._
 
   override def scheduleForProcessing(
-      triplesGeneratedEvent: TriplesGeneratedEvent,
-      currentSchemaVersion:  SchemaVersion
+      triplesGeneratedEvent: TriplesGeneratedEvent
   ): IO[EventSchedulingResult] =
     semaphore.available flatMap {
       case 0 => Busy.pure[IO]
@@ -67,14 +63,14 @@ private class EventsProcessingRunnerImpl(
         {
           for {
             _ <- semaphore.acquire
-            _ <- process(triplesGeneratedEvent, currentSchemaVersion).start
+            _ <- process(triplesGeneratedEvent).start
           } yield Accepted: EventSchedulingResult
         } recoverWith releasingSemaphore
     }
 
-  private def process(triplesGeneratedEvent: TriplesGeneratedEvent, currentSchemaVersion: SchemaVersion) = {
+  private def process(triplesGeneratedEvent: TriplesGeneratedEvent) = {
     for {
-      _ <- eventProcessor.process(triplesGeneratedEvent, currentSchemaVersion)
+      _ <- eventProcessor.process(triplesGeneratedEvent)
       _ <- releaseAndNotify()
     } yield ()
   } recoverWith { case NonFatal(exception) =>

@@ -21,6 +21,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.rdfstore.JsonLDTriples
@@ -42,19 +43,20 @@ private class EventBodyDeserializerImpl[Interpretation[_]](implicit
   ): Interpretation[TriplesGeneratedEvent] =
     ME.fromEither {
       parse(eventBody.value)
-        .flatMap(_.as[(Project, String)])
-        .flatMap { case (project, payload) =>
-          parse(payload).map(json => TriplesGeneratedEvent(eventId.id, project, JsonLDTriples(json)))
+        .flatMap(_.as[(Project, String, SchemaVersion)])
+        .flatMap { case (project, payload, schemaVersion) =>
+          parse(payload).map(json => TriplesGeneratedEvent(eventId.id, project, JsonLDTriples(json), schemaVersion))
         }
         .leftMap(toMeaningfulError(eventBody))
     }
 
-  private implicit val triplesDecoder: Decoder[(Project, String)] = (cursor: HCursor) =>
+  private implicit val triplesDecoder: Decoder[(Project, String, SchemaVersion)] = (cursor: HCursor) =>
     for {
-      projectId    <- cursor.downField("project").downField("id").as[Id]
-      projectPath  <- cursor.downField("project").downField("path").as[Path]
-      eventPayload <- cursor.downField("body").as[String]
-    } yield (Project(projectId, projectPath), eventPayload)
+      projectId     <- cursor.downField("project").downField("id").as[Id]
+      projectPath   <- cursor.downField("project").downField("path").as[Path]
+      eventPayload  <- cursor.downField("body").as[String]
+      schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
+    } yield (Project(projectId, projectPath), eventPayload, schemaVersion)
 
   private def toMeaningfulError(eventBody: EventBody): Error => Error = {
     case failure: DecodingFailure => failure.withMessage(s"TriplesGeneratedEvent cannot be deserialised: '$eventBody'")

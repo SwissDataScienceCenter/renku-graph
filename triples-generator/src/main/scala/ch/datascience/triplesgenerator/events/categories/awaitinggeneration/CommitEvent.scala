@@ -19,12 +19,14 @@
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
 import ch.datascience.graph.model.events._
-import ch.datascience.triplesgenerator.events.categories.models.Project
+import ch.datascience.triplesgenerator.events.categories.models.{CategoryEvent, Project}
 
-private sealed trait CommitEvent extends Product with Serializable {
+private sealed trait CommitEvent extends Product with Serializable with CategoryEvent {
   val eventId:  EventId
   val project:  Project
   val commitId: CommitId
+
+  override val compoundEventId = CompoundEventId(eventId, project.id)
 }
 
 private object CommitEvent {
@@ -42,7 +44,4 @@ private object CommitEvent {
       commitId: CommitId
   ) extends CommitEvent
 
-  implicit class CommitOps(commit: CommitEvent) {
-    lazy val compoundEventId: CompoundEventId = CompoundEventId(commit.eventId, commit.project.id)
-  }
 }
