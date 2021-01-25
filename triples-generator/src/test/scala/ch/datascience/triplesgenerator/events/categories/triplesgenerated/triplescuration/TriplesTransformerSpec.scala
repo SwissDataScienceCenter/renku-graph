@@ -28,10 +28,12 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DataSetInfoEnricher
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.forks.ForkInfoUpdater
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.ProjectInfoUpdater
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsUpdater
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.ProjectInfoUpdater
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -47,14 +49,14 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(CuratedTriples[Try](triplesGeneratedEvent.triples, updatesGroups = Nil),
-          triplesGeneratedEvent.project.path
+                 triplesGeneratedEvent.project.path
         )
         .returning(triplesWithPersonDetails.toRightT)
 
       val triplesWithForkInfo = curatedTriplesObjects[Try].generateOne
-      (forkInfoUpdater
-        .updateForkInfo(_: projects.Path, _: CuratedTriples[Try])(_: Option[AccessToken]))
-        .expects(triplesGeneratedEvent.project.path, triplesWithPersonDetails, maybeAccessToken)
+      (projectInfoUpdater
+        .updateProjectInfo(_: TriplesGeneratedEvent, _: CuratedTriples[Try])(_: Option[AccessToken]))
+        .expects(triplesGeneratedEvent, triplesWithPersonDetails, maybeAccessToken)
         .returning(triplesWithForkInfo.toRightT)
 
       val triplesWithEnrichedDataset = curatedTriplesObjects[Try].generateOne
@@ -70,7 +72,7 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val exception = exceptions.generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(CuratedTriples[Try](triplesGeneratedEvent.triples, updatesGroups = Nil),
-          triplesGeneratedEvent.project.path
+                 triplesGeneratedEvent.project.path
         )
         .returning(exception.toEitherTError)
 
@@ -82,14 +84,14 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(CuratedTriples[Try](triplesGeneratedEvent.triples, updatesGroups = Nil),
-          triplesGeneratedEvent.project.path
+                 triplesGeneratedEvent.project.path
         )
         .returning(triplesWithPersonDetails.toRightT)
 
       val exception = exceptions.generateOne
-      (forkInfoUpdater
-        .updateForkInfo(_: projects.Path, _: CuratedTriples[Try])(_: Option[AccessToken]))
-        .expects(triplesGeneratedEvent.project.path, triplesWithPersonDetails, maybeAccessToken)
+      (projectInfoUpdater
+        .updateProjectInfo(_: TriplesGeneratedEvent, _: CuratedTriples[Try])(_: Option[AccessToken]))
+        .expects(triplesGeneratedEvent, triplesWithPersonDetails, maybeAccessToken)
         .returning(exception.toEitherTError)
 
       curator.transform(triplesGeneratedEvent).value shouldBe exception.raiseError[Try, CuratedTriples[Try]]
@@ -100,14 +102,14 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(CuratedTriples[Try](triplesGeneratedEvent.triples, updatesGroups = Nil),
-          triplesGeneratedEvent.project.path
+                 triplesGeneratedEvent.project.path
         )
         .returning(triplesWithPersonDetails.toRightT)
 
       val triplesWithForkInfo = curatedTriplesObjects[Try].generateOne
-      (forkInfoUpdater
-        .updateForkInfo(_: projects.Path, _: CuratedTriples[Try])(_: Option[AccessToken]))
-        .expects(triplesGeneratedEvent.project.path, triplesWithPersonDetails, maybeAccessToken)
+      (projectInfoUpdater
+        .updateProjectInfo(_: TriplesGeneratedEvent, _: CuratedTriples[Try])(_: Option[AccessToken]))
+        .expects(triplesGeneratedEvent, triplesWithPersonDetails, maybeAccessToken)
         .returning(triplesWithForkInfo.toRightT)
 
       val exception = exceptions.generateOne
@@ -123,7 +125,7 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
       (personDetailsUpdater.updatePersonDetails _)
         .expects(CuratedTriples[Try](triplesGeneratedEvent.triples, updatesGroups = Nil),
-          triplesGeneratedEvent.project.path
+                 triplesGeneratedEvent.project.path
         )
         .returning(exception.toLeftT)
 
@@ -135,14 +137,14 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(CuratedTriples[Try](triplesGeneratedEvent.triples, updatesGroups = Nil),
-          triplesGeneratedEvent.project.path
+                 triplesGeneratedEvent.project.path
         )
         .returning(triplesWithPersonDetails.toRightT)
 
       val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
-      (forkInfoUpdater
-        .updateForkInfo(_: projects.Path, _: CuratedTriples[Try])(_: Option[AccessToken]))
-        .expects(triplesGeneratedEvent.project.path, triplesWithPersonDetails, maybeAccessToken)
+      (projectInfoUpdater
+        .updateProjectInfo(_: TriplesGeneratedEvent, _: CuratedTriples[Try])(_: Option[AccessToken]))
+        .expects(triplesGeneratedEvent, triplesWithPersonDetails, maybeAccessToken)
         .returning(exception.toLeftT)
 
       curator.transform(triplesGeneratedEvent).value shouldBe Left(exception).pure[Try]
@@ -154,9 +156,9 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     val triplesGeneratedEvent = triplesGeneratedEvents.generateOne
 
     val personDetailsUpdater = mock[PersonDetailsUpdater[Try]]
-    val forkInfoUpdater = mock[ForkInfoUpdater[Try]]
-    val dataSetInfoEnricher = mock[DataSetInfoEnricher[Try]]
-    val curator = new TriplesTransformerImpl[Try](personDetailsUpdater, forkInfoUpdater, dataSetInfoEnricher)
+    val projectInfoUpdater   = mock[ProjectInfoUpdater[Try]]
+    val dataSetInfoEnricher  = mock[DataSetInfoEnricher[Try]]
+    val curator              = new TriplesTransformerImpl[Try](personDetailsUpdater, projectInfoUpdater, dataSetInfoEnricher)
   }
 
   private implicit class TriplesOps(out: CuratedTriples[Try]) {

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
@@ -96,12 +96,13 @@ private class IOGitLabInfoFinder(
     implicit val decoder: Decoder[ProjectAndCreatorId] = cursor =>
       for {
         path           <- cursor.downField("path_with_namespace").as[projects.Path]
+        visibility     <- cursor.downField("visibility").as[projects.Visibility]
         dateCreated    <- cursor.downField("created_at").as[projects.DateCreated]
         maybeCreatorId <- cursor.downField("creator_id").as[Option[users.GitLabId]]
         maybeParentPath <- cursor
                              .downField("forked_from_project")
                              .as[Option[projects.Path]](decodeOption(parentPathDecoder))
-      } yield GitLabProject(path, maybeParentPath, maybeCreator = None, dateCreated) -> maybeCreatorId
+      } yield GitLabProject(path, visibility, dateCreated, maybeParentPath, maybeCreator = None) -> maybeCreatorId
 
     jsonOf[IO, ProjectAndCreatorId]
   }

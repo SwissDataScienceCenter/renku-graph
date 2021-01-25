@@ -22,7 +22,7 @@ import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
-import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectPaths, projectSchemaVersions, userAffiliations, userEmails, userGitLabIds, userNames}
+import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectPaths, projectSchemaVersions, projectVisibilities, userAffiliations, userEmails, userGitLabIds, userNames}
 import ch.datascience.graph.model.users.{Email, GitLabId}
 import eu.timepit.refined.api.Refined.unsafeApply
 import eu.timepit.refined.auto._
@@ -46,7 +46,15 @@ trait EntitiesGenerators {
     maybeCreator <- persons.toGeneratorOfOptions
     members      <- persons(userGitLabIds.toGeneratorOfSomes).toGeneratorOfSet(minElements = 0)
     version      <- projectSchemaVersions
-  } yield Project(path, name, dateCreated, maybeCreator, members = members, maybeParentProject = None, version)
+  } yield Project(path,
+                  name,
+                  dateCreated,
+                  maybeCreator,
+                  maybeVisibility = None,
+                  members = members,
+                  maybeParentProject = None,
+                  version
+  )
 
   implicit val agentEntities: Gen[Agent] = cliVersions map Agent.apply
 

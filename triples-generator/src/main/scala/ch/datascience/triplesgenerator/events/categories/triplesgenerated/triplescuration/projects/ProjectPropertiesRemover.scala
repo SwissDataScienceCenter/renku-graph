@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
-package forks
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
 import ch.datascience.graph.Schemas._
 import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.JsonOps
 import io.circe.Json
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath._

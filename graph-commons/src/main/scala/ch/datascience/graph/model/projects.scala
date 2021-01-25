@@ -88,7 +88,7 @@ object projects {
 
   sealed trait Visibility extends StringTinyType with Product with Serializable
 
-  object Visibility {
+  object Visibility extends TinyTypeFactory[Visibility](VisibilityInstantiator) {
 
     val all: Set[Visibility] = Set(Public, Private, Internal)
 
@@ -116,5 +116,11 @@ object projects {
             )
         }
       }
+  }
+
+  private object VisibilityInstantiator extends (String => Visibility) {
+    override def apply(value: String): Visibility = Visibility.all.find(_.value == value).getOrElse {
+      throw new IllegalArgumentException(s"'$value' unknown Visibility")
+    }
   }
 }

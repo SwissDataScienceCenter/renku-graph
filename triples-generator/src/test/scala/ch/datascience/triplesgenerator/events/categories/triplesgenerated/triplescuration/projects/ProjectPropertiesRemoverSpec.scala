@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
@@ -52,6 +52,7 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
               fileCommit()(
                 projectPath = project.path,
                 projectName = project.name,
+                maybeVisibility = project.maybeVisibility,
                 projectDateCreated = project.dateCreated,
                 maybeProjectCreator = project.maybeCreator,
                 maybeParent = project.maybeParentProject,

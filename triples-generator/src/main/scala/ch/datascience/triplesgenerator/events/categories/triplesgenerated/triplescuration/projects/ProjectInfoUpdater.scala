@@ -16,52 +16,51 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
 import cats.effect.IO._
 import cats.effect._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{CuratedTriples, CurationResults}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait ForkInfoUpdater[Interpretation[_]] {
-  def updateForkInfo(
-      projectPath:             projects.Path,
+trait ProjectInfoUpdater[Interpretation[_]] {
+  def updateProjectInfo(
+      event:                   TriplesGeneratedEvent,
       givenCuratedTriples:     CuratedTriples[Interpretation]
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
 }
 
-class ForkInfoUpdaterImpl(
+class ProjectInfoUpdaterImpl(
     payloadTransformer:     PayloadTransformer[IO],
     updateFunctionsCreator: UpdatesCreator[IO]
-) extends ForkInfoUpdater[IO] {
+) extends ProjectInfoUpdater[IO] {
 
-  override def updateForkInfo(
-      projectPath:             projects.Path,
+  override def updateProjectInfo(
+      event:                   TriplesGeneratedEvent,
       curatedTriples:          CuratedTriples[IO]
   )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[IO] =
     payloadTransformer
-      .transform(projectPath, curatedTriples.triples)
+      .transform(event, curatedTriples)
       .map { transformedTriples =>
-        CuratedTriples(transformedTriples, curatedTriples.updatesGroups :+ updateFunctionsCreator.create(projectPath))
+        CuratedTriples(transformedTriples, curatedTriples.updatesGroups :+ updateFunctionsCreator.create(event))
       }
 }
 
-object IOForkInfoUpdater {
+object IOProjectInfoUpdater {
   def apply(
       gitLabThrottler:         Throttler[IO, GitLab],
       logger:                  Logger[IO],
       timeRecorder:            SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[ForkInfoUpdater[IO]] =
+  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[ProjectInfoUpdater[IO]] =
     for {
       payloadTransformer     <- IOPayloadTransformer(gitLabThrottler, logger)
       updateFunctionsCreator <- IOUpdateFunctionsCreator(gitLabThrottler, logger, timeRecorder)
-    } yield new ForkInfoUpdaterImpl(payloadTransformer, updateFunctionsCreator)
+    } yield new ProjectInfoUpdaterImpl(payloadTransformer, updateFunctionsCreator)
 }

@@ -18,15 +18,16 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.implicits.catsSyntaxOptionId
+import cats.syntax.all._
 import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId}
+import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId, Visibility}
 
 final case class Project(path:               Path,
                          name:               Name,
                          dateCreated:        DateCreated,
                          maybeCreator:       Option[Person],
+                         maybeVisibility:    Option[Visibility] = None,
                          members:            Set[Person] = Set.empty,
                          maybeParentProject: Option[Project] = None,
                          version:            SchemaVersion
@@ -49,12 +50,13 @@ object Project {
           Right(
             PartialEntity(
               EntityTypes.of(prov / "Location", schema / "Project"),
-              schema / "name"          -> entity.name.asJsonLD,
-              schema / "dateCreated"   -> entity.dateCreated.asJsonLD,
-              schema / "creator"       -> entity.maybeCreator.asJsonLD,
-              schema / "member"        -> entity.members.toList.asJsonLD,
-              schema / "schemaVersion" -> entity.version.asJsonLD,
-              prov / "wasDerivedFrom"  -> entity.maybeParentProject.asJsonLD
+              schema / "name"             -> entity.name.asJsonLD,
+              schema / "dateCreated"      -> entity.dateCreated.asJsonLD,
+              schema / "creator"          -> entity.maybeCreator.asJsonLD,
+              renku / "projectVisibility" -> entity.maybeVisibility.asJsonLD,
+              schema / "member"           -> entity.members.toList.asJsonLD,
+              schema / "schemaVersion"    -> entity.version.asJsonLD,
+              prov / "wasDerivedFrom"     -> entity.maybeParentProject.asJsonLD
             )
           )
 

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
@@ -29,6 +29,8 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError._
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -44,22 +46,20 @@ class PayloadTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     "do nothing if there's no project in GitLab" in new TestCase {
 
       given(
-        gitLabProjects(projectPath, maybeParentPaths = emptyOptionOf[Path]).generateOne
+        gitLabProjects(event.project.path, maybeParentPaths = emptyOptionOf[Path]).generateOne
       ).doesNotExistsInGitLab
 
-      transformer.transform(projectPath, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
-        givenCuratedTriples
+      transformer.transform(event, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
+        givenCuratedTriples.triples
       )
     }
 
     "transform the triples if there's project in Gitlab" in new TestCase {
 
-      given(gitLabProjects(projectPath, maybeParentPaths = projectPaths.generateSome).generateOne).existsInGitLab
+      given(gitLabProjects(event.project.path, maybeParentPaths = projectPaths.generateSome).generateOne).existsInGitLab
       val transformedTriples = givenTriplesTransformationCalled()
 
-      transformer.transform(projectPath, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(
-        transformedTriples
-      )
+      transformer.transform(event, givenCuratedTriples).value.unsafeRunSync() shouldBe Right(transformedTriples)
     }
 
     Set(
@@ -71,11 +71,11 @@ class PayloadTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
         (gitLabInfoFinder
           .findProject(_: Path)(_: Option[AccessToken]))
-          .expects(projectPath, maybeAccessToken)
+          .expects(event.project.path, maybeAccessToken)
           .returning(exception.raiseError[IO, Option[GitLabProject]])
 
         intercept[Exception] {
-          transformer.transform(projectPath, givenCuratedTriples).value.unsafeRunSync()
+          transformer.transform(event, givenCuratedTriples).value.unsafeRunSync()
         } shouldBe exception
       }
     }
@@ -88,10 +88,10 @@ class PayloadTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
         (gitLabInfoFinder
           .findProject(_: Path)(_: Option[AccessToken]))
-          .expects(projectPath, maybeAccessToken)
+          .expects(event.project.path, maybeAccessToken)
           .returning(exception.raiseError[IO, Option[GitLabProject]])
 
-        transformer.transform(projectPath, givenCuratedTriples).value.unsafeRunSync() shouldBe Left {
+        transformer.transform(event, givenCuratedTriples).value.unsafeRunSync() shouldBe Left {
           CurationRecoverableError("Problem with finding fork info", exception)
         }
       }
@@ -102,9 +102,9 @@ class PayloadTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
-    val projectPath = projectPaths.generateOne
-    val givenCuratedTriples = jsonLDTriples.generateOne
-    val triplesTransformer = mockFunction[JsonLDTriples, JsonLDTriples]
+    val event               = triplesGeneratedEvents.generateOne
+    val givenCuratedTriples = curatedTriplesObjects[IO].generateOne
+    val triplesTransformer  = mockFunction[JsonLDTriples, JsonLDTriples]
 
     val gitLabInfoFinder = mock[GitLabInfoFinder[IO]]
 
@@ -112,7 +112,7 @@ class PayloadTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
 
     def givenTriplesTransformationCalled(): JsonLDTriples = {
       val transformedTriples = jsonLDTriples.generateOne
-      triplesTransformer.expects(givenCuratedTriples).returning(transformedTriples)
+      triplesTransformer.expects(givenCuratedTriples.triples).returning(transformedTriples)
       transformedTriples
     }
 
@@ -120,7 +120,7 @@ class PayloadTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       lazy val existsInGitLab: GitLabProject = {
         (gitLabInfoFinder
           .findProject(_: Path)(_: Option[AccessToken]))
-          .expects(projectPath, maybeAccessToken)
+          .expects(event.project.path, maybeAccessToken)
           .returning(Option(gitLabProject).pure[IO])
         gitLabProject
       }
@@ -128,9 +128,8 @@ class PayloadTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       lazy val doesNotExistsInGitLab =
         (gitLabInfoFinder
           .findProject(_: Path)(_: Option[AccessToken]))
-          .expects(projectPath, maybeAccessToken)
+          .expects(event.project.path, maybeAccessToken)
           .returning(Option.empty.pure[IO])
     }
   }
-
 }

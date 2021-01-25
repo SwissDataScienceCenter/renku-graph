@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
@@ -103,7 +103,8 @@ class GitLabInfoFinderSpec
   private def projectJson(project: GitLabProject, maybeCreatorId: Option[users.GitLabId]): Json =
     json"""{
       "path_with_namespace": ${project.path.value},
-      "created_at":          ${project.dateCreated.value}
+      "created_at":          ${project.dateCreated.value},
+      "visibility":          ${project.visibility.value}
     }"""
       .deepMerge(project.maybeParentPath.map { parentPath =>
         json"""{

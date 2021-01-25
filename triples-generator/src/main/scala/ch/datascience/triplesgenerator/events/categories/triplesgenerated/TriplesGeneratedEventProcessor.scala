@@ -31,6 +31,7 @@ import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.EventHandler.categoryName
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{IOTriplesCurator, TriplesTransformer}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
@@ -85,7 +86,7 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   private def logError(event: TriplesGeneratedEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
       logger.error(exception)(
-        s"Triples Generated Event processing failure: ${event.compoundEventId}, projectPath: ${event.project.path}"
+        s"$categoryName: Triples Generated Event processing failure: ${event.compoundEventId}, projectPath: ${event.project.path}"
       )
   }
   private def transformTriplesAndUpload(
@@ -179,7 +180,7 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   }
 
   private def logMessageCommon(event: TriplesGeneratedEvent): String =
-    s"Triples Generated Event: ${event.compoundEventId}, projectPath: ${event.project.path}"
+    s"$categoryName: ${event.compoundEventId}, projectPath: ${event.project.path}"
 
   private def rollback(triplesGeneratedEvent: TriplesGeneratedEvent,
                        schemaVersion:         SchemaVersion

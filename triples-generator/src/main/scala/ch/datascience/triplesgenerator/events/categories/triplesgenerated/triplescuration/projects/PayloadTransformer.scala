@@ -16,17 +16,18 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
 import cats.MonadError
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import io.chrisdavenport.log4cats.Logger
 
@@ -34,26 +35,26 @@ import scala.concurrent.ExecutionContext
 
 private trait PayloadTransformer[Interpretation[_]] {
   def transform(
-                 projectPath: projects.Path,
-                 triples: JsonLDTriples
-               )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, ProcessingRecoverableError, JsonLDTriples]
+      event:                   TriplesGeneratedEvent,
+      curatedTriples:          CuratedTriples[Interpretation]
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, ProcessingRecoverableError, JsonLDTriples]
 }
 
 private class PayloadTransformerImpl(
-                                      gitLab: GitLabInfoFinder[IO],
-                                      projectPropertiesRemover: JsonLDTriples => JsonLDTriples
-                                    )(implicit ME: MonadError[IO, Throwable], cs: ContextShift[IO])
-  extends PayloadTransformer[IO] {
+    gitLab:                   GitLabInfoFinder[IO],
+    projectPropertiesRemover: JsonLDTriples => JsonLDTriples
+)(implicit ME:                MonadError[IO, Throwable], cs: ContextShift[IO])
+    extends PayloadTransformer[IO] {
 
   override def transform(
-                          projectPath: projects.Path,
-                          triples: JsonLDTriples
-                        )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = EitherT {
+      event:                   TriplesGeneratedEvent,
+      curatedTriples:          CuratedTriples[IO]
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = EitherT {
     gitLab
-      .findProject(projectPath)
+      .findProject(event.project.path)
       .map {
-        case None => triples.pure[IO]
-        case _ => projectPropertiesRemover(triples).pure[IO]
+        case None => curatedTriples.triples.pure[IO]
+        case _    => projectPropertiesRemover(curatedTriples.triples).pure[IO]
       }
       .flatten
       .map(_.asRight[ProcessingRecoverableError])
@@ -61,7 +62,7 @@ private class PayloadTransformerImpl(
   }
 
   private lazy val maybeToRecoverableError
-  : PartialFunction[Throwable, Either[ProcessingRecoverableError, JsonLDTriples]] = {
+      : PartialFunction[Throwable, Either[ProcessingRecoverableError, JsonLDTriples]] = {
     case e: UnexpectedResponseException =>
       Left[ProcessingRecoverableError, JsonLDTriples](
         CurationRecoverableError("Problem with finding fork info", e)
@@ -74,15 +75,14 @@ private class PayloadTransformerImpl(
 }
 
 private object IOPayloadTransformer {
-
   import cats.effect.Timer
   import ch.datascience.config.GitLab
   import ch.datascience.control.Throttler
 
   def apply(
-             gitLabThrottler: Throttler[IO, GitLab],
-             logger: Logger[IO]
-           )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[PayloadTransformer[IO]] =
+      gitLabThrottler:         Throttler[IO, GitLab],
+      logger:                  Logger[IO]
+  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[PayloadTransformer[IO]] =
     for {
       gitLabInfoFinder <- IOGitLabInfoFinder(gitLabThrottler, logger)
       triplesTransformer = new ProjectPropertiesRemover

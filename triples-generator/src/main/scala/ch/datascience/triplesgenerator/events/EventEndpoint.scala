@@ -103,8 +103,15 @@ object IOEventEndpoint {
                                    )
 
       membersSyncHandler <- categories.membersync.EventHandler(gitLabThrottler, logger, timeRecorder)
+      triplesGeneratedHandler <- categories.triplesgenerated.EventHandler(currentVersionPair,
+                                                                          metricsRegistry,
+                                                                          gitLabThrottler,
+                                                                          timeRecorder,
+                                                                          subscriptionMechanismRegistry,
+                                                                          logger
+                                 )
     } yield new EventEndpointImpl[IO](
-      List(awaitingGenerationHandler, membersSyncHandler),
+      List(awaitingGenerationHandler, membersSyncHandler, triplesGeneratedHandler),
       reProvisioningStatus
     )
 }

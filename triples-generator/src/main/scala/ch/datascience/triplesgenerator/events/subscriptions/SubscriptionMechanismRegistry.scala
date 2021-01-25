@@ -61,5 +61,10 @@ object SubscriptionMechanismRegistry {
       SubscriptionMechanism(categories.awaitinggeneration.EventHandler.categoryName, logger)
     membersSyncSubscription <-
       SubscriptionMechanism(categories.membersync.EventHandler.categoryName, logger)
-  } yield new SubscriptionMechanismRegistryImpl[IO](awaitingGenerationSubscription, membersSyncSubscription)
+    triplesGeneratedSubscription <-
+      SubscriptionMechanism(categories.triplesgenerated.EventHandler.categoryName, logger)
+  } yield new SubscriptionMechanismRegistryImpl[IO](awaitingGenerationSubscription,
+                                                    membersSyncSubscription,
+                                                    triplesGeneratedSubscription
+  )
 }

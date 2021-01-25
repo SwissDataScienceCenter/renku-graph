@@ -42,6 +42,7 @@ import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecove
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.Generators._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
+import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.EventHandler.categoryName
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.IOCommitEventProcessor.eventsProcessingTimesBuilder
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.GenerationResult.{MigrationEvent, Triples}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
@@ -492,7 +493,7 @@ class CommitEventProcessorSpec
       logger.logged(Error(s"${commonLogMessage(commit)} $message", exception))
 
     def commonLogMessage(event: CommitEvent): String =
-      s"Commit Event id: ${event.compoundEventId}, ${event.project.path}"
+      s"$categoryName: Commit Event id: ${event.compoundEventId}, ${event.project.path}"
 
     def verifyMetricsCollected() =
       eventsProcessingTimes

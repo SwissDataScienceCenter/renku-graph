@@ -22,7 +22,7 @@ import ch.datascience.generators.CommonGraphGenerators.{fusekiBaseUrls, gitLabUr
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.Path
+import ch.datascience.graph.model.projects.{Path, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.FusekiBaseUrl
@@ -30,31 +30,32 @@ import ch.datascience.rdfstore.entities.EntitiesGenerators._
 import ch.datascience.rdfstore.entities.{Person, Project}
 import org.scalacheck.Gen
 
-package object forks {
+package object projects {
 
   implicit val renkuBaseUrl:  RenkuBaseUrl  = renkuBaseUrls.generateOne
   implicit val gitLabApiUrl:  GitLabApiUrl  = gitLabUrls.generateOne.apiV4
   implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
 
-  private[forks] def gitLabProjects(projectPath: Path, parentPath: Path): Gen[GitLabProject] =
+  private[projects] def gitLabProjects(projectPath: Path, parentPath: Path): Gen[GitLabProject] =
     gitLabProjects(projectPath = projectPath, maybeParentPaths = Gen.const(parentPath).toGeneratorOfSomes)
 
-  private[forks] def gitLabProjects(
+  private[projects] def gitLabProjects(
       projectPath:      Path,
       maybeParentPaths: Gen[Option[Path]] = projectPaths.toGeneratorOfOptions
   ): Gen[GitLabProject] =
     for {
+      visibility      <- projectVisibilities
       maybeParentPath <- maybeParentPaths
       maybeCreator    <- gitLabCreator().toGeneratorOfOptions
       dateCreated     <- projectCreatedDates
-    } yield GitLabProject(projectPath, maybeParentPath, maybeCreator, dateCreated)
+    } yield GitLabProject(projectPath, visibility, dateCreated, maybeParentPath, maybeCreator)
 
-  private[forks] def gitLabCreator(gitLabId: users.GitLabId = userGitLabIds.generateOne,
-                                   name:     users.Name = userNames.generateOne
+  private[projects] def gitLabCreator(gitLabId: users.GitLabId = userGitLabIds.generateOne,
+                                      name:     users.Name = userNames.generateOne
   ): Gen[GitLabCreator] = GitLabCreator(gitLabId, name)
 
-  private[forks] def kgCreator(maybeEmail: Option[Email] = userEmails.generateOption,
-                               name:       users.Name = userNames.generateOne
+  private[projects] def kgCreator(maybeEmail: Option[Email] = userEmails.generateOption,
+                                  name:       users.Name = userNames.generateOne
   ): Gen[KGCreator] =
     for {
       resourceId <- userResourceIds(maybeEmail)
@@ -66,11 +67,19 @@ package object forks {
   )
 
   def entitiesProjects(maybeCreator:       Option[Person] = persons.generateOption,
-                       maybeParentProject: Option[Project] = None
+                       maybeParentProject: Option[Project] = None,
+                       maybeVisibility:    Option[Visibility] = None
   ): Gen[Project] = for {
     path        <- projectPaths
     name        <- projectNames
     createdDate <- projectCreatedDates
     version     <- projectSchemaVersions
-  } yield Project(path, name, createdDate, maybeCreator, maybeParentProject = maybeParentProject, version = version)
+  } yield Project(path,
+                  name,
+                  createdDate,
+                  maybeCreator,
+                  maybeVisibility,
+                  maybeParentProject = maybeParentProject,
+                  version = version
+  )
 }

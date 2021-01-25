@@ -19,43 +19,42 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 
 import cats.MonadError
-import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
-import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
+import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.{DataSetInfoEnricher, IODataSetInfoEnricher}
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.forks.{ForkInfoUpdater, IOForkInfoUpdater}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsUpdater
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects.{IOProjectInfoUpdater, ProjectInfoUpdater}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 trait TriplesTransformer[Interpretation[_]] {
   def transform(
-                 triplesGeneratedEvent: TriplesGeneratedEvent
-               )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
+      triplesGeneratedEvent:   TriplesGeneratedEvent
+  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
 }
 
 private[events] class TriplesTransformerImpl[Interpretation[_]](
-                                                                 personDetailsUpdater: PersonDetailsUpdater[Interpretation],
-                                                                 forkInfoUpdater: ForkInfoUpdater[Interpretation],
-                                                                 dataSetInfoEnricher: DataSetInfoEnricher[Interpretation]
-                                                               )(implicit ME: MonadError[Interpretation, Throwable])
-  extends TriplesTransformer[Interpretation] {
+    personDetailsUpdater: PersonDetailsUpdater[Interpretation],
+    projectInfoUpdater:   ProjectInfoUpdater[Interpretation],
+    dataSetInfoEnricher:  DataSetInfoEnricher[Interpretation]
+)(implicit ME:            MonadError[Interpretation, Throwable])
+    extends TriplesTransformer[Interpretation] {
 
-  import forkInfoUpdater._
   import personDetailsUpdater._
+  import projectInfoUpdater._
 
   override def transform(
-                          triplesGeneratedEvent: TriplesGeneratedEvent
-                        )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] =
+      triplesGeneratedEvent:   TriplesGeneratedEvent
+  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation] =
     for {
       triplesWithPersonDetails <- updatePersonDetails(
-        CuratedTriples(triplesGeneratedEvent.triples, updatesGroups = Nil),
-        triplesGeneratedEvent.project.path
-      )
-      triplesWithForkInfo <- updateForkInfo(triplesGeneratedEvent.project.path, triplesWithPersonDetails)
+                                    CuratedTriples(triplesGeneratedEvent.triples, updatesGroups = Nil),
+                                    triplesGeneratedEvent.project.path
+                                  )
+      triplesWithForkInfo         <- updateProjectInfo(triplesGeneratedEvent, triplesWithPersonDetails)
       triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithForkInfo)
     } yield triplesWithEnrichedDatasets
 }
@@ -67,7 +66,7 @@ private[triplesgenerated] object IOTriplesCurator {
   import ch.datascience.control.Throttler
 
   final case class CurationRecoverableError(message: String, cause: Throwable)
-    extends Exception(message, cause)
+      extends Exception(message, cause)
       with ProcessingRecoverableError
 
   object CurationRecoverableError {
@@ -75,13 +74,13 @@ private[triplesgenerated] object IOTriplesCurator {
   }
 
   def apply(
-             gitLabThrottler: Throttler[IO, GitLab],
-             logger: Logger[IO],
-             timeRecorder: SparqlQueryTimeRecorder[IO]
-           )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[TriplesTransformer[IO]] =
+      gitLabThrottler:         Throttler[IO, GitLab],
+      logger:                  Logger[IO],
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[TriplesTransformer[IO]] =
     for {
       personDetailsUpdater <- PersonDetailsUpdater(gitLabThrottler, logger)
-      forkInfoUpdater <- IOForkInfoUpdater(gitLabThrottler, logger, timeRecorder)
-      dataSetInfoEnricher <- IODataSetInfoEnricher(logger, timeRecorder)
+      forkInfoUpdater      <- IOProjectInfoUpdater(gitLabThrottler, logger, timeRecorder)
+      dataSetInfoEnricher  <- IODataSetInfoEnricher(logger, timeRecorder)
     } yield new TriplesTransformerImpl[IO](personDetailsUpdater, forkInfoUpdater, dataSetInfoEnricher)
 }

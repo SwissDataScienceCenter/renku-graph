@@ -41,6 +41,7 @@ import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.EventHandler.categoryName
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.IOTriplesGeneratedEventProcessor.eventsProcessingTimesBuilder
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators.curatedTriplesObjects
@@ -213,7 +214,7 @@ class TriplesGeneratedEventProcessorSpec
       logger.loggedOnly(
         Error(
           message =
-            s"Triples Generated Event processing failure: ${triplesGeneratedEvent.compoundEventId}, projectPath: ${triplesGeneratedEvent.project.path}",
+            s"$categoryName: Triples Generated Event processing failure: ${triplesGeneratedEvent.compoundEventId}, projectPath: ${triplesGeneratedEvent.project.path}",
           throwableMatcher = NotRefEqual(new Exception("transformation failure -> Event rolled back", exception))
         )
       )
@@ -329,7 +330,7 @@ class TriplesGeneratedEventProcessorSpec
       logger.logged(Error(s"${commonLogMessage(event)} $message", NotRefEqual(exception)))
 
     def commonLogMessage(event: TriplesGeneratedEvent): String =
-      s"Triples Generated Event: ${event.compoundEventId}, projectPath: ${event.project.path}"
+      s"$categoryName: ${event.compoundEventId}, projectPath: ${event.project.path}"
 
     def verifyMetricsCollected() =
       eventsProcessingTimes

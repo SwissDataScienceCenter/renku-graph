@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.forks
+package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.projects
 
 import cats.data.EitherT
 import cats.effect.IO
@@ -24,37 +24,36 @@ import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.{accessTokens, jsonLDTriples}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators.curationRecoverableErrors
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class ProjectInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Matchers {
   import EitherT._
 
-  "updateForkInfo" should {
+  "updateProjectInfo" should {
     "do the payload transformation and prepare update group" in new TestCase {
       val transformedTriples = jsonLDTriples.generateOne
       (payloadTransformer
-        .transform(_: projects.Path, _: JsonLDTriples)(_: Option[AccessToken]))
-        .expects(projectPath, givenCuratedTriples.triples, maybeAccessToken)
+        .transform(_: TriplesGeneratedEvent, _: CuratedTriples[IO])(_: Option[AccessToken]))
+        .expects(event, givenCuratedTriples, maybeAccessToken)
         .returning(rightT[IO, ProcessingRecoverableError](transformedTriples))
 
       val updateGroup = curationUpdatesGroups[IO].generateOne
       (updatesCreator
-        .create(_: projects.Path)(_: Option[AccessToken]))
-        .expects(projectPath, maybeAccessToken)
+        .create(_: TriplesGeneratedEvent)(_: Option[AccessToken]))
+        .expects(event, maybeAccessToken)
         .returning(updateGroup)
 
-      forkInfoUpdater
-        .updateForkInfo(projectPath, givenCuratedTriples)
+      projectInfoUpdater
+        .updateProjectInfo(event, givenCuratedTriples)
         .value
         .unsafeRunSync() shouldBe Right(
         CuratedTriples[IO](triples = transformedTriples,
@@ -66,11 +65,11 @@ class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Match
     "return a ProcessingRecoverableError if the triple transformation fails" in new TestCase {
       val error = curationRecoverableErrors.generateOne
       (payloadTransformer
-        .transform(_: projects.Path, _: JsonLDTriples)(_: Option[AccessToken]))
-        .expects(projectPath, givenCuratedTriples.triples, maybeAccessToken)
+        .transform(_: TriplesGeneratedEvent, _: CuratedTriples[IO])(_: Option[AccessToken]))
+        .expects(event, givenCuratedTriples, maybeAccessToken)
         .returning(leftT[IO, JsonLDTriples](error))
 
-      forkInfoUpdater.updateForkInfo(projectPath, givenCuratedTriples).value.unsafeRunSync() shouldBe Left(error)
+      projectInfoUpdater.updateProjectInfo(event, givenCuratedTriples).value.unsafeRunSync() shouldBe Left(error)
     }
 
     "fail if an error is raised when transforming the triples" in new TestCase {
@@ -78,22 +77,22 @@ class ForkInfoUpdaterSpec extends AnyWordSpec with MockFactory with should.Match
       val exception = exceptions.generateOne
 
       (payloadTransformer
-        .transform(_: projects.Path, _: JsonLDTriples)(_: Option[AccessToken]))
-        .expects(projectPath, givenCuratedTriples.triples, maybeAccessToken)
+        .transform(_: TriplesGeneratedEvent, _: CuratedTriples[IO])(_: Option[AccessToken]))
+        .expects(event, givenCuratedTriples, maybeAccessToken)
         .returning(EitherT(exception.raiseError[IO, Either[ProcessingRecoverableError, JsonLDTriples]]))
 
       intercept[Exception] {
-        forkInfoUpdater.updateForkInfo(projectPath, givenCuratedTriples).value.unsafeRunSync()
+        projectInfoUpdater.updateProjectInfo(event, givenCuratedTriples).value.unsafeRunSync()
       } shouldBe exception
     }
   }
   private trait TestCase {
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
-    val projectPath         = projectPaths.generateOne
+    val event               = triplesGeneratedEvents.generateOne
     val givenCuratedTriples = curatedTriplesObjects[IO].generateOne
 
     val payloadTransformer = mock[PayloadTransformer[IO]]
     val updatesCreator     = mock[UpdatesCreator[IO]]
-    val forkInfoUpdater    = new ForkInfoUpdaterImpl(payloadTransformer, updatesCreator)
+    val projectInfoUpdater = new ProjectInfoUpdaterImpl(payloadTransformer, updatesCreator)
   }
 }
