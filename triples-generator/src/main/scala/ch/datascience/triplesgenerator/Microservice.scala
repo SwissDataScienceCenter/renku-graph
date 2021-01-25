@@ -50,7 +50,7 @@ object Microservice extends IOMicroservice {
 
   val ServicePort: Int Refined Positive = 9002
 
-  private implicit val executionContext: ExecutionContext =
+  protected implicit override val executionContext: ExecutionContext =
     ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
   protected implicit override def contextShift: ContextShift[IO] = IO.contextShift(executionContext)
