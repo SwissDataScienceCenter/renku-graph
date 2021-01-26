@@ -33,6 +33,7 @@ import doobie.util.fragments._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.triplesgenerated.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds, SubscriptionTypeSerializers}
@@ -77,11 +78,6 @@ private class TriplesGeneratedEventFinderImpl(
 
   // format: off
   private def findProjectsWithEventsInQueue = SqlQuery({fr"""
-      SELECT
-        proj.project_id,
-        proj.project_path,
-        proj.latest_event_date
-      FROM (
         SELECT DISTINCT
           proj.project_id,
           proj.project_path,
@@ -93,7 +89,6 @@ private class TriplesGeneratedEventFinderImpl(
         )
         ORDER BY proj.latest_event_date DESC
         LIMIT ${projectsFetchingLimit.value}
-      ) proj
       """ 
     }.query[(projects.Id, projects.Path, EventDate)]
     .map{case (projectId, projectPath, eventDate) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(1))}
@@ -104,7 +99,7 @@ private class TriplesGeneratedEventFinderImpl(
 
   // format: off
   private def findOldestEvent(idAndPath: ProjectIds) = SqlQuery({
-    fr"""SELECT evt.event_id, evt.project_id, ${idAndPath.path} AS project_path, event_payload.payload,  event_payload.schema_version
+    fr"""SELECT evt.event_id, evt.project_id, ${idAndPath.path} AS project_path, evt_payload.payload,  evt_payload.schema_version
          FROM (
            SELECT project_id, min(event_date) AS min_event_date
            FROM event
@@ -117,8 +112,8 @@ private class TriplesGeneratedEventFinderImpl(
            AND oldest_event_date.min_event_date = evt.event_date
            AND ((""" ++ `status IN`(TriplesGenerated, TransformationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
                OR (status = ${TransformingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
-         JOIN event_payload ON event_payload.event_id = evt.event_id
-           AND event_payload.project_id = evt.project_id
+         JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id
+           AND evt.project_id = evt_payload.project_id
          LIMIT 1
          """
     }.query[TriplesGeneratedEvent].option, 
@@ -151,8 +146,8 @@ private class TriplesGeneratedEventFinderImpl(
   private def updateStatus(commitEventId: CompoundEventId) = SqlQuery(
     sql"""|UPDATE event 
           |SET status = ${TransformingTriples: EventStatus}, execution_date = ${now()}
-          |WHERE (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status <> ${TriplesGenerated: EventStatus})
-          |  OR (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status = ${TriplesGenerated: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
+          |WHERE (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status <> ${TransformingTriples: EventStatus})
+          |  OR (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status = ${TransformingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
           |""".stripMargin.update.run,
     name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update status")
   )
@@ -180,7 +175,8 @@ private object IOTriplesGeneratedEventFinder {
       transactor:                  DbTransactor[IO, EventLogDB],
       awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
       underTransformationGauge:    LabeledGauge[IO, projects.Path],
-      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name]
+      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
+      logger:                      Logger[IO]
   )(implicit contextShift:         ContextShift[IO]): IO[EventFinder[IO, TriplesGeneratedEvent]] = IO {
     new TriplesGeneratedEventFinderImpl(transactor,
                                         awaitingTransformationGauge,
@@ -188,7 +184,8 @@ private object IOTriplesGeneratedEventFinder {
                                         queriesExecTimes,
                                         maxProcessingTime = MaxProcessingTime,
                                         projectsFetchingLimit = ProjectsFetchingLimit,
-                                        projectPrioritisation = new ProjectPrioritisation()
+                                        projectPrioritisation = new ProjectPrioritisation(),
+                                        logger = logger
     )
   }
 }
