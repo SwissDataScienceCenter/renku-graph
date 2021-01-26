@@ -78,7 +78,7 @@ class EventLogEventsHandlingSpec
 
       Then("there should be an Commit Event added to the Event Log")
       eventually {
-        EventLog.findEvents(projectId, status = New) shouldBe List(commitId)
+        EventLog.findEvents(projectId, status = New, TriplesGenerated) shouldBe List(commitId)
       }
 
       When("the Event is picked up by the Triples Generator")
@@ -89,7 +89,8 @@ class EventLogEventsHandlingSpec
 
       And(s"the relevant Event got marked as $TriplesStore in the Log")
       eventually {
-        EventLog.findEvents(projectId, status = TriplesStore) should contain(commitId)
+        EventLog.findEvents(projectId, status = New, TriplesGenerated, TransformingTriples) shouldBe List.empty
+        EventLog.findEvents(projectId, status = TriplesStore)                                 should contain(commitId)
       }
     }
   }

@@ -28,6 +28,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Json
 import org.http4s.Uri
 
 import scala.concurrent.ExecutionContext
@@ -75,12 +76,19 @@ private class IOTriplesUploader(
     } yield uploadResult
   } recover withUploadingError
 
-  private def uploadRequest(uploadUri: Uri, triples: JsonLDTriples) = HttpRequest(
-    request(POST, uploadUri, rdfStoreConfig.authCredentials)
-      .withEntity(triples.value)
-      .putHeaders(`Content-Type`(`ld+json`)),
-    name = "json-ld upload"
-  )
+  private def uploadRequest(uploadUri: Uri, triples: JsonLDTriples) = {
+    val triplesWithContext = if (triples.value.findAllByKey("@context").isEmpty) {
+      triples.value.deepMerge(Json.obj("@context" -> Json.obj()))
+    } else {
+      triples.value
+    }
+    HttpRequest(
+      request(POST, uploadUri, rdfStoreConfig.authCredentials)
+        .withEntity(triplesWithContext)
+        .putHeaders(`Content-Type`(`ld+json`)),
+      name = "json-ld upload"
+    )
+  }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[TriplesUploadResult]] = {
     case (Ok, _, _)                         => IO.pure(DeliverySuccess)

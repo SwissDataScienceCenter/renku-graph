@@ -171,21 +171,18 @@ private object IOTriplesGeneratedEventFinder {
   private val MaxProcessingTime:     Duration             = Duration.ofHours(24)
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
-  def apply(
-      transactor:                  DbTransactor[IO, EventLogDB],
-      awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
-      underTransformationGauge:    LabeledGauge[IO, projects.Path],
-      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
-      logger:                      Logger[IO]
-  )(implicit contextShift:         ContextShift[IO]): IO[EventFinder[IO, TriplesGeneratedEvent]] = IO {
+  def apply(transactor:                  DbTransactor[IO, EventLogDB],
+            awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
+            underTransformationGauge:    LabeledGauge[IO, projects.Path],
+            queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name]
+  )(implicit contextShift:               ContextShift[IO]): IO[EventFinder[IO, TriplesGeneratedEvent]] = IO {
     new TriplesGeneratedEventFinderImpl(transactor,
                                         awaitingTransformationGauge,
                                         underTransformationGauge,
                                         queriesExecTimes,
                                         maxProcessingTime = MaxProcessingTime,
                                         projectsFetchingLimit = ProjectsFetchingLimit,
-                                        projectPrioritisation = new ProjectPrioritisation(),
-                                        logger = logger
+                                        projectPrioritisation = new ProjectPrioritisation()
     )
   }
 }
