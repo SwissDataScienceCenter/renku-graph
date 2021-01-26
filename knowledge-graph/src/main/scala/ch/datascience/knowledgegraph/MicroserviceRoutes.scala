@@ -18,7 +18,7 @@
 
 package ch.datascience.knowledgegraph
 
-import cats.data.{Validated, ValidatedNel}
+import cats.data.{EitherT, Validated, ValidatedNel}
 import cats.effect.{Clock, ConcurrentEffect, ContextShift, IO, Resource, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
@@ -29,7 +29,7 @@ import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.PagingRequest.Decoders._
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.QueryParameterTools._
-import ch.datascience.http.server.security.Authentication
+import ch.datascience.http.server.security.{Authentication, ProjectAuthorizer}
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest._
@@ -52,6 +52,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     datasetEndpoint:         DatasetEndpoint[F],
     datasetsSearchEndpoint:  DatasetsSearchEndpoint[F],
     authMiddleware:          AuthMiddleware[F, Option[AuthUser]],
+    projectAuthorizer:       ProjectAuthorizer[F],
     routesMetrics:           RoutesMetrics[F]
 )(implicit clock:            Clock[F])
     extends Http4sDsl[F] {
@@ -97,9 +98,20 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
       .mapN(datasetsSearchEndpoint.searchForDatasets)
       .fold(toBadRequest(), identity)
 
-  private def routeToProjectsEndpoints(path: Path, maybeUser: Option[AuthUser]): F[Response[F]] = path.toList match {
+  private def routeToProjectsEndpoints(
+      path:          Path,
+      maybeAuthUser: Option[AuthUser]
+  ): F[Response[F]] = path.toList match {
     case projectPathParts :+ "datasets" => projectPathParts.toProjectPath.fold(identity, getProjectDatasets)
-    case projectPathParts               => projectPathParts.toProjectPath.fold(identity, getProject)
+    case projectPathParts =>
+      projectPathParts.toProjectPath.map { projectPath =>
+        {
+          for {
+            _        <- projectAuthorizer.authorize(projectPath, maybeAuthUser).leftMap(_.toHttpResponse)
+            response <- EitherT.right[Response[F]](getProject(projectPath))
+          } yield response
+        }.merge
+      }.merge
   }
 
   private implicit class PathPartsOps(parts: List[String]) {
@@ -131,12 +143,13 @@ private object MicroserviceRoutes {
     for {
       gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
-      queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder, ApplicationLogger)
+      queryEndpoint           <- IOQueryEndpoint(sparqlTimeRecorder, logger)
       projectEndpoint         <- IOProjectEndpoint(gitLabThrottler, sparqlTimeRecorder)
       projectDatasetsEndpoint <- IOProjectDatasetsEndpoint(sparqlTimeRecorder)
       datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder)
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)
       authMiddleware          <- Authentication.middlewareWithFallThrough(gitLabThrottler, logger)
+      projectAuthorizer       <- ProjectAuthorizer(sparqlTimeRecorder, logger = logger)
       routesMetrics = new RoutesMetrics[IO](metricsRegistry)
     } yield new MicroserviceRoutes(queryEndpoint,
                                    projectEndpoint,
@@ -144,6 +157,7 @@ private object MicroserviceRoutes {
                                    datasetEndpoint,
                                    datasetsSearchEndpoint,
                                    authMiddleware,
+                                   projectAuthorizer,
                                    routesMetrics
     )
 }

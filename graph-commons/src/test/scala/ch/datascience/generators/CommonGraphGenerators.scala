@@ -35,6 +35,8 @@ import ch.datascience.http.rest.Links.{Href, Link, Rel}
 import ch.datascience.http.rest.paging.model.Total
 import ch.datascience.http.rest.paging.{PagingRequest, PagingResponse}
 import ch.datascience.http.rest.{Links, SortBy, paging}
+import ch.datascience.http.server.security.EndpointSecurityException
+import ch.datascience.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -67,6 +69,9 @@ object CommonGraphGenerators {
     length <- Gen.choose(5, 40)
     chars  <- Gen.listOfN(length, Gen.oneOf((0 to 9).map(_.toString) ++ ('a' to 'z').map(_.toString)))
   } yield OAuthAccessToken(chars.mkString(""))
+
+  implicit val securityExceptions: Gen[EndpointSecurityException] =
+    Gen.oneOf(AuthenticationFailure, AuthorizationFailure)
 
   implicit val accessTokens: Gen[AccessToken] = for {
     boolean     <- Gen.oneOf(true, false)

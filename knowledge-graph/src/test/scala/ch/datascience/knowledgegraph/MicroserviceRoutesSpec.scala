@@ -18,6 +18,7 @@
 
 package ch.datascience.knowledgegraph
 
+import cats.data.EitherT
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
@@ -32,6 +33,8 @@ import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.http.server.security.EndpointSecurityException.AuthorizationFailure
+import ch.datascience.http.server.security.{EndpointSecurityException, ProjectAuthorizer}
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
@@ -232,17 +235,20 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
     }
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Ok for valid path parameters" in new TestCase {
-      forAll { projectPath: Path =>
-        (projectEndpoint.getProject _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
+      val projectPath = projectPaths.generateOne
+      (projectEndpoint.getProject _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
 
-        val response = routes.call(
-          Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
-        )
+      (projectAuthorizer.authorize _)
+        .expects(projectPath, maybeAuthUser)
+        .returning(EitherT.rightT[IO, EndpointSecurityException](()))
 
-        response.status shouldBe Ok
+      val response = routes.call(
+        Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+      )
 
-        routesMetrics.clearRegistry()
-      }
+      response.status shouldBe Ok
+
+      routesMetrics.clearRegistry()
     }
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $NotFound for invalid project paths" in new TestCase {
@@ -255,6 +261,22 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       response.status            shouldBe NotFound
       response.contentType       shouldBe Some(`Content-Type`(MediaType.application.json))
       response.body[InfoMessage] shouldBe InfoMessage("Resource not found")
+    }
+
+    s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Forbidden when user has no rights for the project" in new TestCase {
+      val projectPath = projectPaths.generateOne
+
+      (projectAuthorizer.authorize _)
+        .expects(projectPath, maybeAuthUser)
+        .returning(EitherT.leftT[IO, Unit](AuthorizationFailure))
+
+      val response = routes.call(
+        Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+      )
+
+      response.status            shouldBe Forbidden
+      response.contentType       shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.body[InfoMessage] shouldBe ErrorMessage(AuthorizationFailure.getMessage)
     }
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name/datasets endpoint returning $Ok for valid path parameters" in new TestCase {
@@ -276,19 +298,22 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
 
   private trait TestCase {
 
+    val maybeAuthUser           = authUsers.generateOption
     val queryEndpoint           = mock[IOQueryEndpoint]
     val projectEndpoint         = mock[IOProjectEndpointStub]
     val projectDatasetsEndpoint = mock[IOProjectDatasetsEndpointStub]
     val datasetsEndpoint        = mock[IODatasetEndpointStub]
     val datasetsSearchEndpoint  = mock[IODatasetsSearchEndpointStub]
+    val projectAuthorizer       = mock[ProjectAuthorizer[IO]]
     val routesMetrics           = TestRoutesMetrics()
-    val routes = new MicroserviceRoutes[IO](
+    lazy val routes = new MicroserviceRoutes[IO](
       queryEndpoint,
       projectEndpoint,
       projectDatasetsEndpoint,
       datasetsEndpoint,
       datasetsSearchEndpoint,
-      givenAuthMiddleware(returning = None),
+      givenAuthMiddleware(returning = maybeAuthUser),
+      projectAuthorizer,
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))
   }

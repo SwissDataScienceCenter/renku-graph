@@ -18,12 +18,40 @@
 
 package ch.datascience.http.server.security
 
+import cats.effect.Effect
 import ch.datascience.graph.model.users
+import org.http4s.Response
 
 object model {
 
   final case class AuthUser(id: users.GitLabId)
+}
 
-  final case object UnauthorizedException extends RuntimeException("Unauthorized")
-  type UnauthorizedException = UnauthorizedException.type
+sealed trait EndpointSecurityException extends Exception with Product with Serializable {
+  def toHttpResponse[Interpretation[_]: Effect]: Response[Interpretation]
+}
+
+object EndpointSecurityException {
+
+  import ch.datascience.controllers.ErrorMessage
+  import ch.datascience.controllers.ErrorMessage._
+  import org.http4s.{Response, Status}
+
+  final case object AuthenticationFailure extends EndpointSecurityException {
+
+    override lazy val getMessage: String = "User authentication failure"
+
+    override def toHttpResponse[Interpretation[_]: Effect]: Response[Interpretation] =
+      Response[Interpretation](Status.Unauthorized).withEntity(ErrorMessage(getMessage))
+  }
+  type AuthenticationFailure = AuthenticationFailure.type
+
+  final case object AuthorizationFailure extends EndpointSecurityException {
+
+    override lazy val getMessage: String = "User not authorized failure"
+
+    override def toHttpResponse[Interpretation[_]: Effect]: Response[Interpretation] =
+      Response[Interpretation](Status.Forbidden).withEntity(ErrorMessage(getMessage))
+  }
+  type AuthorizationFailure = AuthorizationFailure.type
 }
