@@ -51,14 +51,14 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
 
     "fail if parsing fails" in new TestCase {
       val Failure(ParsingFailure(message, underlying)) =
-        deserializer.toTriplesGeneratedEvent(compoundEventId, EventBody("{"))
+        deserializer.toTriplesGeneratedEvent(compoundEventId, Json.fromString("{"))
 
       message    shouldBe "TriplesGeneratedEvent cannot be deserialised: '{'"
       underlying shouldBe a[ParsingFailure]
     }
 
     "fail if decoding fails" in new TestCase {
-      val Failure(DecodingFailure(message, _)) = deserializer.toTriplesGeneratedEvent(compoundEventId, EventBody("{}"))
+      val Failure(DecodingFailure(message, _)) = deserializer.toTriplesGeneratedEvent(compoundEventId, Json.obj())
 
       message shouldBe "TriplesGeneratedEvent cannot be deserialised: '{}'"
     }
@@ -76,18 +76,22 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
 
     val deserializer = new EventBodyDeserializerImpl[Try]
 
-    def triplesGenerationEvent(jsonldTriples: JsonLDTriples): EventBody = EventBody {
+    def triplesGenerationEvent(jsonldTriples: JsonLDTriples): Json =
       Json
         .obj(
           "id" -> Json.fromString(compoundEventId.id.value),
           "project" -> Json.obj(
-            "id"   -> Json.fromInt(projectId.value),
-            "path" -> Json.fromString(projectPath.value)
+            "id" -> Json.fromInt(projectId.value)
           ),
-          "body"          -> Json.fromString(jsonldTriples.value.noSpaces),
-          "schemaVersion" -> Json.fromString(schemaVersion.value)
+          "body" -> Json.obj(
+            "project" -> Json.obj(
+              "id"   -> Json.fromInt(projectId.value),
+              "path" -> Json.fromString(projectPath.value)
+            ),
+            "schemaVersion" -> Json.fromString(schemaVersion.value),
+            "payload"       -> Json.fromString(jsonldTriples.value.noSpaces)
+          )
         )
-        .noSpaces
-    }
+
   }
 }

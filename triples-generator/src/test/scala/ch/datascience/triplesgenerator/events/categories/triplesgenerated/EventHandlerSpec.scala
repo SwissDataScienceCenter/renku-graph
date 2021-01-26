@@ -32,7 +32,7 @@ import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import TriplesGeneratedGenerators._
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
 import ch.datascience.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
-import io.circe.Encoder
+import io.circe.{Encoder, Json}
 import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.syntax.all._
@@ -140,7 +140,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
   private trait TestCase {
 
     val eventId   = compoundEventIds.generateOne
-    val eventBody = eventBodies.generateOne
+    val eventBody = jsons.generateOne
 
     val processingRunner      = mock[EventsProcessingRunner[IO]]
     val eventBodyDeserializer = mock[EventBodyDeserializer[IO]]
@@ -148,19 +148,19 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val handler               = new EventHandler[IO](processingRunner, eventBodyDeserializer, logger)
   }
 
-  private implicit lazy val eventEncoder: Encoder[(CompoundEventId, EventBody)] =
-    Encoder.instance[(CompoundEventId, EventBody)] { case (eventId, body) =>
+  private implicit lazy val eventEncoder: Encoder[(CompoundEventId, Json)] =
+    Encoder.instance[(CompoundEventId, Json)] { case (eventId, body) =>
       json"""{
         "categoryName": "TRIPLES_GENERATED",
         "id":           ${eventId.id.value},
         "project": {
           "id" :        ${eventId.projectId.value}
         },
-        "body":         ${body.value}
+        "body":         $body
       }"""
     }
 
-  private implicit class EventBodyOps(eventBody: EventBody) {
+  private implicit class EventBodyOps(eventBody: Json) {
     lazy val toTriplesGeneratedEvent: TriplesGeneratedEvent =
       triplesGeneratedEvents.generateOne
   }

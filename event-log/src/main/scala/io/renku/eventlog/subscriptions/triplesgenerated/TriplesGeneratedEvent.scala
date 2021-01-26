@@ -41,10 +41,15 @@ private object TriplesGeneratedEventEncoder extends Encoder[TriplesGeneratedEven
     "categoryName": ${SubscriptionCategory.name.value},
     "id":           ${event.id.id.value},
     "project": {
-      "id":         ${event.id.projectId.value},
-      "path": ${event.projectPath.value}
+      "id":         ${event.id.projectId.value}
     },
-    "body":${event.payload.value},
-    "schemaVersion":${event.schemaVersion.value}
+    "body":{
+      "payload": ${event.payload.value},
+      "project": {
+        "id":         ${event.id.projectId.value},
+        "path": ${event.projectPath.value}
+      },
+      "schemaVersion":${event.schemaVersion.value}
+    }
   }"""
 }

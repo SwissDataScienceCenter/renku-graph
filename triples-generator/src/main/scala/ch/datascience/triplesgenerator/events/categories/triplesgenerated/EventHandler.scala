@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.model.RenkuVersionPair
+import ch.datascience.graph.model.{RenkuVersionPair, SchemaVersion}
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody, EventId}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
@@ -30,6 +30,7 @@ import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
 import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Json
 
 import scala.concurrent.ExecutionContext
 
@@ -48,7 +49,7 @@ private[events] class EventHandler[Interpretation[_]: Effect](
   import org.http4s._
   import org.http4s.circe._
 
-  private type IdAndBody = (CompoundEventId, EventBody)
+  private type IdAndBody = (CompoundEventId, Json)
 
   override val categoryName: CategoryName = EventHandler.categoryName
 
@@ -78,7 +79,7 @@ private[events] class EventHandler[Interpretation[_]: Effect](
       _         <- validateCategoryName
       id        <- cursor.downField("id").as[EventId]
       projectId <- cursor.downField("project").downField("id").as[projects.Id]
-      body      <- cursor.downField("body").as[EventBody]
+      body      <- cursor.downField("body").as[Json]
     } yield CompoundEventId(id, projectId) -> body
 }
 

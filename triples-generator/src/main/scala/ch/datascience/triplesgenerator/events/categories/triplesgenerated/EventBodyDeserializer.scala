@@ -28,10 +28,10 @@ import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.events.categories.models.Project
 import io.circe.parser._
-import io.circe.{Decoder, DecodingFailure, Error, HCursor, ParsingFailure}
+import io.circe.{Decoder, DecodingFailure, Error, HCursor, Json, ParsingFailure}
 
 private trait EventBodyDeserializer[Interpretation[_]] {
-  def toTriplesGeneratedEvent(eventId: CompoundEventId, eventBody: EventBody): Interpretation[TriplesGeneratedEvent]
+  def toTriplesGeneratedEvent(eventId: CompoundEventId, eventBody: Json): Interpretation[TriplesGeneratedEvent]
 }
 
 private class EventBodyDeserializerImpl[Interpretation[_]](implicit
@@ -39,26 +39,26 @@ private class EventBodyDeserializerImpl[Interpretation[_]](implicit
 ) extends EventBodyDeserializer[Interpretation] {
 
   override def toTriplesGeneratedEvent(eventId:   CompoundEventId,
-                                       eventBody: EventBody
+                                       eventBody: Json
   ): Interpretation[TriplesGeneratedEvent] =
     ME.fromEither {
-      parse(eventBody.value)
-        .flatMap(_.as[(Project, String, SchemaVersion)])
-        .flatMap { case (project, payload, schemaVersion) =>
-          parse(payload).map(json => TriplesGeneratedEvent(eventId.id, project, JsonLDTriples(json), schemaVersion))
+      eventBody
+        .as[(Project, Json, SchemaVersion)]
+        .map { case (project, payload, schemaVersion) =>
+          TriplesGeneratedEvent(eventId.id, project, JsonLDTriples(payload), schemaVersion)
         }
         .leftMap(toMeaningfulError(eventBody))
     }
 
-  private implicit val triplesDecoder: Decoder[(Project, String, SchemaVersion)] = (cursor: HCursor) =>
+  private implicit val triplesDecoder: Decoder[(Project, Json, SchemaVersion)] = (cursor: HCursor) =>
     for {
       projectId     <- cursor.downField("project").downField("id").as[Id]
       projectPath   <- cursor.downField("project").downField("path").as[Path]
-      eventPayload  <- cursor.downField("body").as[String]
+      eventPayload  <- cursor.downField("payload").as[Json]
       schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
     } yield (Project(projectId, projectPath), eventPayload, schemaVersion)
 
-  private def toMeaningfulError(eventBody: EventBody): Error => Error = {
+  private def toMeaningfulError(eventBody: Json): Error => Error = {
     case failure: DecodingFailure => failure.withMessage(s"TriplesGeneratedEvent cannot be deserialised: '$eventBody'")
     case failure: ParsingFailure =>
       ParsingFailure(s"TriplesGeneratedEvent cannot be deserialised: '$eventBody'", failure)
