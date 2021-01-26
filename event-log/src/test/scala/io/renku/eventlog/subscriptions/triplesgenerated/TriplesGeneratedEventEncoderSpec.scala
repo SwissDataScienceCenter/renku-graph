@@ -19,9 +19,9 @@
 package io.renku.eventlog.subscriptions.triplesgenerated
 
 import ch.datascience.generators.Generators.Implicits._
-import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax.EncoderOps
+import io.circe.{Encoder, Json, parser}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -32,17 +32,30 @@ class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers 
   "encoder" should {
 
     "serialize TriplesGeneratedEvent to Json" in {
-      val event = triplesGeneratedEvents.generateOne
+      val event       = triplesGeneratedEvents.generateOne
+      val bodyContent = json"""{ "project": {
+                            "id":         ${event.id.projectId.value},
+                            "path": ${event.projectPath.value}
+                          },
+                          "schemaVersion": ${event.schemaVersion.value},
+                          "payload": ${event.payload.value}
+                         }"""
 
-      event.asJson shouldBe json"""{
-        "categoryName": "TRIPLES_GENERATED",
-        "id":           ${event.id.id.value},
-        "project": {
-          "id":         ${event.id.projectId.value}
-        },
-        "body":         ${event.payload.value},
-        "schemaVersion": ${event.schemaVersion.value}
-      }"""
+      val actualJson = event.asJson
+
+      actualJson.hcursor.downField("categoryName").as[String] shouldBe Right("TRIPLES_GENERATED")
+      actualJson.hcursor.downField("id").as[String]           shouldBe Right(event.id.id.value)
+      actualJson.hcursor.downField("project").as[Json]        shouldBe Right(json"""{
+                                                                               "id": ${event.id.projectId.value}
+                                                                              }""")
+      parser
+        .parse(
+          actualJson.hcursor
+            .downField("body")
+            .as[String]
+            .getOrElse(fail("Could not extract body as string"))
+        ) shouldBe Right(bodyContent)
+
     }
   }
 }

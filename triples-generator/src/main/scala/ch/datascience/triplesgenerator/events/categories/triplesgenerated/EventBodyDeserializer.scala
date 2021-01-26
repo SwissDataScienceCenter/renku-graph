@@ -31,7 +31,7 @@ import io.circe.parser._
 import io.circe.{Decoder, DecodingFailure, Error, HCursor, Json, ParsingFailure}
 
 private trait EventBodyDeserializer[Interpretation[_]] {
-  def toTriplesGeneratedEvent(eventId: CompoundEventId, eventBody: Json): Interpretation[TriplesGeneratedEvent]
+  def toTriplesGeneratedEvent(eventId: CompoundEventId, eventBody: EventBody): Interpretation[TriplesGeneratedEvent]
 }
 
 private class EventBodyDeserializerImpl[Interpretation[_]](implicit
@@ -39,11 +39,11 @@ private class EventBodyDeserializerImpl[Interpretation[_]](implicit
 ) extends EventBodyDeserializer[Interpretation] {
 
   override def toTriplesGeneratedEvent(eventId:   CompoundEventId,
-                                       eventBody: Json
+                                       eventBody: EventBody
   ): Interpretation[TriplesGeneratedEvent] =
     ME.fromEither {
-      eventBody
-        .as[(Project, Json, SchemaVersion)]
+      parse(eventBody.value)
+        .flatMap(_.as[(Project, Json, SchemaVersion)])
         .map { case (project, payload, schemaVersion) =>
           TriplesGeneratedEvent(eventId.id, project, JsonLDTriples(payload), schemaVersion)
         }
@@ -58,7 +58,7 @@ private class EventBodyDeserializerImpl[Interpretation[_]](implicit
       schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
     } yield (Project(projectId, projectPath), eventPayload, schemaVersion)
 
-  private def toMeaningfulError(eventBody: Json): Error => Error = {
+  private def toMeaningfulError(eventBody: EventBody): Error => Error = {
     case failure: DecodingFailure => failure.withMessage(s"TriplesGeneratedEvent cannot be deserialised: '$eventBody'")
     case failure: ParsingFailure =>
       ParsingFailure(s"TriplesGeneratedEvent cannot be deserialised: '$eventBody'", failure)

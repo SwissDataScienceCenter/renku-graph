@@ -37,19 +37,23 @@ private object TriplesGeneratedEventEncoder extends Encoder[TriplesGeneratedEven
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def apply(event: TriplesGeneratedEvent): Json = json"""{
-    "categoryName": ${SubscriptionCategory.name.value},
-    "id":           ${event.id.id.value},
-    "project": {
-      "id":         ${event.id.projectId.value}
-    },
-    "body":{
+  override def apply(event: TriplesGeneratedEvent): Json = {
+    val bodyContent = json"""{
       "payload": ${event.payload.value},
       "project": {
         "id":         ${event.id.projectId.value},
         "path": ${event.projectPath.value}
       },
       "schemaVersion":${event.schemaVersion.value}
-    }
-  }"""
+    }""".noSpaces
+
+    json"""{
+    "categoryName": ${SubscriptionCategory.name.value},
+    "id":           ${event.id.id.value},
+    "project": {
+      "id":         ${event.id.projectId.value}
+    },
+    "body": $bodyContent
+    }"""
+  }
 }

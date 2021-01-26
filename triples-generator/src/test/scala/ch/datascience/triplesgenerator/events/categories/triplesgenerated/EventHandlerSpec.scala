@@ -140,7 +140,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
   private trait TestCase {
 
     val eventId   = compoundEventIds.generateOne
-    val eventBody = jsons.generateOne
+    val eventBody = eventBodies.generateOne
 
     val processingRunner      = mock[EventsProcessingRunner[IO]]
     val eventBodyDeserializer = mock[EventBodyDeserializer[IO]]
@@ -148,19 +148,19 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val handler               = new EventHandler[IO](processingRunner, eventBodyDeserializer, logger)
   }
 
-  private implicit lazy val eventEncoder: Encoder[(CompoundEventId, Json)] =
-    Encoder.instance[(CompoundEventId, Json)] { case (eventId, body) =>
+  private implicit lazy val eventEncoder: Encoder[(CompoundEventId, EventBody)] =
+    Encoder.instance[(CompoundEventId, EventBody)] { case (eventId, body) =>
       json"""{
         "categoryName": "TRIPLES_GENERATED",
         "id":           ${eventId.id.value},
         "project": {
           "id" :        ${eventId.projectId.value}
         },
-        "body":         $body
+        "body":         ${body.value}
       }"""
     }
 
-  private implicit class EventBodyOps(eventBody: Json) {
+  private implicit class EventBodyOps(eventBody: EventBody) {
     lazy val toTriplesGeneratedEvent: TriplesGeneratedEvent =
       triplesGeneratedEvents.generateOne
   }

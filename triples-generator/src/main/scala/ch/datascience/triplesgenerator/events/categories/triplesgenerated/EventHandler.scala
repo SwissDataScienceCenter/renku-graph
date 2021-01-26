@@ -49,7 +49,7 @@ private[events] class EventHandler[Interpretation[_]: Effect](
   import org.http4s._
   import org.http4s.circe._
 
-  private type IdAndBody = (CompoundEventId, Json)
+  private type IdAndBody = (CompoundEventId, EventBody)
 
   override val categoryName: CategoryName = EventHandler.categoryName
 
@@ -79,7 +79,7 @@ private[events] class EventHandler[Interpretation[_]: Effect](
       _         <- validateCategoryName
       id        <- cursor.downField("id").as[EventId]
       projectId <- cursor.downField("project").downField("id").as[projects.Id]
-      body      <- cursor.downField("body").as[Json]
+      body      <- cursor.downField("body").as[EventBody]
     } yield CompoundEventId(id, projectId) -> body
 }
 

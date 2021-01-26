@@ -30,35 +30,32 @@ import io.circe._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Success, Try}
 
 class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
 
   "toJsonLDTriples" should {
 
     "produce TriplesGeneratedEvent if the Json string can be successfully deserialized" in new TestCase {
-      deserializer.toTriplesGeneratedEvent(compoundEventId, triplesGenerationEvent(jsonldTriples)) shouldBe context
-        .pure(
-          TriplesGeneratedEvent(
-            compoundEventId.id,
-            Project(projectId, projectPath),
-            jsonldTriples,
-            schemaVersion
-          )
-        )
+      val Success(deserializedEvent) =
+        deserializer.toTriplesGeneratedEvent(compoundEventId, triplesGenerationEvent(jsonldTriples))
+      deserializedEvent.schemaVersion          shouldBe schemaVersion
+      deserializedEvent.project                shouldBe Project(projectId, projectPath)
+      deserializedEvent.eventId                shouldBe compoundEventId.id
+      deserializedEvent.triples.value.noSpaces shouldBe jsonldTriples.value.noSpaces
 
     }
 
     "fail if parsing fails" in new TestCase {
       val Failure(ParsingFailure(message, underlying)) =
-        deserializer.toTriplesGeneratedEvent(compoundEventId, Json.fromString("{"))
+        deserializer.toTriplesGeneratedEvent(compoundEventId, EventBody("{"))
 
       message    shouldBe "TriplesGeneratedEvent cannot be deserialised: '{'"
       underlying shouldBe a[ParsingFailure]
     }
 
     "fail if decoding fails" in new TestCase {
-      val Failure(DecodingFailure(message, _)) = deserializer.toTriplesGeneratedEvent(compoundEventId, Json.obj())
+      val Failure(DecodingFailure(message, _)) = deserializer.toTriplesGeneratedEvent(compoundEventId, EventBody("{}"))
 
       message shouldBe "TriplesGeneratedEvent cannot be deserialised: '{}'"
     }
@@ -76,22 +73,17 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
 
     val deserializer = new EventBodyDeserializerImpl[Try]
 
-    def triplesGenerationEvent(jsonldTriples: JsonLDTriples): Json =
+    def triplesGenerationEvent(jsonldTriples: JsonLDTriples): EventBody = EventBody {
       Json
         .obj(
-          "id" -> Json.fromString(compoundEventId.id.value),
           "project" -> Json.obj(
-            "id" -> Json.fromInt(projectId.value)
+            "id"   -> Json.fromInt(projectId.value),
+            "path" -> Json.fromString(projectPath.value)
           ),
-          "body" -> Json.obj(
-            "project" -> Json.obj(
-              "id"   -> Json.fromInt(projectId.value),
-              "path" -> Json.fromString(projectPath.value)
-            ),
-            "schemaVersion" -> Json.fromString(schemaVersion.value),
-            "payload"       -> Json.fromString(jsonldTriples.value.noSpaces)
-          )
+          "payload"       -> jsonldTriples.value,
+          "schemaVersion" -> Json.fromString(schemaVersion.value)
         )
-
+        .noSpaces
+    }
   }
 }
