@@ -18,7 +18,6 @@
 
 package ch.datascience.knowledgegraph.projects.rest
 
-import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.controllers.InfoMessage._
@@ -62,12 +61,12 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
     "respond with OK and the found project details" in new TestCase {
       forAll { project: Project =>
-        (projectFinder
-          .findProject(_: Path))
-          .expects(project.path)
-          .returning(context pure Some(project))
+        val maybeAuthUser = authUsers.generateOption
+        (projectFinder.findProject _)
+          .expects(project.path, maybeAuthUser)
+          .returning(project.some.pure[IO])
 
-        val response = getProject(project.path).unsafeRunSync()
+        val response = getProject(project.path, maybeAuthUser).unsafeRunSync()
 
         response.status      shouldBe Ok
         response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -89,14 +88,14 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
     "respond with NOT_FOUND if there is no project with the given path" in new TestCase {
 
-      val path = projectPaths.generateOne
+      val path          = projectPaths.generateOne
+      val maybeAuthUser = authUsers.generateOption
 
-      (projectFinder
-        .findProject(_: Path))
-        .expects(path)
-        .returning(context.pure(None))
+      (projectFinder.findProject _)
+        .expects(path, maybeAuthUser)
+        .returning(None.pure[IO])
 
-      val response = getProject(path).unsafeRunSync()
+      val response = getProject(path, maybeAuthUser).unsafeRunSync()
 
       response.status      shouldBe NotFound
       response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -110,14 +109,14 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
     "respond with INTERNAL_SERVER_ERROR if finding project details fails" in new TestCase {
 
-      val path      = projectPaths.generateOne
-      val exception = exceptions.generateOne
-      (projectFinder
-        .findProject(_: Path))
-        .expects(path)
-        .returning(context.raiseError(exception))
+      val path          = projectPaths.generateOne
+      val maybeAuthUser = authUsers.generateOption
+      val exception     = exceptions.generateOne
+      (projectFinder.findProject _)
+        .expects(path, maybeAuthUser)
+        .returning(exception.raiseError[IO, Option[Project]])
 
-      val response = getProject(path).unsafeRunSync()
+      val response = getProject(path, maybeAuthUser).unsafeRunSync()
 
       response.status      shouldBe InternalServerError
       response.contentType shouldBe Some(`Content-Type`(application.json))
@@ -129,8 +128,6 @@ class ProjectEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
   }
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
-
     val projectFinder         = mock[IOProjectFinder]
     val renkuResourcesUrl     = renkuResourcesUrls.generateOne
     val logger                = TestLogger[IO]()

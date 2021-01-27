@@ -18,7 +18,7 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
+import ch.datascience.generators.CommonGraphGenerators.{accessTokens, renkuBaseUrls}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
@@ -68,8 +68,9 @@ object GraphModelGenerators {
   implicit val userGitLabIds: Gen[users.GitLabId] = nonNegativeInts().map(users.GitLabId(_))
 
   implicit val authUsers: Gen[AuthUser] = for {
-    gitLabId <- userGitLabIds
-  } yield AuthUser(gitLabId)
+    gitLabId    <- userGitLabIds
+    accessToken <- accessTokens
+  } yield AuthUser(gitLabId, accessToken)
 
   implicit val projectIds: Gen[Id] = for {
     min <- choose(1, 1000)

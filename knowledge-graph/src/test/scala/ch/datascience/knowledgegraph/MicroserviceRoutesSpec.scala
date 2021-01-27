@@ -236,7 +236,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Ok for valid path parameters" in new TestCase {
       val projectPath = projectPaths.generateOne
-      (projectEndpoint.getProject _).expects(projectPath).returning(IO.pure(Response[IO](Ok)))
+      (projectEndpoint.getProject _).expects(projectPath, maybeAuthUser).returning(IO.pure(Response[IO](Ok)))
 
       (projectAuthorizer.authorize _)
         .expects(projectPath, maybeAuthUser)
@@ -261,6 +261,10 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       response.status            shouldBe NotFound
       response.contentType       shouldBe Some(`Content-Type`(MediaType.application.json))
       response.body[InfoMessage] shouldBe InfoMessage("Resource not found")
+    }
+
+    s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Unauthorized when user is not authorized" in new TestCase {
+      fail("boom!")
     }
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Forbidden when user has no rights for the project" in new TestCase {

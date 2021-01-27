@@ -20,8 +20,13 @@ package ch.datascience.http.server.security
 
 import cats.MonadError
 import cats.data.{Kleisli, OptionT}
+import cats.syntax.all._
+import ch.datascience.http.client.AccessToken
+import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import io.chrisdavenport.log4cats.Logger
 import model._
+import org.http4s.AuthScheme.Bearer
+import org.http4s.Credentials.Token
 import org.http4s.headers.Authorization
 
 import scala.concurrent.ExecutionContext
@@ -35,18 +40,24 @@ private class Authentication[Interpretation[_]](
   val authenticate: Kleisli[OptionT[Interpretation, *], Request[Interpretation], Option[AuthUser]] = Kleisli {
     request =>
       request.getBearerToken orElse request.getPrivateAccessToken match {
-        case Some(authHeader) => authenticator.authenticate(authHeader) map Option.apply
-        case None             => OptionT.some(Option.empty[AuthUser])
+        case Some(token) => authenticator.authenticate(token) map Option.apply
+        case None        => OptionT.some(Option.empty[AuthUser])
       }
   }
 
   private implicit class RequestOps(request: Request[Interpretation]) {
 
-    lazy val getBearerToken: Option[Header] =
-      request.headers.get(Authorization)
+    lazy val getBearerToken: Option[AccessToken] =
+      request.headers.get(Authorization) flatMap {
+        case Authorization(Token(Bearer, token)) => OAuthAccessToken(token).some
+        case _                                   => None
+      }
 
-    lazy val getPrivateAccessToken: Option[Header] =
-      request.headers.get(CaseInsensitiveString("PRIVATE-TOKEN"))
+    lazy val getPrivateAccessToken: Option[AccessToken] =
+      request.headers.get(CaseInsensitiveString("PRIVATE-TOKEN")) flatMap {
+        case Header(_, token) => PersonalAccessToken(token).some
+        case _                => None
+      }
   }
 }
 

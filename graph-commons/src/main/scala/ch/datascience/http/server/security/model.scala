@@ -20,11 +20,11 @@ package ch.datascience.http.server.security
 
 import cats.effect.Effect
 import ch.datascience.graph.model.users
+import ch.datascience.http.client.AccessToken
 import org.http4s.Response
 
 object model {
-
-  final case class AuthUser(id: users.GitLabId)
+  final case class AuthUser(id: users.GitLabId, accessToken: AccessToken)
 }
 
 sealed trait EndpointSecurityException extends Exception with Product with Serializable {

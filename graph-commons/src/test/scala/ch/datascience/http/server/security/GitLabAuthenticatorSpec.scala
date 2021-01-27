@@ -25,19 +25,14 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.userGitLabIds
-import ch.datascience.http.client.AccessToken
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.ResponseDefinitionBuilder
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.literal._
-import org.http4s.AuthScheme.Bearer
-import org.http4s.Credentials.Token
 import org.http4s.Header
 import org.http4s.Status._
-import org.http4s.headers.Authorization
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -52,18 +47,18 @@ class GitLabAuthenticatorSpec extends AnyWordSpec with should.Matchers with Exte
       "and return authorized user if GitLab responds with OK" in new TestCase {
 
         val userId = userGitLabIds.generateOne
-        `/api/v4/user`(headerWithAccessToken).returning(okJson(json"""{"id": ${userId.value}}""".noSpaces))
+        `/api/v4/user`(accessToken.toHeader).returning(okJson(json"""{"id": ${userId.value}}""".noSpaces))
 
-        authenticator.authenticate(headerWithAccessToken).value.unsafeRunSync() shouldBe Some(AuthUser(userId))
+        authenticator.authenticate(accessToken).value.unsafeRunSync() shouldBe Some(AuthUser(userId, accessToken))
       }
 
     NotFound :: Unauthorized :: Forbidden :: Nil foreach { status =>
       s"return No user if GitLab responds with $status" in new TestCase {
 
-        `/api/v4/user`(headerWithAccessToken)
+        `/api/v4/user`(accessToken.toHeader)
           .returning(aResponse().withStatus(status.code))
 
-        authenticator.authenticate(headerWithAccessToken).value.unsafeRunSync() shouldBe None
+        authenticator.authenticate(accessToken).value.unsafeRunSync() shouldBe None
       }
     }
 
@@ -71,22 +66,22 @@ class GitLabAuthenticatorSpec extends AnyWordSpec with should.Matchers with Exte
       s"fail if GitLab responds with $status" in new TestCase {
 
         val responseBody = sentences().generateOne
-        `/api/v4/user`(headerWithAccessToken)
+        `/api/v4/user`(accessToken.toHeader)
           .returning(aResponse().withStatus(status.code).withBody(responseBody.toString()))
 
         intercept[Exception] {
-          authenticator.authenticate(headerWithAccessToken).value.unsafeRunSync() shouldBe None
+          authenticator.authenticate(accessToken).value.unsafeRunSync() shouldBe None
         }.getMessage shouldBe s"GET $gitLabApiUrl/user returned $status; body: $responseBody"
       }
     }
 
     s"fail if GitLab responds with malformed body" in new TestCase {
 
-      `/api/v4/user`(headerWithAccessToken)
+      `/api/v4/user`(accessToken.toHeader)
         .returning(okJson(sentences().generateOne.toString()))
 
       intercept[Exception] {
-        authenticator.authenticate(headerWithAccessToken).value.unsafeRunSync() shouldBe None
+        authenticator.authenticate(accessToken).value.unsafeRunSync() shouldBe None
       }.getMessage shouldBe s"GET $gitLabApiUrl/user returned $Ok; error: Malformed message body: Invalid JSON"
     }
   }
@@ -95,7 +90,7 @@ class GitLabAuthenticatorSpec extends AnyWordSpec with should.Matchers with Exte
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val headerWithAccessToken = accessTokens.generateOne.toHeader
+    val accessToken = accessTokens.generateOne
 
     val gitLabApiUrl  = GitLabUrl(externalServiceBaseUrl).apiV4
     val authenticator = new GitLabAuthenticatorImpl(gitLabApiUrl, Throttler.noThrottling, TestLogger())
@@ -106,14 +101,6 @@ class GitLabAuthenticatorSpec extends AnyWordSpec with should.Matchers with Exte
       get("/api/v4/user")
         .withHeader(header.name.value, equalTo(header.value))
         .willReturn(response)
-    }
-  }
-
-  private implicit class AccessTokenOps(accessToken: AccessToken) {
-
-    lazy val toHeader: Header = accessToken match {
-      case PersonalAccessToken(token) => Header("PRIVATE-TOKEN", token)
-      case OAuthAccessToken(token)    => Authorization(Token(Bearer, token))
     }
   }
 }

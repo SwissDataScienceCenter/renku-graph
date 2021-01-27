@@ -20,58 +20,61 @@ package ch.datascience.http.server.security
 
 import cats.data.OptionT
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators.accessTokens
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.server.security.model.AuthUser
-import org.http4s.AuthScheme.Bearer
-import org.http4s.Credentials.Token
-import org.http4s.headers.Authorization
-import org.http4s.{Header, Request}
-import org.scalacheck.Gen
+import org.http4s.Request
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Try
 
-class AuthenticationSpec extends AnyWordSpec with should.Matchers with MockFactory {
+class AuthenticationSpec extends AnyWordSpec with should.Matchers with MockFactory with ScalaCheckPropertyChecks {
 
   "authenticate" should {
 
-    "return a function which succeeds authenticating given request and return an authenticated user " +
-      "if the request contains a valid Authorization token" in new TestCase {
+    val scenarios = Table(
+      "Token type"            -> "Value",
+      "Personal Access Token" -> personalAccessTokens.generateOne,
+      "OAuth Access Token"    -> oauthAccessTokens.generateOne
+    )
 
-        val authUser   = AuthUser(userGitLabIds.generateOne)
-        val authHeader = authHeaders.generateOne
-        (authenticator.authenticate _)
-          .expects(authHeader)
-          .returning(OptionT.some[Try](authUser))
+    forAll(scenarios) { (tokenType, accessToken) =>
+      "return a function which succeeds authenticating " +
+        s"if the given $tokenType is valid" in new TestCase {
 
-        authentication.authenticate(
-          request.withHeaders(authHeader)
-        ) shouldBe OptionT.some[Try](Some(authUser))
-      }
+          val authUser = authUsers.generateOne.copy(accessToken = accessToken)
+          (authenticator.authenticate _)
+            .expects(accessToken)
+            .returning(OptionT.some[Try](authUser))
+
+          authentication.authenticate(
+            request.withHeaders(accessToken.toHeader)
+          ) shouldBe OptionT.some[Try](Some(authUser))
+        }
+    }
 
     "return a function which succeeds authenticating given request and return no user " +
-      "if the request does not contain a Authorization token" in new TestCase {
+      "if the request does not contain an Authorization token" in new TestCase {
         authentication.authenticate(request) shouldBe OptionT.some[Try](None)
       }
 
-    "return a function which fails authentication of the given request " +
+    "return a function which fails authenticating the given request " +
       "if it contains an Authorization token that gets rejected by the authenticator" in new TestCase {
 
-        val authHeader = authHeaders.generateOne
-        val exception  = exceptions.generateOne
+        val accessToken = accessTokens.generateOne
+        val exception   = exceptions.generateOne
         (authenticator.authenticate _)
-          .expects(authHeader)
+          .expects(accessToken)
           .returning(OptionT.liftF(exception.raiseError[Try, AuthUser]))
 
         authentication
           .authenticate(
-            request.withHeaders(authHeader)
+            request.withHeaders(accessToken.toHeader)
           )
           .value shouldBe exception.raiseError[Try, Option[AuthUser]]
       }
@@ -79,12 +82,13 @@ class AuthenticationSpec extends AnyWordSpec with should.Matchers with MockFacto
     "return a function which returns None if authenticator returns no user " +
       "for the header from the given request" in new TestCase {
 
-        val authHeader = authHeaders.generateOne
+        val accessToken = accessTokens.generateOne
         (authenticator.authenticate _)
-          .expects(authHeader)
+          .expects(accessToken)
           .returning(OptionT.none[Try, AuthUser])
 
-        authentication.authenticate(request.withHeaders(authHeader)) shouldBe OptionT.none[Try, Option[AuthUser]]
+        authentication.authenticate(request.withHeaders(accessToken.toHeader)) shouldBe OptionT
+          .none[Try, Option[AuthUser]]
       }
   }
 
@@ -94,10 +98,4 @@ class AuthenticationSpec extends AnyWordSpec with should.Matchers with MockFacto
     val authenticator  = mock[GitLabAuthenticator[Try]]
     val authentication = new Authentication[Try](authenticator)
   }
-
-  private lazy val authHeaders: Gen[Header] =
-    accessTokens map {
-      case PersonalAccessToken(token) => Header("PRIVATE-TOKEN", token)
-      case OAuthAccessToken(token)    => Authorization(Token(Bearer, token))
-    }
 }

@@ -26,6 +26,7 @@ import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -50,12 +51,13 @@ class ProjectEndpoint[Interpretation[_]: Effect](
   import io.circe.{Encoder, Json}
   import org.http4s.circe._
 
-  def getProject(path: projects.Path): Interpretation[Response[Interpretation]] = measureExecutionTime {
-    projectFinder
-      .findProject(path)
-      .flatMap(toHttpResult(path))
-      .recoverWith(httpResult(path))
-  } map logExecutionTimeWhen(finishedSuccessfully(path))
+  def getProject(path: projects.Path, maybeAuthUser: Option[AuthUser]): Interpretation[Response[Interpretation]] =
+    measureExecutionTime {
+      projectFinder
+        .findProject(path, maybeAuthUser)
+        .flatMap(toHttpResult(path))
+        .recoverWith(httpResult(path))
+    } map logExecutionTimeWhen(finishedSuccessfully(path))
 
   private def toHttpResult(
       path: projects.Path

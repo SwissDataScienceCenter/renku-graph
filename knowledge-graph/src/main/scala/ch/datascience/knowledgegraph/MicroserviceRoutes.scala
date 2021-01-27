@@ -108,7 +108,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
         {
           for {
             _        <- projectAuthorizer.authorize(projectPath, maybeAuthUser).leftMap(_.toHttpResponse)
-            response <- EitherT.right[Response[F]](getProject(projectPath))
+            response <- EitherT.right[Response[F]](getProject(projectPath, maybeAuthUser))
           } yield response
         }.merge
       }.merge

@@ -23,15 +23,14 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabApiUrl
-import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.{AccessToken, IORestClient}
 import io.chrisdavenport.log4cats.Logger
 import model._
-import org.http4s.Header
 
 import scala.concurrent.ExecutionContext
 
 private trait GitLabAuthenticator[Interpretation[_]] {
-  def authenticate(header: Header): OptionT[Interpretation, AuthUser]
+  def authenticate(accessToken: AccessToken): OptionT[Interpretation, AuthUser]
 }
 
 private class GitLabAuthenticatorImpl(
@@ -50,25 +49,29 @@ private class GitLabAuthenticatorImpl(
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  override def authenticate(header: Header): OptionT[IO, AuthUser] = OptionT {
+  override def authenticate(accessToken: AccessToken): OptionT[IO, AuthUser] = OptionT {
     for {
       uri           <- validateUri(s"$gitLabApiUrl/user")
-      maybeAuthUser <- send(request(GET, uri).withHeaders(header))(mapResponse)
+      maybeAuthUser <- send(request(GET, uri, accessToken))(mapResponse(accessToken))
     } yield maybeAuthUser
   }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[AuthUser]]] = {
-    case (Ok, _, response)                           => response.as[AuthUser].map(Option.apply)
+  private def mapResponse(
+      accessToken: AccessToken
+  ): PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[AuthUser]]] = {
+    case (Ok, _, response) =>
+      implicit val entityDecoder: EntityDecoder[IO, AuthUser] = decoder(accessToken)
+      response.as[AuthUser].map(Option.apply)
     case (NotFound | Unauthorized | Forbidden, _, _) => None.pure[IO]
   }
 
-  private implicit lazy val userEntityDecoder: EntityDecoder[IO, AuthUser] = {
+  private def decoder(accessToken: AccessToken): EntityDecoder[IO, AuthUser] = {
 
     import ch.datascience.graph.model.users
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
     implicit lazy val userDecoder: Decoder[AuthUser] = { cursor =>
-      cursor.downField("id").as[users.GitLabId].map(AuthUser.apply)
+      cursor.downField("id").as[users.GitLabId].map(AuthUser(_, accessToken))
     }
 
     jsonOf[IO, AuthUser]
