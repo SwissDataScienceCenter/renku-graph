@@ -62,10 +62,10 @@ libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % 
 libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % Test
 
-libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.0.0"   % Test
+libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.1.0"   % Test
 libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.1 is broken
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
-libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.2"   % Test
+libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.3"   % Test
 
 val testContainersScalaVersion = "0.38.7"
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test

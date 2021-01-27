@@ -43,18 +43,18 @@ private class EventBodyDeserializerImpl[Interpretation[_]](implicit
   ): Interpretation[TriplesGeneratedEvent] =
     ME.fromEither {
       parse(eventBody.value)
-        .flatMap(_.as[(Project, Json, SchemaVersion)])
-        .map { case (project, payload, schemaVersion) =>
-          TriplesGeneratedEvent(eventId.id, project, JsonLDTriples(payload), schemaVersion)
+        .flatMap(_.as[(Project, String, SchemaVersion)])
+        .flatMap { case (project, payload, schemaVersion) =>
+          parse(payload).map(json => TriplesGeneratedEvent(eventId.id, project, JsonLDTriples(json), schemaVersion))
         }
         .leftMap(toMeaningfulError(eventBody))
     }
 
-  private implicit val triplesDecoder: Decoder[(Project, Json, SchemaVersion)] = (cursor: HCursor) =>
+  private implicit val triplesDecoder: Decoder[(Project, String, SchemaVersion)] = (cursor: HCursor) =>
     for {
       projectId     <- cursor.downField("project").downField("id").as[Id]
       projectPath   <- cursor.downField("project").downField("path").as[Path]
-      eventPayload  <- cursor.downField("payload").as[Json]
+      eventPayload  <- cursor.downField("payload").as[String]
       schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
     } yield (Project(projectId, projectPath), eventPayload, schemaVersion)
 

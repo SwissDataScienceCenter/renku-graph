@@ -76,19 +76,13 @@ private class IOTriplesUploader(
     } yield uploadResult
   } recover withUploadingError
 
-  private def uploadRequest(uploadUri: Uri, triples: JsonLDTriples) = {
-    val triplesWithContext = if (triples.value.findAllByKey("@context").isEmpty) {
-      triples.value.deepMerge(Json.obj("@context" -> Json.obj()))
-    } else {
-      triples.value
-    }
+  private def uploadRequest(uploadUri: Uri, triples: JsonLDTriples) =
     HttpRequest(
       request(POST, uploadUri, rdfStoreConfig.authCredentials)
-        .withEntity(triplesWithContext)
+        .withEntity(triples.value)
         .putHeaders(`Content-Type`(`ld+json`)),
       name = "json-ld upload"
     )
-  }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[TriplesUploadResult]] = {
     case (Ok, _, _)                         => IO.pure(DeliverySuccess)

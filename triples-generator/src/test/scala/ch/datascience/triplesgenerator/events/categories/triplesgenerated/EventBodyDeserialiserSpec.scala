@@ -37,12 +37,15 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
   "toJsonLDTriples" should {
 
     "produce TriplesGeneratedEvent if the Json string can be successfully deserialized" in new TestCase {
-      val Success(deserializedEvent) =
-        deserializer.toTriplesGeneratedEvent(compoundEventId, triplesGenerationEvent(jsonldTriples))
-      deserializedEvent.schemaVersion          shouldBe schemaVersion
-      deserializedEvent.project                shouldBe Project(projectId, projectPath)
-      deserializedEvent.eventId                shouldBe compoundEventId.id
-      deserializedEvent.triples.value.noSpaces shouldBe jsonldTriples.value.noSpaces
+      deserializer.toTriplesGeneratedEvent(compoundEventId, triplesGenerationEvent(jsonldTriples)) shouldBe context
+        .pure(
+          TriplesGeneratedEvent(
+            compoundEventId.id,
+            Project(projectId, projectPath),
+            jsonldTriples,
+            schemaVersion
+          )
+        )
 
     }
 
@@ -80,7 +83,7 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
             "id"   -> Json.fromInt(projectId.value),
             "path" -> Json.fromString(projectPath.value)
           ),
-          "payload"       -> jsonldTriples.value,
+          "payload"       -> Json.fromString(jsonldTriples.value.noSpaces),
           "schemaVersion" -> Json.fromString(schemaVersion.value)
         )
         .noSpaces
