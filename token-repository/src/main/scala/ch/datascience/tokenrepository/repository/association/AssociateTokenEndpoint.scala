@@ -21,10 +21,10 @@ package ch.datascience.tokenrepository.repository.association
 import cats.MonadError
 import cats.effect.Effect
 import cats.syntax.all._
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.Id
+import ch.datascience.http.ErrorMessage
 import ch.datascience.http.client.AccessToken
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB

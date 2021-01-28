@@ -116,8 +116,8 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 
   private implicit class PathPartsOps(parts: List[String]) {
     import cats.MonadError
-    import ch.datascience.controllers.InfoMessage
-    import ch.datascience.controllers.InfoMessage._
+    import ch.datascience.http.InfoMessage._
+    import ch.datascience.http.InfoMessage
     import org.http4s.{Response, Status}
 
     private implicit val ME: MonadError[F, Throwable] = implicitly[MonadError[F, Throwable]]

@@ -20,12 +20,12 @@ package ch.datascience.webhookservice.hookvalidation
 
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects.Id
+import ch.datascience.http.ErrorMessage
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.server.EndpointTester._

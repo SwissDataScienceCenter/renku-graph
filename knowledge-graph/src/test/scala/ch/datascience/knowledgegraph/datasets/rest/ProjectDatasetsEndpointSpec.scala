@@ -20,14 +20,14 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.InfoMessage._
+import ch.datascience.http.InfoMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{Identifier, InitialVersion, Name, Title}
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.http.ErrorMessage
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}

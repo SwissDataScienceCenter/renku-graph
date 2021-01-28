@@ -23,9 +23,9 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config._
 import ch.datascience.config.renku.ResourceUrl
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.InfoMessage._
+import ch.datascience.http.InfoMessage._
 import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.http.ErrorMessage
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPublishing}

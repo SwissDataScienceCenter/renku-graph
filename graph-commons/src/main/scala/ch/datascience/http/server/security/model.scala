@@ -33,8 +33,8 @@ sealed trait EndpointSecurityException extends Exception with Product with Seria
 
 object EndpointSecurityException {
 
-  import ch.datascience.controllers.ErrorMessage
-  import ch.datascience.controllers.ErrorMessage._
+  import ch.datascience.http.ErrorMessage._
+  import ch.datascience.http.ErrorMessage
   import org.http4s.{Response, Status}
 
   final case object AuthenticationFailure extends EndpointSecurityException {

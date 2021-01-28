@@ -20,6 +20,7 @@ package io.renku.eventlog.processingstatus
 
 import cats.MonadError
 import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.metrics.LabeledHistogram
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
@@ -33,8 +34,8 @@ class ProcessingStatusEndpoint[Interpretation[_]](
     extends Http4sDsl[Interpretation] {
 
   import cats.syntax.all._
-  import ch.datascience.controllers.ErrorMessage._
-  import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+  import ch.datascience.http.ErrorMessage._
+  import ch.datascience.http.InfoMessage
   import ch.datascience.graph.model.projects
   import io.circe.Encoder
   import io.circe.literal._

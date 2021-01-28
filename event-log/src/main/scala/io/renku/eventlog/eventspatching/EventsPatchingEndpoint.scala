@@ -19,11 +19,11 @@
 package io.renku.eventlog.eventspatching
 
 import cats.effect.{ContextShift, IO}
-import ch.datascience.controllers.ErrorMessage
 import ch.datascience.db.SqlQuery
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.graph.model.projects
+import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonOf
@@ -46,8 +46,8 @@ class EventsPatchingEndpointImpl(
     with EventsPatchingEndpoint[IO] {
 
   import cats.syntax.all._
-  import ch.datascience.controllers.InfoMessage
-  import ch.datascience.controllers.InfoMessage._
+  import ch.datascience.http.InfoMessage._
+  import ch.datascience.http.InfoMessage
   import eventsPatcher._
   import org.http4s._
 

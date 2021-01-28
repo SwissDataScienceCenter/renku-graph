@@ -20,12 +20,12 @@ package ch.datascience.webhookservice.tokenrepository
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
+import ch.datascience.http.ErrorMessage
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.interpreters.TestLogger

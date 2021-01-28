@@ -19,8 +19,8 @@
 package ch.datascience.http.server.security
 
 import cats.effect.IO
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.ErrorMessage.ErrorMessage
+import ch.datascience.http.ErrorMessage.ErrorMessage
+import ch.datascience.http.ErrorMessage
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import org.http4s.MediaType._

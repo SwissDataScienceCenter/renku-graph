@@ -21,12 +21,13 @@ package io.renku.eventlog.creation
 import cats.MonadError
 import cats.effect.Effect
 import cats.syntax.all._
-import ch.datascience.controllers.InfoMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.http.InfoMessage._
+import ch.datascience.http.InfoMessage
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.{BatchDate, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.DecodingFailure

@@ -21,15 +21,16 @@ package ch.datascience.knowledgegraph
 import cats.data.{EitherT, OptionT}
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
-import ch.datascience.controllers.ErrorMessage.ErrorMessage
-import ch.datascience.controllers.InfoMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage.ErrorMessage
+import ch.datascience.http.InfoMessage._
+import ch.datascience.http.InfoMessage
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.http.server.security.ProjectAuthorizer
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage}

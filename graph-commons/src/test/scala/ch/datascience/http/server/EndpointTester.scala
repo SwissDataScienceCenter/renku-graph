@@ -21,7 +21,7 @@ package ch.datascience.http.server
 import cats.data.{Kleisli, OptionT}
 import cats.effect.{ContextShift, IO, Resource, Sync}
 import cats.syntax.all._
-import ch.datascience.controllers.ErrorMessage.ErrorMessage
+import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.{Href, Rel}
 import ch.datascience.http.server.security.model.AuthUser

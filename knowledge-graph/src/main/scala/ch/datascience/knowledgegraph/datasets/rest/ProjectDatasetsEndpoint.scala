@@ -21,11 +21,11 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.renku
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.InfoMessage._
+import ch.datascience.http.InfoMessage._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{DerivedFrom, SameAs}
 import ch.datascience.graph.model.projects
+import ch.datascience.http.ErrorMessage
 import ch.datascience.http.rest.Links._
 import ch.datascience.knowledgegraph.datasets.rest.ProjectDatasetsFinder.ProjectDataset
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}

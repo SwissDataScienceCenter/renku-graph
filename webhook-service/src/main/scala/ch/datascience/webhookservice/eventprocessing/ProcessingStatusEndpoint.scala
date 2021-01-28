@@ -24,10 +24,11 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.controllers.ErrorMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage._
+import ch.datascience.http.InfoMessage
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}

@@ -20,8 +20,8 @@ package ch.datascience.knowledgegraph.projects.rest
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.controllers.InfoMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.http.InfoMessage._
+import ch.datascience.http.InfoMessage
 import ch.datascience.generators.CommonGraphGenerators.renkuResourcesUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -29,6 +29,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.projects._
 import ch.datascience.graph.model.users.{Email, Name => UserName}
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.{Href, Rel}
 import ch.datascience.http.server.EndpointTester._

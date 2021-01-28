@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.controllers
+package ch.datascience.http
 
 import cats.Applicative
 import eu.timepit.refined.api.{RefType, Refined}

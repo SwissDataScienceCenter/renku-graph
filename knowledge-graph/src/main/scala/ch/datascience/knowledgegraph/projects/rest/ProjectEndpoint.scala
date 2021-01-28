@@ -22,9 +22,10 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.{GitLab, renku}
 import ch.datascience.control.Throttler
-import ch.datascience.controllers.InfoMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.http.InfoMessage._
+import ch.datascience.http.InfoMessage
 import ch.datascience.graph.model.projects
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.projects.model.Permissions._
