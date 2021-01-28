@@ -1,9 +1,27 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.datascience.http.server.security
 
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.authUsers
+import ch.datascience.graph.model.GraphModelGenerators.{authUsers, projectPaths}
 import ch.datascience.graph.model.projects.Visibility._
 import ch.datascience.http.server.security.EndpointSecurityException.AuthorizationFailure
 import ch.datascience.interpreters.TestLogger
@@ -52,6 +70,16 @@ class ProjectAuthorizerSpec extends AnyWordSpec with InMemoryRdfStore with shoul
       loadToStore(project.asJsonLD)
 
       authorizer.authorize(project.path, authUser.some).value.unsafeRunSync() shouldBe Right(())
+    }
+
+    "succeed if there's no project with the given id" in new TestCase {
+      authorizer
+        .authorize(
+          projectPaths.generateOne,
+          authUsers.generateOption
+        )
+        .value
+        .unsafeRunSync() shouldBe Right(())
     }
 
     "fail if the given project is non-public and the user does not have rights for it" in new TestCase {

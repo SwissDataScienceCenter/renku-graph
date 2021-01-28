@@ -94,8 +94,8 @@ object EndpointTester {
       } yield link.href
   }
 
-  def givenAuthMiddleware(returning: Option[AuthUser]): AuthMiddleware[IO, Option[AuthUser]] =
-    AuthMiddleware.withFallThrough {
-      Kleisli.liftF(OptionT.liftF(returning.pure[IO]))
+  def givenAuthMiddleware(returning: OptionT[IO, Option[AuthUser]]): AuthMiddleware[IO, Option[AuthUser]] =
+    AuthMiddleware {
+      Kleisli liftF returning
     }
 }

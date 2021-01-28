@@ -24,13 +24,14 @@ import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.http.server.security.EndpointSecurityException.AuthenticationFailure
 import io.chrisdavenport.log4cats.Logger
 import model._
 
 import scala.concurrent.ExecutionContext
 
 private trait GitLabAuthenticator[Interpretation[_]] {
-  def authenticate(accessToken: AccessToken): OptionT[Interpretation, AuthUser]
+  def authenticate(accessToken: AccessToken): Interpretation[Either[EndpointSecurityException, AuthUser]]
 }
 
 private class GitLabAuthenticatorImpl(
@@ -49,20 +50,18 @@ private class GitLabAuthenticatorImpl(
   import org.http4s.circe.jsonOf
   import org.http4s.dsl.io._
 
-  override def authenticate(accessToken: AccessToken): OptionT[IO, AuthUser] = OptionT {
-    for {
-      uri           <- validateUri(s"$gitLabApiUrl/user")
-      maybeAuthUser <- send(request(GET, uri, accessToken))(mapResponse(accessToken))
-    } yield maybeAuthUser
-  }
+  override def authenticate(accessToken: AccessToken): IO[Either[EndpointSecurityException, AuthUser]] = for {
+    uri      <- validateUri(s"$gitLabApiUrl/user")
+    authUser <- send(request(GET, uri, accessToken))(mapResponse(accessToken))
+  } yield authUser
 
   private def mapResponse(
       accessToken: AccessToken
-  ): PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[AuthUser]]] = {
+  ): PartialFunction[(Status, Request[IO], Response[IO]), IO[Either[EndpointSecurityException, AuthUser]]] = {
     case (Ok, _, response) =>
       implicit val entityDecoder: EntityDecoder[IO, AuthUser] = decoder(accessToken)
-      response.as[AuthUser].map(Option.apply)
-    case (NotFound | Unauthorized | Forbidden, _, _) => None.pure[IO]
+      response.as[AuthUser] map (Right(_))
+    case (NotFound | Unauthorized | Forbidden, _, _) => Left(AuthenticationFailure).pure[IO]
   }
 
   private def decoder(accessToken: AccessToken): EntityDecoder[IO, AuthUser] = {

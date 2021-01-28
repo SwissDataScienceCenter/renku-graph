@@ -28,22 +28,31 @@ import model._
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.headers.Authorization
+import org.http4s.{AuthedRoutes, Request}
 
 import scala.concurrent.ExecutionContext
 
-private class Authentication[Interpretation[_]](
+private trait Authentication[Interpretation[_]] {
+  def authenticate
+      : Kleisli[Interpretation, Request[Interpretation], Either[EndpointSecurityException, Option[AuthUser]]]
+}
+
+private class AuthenticationImpl[Interpretation[_]](
     authenticator: GitLabAuthenticator[Interpretation]
-)(implicit ME:     MonadError[Interpretation, Throwable]) {
+)(implicit ME:     MonadError[Interpretation, Throwable])
+    extends Authentication[Interpretation] {
+
   import org.http4s.util.CaseInsensitiveString
   import org.http4s.{Header, Request}
 
-  val authenticate: Kleisli[OptionT[Interpretation, *], Request[Interpretation], Option[AuthUser]] = Kleisli {
-    request =>
+  val authenticate
+      : Kleisli[Interpretation, Request[Interpretation], Either[EndpointSecurityException, Option[AuthUser]]] =
+    Kleisli { request =>
       request.getBearerToken orElse request.getPrivateAccessToken match {
-        case Some(token) => authenticator.authenticate(token) map Option.apply
-        case None        => OptionT.some(Option.empty[AuthUser])
+        case Some(token) => authenticator.authenticate(token).map(_.map(Option.apply))
+        case None        => Option.empty[AuthUser].asRight[EndpointSecurityException].pure[Interpretation]
       }
-  }
+    }
 
   private implicit class RequestOps(request: Request[Interpretation]) {
 
@@ -68,7 +77,7 @@ object Authentication {
   import ch.datascience.control.Throttler
   import org.http4s.server.AuthMiddleware
 
-  def middlewareWithFallThrough(
+  def middleware(
       gitLabThrottler: Throttler[IO, GitLab],
       logger:          Logger[IO]
   )(implicit
@@ -77,7 +86,16 @@ object Authentication {
       timer:            Timer[IO]
   ): IO[AuthMiddleware[IO, Option[AuthUser]]] = for {
     authentication <- Authentication(gitLabThrottler, logger)
-  } yield AuthMiddleware.withFallThrough(authentication.authenticate)
+  } yield middleware(authentication)
+
+  private[security] def middleware(
+      authentication: Authentication[IO]
+  ): AuthMiddleware[IO, Option[AuthUser]] = {
+    val onFailure: AuthedRoutes[EndpointSecurityException, IO] = Kleisli { req =>
+      OptionT.some(req.context.toHttpResponse)
+    }
+    AuthMiddleware(authentication.authenticate, onFailure)
+  }
 
   private def apply(
       gitLabThrottler: Throttler[IO, GitLab],
@@ -88,5 +106,5 @@ object Authentication {
       timer:            Timer[IO]
   ): IO[Authentication[IO]] = for {
     authenticator <- GitLabAuthenticator(gitLabThrottler, logger)
-  } yield new Authentication(authenticator)
+  } yield new AuthenticationImpl(authenticator)
 }

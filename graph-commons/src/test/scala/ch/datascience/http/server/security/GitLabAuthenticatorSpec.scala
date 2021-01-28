@@ -25,6 +25,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.userGitLabIds
+import ch.datascience.http.server.security.EndpointSecurityException.AuthenticationFailure
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -43,22 +44,22 @@ class GitLabAuthenticatorSpec extends AnyWordSpec with should.Matchers with Exte
 
   "authenticate" should {
 
-    "use the given header to call GitLab's GET /user endpoint " +
+    "use the given access token to call GitLab's GET /user endpoint " +
       "and return authorized user if GitLab responds with OK" in new TestCase {
 
         val userId = userGitLabIds.generateOne
         `/api/v4/user`(accessToken.toHeader).returning(okJson(json"""{"id": ${userId.value}}""".noSpaces))
 
-        authenticator.authenticate(accessToken).value.unsafeRunSync() shouldBe Some(AuthUser(userId, accessToken))
+        authenticator.authenticate(accessToken).unsafeRunSync() shouldBe Right(AuthUser(userId, accessToken))
       }
 
     NotFound :: Unauthorized :: Forbidden :: Nil foreach { status =>
-      s"return No user if GitLab responds with $status" in new TestCase {
+      s"return AuthenticationFailure if GitLab responds with $status" in new TestCase {
 
         `/api/v4/user`(accessToken.toHeader)
           .returning(aResponse().withStatus(status.code))
 
-        authenticator.authenticate(accessToken).value.unsafeRunSync() shouldBe None
+        authenticator.authenticate(accessToken).unsafeRunSync() shouldBe Left(AuthenticationFailure)
       }
     }
 
@@ -70,7 +71,7 @@ class GitLabAuthenticatorSpec extends AnyWordSpec with should.Matchers with Exte
           .returning(aResponse().withStatus(status.code).withBody(responseBody.toString()))
 
         intercept[Exception] {
-          authenticator.authenticate(accessToken).value.unsafeRunSync() shouldBe None
+          authenticator.authenticate(accessToken).unsafeRunSync()
         }.getMessage shouldBe s"GET $gitLabApiUrl/user returned $status; body: $responseBody"
       }
     }
@@ -81,7 +82,7 @@ class GitLabAuthenticatorSpec extends AnyWordSpec with should.Matchers with Exte
         .returning(okJson(sentences().generateOne.toString()))
 
       intercept[Exception] {
-        authenticator.authenticate(accessToken).value.unsafeRunSync() shouldBe None
+        authenticator.authenticate(accessToken).unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabApiUrl/user returned $Ok; error: Malformed message body: Invalid JSON"
     }
   }

@@ -18,7 +18,7 @@
 
 package ch.datascience.knowledgegraph
 
-import cats.data.EitherT
+import cats.data.{EitherT, OptionT}
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
 import ch.datascience.controllers.ErrorMessage.ErrorMessage
@@ -34,6 +34,7 @@ import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.server.security.EndpointSecurityException.AuthorizationFailure
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.http.server.security.{EndpointSecurityException, ProjectAuthorizer}
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
@@ -201,14 +202,13 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       response.status shouldBe Ok
     }
 
-    s"define a GET /knowledge-graph/datasets/:id endpoint returning $ServiceUnavailable when no :id path parameter given" in new TestCase {
-      val id = datasetIdentifiers.generateOne
+    s"define a GET /knowledge-graph/datasets/:id endpoint returning $NotFound when no :id path parameter given" in new TestCase {
 
-      val response = routes.call(
-        Request(Method.GET, uri"knowledge-graph/datasets/")
-      )
-
-      response.status shouldBe ServiceUnavailable
+      routes
+        .call(
+          Request(Method.GET, uri"knowledge-graph/datasets/")
+        )
+        .status shouldBe NotFound
     }
 
     "define a GET /knowledge-graph/graphql endpoint" in new TestCase {
@@ -264,7 +264,15 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
     }
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Unauthorized when user is not authorized" in new TestCase {
-      fail("boom!")
+      override val authenticationResponse = OptionT.none[IO, Option[AuthUser]]
+
+      val projectPath = projectPaths.generateOne
+
+      routes
+        .call(
+          Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
+        )
+        .status shouldBe Unauthorized
     }
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name endpoint returning $Forbidden when user has no rights for the project" in new TestCase {
@@ -278,9 +286,9 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         Request(Method.GET, Uri.unsafeFromString(s"knowledge-graph/projects/$projectPath"))
       )
 
-      response.status            shouldBe Forbidden
-      response.contentType       shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.body[InfoMessage] shouldBe ErrorMessage(AuthorizationFailure.getMessage)
+      response.status             shouldBe Forbidden
+      response.contentType        shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.body[ErrorMessage] shouldBe ErrorMessage(AuthorizationFailure.getMessage)
     }
 
     s"define a GET /knowledge-graph/projects/:namespace/../:name/datasets endpoint returning $Ok for valid path parameters" in new TestCase {
@@ -303,6 +311,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
   private trait TestCase {
 
     val maybeAuthUser           = authUsers.generateOption
+    val authenticationResponse  = OptionT.some[IO](maybeAuthUser)
     val queryEndpoint           = mock[IOQueryEndpoint]
     val projectEndpoint         = mock[IOProjectEndpointStub]
     val projectDatasetsEndpoint = mock[IOProjectDatasetsEndpointStub]
@@ -316,7 +325,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       projectDatasetsEndpoint,
       datasetsEndpoint,
       datasetsSearchEndpoint,
-      givenAuthMiddleware(returning = maybeAuthUser),
+      givenAuthMiddleware(returning = authenticationResponse),
       projectAuthorizer,
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))

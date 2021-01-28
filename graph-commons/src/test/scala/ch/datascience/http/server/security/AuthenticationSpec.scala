@@ -18,14 +18,17 @@
 
 package ch.datascience.http.server.security
 
-import cats.data.OptionT
+import cats.data.Kleisli
+import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.controllers.ErrorMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.server.security.model.AuthUser
-import org.http4s.Request
+import org.http4s.dsl.Http4sDsl
+import org.http4s.{AuthedRoutes, Request, Response}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -50,52 +53,68 @@ class AuthenticationSpec extends AnyWordSpec with should.Matchers with MockFacto
           val authUser = authUsers.generateOne.copy(accessToken = accessToken)
           (authenticator.authenticate _)
             .expects(accessToken)
-            .returning(OptionT.some[Try](authUser))
+            .returning(authUser.asRight[EndpointSecurityException].pure[Try])
 
           authentication.authenticate(
             request.withHeaders(accessToken.toHeader)
-          ) shouldBe OptionT.some[Try](Some(authUser))
+          ) shouldBe authUser.some.asRight[EndpointSecurityException].pure[Try]
         }
     }
 
     "return a function which succeeds authenticating given request and return no user " +
       "if the request does not contain an Authorization token" in new TestCase {
-        authentication.authenticate(request) shouldBe OptionT.some[Try](None)
+        authentication
+          .authenticate(request) shouldBe Option.empty[AuthUser].asRight[EndpointSecurityException].pure[Try]
       }
 
     "return a function which fails authenticating the given request " +
       "if it contains an Authorization token that gets rejected by the authenticator" in new TestCase {
 
         val accessToken = accessTokens.generateOne
-        val exception   = exceptions.generateOne
+        val exception   = securityExceptions.generateOne
         (authenticator.authenticate _)
           .expects(accessToken)
-          .returning(OptionT.liftF(exception.raiseError[Try, AuthUser]))
+          .returning(exception.asLeft[AuthUser].pure[Try])
 
         authentication
           .authenticate(
             request.withHeaders(accessToken.toHeader)
-          )
-          .value shouldBe exception.raiseError[Try, Option[AuthUser]]
+          ) shouldBe exception.asLeft[Option[AuthUser]].pure[Try]
       }
+  }
 
-    "return a function which returns None if authenticator returns no user " +
-      "for the header from the given request" in new TestCase {
+  "middleware" should {
 
-        val accessToken = accessTokens.generateOne
-        (authenticator.authenticate _)
-          .expects(accessToken)
-          .returning(OptionT.none[Try, AuthUser])
+    "return Unauthorized for unauthorized requests" in new Http4sDsl[IO] {
+      val authentication = mock[Authentication[IO]]
 
-        authentication.authenticate(request.withHeaders(accessToken.toHeader)) shouldBe OptionT
-          .none[Try, Option[AuthUser]]
-      }
+      val exception = securityExceptions.generateOne
+      val authenticate: Kleisli[IO, Request[IO], Either[EndpointSecurityException, Option[AuthUser]]] =
+        Kleisli.liftF(exception.asLeft[Option[AuthUser]].pure[IO])
+
+      (() => authentication.authenticate)
+        .expects()
+        .returning(authenticate)
+
+      val request = Request[IO]()
+
+      val maybeResponse = Authentication.middleware(authentication) {
+        AuthedRoutes.of { case GET -> Root as _ => Response.notFound[IO].pure[IO] }
+      }(request)
+
+      val Some(response) = maybeResponse.value.unsafeRunSync()
+
+      val expectedResponse = exception.toHttpResponse[IO]
+      response.status                           shouldBe expectedResponse.status
+      response.contentType                      shouldBe expectedResponse.contentType
+      response.as[ErrorMessage].unsafeRunSync() shouldBe expectedResponse.as[ErrorMessage].unsafeRunSync()
+    }
   }
 
   private trait TestCase {
     val request = Request[Try]()
 
     val authenticator  = mock[GitLabAuthenticator[Try]]
-    val authentication = new Authentication[Try](authenticator)
+    val authentication = new AuthenticationImpl[Try](authenticator)
   }
 }

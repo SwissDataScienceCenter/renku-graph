@@ -29,13 +29,12 @@ import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.PagingRequest.Decoders._
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.QueryParameterTools._
-import ch.datascience.http.server.security.{Authentication, ProjectAuthorizer}
 import ch.datascience.http.server.security.model.AuthUser
+import ch.datascience.http.server.security.{Authentication, ProjectAuthorizer}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.{IOQueryEndpoint, QueryEndpoint}
 import ch.datascience.knowledgegraph.projects.rest.{IOProjectEndpoint, ProjectEndpoint}
-import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import io.chrisdavenport.log4cats.Logger
@@ -83,7 +82,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   }
   // format: on
 
-  lazy val routes: Resource[F, HttpRoutes[F]] = (authorizedRoutes <+> nonAuthorizedRoutes).withMetrics
+  lazy val routes: Resource[F, HttpRoutes[F]] = (nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
 
   private def searchForDatasets(
       maybePhrase:  Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase]],
@@ -148,7 +147,7 @@ private object MicroserviceRoutes {
       projectDatasetsEndpoint <- IOProjectDatasetsEndpoint(sparqlTimeRecorder)
       datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder)
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)
-      authMiddleware          <- Authentication.middlewareWithFallThrough(gitLabThrottler, logger)
+      authMiddleware          <- Authentication.middleware(gitLabThrottler, logger)
       projectAuthorizer       <- ProjectAuthorizer(sparqlTimeRecorder, logger = logger)
       routesMetrics = new RoutesMetrics[IO](metricsRegistry)
     } yield new MicroserviceRoutes(queryEndpoint,
