@@ -45,28 +45,32 @@ import org.http4s.dsl.Http4sDsl
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class ProcessingStatusEndpoint[Interpretation[_]: Effect](
+trait ProcessingStatusEndpoint[Interpretation[_]] {
+  def fetchProcessingStatus(projectId: Id): Interpretation[Response[Interpretation]]
+}
+
+class ProcessingStatusEndpointImpl[Interpretation[_]: Effect](
     hookValidator:           HookValidator[Interpretation],
     processingStatusFetcher: ProcessingStatusFetcher[Interpretation],
     executionTimeRecorder:   ExecutionTimeRecorder[Interpretation],
     logger:                  Logger[Interpretation]
 )(implicit ME:               MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+    extends Http4sDsl[Interpretation]
+    with ProcessingStatusEndpoint[Interpretation] {
 
   import HookValidationResult._
   import ProcessingStatusEndpoint._
   import executionTimeRecorder._
 
-  def fetchProcessingStatus(projectId: Id): Interpretation[Response[Interpretation]] =
-    measureExecutionTime(
-      {
-        for {
-          _        <- validateHook(projectId)
-          response <- findStatus(projectId)
-        } yield response
-      }.getOrElseF(NotFound(InfoMessage(s"Progress status for project '$projectId' not found")))
-        .recoverWith(httpResponse(projectId))
-    ) map logExecutionTime(withMessage = s"Finding progress status for project '$projectId' finished")
+  def fetchProcessingStatus(projectId: Id): Interpretation[Response[Interpretation]] = measureExecutionTime {
+    {
+      for {
+        _        <- validateHook(projectId)
+        response <- findStatus(projectId)
+      } yield response
+    }.getOrElseF(NotFound(InfoMessage(s"Progress status for project '$projectId' not found")))
+      .recoverWith(httpResponse(projectId))
+  } map logExecutionTime(withMessage = s"Finding progress status for project '$projectId' finished")
 
   private def validateHook(projectId: Id): OptionT[Interpretation, Unit] = OptionT {
     hookValidator.validateHook(projectId, maybeAccessToken = None) map hookMissingToNone recover noAccessTokenToNone
@@ -129,5 +133,5 @@ object IOProcessingStatusEndpoint {
     for {
       fetcher       <- IOProcessingStatusFetcher(logger)
       hookValidator <- IOHookValidator(projectHookUrl, gitLabThrottler)
-    } yield new ProcessingStatusEndpoint[IO](hookValidator, fetcher, executionTimeRecorder, logger)
+    } yield new ProcessingStatusEndpointImpl[IO](hookValidator, fetcher, executionTimeRecorder, logger)
 }

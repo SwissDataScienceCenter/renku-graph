@@ -22,34 +22,34 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.InfoMessage
 import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.http.server.security.model.AuthUser
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult._
 import ch.datascience.webhookservice.project.ProjectHookUrl
-import ch.datascience.webhookservice.security.AccessTokenExtractor
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{Request, Response, Status}
+import org.http4s.{Response, Status}
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class HookValidationEndpoint[Interpretation[_]: Effect](
-    hookValidator:     HookValidator[Interpretation],
-    accessTokenFinder: AccessTokenExtractor[Interpretation],
-    logger:            Logger[Interpretation]
-) extends Http4sDsl[Interpretation] {
+trait HookValidationEndpoint[Interpretation[_]] {
+  def validateHook(projectId: Id, authUser: AuthUser): Interpretation[Response[Interpretation]]
+}
 
-  import accessTokenFinder._
+class HookValidationEndpointImpl[Interpretation[_]: Effect](
+    hookValidator: HookValidator[Interpretation],
+    logger:        Logger[Interpretation]
+) extends Http4sDsl[Interpretation]
+    with HookValidationEndpoint[Interpretation] {
 
-  def validateHook(projectId: Id, request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  def validateHook(projectId: Id, authUser: AuthUser): Interpretation[Response[Interpretation]] = {
     for {
-      accessToken    <- findAccessToken(request)
-      creationResult <- hookValidator.validateHook(projectId, Some(accessToken))
+      creationResult <- hookValidator.validateHook(projectId, Some(authUser.accessToken))
       response       <- toHttpResponse(creationResult)
     } yield response
   } recoverWith withHttpResult
@@ -82,9 +82,5 @@ object IOHookValidationEndpoint {
   ): IO[HookValidationEndpoint[IO]] =
     for {
       hookValidator <- IOHookValidator(projectHookUrl, gitLabThrottler)
-    } yield new HookValidationEndpoint[IO](
-      hookValidator,
-      new AccessTokenExtractor[IO],
-      logger
-    )
+    } yield new HookValidationEndpointImpl[IO](hookValidator, logger)
 }

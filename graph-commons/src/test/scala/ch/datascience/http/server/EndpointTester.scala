@@ -27,9 +27,9 @@ import ch.datascience.http.rest.Links.{Href, Rel}
 import ch.datascience.http.server.security.model.AuthUser
 import eu.timepit.refined.api.RefType
 import io.circe._
+import org.http4s._
 import org.http4s.circe.{jsonEncoderOf, jsonOf}
 import org.http4s.headers.`Content-Type`
-import org.http4s._
 import org.http4s.server.AuthMiddleware
 
 import scala.concurrent.ExecutionContext
@@ -94,7 +94,12 @@ object EndpointTester {
       } yield link.href
   }
 
-  def givenAuthMiddleware(returning: OptionT[IO, Option[AuthUser]]): AuthMiddleware[IO, Option[AuthUser]] =
+  def givenAuthIfNeededMiddleware(returning: OptionT[IO, Option[AuthUser]]): AuthMiddleware[IO, Option[AuthUser]] =
+    AuthMiddleware {
+      Kleisli liftF returning
+    }
+
+  def givenAuthMiddleware(returning: OptionT[IO, AuthUser]): AuthMiddleware[IO, AuthUser] =
     AuthMiddleware {
       Kleisli liftF returning
     }

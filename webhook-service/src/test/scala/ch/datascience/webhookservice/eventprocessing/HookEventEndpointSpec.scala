@@ -186,7 +186,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
     val commitToEventLog = mock[IOCommitToEventLog]
     val hookTokenCrypto  = mock[IOHookTokenCrypto]
-    val processPushEvent = new HookEventEndpoint[IO](
+    val processPushEvent = new HookEventEndpointImpl[IO](
       hookTokenCrypto,
       commitToEventLog,
       logger

@@ -30,8 +30,8 @@ import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.PagingRequest.Decoders._
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.QueryParameterTools._
-import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.http.server.security.Authentication
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest._
 import ch.datascience.knowledgegraph.graphql.{IOQueryEndpoint, QueryEndpoint}
@@ -116,8 +116,8 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 
   private implicit class PathPartsOps(parts: List[String]) {
     import cats.MonadError
-    import ch.datascience.http.InfoMessage._
     import ch.datascience.http.InfoMessage
+    import ch.datascience.http.InfoMessage._
     import org.http4s.{Response, Status}
 
     private implicit val ME: MonadError[F, Throwable] = implicitly[MonadError[F, Throwable]]
@@ -149,7 +149,7 @@ private object MicroserviceRoutes {
       datasetEndpoint         <- IODatasetEndpoint(sparqlTimeRecorder)
       datasetsSearchEndpoint  <- IODatasetsSearchEndpoint(sparqlTimeRecorder)
       authenticator           <- GitLabAuthenticator(gitLabThrottler, logger)
-      authMiddleware          <- Authentication.middleware(authenticator)
+      authMiddleware          <- Authentication.middlewareAuthenticatingIfNeeded(authenticator)
       projectAuthorizer       <- ProjectAuthorizer(sparqlTimeRecorder, logger = logger)
       routesMetrics = new RoutesMetrics[IO](metricsRegistry)
     } yield new MicroserviceRoutes(queryEndpoint,

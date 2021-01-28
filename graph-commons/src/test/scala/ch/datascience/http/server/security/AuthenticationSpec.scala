@@ -26,6 +26,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.http.server.security.EndpointSecurityException.AuthenticationFailure
 import ch.datascience.http.server.security.model.AuthUser
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{AuthedRoutes, Request, Response}
@@ -37,6 +38,51 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.util.Try
 
 class AuthenticationSpec extends AnyWordSpec with should.Matchers with MockFactory with ScalaCheckPropertyChecks {
+
+  "authenticateInNeeded" should {
+
+    val scenarios = Table(
+      "Token type"            -> "Value",
+      "Personal Access Token" -> personalAccessTokens.generateOne,
+      "OAuth Access Token"    -> oauthAccessTokens.generateOne
+    )
+
+    forAll(scenarios) { (tokenType, accessToken) =>
+      "return a function which succeeds authenticating " +
+        s"if the given $tokenType is valid" in new TestCase {
+
+          val authUser = authUsers.generateOne.copy(accessToken = accessToken)
+          (authenticator.authenticate _)
+            .expects(accessToken)
+            .returning(authUser.asRight[EndpointSecurityException].pure[Try])
+
+          authentication.authenticateIfNeeded(
+            request.withHeaders(accessToken.toHeader)
+          ) shouldBe authUser.some.asRight[EndpointSecurityException].pure[Try]
+        }
+    }
+
+    "return a function which succeeds authenticating given request and return no user " +
+      "if the request does not contain an Authorization token" in new TestCase {
+        authentication
+          .authenticateIfNeeded(request) shouldBe Option.empty[AuthUser].asRight[EndpointSecurityException].pure[Try]
+      }
+
+    "return a function which fails authenticating the given request " +
+      "if it contains an Authorization token that gets rejected by the authenticator" in new TestCase {
+
+        val accessToken = accessTokens.generateOne
+        val exception   = securityExceptions.generateOne
+        (authenticator.authenticate _)
+          .expects(accessToken)
+          .returning(exception.asLeft[AuthUser].pure[Try])
+
+        authentication
+          .authenticateIfNeeded(
+            request.withHeaders(accessToken.toHeader)
+          ) shouldBe exception.asLeft[Option[AuthUser]].pure[Try]
+      }
+  }
 
   "authenticate" should {
 
@@ -57,14 +103,13 @@ class AuthenticationSpec extends AnyWordSpec with should.Matchers with MockFacto
 
           authentication.authenticate(
             request.withHeaders(accessToken.toHeader)
-          ) shouldBe authUser.some.asRight[EndpointSecurityException].pure[Try]
+          ) shouldBe authUser.asRight[EndpointSecurityException].pure[Try]
         }
     }
 
-    "return a function which succeeds authenticating given request and return no user " +
-      "if the request does not contain an Authorization token" in new TestCase {
-        authentication
-          .authenticate(request) shouldBe Option.empty[AuthUser].asRight[EndpointSecurityException].pure[Try]
+    "return a function which fails authenticating the given request " +
+      "if the it does not contain an Authorization token" in new TestCase {
+        authentication.authenticate(request) shouldBe AuthenticationFailure.asLeft[AuthUser].pure[Try]
       }
 
     "return a function which fails authenticating the given request " +
@@ -77,10 +122,36 @@ class AuthenticationSpec extends AnyWordSpec with should.Matchers with MockFacto
           .returning(exception.asLeft[AuthUser].pure[Try])
 
         authentication
-          .authenticate(
-            request.withHeaders(accessToken.toHeader)
-          ) shouldBe exception.asLeft[Option[AuthUser]].pure[Try]
+          .authenticate(request.withHeaders(accessToken.toHeader)) shouldBe exception.asLeft[AuthUser].pure[Try]
       }
+  }
+
+  "middlewareAuthenticatingIfNeeded" should {
+
+    "return Unauthorized for unauthorized requests" in new Http4sDsl[IO] {
+      val authentication = mock[Authentication[IO]]
+
+      val exception = securityExceptions.generateOne
+      val authenticate: Kleisli[IO, Request[IO], Either[EndpointSecurityException, Option[AuthUser]]] =
+        Kleisli.liftF(exception.asLeft[Option[AuthUser]].pure[IO])
+
+      (() => authentication.authenticateIfNeeded)
+        .expects()
+        .returning(authenticate)
+
+      val request = Request[IO]()
+
+      val maybeResponse = Authentication.middlewareAuthenticatingIfNeeded(authentication) {
+        AuthedRoutes.of { case GET -> Root as _ => Response.notFound[IO].pure[IO] }
+      }(request)
+
+      val Some(response) = maybeResponse.value.unsafeRunSync()
+
+      val expectedResponse = exception.toHttpResponse[IO]
+      response.status                           shouldBe expectedResponse.status
+      response.contentType                      shouldBe expectedResponse.contentType
+      response.as[ErrorMessage].unsafeRunSync() shouldBe expectedResponse.as[ErrorMessage].unsafeRunSync()
+    }
   }
 
   "middleware" should {
@@ -89,8 +160,8 @@ class AuthenticationSpec extends AnyWordSpec with should.Matchers with MockFacto
       val authentication = mock[Authentication[IO]]
 
       val exception = securityExceptions.generateOne
-      val authenticate: Kleisli[IO, Request[IO], Either[EndpointSecurityException, Option[AuthUser]]] =
-        Kleisli.liftF(exception.asLeft[Option[AuthUser]].pure[IO])
+      val authenticate: Kleisli[IO, Request[IO], Either[EndpointSecurityException, AuthUser]] =
+        Kleisli.liftF(exception.asLeft[AuthUser].pure[IO])
 
       (() => authentication.authenticate)
         .expects()

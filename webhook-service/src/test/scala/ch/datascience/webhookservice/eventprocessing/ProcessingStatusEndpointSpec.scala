@@ -190,7 +190,7 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
     val processingStatusFetcher = mock[ProcessingStatusFetcher[IO]]
     val logger                  = TestLogger[IO]()
     val executionTimeRecorder   = TestExecutionTimeRecorder[IO](logger)
-    val fetchProcessingStatus = new ProcessingStatusEndpoint[IO](
+    val fetchProcessingStatus = new ProcessingStatusEndpointImpl[IO](
       hookValidator,
       processingStatusFetcher,
       executionTimeRecorder,

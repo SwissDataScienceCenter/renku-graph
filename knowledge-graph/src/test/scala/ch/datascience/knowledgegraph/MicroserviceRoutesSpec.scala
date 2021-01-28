@@ -327,7 +327,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
       projectDatasetsEndpoint,
       datasetsEndpoint,
       datasetsSearchEndpoint,
-      givenAuthMiddleware(returning = authenticationResponse),
+      givenAuthIfNeededMiddleware(returning = authenticationResponse),
       projectAuthorizer,
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))

@@ -18,28 +18,24 @@
 
 package ch.datascience.webhookservice.hookcreation
 
-import cats.MonadError
 import cats.effect.IO
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.graph.model.GraphModelGenerators.{authUsers, projectIds}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
-import ch.datascience.webhookservice.security.IOAccessTokenExtractor
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -48,85 +44,44 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
   "createHook" should {
 
-    "return CREATED when a valid access token is present in the header " +
-      "and webhook is successfully created for project with the given id in in GitLab" in new TestCase {
-
-        val accessToken = accessTokens.generateOne
-        (accessTokenFinder
-          .findAccessToken(_: Request[IO]))
-          .expects(*)
-          .returning(context.pure(accessToken))
-
-        (hookCreator
-          .createHook(_: Id, _: AccessToken))
-          .expects(projectId, accessToken)
-          .returning(IO.pure(HookCreated))
-
-        val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
-
-        val response = createHook(projectId, request).unsafeRunSync()
-
-        response.status                   shouldBe Created
-        response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-        response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook created"}"""
-      }
-
-    "return OK when hook was already created" in new TestCase {
-
-      val accessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Request[IO]))
-        .expects(*)
-        .returning(context.pure(accessToken))
+    "return CREATED when webhook is successfully created for project with the given id in in GitLab" in new TestCase {
 
       (hookCreator
         .createHook(_: Id, _: AccessToken))
-        .expects(projectId, accessToken)
+        .expects(projectId, authUser.accessToken)
+        .returning(IO.pure(HookCreated))
+
+      val response = createHook(projectId, authUser).unsafeRunSync()
+
+      response.status                   shouldBe Created
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook created"}"""
+    }
+
+    "return OK when hook was already created" in new TestCase {
+
+      (hookCreator
+        .createHook(_: Id, _: AccessToken))
+        .expects(projectId, authUser.accessToken)
         .returning(IO.pure(HookExisted))
 
-      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
-
-      val response = createHook(projectId, request).unsafeRunSync()
+      val response = createHook(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe Ok
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook already existed"}"""
     }
 
-    "return UNAUTHORIZED when finding an access token in the headers fails with UnauthorizedException" in new TestCase {
-
-      (accessTokenFinder
-        .findAccessToken(_: Request[IO]))
-        .expects(*)
-        .returning(context.raiseError(UnauthorizedException))
-
-      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
-
-      val response = createHook(projectId, request).unsafeRunSync()
-
-      response.status                   shouldBe Unauthorized
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(UnauthorizedException).asJson
-    }
-
     "return INTERNAL_SERVER_ERROR when there was an error during hook creation and log the error" in new TestCase {
-
-      val accessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Request[IO]))
-        .expects(*)
-        .returning(context.pure(accessToken))
 
       val errorMessage = ErrorMessage("some error")
       val exception    = new Exception(errorMessage.toString())
       (hookCreator
         .createHook(_: Id, _: AccessToken))
-        .expects(projectId, accessToken)
+        .expects(projectId, authUser.accessToken)
         .returning(IO.raiseError(exception))
 
-      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
-
-      val response = createHook(projectId, request).unsafeRunSync()
+      val response = createHook(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe InternalServerError
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -139,20 +94,12 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
     "return UNAUTHORIZED when there was an UnauthorizedException thrown during hook creation" in new TestCase {
 
-      val accessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Request[IO]))
-        .expects(*)
-        .returning(context.pure(accessToken))
-
       (hookCreator
         .createHook(_: Id, _: AccessToken))
-        .expects(projectId, accessToken)
+        .expects(projectId, authUser.accessToken)
         .returning(IO.raiseError(UnauthorizedException))
 
-      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks")
-
-      val response = createHook(projectId, request).unsafeRunSync()
+      val response = createHook(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe Unauthorized
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -161,17 +108,13 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
   }
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
 
     val projectId = projectIds.generateOne
-    val logger    = TestLogger[IO]()
+    val authUser  = authUsers.generateOne
 
-    val hookCreator       = mock[IOHookCreator]
-    val accessTokenFinder = mock[IOAccessTokenExtractor]
-    val createHook = new HookCreationEndpoint[IO](
-      hookCreator,
-      accessTokenFinder,
-      logger
-    ).createHook _
+    val logger = TestLogger[IO]()
+
+    val hookCreator = mock[IOHookCreator]
+    val createHook  = new HookCreationEndpointImpl[IO](hookCreator, logger).createHook _
   }
 }

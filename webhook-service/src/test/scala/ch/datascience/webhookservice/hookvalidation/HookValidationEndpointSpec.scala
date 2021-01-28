@@ -18,28 +18,25 @@
 
 package ch.datascience.webhookservice.hookvalidation
 
-import cats.MonadError
 import cats.effect.IO
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.generators.CommonGraphGenerators._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.graph.model.GraphModelGenerators.{authUsers, projectIds}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult._
-import ch.datascience.webhookservice.security.IOAccessTokenExtractor
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.http4s.implicits._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -48,84 +45,44 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
   "validateHook" should {
 
-    "return OK when a valid access token is present in the header " +
-      "and the hook exists for the project with the given id" in new TestCase {
-
-        val accessToken = accessTokens.generateOne
-        (accessTokenFinder
-          .findAccessToken(_: Request[IO]))
-          .expects(*)
-          .returning(context.pure(accessToken))
-
-        (hookValidator
-          .validateHook(_: Id, _: Option[AccessToken]))
-          .expects(projectId, Some(accessToken))
-          .returning(context.pure(HookExists))
-
-        val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
-
-        val response = validateHook(projectId, request).unsafeRunSync()
-
-        response.status                   shouldBe Ok
-        response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-        response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook valid"}"""
-      }
-
-    "return NOT_FOUND the hook does not exist" in new TestCase {
-
-      val accessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Request[IO]))
-        .expects(*)
-        .returning(context.pure(accessToken))
+    "return OK when the hook exists for the project with the given id" in new TestCase {
 
       (hookValidator
         .validateHook(_: Id, _: Option[AccessToken]))
-        .expects(projectId, Some(accessToken))
-        .returning(context.pure(HookMissing))
+        .expects(projectId, Some(authUser.accessToken))
+        .returning(HookExists.pure[IO])
 
-      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
+      val response = validateHook(projectId, authUser).unsafeRunSync()
 
-      val response = validateHook(projectId, request).unsafeRunSync()
+      response.status                   shouldBe Ok
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook valid"}"""
+    }
+
+    "return NOT_FOUND the hook does not exist" in new TestCase {
+
+      (hookValidator
+        .validateHook(_: Id, _: Option[AccessToken]))
+        .expects(projectId, Some(authUser.accessToken))
+        .returning(HookMissing.pure[IO])
+
+      val response = validateHook(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe NotFound
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync() shouldBe json"""{"message": "Hook not found"}"""
     }
 
-    "return UNAUTHORIZED when finding an access token in the headers fails with UnauthorizedException" in new TestCase {
-
-      (accessTokenFinder
-        .findAccessToken(_: Request[IO]))
-        .expects(*)
-        .returning(context.raiseError(UnauthorizedException))
-
-      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
-
-      val response = validateHook(projectId, request).unsafeRunSync()
-
-      response.status                   shouldBe Unauthorized
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(UnauthorizedException).asJson
-    }
-
     "return INTERNAL_SERVER_ERROR when there was an error during hook validation and log the error" in new TestCase {
-      val accessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Request[IO]))
-        .expects(*)
-        .returning(context.pure(accessToken))
 
       val errorMessage      = ErrorMessage("some error")
       private val exception = new Exception(errorMessage.toString())
       (hookValidator
         .validateHook(_: Id, _: Option[AccessToken]))
-        .expects(projectId, Some(accessToken))
+        .expects(projectId, Some(authUser.accessToken))
         .returning(IO.raiseError(exception))
 
-      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
-
-      val response = validateHook(projectId, request).unsafeRunSync()
+      val response = validateHook(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe InternalServerError
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -138,20 +95,12 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
 
     "return UNAUTHORIZED when there was an UnauthorizedException thrown during hook validation" in new TestCase {
 
-      val accessToken = accessTokens.generateOne
-      (accessTokenFinder
-        .findAccessToken(_: Request[IO]))
-        .expects(*)
-        .returning(context.pure(accessToken))
-
       (hookValidator
         .validateHook(_: Id, _: Option[AccessToken]))
-        .expects(projectId, Some(accessToken))
+        .expects(projectId, Some(authUser.accessToken))
         .returning(IO.raiseError(UnauthorizedException))
 
-      val request = Request[IO](Method.POST, uri"projects" / projectId.toString / "webhooks" / "validation")
-
-      val response = validateHook(projectId, request).unsafeRunSync()
+      val response = validateHook(projectId, authUser).unsafeRunSync()
 
       response.status                   shouldBe Unauthorized
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -160,17 +109,12 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
   }
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
 
     val projectId = projectIds.generateOne
-    val logger    = TestLogger[IO]()
+    val authUser  = authUsers.generateOne
 
-    val hookValidator     = mock[IOHookValidator]
-    val accessTokenFinder = mock[IOAccessTokenExtractor]
-    val validateHook = new HookValidationEndpoint[IO](
-      hookValidator,
-      accessTokenFinder,
-      logger
-    ).validateHook _
+    val logger        = TestLogger[IO]()
+    val hookValidator = mock[IOHookValidator]
+    val validateHook  = new HookValidationEndpointImpl[IO](hookValidator, logger).validateHook _
   }
 }

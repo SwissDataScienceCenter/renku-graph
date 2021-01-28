@@ -22,36 +22,36 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.InfoMessage
 import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.http.server.security.model.AuthUser
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.project.ProjectHookUrl
-import ch.datascience.webhookservice.security.AccessTokenExtractor
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{Request, Response, Status}
+import org.http4s.{Response, Status}
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class HookCreationEndpoint[Interpretation[_]: Effect](
-    hookCreator:       HookCreator[Interpretation],
-    accessTokenFinder: AccessTokenExtractor[Interpretation],
-    logger:            Logger[Interpretation]
-) extends Http4sDsl[Interpretation] {
+trait HookCreationEndpoint[Interpretation[_]] {
+  def createHook(projectId: Id, authUser: AuthUser): Interpretation[Response[Interpretation]]
+}
 
-  import accessTokenFinder._
+class HookCreationEndpointImpl[Interpretation[_]: Effect](
+    hookCreator: HookCreator[Interpretation],
+    logger:      Logger[Interpretation]
+) extends Http4sDsl[Interpretation]
+    with HookCreationEndpoint[Interpretation] {
 
-  def createHook(projectId: Id, request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  def createHook(projectId: Id, authUser: AuthUser): Interpretation[Response[Interpretation]] = {
     for {
-      accessToken    <- findAccessToken(request)
-      creationResult <- hookCreator.createHook(projectId, accessToken)
+      creationResult <- hookCreator.createHook(projectId, authUser.accessToken)
       response       <- toHttpResponse(creationResult)
     } yield response
   } recoverWith httpResponse
@@ -87,5 +87,5 @@ object IOHookCreationEndpoint {
   ): IO[HookCreationEndpoint[IO]] =
     for {
       hookCreator <- IOHookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
-    } yield new HookCreationEndpoint[IO](hookCreator, new AccessTokenExtractor[IO], logger)
+    } yield new HookCreationEndpointImpl[IO](hookCreator, logger)
 }

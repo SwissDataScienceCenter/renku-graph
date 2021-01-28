@@ -23,6 +23,7 @@ import cats.data.{Kleisli, OptionT}
 import cats.syntax.all._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import ch.datascience.http.server.security.EndpointSecurityException.AuthenticationFailure
 import model._
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
@@ -30,8 +31,9 @@ import org.http4s.headers.Authorization
 import org.http4s.{AuthedRoutes, Request}
 
 private trait Authentication[Interpretation[_]] {
-  def authenticate
+  def authenticateIfNeeded
       : Kleisli[Interpretation, Request[Interpretation], Either[EndpointSecurityException, Option[AuthUser]]]
+  def authenticate: Kleisli[Interpretation, Request[Interpretation], Either[EndpointSecurityException, AuthUser]]
 }
 
 private class AuthenticationImpl[Interpretation[_]](
@@ -42,12 +44,21 @@ private class AuthenticationImpl[Interpretation[_]](
   import org.http4s.util.CaseInsensitiveString
   import org.http4s.{Header, Request}
 
-  val authenticate
+  override val authenticateIfNeeded
       : Kleisli[Interpretation, Request[Interpretation], Either[EndpointSecurityException, Option[AuthUser]]] =
     Kleisli { request =>
       request.getBearerToken orElse request.getPrivateAccessToken match {
         case Some(token) => authenticator.authenticate(token).map(_.map(Option.apply))
         case None        => Option.empty[AuthUser].asRight[EndpointSecurityException].pure[Interpretation]
+      }
+    }
+
+  override val authenticate
+      : Kleisli[Interpretation, Request[Interpretation], Either[EndpointSecurityException, AuthUser]] =
+    Kleisli { request =>
+      request.getBearerToken orElse request.getPrivateAccessToken match {
+        case Some(token) => authenticator.authenticate(token)
+        case None        => (AuthenticationFailure: EndpointSecurityException).asLeft[AuthUser].pure[Interpretation]
       }
     }
 
@@ -72,18 +83,27 @@ object Authentication {
   import cats.effect.IO
   import org.http4s.server.AuthMiddleware
 
-  def middleware(
+  def middlewareAuthenticatingIfNeeded(
       authenticator: Authenticator[IO]
   ): IO[AuthMiddleware[IO, Option[AuthUser]]] = IO {
+    middlewareAuthenticatingIfNeeded(new AuthenticationImpl(authenticator))
+  }
+
+  private[security] def middlewareAuthenticatingIfNeeded(
+      authentication: Authentication[IO]
+  ): AuthMiddleware[IO, Option[AuthUser]] = AuthMiddleware(authentication.authenticateIfNeeded, onFailure)
+
+  def middleware(
+      authenticator: Authenticator[IO]
+  ): IO[AuthMiddleware[IO, AuthUser]] = IO {
     middleware(new AuthenticationImpl(authenticator))
   }
 
   private[security] def middleware(
       authentication: Authentication[IO]
-  ): AuthMiddleware[IO, Option[AuthUser]] = {
-    val onFailure: AuthedRoutes[EndpointSecurityException, IO] = Kleisli { req =>
-      OptionT.some(req.context.toHttpResponse)
-    }
-    AuthMiddleware(authentication.authenticate, onFailure)
+  ): AuthMiddleware[IO, AuthUser] = AuthMiddleware(authentication.authenticate, onFailure)
+
+  private lazy val onFailure: AuthedRoutes[EndpointSecurityException, IO] = Kleisli { req =>
+    OptionT.some(req.context.toHttpResponse)
   }
 }

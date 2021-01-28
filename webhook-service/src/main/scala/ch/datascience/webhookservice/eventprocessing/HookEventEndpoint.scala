@@ -44,12 +44,17 @@ import org.http4s.{EntityDecoder, Request, Response, Status}
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class HookEventEndpoint[Interpretation[_]: Effect](
+trait HookEventEndpoint[Interpretation[_]] {
+  def processPushEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
+}
+
+class HookEventEndpointImpl[Interpretation[_]: Effect](
     hookTokenCrypto:  HookTokenCrypto[Interpretation],
     commitToEventLog: CommitToEventLog[Interpretation],
     logger:           Logger[Interpretation]
 )(implicit ME:        MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+    extends Http4sDsl[Interpretation]
+    with HookEventEndpoint[Interpretation] {
 
   import HookEventEndpoint._
   import commitToEventLog._
@@ -136,5 +141,5 @@ object IOHookEventEndpoint {
   ): IO[HookEventEndpoint[IO]] =
     for {
       commitToEventLog <- IOCommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
-    } yield new HookEventEndpoint[IO](hookTokenCrypto, commitToEventLog, logger)
+    } yield new HookEventEndpointImpl[IO](hookTokenCrypto, commitToEventLog, logger)
 }
