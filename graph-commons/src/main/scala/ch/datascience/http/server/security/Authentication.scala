@@ -78,17 +78,6 @@ object Authentication {
     middleware(new AuthenticationImpl(authenticator))
   }
 
-  //  def middleware(
-//      gitLabThrottler: Throttler[IO, GitLab],
-//      logger:          Logger[IO]
-//  )(implicit
-//      executionContext: ExecutionContext,
-//      contextShift:     ContextShift[IO],
-//      timer:            Timer[IO]
-//  ): IO[AuthMiddleware[IO, Option[AuthUser]]] = for {
-//    authentication <- Authentication(gitLabThrottler, logger)
-//  } yield middleware(authentication)
-
   private[security] def middleware(
       authentication: Authentication[IO]
   ): AuthMiddleware[IO, Option[AuthUser]] = {
