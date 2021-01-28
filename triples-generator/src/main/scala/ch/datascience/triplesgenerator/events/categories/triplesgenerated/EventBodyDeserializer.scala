@@ -31,7 +31,10 @@ import io.circe.parser._
 import io.circe.{Decoder, DecodingFailure, Error, HCursor, Json, ParsingFailure}
 
 private trait EventBodyDeserializer[Interpretation[_]] {
-  def toTriplesGeneratedEvent(eventId: CompoundEventId, eventBody: EventBody): Interpretation[TriplesGeneratedEvent]
+  def toTriplesGeneratedEvent(eventId:   CompoundEventId,
+                              project:   Project,
+                              eventBody: EventBody
+  ): Interpretation[TriplesGeneratedEvent]
 }
 
 private class EventBodyDeserializerImpl[Interpretation[_]](implicit
@@ -39,24 +42,23 @@ private class EventBodyDeserializerImpl[Interpretation[_]](implicit
 ) extends EventBodyDeserializer[Interpretation] {
 
   override def toTriplesGeneratedEvent(eventId:   CompoundEventId,
+                                       project:   Project,
                                        eventBody: EventBody
   ): Interpretation[TriplesGeneratedEvent] =
     ME.fromEither {
       parse(eventBody.value)
-        .flatMap(_.as[(Project, String, SchemaVersion)])
-        .flatMap { case (project, payload, schemaVersion) =>
+        .flatMap(_.as[(String, SchemaVersion)])
+        .flatMap { case (payload, schemaVersion) =>
           parse(payload).map(json => TriplesGeneratedEvent(eventId.id, project, JsonLDTriples(json), schemaVersion))
         }
         .leftMap(toMeaningfulError(eventId))
     }
 
-  private implicit val triplesDecoder: Decoder[(Project, String, SchemaVersion)] = (cursor: HCursor) =>
+  private implicit val triplesDecoder: Decoder[(String, SchemaVersion)] = (cursor: HCursor) =>
     for {
-      projectId     <- cursor.downField("project").downField("id").as[Id]
-      projectPath   <- cursor.downField("project").downField("path").as[Path]
       eventPayload  <- cursor.downField("payload").as[String]
       schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
-    } yield (Project(projectId, projectPath), eventPayload, schemaVersion)
+    } yield (eventPayload, schemaVersion)
 
   private def toMeaningfulError(eventId: CompoundEventId): Error => Error = {
     case failure: DecodingFailure => failure.withMessage(s"TriplesGeneratedEvent cannot be deserialised: $eventId")

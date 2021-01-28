@@ -37,11 +37,14 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
   "toJsonLDTriples" should {
 
     "produce TriplesGeneratedEvent if the Json string can be successfully deserialized" in new TestCase {
-      deserializer.toTriplesGeneratedEvent(compoundEventId, triplesGenerationEvent(jsonldTriples)) shouldBe context
+      deserializer.toTriplesGeneratedEvent(compoundEventId,
+                                           project,
+                                           triplesGenerationEvent(jsonldTriples)
+      ) shouldBe context
         .pure(
           TriplesGeneratedEvent(
             compoundEventId.id,
-            Project(projectId, projectPath),
+            project,
             jsonldTriples,
             schemaVersion
           )
@@ -51,21 +54,22 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
 
     "fail if parsing fails" in new TestCase {
       val Failure(ParsingFailure(message, underlying)) =
-        deserializer.toTriplesGeneratedEvent(compoundEventId, EventBody("{"))
+        deserializer.toTriplesGeneratedEvent(compoundEventId, project, EventBody("{"))
 
       message    shouldBe s"TriplesGeneratedEvent cannot be deserialised: $compoundEventId"
       underlying shouldBe a[ParsingFailure]
     }
 
     "fail if decoding fails" in new TestCase {
-      val Failure(DecodingFailure(message, _)) = deserializer.toTriplesGeneratedEvent(compoundEventId, EventBody("{}"))
+      val Failure(DecodingFailure(message, _)) =
+        deserializer.toTriplesGeneratedEvent(compoundEventId, project, EventBody("{}"))
 
       message shouldBe s"TriplesGeneratedEvent cannot be deserialised: $compoundEventId"
     }
 
     "fail if parsing of internal payload fails" in new TestCase {
       val Failure(ParsingFailure(message, underlying)) =
-        deserializer.toTriplesGeneratedEvent(compoundEventId, faultyPayload)
+        deserializer.toTriplesGeneratedEvent(compoundEventId, project, faultyPayload)
 
       message    shouldBe s"TriplesGeneratedEvent cannot be deserialised: $compoundEventId"
       underlying shouldBe a[ParsingFailure]
@@ -81,6 +85,8 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
 
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne
+
+    val project = Project(projectId, projectPath)
 
     val deserializer = new EventBodyDeserializerImpl[Try]
 

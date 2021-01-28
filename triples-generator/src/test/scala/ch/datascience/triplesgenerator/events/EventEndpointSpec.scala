@@ -188,16 +188,4 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
         .expects()
         .returning(flag.pure[IO])
   }
-
-  private implicit lazy val eventEncoder: Encoder[(CompoundEventId, EventBody)] =
-    Encoder.instance[(CompoundEventId, EventBody)] { case (eventId, body) =>
-      json"""{
-        "id":      ${eventId.id.value},
-        "project": {
-          "id" :   ${eventId.projectId.value}
-        },
-        "body":    ${body.value}
-      }"""
-    }
-
 }

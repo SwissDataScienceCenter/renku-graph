@@ -31,6 +31,7 @@ import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
 import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
+import ch.datascience.triplesgenerator.events.categories.models.Project
 import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import io.chrisdavenport.log4cats.Logger
 
@@ -56,28 +57,31 @@ private[events] class EventHandler[Interpretation[_]: Effect](
   override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
 
     for {
-      eventId   <- EitherT(request.event.as[CompoundEventId].pure[Interpretation]).leftMap(_ => UnsupportedEventType)
+      eventIdAndProject <-
+        EitherT(request.event.as[(CompoundEventId, Project)].pure[Interpretation]).leftMap(_ => UnsupportedEventType)
+      (eventId, project) = eventIdAndProject
       eventBody <- EitherT.fromOption[Interpretation](request.maybePayload.map(EventBody.apply), BadRequest)
       triplesGeneratedEvent <-
         eventBodyDeserializer
-          .toTriplesGeneratedEvent(eventId, eventBody)
+          .toTriplesGeneratedEvent(eventId, project, eventBody)
           .toRightT(recoverTo = BadRequest)
       result <- scheduleForProcessing(triplesGeneratedEvent).toRightT
-                  .semiflatTap(logger.log(eventId -> triplesGeneratedEvent.project.path))
-                  .leftSemiflatTap(logger.log(eventId -> triplesGeneratedEvent.project.path))
+                  .semiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
+                  .leftSemiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
     } yield result
   }.merge
 
-  private implicit lazy val eventInfoToString: ((CompoundEventId, projects.Path)) => String = {
-    case (eventId, projectPath) => s"$eventId, projectPath = $projectPath"
+  private implicit lazy val eventInfoToString: ((CompoundEventId, Project)) => String = { case (eventId, project) =>
+    s"$eventId, projectPath = ${project.path}"
   }
 
-  private implicit val eventDecoder: Decoder[CompoundEventId] = { implicit cursor =>
+  private implicit val eventDecoder: Decoder[(CompoundEventId, Project)] = { implicit cursor =>
     for {
-      _         <- validateCategoryName
-      id        <- cursor.downField("id").as[EventId]
-      projectId <- cursor.downField("project").downField("id").as[projects.Id]
-    } yield CompoundEventId(id, projectId)
+      _           <- validateCategoryName
+      id          <- cursor.downField("id").as[EventId]
+      projectId   <- cursor.downField("project").downField("id").as[projects.Id]
+      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
+    } yield CompoundEventId(id, projectId) -> Project(projectId, projectPath)
   }
 }
 
