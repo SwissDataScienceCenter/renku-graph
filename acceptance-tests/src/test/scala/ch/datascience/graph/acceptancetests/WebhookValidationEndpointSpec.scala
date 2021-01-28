@@ -40,6 +40,8 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
 
       val projectId = projectIds.generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
+      Given("api user is authenticated")
+      `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
       `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
@@ -58,6 +60,8 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
 
       val projectId = projectIds.generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
+      Given("api user is authenticated")
+      `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
       `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
@@ -76,6 +80,8 @@ class WebhookValidationEndpointSpec extends AnyFeatureSpec with GivenWhenThen wi
 
       val projectId = projectIds.generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
+      Given("api user is authenticated")
+      `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
       `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Private)

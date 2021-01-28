@@ -51,6 +51,8 @@ class WebhookCreationSpec
 
       val projectId = projectIds.generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
+      Given("api user is authenticated")
+      `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
       `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
@@ -70,6 +72,8 @@ class WebhookCreationSpec
       val project   = projects.generateOne
       val projectId = project.id
       implicit val accessToken: AccessToken = accessTokens.generateOne
+      Given("api user is authenticated")
+      `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
       `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)

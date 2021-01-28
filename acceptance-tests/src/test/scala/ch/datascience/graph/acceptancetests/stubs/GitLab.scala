@@ -50,6 +50,18 @@ object GitLab {
   private val logger = TestLogger()
   private val port: Int Refined Positive = 2048
 
+  def `GET <gitlabApi>/user returning OK`(
+      userGitLabId:       users.GitLabId = userGitLabIds.generateOne
+  )(implicit accessToken: AccessToken): Unit = {
+    stubFor {
+      get("/api/v4/user").withAccessTokenInHeader
+        .willReturn(okJson(json"""{
+          "id": ${userGitLabId.value} 
+        }""".noSpaces))
+    }
+    ()
+  }
+
   def `GET <gitlabApi>/projects/:id returning OK`(
       projectId:          Id,
       projectVisibility:  Visibility
