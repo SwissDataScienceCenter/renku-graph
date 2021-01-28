@@ -27,11 +27,11 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
-import io.circe.Encoder
+import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
+import ch.datascience.triplesgenerator.events.eventRequestContents
 import io.circe.literal._
 import io.circe.syntax._
-import org.http4s.syntax.all._
-import org.http4s.{Method, Request}
+import io.circe.{Encoder, Json}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -48,9 +48,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .expects(projectPath)
           .returning(IO.unit)
 
-        val request = Request[IO](Method.POST, uri"events").withEntity(projectPath.asJson(eventEncoder))
+        val requestContent: EventRequestContent = requestContent(projectPath.asJson(eventEncoder))
 
-        handler.handle(request).unsafeRunSync() shouldBe Accepted
+        handler.handle(requestContent).unsafeRunSync() shouldBe Accepted
 
         logger.loggedOnly(
           Info(
@@ -62,7 +62,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
 
       val payload = jsons.generateOne.asJson
-      val request = Request(Method.POST, uri"events").withEntity(payload)
+      val request = eventRequestContents.generateOne.copy(event = payload)
 
       handler.handle(request).unsafeRunSync() shouldBe UnsupportedEventType
 
@@ -71,14 +71,14 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     s"return $BadRequest if project path is malformed" in new TestCase {
 
-      val request = Request(Method.POST, uri"events").withEntity(json"""{
+      val requestContent: EventRequestContent = requestContent(json"""{
         "categoryName": "MEMBER_SYNC",
         "project": {
           "path" :      ${nonNegativeInts().generateOne.value}
         }
       }""")
 
-      handler.handle(request).unsafeRunSync() shouldBe BadRequest
+      handler.handle(requestContent).unsafeRunSync() shouldBe BadRequest
 
       logger.expectNoLogs()
     }
@@ -90,6 +90,8 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val membersSynchronizer = mock[MembersSynchronizer[IO]]
     val logger              = TestLogger[IO]()
     val handler             = new EventHandler[IO](membersSynchronizer, logger)
+
+    def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
   }
 
   implicit lazy val eventEncoder: Encoder[projects.Path] =

@@ -20,8 +20,9 @@ package ch.datascience.triplesgenerator
 package events.categories.awaitinggeneration
 
 import cats.MonadError
-import cats.data.NonEmptyList
+import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, Effect, IO, Timer}
+import cats.implicits.catsSyntaxApplicativeId
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.RenkuVersionPair
@@ -30,6 +31,7 @@ import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
+import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import io.chrisdavenport.log4cats.Logger
 
@@ -53,14 +55,14 @@ private[events] class EventHandler[Interpretation[_]: Effect](
   import org.http4s._
   import org.http4s.circe._
 
-  private type IdAndBody = (CompoundEventId, EventBody)
-
   override val categoryName: CategoryName = EventHandler.categoryName
 
-  override def handle(request: Request[Interpretation]): Interpretation[EventSchedulingResult] = {
+  override def handle(requestContent: EventRequestContent): Interpretation[EventSchedulingResult] = {
     for {
-      eventAndBody <- request.as[IdAndBody].toRightT(recoverTo = UnsupportedEventType)
-      (eventId, eventBody) = eventAndBody
+      eventId <-
+        EitherT(requestContent.event.as[CompoundEventId].pure[Interpretation]).leftMap(_ => UnsupportedEventType)
+      eventBody <-
+        EitherT.fromOption[Interpretation](requestContent.maybePayload.map(EventBody.apply), BadRequest)
       commitEvents <- toCommitEvents(eventBody).toRightT(recoverTo = BadRequest)
       result <- scheduleForProcessing(eventId, commitEvents, schemaVersion).toRightT
                   .semiflatTap(logger.log(eventId -> commitEvents))
@@ -72,15 +74,15 @@ private[events] class EventHandler[Interpretation[_]: Effect](
     case (eventId, events) => s"$eventId, projectPath = ${events.head.project.path}"
   }
 
-  private implicit lazy val payloadDecoder: EntityDecoder[Interpretation, IdAndBody] = jsonOf[Interpretation, IdAndBody]
+  private implicit lazy val payloadDecoder: EntityDecoder[Interpretation, CompoundEventId] =
+    jsonOf[Interpretation, CompoundEventId]
 
-  private implicit val eventDecoder: Decoder[IdAndBody] = implicit cursor =>
+  private implicit val eventDecoder: Decoder[CompoundEventId] = implicit cursor =>
     for {
       _         <- validateCategoryName
       id        <- cursor.downField("id").as[EventId]
       projectId <- cursor.downField("project").downField("id").as[projects.Id]
-      body      <- cursor.downField("body").as[EventBody]
-    } yield CompoundEventId(id, projectId) -> body
+    } yield CompoundEventId(id, projectId)
 }
 
 private[events] object EventHandler {

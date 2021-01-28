@@ -53,14 +53,22 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
       val Failure(ParsingFailure(message, underlying)) =
         deserializer.toTriplesGeneratedEvent(compoundEventId, EventBody("{"))
 
-      message    shouldBe "TriplesGeneratedEvent cannot be deserialised: '{'"
+      message    shouldBe s"TriplesGeneratedEvent cannot be deserialised: $compoundEventId"
       underlying shouldBe a[ParsingFailure]
     }
 
     "fail if decoding fails" in new TestCase {
       val Failure(DecodingFailure(message, _)) = deserializer.toTriplesGeneratedEvent(compoundEventId, EventBody("{}"))
 
-      message shouldBe "TriplesGeneratedEvent cannot be deserialised: '{}'"
+      message shouldBe s"TriplesGeneratedEvent cannot be deserialised: $compoundEventId"
+    }
+
+    "fail if parsing of internal payload fails" in new TestCase {
+      val Failure(ParsingFailure(message, underlying)) =
+        deserializer.toTriplesGeneratedEvent(compoundEventId, faultyPayload)
+
+      message    shouldBe s"TriplesGeneratedEvent cannot be deserialised: $compoundEventId"
+      underlying shouldBe a[ParsingFailure]
     }
   }
 
@@ -84,6 +92,19 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
             "path" -> Json.fromString(projectPath.value)
           ),
           "payload"       -> Json.fromString(jsonldTriples.value.noSpaces),
+          "schemaVersion" -> Json.fromString(schemaVersion.value)
+        )
+        .noSpaces
+    }
+
+    lazy val faultyPayload = EventBody {
+      Json
+        .obj(
+          "project" -> Json.obj(
+            "id"   -> Json.fromInt(projectId.value),
+            "path" -> Json.fromString(projectPath.value)
+          ),
+          "payload"       -> Json.fromString("{"),
           "schemaVersion" -> Json.fromString(schemaVersion.value)
         )
         .noSpaces

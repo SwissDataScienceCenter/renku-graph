@@ -18,44 +18,37 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import io.circe.Json
 import io.circe.literal._
-import io.circe.syntax.EncoderOps
-import io.circe.{Encoder, Json, parser}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers {
-
-  private implicit val encoder: Encoder[TriplesGeneratedEvent] = TriplesGeneratedEventEncoder
-
-  "encoder" should {
+  "encodeEvent" should {
 
     "serialize TriplesGeneratedEvent to Json" in {
-      val event       = triplesGeneratedEvents.generateOne
-      val bodyContent = json"""{ "project": {
-                            "id":         ${event.id.projectId.value},
-                            "path": ${event.projectPath.value}
-                          },
-                          "schemaVersion": ${event.schemaVersion.value},
-                          "payload": ${event.payload.value}
-                         }"""
+      val event = triplesGeneratedEvents.generateOne
 
-      val actualJson = event.asJson
+      val actualJson = TriplesGeneratedEventEncoder.encodeEvent(event)
 
-      actualJson.hcursor.downField("categoryName").as[String] shouldBe Right("TRIPLES_GENERATED")
-      actualJson.hcursor.downField("id").as[String]           shouldBe Right(event.id.id.value)
-      actualJson.hcursor.downField("project").as[Json]        shouldBe Right(json"""{
-                                                                               "id": ${event.id.projectId.value}
+      actualJson.hcursor.downField("categoryName").as[String]  shouldBe Right("TRIPLES_GENERATED")
+      actualJson.hcursor.downField("id").as[String]            shouldBe Right(event.id.id.value)
+      actualJson.hcursor.downField("schemaVersion").as[String] shouldBe Right(event.schemaVersion.value)
+      actualJson.hcursor.downField("project").as[Json]         shouldBe Right(json"""{
+                                                                               "id": ${event.id.projectId.value},
+                                                                               "path": ${event.projectPath.value}
                                                                               }""")
-      parser
-        .parse(
-          actualJson.hcursor
-            .downField("body")
-            .as[String]
-            .getOrElse(fail("Could not extract body as string"))
-        ) shouldBe Right(bodyContent)
 
+    }
+  }
+
+  "encodePayload" should {
+    "serialize TriplesGeneratedEvent payload to a string" in {
+      val event = triplesGeneratedEvents.generateOne
+
+      TriplesGeneratedEventEncoder.encodePayload(event) shouldBe event.payload.value.some
     }
   }
 }

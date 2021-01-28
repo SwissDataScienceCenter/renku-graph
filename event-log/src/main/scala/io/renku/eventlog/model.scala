@@ -20,15 +20,12 @@ package io.renku.eventlog
 
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.constraints.{BoundedInstant, DurationNotNegative, InstantNotInTheFuture, NonBlank, NonNegativeInt}
+import ch.datascience.tinytypes.constraints.{BoundedInstant, DurationNotNegative, InstantNotInTheFuture, NonBlank}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.{DurationTinyType, InstantTinyType, StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
-import org.postgresql.util.PGInterval
 
 import java.time.{Duration, Instant}
-import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.FiniteDuration
 
 sealed trait Event extends CompoundId {
   def id:        EventId

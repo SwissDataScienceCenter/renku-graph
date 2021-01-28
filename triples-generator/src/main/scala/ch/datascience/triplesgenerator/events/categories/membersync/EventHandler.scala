@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.MonadError
+import cats.data.EitherT
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
@@ -27,6 +28,7 @@ import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events
 import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
+import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -43,15 +45,13 @@ private[events] class EventHandler[Interpretation[_]](
   import ch.datascience.graph.model.projects
   import io.circe.Decoder
   import membersSynchronizer._
-  import org.http4s._
-  import org.http4s.circe._
 
   override val categoryName: CategoryName = EventHandler.categoryName
 
-  override def handle(request: Request[Interpretation]) = {
+  override def handle(request: EventRequestContent) = {
     for {
-      _           <- request.as[CategoryName].toRightT(recoverTo = UnsupportedEventType)
-      projectPath <- request.as[projects.Path].toRightT(recoverTo = BadRequest)
+      _           <- EitherT(request.event.as[CategoryName].pure[Interpretation]).leftMap(_ => UnsupportedEventType)
+      projectPath <- EitherT(request.event.as[projects.Path].pure[Interpretation]).leftMap(_ => BadRequest)
       result <- (contextShift.shift *> concurrent
                   .start(synchronizeMembers(projectPath))).toRightT
                   .map(_ => Accepted)
@@ -64,21 +64,11 @@ private[events] class EventHandler[Interpretation[_]](
     s"projectPath = $path"
   }
 
-  private implicit lazy val categoryDecoder: EntityDecoder[Interpretation, CategoryName] = {
+  implicit lazy val categoryNameDecoder: Decoder[CategoryName] = { implicit cursor => validateCategoryName }
 
-    implicit lazy val categoryNameDecoder: Decoder[CategoryName] = { implicit cursor => validateCategoryName }
-
-    jsonOf[Interpretation, CategoryName]
-  }
-
-  private implicit lazy val payloadDecoder: EntityDecoder[Interpretation, projects.Path] = {
-
-    implicit lazy val eventDecoder: Decoder[projects.Path] = { implicit cursor =>
-      import ch.datascience.tinytypes.json.TinyTypeDecoders._
-      cursor.downField("project").downField("path").as[projects.Path](relativePathDecoder(projects.Path))
-    }
-
-    jsonOf[Interpretation, projects.Path]
+  implicit lazy val eventDecoder: Decoder[projects.Path] = { implicit cursor =>
+    import ch.datascience.tinytypes.json.TinyTypeDecoders._
+    cursor.downField("project").downField("path").as[projects.Path](relativePathDecoder(projects.Path))
   }
 
 }

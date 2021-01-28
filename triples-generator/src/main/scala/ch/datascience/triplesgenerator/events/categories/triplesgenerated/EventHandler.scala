@@ -16,21 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.triplesgenerated
+package ch.datascience.triplesgenerator
+package events.categories.triplesgenerated
 
 import cats.MonadError
+import cats.data.EitherT
 import cats.effect.{ContextShift, Effect, IO, Timer}
+import cats.implicits.catsSyntaxApplicativeId
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.model.{RenkuVersionPair, SchemaVersion}
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody, EventId}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
+import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Json
 
 import scala.concurrent.ExecutionContext
 
@@ -40,23 +42,22 @@ private[events] class EventHandler[Interpretation[_]: Effect](
     logger:                 Logger[Interpretation]
 )(implicit
     ME: MonadError[Interpretation, Throwable]
-) extends ch.datascience.triplesgenerator.events.EventHandler[Interpretation] {
+) extends events.EventHandler[Interpretation] {
 
   import ch.datascience.graph.model.projects
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eventsProcessingRunner.scheduleForProcessing
   import io.circe.Decoder
-  import org.http4s._
-  import org.http4s.circe._
 
   private type IdAndBody = (CompoundEventId, EventBody)
 
   override val categoryName: CategoryName = EventHandler.categoryName
 
-  override def handle(request: Request[Interpretation]): Interpretation[EventSchedulingResult] = {
+  override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
+
     for {
-      eventAndBody <- request.as[IdAndBody].toRightT(recoverTo = UnsupportedEventType)
-      (eventId, eventBody) = eventAndBody
+      eventId   <- EitherT(request.event.as[CompoundEventId].pure[Interpretation]).leftMap(_ => UnsupportedEventType)
+      eventBody <- EitherT.fromOption[Interpretation](request.maybePayload.map(EventBody.apply), BadRequest)
       triplesGeneratedEvent <-
         eventBodyDeserializer
           .toTriplesGeneratedEvent(eventId, eventBody)
@@ -68,19 +69,16 @@ private[events] class EventHandler[Interpretation[_]: Effect](
   }.merge
 
   private implicit lazy val eventInfoToString: ((CompoundEventId, projects.Path)) => String = {
-    case (eventId, projectPath) =>
-      s"$eventId, projectPath = $projectPath"
+    case (eventId, projectPath) => s"$eventId, projectPath = $projectPath"
   }
 
-  private implicit lazy val payloadDecoder: EntityDecoder[Interpretation, IdAndBody] = jsonOf[Interpretation, IdAndBody]
-
-  private implicit val eventDecoder: Decoder[IdAndBody] = implicit cursor =>
+  private implicit val eventDecoder: Decoder[CompoundEventId] = { implicit cursor =>
     for {
       _         <- validateCategoryName
       id        <- cursor.downField("id").as[EventId]
       projectId <- cursor.downField("project").downField("id").as[projects.Id]
-      body      <- cursor.downField("body").as[EventBody]
-    } yield CompoundEventId(id, projectId) -> body
+    } yield CompoundEventId(id, projectId)
+  }
 }
 
 private[events] object EventHandler {

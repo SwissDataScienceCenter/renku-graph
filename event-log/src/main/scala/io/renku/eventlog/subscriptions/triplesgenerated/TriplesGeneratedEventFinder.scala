@@ -33,7 +33,6 @@ import doobie.util.fragments._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.triplesgenerated.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds, SubscriptionTypeSerializers}
@@ -60,10 +59,10 @@ private class TriplesGeneratedEventFinderImpl(
 
   override def popEvent(): IO[Option[TriplesGeneratedEvent]] =
     for {
-      maybeProjectAwaitingGenerationEvent <- findEventAndUpdateForProcessing() transact transactor.get
-      (maybeProject, maybeAwaitingGenerationEvent) = maybeProjectAwaitingGenerationEvent
-      _ <- maybeUpdateMetrics(maybeProject, maybeAwaitingGenerationEvent)
-    } yield maybeAwaitingGenerationEvent
+      maybeProjectAndEvent <- findEventAndUpdateForProcessing() transact transactor.get
+      (maybeProject, maybeTriplesGeneratedEvent) = maybeProjectAndEvent
+      _ <- maybeUpdateMetrics(maybeProject, maybeTriplesGeneratedEvent)
+    } yield maybeTriplesGeneratedEvent
 
   private def findEventAndUpdateForProcessing() =
     for {

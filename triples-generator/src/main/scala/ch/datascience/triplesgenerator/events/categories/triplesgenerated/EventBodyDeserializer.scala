@@ -47,7 +47,7 @@ private class EventBodyDeserializerImpl[Interpretation[_]](implicit
         .flatMap { case (project, payload, schemaVersion) =>
           parse(payload).map(json => TriplesGeneratedEvent(eventId.id, project, JsonLDTriples(json), schemaVersion))
         }
-        .leftMap(toMeaningfulError(eventBody))
+        .leftMap(toMeaningfulError(eventId))
     }
 
   private implicit val triplesDecoder: Decoder[(Project, String, SchemaVersion)] = (cursor: HCursor) =>
@@ -58,10 +58,10 @@ private class EventBodyDeserializerImpl[Interpretation[_]](implicit
       schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
     } yield (Project(projectId, projectPath), eventPayload, schemaVersion)
 
-  private def toMeaningfulError(eventBody: EventBody): Error => Error = {
-    case failure: DecodingFailure => failure.withMessage(s"TriplesGeneratedEvent cannot be deserialised: '$eventBody'")
+  private def toMeaningfulError(eventId: CompoundEventId): Error => Error = {
+    case failure: DecodingFailure => failure.withMessage(s"TriplesGeneratedEvent cannot be deserialised: $eventId")
     case failure: ParsingFailure =>
-      ParsingFailure(s"TriplesGeneratedEvent cannot be deserialised: '$eventBody'", failure)
+      ParsingFailure(s"TriplesGeneratedEvent cannot be deserialised: $eventId", failure)
   }
 }
 

@@ -24,22 +24,23 @@ import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, SchedulingError}
+import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import io.chrisdavenport.log4cats.Logger
 import io.circe.{Decoder, DecodingFailure, HCursor}
-import org.http4s.Request
 
 import scala.util.control.NonFatal
 
 private trait EventHandler[Interpretation[_]] {
   val categoryName: CategoryName
-  def handle(request: Request[Interpretation]): Interpretation[EventSchedulingResult]
+  def handle(request: EventRequestContent): Interpretation[EventSchedulingResult]
 
   protected def validateCategoryName(implicit cursor: HCursor): Decoder.Result[CategoryName] =
     cursor.downField("categoryName").as[CategoryName] flatMap checkCategoryName
 
   private lazy val checkCategoryName: CategoryName => Decoder.Result[CategoryName] = {
     case name @ `categoryName` => Right(name)
-    case other                 => Left(DecodingFailure(s"$other not supported by $categoryName", Nil))
+    case other =>
+      Left(DecodingFailure(s"$other not supported by $categoryName", Nil))
   }
 
   protected implicit class EitherTOps[T](
@@ -65,6 +66,7 @@ private trait EventHandler[Interpretation[_]] {
     private lazy val asSchedulingError: PartialFunction[Throwable, Either[EventSchedulingResult, T]] = {
       case NonFatal(exception) => Left(SchedulingError(exception))
     }
+
   }
 
   protected implicit class LoggerOps(

@@ -339,7 +339,7 @@ As a good practice, the subscription should be renewed periodically in case of r
   "project": {
     "id": 12
   },
-  "body": "JSON payload"
+  "body": "JSON payload as string"
 }
 ```
 
@@ -363,7 +363,7 @@ As a good practice, the subscription should be renewed periodically in case of r
   "project": {
     "id": 12
   },
-  "body": "JSON payload"
+  "body": "JSON payload as string"
 }
 ```
 

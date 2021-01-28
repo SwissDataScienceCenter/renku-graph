@@ -36,6 +36,7 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
+import org.http4s.multipart.{Multipart, Part}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -49,11 +50,11 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenReProvisioningStatusSet(false)
 
       (handler0.handle _)
-        .expects(request)
+        .expects(requestContent)
         .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
 
       (handler1.handle _)
-        .expects(request)
+        .expects(requestContent)
         .returning(EventSchedulingResult.Accepted.pure[IO])
 
       val response = processEvent(request).unsafeRunSync()
@@ -69,11 +70,11 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenReProvisioningStatusSet(false)
 
       (handler0.handle _)
-        .expects(request)
+        .expects(requestContent)
         .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
 
       (handler1.handle _)
-        .expects(request)
+        .expects(requestContent)
         .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
 
       val response = processEvent(request).unsafeRunSync()
@@ -90,11 +91,11 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenReProvisioningStatusSet(false)
 
       (handler0.handle _)
-        .expects(request)
+        .expects(requestContent)
         .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
 
       (handler1.handle _)
-        .expects(request)
+        .expects(requestContent)
         .returning(EventSchedulingResult.BadRequest.pure[IO])
 
       val response = processEvent(request).unsafeRunSync()
@@ -111,7 +112,7 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenReProvisioningStatusSet(false)
 
       (handler0.handle _)
-        .expects(request)
+        .expects(requestContent)
         .returning(EventSchedulingResult.Busy.pure[IO])
 
       val response = processEvent(request).unsafeRunSync()
@@ -128,7 +129,7 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       givenReProvisioningStatusSet(false)
 
       (handler0.handle _)
-        .expects(request)
+        .expects(requestContent)
         .returning(EventSchedulingResult.SchedulingError(exceptions.generateOne).pure[IO])
 
       val response = processEvent(request).unsafeRunSync()
@@ -158,8 +159,18 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
   }
 
   private trait TestCase {
-
-    val request = Request(Method.POST, uri"events").withEntity(jsons.generateOne)
+    val requestContent = eventRequestContents.generateOne
+    private val multipartContent: Multipart[IO] = Multipart[IO](
+      Vector(
+        Part
+          .formData[IO]("event", requestContent.event.noSpaces, `Content-Type`(MediaType.application.json))
+          .some,
+        requestContent.maybePayload.map(Part.formData[IO]("payload", _))
+      ).flatten
+    )
+    val request = Request(Method.POST, uri"events")
+      .withEntity(multipartContent)
+      .withHeaders(multipartContent.headers)
 
     val handler0 = mock[EventHandler[IO]]
     val handler1 = mock[EventHandler[IO]]

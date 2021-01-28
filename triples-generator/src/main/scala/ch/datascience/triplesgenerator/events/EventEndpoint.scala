@@ -25,10 +25,15 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
+import fs2.text.utf8Decode
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Json
+import io.circe.parser.parse
 import org.http4s.dsl.Http4sDsl
+import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}
 
 import scala.concurrent.ExecutionContext
@@ -53,19 +58,20 @@ class EventEndpointImpl[Interpretation[_]: Effect](
   override def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] =
     reProvisioningStatus.isReProvisioning() flatMap { isReProvisioning =>
       if (isReProvisioning) ServiceUnavailable(InfoMessage("Temporarily unavailable: currently re-provisioning"))
-      else tryNextHandler(request, eventHandlers) flatMap toHttpResult
+      else requestMultipartDecoder(request)
     }
 
-  private def tryNextHandler(request:  Request[Interpretation],
-                             handlers: List[EventHandler[Interpretation]]
+  private def tryNextHandler(requestContent: EventRequestContent,
+                             handlers:       List[EventHandler[Interpretation]]
   ): Interpretation[EventSchedulingResult] =
     handlers.headOption match {
       case Some(handler) =>
-        handler.handle(request).flatMap {
-          case UnsupportedEventType => tryNextHandler(request, handlers.tail)
+        handler.handle(requestContent).flatMap {
+          case UnsupportedEventType => tryNextHandler(requestContent, handlers.tail)
           case otherResult          => otherResult.pure[Interpretation]
         }
-      case None => (UnsupportedEventType: EventSchedulingResult).pure[Interpretation]
+      case None =>
+        (UnsupportedEventType: EventSchedulingResult).pure[Interpretation]
     }
 
   private lazy val toHttpResult: EventSchedulingResult => Interpretation[Response[Interpretation]] = {
@@ -75,6 +81,34 @@ class EventEndpointImpl[Interpretation[_]: Effect](
     case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
     case EventSchedulingResult.SchedulingError(_)   => InternalServerError(ErrorMessage("Failed to schedule event"))
   }
+
+  private def requestMultipartDecoder(
+      request: Request[Interpretation]
+  )(implicit
+      ME: MonadError[Interpretation, Throwable]
+  ): Interpretation[Response[Interpretation]] =
+    request.decode[Multipart[Interpretation]] { p =>
+      (p.parts.find(_.name.contains("event")), p.parts.find(_.name.contains("payload"))) match {
+        case (Some(eventPart), Some(payloadPart)) =>
+          for {
+            eventStr <- eventPart.body.through(utf8Decode).compile.foldMonoid
+            event = parse(eventStr).getOrElse(throw new Exception("Parsing error"))
+            payload <- payloadPart.body.through(utf8Decode).compile.foldMonoid
+            eventRequestContent = EventRequestContent(event, payload.some)
+            result     <- tryNextHandler(eventRequestContent, eventHandlers)
+            httpResult <- toHttpResult(result)
+          } yield httpResult
+        case (Some(eventPart), None) =>
+          for {
+            eventStr <- eventPart.body.through(utf8Decode).compile.foldMonoid
+            event               = parse(eventStr).getOrElse(throw new Exception("Parsing error"))
+            eventRequestContent = EventRequestContent(event, None)
+            result     <- tryNextHandler(eventRequestContent, eventHandlers)
+            httpResult <- toHttpResult(result)
+          } yield httpResult
+        case _ => toHttpResult(EventSchedulingResult.BadRequest)
+      }
+    }
 }
 
 object IOEventEndpoint {
@@ -113,4 +147,6 @@ object IOEventEndpoint {
       List(awaitingGenerationHandler, membersSyncHandler, triplesGeneratedHandler),
       reProvisioningStatus
     )
+
+  case class EventRequestContent(event: Json, maybePayload: Option[String])
 }

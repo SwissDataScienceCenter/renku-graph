@@ -18,15 +18,15 @@
 
 package io.renku.eventlog.subscriptions
 
-import TestCategoryEvent._
 import cats.effect.{ContextShift, IO, Timer}
+import cats.implicits.catsSyntaxOptionId
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
-import io.circe.Encoder
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult.{Delivered, Misdelivered, ServiceBusy}
+import io.renku.eventlog.subscriptions.TestCategoryEvent._
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -42,14 +42,17 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
 
     s"return Delivered if remote responds with $Accepted" in new TestCase {
 
-      val eventJson = jsons.generateOne
-      (categoryEventEncoder.apply _)
-        .expects(event)
-        .returning(eventJson)
-
+      val (eventJson, eventPayload) = expectEventEncoding(event)
       stubFor {
         post("/")
-          .withRequestBody(equalToJson(eventJson.spaces2))
+          .withMultipartRequestBody(
+            aMultipart("event")
+              .withBody(equalToJson(eventJson.spaces2))
+          )
+          .withMultipartRequestBody(
+            aMultipart("payload")
+              .withBody(equalTo(eventPayload))
+          )
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
@@ -59,14 +62,18 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
     TooManyRequests +: ServiceUnavailable +: Nil foreach { status =>
       s"return ServiceBusy if remote responds with $status" in new TestCase {
 
-        val eventJson = jsons.generateOne
-        (categoryEventEncoder.apply _)
-          .expects(event)
-          .returning(eventJson)
+        val (eventJson, eventPayload) = expectEventEncoding(event)
 
         stubFor {
           post("/")
-            .withRequestBody(equalToJson(eventJson.spaces2))
+            .withMultipartRequestBody(
+              aMultipart("event")
+                .withBody(equalToJson(eventJson.spaces2))
+            )
+            .withMultipartRequestBody(
+              aMultipart("payload")
+                .withBody(equalTo(eventPayload))
+            )
             .willReturn(aResponse().withStatus(TooManyRequests.code))
         }
 
@@ -77,14 +84,18 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
     NotFound +: BadGateway +: Nil foreach { status =>
       s"return Misdelivered if remote responds with $status" in new TestCase {
 
-        val eventJson = jsons.generateOne
-        (categoryEventEncoder.apply _)
-          .expects(event)
-          .returning(eventJson)
+        val (eventJson, eventPayload) = expectEventEncoding(event)
 
         stubFor {
           post("/")
-            .withRequestBody(equalToJson(eventJson.spaces2))
+            .withMultipartRequestBody(
+              aMultipart("event")
+                .withBody(equalToJson(eventJson.spaces2))
+            )
+            .withMultipartRequestBody(
+              aMultipart("payload")
+                .withBody(equalTo(eventPayload))
+            )
             .willReturn(aResponse().withStatus(status.code))
         }
 
@@ -95,9 +106,7 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
     "return Misdelivered if call to the remote fails with Connect Exception" in new TestCase {
       override val sender = new EventsSenderImpl(categoryEventEncoder, TestLogger(), retryInterval = 10 millis)
 
-      (categoryEventEncoder.apply _)
-        .expects(event)
-        .returning(jsons.generateOne)
+      expectEventEncoding(event)
 
       sender
         .sendEvent(SubscriberUrl("http://unexisting"), event)
@@ -106,14 +115,17 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
 
     s"fail if remote responds with $BadRequest" in new TestCase {
 
-      val eventJson = jsons.generateOne
-      (categoryEventEncoder.apply _)
-        .expects(event)
-        .returning(eventJson)
-
+      val (eventJson, eventPayload) = expectEventEncoding(event)
       stubFor {
         post("/")
-          .withRequestBody(equalToJson(eventJson.spaces2))
+          .withMultipartRequestBody(
+            aMultipart("event")
+              .withBody(equalToJson(eventJson.spaces2))
+          )
+          .withMultipartRequestBody(
+            aMultipart("payload")
+              .withBody(equalTo(eventPayload))
+          )
           .willReturn(badRequest().withBody("message"))
       }
 
@@ -129,8 +141,22 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
   private trait TestCase {
     val event                = testCategoryEvents.generateOne
     val subscriberUrl        = SubscriberUrl(externalServiceBaseUrl)
-    val categoryEventEncoder = mock[Encoder[TestCategoryEvent]]
+    val categoryEventEncoder = mock[EventEncoder[TestCategoryEvent]]
 
     val sender = new EventsSenderImpl[TestCategoryEvent](categoryEventEncoder, TestLogger())
+
+    def expectEventEncoding(event: TestCategoryEvent) = {
+      val eventJson    = jsons.generateOne
+      val eventPayload = nonEmptyStrings().generateOne
+      (categoryEventEncoder.encodeEvent _)
+        .expects(event)
+        .returning(eventJson)
+
+      (categoryEventEncoder.encodePayload _)
+        .expects(event)
+        .returning(eventPayload.some)
+      (eventJson, eventPayload)
+    }
   }
+
 }

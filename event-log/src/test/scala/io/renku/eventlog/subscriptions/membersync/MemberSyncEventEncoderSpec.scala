@@ -28,19 +28,25 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class MemberSyncEventEncoderSpec extends AnyWordSpec with should.Matchers {
 
-  private implicit val encoder: Encoder[MemberSyncEvent] = MemberSyncEventEncoder
-
-  "encoder" should {
+  "encodeEvent" should {
 
     "serialize MemberSyncEvent to Json" in {
       val event = MemberSyncEvent(projectPaths.generateOne)
 
-      event.asJson shouldBe json"""{
+      MemberSyncEventEncoder.encodeEvent(event) shouldBe json"""{
         "categoryName": "MEMBER_SYNC",
         "project": {
           "path":       ${event.projectPath.value}
         }
       }"""
+    }
+  }
+
+  "encodePayload" should {
+    "return None" in {
+      val event = MemberSyncEvent(projectPaths.generateOne)
+
+      MemberSyncEventEncoder.encodePayload(event) shouldBe None
     }
   }
 }

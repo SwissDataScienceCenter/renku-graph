@@ -16,26 +16,13 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.membersync
+package io.renku.eventlog.subscriptions
 
-import ch.datascience.graph.model.projects
-import io.renku.eventlog.subscriptions.EventEncoder
+import io.circe.Json
 
-private final case class MemberSyncEvent(projectPath: projects.Path) {
-  override lazy val toString: String = s"$MemberSyncEvent projectPath = $projectPath"
-}
+private trait EventEncoder[CategoryEvent] {
 
-private object MemberSyncEventEncoder extends EventEncoder[MemberSyncEvent] {
+  def encodeEvent(categoryEvent:   CategoryEvent): Json
+  def encodePayload(categoryEvent: CategoryEvent): Option[String]
 
-  import io.circe.Json
-  import io.circe.literal.JsonStringContext
-
-  override def encodeEvent(event: MemberSyncEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
-    "project": {
-      "path":       ${event.projectPath.value}
-    }
-  }"""
-
-  override def encodePayload(categoryEvent: MemberSyncEvent): Option[String] = None
 }

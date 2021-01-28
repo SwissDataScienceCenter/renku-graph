@@ -16,26 +16,17 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.membersync
+package ch.datascience.triplesgenerator
 
-import ch.datascience.graph.model.projects
-import io.renku.eventlog.subscriptions.EventEncoder
+import ch.datascience.generators.Generators.{jsons, nonEmptyStrings}
+import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
+import org.scalacheck.Gen
+import ch.datascience.generators.Generators.Implicits._
 
-private final case class MemberSyncEvent(projectPath: projects.Path) {
-  override lazy val toString: String = s"$MemberSyncEvent projectPath = $projectPath"
-}
+package object events {
 
-private object MemberSyncEventEncoder extends EventEncoder[MemberSyncEvent] {
-
-  import io.circe.Json
-  import io.circe.literal.JsonStringContext
-
-  override def encodeEvent(event: MemberSyncEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
-    "project": {
-      "path":       ${event.projectPath.value}
-    }
-  }"""
-
-  override def encodePayload(categoryEvent: MemberSyncEvent): Option[String] = None
+  implicit val eventRequestContents: Gen[EventRequestContent] = for {
+    event        <- jsons
+    maybePayload <- nonEmptyStrings().toGeneratorOfOptions
+  } yield EventRequestContent(event, maybePayload)
 }
