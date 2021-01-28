@@ -24,6 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
@@ -50,7 +51,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
         val triplesGeneratedEvent = eventBody.toTriplesGeneratedEvent
         (eventBodyDeserializer.toTriplesGeneratedEvent _)
-          .expects(eventId, project, eventBody)
+          .expects(eventId, project, schemaVersion, eventBody)
           .returning(triplesGeneratedEvent.pure[IO])
 
         (processingRunner.scheduleForProcessing _)
@@ -58,7 +59,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .returning(EventSchedulingResult.Accepted.pure[IO])
 
         val requestContent: EventRequestContent =
-          requestContent((eventId, project).asJson(eventEncoder), eventBody.value.some)
+          requestContent((eventId, project, schemaVersion).asJson(eventEncoder), eventBody.value.some)
 
         handler.handle(requestContent).unsafeRunSync() shouldBe Accepted
 
@@ -75,7 +76,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
         val triplesGeneratedEvent = eventBody.toTriplesGeneratedEvent
         (eventBodyDeserializer.toTriplesGeneratedEvent _)
-          .expects(eventId, project, eventBody)
+          .expects(eventId, project, schemaVersion, eventBody)
           .returning(triplesGeneratedEvent.pure[IO])
 
         (processingRunner.scheduleForProcessing _)
@@ -83,7 +84,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .returning(EventSchedulingResult.Busy.pure[IO])
 
         val requestContent: EventRequestContent =
-          requestContent((eventId, project).asJson(eventEncoder), eventBody.value.some)
+          requestContent((eventId, project, schemaVersion).asJson(eventEncoder), eventBody.value.some)
 
         handler.handle(requestContent).unsafeRunSync() shouldBe Busy
 
@@ -104,10 +105,10 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     s"return $BadRequest if event body is not present" in new TestCase {
 
       val requestContent: EventRequestContent =
-        requestContent((eventId, project).asJson(eventEncoder), eventBody.value.some)
+        requestContent((eventId, project, schemaVersion).asJson(eventEncoder), eventBody.value.some)
 
       (eventBodyDeserializer.toTriplesGeneratedEvent _)
-        .expects(eventId, project, eventBody)
+        .expects(eventId, project, schemaVersion, eventBody)
         .returning(exceptions.generateOne.raiseError[IO, TriplesGeneratedEvent])
 
       handler.handle(requestContent).unsafeRunSync() shouldBe BadRequest
@@ -119,7 +120,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       val triplesGeneratedEvent = eventBody.toTriplesGeneratedEvent
       (eventBodyDeserializer.toTriplesGeneratedEvent _)
-        .expects(eventId, project, eventBody)
+        .expects(eventId, project, schemaVersion, eventBody)
         .returning(triplesGeneratedEvent.pure[IO])
 
       val exception = exceptions.generateOne
@@ -128,7 +129,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         .returning(exception.raiseError[IO, EventSchedulingResult])
 
       val requestContent: EventRequestContent =
-        requestContent((eventId, project).asJson(eventEncoder), eventBody.value.some)
+        requestContent((eventId, project, schemaVersion).asJson(eventEncoder), eventBody.value.some)
 
       handler.handle(requestContent).unsafeRunSync() shouldBe SchedulingError(exception)
 
@@ -143,10 +144,11 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
   private trait TestCase {
 
-    val eventId     = compoundEventIds.generateOne
-    val eventBody   = eventBodies.generateOne
-    val projectPath = projectPaths.generateOne
-    val project     = Project(eventId.projectId, projectPath)
+    val eventId       = compoundEventIds.generateOne
+    val eventBody     = eventBodies.generateOne
+    val projectPath   = projectPaths.generateOne
+    val project       = Project(eventId.projectId, projectPath)
+    val schemaVersion = projectSchemaVersions.generateOne
 
     val processingRunner      = mock[EventsProcessingRunner[IO]]
     val eventBodyDeserializer = mock[EventBodyDeserializer[IO]]
@@ -157,15 +159,16 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       EventRequestContent(event, maybePayload)
   }
 
-  private implicit lazy val eventEncoder: Encoder[(CompoundEventId, Project)] =
-    Encoder.instance[(CompoundEventId, Project)] { case (eventId, project) =>
+  private implicit lazy val eventEncoder: Encoder[(CompoundEventId, Project, SchemaVersion)] =
+    Encoder.instance[(CompoundEventId, Project, SchemaVersion)] { case (eventId, project, schemaVersion) =>
       json"""{
         "categoryName": "TRIPLES_GENERATED",
         "id":           ${eventId.id.value},
         "project": {
           "id" :        ${eventId.projectId.value},
           "path": ${project.path.value}
-        }
+        },
+        "schemaVersion": ${schemaVersion.value}
       }"""
     }
 

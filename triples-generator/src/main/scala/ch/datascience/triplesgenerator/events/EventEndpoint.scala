@@ -58,7 +58,7 @@ class EventEndpointImpl[Interpretation[_]: Effect](
   override def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] =
     reProvisioningStatus.isReProvisioning() flatMap { isReProvisioning =>
       if (isReProvisioning) ServiceUnavailable(InfoMessage("Temporarily unavailable: currently re-provisioning"))
-      else requestMultipartDecoder(request)
+      else decodeRequestAndProcess(request)
     }
 
   private def tryNextHandler(requestContent: EventRequestContent,
@@ -82,7 +82,7 @@ class EventEndpointImpl[Interpretation[_]: Effect](
     case EventSchedulingResult.SchedulingError(_)   => InternalServerError(ErrorMessage("Failed to schedule event"))
   }
 
-  private def requestMultipartDecoder(
+  private def decodeRequestAndProcess(
       request: Request[Interpretation]
   )(implicit
       ME: MonadError[Interpretation, Throwable]

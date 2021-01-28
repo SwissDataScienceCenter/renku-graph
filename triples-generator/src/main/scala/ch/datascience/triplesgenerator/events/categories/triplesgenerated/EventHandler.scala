@@ -25,6 +25,7 @@ import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.implicits.catsSyntaxApplicativeId
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
+import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody, EventId}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
@@ -57,13 +58,15 @@ private[events] class EventHandler[Interpretation[_]: Effect](
   override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
 
     for {
-      eventIdAndProject <-
-        EitherT(request.event.as[(CompoundEventId, Project)].pure[Interpretation]).leftMap(_ => UnsupportedEventType)
-      (eventId, project) = eventIdAndProject
+      eventIdProjectAndSchema <-
+        EitherT(request.event.as[(CompoundEventId, Project, SchemaVersion)].pure[Interpretation]).leftMap(_ =>
+          UnsupportedEventType
+        )
+      (eventId, project, schemaVersion) = eventIdProjectAndSchema
       eventBody <- EitherT.fromOption[Interpretation](request.maybePayload.map(EventBody.apply), BadRequest)
       triplesGeneratedEvent <-
         eventBodyDeserializer
-          .toTriplesGeneratedEvent(eventId, project, eventBody)
+          .toTriplesGeneratedEvent(eventId, project, schemaVersion, eventBody)
           .toRightT(recoverTo = BadRequest)
       result <- scheduleForProcessing(triplesGeneratedEvent).toRightT
                   .semiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
@@ -75,13 +78,14 @@ private[events] class EventHandler[Interpretation[_]: Effect](
     s"$eventId, projectPath = ${project.path}"
   }
 
-  private implicit val eventDecoder: Decoder[(CompoundEventId, Project)] = { implicit cursor =>
+  private implicit val eventDecoder: Decoder[(CompoundEventId, Project, SchemaVersion)] = { implicit cursor =>
     for {
-      _           <- validateCategoryName
-      id          <- cursor.downField("id").as[EventId]
-      projectId   <- cursor.downField("project").downField("id").as[projects.Id]
-      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
-    } yield CompoundEventId(id, projectId) -> Project(projectId, projectPath)
+      _             <- validateCategoryName
+      id            <- cursor.downField("id").as[EventId]
+      projectId     <- cursor.downField("project").downField("id").as[projects.Id]
+      projectPath   <- cursor.downField("project").downField("path").as[projects.Path]
+      schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
+    } yield (CompoundEventId(id, projectId), Project(projectId, projectPath), schemaVersion)
   }
 }
 

@@ -23,17 +23,16 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events._
-import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.events.categories.models.Project
 import io.circe.parser._
-import io.circe.{Decoder, DecodingFailure, Error, HCursor, Json, ParsingFailure}
+import io.circe.{DecodingFailure, Error, ParsingFailure}
 
 private trait EventBodyDeserializer[Interpretation[_]] {
-  def toTriplesGeneratedEvent(eventId:   CompoundEventId,
-                              project:   Project,
-                              eventBody: EventBody
+  def toTriplesGeneratedEvent(eventId:       CompoundEventId,
+                              project:       Project,
+                              schemaVersion: SchemaVersion,
+                              eventBody:     EventBody
   ): Interpretation[TriplesGeneratedEvent]
 }
 
@@ -41,24 +40,16 @@ private class EventBodyDeserializerImpl[Interpretation[_]](implicit
     ME: MonadError[Interpretation, Throwable]
 ) extends EventBodyDeserializer[Interpretation] {
 
-  override def toTriplesGeneratedEvent(eventId:   CompoundEventId,
-                                       project:   Project,
-                                       eventBody: EventBody
+  override def toTriplesGeneratedEvent(eventId:       CompoundEventId,
+                                       project:       Project,
+                                       schemaVersion: SchemaVersion,
+                                       eventBody:     EventBody
   ): Interpretation[TriplesGeneratedEvent] =
     ME.fromEither {
       parse(eventBody.value)
-        .flatMap(_.as[(String, SchemaVersion)])
-        .flatMap { case (payload, schemaVersion) =>
-          parse(payload).map(json => TriplesGeneratedEvent(eventId.id, project, JsonLDTriples(json), schemaVersion))
-        }
+        .map(json => TriplesGeneratedEvent(eventId.id, project, JsonLDTriples(json), schemaVersion))
         .leftMap(toMeaningfulError(eventId))
     }
-
-  private implicit val triplesDecoder: Decoder[(String, SchemaVersion)] = (cursor: HCursor) =>
-    for {
-      eventPayload  <- cursor.downField("payload").as[String]
-      schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
-    } yield (eventPayload, schemaVersion)
 
   private def toMeaningfulError(eventId: CompoundEventId): Error => Error = {
     case failure: DecodingFailure => failure.withMessage(s"TriplesGeneratedEvent cannot be deserialised: $eventId")
