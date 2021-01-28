@@ -94,7 +94,8 @@ class DatasetEndpoint[Interpretation[_]: Effect](
         ("published" -> dataset.published.asJson).some,
         ("hasPart" -> dataset.parts.asJson).some,
         ("isPartOf" -> dataset.projects.asJson).some,
-        ("keywords" -> dataset.keywords.asJson).some
+        ("keywords" -> dataset.keywords.asJson).some,
+        ("images" -> dataset.images.asJson).some
       ).flatten: _*
     ) deepMerge _links(
       Rel.Self -> Href(renkuResourcesUrl / "datasets" / dataset.id),
@@ -149,6 +150,13 @@ class DatasetEndpoint[Interpretation[_]: Effect](
   private implicit lazy val versionsEncoder: Encoder[DatasetVersions] = Encoder.instance[DatasetVersions] { versions =>
     json"""{
       "initial": ${versions.initial}
+    }"""
+  }
+
+  private implicit lazy val imagesEncoder: Encoder[List[ImageUrl]] = Encoder.instance[List[ImageUrl]] { imageUrls =>
+    val urlsInQuotes = imageUrls.map(_.url.toString).map(url => s""""$url"""")
+    json"""{
+      "images": [ ${urlsInQuotes.mkString(", ")} ]
     }"""
   }
 }

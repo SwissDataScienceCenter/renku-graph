@@ -566,7 +566,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           published = modifiedDataset2.published,
           parts = modifiedDataset2.parts,
           projects = List(dataset3Project),
-          keywords = modifiedDataset2.keywords
+          keywords = modifiedDataset2.keywords,
+          images = ??? // TODO: find value
         )
 
         loadToStore(

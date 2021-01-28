@@ -163,6 +163,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
       maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
       versions         <- cursor.downField("versions").as[DatasetVersions]
+      images           <- cursor.downField("images").as[List[ImageUrl]]
     } yield maybeSameAs
       .map { sameAs =>
         NonModifiedDataset(id,
@@ -175,7 +176,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                            published,
                            parts,
                            projects,
-                           keywords
+                           keywords,
+                           images
         )
       }
       .orElse(
@@ -190,7 +192,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                           published,
                           parts,
                           projects,
-                          keywords
+                          keywords,
+                          images
           )
         }
       )
@@ -233,4 +236,9 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
     for {
       initial <- cursor.downField("initial").as[InitialVersion]
     } yield DatasetVersions(initial)
+
+  private implicit lazy val imageUrlDecoder: Decoder[List[ImageUrl]] = cursor =>
+    for {
+      urls <- cursor.downField("images").as[List[Url]]
+    } yield urls.map(ImageUrl)
 }

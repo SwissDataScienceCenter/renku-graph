@@ -22,6 +22,7 @@ import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
+import eu.timepit.refined.types.string.NonEmptyString
 
 object model {
 
@@ -36,6 +37,7 @@ object model {
     val projects:         List[DatasetProject]
     val keywords:         List[Keyword]
     val versions:         DatasetVersions
+    val images:           List[ImageUrl]
   }
 
   final case class NonModifiedDataset(id:               Identifier,
@@ -48,7 +50,8 @@ object model {
                                       published:        DatasetPublishing,
                                       parts:            List[DatasetPart],
                                       projects:         List[DatasetProject],
-                                      keywords:         List[Keyword]
+                                      keywords:         List[Keyword],
+                                      images:           List[ImageUrl]
   ) extends Dataset
 
   final case class ModifiedDataset(id:               Identifier,
@@ -61,7 +64,8 @@ object model {
                                    published:        DatasetPublishing,
                                    parts:            List[DatasetPart],
                                    projects:         List[DatasetProject],
-                                   keywords:         List[Keyword]
+                                   keywords:         List[Keyword],
+                                   images:           List[ImageUrl]
   ) extends Dataset
 
   final case class DatasetPublishing(maybeDate: Option[PublishedDate], creators: Set[DatasetCreator])
@@ -73,4 +77,6 @@ object model {
   final case class DatasetProject(path: Path, name: projects.Name, created: AddedToProject)
   final case class AddedToProject(date: DateCreatedInProject, agent: DatasetAgent)
   final case class DatasetAgent(maybeEmail: Option[Email], name: UserName)
+
+  final case class ImageUrl(url: Url)
 }
