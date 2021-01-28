@@ -114,7 +114,7 @@ class AuthenticationSpec extends AnyWordSpec with should.Matchers with MockFacto
   private trait TestCase {
     val request = Request[Try]()
 
-    val authenticator  = mock[GitLabAuthenticator[Try]]
+    val authenticator  = mock[Authenticator[Try]]
     val authentication = new AuthenticationImpl[Try](authenticator)
   }
 }

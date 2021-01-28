@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.http.server.security
+package ch.datascience.graph.http.server.security
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
@@ -26,6 +26,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.GraphModelGenerators.userGitLabIds
 import ch.datascience.http.server.security.EndpointSecurityException.AuthenticationFailure
+import ch.datascience.http.server.security._
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing

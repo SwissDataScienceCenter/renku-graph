@@ -23,14 +23,11 @@ import cats.data.{Kleisli, OptionT}
 import cats.syntax.all._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
-import io.chrisdavenport.log4cats.Logger
 import model._
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.headers.Authorization
 import org.http4s.{AuthedRoutes, Request}
-
-import scala.concurrent.ExecutionContext
 
 private trait Authentication[Interpretation[_]] {
   def authenticate
@@ -38,7 +35,7 @@ private trait Authentication[Interpretation[_]] {
 }
 
 private class AuthenticationImpl[Interpretation[_]](
-    authenticator: GitLabAuthenticator[Interpretation]
+    authenticator: Authenticator[Interpretation]
 )(implicit ME:     MonadError[Interpretation, Throwable])
     extends Authentication[Interpretation] {
 
@@ -72,21 +69,25 @@ private class AuthenticationImpl[Interpretation[_]](
 
 object Authentication {
 
-  import cats.effect.{ContextShift, IO, Timer}
-  import ch.datascience.config.GitLab
-  import ch.datascience.control.Throttler
+  import cats.effect.IO
   import org.http4s.server.AuthMiddleware
 
   def middleware(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[AuthMiddleware[IO, Option[AuthUser]]] = for {
-    authentication <- Authentication(gitLabThrottler, logger)
-  } yield middleware(authentication)
+      authenticator: Authenticator[IO]
+  ): IO[AuthMiddleware[IO, Option[AuthUser]]] = IO {
+    middleware(new AuthenticationImpl(authenticator))
+  }
+
+  //  def middleware(
+//      gitLabThrottler: Throttler[IO, GitLab],
+//      logger:          Logger[IO]
+//  )(implicit
+//      executionContext: ExecutionContext,
+//      contextShift:     ContextShift[IO],
+//      timer:            Timer[IO]
+//  ): IO[AuthMiddleware[IO, Option[AuthUser]]] = for {
+//    authentication <- Authentication(gitLabThrottler, logger)
+//  } yield middleware(authentication)
 
   private[security] def middleware(
       authentication: Authentication[IO]
@@ -96,15 +97,4 @@ object Authentication {
     }
     AuthMiddleware(authentication.authenticate, onFailure)
   }
-
-  private def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[Authentication[IO]] = for {
-    authenticator <- GitLabAuthenticator(gitLabThrottler, logger)
-  } yield new AuthenticationImpl(authenticator)
 }

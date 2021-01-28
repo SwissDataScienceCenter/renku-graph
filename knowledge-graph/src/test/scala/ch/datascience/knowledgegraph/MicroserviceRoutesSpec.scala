@@ -27,6 +27,7 @@ import ch.datascience.controllers.{ErrorMessage, InfoMessage}
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.http.server.security.ProjectAuthorizer
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.rest.SortBy.Direction
@@ -35,7 +36,7 @@ import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.server.security.EndpointSecurityException.AuthorizationFailure
 import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.http.server.security.{EndpointSecurityException, ProjectAuthorizer}
+import ch.datascience.http.server.security.EndpointSecurityException
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort

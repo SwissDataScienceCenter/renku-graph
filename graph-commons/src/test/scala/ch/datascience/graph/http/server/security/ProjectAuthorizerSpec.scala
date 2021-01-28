@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.http.server.security
+package ch.datascience.graph.http.server.security
 
 import cats.effect.IO
 import cats.syntax.all._

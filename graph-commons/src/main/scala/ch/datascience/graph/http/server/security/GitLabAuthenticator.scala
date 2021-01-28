@@ -16,31 +16,27 @@
  * limitations under the License.
  */
 
-package ch.datascience.http.server.security
+package ch.datascience.graph.http.server.security
 
-import cats.data.OptionT
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.http.server.security.EndpointSecurityException.AuthenticationFailure
+import ch.datascience.http.server.security.model.AuthUser
+import ch.datascience.http.server.security.{Authenticator, EndpointSecurityException}
 import io.chrisdavenport.log4cats.Logger
-import model._
 
 import scala.concurrent.ExecutionContext
 
-private trait GitLabAuthenticator[Interpretation[_]] {
-  def authenticate(accessToken: AccessToken): Interpretation[Either[EndpointSecurityException, AuthUser]]
-}
-
-private class GitLabAuthenticatorImpl(
+class GitLabAuthenticatorImpl(
     gitLabApiUrl:            GitLabApiUrl,
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient(gitLabThrottler, logger)
-    with GitLabAuthenticator[IO] {
+    with Authenticator[IO] {
 
   import cats.effect._
   import cats.syntax.all._
@@ -77,7 +73,7 @@ private class GitLabAuthenticatorImpl(
   }
 }
 
-private object GitLabAuthenticator {
+object GitLabAuthenticator {
 
   import ch.datascience.graph.config.GitLabUrl
 
@@ -88,7 +84,7 @@ private object GitLabAuthenticator {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[GitLabAuthenticator[IO]] = for {
+  ): IO[Authenticator[IO]] = for {
     gitLabApiUrl <- GitLabUrl[IO]().map(_.apiV4)
   } yield new GitLabAuthenticatorImpl(gitLabApiUrl, gitLabThrottler, logger)
 }

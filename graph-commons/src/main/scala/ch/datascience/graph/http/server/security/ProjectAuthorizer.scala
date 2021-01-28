@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.http.server.security
+package ch.datascience.graph.http.server.security
 
 import cats.MonadError
 import cats.data.EitherT
@@ -29,6 +29,7 @@ import ch.datascience.graph.model.projects.Visibility._
 import ch.datascience.graph.model.projects.{Path, ResourceId, Visibility}
 import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.http.server.security.EndpointSecurityException
 import ch.datascience.http.server.security.EndpointSecurityException.AuthorizationFailure
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
