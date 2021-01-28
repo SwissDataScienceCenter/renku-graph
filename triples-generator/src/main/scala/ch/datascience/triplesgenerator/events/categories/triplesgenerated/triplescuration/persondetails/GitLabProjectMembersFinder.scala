@@ -45,37 +45,37 @@ import scala.concurrent.duration.FiniteDuration
 
 private trait GitLabProjectMembersFinder[Interpretation[_]] {
   def findProjectMembers(path: Path)(implicit
-                                     maybeAccessToken: Option[AccessToken]
+      maybeAccessToken:        Option[AccessToken]
   ): EitherT[Interpretation, ProcessingRecoverableError, Set[GitLabProjectMember]]
 }
 
 private class IOGitLabProjectMembersFinder(
-                                            gitLabApiUrl: GitLabApiUrl,
-                                            gitLabThrottler: Throttler[IO, GitLab],
-                                            logger: Logger[IO],
-                                            retryInterval: FiniteDuration = IORestClient.SleepAfterConnectionIssue
-                                          )(implicit
-                                            executionContext: ExecutionContext,
-                                            contextShift: ContextShift[IO],
-                                            timer: Timer[IO]
-                                          ) extends IORestClient(gitLabThrottler, logger, retryInterval = retryInterval)
-  with GitLabProjectMembersFinder[IO] {
+    gitLabApiUrl:    GitLabApiUrl,
+    gitLabThrottler: Throttler[IO, GitLab],
+    logger:          Logger[IO],
+    retryInterval:   FiniteDuration = IORestClient.SleepAfterConnectionIssue
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO]
+) extends IORestClient(gitLabThrottler, logger, retryInterval = retryInterval)
+    with GitLabProjectMembersFinder[IO] {
 
   override def findProjectMembers(
-                                   path: Path
-                                 )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, Set[GitLabProjectMember]] =
+      path:                    Path
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, Set[GitLabProjectMember]] =
     for {
-      users <- fetch(s"$gitLabApiUrl/projects/${urlEncode(path.value)}/users")
+      users   <- fetch(s"$gitLabApiUrl/projects/${urlEncode(path.value)}/users")
       members <- fetch(s"$gitLabApiUrl/projects/${urlEncode(path.value)}/members")
     } yield users ++ members
 
   private def fetch(
-                     url: String,
-                     maybePage: Option[Int] = None,
-                     allUsers: Set[GitLabProjectMember] = Set.empty
-                   )(implicit
-                     maybeAccessToken: Option[AccessToken]
-                   ): EitherT[IO, ProcessingRecoverableError, Set[GitLabProjectMember]] = for {
+      url:       String,
+      maybePage: Option[Int] = None,
+      allUsers:  Set[GitLabProjectMember] = Set.empty
+  )(implicit
+      maybeAccessToken: Option[AccessToken]
+  ): EitherT[IO, ProcessingRecoverableError, Set[GitLabProjectMember]] = for {
     uri <- validateUri(merge(url, maybePage)).toRightT
     fetchedUsersAndNextPage <-
       EitherT(send(request(GET, uri, maybeAccessToken))(mapResponse) recoverWith maybeRecoverableError)
@@ -99,13 +99,13 @@ private class IOGitLabProjectMembersFinder(
   }
 
   private def addNextPage(
-                           url: String,
-                           allUsers: Set[GitLabProjectMember],
-                           fetchedUsersAndMaybeNextPage: (Set[GitLabProjectMember], Option[Int])
-                         )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, Set[GitLabProjectMember]] =
+      url:                          String,
+      allUsers:                     Set[GitLabProjectMember],
+      fetchedUsersAndMaybeNextPage: (Set[GitLabProjectMember], Option[Int])
+  )(implicit maybeAccessToken:      Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, Set[GitLabProjectMember]] =
     fetchedUsersAndMaybeNextPage match {
-      case (fetchedUsers, maybeNextPage@Some(_)) => fetch(url, maybeNextPage, allUsers ++ fetchedUsers)
-      case (fetchedUsers, None) => (allUsers ++ fetchedUsers).pure[IO].toRightT
+      case (fetchedUsers, maybeNextPage @ Some(_)) => fetch(url, maybeNextPage, allUsers ++ fetchedUsers)
+      case (fetchedUsers, None)                    => (allUsers ++ fetchedUsers).pure[IO].toRightT
     }
 
   private def maybeNextPage(response: Response[IO]): Option[Int] =
@@ -116,9 +116,9 @@ private class IOGitLabProjectMembersFinder(
 
     implicit val decoder: Decoder[GitLabProjectMember] = { cursor =>
       for {
-        id <- cursor.downField("id").as[GitLabId]
+        id       <- cursor.downField("id").as[GitLabId]
         username <- cursor.downField("username").as[users.Username]
-        name <- cursor.downField("name").as[users.Name]
+        name     <- cursor.downField("name").as[users.Name]
       } yield GitLabProjectMember(id, username, name)
     }
 
@@ -126,7 +126,7 @@ private class IOGitLabProjectMembersFinder(
   }
 
   private lazy val maybeRecoverableError
-  : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, (Set[GitLabProjectMember], Option[Int])]]] = {
+      : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, (Set[GitLabProjectMember], Option[Int])]]] = {
     case ConnectivityException(message, cause) =>
       IO.pure(Either.left(CurationRecoverableError(message, cause)))
   }
@@ -141,9 +141,9 @@ private class IOGitLabProjectMembersFinder(
 private object IOGitLabProjectMembersFinder {
 
   def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
-                                                                        executionContext: ExecutionContext,
-                                                                        contextShift: ContextShift[IO],
-                                                                        timer: Timer[IO]
+      executionContext:      ExecutionContext,
+      contextShift:          ContextShift[IO],
+      timer:                 Timer[IO]
   ): IO[GitLabProjectMembersFinder[IO]] = for {
     gitLabUrl <- GitLabUrl[IO]()
   } yield new IOGitLabProjectMembersFinder(gitLabUrl.apiV4, gitLabThrottler, logger)

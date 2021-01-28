@@ -37,12 +37,12 @@ private[triplescuration] trait DataSetInfoEnricher[Interpretation[_]] {
 }
 
 private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
-                                                                           dataSetInfoFinder: DataSetInfoFinder[Interpretation],
-                                                                           triplesUpdater: TriplesUpdater,
-                                                                           topmostDataFinder: TopmostDataFinder[Interpretation],
-                                                                           descendantsUpdater: DescendantsUpdater
-                                                                         )(implicit ME: MonadError[Interpretation, Throwable])
-  extends DataSetInfoEnricher[Interpretation] {
+    dataSetInfoFinder:  DataSetInfoFinder[Interpretation],
+    triplesUpdater:     TriplesUpdater,
+    topmostDataFinder:  TopmostDataFinder[Interpretation],
+    descendantsUpdater: DescendantsUpdater
+)(implicit ME:          MonadError[Interpretation, Throwable])
+    extends DataSetInfoEnricher[Interpretation] {
 
   import dataSetInfoFinder._
   import topmostDataFinder._
@@ -52,18 +52,18 @@ private[triplescuration] class DataSetInfoEnricherImpl[Interpretation[_]](
     for {
       datasetInfos <- findDatasetsInfo(curatedTriples.triples).asRightT
       topmostInfos <- EitherT(
-        datasetInfos
-          .map(findTopmostData)
-          .toList
-          .sequence
-          .map(_.asRight[ProcessingRecoverableError])
-          .recover(maybeToRecoverableError)
-      )
+                        datasetInfos
+                          .map(findTopmostData)
+                          .toList
+                          .sequence
+                          .map(_.asRight[ProcessingRecoverableError])
+                          .recover(maybeToRecoverableError)
+                      )
       updatedTriples = topmostInfos.foldLeft(curatedTriples)(mergeTopmostDataIntoTriples)
     } yield topmostInfos.foldLeft(updatedTriples)(descendantsUpdater.prepareUpdates[Interpretation])
 
   private lazy val maybeToRecoverableError
-  : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[TopmostData]]] = {
+      : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[TopmostData]]] = {
     case e: UnexpectedResponseException =>
       Left[ProcessingRecoverableError, List[TopmostData]](
         CurationRecoverableError("Problem with finding top most data", e)
@@ -86,9 +86,9 @@ private[triplescuration] object IODataSetInfoEnricher {
   import cats.effect.Timer
 
   def apply(
-             logger: Logger[IO],
-             timeRecorder: SparqlQueryTimeRecorder[IO]
-           )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[DataSetInfoEnricher[IO]] =
+      logger:                  Logger[IO],
+      timeRecorder:            SparqlQueryTimeRecorder[IO]
+  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[DataSetInfoEnricher[IO]] =
     for {
       topmostDataFinder <- IOTopmostDataFinder(logger, timeRecorder)
     } yield new DataSetInfoEnricherImpl[IO](
