@@ -163,4 +163,5 @@ object datasets {
 
   final class PartLocation private (val value: String) extends AnyVal with RelativePathTinyType
   implicit object PartLocation extends TinyTypeFactory[PartLocation](new PartLocation(_)) with RelativePath
+
 }

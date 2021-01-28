@@ -46,6 +46,7 @@ object DatasetsGenerators {
       sameAs           <- sameAs
       maybeDescription <- Gen.option(datasetDescriptions)
       keywords         <- listOf(datasetKeywords)
+      images           <- listOf(datasetUrls) // TODO: which type should we use here?
       published        <- datasetPublishingInfos
       part             <- listOf(datasetParts)
       projects         <- projects
@@ -60,7 +61,8 @@ object DatasetsGenerators {
       published,
       part,
       projects.toList,
-      keywords
+      keywords,
+      images.map(ImageUrl)
     )
 
   def modifiedDatasetsOnFirstProject(
@@ -72,6 +74,7 @@ object DatasetsGenerators {
       id        <- datasetIdentifiers
       published <- datasetPublishingInfos
       keywords  <- listOf(datasetKeywords)
+      imageUrls <- listOf(imageUrls)
     } yield ModifiedDataset(
       id,
       dataset.title,
@@ -83,7 +86,8 @@ object DatasetsGenerators {
       published,
       dataset.parts,
       List(dataset.projects.headOption getOrElse (throw new IllegalStateException("No projects on a dataset"))),
-      keywords
+      keywords,
+      imageUrls.map(ImageUrl)
     )
 
   implicit lazy val datasetCreators: Gen[DatasetCreator] = for {

@@ -61,13 +61,14 @@ private class BaseDetailsFinder(
         |    ?datasetId schema:identifier "$identifier";
         |               schema:identifier ?identifier;
         |               rdf:type <http://schema.org/Dataset>;
-        |               schema:isPartOf ?projectId; 
+        |               schema:isPartOf ?projectId;   
         |               schema:url ?url;
         |               schema:name ?name;
         |               schema:alternateName ?alternateName;
         |               prov:atLocation ?location ;
         |               renku:topmostSameAs ?topmostSameAs;
-        |               renku:topmostDerivedFrom/schema:identifier ?initialVersion.
+        |               renku:topmostDerivedFrom/schema:identifier ?initialVersion
+        |               schema:image ?imageIdentifier.
         |               
         |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
         |    FILTER NOT EXISTS {
@@ -140,7 +141,8 @@ private object BaseDetailsFinder {
             DatasetPublishing(maybePublishedDate, Set.empty),
             parts = List.empty,
             projects = List.empty,
-            keywords = List.empty
+            keywords = List.empty,
+            images = List.empty
           )
         case None =>
           NonModifiedDataset(
@@ -154,7 +156,8 @@ private object BaseDetailsFinder {
             DatasetPublishing(maybePublishedDate, Set.empty),
             parts = List.empty,
             projects = List.empty,
-            keywords = List.empty
+            keywords = List.empty,
+            images = List.empty
           )
       }
     }
