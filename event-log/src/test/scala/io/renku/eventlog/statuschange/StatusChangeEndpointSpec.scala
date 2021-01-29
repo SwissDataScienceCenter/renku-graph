@@ -33,9 +33,9 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.metrics.LabeledGauge
+import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
 import io.prometheus.client.Gauge
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
@@ -45,6 +45,7 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
+import org.http4s.multipart.{Multipart, Part}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -121,10 +122,11 @@ class StatusChangeEndpointSpec
             .expects(command)
             .returning(Updated.pure[IO])
 
+          val multipartContent: Multipart[IO] = command.toMultipartContent
           val request = Request(
             Method.PATCH,
             uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-          ).withEntity(command.asJson)
+          ).withEntity(multipartContent).withHeaders(multipartContent.headers)
 
           val response = changeStatus(eventId, request).unsafeRunSync()
 
@@ -145,10 +147,11 @@ class StatusChangeEndpointSpec
             .expects(command)
             .returning(UpdateResult.Conflict.pure[IO])
 
+          val multipartContent: Multipart[IO] = command.toMultipartContent
           val request = Request(
             Method.PATCH,
             uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-          ).withEntity(command.asJson)
+          ).withEntity(multipartContent).withHeaders(multipartContent.headers)
 
           val response = changeStatus(eventId, request).unsafeRunSync()
 
@@ -170,10 +173,11 @@ class StatusChangeEndpointSpec
             .expects(command)
             .returning(UpdateResult.Failure(errorMessage).pure[IO])
 
+          val multipartContent: Multipart[IO] = command.toMultipartContent
           val request = Request(
             Method.PATCH,
             uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-          ).withEntity(command.asJson)
+          ).withEntity(multipartContent).withHeaders(multipartContent.headers)
 
           val response = changeStatus(eventId, request).unsafeRunSync()
 
@@ -190,10 +194,11 @@ class StatusChangeEndpointSpec
       val eventId = compoundEventIds.generateOne
 
       val payload = json"""{}"""
+      val content: Multipart[IO] = multipartContent(payload)
       val request = Request(
         Method.PATCH,
         uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(payload)
+      ).withEntity(content).withHeaders(content.headers)
 
       val response = changeStatus(eventId, request).unsafeRunSync()
 
@@ -210,11 +215,12 @@ class StatusChangeEndpointSpec
 
       val eventId = compoundEventIds.generateOne
 
-      val payload = json"""{"status": ${Skipped.value}}"""
+      val eventContent = json"""{"status": ${Skipped.value}}"""
+      val content: Multipart[IO] = multipartContent(eventContent)
       val request = Request(
         Method.PATCH,
         uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(payload)
+      ).withEntity(content).withHeaders(content.headers)
 
       val response = changeStatus(eventId, request).unsafeRunSync()
 
@@ -231,10 +237,11 @@ class StatusChangeEndpointSpec
 
       val payload =
         json"""{"status": ${TriplesGenerated.value}, "schemaVersion": ${projectSchemaVersions.generateOne.value} }"""
+      private val content: Multipart[IO] = multipartContent(payload)
       val request = Request(
         Method.PATCH,
         uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(payload)
+      ).withEntity(content).withHeaders(content.headers)
 
       val response = changeStatus(eventId, request).unsafeRunSync()
 
@@ -249,11 +256,12 @@ class StatusChangeEndpointSpec
 
       val eventId = compoundEventIds.generateOne
 
-      val payload = json"""{"status": ${TriplesGenerated.value}, "payload": ${eventPayloads.generateOne.value} }"""
+      val eventContent = json"""{"status": ${TriplesGenerated.value}}"""
+      private val entityContent: Multipart[IO] = multipartContent(eventContent, eventPayloads.generateOne.value.some)
       val request = Request(
         Method.PATCH,
         uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(payload)
+      ).withEntity(entityContent).withHeaders(entityContent.headers)
 
       val response = changeStatus(eventId, request).unsafeRunSync()
 
@@ -268,11 +276,12 @@ class StatusChangeEndpointSpec
 
       val eventId = compoundEventIds.generateOne
 
-      val payload = json"""{"status": "GENERATING_TRIPLES"}"""
+      val eventContent = json"""{"status": "GENERATING_TRIPLES"}"""
+      private val entityContent: Multipart[IO] = multipartContent(eventContent)
       val request = Request(
         Method.PATCH,
         uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(payload)
+      ).withEntity(entityContent).withHeaders(entityContent.headers)
 
       val response = changeStatus(eventId, request).unsafeRunSync()
 
@@ -296,10 +305,11 @@ class StatusChangeEndpointSpec
         .expects(command)
         .returning(exception.raiseError[IO, UpdateResult])
 
+      private val multipartContent: Multipart[IO] = command.toMultipartContent
       val request = Request(
         Method.PATCH,
         uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(command.asJson)
+      ).withEntity(multipartContent).withHeaders(multipartContent.headers)
 
       val response = changeStatus(eventId, request).unsafeRunSync()
 
@@ -324,66 +334,93 @@ class StatusChangeEndpointSpec
     ).changeStatus _
   }
 
-  implicit val commandEncoder: Encoder[ChangeStatusCommand[IO]] = Encoder.instance[ChangeStatusCommand[IO]] {
-    case command: ToNew[IO] =>
-      json"""{
+  private def multipartContent(content: Json, maybePayload: Option[String] = None): Multipart[IO] = Multipart[IO](
+    Vector(
+      Part
+        .formData[IO]("event", content.noSpaces, `Content-Type`(MediaType.application.json))
+        .some,
+      maybePayload.map(Part.formData[IO]("payload", _))
+    ).flatten
+  )
+  implicit class ChangeStatusOps(command: ChangeStatusCommand[IO]) {
+
+    lazy val toMultipartContent: Multipart[IO] = command match {
+      case command: ToNew[IO] =>
+        multipartContent(
+          json"""{
         "status": ${command.status.value}
       }""" deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToTriplesStore[IO] =>
-      json"""{
-        "status": ${command.status.value} 
+            .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+            .getOrElse(Json.obj())
+        )
+      case command: ToTriplesStore[IO] =>
+        multipartContent(
+          json"""{
+        "status": ${command.status.value}
       }""" deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToSkipped[IO] =>
-      json"""{
+            .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+            .getOrElse(Json.obj())
+        )
+      case command: ToSkipped[IO] =>
+        multipartContent(
+          json"""{
         "status": ${command.status.value},
         "message": ${command.message.value}
       }""" deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToTriplesGenerated[IO] =>
-      json"""{
+            .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+            .getOrElse(Json.obj())
+        )
+      case command: ToTriplesGenerated[IO] =>
+        multipartContent(
+          json"""{
         "status": ${command.status.value},
-        "payload": ${command.payload.value},
-        "schemaVersion": ${command.schemaVersion.value} 
+        "schemaVersion": ${command.schemaVersion.value}
       }""" deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToGenerationRecoverableFailure[IO] =>
-      json"""{
+            .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+            .getOrElse(Json.obj()),
+          command.payload.value.some
+        )
+      case command: ToGenerationRecoverableFailure[IO] =>
+        multipartContent(
+          json"""{
         "status": ${command.status.value}
       }""" deepMerge command.maybeMessage
-        .map(m => json"""{"message": ${m.value}}""")
-        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToGenerationNonRecoverableFailure[IO] =>
-      json"""{
+            .map(m => json"""{"message": ${m.value}}""")
+            .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
+            .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+            .getOrElse(Json.obj())
+        )
+      case command: ToGenerationNonRecoverableFailure[IO] =>
+        multipartContent(
+          json"""{
         "status": ${command.status.value}
       }""" deepMerge command.maybeMessage
-        .map(m => json"""{"message": ${m.value}}""")
-        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToTransformationRecoverableFailure[IO] =>
-      json"""{
+            .map(m => json"""{"message": ${m.value}}""")
+            .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
+            .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+            .getOrElse(Json.obj())
+        )
+      case command: ToTransformationRecoverableFailure[IO] =>
+        multipartContent(
+          json"""{
         "status": ${command.status.value}
       }""" deepMerge command.maybeMessage
-        .map(m => json"""{"message": ${m.value}}""")
-        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToTransformationNonRecoverableFailure[IO] =>
-      json"""{
+            .map(m => json"""{"message": ${m.value}}""")
+            .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
+            .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+            .getOrElse(Json.obj())
+        )
+      case command: ToTransformationNonRecoverableFailure[IO] =>
+        multipartContent(
+          json"""{
         "status": ${command.status.value}
       }""" deepMerge command.maybeMessage
-        .map(m => json"""{"message": ${m.value}}""")
-        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
+            .map(m => json"""{"message": ${m.value}}""")
+            .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
+            .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+            .getOrElse(Json.obj())
+        )
+    }
   }
 
   private lazy val awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path] = new GaugeStub

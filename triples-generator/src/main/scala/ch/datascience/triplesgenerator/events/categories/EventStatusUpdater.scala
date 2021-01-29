@@ -20,14 +20,18 @@ package ch.datascience.triplesgenerator.events.categories
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
+import cats.implicits.catsSyntaxOptionId
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.http.client.IORestClient
 import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import io.chrisdavenport.log4cats.Logger
-import org.http4s.Status
+import org.http4s.headers.`Content-Type`
+import org.http4s.multipart.{Multipart, Part}
+import org.http4s.{MediaType, Status}
 
 import java.io.{PrintWriter, StringWriter}
 import scala.concurrent.ExecutionContext
@@ -63,18 +67,17 @@ private class IOEventStatusUpdater(
   import io.circe.syntax._
   import org.http4s.Method.PATCH
   import org.http4s.Status.{Conflict, NotFound, Ok}
-  import org.http4s.circe._
   import org.http4s.{Request, Response}
 
   override def markEventNew(eventId: CompoundEventId): IO[Unit] = sendStatusChange(
     eventId,
-    payload = json"""{"status": "NEW"}""",
+    eventContent = EventRequestContent(json"""{"status": "NEW"}""", None),
     responseMapping = okConflictAsSuccess
   )
 
   override def markEventDone(eventId: CompoundEventId): IO[Unit] = sendStatusChange(
     eventId,
-    payload = json"""{"status": "TRIPLES_STORE"}""",
+    eventContent = EventRequestContent(json"""{"status": "TRIPLES_STORE"}""", None),
     responseMapping = okConflictAsSuccess
   )
 
@@ -83,55 +86,83 @@ private class IOEventStatusUpdater(
                                     schemaVersion: SchemaVersion
   ): IO[Unit] = sendStatusChange(
     eventId,
-    payload =
-      json"""{"status": "TRIPLES_GENERATED", "payload": ${payload.value.noSpaces} , "schemaVersion": ${schemaVersion.value} }""",
+    eventContent =
+      EventRequestContent(json"""{"status": "TRIPLES_GENERATED", "schemaVersion": ${schemaVersion.value} }""",
+                          maybePayload = payload.value.noSpaces.some
+      ),
     responseMapping = okConflictAsSuccess
   )
 
   override def markEventFailedRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
     sendStatusChange(
       eventId,
-      payload = json"""{"status": "GENERATION_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+      eventContent =
+        EventRequestContent(json"""{"status": "GENERATION_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson, None),
       responseMapping = okConflictAsSuccess
     )
 
   override def markEventFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
     sendStatusChange(
       eventId,
-      payload = json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+      eventContent =
+        EventRequestContent(json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+                            None
+        ),
       responseMapping = okConflictAsSuccess
     )
 
   override def markEventTransformationFailedRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
     sendStatusChange(
       eventId,
-      payload = json"""{"status": "TRANSFORMATION_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+      eventContent =
+        EventRequestContent(json"""{"status": "TRANSFORMATION_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+                            None
+        ),
       responseMapping = okConflictAsSuccess
     )
 
   override def markEventTransformationFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
     sendStatusChange(
       eventId,
-      payload = json"""{"status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+      eventContent =
+        EventRequestContent(json"""{"status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
+                            None
+        ),
       responseMapping = okConflictAsSuccess
     )
 
   def markEventSkipped(eventId: CompoundEventId, message: String): IO[Unit] =
     sendStatusChange(
       eventId,
-      payload = json"""{"status": "SKIPPED", "message": $message}""",
+      eventContent = EventRequestContent(event = json"""{"status": "SKIPPED", "message": $message}""", None),
       responseMapping = okConflictAsSuccess
     )
 
   private def sendStatusChange(
       eventId:         CompoundEventId,
-      payload:         Json,
+      eventContent:    EventRequestContent,
       responseMapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]]
   ): IO[Unit] =
     for {
-      uri           <- validateUri(s"$eventLogUrl/events/${eventId.id}/${eventId.projectId}")
-      sendingResult <- send(request(PATCH, uri).withEntity(payload))(responseMapping)
+      uri <- validateUri(s"$eventLogUrl/events/${eventId.id}/${eventId.projectId}")
+      multipartPayload = multipart(eventContent)
+      sendingResult <- send(
+                         request(PATCH, uri)
+                           .withEntity(multipartPayload)
+                           .withHeaders(multipartPayload.headers)
+                       )(responseMapping)
     } yield sendingResult
+
+  private def multipart(eventRequestContent: EventRequestContent) =
+    Multipart[IO](
+      Vector(
+        Part.formData[IO]("event", eventRequestContent.event.noSpaces, `Content-Type`(MediaType.application.json)).some,
+        eventRequestContent.maybePayload.map(
+          Part
+            .formData[IO]("payload", _)
+        )
+      ).flatten
+    )
 
   private lazy val okConflictAsSuccess: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
     case (Ok, _, _)       => IO.unit

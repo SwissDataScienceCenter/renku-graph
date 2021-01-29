@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.events
 
 import cats.MonadError
+import cats.data.EitherT
 import cats.effect.{Effect, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
@@ -89,23 +90,28 @@ class EventEndpointImpl[Interpretation[_]: Effect](
   ): Interpretation[Response[Interpretation]] =
     request.decode[Multipart[Interpretation]] { p =>
       (p.parts.find(_.name.contains("event")), p.parts.find(_.name.contains("payload"))) match {
-        case (Some(eventPart), Some(payloadPart)) =>
-          for {
-            eventStr <- eventPart.body.through(utf8Decode).compile.foldMonoid
-            event = parse(eventStr).getOrElse(throw new Exception("Parsing error"))
-            payload <- payloadPart.body.through(utf8Decode).compile.foldMonoid
-            eventRequestContent = EventRequestContent(event, payload.some)
-            result     <- tryNextHandler(eventRequestContent, eventHandlers)
-            httpResult <- toHttpResult(result)
-          } yield httpResult
-        case (Some(eventPart), None) =>
-          for {
-            eventStr <- eventPart.body.through(utf8Decode).compile.foldMonoid
-            event               = parse(eventStr).getOrElse(throw new Exception("Parsing error"))
-            eventRequestContent = EventRequestContent(event, None)
-            result     <- tryNextHandler(eventRequestContent, eventHandlers)
-            httpResult <- toHttpResult(result)
-          } yield httpResult
+        case (Some(eventPart), maybePayloadPart) =>
+          {
+            for {
+              eventStr <- EitherT.liftF[Interpretation, Response[Interpretation], String](
+                            eventPart.body.through(utf8Decode).compile.foldMonoid
+                          )
+              event <- EitherT
+                         .fromEither[Interpretation](parse(eventStr))
+                         .leftSemiflatMap(_ => toHttpResult(EventSchedulingResult.BadRequest))
+              maybePayload <- EitherT.liftF[Interpretation, Response[Interpretation], Option[String]](
+                                maybePayloadPart.map(_.body.through(utf8Decode).compile.foldMonoid).sequence
+                              )
+              eventRequestContent = EventRequestContent(event, maybePayload)
+              result <- EitherT
+                          .liftF[Interpretation, Response[Interpretation], EventSchedulingResult](
+                            tryNextHandler(eventRequestContent, eventHandlers)
+                          )
+              httpResult <-
+                EitherT
+                  .liftF[Interpretation, Response[Interpretation], Response[Interpretation]](toHttpResult(result))
+            } yield httpResult
+          }.merge
         case _ => toHttpResult(EventSchedulingResult.BadRequest)
       }
     }

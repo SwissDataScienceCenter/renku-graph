@@ -19,18 +19,22 @@
 package io.renku.eventlog.statuschange
 
 import cats.MonadError
+import cats.data.EitherT
 import cats.effect.{ContextShift, Effect}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
+import fs2.text.utf8Decode
 import io.chrisdavenport.log4cats.Logger
+import io.circe.parser.parse
+import io.circe.{Decoder, DecodingFailure}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
-import io.renku.eventlog.{EventLogDB, EventMessage, EventPayload, EventProcessingTime, ExecutionDate}
+import io.renku.eventlog.{EventLogDB, EventMessage, EventPayload, EventProcessingTime}
 import org.http4s.dsl.Http4sDsl
+import org.http4s.multipart.Multipart
 
-import java.time.Instant
 import scala.util.control.NonFatal
 
 class StatusChangeEndpoint[Interpretation[_]: Effect](
@@ -45,23 +49,14 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
 
   import ch.datascience.controllers.InfoMessage._
   import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-  import org.http4s.circe._
-  import org.http4s.{EntityDecoder, Request, Response}
+  import org.http4s.{Request, Response}
   import statusUpdatesRunner.run
 
   def changeStatus(eventId: CompoundEventId,
                    request: Request[Interpretation]
   ): Interpretation[Response[Interpretation]] = {
-    for {
-      command      <- request.as[ChangeStatusCommand[Interpretation]](ME, findDecoder(eventId)) recoverWith badRequest
-      updateResult <- run(command)
-      response     <- updateResult.asHttpResponse
-    } yield response
+    decodeRequestAndProcess(eventId, request)
   } recoverWith httpResponse
-
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[ChangeStatusCommand[Interpretation]]] = {
-    case NonFatal(exception) => ME.raiseError(BadRequestError(exception))
-  }
 
   private implicit class ResultOps(result: UpdateResult) {
     lazy val asHttpResponse: Interpretation[Response[Interpretation]] = result match {
@@ -85,74 +80,135 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
   private def findDecoder(
-      eventId: CompoundEventId
-  ): EntityDecoder[Interpretation, ChangeStatusCommand[Interpretation]] = {
+      eventId:      CompoundEventId,
+      maybePayload: Option[EventPayload]
+  ): Decoder[ChangeStatusCommand[Interpretation]] = {
     import ch.datascience.graph.model.events.EventStatus
     import ch.datascience.graph.model.events.EventStatus._
     import commands._
-    import io.circe.{Decoder, HCursor}
-    implicit val commandDecoder: Decoder[ChangeStatusCommand[Interpretation]] = (cursor: HCursor) =>
-      for {
-        status              <- cursor.downField("status").as[EventStatus]
-        maybeMessage        <- cursor.downField("message").as[Option[EventMessage]]
-        maybePayload        <- cursor.downField("payload").as[Option[EventPayload]]
-        maybeSchemaVersion  <- cursor.downField("schemaVersion").as[Option[SchemaVersion]]
-        maybeProcessingTime <- cursor.downField("processingTime").as[Option[EventProcessingTime]]
-      } yield status match {
-        case TriplesStore =>
-          ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge, maybeProcessingTime)
-        case New =>
-          ToNew[Interpretation](eventId,
-                                awaitingTriplesGenerationGauge,
-                                underTriplesGenerationGauge,
-                                maybeProcessingTime
-          )
-        case TriplesGenerated =>
-          ToTriplesGenerated[Interpretation](
-            eventId,
-            maybePayload getOrElse (throw new Exception(s"$status status needs a payload")),
-            maybeSchemaVersion getOrElse (throw new Exception(s"$status status needs a schemaVersion")),
-            underTriplesGenerationGauge,
-            awaitingTriplesTransformationGauge,
-            maybeProcessingTime
-          )
-        case Skipped =>
-          ToSkipped[Interpretation](eventId,
-                                    maybeMessage getOrElse (throw new Exception(s"$status status needs a message")),
-                                    underTriplesGenerationGauge,
-                                    maybeProcessingTime
-          )
-        case GenerationRecoverableFailure =>
-          ToGenerationRecoverableFailure[Interpretation](eventId,
-                                                         maybeMessage,
-                                                         awaitingTriplesGenerationGauge,
-                                                         underTriplesGenerationGauge,
-                                                         maybeProcessingTime
-          )
-        case GenerationNonRecoverableFailure =>
-          ToGenerationNonRecoverableFailure[Interpretation](eventId,
-                                                            maybeMessage,
-                                                            underTriplesGenerationGauge,
-                                                            maybeProcessingTime
-          )
-        case TransformationRecoverableFailure =>
-          ToTransformationRecoverableFailure[Interpretation](eventId,
-                                                             maybeMessage,
-                                                             awaitingTriplesTransformationGauge,
-                                                             underTriplesTransformationGauge,
-                                                             maybeProcessingTime
-          )
-        case TransformationNonRecoverableFailure =>
-          ToTransformationNonRecoverableFailure[Interpretation](eventId,
-                                                                maybeMessage,
-                                                                underTriplesTransformationGauge,
-                                                                maybeProcessingTime
-          )
-        case other => throw new Exception(s"Transition to '$other' status unsupported")
-      }
+    import io.circe.HCursor
+    (cursor: HCursor) =>
+      {
+        for {
+          maybeStatus         <- cursor.downField("status").as[Option[EventStatus]]
+          maybeMessage        <- cursor.downField("message").as[Option[EventMessage]]
+          maybeSchemaVersion  <- cursor.downField("schemaVersion").as[Option[SchemaVersion]]
+          maybeProcessingTime <- cursor.downField("processingTime").as[Option[EventProcessingTime]]
+        } yield maybeStatus
+          .map {
+            case TriplesStore =>
+              Right(ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge, maybeProcessingTime))
+            case New =>
+              Right(
+                ToNew[Interpretation](eventId,
+                                      awaitingTriplesGenerationGauge,
+                                      underTriplesGenerationGauge,
+                                      maybeProcessingTime
+                )
+              )
+            case status @ TriplesGenerated =>
+              (maybePayload, maybeSchemaVersion) match {
+                case (Some(payload), Some(schemaVersion)) =>
+                  Right(
+                    ToTriplesGenerated[Interpretation](
+                      eventId,
+                      payload,
+                      schemaVersion,
+                      underTriplesGenerationGauge,
+                      awaitingTriplesTransformationGauge,
+                      maybeProcessingTime
+                    )
+                  )
+                case (None, _) => Left(DecodingFailure(s"$status status needs a payload", Nil))
+                case (_, None) => Left(DecodingFailure(s"$status status needs a schemaVersion", Nil))
+              }
 
-    jsonOf[Interpretation, ChangeStatusCommand[Interpretation]]
+            case status @ Skipped =>
+              maybeMessage match {
+                case Some(message) =>
+                  Right(ToSkipped[Interpretation](eventId, message, underTriplesGenerationGauge, maybeProcessingTime))
+                case None => Left(DecodingFailure(s"$status status needs a message", Nil))
+              }
+            case GenerationRecoverableFailure =>
+              Right(
+                ToGenerationRecoverableFailure[Interpretation](eventId,
+                                                               maybeMessage,
+                                                               awaitingTriplesGenerationGauge,
+                                                               underTriplesGenerationGauge,
+                                                               maybeProcessingTime
+                )
+              )
+            case GenerationNonRecoverableFailure =>
+              Right(
+                ToGenerationNonRecoverableFailure[Interpretation](eventId,
+                                                                  maybeMessage,
+                                                                  underTriplesGenerationGauge,
+                                                                  maybeProcessingTime
+                )
+              )
+            case TransformationRecoverableFailure =>
+              Right(
+                ToTransformationRecoverableFailure[Interpretation](eventId,
+                                                                   maybeMessage,
+                                                                   awaitingTriplesTransformationGauge,
+                                                                   underTriplesTransformationGauge,
+                                                                   maybeProcessingTime
+                )
+              )
+            case TransformationNonRecoverableFailure =>
+              Right(
+                ToTransformationNonRecoverableFailure[Interpretation](eventId,
+                                                                      maybeMessage,
+                                                                      underTriplesTransformationGauge,
+                                                                      maybeProcessingTime
+                )
+              )
+            case other => Left(DecodingFailure(s"Transition to '$other' status unsupported", Nil))
+
+          }
+          .getOrElse(
+            Left(DecodingFailure(s"Invalid message body: Could not decode JSON: ${cursor.value.toString}", Nil))
+          )
+      }.flatten
   }
+
+  private def decodeRequestAndProcess(
+      eventId: CompoundEventId,
+      request: Request[Interpretation]
+  )(implicit
+      ME: MonadError[Interpretation, Throwable]
+  ): Interpretation[Response[Interpretation]] =
+    request.decode[Multipart[Interpretation]] { p =>
+      (p.parts.find(_.name.contains("event")), p.parts.find(_.name.contains("payload"))) match {
+        case (Some(eventPart), maybePayloadPart) =>
+          {
+            for {
+              event <- EitherT.liftF[Interpretation, Response[Interpretation], String](
+                         eventPart.body.through(utf8Decode).compile.foldMonoid
+                       )
+              eventJson <- EitherT
+                             .fromEither[Interpretation](parse(event))
+                             .leftSemiflatMap(e => httpResponse(BadRequestError(e)))
+              maybePayload <-
+                EitherT.liftF[Interpretation, Response[Interpretation], Option[EventPayload]](
+                  maybePayloadPart.map(_.body.through(utf8Decode).compile.foldMonoid.map(EventPayload.apply)).sequence
+                )
+              command <-
+                EitherT
+                  .fromEither[Interpretation](
+                    eventJson.as[ChangeStatusCommand[Interpretation]](findDecoder(eventId, maybePayload))
+                  )
+                  .leftSemiflatMap(e => httpResponse(BadRequestError(e)))
+
+              updateResult <- EitherT.liftF[Interpretation, Response[Interpretation], UpdateResult](run(command))
+              response <- EitherT.liftF[Interpretation, Response[Interpretation], Response[Interpretation]](
+                            updateResult.asHttpResponse
+                          )
+            } yield response
+          }.merge
+        case _ => httpResponse(BadRequestError(new Exception("Unprocessable Entity")))
+      }
+    }
 }
 
 object IOStatusChangeEndpoint {
