@@ -16,9 +16,22 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.security
+package ch.datascience.http.server
 
-import cats.MonadError
-import cats.effect.IO
+import ch.datascience.http.client.AccessToken
+import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
+import org.http4s.AuthScheme.Bearer
+import org.http4s.Credentials.Token
+import org.http4s.Header
+import org.http4s.headers.Authorization
 
-class IOAccessTokenExtractor(implicit ME: MonadError[IO, Throwable]) extends AccessTokenExtractor[IO]
+package object security {
+
+  implicit class AccessTokenOps(accessToken: AccessToken) {
+
+    lazy val toHeader: Header = accessToken match {
+      case PersonalAccessToken(token) => Header("PRIVATE-TOKEN", token)
+      case OAuthAccessToken(token)    => Authorization(Token(Bearer, token))
+    }
+  }
+}

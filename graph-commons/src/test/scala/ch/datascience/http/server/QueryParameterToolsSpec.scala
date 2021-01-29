@@ -20,10 +20,10 @@ package ch.datascience.http.server
 
 import EndpointTester._
 import cats.effect.IO
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.ErrorMessage.ErrorMessage
+import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.http.ErrorMessage
 import org.http4s.ParseFailure
 import org.http4s.Status._
 import org.scalacheck.Gen

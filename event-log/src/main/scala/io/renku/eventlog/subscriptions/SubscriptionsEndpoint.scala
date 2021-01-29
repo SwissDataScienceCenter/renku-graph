@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions
 
 import cats.MonadError
 import cats.effect.Effect
+import ch.datascience.http.ErrorMessage
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry.{NoCategoriesAvailable, SubscriptionResult, UnsupportedPayload}
@@ -35,8 +36,8 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
 
   import SubscriptionsEndpoint._
   import cats.syntax.all._
-  import ch.datascience.controllers.InfoMessage._
-  import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+  import ch.datascience.http.InfoMessage
+  import ch.datascience.http.InfoMessage._
   import org.http4s.circe._
   import org.http4s.{Request, Response}
 

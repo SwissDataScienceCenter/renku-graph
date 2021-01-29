@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests
 
+import cats.data.NonEmptyList
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
@@ -51,6 +52,8 @@ class WebhookCreationSpec
 
       val projectId = projectIds.generateOne
       implicit val accessToken: AccessToken = accessTokens.generateOne
+      Given("api user is authenticated")
+      `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
       `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
@@ -70,6 +73,8 @@ class WebhookCreationSpec
       val project   = projects.generateOne
       val projectId = project.id
       implicit val accessToken: AccessToken = accessTokens.generateOne
+      Given("api user is authenticated")
+      `GET <gitlabApi>/user returning OK`()
 
       Given("project is present in GitLab")
       `GET <gitlabApi>/projects/:id returning OK`(projectId, projectVisibility = Public)
@@ -90,7 +95,10 @@ class WebhookCreationSpec
       // making the triples generation be happy and not throwing exceptions to the logs
       `GET <gitlabApi>/projects/:path returning OK with`(project)
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project.path, committer.asMember())
+      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
+        project.path,
+        committer.asMembersList()
+      )
 
       When("user does POST webhook-service/projects/:id/webhooks")
       val response = webhookServiceClient.POST(s"projects/$projectId/webhooks", Some(accessToken))

@@ -21,9 +21,10 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.renku
-import ch.datascience.controllers.InfoMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.http.InfoMessage._
+import ch.datascience.http.InfoMessage
 import ch.datascience.graph.model.datasets.Identifier
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}

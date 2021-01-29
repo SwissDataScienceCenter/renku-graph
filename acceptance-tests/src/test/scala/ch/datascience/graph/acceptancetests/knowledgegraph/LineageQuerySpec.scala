@@ -63,7 +63,7 @@ class LineageQuerySpec
         commitId,
         committer,
         JsonLD.arr(jsons: _*)
-      )
+      )()
 
       When("user posts a graphql query to fetch lineage")
       val response = knowledgeGraphClient POST lineageQuery

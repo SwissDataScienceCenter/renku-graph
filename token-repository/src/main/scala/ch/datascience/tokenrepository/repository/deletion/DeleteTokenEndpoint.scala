@@ -21,10 +21,10 @@ package ch.datascience.tokenrepository.repository.deletion
 import cats.MonadError
 import cats.effect.{ContextShift, Effect, IO}
 import cats.syntax.all._
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects.Id
+import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger

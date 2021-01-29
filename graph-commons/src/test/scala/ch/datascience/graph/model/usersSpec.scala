@@ -115,3 +115,26 @@ class UsersResourceIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with
     }
   }
 }
+
+class GitLabIdSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+
+  import users.GitLabId
+
+  "parse" should {
+
+    "return a GitLabId for valid id in String" in {
+      forAll(userGitLabIds) { gitLabId =>
+        GitLabId.parse(gitLabId.toString) shouldBe Right(gitLabId)
+      }
+    }
+
+    "fail for invalid id in String" in {
+      val value = nonBlankStrings().generateOne.value
+
+      val Left(exception) = GitLabId.parse(value)
+
+      exception            shouldBe an[IllegalArgumentException]
+      exception.getMessage shouldBe s"$value not a valid GitLabId"
+    }
+  }
+}

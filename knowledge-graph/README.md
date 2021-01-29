@@ -286,14 +286,20 @@ Response body example:
 #### GET /knowledge-graph/projects/:namespace/:name
 
 Finds details of the project with the given `namespace/name`.
+The endpoint requires an authorization token to be passed in the request for non-public projects. Supported headers are:
+- `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
+- `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
+There's no need for a security headers for public projects.
 
 **Response**
 
-| Status                     | Description                                             |
-|----------------------------|---------------------------------------------------------|
-| OK (200)                   | If project with the given `namespace/name` can be found |
-| NOT_FOUND (404)            | If there is no project with the given `namespace/name`  |
-| INTERNAL SERVER ERROR (500)| Otherwise                                               |
+| Status                     | Description                                              |
+|----------------------------|----------------------------------------------------------|
+| OK (200)                   | If project with the given `namespace/name` can be found  |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated             |
+| FORBIDDEN (403)            | If given auth header doesn't allow accessing the project |
+| NOT_FOUND (404)            | If there is no project with the given `namespace/name`   |
+| INTERNAL SERVER ERROR (500)| Otherwise                                                |
 
 Response body example:
 ```

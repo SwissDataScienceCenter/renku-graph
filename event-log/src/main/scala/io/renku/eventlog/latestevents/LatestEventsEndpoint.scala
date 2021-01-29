@@ -36,8 +36,8 @@ class LatestEventsEndpoint[Interpretation[_]: Effect](
     extends Http4sDsl[Interpretation] {
 
   import LatestEventsFinder.IdProjectBody
-  import ch.datascience.controllers.ErrorMessage
-  import ch.datascience.controllers.ErrorMessage._
+  import ch.datascience.http.ErrorMessage._
+  import ch.datascience.http.ErrorMessage
   import io.circe.Encoder
   import io.circe.literal._
   import io.circe.syntax._

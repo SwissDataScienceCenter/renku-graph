@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.tooling
 
+import cats.data.NonEmptyList
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users
@@ -29,5 +30,8 @@ trait ModelImplicits {
 
     def asMember(): (users.GitLabId, users.Username, users.Name) =
       (person.maybeGitLabId getOrElse userGitLabIds.generateOne, usernames.generateOne, person.name)
+
+    def asMembersList(): NonEmptyList[(users.GitLabId, users.Username, users.Name)] =
+      NonEmptyList.of(person.asMember())
   }
 }

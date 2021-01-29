@@ -18,18 +18,19 @@
 
 package ch.datascience.graph.model
 
-import java.util.UUID
-
-import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
+import ch.datascience.generators.CommonGraphGenerators.{accessTokens, renkuBaseUrls}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects.{FilePath, Id, Path, ResourceId, Visibility}
 import ch.datascience.graph.model.users.{Affiliation, Email, Name, Username}
+import ch.datascience.http.server.security.model.AuthUser
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalacheck.Gen.{alphaChar, choose, const, frequency, numChar, oneOf, uuid}
+
+import java.util.UUID
 
 object GraphModelGenerators {
 
@@ -65,6 +66,11 @@ object GraphModelGenerators {
       .fold(throw _, identity)
 
   implicit val userGitLabIds: Gen[users.GitLabId] = nonNegativeInts().map(users.GitLabId(_))
+
+  implicit val authUsers: Gen[AuthUser] = for {
+    gitLabId    <- userGitLabIds
+    accessToken <- accessTokens
+  } yield AuthUser(gitLabId, accessToken)
 
   implicit val projectIds: Gen[Id] = for {
     min <- choose(1, 1000)

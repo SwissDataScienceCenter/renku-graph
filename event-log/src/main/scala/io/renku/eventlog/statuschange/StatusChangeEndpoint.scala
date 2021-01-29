@@ -24,6 +24,7 @@ import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.{SchemaVersion, projects}
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
@@ -43,8 +44,8 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
 )(implicit ME:                          MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
-  import ch.datascience.controllers.InfoMessage._
-  import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+  import ch.datascience.http.InfoMessage._
+  import ch.datascience.http.InfoMessage
   import org.http4s.circe._
   import org.http4s.{EntityDecoder, Request, Response}
   import statusUpdatesRunner.run
