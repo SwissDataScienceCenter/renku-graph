@@ -27,6 +27,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.IOAccessTokenFinder._
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder.{KGProject, Parent}
@@ -35,7 +36,7 @@ import scala.concurrent.ExecutionContext
 import scala.util.Try
 
 trait ProjectFinder[Interpretation[_]] {
-  def findProject(path: Path): Interpretation[Option[Project]]
+  def findProject(path: Path, maybeAuthUser: Option[AuthUser]): Interpretation[Option[Project]]
 }
 
 class IOProjectFinder(
@@ -49,11 +50,11 @@ class IOProjectFinder(
   import gitLabProjectFinder.{findProject => findProjectInGitLab}
   import kgProjectFinder.{findProject => findInKG}
 
-  def findProject(path: Path): IO[Option[Project]] =
-    ((OptionT(findInKG(path)), findInGitLab(path)) parMapN (merge(path, _, _))).value
+  def findProject(path: Path, maybeAuthUser: Option[AuthUser]): IO[Option[Project]] =
+    ((OptionT(findInKG(path)), findInGitLab(path, maybeAuthUser)) parMapN (merge(path, _, _))).value
 
-  private def findInGitLab(path: Path) = for {
-    accessToken   <- OptionT(findAccessToken(path))
+  private def findInGitLab(path: Path, maybeAuthUser: Option[AuthUser]) = for {
+    accessToken   <- OptionT.fromOption[IO](maybeAuthUser.map(_.accessToken)) orElseF findAccessToken(path)
     gitLabProject <- findProjectInGitLab(path, Some(accessToken))
   } yield gitLabProject
 

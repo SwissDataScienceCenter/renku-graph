@@ -20,12 +20,13 @@ package io.renku.eventlog.creation
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.controllers.ErrorMessage.ErrorMessage
-import ch.datascience.controllers.InfoMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage.ErrorMessage
+import ch.datascience.http.InfoMessage._
+import ch.datascience.http.InfoMessage
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}

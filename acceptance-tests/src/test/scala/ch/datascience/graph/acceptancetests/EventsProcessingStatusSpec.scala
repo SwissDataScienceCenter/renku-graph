@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests
 
+import cats.data.NonEmptyList
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -145,7 +146,10 @@ class EventsProcessingStatusSpec
       // making the triples generation process happy and not throwing exceptions to the logs
       val committer = persons.generateOne
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project.path, committer.asMember())
+      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
+        project.path,
+        committer.asMembersList()
+      )
     }
 
     webhookServiceClient

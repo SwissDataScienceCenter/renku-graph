@@ -21,10 +21,11 @@ package ch.datascience.tokenrepository.repository.fetching
 import cats.data.OptionT
 import cats.effect.{ContextShift, Effect, IO}
 import cats.syntax.all._
-import ch.datascience.controllers.ErrorMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage._
+import ch.datascience.http.InfoMessage
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.projects
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB

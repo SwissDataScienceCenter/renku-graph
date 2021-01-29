@@ -18,9 +18,6 @@
 
 package ch.datascience.webhookservice
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors.newFixedThreadPool
-
 import cats.effect._
 import ch.datascience.config.GitLab
 import ch.datascience.config.certificates.CertificateLoader
@@ -28,16 +25,13 @@ import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
-import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
+import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.microservices.IOMicroservice
-import ch.datascience.webhookservice.crypto.HookTokenCrypto
-import ch.datascience.webhookservice.eventprocessing.{IOHookEventEndpoint, IOProcessingStatusEndpoint}
-import ch.datascience.webhookservice.hookcreation.IOHookCreationEndpoint
-import ch.datascience.webhookservice.hookvalidation.IOHookValidationEndpoint
 import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, IOEventsSynchronizationScheduler}
-import ch.datascience.webhookservice.project.ProjectHookUrl
 import pureconfig.ConfigSource
 
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors.newFixedThreadPool
 import scala.concurrent.ExecutionContext
 
 object Microservice extends IOMicroservice {
@@ -51,50 +45,29 @@ object Microservice extends IOMicroservice {
   protected implicit override def timer: Timer[IO] =
     IO.timer(executionContext)
 
-  override def run(args: List[String]): IO[ExitCode] =
-    for {
-      certificateLoader     <- CertificateLoader[IO](ApplicationLogger)
-      sentryInitializer     <- SentryInitializer[IO]()
-      projectHookUrl        <- ProjectHookUrl.fromConfig[IO]()
-      gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-      gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
-      hookTokenCrypto       <- HookTokenCrypto[IO]()
-      executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
-      metricsRegistry       <- MetricsRegistry()
-      hookEventEndpoint <-
-        IOHookEventEndpoint(gitLabThrottler, hookTokenCrypto, executionTimeRecorder, ApplicationLogger)
-      hookCreatorEndpoint <- IOHookCreationEndpoint(projectHookUrl,
-                                                    gitLabThrottler,
-                                                    hookTokenCrypto,
-                                                    executionTimeRecorder,
-                                                    ApplicationLogger
-                             )
-      processingStatusEndpoint <-
-        IOProcessingStatusEndpoint(projectHookUrl, gitLabThrottler, executionTimeRecorder, ApplicationLogger)
-      hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler, ApplicationLogger)
-      eventsSynchronizationScheduler <-
-        IOEventsSynchronizationScheduler(gitLabThrottler, executionTimeRecorder, ApplicationLogger)
+  override def run(args: List[String]): IO[ExitCode] = for {
+    certificateLoader     <- CertificateLoader[IO](ApplicationLogger)
+    sentryInitializer     <- SentryInitializer[IO]()
+    gitLabRateLimit       <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+    gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
+    executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
+    metricsRegistry       <- MetricsRegistry()
+    eventsSynchronizationScheduler <-
+      IOEventsSynchronizationScheduler(gitLabThrottler, executionTimeRecorder, ApplicationLogger)
+    microserviceRoutes <-
+      MicroserviceRoutes(metricsRegistry, gitLabThrottler, executionTimeRecorder, ApplicationLogger)
+    exitcode <- microserviceRoutes.routes.use { routes =>
+                  val httpServer = new HttpServer[IO](serverPort = 9001, routes)
 
-      microserviceRoutes = new MicroserviceRoutes[IO](
-                             hookEventEndpoint,
-                             hookCreatorEndpoint,
-                             hookValidationEndpoint,
-                             processingStatusEndpoint,
-                             new RoutesMetrics[IO](metricsRegistry)
-                           ).routes
-
-      exitcode <- microserviceRoutes.use { routes =>
-                    val httpServer = new HttpServer[IO](serverPort = 9001, routes)
-
-                    new MicroserviceRunner(
-                      certificateLoader,
-                      sentryInitializer,
-                      eventsSynchronizationScheduler,
-                      httpServer,
-                      subProcessesCancelTokens
-                    ).run()
-                  }
-    } yield exitcode
+                  new MicroserviceRunner(
+                    certificateLoader,
+                    sentryInitializer,
+                    eventsSynchronizationScheduler,
+                    httpServer,
+                    subProcessesCancelTokens
+                  ).run()
+                }
+  } yield exitcode
 }
 
 class MicroserviceRunner(certificateLoader:              CertificateLoader[IO],

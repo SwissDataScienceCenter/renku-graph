@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -31,22 +32,24 @@ import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TestReadabilityTools._
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.Permissions.{GroupPermissions, ProjectAndGroupPermissions, ProjectPermissions}
+import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.rdfstore.entities
-import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import io.circe.Json
 import io.circe.literal._
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
+import org.scalacheck.Gen
 import org.scalatest.GivenWhenThen
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
@@ -60,7 +63,9 @@ class ProjectsResourcesSpec
 
   import ProjectsResources._
 
-  private implicit val accessToken: AccessToken = accessTokens.generateOne
+  private val user = authUsers.generateOne
+  private implicit val accessToken: AccessToken = user.accessToken
+
   private val fullParentProject = projects.generateOne.copy(
     created = Creation(projectCreatedDates.generateOne, maybeCreator = None)
   )
@@ -83,7 +88,8 @@ class ProjectsResourcesSpec
       ),
       created = initProject.created.copy(
         maybeCreator = Creator(dataset1Committer.maybeEmail, dataset1Committer.name).some
-      )
+      ),
+      visibility = Gen.oneOf(Visibility.Private, Visibility.Internal).generateOne
     )
   }
   private val dataset1CommitId    = commitIds.generateOne
@@ -97,6 +103,9 @@ class ProjectsResourcesSpec
   Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {
 
     Scenario("As a user I would like to find project's details by calling a REST endpoint") {
+
+      Given("I am authenticated")
+      `GET <gitlabApi>/user returning OK`(user)
 
       Given("some data in the RDF Store")
       val parentProjectEntity = entities
@@ -125,7 +134,7 @@ class ProjectsResourcesSpec
                               parentProjectCommit,
                               parentProjectCommitter,
                               jsonLDParentProjectTriples
-      )
+      )()
 
       val jsonLDTriples = JsonLD.arr(
         nonModifiedDataSetCommit(
@@ -135,6 +144,7 @@ class ProjectsResourcesSpec
         )(
           projectPath = project.path,
           projectName = project.name,
+          maybeVisibility = project.visibility.some,
           projectDateCreated = project.created.date,
           maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
           maybeParent = parentProjectEntity.some,
@@ -146,14 +156,11 @@ class ProjectsResourcesSpec
           maybeDatasetSameAs = dataset.sameAs.some
         )
       )
-      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)
-
-      `triples updates run`(
-        Set(project.created.maybeCreator.flatMap(_.maybeEmail),
-            parentProject.created.maybeCreator.flatMap(_.maybeEmail)
-        ).flatten,
-        project.path
+      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
+        NonEmptyList.of(dataset1Committer, persons.generateOne.copy(maybeGitLabId = user.id.some)).map(_.asMember())
       )
+
+      `events processed`(project.id)
 
       And("the project exists in GitLab")
       `GET <gitlabApi>/projects/:path returning OK with`(project,
@@ -162,7 +169,7 @@ class ProjectsResourcesSpec
       )
 
       When("user fetches project's details with GET knowledge-graph/projects/<namespace>/<name>")
-      val projectDetailsResponse = knowledgeGraphClient GET s"knowledge-graph/projects/${project.path}"
+      val projectDetailsResponse = knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", accessToken)
 
       Then("he should get OK response with project's details")
       projectDetailsResponse.status shouldBe Ok
@@ -177,6 +184,17 @@ class ProjectsResourcesSpec
       datasetsResponse.status shouldBe Ok
       val Right(foundDatasets) = datasetsResponse.bodyAsJson.as[List[Json]]
       foundDatasets should contain theSameElementsAs List(briefJson(dataset))
+
+      When("there's an authenticated user who is not project member")
+      val nonMemberAccessToken = accessTokens.generateOne
+      `GET <gitlabApi>/user returning OK`()(nonMemberAccessToken)
+
+      And("he fetches project's details")
+      val projectDetailsResponseForNonMember =
+        knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", nonMemberAccessToken)
+
+      Then("he should get FORBIDDEN response")
+      projectDetailsResponseForNonMember.status shouldBe Forbidden
     }
   }
 }

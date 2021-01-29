@@ -20,7 +20,7 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.interpreters.TestLogger
 import eu.timepit.refined.auto._
 import org.http4s.{Method, Request, Response, Status}
@@ -36,6 +36,13 @@ class RestClient()(implicit executionContext: ExecutionContext, contextShift: Co
     for {
       uri      <- validateUri(url)
       response <- send(request(Method.GET, uri))(mapResponse)
+    } yield response
+  }.unsafeRunSync()
+
+  def GET(url: String, accessToken: AccessToken): Response[IO] = {
+    for {
+      uri      <- validateUri(url)
+      response <- send(request(Method.GET, uri, accessToken))(mapResponse)
     } yield response
   }.unsafeRunSync()
 

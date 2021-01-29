@@ -99,7 +99,7 @@ private object IODatasetFinder {
     } yield new IODatasetFinder(
       new BaseDetailsFinder(config, logger, timeRecorder),
       new CreatorsFinder(config, renkuBaseUrl, logger, timeRecorder),
-      new PartsFinder(config, renkuBaseUrl, logger, timeRecorder),
+      new PartsFinder(config, logger, timeRecorder),
       new ProjectsFinder(config, logger, timeRecorder)
     )
 }

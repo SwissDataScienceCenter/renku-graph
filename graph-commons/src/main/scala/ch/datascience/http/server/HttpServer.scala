@@ -21,8 +21,8 @@ package ch.datascience.http.server
 import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.controllers.InfoMessage
-import ch.datascience.controllers.InfoMessage._
+import ch.datascience.http.InfoMessage._
+import ch.datascience.http.InfoMessage
 import org.http4s.server.blaze._
 import org.http4s.{HttpRoutes, Request, Response, Status}
 

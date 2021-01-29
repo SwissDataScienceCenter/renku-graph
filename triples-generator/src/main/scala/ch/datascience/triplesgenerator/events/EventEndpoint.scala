@@ -24,6 +24,7 @@ import cats.effect.{Effect, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.RenkuVersionPair
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
@@ -52,8 +53,8 @@ class EventEndpointImpl[Interpretation[_]: Effect](
 
   import EventSchedulingResult._
   import cats.syntax.all._
-  import ch.datascience.controllers.InfoMessage._
-  import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+  import ch.datascience.http.InfoMessage._
+  import ch.datascience.http.InfoMessage
   import org.http4s._
 
   override def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] =
