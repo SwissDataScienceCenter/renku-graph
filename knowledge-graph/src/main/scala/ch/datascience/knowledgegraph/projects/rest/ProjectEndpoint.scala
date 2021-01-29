@@ -111,9 +111,8 @@ class ProjectEndpoint[Interpretation[_]: Effect](
     json"""{
       "ssh":    ${urls.ssh.value},
       "http":   ${urls.http.value},
-      "web":    ${urls.web.value},
-      "readme": ${urls.maybeReadme.map(_.value)}
-    }"""
+      "web":    ${urls.web.value}
+    }""" deepMerge (urls.maybeReadme.map(readme => json"""{"readme": ${readme.value}}""") getOrElse Json.obj())
   }
 
   private implicit lazy val forkingEncoder: Encoder[Forking] = Encoder.instance[Forking] { forks =>
