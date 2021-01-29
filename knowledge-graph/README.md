@@ -286,6 +286,9 @@ Response body example:
 #### GET /knowledge-graph/projects/:namespace/:name
 
 Finds details of the project with the given `namespace/name`.
+The endpoint requires an authorization token passed in the request header as:
+- `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
+- `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
 
 **Response**
 
