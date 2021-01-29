@@ -52,11 +52,10 @@ private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]](
     }
 
   private def checkTableExists: Interpretation[Boolean] =
-    sql"select project_id from subscription_category_sync_time limit 1"
-      .query[String]
-      .option
+    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'subscription_category_sync_time')"
+      .query[Boolean]
+      .unique
       .transact(transactor.get)
-      .map(_ => true)
       .recover { case _ => false }
 
   private def createTable = for {

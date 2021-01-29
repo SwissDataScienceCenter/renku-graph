@@ -33,11 +33,11 @@ class LatestEventDatesViewRemoverSpec extends AnyWordSpec with DbInitSpec with s
 
     "not create a new 'project_latest_event_date' view if it does not exist" in new TestCase {
 
-      tableExists("project_latest_event_date") shouldBe false
+      viewExists("project_latest_event_date") shouldBe false
 
       viewCreator.run().unsafeRunSync() shouldBe ((): Unit)
 
-      tableExists("project_latest_event_date") shouldBe false
+      viewExists("project_latest_event_date") shouldBe false
 
       logger.loggedOnly(Info("'project_latest_event_date' view dropped"))
     }
@@ -46,7 +46,7 @@ class LatestEventDatesViewRemoverSpec extends AnyWordSpec with DbInitSpec with s
 
       createView()
 
-      tableExists("project_latest_event_date") shouldBe true
+      viewExists("project_latest_event_date") shouldBe true
 
       viewCreator.run().unsafeRunSync() shouldBe ((): Unit)
 

@@ -54,11 +54,10 @@ private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]](
     }
 
   private def checkTableExists: Interpretation[Boolean] =
-    sql"select event_id from event_payload limit 1"
-      .query[String]
-      .option
+    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
+      .query[Boolean]
+      .unique
       .transact(transactor.get)
-      .map(_ => true)
       .recover { case _ => false }
 
   private def alterTable = for {

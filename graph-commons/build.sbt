@@ -22,7 +22,7 @@ val pureConfigVersion = "0.14.0"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
-val refinedVersion = "0.9.18"
+val refinedVersion = "0.9.20"
 libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 
@@ -36,17 +36,17 @@ libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
 
 libraryDependencies += "io.sentry" % "sentry-logback" % "3.2.0"
 
-val doobieVersion = "0.9.4"
+val doobieVersion = "0.10.0"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 
-val catsVersion = "2.3.0"
+val catsVersion = "2.3.1"
 libraryDependencies += "org.typelevel" %% "cats-core"   % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-effect" % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-free"   % catsVersion
 
-val http4sVersion = "0.21.13"
+val http4sVersion = "0.21.15"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
@@ -57,17 +57,17 @@ libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sVersi
 // Test dependencies
 libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.27.2" % Test
 
-val jenaVersion = "3.16.0"
+val jenaVersion = "3.16.0" // leave at 3.16 until the Docker image version can catch up. 3.17 made changes with \\\\
 libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % Test
 
-libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.0.0"   % Test
-libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.1 is broken
+libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.1.0"   % Test
+libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.2 is broken
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
-libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.2"   % Test
+libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.2"   % Test // 3.2.3 seems to break List comparison
 
-val testContainersScalaVersion = "0.38.7"
+val testContainersScalaVersion = "0.38.8"
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
 
