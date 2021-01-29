@@ -215,7 +215,7 @@ class DatasetsResourcesSpec
         ._links
         .get(Rel("project-details"))
         .getOrFail("No link with rel 'project-details'")
-      val getProjectResponse = restClient GET datasetProjectLink.toString
+      val getProjectResponse = restClient.GET(datasetProjectLink.toString, user.accessToken)
 
       Then("he should get OK response with project details")
       getProjectResponse.status     shouldBe Ok
