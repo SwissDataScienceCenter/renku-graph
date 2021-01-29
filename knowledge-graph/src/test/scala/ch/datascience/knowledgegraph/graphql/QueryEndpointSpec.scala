@@ -19,10 +19,10 @@
 package ch.datascience.knowledgegraph.graphql
 
 import cats.effect.IO
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.http.ErrorMessage
 import ch.datascience.http.server.EndpointTester._
 import io.circe.Json
 import io.circe.literal._

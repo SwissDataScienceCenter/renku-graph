@@ -21,8 +21,8 @@ package ch.datascience.http.server
 import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.ConcurrentEffect
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.http.ErrorMessage._
+import ch.datascience.http.ErrorMessage
 import io.circe.syntax._
 import org.http4s.circe._
 import org.http4s.{ParseFailure, Response, Status}

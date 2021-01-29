@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.graphql
 import cats.MonadError
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.controllers.ErrorMessage
+import ch.datascience.http.ErrorMessage
 import ch.datascience.knowledgegraph.lineage
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json

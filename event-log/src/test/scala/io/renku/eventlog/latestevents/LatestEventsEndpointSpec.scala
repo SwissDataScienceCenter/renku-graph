@@ -20,12 +20,12 @@ package io.renku.eventlog.latestevents
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.InfoMessage._
+import ch.datascience.http.InfoMessage._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.{EventBody, EventId}
 import ch.datascience.graph.model.projects
+import ch.datascience.http.ErrorMessage
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error

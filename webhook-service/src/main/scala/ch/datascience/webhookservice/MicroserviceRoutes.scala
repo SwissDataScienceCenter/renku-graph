@@ -18,19 +18,34 @@
 
 package ch.datascience.webhookservice
 
-import cats.effect.{Clock, ConcurrentEffect, Resource}
+import cats.effect.{Clock, ConcurrentEffect, ContextShift, IO, Resource, Timer}
+import cats.syntax.all._
+import ch.datascience.config.GitLab
+import ch.datascience.control.Throttler
 import ch.datascience.graph.http.server.binders.ProjectId
-import ch.datascience.metrics.RoutesMetrics
-import ch.datascience.webhookservice.eventprocessing.{HookEventEndpoint, ProcessingStatusEndpoint}
-import ch.datascience.webhookservice.hookcreation.HookCreationEndpoint
-import ch.datascience.webhookservice.hookvalidation.HookValidationEndpoint
+import ch.datascience.graph.http.server.security.GitLabAuthenticator
+import ch.datascience.http.server.security.Authentication
+import ch.datascience.http.server.security.model.AuthUser
+import ch.datascience.logging.ExecutionTimeRecorder
+import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
+import ch.datascience.webhookservice.crypto.HookTokenCrypto
+import ch.datascience.webhookservice.eventprocessing._
+import ch.datascience.webhookservice.hookcreation.{HookCreationEndpoint, IOHookCreationEndpoint}
+import ch.datascience.webhookservice.hookvalidation.{HookValidationEndpoint, IOHookValidationEndpoint}
+import ch.datascience.webhookservice.project.ProjectHookUrl
+import io.chrisdavenport.log4cats.Logger
+import org.http4s.AuthedRoutes
 import org.http4s.dsl.Http4sDsl
+import org.http4s.server.AuthMiddleware
+
+import scala.concurrent.ExecutionContext
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     hookEventEndpoint:        HookEventEndpoint[F],
     hookCreationEndpoint:     HookCreationEndpoint[F],
     hookValidationEndpoint:   HookValidationEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
+    authMiddleware:           AuthMiddleware[F, AuthUser],
     routesMetrics:            RoutesMetrics[F]
 )(implicit clock:             Clock[F])
     extends Http4sDsl[F] {
@@ -43,12 +58,52 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import routesMetrics._
 
   // format: off
-  lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
+  private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
+    AuthedRoutes.of {
+      case POST -> Root / "projects" / ProjectId(projectId) / "webhooks" as authUser                => createHook(projectId, authUser)
+      case POST -> Root / "projects" / ProjectId(projectId) / "webhooks" / "validation" as authUser => validateHook(projectId, authUser)
+    }
+  }
+
+  lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
     case           GET  -> Root / "ping"                                                        => Ok("pong")
     case request @ POST -> Root / "webhooks" / "events"                                         => processPushEvent(request)
-    case request @ POST -> Root / "projects" / ProjectId(projectId) / "webhooks"                => createHook(projectId, request)
-    case request @ POST -> Root / "projects" / ProjectId(projectId) / "webhooks" / "validation" => validateHook(projectId, request)
     case           GET  -> Root / "projects" / ProjectId(projectId) / "events" / "status"       => fetchProcessingStatus(projectId)
-  }.withMetrics
+  }
   // format: on
+
+  lazy val routes: Resource[F, HttpRoutes[F]] = (nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
+}
+
+private object MicroserviceRoutes {
+  def apply(
+      metricsRegistry:       MetricsRegistry[IO],
+      gitLabThrottler:       Throttler[IO, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[IO],
+      logger:                Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[MicroserviceRoutes[IO]] =
+    for {
+      projectHookUrl  <- ProjectHookUrl.fromConfig[IO]()
+      hookTokenCrypto <- HookTokenCrypto[IO]()
+      hookEventEndpoint <-
+        IOHookEventEndpoint(gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
+      hookCreatorEndpoint <-
+        IOHookCreationEndpoint(projectHookUrl, gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
+      processingStatusEndpoint <-
+        IOProcessingStatusEndpoint(projectHookUrl, gitLabThrottler, executionTimeRecorder, logger)
+      hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler, logger)
+      authenticator          <- GitLabAuthenticator(gitLabThrottler, logger)
+      authMiddleware         <- Authentication.middleware(authenticator)
+    } yield new MicroserviceRoutes(
+      hookEventEndpoint,
+      hookCreatorEndpoint,
+      hookValidationEndpoint,
+      processingStatusEndpoint,
+      authMiddleware,
+      new RoutesMetrics[IO](metricsRegistry)
+    )
 }

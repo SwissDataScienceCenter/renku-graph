@@ -22,10 +22,12 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.{GitLab, renku}
 import ch.datascience.control.Throttler
-import ch.datascience.controllers.InfoMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.http.InfoMessage._
+import ch.datascience.http.InfoMessage
 import ch.datascience.graph.model.projects
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -50,10 +52,10 @@ class ProjectEndpoint[Interpretation[_]: Effect](
   import io.circe.{Encoder, Json}
   import org.http4s.circe._
 
-  def getProject(path: projects.Path): Interpretation[Response[Interpretation]] =
+  def getProject(path: projects.Path, maybeAuthUser: Option[AuthUser]): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
       projectFinder
-        .findProject(path)
+        .findProject(path, maybeAuthUser)
         .flatMap(toHttpResult(path))
         .recoverWith(httpResult(path))
     } map logExecutionTimeWhen(finishedSuccessfully(path))

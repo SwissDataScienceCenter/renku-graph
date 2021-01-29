@@ -20,11 +20,12 @@ package ch.datascience.webhookservice.eventprocessing
 
 import cats.MonadError
 import cats.effect.IO
-import ch.datascience.controllers.ErrorMessage._
-import ch.datascience.controllers.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage._
+import ch.datascience.http.InfoMessage
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
@@ -185,7 +186,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
     val commitToEventLog = mock[IOCommitToEventLog]
     val hookTokenCrypto  = mock[IOHookTokenCrypto]
-    val processPushEvent = new HookEventEndpoint[IO](
+    val processPushEvent = new HookEventEndpointImpl[IO](
       hookTokenCrypto,
       commitToEventLog,
       logger

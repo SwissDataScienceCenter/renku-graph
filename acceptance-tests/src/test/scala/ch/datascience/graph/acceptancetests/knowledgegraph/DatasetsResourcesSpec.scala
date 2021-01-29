@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -41,9 +42,9 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.{Creator, Project}
-import ch.datascience.rdfstore.entities.Person
+import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
@@ -68,7 +69,8 @@ class DatasetsResourcesSpec
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
-    implicit val accessToken: AccessToken = accessTokens.generateOne
+    val user = authUsers.generateOne
+    implicit val accessToken: AccessToken = user.accessToken
 
     val project = {
       val initProject = projects.generateOne
@@ -169,15 +171,11 @@ class DatasetsResourcesSpec
         )
       )
 
-      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)
-
-      `triples updates run`(
-        (List(dataset1, dataset2)
-          .flatMap(_.published.creators.map(_.maybeEmail))
-          .toSet + dataset1Creation.agent.maybeEmail + dataset2Creation.agent.maybeEmail + project.created.maybeCreator
-          .flatMap(_.maybeEmail)).flatten,
-        project.path
+      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
+        NonEmptyList.of(dataset1Committer, persons.generateOne.copy(maybeGitLabId = user.id.some)).map(_.asMember())
       )
+
+      `events processed`(project.id)
 
       And("the project exists in GitLab")
       `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
@@ -207,7 +205,10 @@ class DatasetsResourcesSpec
         .getOrFail(message = "Returned 'details' link does not point to any dataset in the RDF store")
       findIdentifier(foundDatasetDetails) shouldBe expectedDataset.id
 
-      When("user fetches details of the dataset project with the link from the response")
+      When("user is authenticated")
+      `GET <gitlabApi>/user returning OK`(user)
+
+      And("he fetches details of the dataset project using the link from the response")
       val datasetProjectLink = foundDatasetDetails.hcursor
         .downField("isPartOf")
         .downArray
@@ -372,8 +373,8 @@ class DatasetsResourcesSpec
       val committer     = persons.generateOne
       val committedDate = committedDates.generateOne
       val datasetJsonLD = toDataSetCommit(firstProject, commitId, committer, committedDate, dataset)
-      `data in the RDF store`(firstProject, commitId, committer, datasetJsonLD)
-      `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail), firstProject.path)
+      `data in the RDF store`(firstProject, commitId, committer, datasetJsonLD)()
+      `events processed`(firstProject.id)
 
       otherProjects.foldLeft(List(dataset.id)) { (datasetsIds, project) =>
         val commitId  = commitIds.generateOne
@@ -391,9 +392,9 @@ class DatasetsResourcesSpec
                           dataset,
                           datasetId.some
           )
-        )
+        )()
 
-        `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail), project.path)
+        `events processed`(project.id)
 
         datasetsIds :+ datasetId
       }

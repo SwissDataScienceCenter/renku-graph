@@ -22,12 +22,12 @@ import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.config.renku
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.InfoMessage._
+import ch.datascience.http.InfoMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.http.ErrorMessage
 import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import ch.datascience.http.rest.paging.model.Total
 import ch.datascience.http.rest.paging.{PagingHeaders, PagingResponse}

@@ -21,11 +21,11 @@ package io.renku.eventlog
 import cats.data.ValidatedNel
 import cats.effect.{Clock, ConcurrentEffect, ContextShift, Resource}
 import cats.syntax.all._
-import ch.datascience.controllers.ErrorMessage
-import ch.datascience.controllers.ErrorMessage._
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.graph.http.server.binders._
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
+import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.RoutesMetrics
 import io.renku.eventlog.creation.EventCreationEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
