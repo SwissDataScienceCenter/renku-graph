@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -68,7 +69,8 @@ class DatasetsResourcesSpec
 
   Feature("GET knowledge-graph/projects/<namespace>/<name>/datasets to find project's datasets") {
 
-    implicit val accessToken: AccessToken = accessTokens.generateOne
+    val user = authUsers.generateOne
+    implicit val accessToken: AccessToken = user.accessToken
 
     val project = {
       val initProject = projects.generateOne
@@ -169,7 +171,9 @@ class DatasetsResourcesSpec
         )
       )
 
-      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)()
+      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
+        NonEmptyList.of(dataset1Committer, persons.generateOne.copy(maybeGitLabId = user.id.some)).map(_.asMember())
+      )
 
       `events processed`(project.id)
 
@@ -201,7 +205,10 @@ class DatasetsResourcesSpec
         .getOrFail(message = "Returned 'details' link does not point to any dataset in the RDF store")
       findIdentifier(foundDatasetDetails) shouldBe expectedDataset.id
 
-      When("user fetches details of the dataset project with the link from the response")
+      When("user is authenticated")
+      `GET <gitlabApi>/user returning OK`(user)
+
+      And("he fetches details of the dataset project using the link from the response")
       val datasetProjectLink = foundDatasetDetails.hcursor
         .downField("isPartOf")
         .downArray
