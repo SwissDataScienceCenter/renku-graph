@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.stubs
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -31,6 +32,7 @@ import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.UrlEncoder.urlEncode
+import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model.{ParentProject, Permissions, Project}
 import ch.datascience.rdfstore.entities.Person
@@ -49,6 +51,9 @@ object GitLab {
 
   private val logger = TestLogger()
   private val port: Int Refined Positive = 2048
+
+  def `GET <gitlabApi>/user returning OK`(user: AuthUser): Unit =
+    `GET <gitlabApi>/user returning OK`(user.id)(user.accessToken)
 
   def `GET <gitlabApi>/user returning OK`(
       userGitLabId:       users.GitLabId = userGitLabIds.generateOne
@@ -172,8 +177,7 @@ object GitLab {
 
   def `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
       projectPath:        Path,
-      person:             (users.GitLabId, users.Username, users.Name),
-      otherPersons:       (users.GitLabId, users.Username, users.Name)*
+      persons:            NonEmptyList[(users.GitLabId, users.Username, users.Name)]
   )(implicit accessToken: AccessToken): Unit = {
     implicit val personEncoder: Encoder[(users.GitLabId, users.Username, users.Name)] = Encoder.instance {
       case (gitLabId, username, name) =>
@@ -186,11 +190,11 @@ object GitLab {
 
     stubFor {
       get(s"/api/v4/projects/${urlEncode(projectPath.value)}/members").withAccessTokenInHeader
-        .willReturn(okJson((person +: otherPersons).toList.asJson.noSpaces))
+        .willReturn(okJson(persons.toList.asJson.noSpaces))
     }
     stubFor {
       get(s"/api/v4/projects/${urlEncode(projectPath.value)}/users").withAccessTokenInHeader
-        .willReturn(okJson((person +: otherPersons).toList.asJson.noSpaces))
+        .willReturn(okJson(persons.toList.asJson.noSpaces))
     }
     ()
   }

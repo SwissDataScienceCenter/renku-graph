@@ -41,9 +41,9 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.{Creator, Project}
-import ch.datascience.rdfstore.entities.Person
+import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import eu.timepit.refined.auto._
@@ -169,15 +169,9 @@ class DatasetsResourcesSpec
         )
       )
 
-      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)
+      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)()
 
-      `triples updates run`(
-        (List(dataset1, dataset2)
-          .flatMap(_.published.creators.map(_.maybeEmail))
-          .toSet + dataset1Creation.agent.maybeEmail + dataset2Creation.agent.maybeEmail + project.created.maybeCreator
-          .flatMap(_.maybeEmail)).flatten,
-        project.path
-      )
+      `events processed`(project.id)
 
       And("the project exists in GitLab")
       `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
@@ -372,8 +366,8 @@ class DatasetsResourcesSpec
       val committer     = persons.generateOne
       val committedDate = committedDates.generateOne
       val datasetJsonLD = toDataSetCommit(firstProject, commitId, committer, committedDate, dataset)
-      `data in the RDF store`(firstProject, commitId, committer, datasetJsonLD)
-      `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail), firstProject.path)
+      `data in the RDF store`(firstProject, commitId, committer, datasetJsonLD)()
+      `events processed`(firstProject.id)
 
       otherProjects.foldLeft(List(dataset.id)) { (datasetsIds, project) =>
         val commitId  = commitIds.generateOne
@@ -391,9 +385,9 @@ class DatasetsResourcesSpec
                           dataset,
                           datasetId.some
           )
-        )
+        )()
 
-        `triples updates run`(dataset.published.creators.flatMap(_.maybeEmail), project.path)
+        `events processed`(project.id)
 
         datasetsIds :+ datasetId
       }

@@ -20,6 +20,7 @@ package ch.datascience.graph.acceptancetests.tooling
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
+import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.http.client.{AccessToken, BasicAuthCredentials, IORestClient}
 import ch.datascience.interpreters.TestLogger
@@ -32,6 +33,7 @@ import io.circe.Json
 import io.circe.literal._
 import org.http4s.Status.Ok
 import org.http4s.{Header, Method, Response}
+import org.scalatest.matchers.should
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -43,10 +45,12 @@ object WebhookServiceClient {
   def apply()(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO]) =
     new WebhookServiceClient
 
-  class WebhookServiceClient(implicit executionContext: ExecutionContext,
-                             contextShift:              ContextShift[IO],
-                             timer:                     Timer[IO])
-      extends ServiceClient {
+  class WebhookServiceClient(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ) extends ServiceClient
+      with should.Matchers {
     import io.circe.Json
 
     override val baseUrl: String Refined Url = "http://localhost:9001"
@@ -64,18 +68,22 @@ object WebhookServiceClient {
 }
 
 object TriplesGeneratorClient {
-  def apply()(implicit executionContext: ExecutionContext,
-              contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): ServiceClient =
+  def apply()(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): ServiceClient =
     new ServiceClient {
       override val baseUrl: String Refined Url = "http://localhost:9002"
     }
 }
 
 object TokenRepositoryClient {
-  def apply()(implicit executionContext: ExecutionContext,
-              contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): ServiceClient =
+  def apply()(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): ServiceClient =
     new ServiceClient {
       override val baseUrl: String Refined Url = "http://localhost:9003"
     }
@@ -92,14 +100,17 @@ object TokenRepositoryClient {
 object KnowledgeGraphClient {
   import sangria.ast.Document
 
-  def apply()(implicit executionContext: ExecutionContext,
-              contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): KnowledgeGraphClient = new KnowledgeGraphClient
+  def apply()(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): KnowledgeGraphClient = new KnowledgeGraphClient
 
-  class KnowledgeGraphClient(implicit executionContext: ExecutionContext,
-                             contextShift:              ContextShift[IO],
-                             timer:                     Timer[IO])
-      extends ServiceClient {
+  class KnowledgeGraphClient(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ) extends ServiceClient {
     override val baseUrl: String Refined Url = "http://localhost:9004"
 
     def POST(query: Document, variables: Map[String, String] = Map.empty): Response[IO] = {
@@ -129,18 +140,30 @@ object KnowledgeGraphClient {
 }
 
 object EventLogClient {
-  def apply()(implicit executionContext: ExecutionContext,
-              contextShift:              ContextShift[IO],
-              timer:                     Timer[IO]): ServiceClient =
-    new ServiceClient {
-      override val baseUrl: String Refined Url = "http://localhost:9005"
-    }
+
+  def apply()(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): EventLogClient = new EventLogClient
+
+  class EventLogClient(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ) extends ServiceClient {
+    override val baseUrl: String Refined Url = "http://localhost:9005"
+
+    def fetchProcessingStatus(projectId: projects.Id): Response[IO] =
+      GET(s"processing-status?project-id=$projectId")
+  }
 }
 
-abstract class ServiceClient(implicit executionContext: ExecutionContext,
-                             contextShift:              ContextShift[IO],
-                             timer:                     Timer[IO])
-    extends IORestClient(Throttler.noThrottling, TestLogger(), retryInterval = 500 millis, maxRetries = 1) {
+abstract class ServiceClient(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO]
+) extends IORestClient(Throttler.noThrottling, TestLogger(), retryInterval = 500 millis, maxRetries = 1) {
 
   import ServiceClient.ServiceReadiness
   import ServiceClient.ServiceReadiness._
@@ -193,8 +216,8 @@ abstract class ServiceClient(implicit executionContext: ExecutionContext,
     } yield
       if (response.status == Ok) ServiceUp
       else ServiceDown
-  } recover {
-    case NonFatal(_) => ServiceDown
+  } recover { case NonFatal(_) =>
+    ServiceDown
   }
 
   protected lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Response[IO]]] = {

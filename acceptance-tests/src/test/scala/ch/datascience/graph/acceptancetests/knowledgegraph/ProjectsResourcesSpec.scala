@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests.knowledgegraph
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -38,7 +39,7 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators._
-import ch.datascience.knowledgegraph.projects.model.Permissions.{GroupPermissions, ProjectAndGroupPermissions, ProjectPermissions}
+import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.rdfstore.entities
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
@@ -47,7 +48,6 @@ import ch.datascience.rdfstore.entities.bundles._
 import io.circe.Json
 import io.circe.literal._
 import io.renku.jsonld.JsonLD
-import io.renku.jsonld.syntax._
 import org.http4s.Status._
 import org.scalacheck.Gen
 import org.scalatest.GivenWhenThen
@@ -65,6 +65,7 @@ class ProjectsResourcesSpec
 
   private val user = authUsers.generateOne
   private implicit val accessToken: AccessToken = user.accessToken
+
   private val fullParentProject = projects.generateOne.copy(
     created = Creation(projectCreatedDates.generateOne, maybeCreator = None)
   )
@@ -87,7 +88,8 @@ class ProjectsResourcesSpec
       ),
       created = initProject.created.copy(
         maybeCreator = Creator(dataset1Committer.maybeEmail, dataset1Committer.name).some
-      )
+      ),
+      visibility = Gen.oneOf(Visibility.Private, Visibility.Internal).generateOne
     )
   }
   private val dataset1CommitId    = commitIds.generateOne
@@ -103,7 +105,7 @@ class ProjectsResourcesSpec
     Scenario("As a user I would like to find project's details by calling a REST endpoint") {
 
       Given("I am authenticated")
-      `GET <gitlabApi>/user returning OK`(user.id)(user.accessToken)
+      `GET <gitlabApi>/user returning OK`(user)
 
       Given("some data in the RDF Store")
       val parentProjectEntity = entities
@@ -132,7 +134,7 @@ class ProjectsResourcesSpec
                               parentProjectCommit,
                               parentProjectCommitter,
                               jsonLDParentProjectTriples
-      )
+      )()
 
       val jsonLDTriples = JsonLD.arr(
         nonModifiedDataSetCommit(
@@ -142,6 +144,7 @@ class ProjectsResourcesSpec
         )(
           projectPath = project.path,
           projectName = project.name,
+          maybeVisibility = project.visibility.some,
           projectDateCreated = project.created.date,
           maybeProjectCreator = project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
           maybeParent = parentProjectEntity.some,
@@ -151,27 +154,13 @@ class ProjectsResourcesSpec
           datasetTitle = dataset.title,
           datasetName = dataset.name,
           maybeDatasetSameAs = dataset.sameAs.some
-        ),
-        entities
-          .Project(
-            project.path,
-            project.name,
-            project.created.date,
-            project.created.maybeCreator.map(creator => Person(creator.name, creator.maybeEmail)),
-            Gen.oneOf(Visibility.Private, Visibility.Internal).generateSome,
-            members = Set(persons.generateOne.copy(maybeGitLabId = user.id.some)),
-            version = project.version
-          )
-          .asJsonLD
+        )
       )
-      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)
+      `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
+        NonEmptyList.of(dataset1Committer, persons.generateOne.copy(maybeGitLabId = user.id.some)).map(_.asMember())
+      )
 
-      `triples updates run`(
-        Set(project.created.maybeCreator.flatMap(_.maybeEmail),
-            parentProject.created.maybeCreator.flatMap(_.maybeEmail)
-        ).flatten,
-        project.path
-      )
+      `events processed`(project.id)
 
       And("the project exists in GitLab")
       `GET <gitlabApi>/projects/:path returning OK with`(project,

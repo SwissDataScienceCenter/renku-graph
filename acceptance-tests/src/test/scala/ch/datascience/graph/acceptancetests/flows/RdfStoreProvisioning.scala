@@ -18,25 +18,20 @@
 
 package ch.datascience.graph.acceptancetests.flows
 
+import cats.data.NonEmptyList
 import ch.datascience.graph.acceptancetests.data
-import ch.datascience.graph.acceptancetests.data._
-import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence._
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.GraphServices._
-import ch.datascience.graph.acceptancetests.tooling.{ModelImplicits, RDFStore}
-import ch.datascience.graph.model.CliVersion
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CommitId, EventStatus}
-import ch.datascience.graph.model.projects.{Path, ResourceId}
-import ch.datascience.graph.model.users.Email
-import ch.datascience.graph.model.views.RdfResource
+import ch.datascience.graph.acceptancetests.tooling.ModelImplicits
+import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.{projects, users}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
-import ch.datascience.rdfstore.entities.bundles._
 import ch.datascience.webhookservice.model.HookToken
 import io.renku.jsonld.JsonLD
 import org.http4s.Status._
@@ -47,28 +42,15 @@ import org.scalatest.matchers.should
 object RdfStoreProvisioning extends ModelImplicits with Eventually with AcceptanceTestPatience with should.Matchers {
 
   def `data in the RDF store`(
-      project:            Project,
-      commitId:           CommitId,
-      committer:          Person,
-      cliVersion:         CliVersion = currentVersionPair.cliVersion
-  )(implicit accessToken: AccessToken): Assertion =
-    `data in the RDF store`(
-      project,
-      commitId,
-      committer,
-      fileCommit(
-        commitId = commitId,
-        committer = committer,
-        cliVersion = cliVersion
-      )(projectPath = project.path, projectVersion = project.version)
-    )
-
-  def `data in the RDF store`(
-      project:            Project,
-      commitId:           CommitId,
-      committer:          Person,
-      triples:            JsonLD
-  )(implicit accessToken: AccessToken): Assertion = {
+      project:   Project,
+      commitId:  CommitId,
+      committer: Person,
+      triples:   JsonLD
+  )(
+      members: NonEmptyList[(users.GitLabId, users.Username, users.Name)] = committer.asMembersList()
+  )(implicit
+      accessToken: AccessToken
+  ): Assertion = {
     val projectId = project.id
 
     givenAccessTokenPresentFor(project)
@@ -79,75 +61,18 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
 
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)
 
-    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project.path, committer.asMember())
+    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project.path, members)
 
     webhookServiceClient
       .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))
       .status shouldBe Accepted
 
-    eventually {
-      EventLog.findEvents(projectId, status = New, TriplesStore) shouldBe List(commitId)
-    }
-
-    eventually {
-      RDFStore
-        .run(
-          s"""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-              |PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-              |
-              |SELECT ?label
-              |WHERE {
-              |  ?id rdf:type <http://www.w3.org/ns/prov#Activity>;
-              |      rdfs:label ?label.
-              |  FILTER (CONTAINS (?label, "$commitId"))    
-              |}
-              |""".stripMargin
-        )
-        .exists(_.get("label").exists(_ contains commitId.value)) shouldBe true
-    }
-
-    eventually {
-      EventLog
-        .findEvents(projectId, status = EventStatus.GeneratingTriples, EventStatus.TransformingTriples)
-        .isEmpty shouldBe true
-    }
+    `events processed`(projectId)
   }
 
-  def `triples updates run`(emails: Set[Email], projectPath: Path): Assertion = {
-    eventually {
-
-      val emailsInStore = RDFStore
-        .run("""|PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                |PREFIX schema: <http://schema.org/>
-                |
-                |SELECT ?email
-                |WHERE {
-                |  ?resource rdf:type <http://schema.org/Person> ;
-                |            schema:email ?email .
-                |}
-                |""".stripMargin)
-        .flatMap(_.get("email"))
-        .toSet
-
-      (emails.map(_.value) diff emailsInStore).isEmpty shouldBe true
-    }
-
-    eventually {
-      val projects = RDFStore
-        .run(s"""
-                |PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-                |PREFIX schema: <http://schema.org/>
-                |
-                |SELECT DISTINCT  ?dateCreated
-                |WHERE {
-                |  ${ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]} rdf:type <http://schema.org/Project>; 
-                | schema:dateCreated ?dateCreated .
-                |} 
-                |
-                |""".stripMargin)
-        .flatMap(_.get("dateCreated"))
-        .toSet
-      projects.nonEmpty shouldBe true
-    }
+  def `events processed`(projectId: projects.Id): Assertion = eventually {
+    val response = eventLogClient.fetchProcessingStatus(projectId)
+    response.status                                              shouldBe Ok
+    response.bodyAsJson.hcursor.downField("progress").as[Double] shouldBe Right(100d)
   }
 }

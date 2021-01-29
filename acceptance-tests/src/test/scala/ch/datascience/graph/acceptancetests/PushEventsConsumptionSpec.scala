@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests
 
+import cats.data.NonEmptyList
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.db.EventLog
@@ -66,7 +67,10 @@ class PushEventsConsumptionSpec
       `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
 
       And("project members/users exists in GitLab")
-      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(project.path, committer.asMember())
+      `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
+        project.path,
+        committer.asMembersList()
+      )
 
       And("project exists in GitLab")
       `GET <gitlabApi>/projects/:path returning OK with`(project)
