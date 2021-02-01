@@ -21,11 +21,10 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.renku
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.InfoMessage
 import ch.datascience.graph.model.datasets.Identifier
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
@@ -151,13 +150,6 @@ class DatasetEndpoint[Interpretation[_]: Effect](
   private implicit lazy val versionsEncoder: Encoder[DatasetVersions] = Encoder.instance[DatasetVersions] { versions =>
     json"""{
       "initial": ${versions.initial}
-    }"""
-  }
-
-  private implicit lazy val imagesEncoder: Encoder[List[ImageUrl]] = Encoder.instance[List[ImageUrl]] { imageUrls =>
-    val urlsInQuotes = imageUrls.map(_.url.toString).map(url => s""""$url"""")
-    json"""{
-      "images": [ ${urlsInQuotes.mkString(", ")} ]
     }"""
   }
 }

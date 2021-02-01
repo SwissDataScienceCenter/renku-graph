@@ -63,6 +63,9 @@ object datasets {
   final class Url private (val value: String) extends AnyVal with StringTinyType
   implicit object Url extends TinyTypeFactory[Url](new Url(_)) with constraints.Url
 
+  final class ImageUrl private (val value: String) extends AnyVal with StringTinyType
+  implicit object ImageUrl extends TinyTypeFactory[ImageUrl](new ImageUrl(_)) with constraints.Url
+
   final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
   implicit object DerivedFrom extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_)) with constraints.Url {
 

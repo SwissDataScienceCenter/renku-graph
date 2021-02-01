@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.datasets.{Identifier, Keyword}
+import ch.datascience.graph.model.datasets.{Identifier, ImageUrl, Keyword}
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
@@ -46,7 +46,9 @@ private class BaseDetailsFinder(
   import ch.datascience.graph.Schemas._
 
   def findBaseDetails(identifier: Identifier): IO[Option[Dataset]] =
-    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier)) flatMap toSingleDataset
+    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier)) flatMap { dataset =>
+      toSingleDataset(dataset)
+    }
 
   private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - details",
@@ -56,7 +58,7 @@ private class BaseDetailsFinder(
       renku  -> "renku",
       schema -> "schema"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?publishedDate
+    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?publishedDate ?imageIdentifier
         |WHERE {
         |    ?datasetId schema:identifier "$identifier";
         |               schema:identifier ?identifier;
@@ -68,7 +70,6 @@ private class BaseDetailsFinder(
         |               prov:atLocation ?location ;
         |               renku:topmostSameAs ?topmostSameAs;
         |               renku:topmostDerivedFrom/schema:identifier ?initialVersion
-        |               schema:image ?imageIdentifier.
         |               
         |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
         |    FILTER NOT EXISTS {
@@ -82,6 +83,7 @@ private class BaseDetailsFinder(
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    OPTIONAL { ?datasetId schema:description ?description }.
         |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate }.
+        |    
         |}
         |""".stripMargin
   )
@@ -97,6 +99,20 @@ private class BaseDetailsFinder(
         |    ?datasetId schema:identifier "$identifier" ;
         |               schema:keywords ?keyword .
         |}ORDER BY ASC(?keyword)
+        |""".stripMargin
+  )
+
+  def findImages(identifier: Identifier): IO[List[ImageUrl]] =
+    queryExpecting[List[ImageUrl]](using = queryImages(identifier)).flatMap(s => ME.pure(s))
+
+  private def queryImages(identifier: Identifier) = SparqlQuery.of(
+    name = "ds by id - image urls",
+    Prefixes.of(schema -> "schema"),
+    s"""|SELECT DISTINCT ?imageUrl
+        |WHERE {
+        |    ?datasetId schema:identifier "$identifier" ;
+        |               schema:image ?imageUrl .
+        |}
         |""".stripMargin
   )
 
@@ -171,6 +187,14 @@ private object BaseDetailsFinder {
       _.downField("keyword").downField("value").as[String].map(Keyword.apply)
 
     _.downField("results").downField("bindings").as(decodeList[Keyword])
+  }
+
+  private implicit val imagesDecoder: Decoder[List[ImageUrl]] = {
+
+    implicit val keywordDecoder: Decoder[ImageUrl] =
+      _.downField("image").downField("value").as[String].map(ImageUrl.apply)
+
+    _.downField("results").downField("bindings")
   }
 
   private def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =

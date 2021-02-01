@@ -238,8 +238,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       initial <- cursor.downField("initial").as[InitialVersion]
     } yield DatasetVersions(initial)
 
-  private implicit lazy val imageUrlDecoder: Decoder[List[ImageUrl]] = cursor =>
-    for {
-      urls <- cursor.downField("images").as[List[Url]]
-    } yield urls.map(ImageUrl)
+//  private implicit lazy val imageUrlDecoder: Decoder[List[ImageUrl]] = cursor =>
+//    for {
+//      urls <- cursor.downField("images").as[List[Url]]
+//    } yield urls.map(ImageUrl)
 }
