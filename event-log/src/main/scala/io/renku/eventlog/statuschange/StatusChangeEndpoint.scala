@@ -25,16 +25,14 @@ import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.{SchemaVersion, projects}
-import ch.datascience.http.ErrorMessage
+import ch.datascience.http.EventRequest.EventRequestContent
+import ch.datascience.http.{ErrorMessage, MultipartRequest}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import fs2.text.utf8Decode
 import io.chrisdavenport.log4cats.Logger
-import io.circe.parser.parse
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 import io.renku.eventlog.{EventLogDB, EventMessage, EventPayload, EventProcessingTime}
 import org.http4s.dsl.Http4sDsl
-import org.http4s.multipart.Multipart
 
 import scala.util.control.NonFatal
 
@@ -46,7 +44,8 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
     underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
     logger:                             Logger[Interpretation]
 )(implicit ME:                          MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+    extends Http4sDsl[Interpretation]
+    with MultipartRequest {
 
   import ch.datascience.http.InfoMessage
   import ch.datascience.http.InfoMessage._
@@ -178,38 +177,26 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
       request: Request[Interpretation]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
-  ): Interpretation[Response[Interpretation]] =
-    request.decode[Multipart[Interpretation]] { p =>
-      (p.parts.find(_.name.contains("event")), p.parts.find(_.name.contains("payload"))) match {
-        case (Some(eventPart), maybePayloadPart) =>
-          {
-            for {
-              event <- EitherT.liftF[Interpretation, Response[Interpretation], String](
-                         eventPart.body.through(utf8Decode).compile.foldMonoid
-                       )
-              eventJson <- EitherT
-                             .fromEither[Interpretation](parse(event))
-                             .leftSemiflatMap(e => httpResponse(BadRequestError(e)))
-              maybePayload <-
-                EitherT.liftF[Interpretation, Response[Interpretation], Option[EventPayload]](
-                  maybePayloadPart.map(_.body.through(utf8Decode).compile.foldMonoid.map(EventPayload.apply)).sequence
-                )
-              command <-
-                EitherT
-                  .fromEither[Interpretation](
-                    eventJson.as[ChangeStatusCommand[Interpretation]](findDecoder(eventId, maybePayload))
-                  )
-                  .leftSemiflatMap(e => httpResponse(BadRequestError(e)))
+  ): Interpretation[Response[Interpretation]] = decodeAndProcessMultipart[Interpretation, EventRequestContent](
+    request,
+    content =>
+      {
+        for {
+          requestContent <- content.leftSemiflatMap(error => httpResponse(BadRequestError(error)))
+          command <- EitherT
+                       .fromEither[Interpretation] {
+                         requestContent.event.as[ChangeStatusCommand[Interpretation]](
+                           findDecoder(eventId, requestContent.maybePayload.map(EventPayload.apply))
+                         )
+                       }
+                       .leftSemiflatMap(e => httpResponse(BadRequestError(e)))
+          response <- EitherT.liftF[Interpretation, Response[Interpretation], Response[Interpretation]](
+                        run(command).flatMap(_.asHttpResponse)
+                      )
+        } yield response
+      }.merge
+  )
 
-              updateResult <- EitherT.liftF[Interpretation, Response[Interpretation], UpdateResult](run(command))
-              response <- EitherT.liftF[Interpretation, Response[Interpretation], Response[Interpretation]](
-                            updateResult.asHttpResponse
-                          )
-            } yield response
-          }.merge
-        case _ => httpResponse(BadRequestError(new Exception("Unprocessable Entity")))
-      }
-    }
 }
 
 object IOStatusChangeEndpoint {

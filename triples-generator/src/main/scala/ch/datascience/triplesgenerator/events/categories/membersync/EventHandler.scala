@@ -25,10 +25,10 @@ import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.http.EventRequest.EventRequestContent
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events
 import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext

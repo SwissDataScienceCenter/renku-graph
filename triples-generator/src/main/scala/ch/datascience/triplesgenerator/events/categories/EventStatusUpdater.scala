@@ -25,9 +25,9 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.http.EventRequest.EventRequestContent
 import ch.datascience.http.client.IORestClient
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.headers.`Content-Type`
 import org.http4s.multipart.{Multipart, Part}

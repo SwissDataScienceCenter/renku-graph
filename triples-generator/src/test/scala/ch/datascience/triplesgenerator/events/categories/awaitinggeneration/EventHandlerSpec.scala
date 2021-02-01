@@ -25,11 +25,11 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
+import ch.datascience.http.EventRequest.EventRequestContent
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.events.{EventSchedulingResult, eventRequestContents}
 import ch.datascience.triplesgenerator.generators.VersionGenerators.renkuVersionPairs

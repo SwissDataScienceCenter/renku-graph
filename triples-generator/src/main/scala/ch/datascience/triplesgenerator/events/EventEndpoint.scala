@@ -24,18 +24,14 @@ import cats.effect.{Effect, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.RenkuVersionPair
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.EventRequest.EventRequestContent
+import ch.datascience.http.{ErrorMessage, MultipartRequest}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
-import fs2.text.utf8Decode
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Json
-import io.circe.parser.parse
 import org.http4s.dsl.Http4sDsl
-import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}
 
 import scala.concurrent.ExecutionContext
@@ -49,18 +45,33 @@ class EventEndpointImpl[Interpretation[_]: Effect](
     reProvisioningStatus: ReProvisioningStatus[Interpretation]
 )(implicit ME:            MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation]
-    with EventEndpoint[Interpretation] {
+    with EventEndpoint[Interpretation]
+    with MultipartRequest {
 
   import EventSchedulingResult._
   import cats.syntax.all._
-  import ch.datascience.http.InfoMessage._
   import ch.datascience.http.InfoMessage
+  import ch.datascience.http.InfoMessage._
   import org.http4s._
 
   override def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] =
     reProvisioningStatus.isReProvisioning() flatMap { isReProvisioning =>
       if (isReProvisioning) ServiceUnavailable(InfoMessage("Temporarily unavailable: currently re-provisioning"))
-      else decodeRequestAndProcess(request)
+      else
+        decodeAndProcessMultipart[Interpretation, EventRequestContent](
+          request,
+          eventContent =>
+            {
+              for {
+                content <- eventContent.leftSemiflatMap(_ => toHttpResult(EventSchedulingResult.BadRequest))
+                result <-
+                  EitherT.liftF(
+                    tryNextHandler(content, eventHandlers).flatMap(toHttpResult)
+                  ) leftSemiflatMap toHttpResult
+              } yield result
+            }.merge
+        )
+
     }
 
   private def tryNextHandler(requestContent: EventRequestContent,
@@ -84,38 +95,6 @@ class EventEndpointImpl[Interpretation[_]: Effect](
     case EventSchedulingResult.SchedulingError(_)   => InternalServerError(ErrorMessage("Failed to schedule event"))
   }
 
-  private def decodeRequestAndProcess(
-      request: Request[Interpretation]
-  )(implicit
-      ME: MonadError[Interpretation, Throwable]
-  ): Interpretation[Response[Interpretation]] =
-    request.decode[Multipart[Interpretation]] { p =>
-      (p.parts.find(_.name.contains("event")), p.parts.find(_.name.contains("payload"))) match {
-        case (Some(eventPart), maybePayloadPart) =>
-          {
-            for {
-              eventStr <- EitherT.liftF[Interpretation, Response[Interpretation], String](
-                            eventPart.body.through(utf8Decode).compile.foldMonoid
-                          )
-              event <- EitherT
-                         .fromEither[Interpretation](parse(eventStr))
-                         .leftSemiflatMap(_ => toHttpResult(EventSchedulingResult.BadRequest))
-              maybePayload <- EitherT.liftF[Interpretation, Response[Interpretation], Option[String]](
-                                maybePayloadPart.map(_.body.through(utf8Decode).compile.foldMonoid).sequence
-                              )
-              eventRequestContent = EventRequestContent(event, maybePayload)
-              result <- EitherT
-                          .liftF[Interpretation, Response[Interpretation], EventSchedulingResult](
-                            tryNextHandler(eventRequestContent, eventHandlers)
-                          )
-              httpResult <-
-                EitherT
-                  .liftF[Interpretation, Response[Interpretation], Response[Interpretation]](toHttpResult(result))
-            } yield httpResult
-          }.merge
-        case _ => toHttpResult(EventSchedulingResult.BadRequest)
-      }
-    }
 }
 
 object IOEventEndpoint {
@@ -155,5 +134,4 @@ object IOEventEndpoint {
       reProvisioningStatus
     )
 
-  case class EventRequestContent(event: Json, maybePayload: Option[String])
 }

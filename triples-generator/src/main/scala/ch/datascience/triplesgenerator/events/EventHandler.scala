@@ -22,9 +22,9 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.http.EventRequest.EventRequestContent
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, SchedulingError}
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import io.chrisdavenport.log4cats.Logger
 import io.circe.{Decoder, DecodingFailure, HCursor}
 
