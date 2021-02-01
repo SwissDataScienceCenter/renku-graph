@@ -175,7 +175,7 @@ class DatasetsResourcesSpec
         NonEmptyList.of(dataset1Committer, persons.generateOne.copy(maybeGitLabId = user.id.some)).map(_.asMember())
       )
 
-      `events processed`(project.id)
+      `wait for events to be processed`(project.id)
 
       And("the project exists in GitLab")
       `GET <gitlabApi>/projects/:path returning OK with`(project, withStatistics = true)
@@ -374,7 +374,7 @@ class DatasetsResourcesSpec
       val committedDate = committedDates.generateOne
       val datasetJsonLD = toDataSetCommit(firstProject, commitId, committer, committedDate, dataset)
       `data in the RDF store`(firstProject, commitId, committer, datasetJsonLD)()
-      `events processed`(firstProject.id)
+      `wait for events to be processed`(firstProject.id)
 
       otherProjects.foldLeft(List(dataset.id)) { (datasetsIds, project) =>
         val commitId  = commitIds.generateOne
@@ -394,7 +394,7 @@ class DatasetsResourcesSpec
           )
         )()
 
-        `events processed`(project.id)
+        `wait for events to be processed`(project.id)
 
         datasetsIds :+ datasetId
       }
