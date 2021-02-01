@@ -49,12 +49,15 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         forAll(datasetProjects, addedToProjectObjects) { (project, addedToProject) =>
           val dataset = nonModifiedDatasets(projects = project.copy(created = addedToProject).toGenerator).generateOne
 
+          val dataSetJsonLD = dataset.toJsonLD(noSameAs = true)() //this has no images
           loadToStore(
-            dataset.toJsonLD(noSameAs = true)(),
+            dataSetJsonLD,
             randomDataSetCommit
           )
 
-          datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
+          datasetFinder
+            .findDataset(dataset.id)
+            .unsafeRunSync() shouldBe Some( // the expectation is correct but the finding is not
             dataset.copy(
               sameAs = dataset.entityId.asSameAs,
               parts = dataset.parts.sorted,

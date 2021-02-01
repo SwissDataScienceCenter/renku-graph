@@ -23,7 +23,7 @@ import cats.syntax.all._
 import ch.datascience.config.renku
 import ch.datascience.controllers.InfoMessage._
 import ch.datascience.controllers.{ErrorMessage, InfoMessage}
-import ch.datascience.graph.model.datasets.Identifier
+import ch.datascience.graph.model.datasets.{Identifier, ImageUrl}
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
@@ -153,12 +153,9 @@ class DatasetEndpoint[Interpretation[_]: Effect](
     }"""
   }
 
-  private implicit lazy val imagesEncoder: Encoder[List[ImageUrl]] = Encoder.instance[List[ImageUrl]] { imageUrls =>
-    val urlsInQuotes = imageUrls.map(_.url.toString).map(url => s""""$url"""")
-    json"""{
-      "images": [ ${urlsInQuotes.mkString(", ")} ]
-    }"""
-  }
+//  private implicit lazy val imagesEncoder: Encoder[ImageUrl] = Encoder.instance[ImageUrl] { imageUrl =>
+//    imageUrl.asJson
+//  }
 }
 
 object IODatasetEndpoint {

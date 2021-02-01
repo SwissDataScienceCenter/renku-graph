@@ -40,6 +40,7 @@ trait DataSet {
   val datasetCreators:                   Set[Person]
   val datasetParts:                      List[DataSetPartArtifact]
   val datasetKeywords:                   List[Keyword]
+  val datasetImages:                     List[ImageUrl]
   val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]
   val overrideDatasetTopmostDerivedFrom: Option[TopmostDerivedFrom]
 
@@ -77,6 +78,7 @@ object DataSet {
                          creators:                   Set[Person],
                          partsFactories:             List[Activity => DataSetPartArtifact],
                          keywords:                   List[Keyword] = Nil,
+                         images:                     List[ImageUrl] = Nil,
                          overrideTopmostSameAs:      Option[TopmostSameAs] = None,
                          overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   )(activity:                                        Activity): DataSetEntity =
@@ -98,6 +100,7 @@ object DataSet {
       override val datasetCreators:                   Set[Person]                = creators
       override val datasetParts:                      List[DataSetPartArtifact]  = partsFactories.map(_.apply(activity))
       override val datasetKeywords:                   List[Keyword]              = keywords
+      override val datasetImages:                     List[ImageUrl]             = images
       override val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]      = overrideTopmostSameAs
       override val overrideDatasetTopmostDerivedFrom: Option[TopmostDerivedFrom] = overrideTopmostDerivedFrom
     }
@@ -113,6 +116,7 @@ object DataSet {
                       creators:                   Set[Person],
                       partsFactories:             List[Activity => DataSetPartArtifact],
                       keywords:                   List[Keyword] = Nil,
+                      images:                     List[ImageUrl] = Nil,
                       overrideTopmostSameAs:      Option[TopmostSameAs] = None,
                       overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   )(activity:                                     Activity): DataSetEntity =
@@ -134,6 +138,7 @@ object DataSet {
       override val datasetCreators:                   Set[Person]                = creators
       override val datasetParts:                      List[DataSetPartArtifact]  = partsFactories.map(_.apply(activity))
       override val datasetKeywords:                   List[Keyword]              = keywords
+      override val datasetImages:                     List[ImageUrl]             = images
       override val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]      = overrideTopmostSameAs
       override val overrideDatasetTopmostDerivedFrom: Option[TopmostDerivedFrom] = overrideTopmostDerivedFrom
     }
@@ -166,6 +171,7 @@ object DataSet {
           schema / "creator"           -> entity.datasetCreators.asJsonLD,
           schema / "hasPart"           -> entity.datasetParts.asJsonLD,
           schema / "keywords"          -> entity.datasetKeywords.asJsonLD,
+          schema / "image"             -> entity.datasetImages.asJsonLD,
           renku / "topmostSameAs"      -> entity.topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> entity.topmostDerivedFrom.asJsonLD
         ).asRight

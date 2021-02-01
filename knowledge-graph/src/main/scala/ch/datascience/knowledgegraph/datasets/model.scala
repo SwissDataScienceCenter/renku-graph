@@ -22,7 +22,6 @@ import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
-import eu.timepit.refined.types.string.NonEmptyString
 
 object model {
 
@@ -77,6 +76,4 @@ object model {
   final case class DatasetProject(path: Path, name: projects.Name, created: AddedToProject)
   final case class AddedToProject(date: DateCreatedInProject, agent: DatasetAgent)
   final case class DatasetAgent(maybeEmail: Option[Email], name: UserName)
-
-  final case class ImageUrl(url: Url)
 }
