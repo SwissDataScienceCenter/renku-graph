@@ -44,10 +44,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       s"succeed if remote responds with $status" in new TestCase {
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withMultipartRequestBody(
-              aMultipart("event")
-                .withBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
-            )
+            .withRequestBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
             .willReturn(aResponse().withStatus(status.code))
         }
 
@@ -59,10 +56,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       val status = BadRequest
       stubFor {
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-          .withMultipartRequestBody(
-            aMultipart("event")
-              .withBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
-          )
+          .withRequestBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
           .willReturn(aResponse().withStatus(status.code))
       }
 
@@ -78,10 +72,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       s"succeed if remote responds with $status" in new TestCase {
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withMultipartRequestBody(
-              aMultipart("event")
-                .withBody(equalToJson(json"""{"status": "TRIPLES_STORE"}""".spaces2))
-            )
+            .withRequestBody(equalToJson(json"""{"status": "TRIPLES_STORE"}""".spaces2))
             .willReturn(aResponse().withStatus(status.code))
         }
 
@@ -94,10 +85,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
       stubFor {
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-          .withMultipartRequestBody(
-            aMultipart("event")
-              .withBody(equalToJson(json"""{"status": "TRIPLES_STORE"}""".spaces2))
-          )
+          .withRequestBody(equalToJson(json"""{"status": "TRIPLES_STORE"}""".spaces2))
           .willReturn(aResponse().withStatus(status.code))
       }
 
@@ -117,7 +105,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
               aMultipart("event")
                 .withBody(
                   equalToJson(
-                    json"""{"status": "TRIPLES_GENERATED", "schemaVersion": ${schemaVersion.value} }""".spaces2
+                    json"""{"status": "TRIPLES_GENERATED" }""".spaces2
                   )
                 )
             )
@@ -125,7 +113,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
               aMultipart("payload")
                 .withBody(
                   equalToJson(
-                    rawTriples.value.noSpaces
+                    json"""{"schemaVersion": ${schemaVersion.value} , "payload": ${rawTriples.value.noSpaces} }""".noSpaces
                   )
                 )
             )
@@ -145,7 +133,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
             aMultipart("event")
               .withBody(
                 equalToJson(
-                  json"""{"status": "TRIPLES_GENERATED", "schemaVersion": ${schemaVersion.value}  }""".spaces2
+                  json"""{"status": "TRIPLES_GENERATED" }""".spaces2
                 )
               )
           )
@@ -153,7 +141,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
             aMultipart("payload")
               .withBody(
                 equalToJson(
-                  rawTriples.value.noSpaces
+                  json"""{"schemaVersion": ${schemaVersion.value} , "payload": ${rawTriples.value.noSpaces} }""".noSpaces
                 )
               )
           )
@@ -173,12 +161,9 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         val exception = exceptions.generateOne
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withMultipartRequestBody(
-              aMultipart("event")
-                .withBody(equalToJson(json"""{"status": "GENERATION_RECOVERABLE_FAILURE", "message": ${asString(
-                  exception
-                )}}""".spaces2))
-            )
+            .withRequestBody(equalToJson(json"""{"status": "GENERATION_RECOVERABLE_FAILURE", "message": ${asString(
+              exception
+            )}}""".spaces2))
             .willReturn(aResponse().withStatus(status.code))
         }
 
@@ -207,12 +192,9 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         val exception = exceptions.generateOne
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withMultipartRequestBody(
-              aMultipart("event")
-                .withBody(equalToJson(json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE", "message": ${asString(
-                  exception
-                )}}""".spaces2))
-            )
+            .withRequestBody(equalToJson(json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE", "message": ${asString(
+              exception
+            )}}""".spaces2))
             .willReturn(aResponse().withStatus(status.code))
         }
 
@@ -242,9 +224,8 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       s"succeed if remote responds with $status" in new TestCase {
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withMultipartRequestBody(
-              aMultipart("event")
-                .withBody(equalToJson(json"""{"status": "SKIPPED", "message": $message}""".spaces2))
+            .withRequestBody(
+              equalToJson(json"""{"status": "SKIPPED", "message": $message}""".spaces2)
             )
             .willReturn(aResponse().withStatus(status.code))
         }

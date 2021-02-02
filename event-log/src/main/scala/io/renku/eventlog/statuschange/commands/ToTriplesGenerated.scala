@@ -103,7 +103,7 @@ object ToTriplesGenerated {
     Kleisli { eventIdAndRequest =>
       val (eventId, request) = eventIdAndRequest
       (for {
-        multipart <- OptionT.liftF(request.as[Multipart[Interpretation]]) // TODO failure to be badrequest
+        multipart <- OptionT.liftF(request.as[Multipart[Interpretation]])
         eventJson <-
           OptionT.liftF(multipart.parts.find(_.name.contains("event")).map(_.as[Json]).get)
         payloadStr <-

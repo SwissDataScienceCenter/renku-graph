@@ -64,7 +64,6 @@ class EventEndpointImpl[Interpretation[_]: Effect](
           multipart <- request.as[Multipart[Interpretation]]
           eventJson <-
             multipart.parts.find(_.name.contains("event")).map(_.as[Json]).get
-
           maybePayload <-
             multipart.parts.find(_.name.contains("payload")).map(_.as[String]).sequence
           eventRequestContent = EventRequestContent(eventJson, maybePayload)

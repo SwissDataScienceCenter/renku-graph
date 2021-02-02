@@ -29,9 +29,10 @@ import ch.datascience.http.client.IORestClient
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import io.chrisdavenport.log4cats.Logger
+import org.http4s.circe.jsonEncoder
 import org.http4s.headers.`Content-Type`
 import org.http4s.multipart.{Multipart, Part}
-import org.http4s.{MediaType, Status}
+import org.http4s.{MediaType, Status, Uri}
 
 import java.io.{PrintWriter, StringWriter}
 import scala.concurrent.ExecutionContext
@@ -86,10 +87,11 @@ private class IOEventStatusUpdater(
                                     schemaVersion: SchemaVersion
   ): IO[Unit] = sendStatusChange(
     eventId,
-    eventContent =
-      EventRequestContent(json"""{"status": "TRIPLES_GENERATED", "schemaVersion": ${schemaVersion.value} }""",
-                          maybePayload = payload.value.noSpaces.some
-      ),
+    eventContent = EventRequestContent(
+      json"""{"status": "TRIPLES_GENERATED"}""",
+      maybePayload =
+        (json"""{"payload": ${payload.value.noSpaces}, "schemaVersion": ${schemaVersion.value} }""").noSpaces.some
+    ),
     responseMapping = okConflictAsSuccess
   )
 
@@ -145,24 +147,26 @@ private class IOEventStatusUpdater(
   ): IO[Unit] =
     for {
       uri <- validateUri(s"$eventLogUrl/events/${eventId.id}/${eventId.projectId}")
-      multipartPayload = multipart(eventContent)
-      sendingResult <- send(
-                         request(PATCH, uri)
-                           .withEntity(multipartPayload)
-                           .withHeaders(multipartPayload.headers)
-                       )(responseMapping)
+      request = createRequest(uri, eventContent)
+      sendingResult <- send(request)(responseMapping)
     } yield sendingResult
 
-  private def multipart(eventRequestContent: EventRequestContent) =
-    Multipart[IO](
-      Vector(
-        Part.formData[IO]("event", eventRequestContent.event.noSpaces, `Content-Type`(MediaType.application.json)).some,
-        eventRequestContent.maybePayload.map(
-          Part
-            .formData[IO]("payload", _)
+  private def createRequest(uri: Uri, eventRequestContent: EventRequestContent) =
+    eventRequestContent.maybePayload match {
+      case Some(payload) =>
+        val multipart = Multipart[IO](
+          Vector(
+            Part
+              .formData[IO]("event", eventRequestContent.event.noSpaces, `Content-Type`(MediaType.application.json)),
+            Part.formData[IO]("payload", payload)
+          )
         )
-      ).flatten
-    )
+        request(PATCH, uri)
+          .withEntity(multipart)
+          .withHeaders(multipart.headers)
+      case None =>
+        request(PATCH, uri).withEntity(eventRequestContent.event)
+    }
 
   private lazy val okConflictAsSuccess: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
     case (Ok, _, _)       => IO.unit
