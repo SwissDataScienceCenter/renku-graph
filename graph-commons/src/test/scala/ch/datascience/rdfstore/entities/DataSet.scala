@@ -154,8 +154,9 @@ object DataSet {
     new PartialEntityConverter[DataSetEntity] {
       override def convert[T <: DataSetEntity]: T => Either[Exception, PartialEntity] = { entity =>
         implicit val creatorsOrdering: Ordering[Person] = Ordering.by((p: Person) => p.name.value)
+        val datasetEntityId = entityId(entity.datasetId)
         PartialEntity(
-          entityId(entity.datasetId),
+          datasetEntityId,
           EntityTypes of schema / "Dataset",
           rdfs / "label"               -> entity.datasetId.asJsonLD,
           schema / "identifier"        -> entity.datasetId.asJsonLD,
@@ -171,7 +172,7 @@ object DataSet {
           schema / "creator"           -> entity.datasetCreators.asJsonLD,
           schema / "hasPart"           -> entity.datasetParts.asJsonLD,
           schema / "keywords"          -> entity.datasetKeywords.asJsonLD,
-          schema / "image"             -> entity.datasetImages.asJsonLD,
+          schema / "image"             -> entity.datasetImages.zipWithIndex.asJsonLD(encodeList(imageUrlEncoder(datasetEntityId))),
           renku / "topmostSameAs"      -> entity.topmostSameAs.asJsonLD,
           renku / "topmostDerivedFrom" -> entity.topmostDerivedFrom.asJsonLD
         ).asRight
@@ -192,4 +193,13 @@ object DataSet {
         .combine(entity.asPartialJsonLD[DataSetEntity])
         .getOrFail
     }
+
+  private def imageUrlEncoder(datasetEntityId: EntityId): JsonLDEncoder[(ImageUrl, Int)] = JsonLDEncoder.instance {
+    case (imageUrl, position) =>
+      JsonLD.entity(datasetEntityId / "images" / position,
+                    EntityTypes of schema / "ImageObject",
+                    (schema / "contentUrl") -> imageUrl.asJsonLD,
+                    (schema / "position")   -> position.asJsonLD
+      )
+  }
 }

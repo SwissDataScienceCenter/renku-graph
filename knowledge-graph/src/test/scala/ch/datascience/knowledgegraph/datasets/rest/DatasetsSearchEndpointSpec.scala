@@ -154,13 +154,14 @@ class DatasetsSearchEndpointSpec
     ).searchForDatasets _
 
     lazy val toJson: DatasetSearchResult => Json = {
-      case DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount) =>
+      case DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount, images) =>
         json"""{
           "identifier": $id,
           "title": $title,
           "name": $name,
           "published": $published,
           "projectsCount": ${projectsCount.value},
+          "images": ${images.map(_.value)},
           "_links": [{
             "rel": "details",
             "href": ${(renkuResourcesUrl / "datasets" / id).value}
@@ -197,5 +198,6 @@ class DatasetsSearchEndpointSpec
     maybeDescription <- Gen.option(datasetDescriptions)
     published        <- datasetPublishingInfos
     projectsCount    <- nonNegativeInts() map (_.value) map ProjectsCount.apply
-  } yield DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount)
+    images           <- listOf(imageUrls)
+  } yield DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount, images)
 }

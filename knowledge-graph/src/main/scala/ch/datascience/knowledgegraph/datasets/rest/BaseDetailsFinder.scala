@@ -103,16 +103,19 @@ private class BaseDetailsFinder(
   )
 
   def findImages(identifier: Identifier): IO[List[ImageUrl]] =
-    queryExpecting[List[ImageUrl]](using = queryImages(identifier)).flatMap(s => ME.pure(s))
+    queryExpecting[List[ImageUrl]](using = queryImages(identifier))
 
   private def queryImages(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - image urls",
     Prefixes.of(schema -> "schema"),
-    s"""|SELECT DISTINCT ?imageUrl
+    s"""|SELECT DISTINCT ?contentUrl
         |WHERE {
         |    ?datasetId schema:identifier "$identifier" ;
-        |               schema:image ?imageUrl .
-        |}
+        |               schema:image ?imageId .
+        |    ?imageId   a schema:ImageObject;
+        |               schema:contentUrl ?contentUrl ;
+        |               schema:position ?position .
+        |}ORDER BY ASC(?position)
         |""".stripMargin
   )
 
@@ -181,7 +184,7 @@ private object BaseDetailsFinder {
     _.downField("results").downField("bindings").as(decodeList(dataset))
   }
 
-  private implicit val keywordsDecoder: Decoder[List[Keyword]] = {
+  private implicit lazy val keywordsDecoder: Decoder[List[Keyword]] = {
 
     implicit val keywordDecoder: Decoder[Keyword] =
       _.downField("keyword").downField("value").as[String].map(Keyword.apply)
@@ -189,12 +192,12 @@ private object BaseDetailsFinder {
     _.downField("results").downField("bindings").as(decodeList[Keyword])
   }
 
-  private implicit val imagesDecoder: Decoder[List[ImageUrl]] = {
+  private implicit lazy val imagesDecoder: Decoder[List[ImageUrl]] = {
 
-    implicit val keywordDecoder: Decoder[ImageUrl] =
-      _.downField("image").downField("value").as[String].map(ImageUrl.apply)
+    implicit val imageDecoder: Decoder[ImageUrl] =
+      _.downField("contentUrl").downField("value").as[String].map(ImageUrl.apply)
 
-    _.downField("results").downField("bindings")
+    _.downField("results").downField("bindings").as(decodeList[ImageUrl])
   }
 
   private def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =

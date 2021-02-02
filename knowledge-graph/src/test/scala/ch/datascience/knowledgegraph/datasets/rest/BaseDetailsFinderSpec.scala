@@ -41,7 +41,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
 
   "non modified dataset decoder" should {
 
-    "decode result-set with a blank description, url, and sameAs to a Dataset object" in {
+    "decode result-set with a blank description, url, sameAs, and images to a Dataset object" in {
       forAll(nonModifiedDatasets(), datasetPublishedDates, blankStrings()) { (dataset, publishedDate, description) =>
         resultSet(dataset, publishedDate, description).as[List[Dataset]] shouldBe Right {
           List(
@@ -52,6 +52,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
               .copy(parts = Nil)
               .copy(projects = Nil)
               .copy(keywords = Nil)
+              .copy(images = Nil)
           )
         }
       }
@@ -60,7 +61,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
 
   "modified dataset decoder" should {
 
-    "decode result-set with a blank description, url, and sameAs to a Dataset object" in {
+    "decode result-set with a blank description, url, sameAs, and images to a Dataset object" in {
       forAll(nonModifiedDatasets(), datasetPublishedDates, blankStrings()) { (dataset, publishedDate, description) =>
         val modifiedDataset = modifiedDatasetsOnFirstProject(dataset).generateOne
         resultSet(modifiedDataset, publishedDate, description).as[List[Dataset]] shouldBe Right {
@@ -71,6 +72,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
               .copy(parts = Nil)
               .copy(projects = Nil)
               .copy(keywords = Nil)
+              .copy(images = Nil)
           )
         }
       }
@@ -112,7 +114,8 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
           "topmostSameAs": {"value": ${DataSet.entityId(dataset.id).toString} },
           "maybeDerivedFrom": {"value": ${dataset.derivedFrom.value}},
           "initialVersion": {"value": ${dataset.versions.initial.toString} },
-          "keywords": {"value": ${dataset.keywords.map(_.value).asJson}}
+          "keywords": {"value": ${dataset.keywords.map(_.value).asJson}},
+          "images": {"value": ${dataset.images.map(_.value).asJson}}
         }
       ]
     }

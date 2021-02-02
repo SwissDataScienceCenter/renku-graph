@@ -54,10 +54,11 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataSetJsonLD,
             randomDataSetCommit
           )
-
-          datasetFinder
+          val results = datasetFinder
             .findDataset(dataset.id)
-            .unsafeRunSync() shouldBe Some( // the expectation is correct but the finding is not
+            .unsafeRunSync()
+
+          results shouldBe Some( // the expectation is correct but the finding is not
             dataset.copy(
               sameAs = dataset.entityId.asSameAs,
               parts = dataset.parts.sorted,
@@ -570,7 +571,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           parts = modifiedDataset2.parts,
           projects = List(dataset3Project),
           keywords = modifiedDataset2.keywords,
-          images = ??? // TODO: find value
+          images = modifiedDataset2.images
         )
 
         loadToStore(

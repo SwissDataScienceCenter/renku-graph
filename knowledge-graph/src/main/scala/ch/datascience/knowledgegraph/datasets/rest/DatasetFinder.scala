@@ -78,9 +78,9 @@ private class IODatasetFinder(
     ): Dataset =
       dataset match {
         case ds: NonModifiedDataset =>
-          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords)
+          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords, images = images)
         case ds: ModifiedDataset =>
-          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords)
+          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords, images = images)
       }
   }
 }

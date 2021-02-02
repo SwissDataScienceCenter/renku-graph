@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{Description, Identifier, Name, PublishedDate, Title}
+import ch.datascience.graph.model.datasets.{Description, Identifier, ImageUrl, Name, PublishedDate, Title}
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
@@ -51,7 +51,8 @@ private object DatasetsFinder {
       name:             Name,
       maybeDescription: Option[Description],
       published:        DatasetPublishing,
-      projectsCount:    ProjectsCount
+      projectsCount:    ProjectsCount,
+      images:           List[ImageUrl]
   )
 
   final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
@@ -99,7 +100,7 @@ private class IODatasetsFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX text: <http://jena.apache.org/text#>"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs ?projectsCount
+    s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs ?projectsCount (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
         |  {
         |    SELECT (MIN(?dsId) AS ?dsIdExample) ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
@@ -151,16 +152,23 @@ private class IODatasetsFinder(
         |          schema:name ?name ;
         |          schema:alternateName ?alternateName;
         |          schema:isPartOf ?projectId.
+        |    OPTIONAL { 
+        |      ?dsIdExample schema:image ?imageId .
+        |      ?imageId     schema:position ?imagePosition ;
+        |                   schema:contentUrl ?imageUrl .
+        |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |    }
         |    OPTIONAL { ?dsIdExample schema:description ?maybeDescription }
         |    OPTIONAL { ?dsIdExample schema:datePublished ?maybePublishedDate }
         |    OPTIONAL { ?dsIdExample prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
         |    OPTIONAL { ?dsIdExample schema:url ?maybeUrl }
-        |        FILTER NOT EXISTS {
+        |    FILTER NOT EXISTS {
         |      ?someId prov:wasDerivedFrom/schema:url ?dsIdExample.
         |      ?someId schema:isPartOf ?projectId.
         |    }
         |  }
         |}
+        |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs ?projectsCount
         |${`ORDER BY`(sort)}
         |""".stripMargin
   )
@@ -190,12 +198,25 @@ private object IODatasetsFinder {
   implicit val recordDecoder: Decoder[DatasetSearchResult] = { cursor =>
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
+    def toListOfImageUrls(urlString: Option[String]): List[ImageUrl] =
+      urlString
+        .map(
+          _.split(",")
+            .map(_.trim)
+            .map { case s"$position:$url" => position.toIntOption.getOrElse(0) -> ImageUrl(url) }
+            .toList
+            .sortBy(_._1)
+            .map(_._2)
+        )
+        .getOrElse(Nil)
+
     for {
       id                 <- cursor.downField("identifier").downField("value").as[Identifier]
       title              <- cursor.downField("name").downField("value").as[Title]
       name               <- cursor.downField("alternateName").downField("value").as[Name]
       maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
       projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
+      images             <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
       maybeDescription <- cursor
                             .downField("maybeDescription")
                             .downField("value")
@@ -208,7 +229,8 @@ private object IODatasetsFinder {
       name,
       maybeDescription,
       DatasetPublishing(maybePublishedDate, Set.empty),
-      projectsCount
+      projectsCount,
+      images
     )
   }
 }
