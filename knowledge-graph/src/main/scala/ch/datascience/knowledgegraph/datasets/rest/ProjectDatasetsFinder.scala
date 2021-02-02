@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import ProjectDatasetsFinder._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, InitialVersion, Name, SameAs, Title}
+import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, ImageUrl, InitialVersion, Name, SameAs, Title}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore._
@@ -35,7 +35,7 @@ private trait ProjectDatasetsFinder[Interpretation[_]] {
 
 private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
-  type ProjectDataset  = (Identifier, InitialVersion, Title, Name, SameAsOrDerived)
+  type ProjectDataset  = (Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUrl])
 }
 
 private class IOProjectDatasetsFinder(
@@ -101,6 +101,9 @@ private object IOProjectDatasetsFinder {
       case (sameAs, _)            => Left(sameAs)
     }
 
+    def toListOfImageUrls(urlString: String): List[ImageUrl] =
+      urlString.split(",").map(_.trim).map(ImageUrl.apply).toList
+
     implicit val recordDecoder: Decoder[ProjectDataset] = { cursor =>
       for {
         id               <- cursor.downField("identifier").downField("value").as[Identifier]
@@ -109,7 +112,8 @@ private object IOProjectDatasetsFinder {
         sameAs           <- cursor.downField("topmostSameAs").downField("value").as[SameAs]
         maybeDerivedFrom <- cursor.downField("maybeDerivedFrom").downField("value").as[Option[DerivedFrom]]
         initialVersion   <- cursor.downField("initialVersion").downField("value").as[InitialVersion]
-      } yield (id, initialVersion, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom))
+        images           <- cursor.downField("images").downField("value").as[String].map(toListOfImageUrls)
+      } yield (id, initialVersion, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom), images)
     }
 
     _.downField("results").downField("bindings").as(decodeList[ProjectDataset])

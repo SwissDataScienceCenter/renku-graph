@@ -857,7 +857,8 @@ class IODatasetsFinderSpec
       dataset.name,
       dataset.maybeDescription,
       dataset.published,
-      ProjectsCount(projectsCount)
+      ProjectsCount(projectsCount),
+      dataset.images
     )
   }
 
