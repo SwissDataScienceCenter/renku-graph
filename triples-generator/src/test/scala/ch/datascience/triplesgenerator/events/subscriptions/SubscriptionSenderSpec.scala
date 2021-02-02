@@ -20,18 +20,15 @@ package ch.datascience.triplesgenerator.events.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
-import io.circe.Encoder
-import io.circe.literal._
-import io.circe.syntax._
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.graph.model.EventsGenerators._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -39,15 +36,15 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
 
   "postToEventLog" should {
 
-    s"succeed if posting Subscriber URL and statuses NEW and GENERATION_RECOVERABLE_FAILURE results with $Accepted" in new TestCase {
+    s"succeed if posting payload results with $Accepted" in new TestCase {
 
       stubFor {
         post("/subscriptions")
-          .withRequestBody(equalToJson(subscriberUrl.asJson.spaces2))
+          .withRequestBody(equalToJson(payload.spaces2))
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
-      sender.postToEventLog(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      sender.postToEventLog(payload).unsafeRunSync() shouldBe ((): Unit)
     }
 
     "fail when posting the payload results in any other status" in new TestCase {
@@ -55,12 +52,12 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
       val message = "message"
       stubFor {
         post("/subscriptions")
-          .withRequestBody(equalToJson(subscriberUrl.asJson.spaces2))
+          .withRequestBody(equalToJson(payload.spaces2))
           .willReturn(badRequest().withBody(message))
       }
 
       intercept[Exception] {
-        sender.postToEventLog(subscriberUrl).unsafeRunSync()
+        sender.postToEventLog(payload).unsafeRunSync()
       }.getMessage shouldBe s"POST $eventLogUrl/subscriptions returned $BadRequest; body: $message"
     }
   }
@@ -69,18 +66,9 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val subscriberUrl = subscriberUrls.generateOne
-    val categoryName  = categoryNames.generateOne
+    val payload = jsons.generateOne
 
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val sender      = new IOSubscriptionSender(eventLogUrl, categoryName, TestLogger())
-
-    implicit lazy val payloadEncoder: Encoder[SubscriberUrl] =
-      Encoder.instance[SubscriberUrl] { url =>
-        json"""{
-        "categoryName":  ${categoryName.value},
-        "subscriberUrl": ${url.value}
-      }"""
-      }
+    val sender      = new IOSubscriptionSender(eventLogUrl, TestLogger())
   }
 }

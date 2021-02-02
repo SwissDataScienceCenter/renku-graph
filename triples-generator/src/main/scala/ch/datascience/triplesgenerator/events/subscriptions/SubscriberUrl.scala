@@ -26,7 +26,7 @@ import ch.datascience.triplesgenerator.Microservice
 final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
 object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url
 
-private trait SubscriptionUrlFinder[Interpretation[_]] {
+private[events] trait SubscriptionUrlFinder[Interpretation[_]] {
   def findSubscriberUrl(): Interpretation[SubscriberUrl]
 }
 
@@ -57,7 +57,7 @@ private class SubscriptionUrlFinderImpl[Interpretation[_]]()(implicit ME: MonadE
   }
 }
 
-private object IOSubscriptionUrlFinder {
+private[events] object IOSubscriptionUrlFinder {
   import cats.effect.IO
 
   def apply(): IO[SubscriptionUrlFinder[IO]] = IO {

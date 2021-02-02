@@ -23,7 +23,7 @@ import cats.effect.IO._
 import cats.effect._
 import cats.effect.concurrent.Semaphore
 import cats.syntax.all._
-import ch.datascience.config.{ConfigLoader, GitLab}
+import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CompoundEventId
@@ -33,8 +33,6 @@ import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
 import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanism
 import com.typesafe.config.{Config, ConfigFactory}
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -49,7 +47,7 @@ private trait EventsProcessingRunner[Interpretation[_]] {
 
 private class EventsProcessingRunnerImpl(
     eventProcessor:        EventProcessor[IO],
-    generationProcesses:   Long Refined Positive,
+    generationProcesses:   GenerationProcessesNumber,
     semaphore:             Semaphore[IO],
     subscriptionMechanism: SubscriptionMechanism[IO],
     logger:                Logger[IO]
@@ -107,9 +105,6 @@ private class EventsProcessingRunnerImpl(
 
 private object IOEventsProcessingRunner {
 
-  import ConfigLoader.find
-  import eu.timepit.refined.pureconfig._
-
   import scala.language.postfixOps
 
   def apply(
@@ -126,7 +121,7 @@ private object IOEventsProcessingRunner {
   ): IO[EventsProcessingRunner[IO]] =
     for {
       eventProcessor      <- IOCommitEventProcessor(metricsRegistry, gitLabThrottler, timeRecorder, logger)
-      generationProcesses <- find[IO, Long Refined Positive]("generation-processes-number", config)
+      generationProcesses <- GenerationProcessesNumber(config)
       semaphore           <- Semaphore(generationProcesses.value)
     } yield new EventsProcessingRunnerImpl(eventProcessor,
                                            generationProcesses,

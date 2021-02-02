@@ -160,7 +160,7 @@ class ProjectsResourcesSpec
         NonEmptyList.of(dataset1Committer, persons.generateOne.copy(maybeGitLabId = user.id.some)).map(_.asMember())
       )
 
-      `events processed`(project.id)
+      `wait for events to be processed`(project.id)
 
       And("the project exists in GitLab")
       `GET <gitlabApi>/projects/:path returning OK with`(project,

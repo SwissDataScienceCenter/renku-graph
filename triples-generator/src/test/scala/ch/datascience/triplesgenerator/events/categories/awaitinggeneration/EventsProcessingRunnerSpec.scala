@@ -33,9 +33,6 @@ import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
 import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanism
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
@@ -125,10 +122,10 @@ class EventsProcessingRunnerSpec
             timer sleep eventProcessingTime
         }
 
-    val processesNumber: Long Refined Positive = 2L
-    val semaphore  = Semaphore[IO](processesNumber.value).unsafeRunSync()
-    val logger     = TestLogger[IO]()
-    val subscriber = mock[SubscriptionMechanism[IO]]
+    val processesNumber = GenerationProcessesNumber(2)
+    val semaphore       = Semaphore[IO](processesNumber.value).unsafeRunSync()
+    val logger          = TestLogger[IO]()
+    val subscriber      = mock[SubscriptionMechanism[IO]]
     val processingRunner =
       new EventsProcessingRunnerImpl(eventProcessor, processesNumber, semaphore, subscriber, logger)
 
