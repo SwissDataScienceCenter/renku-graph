@@ -52,14 +52,26 @@ class SubscriptionMechanismRegistryImpl[Interpretation[_]: Effect](
 
 object SubscriptionMechanismRegistry {
 
+  import SubscriptionPayloadComposer._
+
   def apply(logger:     Logger[IO])(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[SubscriptionMechanismRegistry[IO]] = for {
     awaitingGenerationSubscription <-
-      SubscriptionMechanism(categories.awaitinggeneration.EventHandler.categoryName, logger)
+      SubscriptionMechanism(
+        categories.awaitinggeneration.EventHandler.categoryName,
+        categories.awaitinggeneration.subscriptions.PayloadComposer.payloadsComposerFactory,
+        categories.awaitinggeneration.subscriptions.Payload.encoder,
+        logger
+      )
     membersSyncSubscription <-
-      SubscriptionMechanism(categories.membersync.EventHandler.categoryName, logger)
+      SubscriptionMechanism(
+        categories.membersync.EventHandler.categoryName,
+        categoryAndUrlPayloadsComposerFactory,
+        CategoryAndUrlPayload.encoder,
+        logger
+      )
   } yield new SubscriptionMechanismRegistryImpl[IO](awaitingGenerationSubscription, membersSyncSubscription)
 }

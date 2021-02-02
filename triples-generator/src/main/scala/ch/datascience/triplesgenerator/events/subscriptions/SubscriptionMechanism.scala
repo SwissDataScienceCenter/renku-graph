@@ -19,9 +19,11 @@
 package ch.datascience.triplesgenerator.events.subscriptions
 
 import cats.Applicative
+import cats.data.Kleisli
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.events.CategoryName
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Encoder
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -33,14 +35,14 @@ trait SubscriptionMechanism[Interpretation[_]] {
   def run():               Interpretation[Unit]
 }
 
-class SubscriptionMechanismImpl(
-    val categoryName:      CategoryName,
-    subscriptionUrlFinder: SubscriptionUrlFinder[IO],
-    subscriptionSender:    SubscriptionSender[IO],
-    logger:                Logger[IO],
-    initialDelay:          FiniteDuration,
-    renewDelay:            FiniteDuration
-)(implicit timer:          Timer[IO])
+private class SubscriptionMechanismImpl[Payload <: SubscriptionPayload](
+    val categoryName:            CategoryName,
+    subscriptionPayloadComposer: SubscriptionPayloadComposer[IO, Payload],
+    subscriptionSender:          SubscriptionSender[IO, Payload],
+    logger:                      Logger[IO],
+    initialDelay:                FiniteDuration,
+    renewDelay:                  FiniteDuration
+)(implicit timer:                Timer[IO])
     extends SubscriptionMechanism[IO] {
 
   private val applicative = Applicative[IO]
@@ -49,12 +51,12 @@ class SubscriptionMechanismImpl(
   import cats.syntax.all._
   import cats.effect.concurrent.Ref
   import subscriptionSender._
-  import subscriptionUrlFinder._
+  import subscriptionPayloadComposer._
 
   override def renewSubscription(): IO[Unit] = {
     for {
-      subscriberUrl <- findSubscriberUrl()
-      _             <- postToEventLog(subscriberUrl)
+      subscriptionPayload <- prepareSubscriptionPayload()
+      _                   <- postToEventLog(subscriptionPayload)
     } yield ()
   } recoverWith { case NonFatal(exception) =>
     logger.error(exception)(s"$categoryName: Problem with notifying event-log")
@@ -70,18 +72,18 @@ class SubscriptionMechanismImpl(
 
   private def subscribeForEvents(initOrError: Ref[IO, Boolean]): IO[Unit] = {
     for {
-      _             <- IO.unit
-      subscriberUrl <- findSubscriberUrl()
-      postingError  <- postToEventLog(subscriberUrl).map(_ => false).recoverWith(logPostError)
-      shouldLog     <- initOrError getAndSet postingError
-      _             <- whenA(shouldLog && !postingError)(logger.info(s"$categoryName: Subscribed for events with $subscriberUrl"))
-      _             <- timer sleep renewDelay
+      _            <- IO.unit
+      payload      <- prepareSubscriptionPayload()
+      postingError <- postToEventLog(payload).map(_ => false).recoverWith(logPostError)
+      shouldLog    <- initOrError getAndSet postingError
+      _            <- whenA(shouldLog && !postingError)(logger.info(s"$categoryName: Subscribed for events with $payload"))
+      _            <- timer sleep renewDelay
     } yield ()
   } recoverWith logSubscriberUrlError
 
   private lazy val logSubscriberUrlError: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
     for {
-      _ <- logger.error(exception)(s"$categoryName: Finding subscriber URL failed")
+      _ <- logger.error(exception)(s"$categoryName: Composing subscription payload failed")
       _ <- timer sleep initialDelay
     } yield ()
   }
@@ -103,18 +105,26 @@ object SubscriptionMechanism {
 
   private val RenewDelay = 5 minutes
 
-  def apply(
-      categoryName:  CategoryName,
-      logger:        Logger[IO],
-      configuration: Config = ConfigFactory.load()
+  def apply[Payload <: SubscriptionPayload](
+      categoryName:                       CategoryName,
+      subscriptionPayloadComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO, Payload]],
+      subscriptionPayloadEncoder:         Encoder[Payload],
+      logger:                             Logger[IO],
+      configuration:                      Config = ConfigFactory.load()
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[SubscriptionMechanism[IO]] =
     for {
-      initialDelay       <- find[IO, FiniteDuration]("event-subscription-initial-delay", configuration)
-      urlFinder          <- IOSubscriptionUrlFinder()
-      subscriptionSender <- IOSubscriptionSender(categoryName, logger)
-    } yield new SubscriptionMechanismImpl(categoryName, urlFinder, subscriptionSender, logger, initialDelay, RenewDelay)
+      initialDelay                <- find[IO, FiniteDuration]("event-subscription-initial-delay", configuration)
+      subscriptionPayloadComposer <- subscriptionPayloadComposerFactory(categoryName)
+      subscriptionSender          <- IOSubscriptionSender(subscriptionPayloadEncoder, logger)
+    } yield new SubscriptionMechanismImpl(categoryName,
+                                          subscriptionPayloadComposer,
+                                          subscriptionSender,
+                                          logger,
+                                          initialDelay,
+                                          RenewDelay
+    )
 }

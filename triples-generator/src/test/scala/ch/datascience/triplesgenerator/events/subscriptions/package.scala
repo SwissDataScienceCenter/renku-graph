@@ -19,8 +19,23 @@
 package ch.datascience.triplesgenerator.events
 
 import ch.datascience.generators.Generators.httpUrls
+import ch.datascience.graph.model.EventsGenerators.categoryNames
+import ch.datascience.graph.model.events.CategoryName
 import org.scalacheck.Gen
 
 package object subscriptions {
   implicit val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
+
+  private[subscriptions] val categoryAndUrlPayloads: Gen[CategoryAndUrlPayload] = for {
+    categoryName  <- categoryNames
+    subscriberUrl <- subscriberUrls
+  } yield CategoryAndUrlPayload(categoryName, subscriberUrl)
+
+  private[subscriptions] case class TestSubscriptionPayload(categoryName: CategoryName, subscriberUrl: SubscriberUrl)
+      extends SubscriptionPayload
+
+  private[subscriptions] lazy val testSubscriptionPayloads: Gen[TestSubscriptionPayload] = for {
+    categoryName  <- categoryNames
+    subscriberUrl <- subscriberUrls
+  } yield TestSubscriptionPayload(categoryName, subscriberUrl)
 }
