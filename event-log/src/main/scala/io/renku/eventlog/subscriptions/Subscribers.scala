@@ -43,15 +43,18 @@ private class SubscribersImpl private[subscriptions] (
 )(implicit contextShift: ContextShift[IO])
     extends Subscribers[IO] {
 
+  private val applicative = Applicative[IO]
+  import applicative._
+
   override def add(subscriberUrl: SubscriberUrl): IO[Unit] = for {
     wasAdded <- subscribersRegistry add subscriberUrl
-    _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$categoryName: $subscriberUrl added"))
+    _        <- whenA(wasAdded)(logger.info(s"$categoryName: $subscriberUrl added"))
   } yield ()
 
   override def delete(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
       removed <- subscribersRegistry delete subscriberUrl
-      _       <- Applicative[IO].whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))
+      _       <- whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))
     } yield ()
 
   override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =
