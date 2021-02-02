@@ -68,12 +68,12 @@ private class EventsSenderImpl[CategoryEvent](
   def sendEvent(subscriberUrl: SubscriberUrl, categoryEvent: CategoryEvent): IO[SendingResult] = {
     for {
       uri <- validateUri(subscriberUrl.value)
-      multipartPayload = multipart(categoryEvent)
       sendingResult <-
         send(
-          request(POST, uri)
-            .withEntity(multipartPayload)
-            .withHeaders(multipartPayload.headers)
+          request(POST, uri).withMultipartBuilder
+            .addPart("event", categoryEventEncoder.encodeEvent(categoryEvent))
+            .maybeAddPart("payload", categoryEventEncoder.encodePayload(categoryEvent))
+            .build()
         )(mapResponse)
     } yield sendingResult
   } recoverWith connectivityException(to = Misdelivered)
@@ -89,19 +89,6 @@ private class EventsSenderImpl[CategoryEvent](
   private def connectivityException(to: SendingResult): PartialFunction[Throwable, IO[SendingResult]] = {
     case _: ConnectivityException => to.pure[IO]
   }
-
-  private def multipart(categoryEvent: CategoryEvent) =
-    Multipart[IO](
-      Vector(
-        Part
-          .formData[IO]("event",
-                        categoryEventEncoder.encodeEvent(categoryEvent).noSpaces,
-                        `Content-Type`(MediaType.application.json)
-          )
-          .some,
-        categoryEventEncoder.encodePayload(categoryEvent).map(Part.formData[IO]("payload", _))
-      ).flatten
-    )
 }
 
 private object IOEventsSender {

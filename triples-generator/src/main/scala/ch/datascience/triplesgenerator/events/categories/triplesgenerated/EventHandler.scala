@@ -22,16 +22,15 @@ package events.categories.triplesgenerated
 import cats.MonadError
 import cats.data.EitherT
 import cats.effect.{ContextShift, Effect, IO, Timer}
-import cats.implicits.catsSyntaxApplicativeId
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody, EventId}
-import ch.datascience.http.EventRequest.EventRequestContent
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
+import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.categories.models.Project
 import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import io.chrisdavenport.log4cats.Logger
@@ -59,9 +58,9 @@ private[events] class EventHandler[Interpretation[_]: Effect](
 
     for {
       eventIdProjectAndSchema <-
-        EitherT(request.event.as[(CompoundEventId, Project, SchemaVersion)].pure[Interpretation]).leftMap(_ =>
-          UnsupportedEventType
-        )
+        EitherT
+          .fromEither(request.event.as[(CompoundEventId, Project, SchemaVersion)])
+          .leftMap(_ => UnsupportedEventType)
       (eventId, project, schemaVersion) = eventIdProjectAndSchema
       eventBody <- EitherT.fromOption[Interpretation](request.maybePayload.map(EventBody.apply), BadRequest)
       triplesGeneratedEvent <-

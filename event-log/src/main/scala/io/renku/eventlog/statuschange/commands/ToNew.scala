@@ -18,18 +18,26 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import cats.data.NonEmptyList
-import cats.effect.Bracket
+import cats.MonadError
+import cats.data.{Kleisli, NonEmptyList}
+import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.graph.model.datasets.Description
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
+import ch.datascience.tinytypes.json.TinyTypeDecoders.{blankToNone, toOption}
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.{EventLogDB, EventProcessingTime}
+import io.circe._
+import Decoder._
+import io.circe.{Decoder, DecodingFailure, HCursor}
+import io.renku.eventlog.{EventLogDB, EventMessage, EventProcessingTime}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+import org.http4s.circe.jsonOf
+import org.http4s.{EntityDecoder, Request}
 
 import java.time.Instant
 
@@ -66,4 +74,45 @@ final case class ToNew[Interpretation[_]](
       } yield ()
     case _ => ME.unit
   }
+}
+
+object ToNew {
+  def factory[Interpretation[_]: Sync](awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
+                                       underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
+  )(implicit
+      ME: MonadError[Interpretation, Throwable]
+  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), Option[
+    ChangeStatusCommand[Interpretation]
+  ]] =
+    Kleisli { eventIdAndRequest =>
+      val (eventId, request) = eventIdAndRequest
+      (for {
+        maybeProcessingTime <- request.as[Option[EventProcessingTime]](ME, entityDecoder[Interpretation]())
+      } yield (ToNew[Interpretation](
+        eventId,
+        awaitingTriplesGenerationGauge,
+        underTriplesGenerationGauge,
+        maybeProcessingTime
+      ): ChangeStatusCommand[Interpretation]).some) recoverWith (_ =>
+        Option.empty[ChangeStatusCommand[Interpretation]].pure[Interpretation]
+      )
+
+    }
+
+  private def entityDecoder[Interpretation[_]: Sync](): EntityDecoder[Interpretation, Option[EventProcessingTime]] = {
+    implicit val decoder: Decoder[Option[EventProcessingTime]] = { (cursor: HCursor) =>
+      (for {
+        status <- cursor.downField("status").as[EventStatus]
+        maybeProcessingTime <-
+          cursor
+            .downField("processingTime")
+            .as[Option[EventProcessingTime]](decodeOption(EventProcessingTime.decoder))
+      } yield status match {
+        case EventStatus.New => Right(maybeProcessingTime)
+        case _               => Left(DecodingFailure("Invalid event status", Nil))
+      }).flatten
+    }
+    jsonOf[Interpretation, Option[EventProcessingTime]]
+  }
+
 }

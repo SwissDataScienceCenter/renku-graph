@@ -29,9 +29,13 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventContentGenerators.{eventDates, eventProcessingTimes, executionDates}
+import io.circe.Json
+import io.circe.literal.JsonStringContext
+import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
+import org.http4s.Request
+import org.http4s.circe.jsonEncoder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -132,6 +136,39 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
           histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
+    }
+    "factory" should {
+      "decode properly a request" in new TestCase {
+        val maybeProcessingTime = eventProcessingTimes.generateOption
+        val expected =
+          ToTriplesStore(eventId, underTriplesGenerationGauge, maybeProcessingTime)
+
+        val body = json"""{
+            "status": ${EventStatus.TriplesStore.value}
+          }""" deepMerge maybeProcessingTime
+          .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+          .getOrElse(Json.obj())
+
+        val request = Request[IO]().withEntity(body)
+
+        val actual = ToTriplesStore.factory[IO](underTriplesGenerationGauge).run((eventId, request))
+        actual.unsafeRunSync() shouldBe Some(expected)
+      }
+
+      EventStatus.all.filterNot(status => status == TriplesStore) foreach { eventStatus =>
+        s"return None if the decoding failed with status: $eventStatus " in new TestCase {
+          val body =
+            json"""{
+              "status": ${eventStatus.value}
+            }"""
+
+          val request = Request[IO]().withEntity(body)
+
+          val actual = ToTriplesStore.factory[IO](underTriplesGenerationGauge).run((eventId, request))
+
+          actual.unsafeRunSync() shouldBe None
+        }
+      }
     }
   }
 

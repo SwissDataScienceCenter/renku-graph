@@ -31,9 +31,13 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import doobie.implicits._
 import eu.timepit.refined.auto._
+import io.circe.Json
+import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
+import org.http4s.Request
+import org.http4s.circe.jsonEncoder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -105,6 +109,43 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
 
           histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
+    }
+    "factory" should {
+      "decode properly a request" in new TestCase {
+        val message             = eventMessages.generateOne
+        val maybeProcessingTime = eventProcessingTimes.generateOption
+        val expected =
+          ToSkipped(eventId, message, underTriplesGenerationGauge, maybeProcessingTime)
+
+        val body = json"""{
+            "status": ${EventStatus.Skipped.value},
+            "message": ${message.value}
+          }""" deepMerge maybeProcessingTime
+          .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+          .getOrElse(Json.obj())
+
+        val request = Request[IO]().withEntity(body)
+
+        val actual = ToSkipped
+          .factory[IO](underTriplesGenerationGauge)
+          .run((eventId, request))
+        actual.unsafeRunSync() shouldBe Some(expected)
+      }
+
+      EventStatus.all.filterNot(status => status == Skipped) foreach { eventStatus =>
+        s"return None if the decoding failed with status: $eventStatus " in new TestCase {
+          val body =
+            json"""{
+              "status": ${eventStatus.value}
+            }"""
+
+          val request = Request[IO]().withEntity(body)
+
+          val actual = ToSkipped.factory[IO](underTriplesGenerationGauge).run((eventId, request))
+
+          actual.unsafeRunSync() shouldBe None
+        }
+      }
     }
   }
 

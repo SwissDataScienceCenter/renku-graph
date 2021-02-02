@@ -29,13 +29,15 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.NonNegative
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Json
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
 import org.http4s.Status.BadRequest
 import org.http4s._
 import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.client.{Client, ConnectionFailure}
-import org.http4s.headers.Authorization
+import org.http4s.headers.{Authorization, `Content-Type`}
+import org.http4s.multipart.{Multipart, Part}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -174,6 +176,7 @@ abstract class IORestClient[ThrottlingTarget](
             ConnectivityException(LogMessage(request.request, other), other).raiseError[IO, T]
           )
       }
+
   }
 
   private type ResponseMapping[ResultType] = PartialFunction[(Status, Request[IO], Response[IO]), IO[ResultType]]
@@ -209,6 +212,51 @@ abstract class IORestClient[ThrottlingTarget](
       Option(exception.getMessage) map toSingleLine getOrElse exception.getClass.getSimpleName
 
     def toSingleLine(string: String): String = string.split('\n').map(_.trim.filter(_ >= ' ')).mkString
+  }
+
+  implicit class RequestOps(request: Request[IO]) {
+    lazy val withMultipartBuilder: MultipartBuilder = new MultipartBuilder(request)
+
+    class MultipartBuilder private[RequestOps] (request: Request[IO],
+                                                parts:   Vector[Part[IO]] = Vector.empty[Part[IO]]
+    ) {
+      def addPart[PartType](name: String, value: PartType)(implicit
+          encoder:                PartEncoder[PartType]
+      ): MultipartBuilder =
+        new MultipartBuilder(request,
+                             parts :+ Part
+                               .formData[IO](name, encoder.encodeValue(value), encoder.contentType)
+        )
+
+      def maybeAddPart[PartType](name: String, maybeValue: Option[PartType])(implicit
+          encoder:                     PartEncoder[PartType]
+      ): MultipartBuilder = maybeValue
+        .map(addPart(name, _))
+        .getOrElse(this)
+
+      def build(): Request[IO] = {
+        val multipart = Multipart[IO](parts)
+        request.withEntity(multipart).withHeaders(multipart.headers)
+      }
+    }
+  }
+
+  trait PartEncoder[PartType] {
+    def encodeValue(value: PartType): String
+
+    val contentType: `Content-Type`
+  }
+
+  implicit object JsonPartEncoder extends PartEncoder[Json] {
+    override def encodeValue(value: Json): String = value.noSpaces
+
+    override val contentType: `Content-Type` = `Content-Type`(MediaType.application.json)
+  }
+
+  implicit object StringPartEncoder extends PartEncoder[String] {
+    override def encodeValue(value: String): String = value
+
+    override val contentType: `Content-Type` = `Content-Type`(MediaType.text.plain)
   }
 }
 

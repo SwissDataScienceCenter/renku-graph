@@ -29,9 +29,13 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.renku.eventlog.EventContentGenerators.{eventDates, eventProcessingTimes, executionDates}
+import io.circe.Json
+import io.circe.literal.JsonStringContext
+import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
+import org.http4s.Request
+import org.http4s.circe.jsonEncoder
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -117,6 +121,42 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
 
           histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
+    }
+
+    "factory" should {
+      "decode properly a request" in new TestCase {
+        val maybeProcessingTime = eventProcessingTimes.generateOption
+        val expected =
+          ToNew(eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, maybeProcessingTime)
+
+        val body = json"""{
+            "status": ${EventStatus.New.value}
+          }""" deepMerge maybeProcessingTime
+          .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+          .getOrElse(Json.obj())
+
+        val request = Request[IO]().withEntity(body)
+
+        val actual = ToNew
+          .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
+          .run((eventId, request))
+        actual.unsafeRunSync() shouldBe Some(expected)
+      }
+
+      EventStatus.all.filterNot(status => status == New) foreach { eventStatus =>
+        s"return None if the decoding failed with status: $eventStatus " in new TestCase {
+          val body =
+            json"""{
+              "status": ${eventStatus.value}
+            }"""
+
+          val request = Request[IO]().withEntity(body)
+
+          val actual =
+            ToNew.factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge).run((eventId, request))
+          actual.unsafeRunSync() shouldBe None
+        }
+      }
     }
   }
 

@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import cats.data.NonEmptyList
-import cats.effect.Bracket
+import cats.MonadError
+import cats.data.{EitherT, Kleisli, NonEmptyList, OptionT}
+import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TriplesGenerated}
@@ -29,9 +30,14 @@ import ch.datascience.metrics.LabeledGauge
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import eu.timepit.refined.auto._
+import io.circe.Decoder.decodeOption
+import io.circe.{Decoder, DecodingFailure, HCursor, Json, parser}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
-import io.renku.eventlog.{EventLogDB, EventPayload, EventProcessingTime}
+import io.renku.eventlog.{EventLogDB, EventMessage, EventPayload, EventProcessingTime}
+import org.http4s.circe.jsonOf
+import org.http4s.multipart.Multipart
+import org.http4s.{EntityDecoder, Request}
 
 import java.time.Instant
 
@@ -83,4 +89,61 @@ private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
       } yield ()
     case _ => ME.unit
   }
+}
+
+object ToTriplesGenerated {
+  import org.http4s.circe.jsonDecoder
+  def factory[Interpretation[_]: Sync](underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
+                                       awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path]
+  )(implicit
+      ME: MonadError[Interpretation, Throwable]
+  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), Option[
+    ChangeStatusCommand[Interpretation]
+  ]] =
+    Kleisli { eventIdAndRequest =>
+      val (eventId, request) = eventIdAndRequest
+      (for {
+        multipart <- OptionT.liftF(request.as[Multipart[Interpretation]]) // TODO failure to be badrequest
+        eventJson <-
+          OptionT.liftF(multipart.parts.find(_.name.contains("event")).map(_.as[Json]).get)
+        payloadStr <-
+          OptionT.liftF(
+            multipart.parts.find(_.name.contains("payload")).map(_.as[String]).get
+          )
+
+        maybeProcessingTime <-
+          OptionT.fromOption[Interpretation](eventJson.as[Option[EventProcessingTime]](decoder).toOption)
+        payloadJson <- OptionT.fromOption[Interpretation](parser.parse(payloadStr).toOption)
+        parsedPayload <- OptionT
+                           .fromOption[Interpretation](payloadJson.as[(SchemaVersion, EventPayload)].toOption)
+        (schemaVersion, eventPayload) = parsedPayload
+      } yield (ToTriplesGenerated[Interpretation](eventId,
+                                                  eventPayload,
+                                                  schemaVersion,
+                                                  underTriplesGenerationGauge,
+                                                  awaitingTransformationGauge,
+                                                  maybeProcessingTime
+      ): ChangeStatusCommand[Interpretation])).value recoverWith (_ =>
+        Option.empty[ChangeStatusCommand[Interpretation]].pure[Interpretation]
+      )
+
+    }
+
+  implicit val decoder: Decoder[Option[EventProcessingTime]] = { (cursor: HCursor) =>
+    (for {
+      status <- cursor.downField("status").as[EventStatus]
+      maybeProcessingTime <-
+        cursor.downField("processingTime").as[Option[EventProcessingTime]](decodeOption(EventProcessingTime.decoder))
+    } yield status match {
+      case EventStatus.TriplesGenerated => Right(maybeProcessingTime)
+      case _                            => Left(DecodingFailure("Invalid event status", Nil))
+    }).flatten
+  }
+
+  implicit val payloadDecoder: Decoder[(SchemaVersion, EventPayload)] = (cursor: HCursor) =>
+    for {
+      schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
+      payload       <- cursor.downField("payload").as[EventPayload]
+    } yield (schemaVersion, payload)
+
 }

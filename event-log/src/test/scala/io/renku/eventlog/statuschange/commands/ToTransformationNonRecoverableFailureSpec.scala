@@ -29,9 +29,13 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
+import io.circe.Json
+import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
+import org.http4s.Request
+import org.http4s.circe.jsonEncoder
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -123,6 +127,49 @@ class ToTransformationNonRecoverableFailureSpec
 
           histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
+    }
+
+    "factory" should {
+      "decode properly a request" in new TestCase {
+        val maybeMessage        = eventMessages.generateOption
+        val maybeProcessingTime = eventProcessingTimes.generateOption
+        val expected =
+          ToTransformationNonRecoverableFailure(eventId,
+                                                maybeMessage,
+                                                underTriplesTransformationGauge,
+                                                maybeProcessingTime
+          )
+
+        val body = json"""{
+            "status": ${EventStatus.TransformationNonRecoverableFailure.value}
+          }""" deepMerge maybeMessage
+          .map(m => json"""{"message": ${m.value}}""")
+          .getOrElse(Json.obj()) deepMerge maybeProcessingTime
+          .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+          .getOrElse(Json.obj())
+
+        val request = Request[IO]().withEntity(body)
+
+        val actual = ToTransformationNonRecoverableFailure
+          .factory[IO](underTriplesTransformationGauge)
+          .run((eventId, request))
+        actual.unsafeRunSync() shouldBe Some(expected)
+      }
+
+      EventStatus.all.filterNot(status => status == TransformationNonRecoverableFailure) foreach { eventStatus =>
+        s"return None if the decoding failed with status: $eventStatus " in new TestCase {
+          val body =
+            json"""{
+              "status": ${eventStatus.value}
+            }"""
+
+          val request = Request[IO]().withEntity(body)
+
+          val actual =
+            ToTransformationNonRecoverableFailure.factory[IO](underTriplesTransformationGauge).run((eventId, request))
+          actual.unsafeRunSync() shouldBe None
+        }
+      }
     }
   }
 

@@ -17,7 +17,6 @@
  */
 
 package io.renku.eventlog.statuschange.commands
-
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
@@ -29,9 +28,14 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
+import io.circe.Json
+import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
+import org.http4s.headers.`Content-Type`
+import org.http4s.multipart.{Multipart, Part}
+import org.http4s.{MediaType, Request}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -134,6 +138,131 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
           histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
+    }
+
+    "factory" should {
+      "decode properly a request" in new TestCase {
+        val triples             = eventPayloads.generateOne
+        val maybeProcessingTime = eventProcessingTimes.generateOption
+        val expected =
+          ToTriplesGenerated(eventId,
+                             triples,
+                             schemaVersion,
+                             underTriplesGenerationGauge,
+                             awaitingTransformationGauge,
+                             maybeProcessingTime
+          )
+
+        val payloadStr = json"""{ "schemaVersion": ${schemaVersion.value}, "payload": ${triples.value}  }"""
+
+        val body = Multipart[IO](
+          Vector(
+            Part.formData[IO](
+              "event",
+              (json"""{
+            "status": ${EventStatus.TriplesGenerated.value}
+          }""" deepMerge maybeProcessingTime
+                .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+                .getOrElse(Json.obj())).noSpaces,
+              `Content-Type`(MediaType.application.json)
+            ),
+            Part.formData[IO]("payload", payloadStr.noSpaces)
+          )
+        )
+
+        val request = Request[IO]().withEntity(body).withHeaders(body.headers)
+
+        val actual = ToTriplesGenerated
+          .factory[IO](underTriplesGenerationGauge, awaitingTransformationGauge)
+          .run((eventId, request))
+        actual.unsafeRunSync() shouldBe Some(expected)
+      }
+
+      EventStatus.all.filterNot(status => status == TriplesGenerated) foreach { eventStatus =>
+        s"return None if the decoding failed because of wrong status: $eventStatus " in new TestCase {
+          val triples             = eventPayloads.generateOne
+          val maybeProcessingTime = eventProcessingTimes.generateOption
+          val payloadStr          = json"""{ "schemaVersion": ${schemaVersion.value}, "payload": ${triples.value}  }"""
+          val body = Multipart[IO](
+            Vector(
+              Part.formData[IO](
+                "event",
+                (json"""{
+            "status": ${eventStatus.value}
+          }""" deepMerge maybeProcessingTime
+                  .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+                  .getOrElse(Json.obj())).noSpaces,
+                `Content-Type`(MediaType.application.json)
+              ),
+              Part.formData[IO]("payload", payloadStr.noSpaces)
+            )
+          )
+          val request = Request[IO]().withEntity(body).withHeaders(body.headers)
+
+          val actual =
+            ToTriplesGenerated
+              .factory[IO](underTriplesGenerationGauge, awaitingTransformationGauge)
+              .run((eventId, request))
+          actual.unsafeRunSync() shouldBe None
+        }
+      }
+
+      s"return None if the decoding failed because of schema version is missing " in new TestCase {
+        val triples             = eventPayloads.generateOne
+        val maybeProcessingTime = eventProcessingTimes.generateOption
+        val payloadStr          = json"""{ "payload": ${triples.value}  }"""
+
+        val body = Multipart[IO](
+          Vector(
+            Part.formData[IO](
+              "event",
+              (json"""{
+            "status": ${EventStatus.TriplesGenerated.value}
+          }""" deepMerge maybeProcessingTime
+                .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+                .getOrElse(Json.obj())).noSpaces,
+              `Content-Type`(MediaType.application.json)
+            ),
+            Part.formData[IO]("payload", payloadStr.noSpaces)
+          )
+        )
+
+        val request = Request[IO]().withEntity(body).withHeaders(body.headers)
+
+        val actual =
+          ToTriplesGenerated
+            .factory[IO](underTriplesGenerationGauge, awaitingTransformationGauge)
+            .run((eventId, request))
+        actual.unsafeRunSync() shouldBe None
+      }
+
+      s"return None if the decoding failed because of missing payload " in new TestCase {
+        val maybeProcessingTime = eventProcessingTimes.generateOption
+        val payloadStr          = json"""{ "schemaVersion": ${schemaVersion.value}}"""
+
+        val body = Multipart[IO](
+          Vector(
+            Part.formData[IO](
+              "event",
+              (json"""{
+            "status": ${EventStatus.TriplesGenerated.value}
+          }""" deepMerge maybeProcessingTime
+                .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+                .getOrElse(Json.obj())).noSpaces,
+              `Content-Type`(MediaType.application.json)
+            ),
+            Part.formData[IO]("payload", payloadStr.noSpaces)
+          )
+        )
+
+        val request = Request[IO]().withEntity(body).withHeaders(body.headers)
+
+        val actual =
+          ToTriplesGenerated
+            .factory[IO](underTriplesGenerationGauge, awaitingTransformationGauge)
+            .run((eventId, request))
+        actual.unsafeRunSync() shouldBe None
+      }
     }
   }
 
