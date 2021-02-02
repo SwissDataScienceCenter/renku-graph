@@ -24,6 +24,7 @@ import ch.datascience.generators.Generators.{exceptions, positiveInts}
 import ch.datascience.graph.model.EventsGenerators.categoryNames
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
 import ch.datascience.triplesgenerator.events.subscriptions.{SubscriberUrl, SubscriptionUrlFinder, subscriberUrls}
+import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -40,7 +41,11 @@ class PayloadComposerSpec extends AnyWordSpec with should.Matchers with MockFact
         .expects()
         .returning(subscriberUrl.pure[Try])
 
-      composer.prepareSubscriptionPayload() shouldBe Payload(categoryName, subscriberUrl, capacity).pure[Try]
+      composer.prepareSubscriptionPayload() shouldBe json"""{
+        "categoryName" : ${categoryName.value},
+        "subscriberUrl": ${subscriberUrl.value},
+        "capacity":      ${capacity.value}
+      }""".pure[Try]
     }
 
     "fail if finding subscriberUrl fails" in new TestCase {

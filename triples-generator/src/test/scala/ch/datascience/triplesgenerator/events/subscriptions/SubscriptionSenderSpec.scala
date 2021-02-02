@@ -25,7 +25,6 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
-import io.circe.Encoder
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -39,14 +38,9 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
 
     s"succeed if posting payload results with $Accepted" in new TestCase {
 
-      val payloadAsJson = jsons.generateOne
-      (payloadEncoder.apply _)
-        .expects(payload)
-        .returning(payloadAsJson)
-
       stubFor {
         post("/subscriptions")
-          .withRequestBody(equalToJson(payloadAsJson.spaces2))
+          .withRequestBody(equalToJson(payload.spaces2))
           .willReturn(aResponse().withStatus(Accepted.code))
       }
 
@@ -55,15 +49,10 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
 
     "fail when posting the payload results in any other status" in new TestCase {
 
-      val payloadAsJson = jsons.generateOne
-      (payloadEncoder.apply _)
-        .expects(payload)
-        .returning(payloadAsJson)
-
       val message = "message"
       stubFor {
         post("/subscriptions")
-          .withRequestBody(equalToJson(payloadAsJson.spaces2))
+          .withRequestBody(equalToJson(payload.spaces2))
           .willReturn(badRequest().withBody(message))
       }
 
@@ -77,10 +66,9 @@ class SubscriptionSenderSpec extends AnyWordSpec with MockFactory with ExternalS
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val payload = testSubscriptionPayloads.generateOne
+    val payload = jsons.generateOne
 
-    val eventLogUrl    = EventLogUrl(externalServiceBaseUrl)
-    val payloadEncoder = mock[Encoder[TestSubscriptionPayload]]
-    val sender         = new IOSubscriptionSender[TestSubscriptionPayload](eventLogUrl, payloadEncoder, TestLogger())
+    val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
+    val sender      = new IOSubscriptionSender(eventLogUrl, TestLogger())
   }
 }

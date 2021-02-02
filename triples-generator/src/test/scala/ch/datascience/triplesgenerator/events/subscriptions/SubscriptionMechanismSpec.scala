@@ -21,10 +21,11 @@ package ch.datascience.triplesgenerator.events.subscriptions
 import cats.effect.{IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
+import ch.datascience.generators.Generators.{exceptions, jsons}
 import ch.datascience.graph.model.EventsGenerators.categoryNames
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import io.circe.Json
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
@@ -47,7 +48,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
   "notifyAvailability" should {
 
     "send subscription for events" in new TestCase {
-      val payload = testSubscriptionPayloads.generateOne
+      val payload = jsons.generateOne
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
       subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
@@ -58,7 +59,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
     "fail if composing the subscription payload fails" in new TestCase {
       val exception = exceptions.generateOne
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(
-        exception.raiseError[IO, TestSubscriptionPayload]
+        exception.raiseError[IO, Json]
       )
 
       intercept[Exception] {
@@ -67,7 +68,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
     }
 
     "fail if posting the subscription payload fails" in new TestCase {
-      val payload = testSubscriptionPayloads.generateOne
+      val payload = jsons.generateOne
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
       val exception = exceptions.generateOne
@@ -83,7 +84,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
 
     "send/resend subscription for events" in new TestCase {
 
-      val payload = testSubscriptionPayloads.generateOne
+      val payload = jsons.generateOne
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
       subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
@@ -101,9 +102,9 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
 
       val exception = exceptions.generateOne
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(
-        exception.raiseError[IO, TestSubscriptionPayload]
+        exception.raiseError[IO, Json]
       )
-      val payload = testSubscriptionPayloads.generateOne
+      val payload = jsons.generateOne
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
       subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
@@ -120,7 +121,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
 
     "log an error and retry if sending subscription payload fails" in new TestCase {
 
-      val payload = testSubscriptionPayloads.generateOne
+      val payload = jsons.generateOne
       payloadComposer.`expected prepareSubscriptionPayload default response`.set(payload.pure[IO])
 
       val exception = exceptions.generateOne
@@ -145,19 +146,19 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
   private trait TestCase {
     val categoryName = categoryNames.generateOne
 
-    val payloadComposer = new SubscriptionPayloadComposer[IO, TestSubscriptionPayload] {
-      val `expected prepareSubscriptionPayload responses`        = new ConcurrentLinkedQueue[IO[TestSubscriptionPayload]]()
-      val `expected prepareSubscriptionPayload default response` = new AtomicReference[IO[TestSubscriptionPayload]]()
+    val payloadComposer = new SubscriptionPayloadComposer[IO] {
+      val `expected prepareSubscriptionPayload responses`        = new ConcurrentLinkedQueue[IO[Json]]()
+      val `expected prepareSubscriptionPayload default response` = new AtomicReference[IO[Json]]()
 
-      override def prepareSubscriptionPayload(): IO[TestSubscriptionPayload] =
+      override def prepareSubscriptionPayload(): IO[Json] =
         Option(`expected prepareSubscriptionPayload responses`.poll())
           .getOrElse(`expected prepareSubscriptionPayload default response`.get())
     }
 
-    val subscriptionSender = new SubscriptionSender[IO, TestSubscriptionPayload] {
-      val `expected postToEventLog responses` = new ConcurrentLinkedQueue[(TestSubscriptionPayload, IO[Unit])]()
+    val subscriptionSender = new SubscriptionSender[IO] {
+      val `expected postToEventLog responses` = new ConcurrentLinkedQueue[(Json, IO[Unit])]()
 
-      override def postToEventLog(payload: TestSubscriptionPayload): IO[Unit] =
+      override def postToEventLog(payload: Json): IO[Unit] =
         Option {
           val (expectedPayload, response) = `expected postToEventLog responses`.poll()
           if (payload == expectedPayload) response

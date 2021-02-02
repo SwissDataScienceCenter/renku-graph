@@ -32,7 +32,7 @@ private object CategoryAndUrlPayload {
   import io.circe.Encoder
   import io.circe.literal._
 
-  val encoder: Encoder[CategoryAndUrlPayload] = Encoder.instance[CategoryAndUrlPayload] { payload =>
+  implicit val encoder: Encoder[CategoryAndUrlPayload] = Encoder.instance[CategoryAndUrlPayload] { payload =>
     json"""{
         "categoryName":  ${payload.categoryName.value},
         "subscriberUrl": ${payload.subscriberUrl.value}

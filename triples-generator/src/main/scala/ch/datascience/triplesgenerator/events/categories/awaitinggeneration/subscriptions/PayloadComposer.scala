@@ -25,23 +25,25 @@ import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
 import ch.datascience.triplesgenerator.events.subscriptions.{IOSubscriptionUrlFinder, SubscriptionPayloadComposer, SubscriptionUrlFinder}
+import io.circe.Json
 
 private[events] class PayloadComposer[Interpretation[_]](
     categoryName: CategoryName,
     capacity:     GenerationProcessesNumber,
     urlFinder:    SubscriptionUrlFinder[Interpretation]
 )(implicit ME:    MonadError[Interpretation, Throwable])
-    extends SubscriptionPayloadComposer[Interpretation, Payload] {
+    extends SubscriptionPayloadComposer[Interpretation] {
+  import io.circe.syntax._
   import urlFinder._
 
-  override def prepareSubscriptionPayload(): Interpretation[Payload] =
-    findSubscriberUrl() map (Payload(categoryName, _, capacity))
+  override def prepareSubscriptionPayload(): Interpretation[Json] =
+    findSubscriberUrl() map (Payload(categoryName, _, capacity).asJson)
 }
 
 private[events] object PayloadComposer {
 
-  lazy val payloadsComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO, Payload]] =
-    Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO, Payload]] { (categoryName: CategoryName) =>
+  lazy val payloadsComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
+    Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>
       for {
         subscriptionUrlFinder <- IOSubscriptionUrlFinder()
         capacity              <- GenerationProcessesNumber[IO]()

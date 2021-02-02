@@ -23,7 +23,6 @@ import cats.data.Kleisli
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.events.CategoryName
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Encoder
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -35,10 +34,10 @@ trait SubscriptionMechanism[Interpretation[_]] {
   def run():               Interpretation[Unit]
 }
 
-private class SubscriptionMechanismImpl[Payload <: SubscriptionPayload](
+private class SubscriptionMechanismImpl(
     val categoryName:            CategoryName,
-    subscriptionPayloadComposer: SubscriptionPayloadComposer[IO, Payload],
-    subscriptionSender:          SubscriptionSender[IO, Payload],
+    subscriptionPayloadComposer: SubscriptionPayloadComposer[IO],
+    subscriptionSender:          SubscriptionSender[IO],
     logger:                      Logger[IO],
     initialDelay:                FiniteDuration,
     renewDelay:                  FiniteDuration
@@ -48,10 +47,10 @@ private class SubscriptionMechanismImpl[Payload <: SubscriptionPayload](
   private val applicative = Applicative[IO]
 
   import applicative._
-  import cats.syntax.all._
   import cats.effect.concurrent.Ref
-  import subscriptionSender._
+  import cats.syntax.all._
   import subscriptionPayloadComposer._
+  import subscriptionSender._
 
   override def renewSubscription(): IO[Unit] = {
     for {
@@ -63,12 +62,11 @@ private class SubscriptionMechanismImpl[Payload <: SubscriptionPayload](
     exception.raiseError[IO, Unit]
   }
 
-  override def run(): IO[Unit] =
-    for {
-      _    <- timer sleep initialDelay
-      init <- Ref.of[IO, Boolean](true)
-      _    <- subscribeForEvents(init).foreverM
-    } yield ()
+  override def run(): IO[Unit] = for {
+    _    <- timer sleep initialDelay
+    init <- Ref.of[IO, Boolean](true)
+    _    <- subscribeForEvents(init).foreverM
+  } yield ()
 
   private def subscribeForEvents(initOrError: Ref[IO, Boolean]): IO[Unit] = {
     for {
@@ -105,26 +103,24 @@ object SubscriptionMechanism {
 
   private val RenewDelay = 5 minutes
 
-  def apply[Payload <: SubscriptionPayload](
+  def apply(
       categoryName:                       CategoryName,
-      subscriptionPayloadComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO, Payload]],
-      subscriptionPayloadEncoder:         Encoder[Payload],
+      subscriptionPayloadComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]],
       logger:                             Logger[IO],
       configuration:                      Config = ConfigFactory.load()
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[SubscriptionMechanism[IO]] =
-    for {
-      initialDelay                <- find[IO, FiniteDuration]("event-subscription-initial-delay", configuration)
-      subscriptionPayloadComposer <- subscriptionPayloadComposerFactory(categoryName)
-      subscriptionSender          <- IOSubscriptionSender(subscriptionPayloadEncoder, logger)
-    } yield new SubscriptionMechanismImpl(categoryName,
-                                          subscriptionPayloadComposer,
-                                          subscriptionSender,
-                                          logger,
-                                          initialDelay,
-                                          RenewDelay
-    )
+  ): IO[SubscriptionMechanism[IO]] = for {
+    initialDelay                <- find[IO, FiniteDuration]("event-subscription-initial-delay", configuration)
+    subscriptionPayloadComposer <- subscriptionPayloadComposerFactory(categoryName)
+    subscriptionSender          <- IOSubscriptionSender(logger)
+  } yield new SubscriptionMechanismImpl(categoryName,
+                                        subscriptionPayloadComposer,
+                                        subscriptionSender,
+                                        logger,
+                                        initialDelay,
+                                        RenewDelay
+  )
 }

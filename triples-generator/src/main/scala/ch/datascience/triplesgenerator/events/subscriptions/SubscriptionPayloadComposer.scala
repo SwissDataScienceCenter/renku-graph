@@ -23,28 +23,29 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
+import io.circe.Json
 
-private[events] trait SubscriptionPayloadComposer[Interpretation[_], Payload <: SubscriptionPayload] {
-  def prepareSubscriptionPayload(): Interpretation[Payload]
+private[events] trait SubscriptionPayloadComposer[Interpretation[_]] {
+  def prepareSubscriptionPayload(): Interpretation[Json]
 }
 
 private class SubscriptionPayloadComposerImpl[Interpretation[_]](
     categoryName:          CategoryName,
     subscriptionUrlFinder: SubscriptionUrlFinder[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable])
-    extends SubscriptionPayloadComposer[Interpretation, CategoryAndUrlPayload] {
+    extends SubscriptionPayloadComposer[Interpretation] {
 
+  import io.circe.syntax._
   import subscriptionUrlFinder._
 
-  override def prepareSubscriptionPayload(): Interpretation[CategoryAndUrlPayload] =
-    findSubscriberUrl() map (CategoryAndUrlPayload(categoryName, _))
+  override def prepareSubscriptionPayload(): Interpretation[Json] =
+    findSubscriberUrl() map (CategoryAndUrlPayload(categoryName, _).asJson)
 }
 
 private object SubscriptionPayloadComposer {
 
-  lazy val categoryAndUrlPayloadsComposerFactory
-      : Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO, CategoryAndUrlPayload]] =
-    Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO, CategoryAndUrlPayload]] { (categoryName: CategoryName) =>
+  lazy val categoryAndUrlPayloadsComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
+    Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>
       for {
         subscriptionUrlFinder <- IOSubscriptionUrlFinder()
       } yield new SubscriptionPayloadComposerImpl[IO](categoryName, subscriptionUrlFinder)

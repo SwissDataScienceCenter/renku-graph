@@ -22,6 +22,7 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.EventsGenerators.categoryNames
+import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -38,7 +39,10 @@ class SubscriptionPayloadComposerSpec extends AnyWordSpec with should.Matchers w
         .expects()
         .returning(subscriberUrl.pure[Try])
 
-      composer.prepareSubscriptionPayload() shouldBe CategoryAndUrlPayload(categoryName, subscriberUrl).pure[Try]
+      composer.prepareSubscriptionPayload() shouldBe json"""{
+        "categoryName" : ${categoryName.value},
+        "subscriberUrl": ${subscriberUrl.value}
+      }""".pure[Try]
     }
 
     "fail if finding subscriberUrl fails" in new TestCase {

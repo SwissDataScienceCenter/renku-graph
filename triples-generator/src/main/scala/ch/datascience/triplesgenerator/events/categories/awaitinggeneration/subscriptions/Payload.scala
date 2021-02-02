@@ -23,16 +23,16 @@ import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
 import ch.datascience.triplesgenerator.events.subscriptions.SubscriberUrl
 
-private[events] final case class Payload(categoryName:  CategoryName,
-                                         subscriberUrl: SubscriberUrl,
-                                         capacity:      GenerationProcessesNumber
+private final case class Payload(categoryName:  CategoryName,
+                                 subscriberUrl: SubscriberUrl,
+                                 capacity:      GenerationProcessesNumber
 ) extends subscriptions.SubscriptionPayload
 
-private[events] object Payload {
+private object Payload {
   import io.circe.Encoder
   import io.circe.literal._
 
-  val encoder: Encoder[Payload] = Encoder.instance[Payload] { payload =>
+  implicit val encoder: Encoder[Payload] = Encoder.instance[Payload] { payload =>
     json"""{
         "categoryName":  ${payload.categoryName.value},
         "subscriberUrl": ${payload.subscriberUrl.value},
