@@ -71,7 +71,8 @@ class IOProjectDatasetsFinderSpec
            originalDataset.versions.initial,
            datasetModification2.title,
            datasetModification2.name,
-           Right(datasetModification2.derivedFrom)
+           Right(datasetModification2.derivedFrom),
+           datasetModification2.images
           )
         )
       }
@@ -93,15 +94,22 @@ class IOProjectDatasetsFinderSpec
           dataset2Modification.toJsonLD()
         )
 
-        datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.versions.initial, dataset1.title, dataset1.name, Left(dataset1.sameAs)),
+        datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() shouldBe List(
+          (dataset1.id,
+           dataset1.versions.initial,
+           dataset1.title,
+           dataset1.name,
+           Left(dataset1.sameAs),
+           dataset1.images
+          ),
           (dataset2Modification.id,
            dataset2.versions.initial,
            dataset2Modification.title,
            dataset2Modification.name,
-           Right(dataset2Modification.derivedFrom)
+           Right(dataset2Modification.derivedFrom),
+           dataset2Modification.images
           )
-        )
+        ).sortBy(_._3)
       }
     }
 
@@ -122,8 +130,8 @@ class IOProjectDatasetsFinderSpec
         )
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.versions.initial, dataset1.title, dataset1.name, Left(sharedSameAs)),
-          (dataset2.id, dataset2.versions.initial, dataset2.title, dataset2.name, Left(sharedSameAs))
+          (dataset1.id, dataset1.versions.initial, dataset1.title, dataset1.name, Left(sharedSameAs), dataset1.images),
+          (dataset2.id, dataset2.versions.initial, dataset2.title, dataset2.name, Left(sharedSameAs), dataset2.images)
         )
       }
     }
@@ -149,7 +157,13 @@ class IOProjectDatasetsFinderSpec
         )
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.versions.initial, dataset1.title, dataset1.name, Left(dataset1.sameAs))
+          (dataset1.id,
+           dataset1.versions.initial,
+           dataset1.title,
+           dataset1.name,
+           Left(dataset1.sameAs),
+           dataset1.images
+          )
         )
       }
     }
@@ -176,7 +190,13 @@ class IOProjectDatasetsFinderSpec
         )
 
         datasetsFinder.findProjectDatasets(project.path).unsafeRunSync() should contain theSameElementsAs List(
-          (dataset1.id, dataset1.versions.initial, dataset1.title, dataset1.name, Left(dataset1.sameAs))
+          (dataset1.id,
+           dataset1.versions.initial,
+           dataset1.title,
+           dataset1.name,
+           Left(dataset1.sameAs),
+           dataset1.images
+          )
         )
       }
     }

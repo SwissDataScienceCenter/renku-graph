@@ -204,6 +204,7 @@ private object IODatasetsFinder {
           _.split(",")
             .map(_.trim)
             .map { case s"$position:$url" => position.toIntOption.getOrElse(0) -> ImageUrl(url) }
+            .toSet[(Int, ImageUrl)]
             .toList
             .sortBy(_._1)
             .map(_._2)

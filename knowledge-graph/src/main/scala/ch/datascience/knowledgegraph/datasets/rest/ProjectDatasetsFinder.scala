@@ -61,7 +61,7 @@ private class IOProjectDatasetsFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX prov: <http://www.w3.org/ns/prov#>"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion
+    s"""|SELECT ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
         |    ?datasetId rdf:type <http://schema.org/Dataset>;
         |               schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
@@ -74,16 +74,25 @@ private class IOProjectDatasetsFinder(
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
         |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
-        |
+        |    
         |    FILTER NOT EXISTS { 
         |      # Removing dataset that have an activity that invalidates them
         |      ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
         |                         prov:atLocation ?metaDataLocation ;
         |                         schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |                         prov:wasInvalidatedBy ?invalidationActivity .	
-        |      }
+        |    }
+        |    OPTIONAL { 
+        |      ?datasetId   schema:image ?imageId .
+        |      ?imageId     schema:position ?imagePosition ;
+        |                   schema:contentUrl ?imageUrl .
+        |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |    }
         |}
+        |
+        |GROUP BY ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion 
         |ORDER BY ?name
+        |
         |""".stripMargin
   )
 }
@@ -101,8 +110,18 @@ private object IOProjectDatasetsFinder {
       case (sameAs, _)            => Left(sameAs)
     }
 
-    def toListOfImageUrls(urlString: String): List[ImageUrl] =
-      urlString.split(",").map(_.trim).map(ImageUrl.apply).toList
+    def toListOfImageUrls(urlString: Option[String]): List[ImageUrl] =
+      urlString
+        .map(
+          _.split(",")
+            .map(_.trim)
+            .map { case s"$position:$url" => position.toIntOption.getOrElse(0) -> ImageUrl(url) }
+            .toSet[(Int, ImageUrl)]
+            .toList
+            .sortBy(_._1)
+            .map(_._2)
+        )
+        .getOrElse(Nil)
 
     implicit val recordDecoder: Decoder[ProjectDataset] = { cursor =>
       for {
@@ -112,7 +131,7 @@ private object IOProjectDatasetsFinder {
         sameAs           <- cursor.downField("topmostSameAs").downField("value").as[SameAs]
         maybeDerivedFrom <- cursor.downField("maybeDerivedFrom").downField("value").as[Option[DerivedFrom]]
         initialVersion   <- cursor.downField("initialVersion").downField("value").as[InitialVersion]
-        images           <- cursor.downField("images").downField("value").as[String].map(toListOfImageUrls)
+        images           <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
       } yield (id, initialVersion, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom), images)
     }
 
