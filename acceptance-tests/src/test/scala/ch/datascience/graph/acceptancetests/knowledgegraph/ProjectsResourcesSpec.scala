@@ -153,7 +153,8 @@ class ProjectsResourcesSpec
           datasetIdentifier = dataset.id,
           datasetTitle = dataset.title,
           datasetName = dataset.name,
-          maybeDatasetSameAs = dataset.sameAs.some
+          maybeDatasetSameAs = dataset.sameAs.some,
+          datasetImages = dataset.images
         )
       )
       `data in the RDF store`(project, dataset1CommitId, dataset1Committer, jsonLDTriples)(
