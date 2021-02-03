@@ -30,6 +30,7 @@ import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 import scala.language.postfixOps
 import scala.util.Random
 
@@ -41,17 +42,19 @@ private class SubscribersRegistry(
     busySleep:                   FiniteDuration,
     checkupInterval:             FiniteDuration
 )(implicit contextShift:         ContextShift[IO], timer: Timer[IO], executionContext: ExecutionContext) {
+
+  val applicative = Applicative[IO]
+
   import SubscribersRegistry._
+  import applicative._
 
-  import scala.jdk.CollectionConverters._
+  private val availablePool = new ConcurrentHashMap[SubscriptionInfo, Unit]()
+  private val busyPool      = new ConcurrentHashMap[SubscriptionInfo, CheckupTime]()
 
-  private val availablePool = new ConcurrentHashMap[SubscriberUrl, Unit]()
-  private val busyPool      = new ConcurrentHashMap[SubscriberUrl, CheckupTime]()
-
-  def add(subscriberUrl: SubscriberUrl): IO[Boolean] = for {
-    _        <- IO(busyPool remove subscriberUrl)
-    wasAdded <- IO(Option(availablePool.putIfAbsent(subscriberUrl, ())).isEmpty)
-    _        <- Applicative[IO].whenA(wasAdded)(notifyCallerAboutAvailability(subscriberUrl))
+  def add(subscriptionInfo: SubscriptionInfo): IO[Boolean] = for {
+    _        <- IO(busyPool remove subscriptionInfo)
+    wasAdded <- IO(Option(availablePool.putIfAbsent(subscriptionInfo, ())).isEmpty)
+    _        <- whenA(wasAdded)(notifyCallerAboutAvailability(subscriptionInfo.subscriberUrl))
   } yield wasAdded
 
   private def notifyCallerAboutAvailability(subscriberUrl: SubscriberUrl): IO[Unit] = for {
@@ -75,9 +78,10 @@ private class SubscribersRegistry(
     _                      <- maybeSubscriberUrl map subscriberUrlReference.complete getOrElse makeCallerToWait(subscriberUrlReference)
   } yield subscriberUrlReference
 
-  private def maybeSubscriberUrl = Random.shuffle {
-    availablePool.keySet().asScala.toList
-  }.headOption
+  private def maybeSubscriberUrl = Random
+    .shuffle(availablePool.keySet().asScala.toList)
+    .headOption
+    .map(_.subscriberUrl)
 
   private def makeCallerToWait(subscriberUrlReference: Deferred[IO, SubscriberUrl]) = for {
     _ <- logNoFreeSubscribersInfo
@@ -89,16 +93,18 @@ private class SubscribersRegistry(
   )
 
   def delete(subscriberUrl: SubscriberUrl): IO[Boolean] = IO {
-    Option(busyPool remove subscriberUrl).isDefined |
-      Option(availablePool remove subscriberUrl).isDefined
+    find(subscriberUrl, in = busyPool).flatMap(info => Option(busyPool remove info)).isDefined |
+      find(subscriberUrl, in = availablePool).flatMap(info => Option(availablePool remove info)).isDefined
   }
 
   def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] = IO {
-    availablePool remove subscriberUrl
+    (find(subscriberUrl, in = availablePool) orElse find(subscriberUrl, in = busyPool))
+      .foreach { info =>
+        availablePool.remove(info)
 
-    val checkupTime = CheckupTime(now() plusMillis busySleep.toMillis)
-    busyPool.put(subscriberUrl, checkupTime)
-    ()
+        val checkupTime = CheckupTime(now() plusMillis busySleep.toMillis)
+        busyPool.put(info, checkupTime)
+      }
   }
 
   def subscriberCount(): Int = busyPool.size() + availablePool.size()
@@ -109,22 +115,27 @@ private class SubscribersRegistry(
     _                        <- bringToAvailable(subscribersDueForCheckup)
   } yield ()
 
-  private def findSubscribersDueForCheckup: IO[List[SubscriberUrl]] = IO {
+  private def findSubscribersDueForCheckup: IO[List[SubscriptionInfo]] = IO {
     busyPool.asScala.toList
       .filter(isDueForCheckup)
-      .map { case (subscriberUrl, _) => subscriberUrl }
+      .map { case (info, _) => info }
   }
 
-  private val isDueForCheckup: PartialFunction[(SubscriberUrl, CheckupTime), Boolean] = { case (_, checkupTime) =>
+  private val isDueForCheckup: PartialFunction[(SubscriptionInfo, CheckupTime), Boolean] = { case (_, checkupTime) =>
     (checkupTime.value compareTo now()) <= 0
   }
 
-  private def bringToAvailable(subscribers: List[SubscriberUrl]): IO[List[Unit]] = subscribers.map { subscriberUrl =>
+  private def bringToAvailable(subscribers: List[SubscriptionInfo]): IO[List[Unit]] = subscribers.map { subscriberUrl =>
     for {
       wasAdded <- add(subscriberUrl)
-      _        <- Applicative[IO].whenA(wasAdded)(logger.debug(s"$categoryName: $subscriberUrl taken from busy state"))
+      _        <- whenA(wasAdded)(logger.debug(s"$categoryName: $subscriberUrl taken from busy state"))
     } yield ()
   }.sequence
+
+  private def find(subscriberUrl: SubscriberUrl, in: ConcurrentHashMap[SubscriptionInfo, _]): Option[SubscriptionInfo] =
+    in.asScala
+      .find { case (info, _) => info.subscriberUrl == subscriberUrl }
+      .map { case (info, _) => info }
 }
 
 private object SubscribersRegistry {
@@ -147,7 +158,7 @@ private object SubscribersRegistry {
       IO(
         new SubscribersRegistry(categoryName,
                                 subscriberUrlReferenceQueue,
-                                Instant.now,
+                                Instant.now _,
                                 logger,
                                 busySleep,
                                 checkupInterval

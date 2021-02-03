@@ -18,18 +18,23 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings}
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings, positiveInts}
 import ch.datascience.graph.model.events.CategoryName
 import org.scalacheck.Gen
 
 private object Generators {
 
-  val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
-  val categoryNames:  Gen[CategoryName]  = nonBlankStrings() map (value => CategoryName(value.value))
+  val subscriberUrls:       Gen[SubscriberUrl]      = httpUrls() map SubscriberUrl.apply
+  val subscriberCapacities: Gen[SubscriberCapacity] = positiveInts() map (v => SubscriberCapacity(v.value))
+  val categoryNames:        Gen[CategoryName]       = nonBlankStrings() map (value => CategoryName(value.value))
 
-  implicit val subscriptionCategoryPayloads: Gen[SubscriptionCategoryPayload] = for {
-    url <- subscriberUrls
-  } yield new SubscriptionCategoryPayload {
-    override def subscriberUrl: SubscriberUrl = url
-  }
+  final case class TestSubscriptionInfo(subscriberUrl:           SubscriberUrl,
+                                        maybeSubscriberCapacity: Option[SubscriberCapacity]
+  ) extends SubscriptionInfo
+
+  implicit val subscriptionInfos: Gen[TestSubscriptionInfo] = for {
+    url           <- subscriberUrls
+    maybeCapacity <- subscriberCapacities.toGeneratorOfOptions
+  } yield TestSubscriptionInfo(url, maybeCapacity)
 }

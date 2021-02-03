@@ -49,30 +49,42 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
 
     "adds the given subscriber to the registry" in new TestCase {
 
-      subscribersRegistry.add(subscriberUrl).unsafeRunSync()                       shouldBe true
+      subscribersRegistry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       subscribersRegistry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
 
-      subscribersRegistry.add(subscriberUrl).unsafeRunSync() shouldBe false
+      subscribersRegistry.add(subscriptionInfo).unsafeRunSync() shouldBe false
     }
 
     "move the given subscriber from the busy state to available" in new TestCase {
 
-      subscribersRegistry.add(subscriberUrl).unsafeRunSync()                       shouldBe true
+      subscribersRegistry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       subscribersRegistry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
 
       subscribersRegistry.markBusy(subscriberUrl).unsafeRunSync()                  shouldBe ((): Unit)
-      subscribersRegistry.add(subscriberUrl).unsafeRunSync()                       shouldBe true
+      subscribersRegistry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       subscribersRegistry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
     }
 
     "add the given subscriber if it was deleted" in new TestCase {
 
-      subscribersRegistry.add(subscriberUrl).unsafeRunSync()                       shouldBe true
+      subscribersRegistry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       subscribersRegistry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
 
       subscribersRegistry.delete(subscriberUrl).unsafeRunSync()                    shouldBe true
-      subscribersRegistry.add(subscriberUrl).unsafeRunSync()                       shouldBe true
+      subscribersRegistry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       subscribersRegistry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+    }
+
+    "don't add a subscriber twice even if it comes with different capacity" in new TestCase {
+
+      subscribersRegistry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
+      subscribersRegistry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+
+      val sameSubscriptionButWithDifferentCapacity = subscriptionInfo.copy(
+        maybeSubscriberCapacity =
+          subscriberCapacities.toGeneratorOfOptions.generateDifferentThan(subscriptionInfo.maybeSubscriberCapacity)
+      )
+      subscribersRegistry.add(sameSubscriptionButWithDifferentCapacity).unsafeRunSync() shouldBe false
     }
   }
 
@@ -80,7 +92,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
 
     "not always return the same subscriber" in new TestCase {
 
-      val subscribers = subscriberUrls.generateNonEmptyList(minElements = 10, maxElements = 20).toList
+      val subscribers = subscriptionInfos.generateNonEmptyList(minElements = 10, maxElements = 20).toList
 
       subscribers.map(subscribersRegistry.add).sequence.unsafeRunSync()
 
@@ -96,12 +108,12 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
 
       override val busySleep = 10 seconds
 
-      val busySubscriber = subscriberUrls.generateOne
+      val busySubscriber = subscriptionInfos.generateOne
       subscribersRegistry.add(busySubscriber).unsafeRunSync()                      shouldBe true
-      subscribersRegistry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe busySubscriber
-      subscribersRegistry.markBusy(busySubscriber).unsafeRunSync()                 shouldBe ((): Unit)
+      subscribersRegistry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe busySubscriber.subscriberUrl
+      subscribersRegistry.markBusy(busySubscriber.subscriberUrl).unsafeRunSync()   shouldBe ((): Unit)
 
-      subscribersRegistry.add(subscriberUrl).unsafeRunSync()                       shouldBe true
+      subscribersRegistry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       subscribersRegistry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
 
       val subscribersFound = (1 to 10).foldLeft(Set.empty[SubscriberUrl]) { (returnedSubscribers, _) =>
@@ -125,7 +137,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
 
       Thread sleep 500
 
-      subscribersRegistry.add(subscriberUrl).unsafeRunSync() shouldBe true
+      subscribersRegistry.add(subscriptionInfo).unsafeRunSync() shouldBe true
 
       eventually {
         collectedCallerIds.get(()) shouldBe callerIds
@@ -141,7 +153,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
     }
 
     "remove the subscriber if it's busy" in new TestCase {
-      subscribersRegistry.add(subscriberUrl).unsafeRunSync()                       shouldBe true
+      subscribersRegistry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       subscribersRegistry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
 
       subscribersRegistry.markBusy(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
@@ -156,7 +168,7 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
 
     "make the subscriber temporarily unavailable" in new TestCase {
 
-      subscribersRegistry.add(subscriberUrl).unsafeRunSync()                       shouldBe true
+      subscribersRegistry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       subscribersRegistry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
 
       val startTime = Instant.now()
@@ -172,13 +184,14 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
       eventually {
         logger.loggedOnly(
           Info(s"$categoryName: all 1 subscriber(s) are busy; waiting for one to become available"),
-          Debug(s"$categoryName: $subscriberUrl taken from busy state")
+          Debug(s"$categoryName: $subscriptionInfo taken from busy state")
         )
       }
     }
 
     "extend unavailable time if the subscriber is already unavailable" in new TestCase {
-      subscribersRegistry.add(subscriberUrl).unsafeRunSync()                       shouldBe true
+
+      subscribersRegistry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       subscribersRegistry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
 
       val startTime = Instant.now()
@@ -196,13 +209,14 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
     }
   }
 
+  private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit val timer: Timer[IO]        = IO.timer(global)
+
   private trait TestCase {
 
-    implicit val cs:    ContextShift[IO] = IO.contextShift(global)
-    implicit val timer: Timer[IO]        = IO.timer(global)
-
-    val subscriberUrl = subscriberUrls.generateOne
-    val categoryName  = categoryNames.generateOne
+    val subscriptionInfo = subscriptionInfos.generateOne
+    val subscriberUrl    = subscriptionInfo.subscriberUrl
+    val categoryName     = categoryNames.generateOne
 
     val busySleep                = 500 milliseconds
     val checkupInterval          = 500 milliseconds

@@ -22,45 +22,47 @@ import cats.MonadError
 import ch.datascience.graph.model.events.CategoryName
 import io.circe.{Decoder, Json}
 
-private trait SubscriptionRequestDeserializer[Interpretation[_], PayloadType <: SubscriptionCategoryPayload] {
-  def deserialize(payload: Json): Interpretation[Option[PayloadType]]
+private trait SubscriptionRequestDeserializer[Interpretation[_], SubscriptionInfoType <: SubscriptionInfo] {
+  def deserialize(payload: Json): Interpretation[Option[SubscriptionInfoType]]
 }
 
 private object SubscriptionRequestDeserializer {
 
-  def apply[Interpretation[_], PayloadType <: SubscriptionCategoryPayload](
+  def apply[Interpretation[_], SubscriptionInfoType <: SubscriptionInfo](
       categoryName:   CategoryName,
-      payloadFactory: SubscriberUrl => PayloadType
+      payloadFactory: (SubscriberUrl, Option[SubscriberCapacity]) => SubscriptionInfoType
   )(implicit
       monadError: MonadError[Interpretation, Throwable]
-  ): Interpretation[SubscriptionRequestDeserializer[Interpretation, PayloadType]] = monadError.catchNonFatal {
+  ): Interpretation[SubscriptionRequestDeserializer[Interpretation, SubscriptionInfoType]] = monadError.catchNonFatal {
     new SubscriptionRequestDeserializerImpl(categoryName, payloadFactory)
   }
 }
 
-private class SubscriptionRequestDeserializerImpl[Interpretation[_], PayloadType <: SubscriptionCategoryPayload](
+private class SubscriptionRequestDeserializerImpl[Interpretation[_], SubscriptionInfoType <: SubscriptionInfo](
     categoryName:      CategoryName,
-    payloadFactory:    SubscriberUrl => PayloadType
+    payloadFactory:    (SubscriberUrl, Option[SubscriberCapacity]) => SubscriptionInfoType
 )(implicit monadError: MonadError[Interpretation, Throwable])
-    extends SubscriptionRequestDeserializer[Interpretation, PayloadType] {
+    extends SubscriptionRequestDeserializer[Interpretation, SubscriptionInfoType] {
 
   import cats.syntax.all._
 
-  override def deserialize(payload: Json): Interpretation[Option[PayloadType]] =
+  override def deserialize(payload: Json): Interpretation[Option[SubscriptionInfoType]] =
     payload
-      .as[(String, SubscriberUrl)]
-      .fold(_ => Option.empty[PayloadType], toCategoryPayload)
+      .as[(String, SubscriberUrl, Option[SubscriberCapacity])]
+      .fold(_ => Option.empty[SubscriptionInfoType], toCategoryPayload)
       .pure[Interpretation]
 
-  private lazy val toCategoryPayload: ((String, SubscriberUrl)) => Option[PayloadType] = {
-    case (categoryName.value, subscriberUrl) => Some(payloadFactory(subscriberUrl))
-    case _                                   => None
+  private lazy val toCategoryPayload
+      : ((String, SubscriberUrl, Option[SubscriberCapacity])) => Option[SubscriptionInfoType] = {
+    case (categoryName.value, subscriberUrl, maybeCapacity) => Some(payloadFactory(subscriberUrl, maybeCapacity))
+    case _                                                  => None
   }
 
-  private implicit lazy val payloadDecoder: Decoder[(String, SubscriberUrl)] = { cursor =>
+  private implicit lazy val payloadDecoder: Decoder[(String, SubscriberUrl, Option[SubscriberCapacity])] = { cursor =>
     for {
-      categoryName  <- cursor.downField("categoryName").as[String]
-      subscriberUrl <- cursor.downField("subscriberUrl").as[SubscriberUrl]
-    } yield categoryName -> subscriberUrl
+      categoryName            <- cursor.downField("categoryName").as[String]
+      subscriberUrl           <- cursor.downField("subscriberUrl").as[SubscriberUrl]
+      maybeSubscriberCapacity <- cursor.downField("capacity").as[Option[SubscriberCapacity]]
+    } yield (categoryName, subscriberUrl, maybeSubscriberCapacity)
   }
 }
