@@ -19,8 +19,7 @@
 package io.renku.eventlog.subscriptions.membersync
 
 import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.{SubscriberCapacity, SubscriberUrl}
+import io.renku.eventlog.subscriptions.{Capacity, SubscriberUrl}
 
-private case class SubscriptionCategoryPayload(subscriberUrl:           SubscriberUrl,
-                                               maybeSubscriberCapacity: Option[SubscriberCapacity]
-) extends subscriptions.SubscriptionInfo
+private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl, maybeCapacity: Option[Capacity])
+    extends subscriptions.SubscriptionInfo

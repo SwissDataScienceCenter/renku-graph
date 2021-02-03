@@ -30,7 +30,7 @@ private object SubscriptionRequestDeserializer {
 
   def apply[Interpretation[_], SubscriptionInfoType <: SubscriptionInfo](
       categoryName:   CategoryName,
-      payloadFactory: (SubscriberUrl, Option[SubscriberCapacity]) => SubscriptionInfoType
+      payloadFactory: (SubscriberUrl, Option[Capacity]) => SubscriptionInfoType
   )(implicit
       monadError: MonadError[Interpretation, Throwable]
   ): Interpretation[SubscriptionRequestDeserializer[Interpretation, SubscriptionInfoType]] = monadError.catchNonFatal {
@@ -40,7 +40,7 @@ private object SubscriptionRequestDeserializer {
 
 private class SubscriptionRequestDeserializerImpl[Interpretation[_], SubscriptionInfoType <: SubscriptionInfo](
     categoryName:      CategoryName,
-    payloadFactory:    (SubscriberUrl, Option[SubscriberCapacity]) => SubscriptionInfoType
+    payloadFactory:    (SubscriberUrl, Option[Capacity]) => SubscriptionInfoType
 )(implicit monadError: MonadError[Interpretation, Throwable])
     extends SubscriptionRequestDeserializer[Interpretation, SubscriptionInfoType] {
 
@@ -48,21 +48,20 @@ private class SubscriptionRequestDeserializerImpl[Interpretation[_], Subscriptio
 
   override def deserialize(payload: Json): Interpretation[Option[SubscriptionInfoType]] =
     payload
-      .as[(String, SubscriberUrl, Option[SubscriberCapacity])]
+      .as[(String, SubscriberUrl, Option[Capacity])]
       .fold(_ => Option.empty[SubscriptionInfoType], toCategoryPayload)
       .pure[Interpretation]
 
-  private lazy val toCategoryPayload
-      : ((String, SubscriberUrl, Option[SubscriberCapacity])) => Option[SubscriptionInfoType] = {
+  private lazy val toCategoryPayload: ((String, SubscriberUrl, Option[Capacity])) => Option[SubscriptionInfoType] = {
     case (categoryName.value, subscriberUrl, maybeCapacity) => Some(payloadFactory(subscriberUrl, maybeCapacity))
     case _                                                  => None
   }
 
-  private implicit lazy val payloadDecoder: Decoder[(String, SubscriberUrl, Option[SubscriberCapacity])] = { cursor =>
+  private implicit lazy val payloadDecoder: Decoder[(String, SubscriberUrl, Option[Capacity])] = { cursor =>
     for {
-      categoryName            <- cursor.downField("categoryName").as[String]
-      subscriberUrl           <- cursor.downField("subscriberUrl").as[SubscriberUrl]
-      maybeSubscriberCapacity <- cursor.downField("capacity").as[Option[SubscriberCapacity]]
-    } yield (categoryName, subscriberUrl, maybeSubscriberCapacity)
+      categoryName  <- cursor.downField("categoryName").as[String]
+      subscriberUrl <- cursor.downField("subscriberUrl").as[SubscriberUrl]
+      maybeCapacity <- cursor.downField("capacity").as[Option[Capacity]]
+    } yield (categoryName, subscriberUrl, maybeCapacity)
   }
 }

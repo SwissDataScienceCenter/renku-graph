@@ -33,19 +33,17 @@ private object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new Subscrib
   implicit val decoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
 }
 
-private final class SubscriberCapacity private (val value: Int) extends AnyVal with IntTinyType
-private object SubscriberCapacity
-    extends TinyTypeFactory[SubscriberCapacity](new SubscriberCapacity(_))
-    with NonNegativeInt {
-  implicit val decoder: Decoder[SubscriberCapacity] = intDecoder(SubscriberCapacity)
+private final class Capacity private (val value: Int) extends AnyVal with IntTinyType
+private object Capacity extends TinyTypeFactory[Capacity](new Capacity(_)) with NonNegativeInt {
+  implicit val decoder: Decoder[Capacity] = intDecoder(Capacity)
 }
 
 final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
 object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_)) with InstantNotInTheFuture
 
 private trait SubscriptionInfo extends Product with Serializable {
-  val subscriberUrl:           SubscriberUrl
-  val maybeSubscriberCapacity: Option[SubscriberCapacity]
+  val subscriberUrl: SubscriberUrl
+  val maybeCapacity: Option[Capacity]
 
   override def equals(obj: Any): Boolean = obj match {
     case info: SubscriptionInfo => info.subscriberUrl == subscriberUrl
@@ -55,7 +53,7 @@ private trait SubscriptionInfo extends Product with Serializable {
   override def hashCode(): Int = subscriberUrl.hashCode()
 
   override lazy val toString = {
-    val capacityAsString = maybeSubscriberCapacity.map(capacity => s" with capacity $capacity").getOrElse("")
+    val capacityAsString = maybeCapacity.map(capacity => s" with capacity $capacity").getOrElse("")
     s"$subscriberUrl$capacityAsString"
   }
 }

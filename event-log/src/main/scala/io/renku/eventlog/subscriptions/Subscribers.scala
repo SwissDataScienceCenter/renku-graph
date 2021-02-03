@@ -34,6 +34,8 @@ private trait Subscribers[Interpretation[_]] {
   def markBusy(subscriberUrl: SubscriberUrl): Interpretation[Unit]
 
   def runOnSubscriber(f: SubscriberUrl => Interpretation[Unit]): Interpretation[Unit]
+
+  def getTotalCapacity: Option[Capacity]
 }
 
 private class SubscribersImpl private[subscriptions] (
@@ -66,6 +68,8 @@ private class SubscribersImpl private[subscriptions] (
       subscriberUrl          <- subscriberUrlReference.get
       _                      <- f(subscriberUrl)
     } yield ()
+
+  def getTotalCapacity: Option[Capacity] = subscribersRegistry.getTotalCapacity
 }
 
 private object Subscribers {

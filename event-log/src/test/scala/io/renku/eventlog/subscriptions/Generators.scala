@@ -25,16 +25,15 @@ import org.scalacheck.Gen
 
 private object Generators {
 
-  val subscriberUrls:       Gen[SubscriberUrl]      = httpUrls() map SubscriberUrl.apply
-  val subscriberCapacities: Gen[SubscriberCapacity] = positiveInts() map (v => SubscriberCapacity(v.value))
-  val categoryNames:        Gen[CategoryName]       = nonBlankStrings() map (value => CategoryName(value.value))
+  val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
+  val capacities:     Gen[Capacity]      = positiveInts() map (v => Capacity(v.value))
+  val categoryNames:  Gen[CategoryName]  = nonBlankStrings() map (value => CategoryName(value.value))
 
-  final case class TestSubscriptionInfo(subscriberUrl:           SubscriberUrl,
-                                        maybeSubscriberCapacity: Option[SubscriberCapacity]
-  ) extends SubscriptionInfo
+  final case class TestSubscriptionInfo(subscriberUrl: SubscriberUrl, maybeCapacity: Option[Capacity])
+      extends SubscriptionInfo
 
   implicit val subscriptionInfos: Gen[TestSubscriptionInfo] = for {
     url           <- subscriberUrls
-    maybeCapacity <- subscriberCapacities.toGeneratorOfOptions
+    maybeCapacity <- capacities.toGeneratorOfOptions
   } yield TestSubscriptionInfo(url, maybeCapacity)
 }

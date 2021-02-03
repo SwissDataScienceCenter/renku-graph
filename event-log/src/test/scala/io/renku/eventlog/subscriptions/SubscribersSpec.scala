@@ -137,6 +137,18 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
     }
   }
 
+  "getTotalCapacity" should {
+
+    "return totalCapacity fetched from the registry" in new TestCase {
+      val maybeCapacity = capacities.generateOption
+      (() => subscribersRegistry.getTotalCapacity)
+        .expects()
+        .returning(maybeCapacity)
+
+      subscribers.getTotalCapacity shouldBe maybeCapacity
+    }
+  }
+
   private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
   private implicit val timer: Timer[IO]        = IO.timer(global)
 

@@ -136,6 +136,13 @@ private class SubscribersRegistry(
     in.asScala
       .find { case (info, _) => info.subscriberUrl == subscriberUrl }
       .map { case (info, _) => info }
+
+  def getTotalCapacity: Option[Capacity] =
+    (availablePool.asScala.keySet ++ busyPool.asScala.keySet).toList
+      .flatMap(_.maybeCapacity) match {
+      case Nil        => None
+      case capacities => Some(Capacity(capacities.map(_.value).sum))
+    }
 }
 
 private object SubscribersRegistry {

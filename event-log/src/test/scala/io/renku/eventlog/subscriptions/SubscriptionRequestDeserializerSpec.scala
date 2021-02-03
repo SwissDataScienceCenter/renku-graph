@@ -37,7 +37,7 @@ private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockF
     "return the subscriber URL if the categoryName and subscriberUrl are valid " +
       "and there's no capacity" in new TestCase {
         val subscriptionCategoryPayload = subscriptionInfos.generateOne
-          .copy(maybeSubscriberCapacity = None)
+          .copy(maybeCapacity = None)
         val payload = json"""{
           "categoryName":  ${categoryName.value},
           "subscriberUrl": ${subscriptionCategoryPayload.subscriberUrl.value}
@@ -47,9 +47,9 @@ private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockF
       }
 
     "return the subscriber URL if the categoryName, subscriberUrl, and capacity are given and valid" in new TestCase {
-      val capacity = subscriberCapacities.generateOne
+      val capacity = capacities.generateOne
       val subscriptionCategoryPayload = subscriptionInfos.generateOne
-        .copy(maybeSubscriberCapacity = capacity.some)
+        .copy(maybeCapacity = capacity.some)
       val payload = json"""{
           "categoryName":  ${categoryName.value},
           "subscriberUrl": ${subscriptionCategoryPayload.subscriberUrl.value},

@@ -46,13 +46,13 @@ class SubscriptionInfoSpec extends AnyWordSpec with should.Matchers with ScalaCh
   "toString" should {
 
     "return only the url if no capacity is present" in {
-      val info = subscriptionInfos.generateOne.copy(maybeSubscriberCapacity = None)
+      val info = subscriptionInfos.generateOne.copy(maybeCapacity = None)
       info.toString shouldBe info.subscriberUrl.toString
     }
 
     "return the url with capacity when it's present" in {
-      val capacity = subscriberCapacities.generateOne
-      val info     = subscriptionInfos.generateOne.copy(maybeSubscriberCapacity = Some(capacity))
+      val capacity = capacities.generateOne
+      val info     = subscriptionInfos.generateOne.copy(maybeCapacity = Some(capacity))
       info.toString shouldBe s"${info.subscriberUrl} with capacity $capacity"
     }
   }
