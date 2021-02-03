@@ -90,7 +90,6 @@ private object IODatasetFinder {
   def apply(
       timeRecorder:   SparqlQueryTimeRecorder[IO],
       rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
       logger:         Logger[IO] = ApplicationLogger
   )(implicit
       executionContext: ExecutionContext,
@@ -98,11 +97,10 @@ private object IODatasetFinder {
       timer:            Timer[IO]
   ): IO[DatasetFinder[IO]] =
     for {
-      config       <- rdfStoreConfig
-      renkuBaseUrl <- renkuBaseUrl
+      config <- rdfStoreConfig
     } yield new IODatasetFinder(
       new BaseDetailsFinder(config, logger, timeRecorder),
-      new CreatorsFinder(config, renkuBaseUrl, logger, timeRecorder),
+      new CreatorsFinder(config, logger, timeRecorder),
       new PartsFinder(config, logger, timeRecorder),
       new ProjectsFinder(config, logger, timeRecorder)
     )

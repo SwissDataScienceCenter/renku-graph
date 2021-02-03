@@ -675,7 +675,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     val datasetFinder = new IODatasetFinder(
       new BaseDetailsFinder(rdfStoreConfig, logger, timeRecorder),
-      new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
+      new CreatorsFinder(rdfStoreConfig, logger, timeRecorder),
       new PartsFinder(rdfStoreConfig, logger, timeRecorder),
       new ProjectsFinder(rdfStoreConfig, logger, timeRecorder)
     )
