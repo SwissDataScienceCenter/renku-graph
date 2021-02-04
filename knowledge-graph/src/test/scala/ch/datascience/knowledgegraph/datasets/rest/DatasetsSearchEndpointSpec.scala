@@ -198,6 +198,6 @@ class DatasetsSearchEndpointSpec
     maybeDescription <- Gen.option(datasetDescriptions)
     published        <- datasetPublishingInfos
     projectsCount    <- nonNegativeInts() map (_.value) map ProjectsCount.apply
-    images           <- listOf(imageUrls)
+    images           <- listOf(imageUris)
   } yield DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount, images)
 }

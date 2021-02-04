@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{Description, Identifier, ImageUrl, Name, PublishedDate, Title}
+import ch.datascience.graph.model.datasets.{Description, Identifier, ImageUri, Name, PublishedDate, Title}
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
@@ -52,7 +52,7 @@ private object DatasetsFinder {
       maybeDescription: Option[Description],
       published:        DatasetPublishing,
       projectsCount:    ProjectsCount,
-      images:           List[ImageUrl]
+      images:           List[ImageUri]
   )
 
   final class ProjectsCount private (val value: Int) extends AnyVal with IntTinyType
@@ -198,13 +198,13 @@ private object IODatasetsFinder {
   implicit val recordDecoder: Decoder[DatasetSearchResult] = { cursor =>
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-    def toListOfImageUrls(urlString: Option[String]): List[ImageUrl] =
+    def toListOfImageUrls(urlString: Option[String]): List[ImageUri] =
       urlString
         .map(
           _.split(",")
             .map(_.trim)
-            .map { case s"$position:$url" => position.toIntOption.getOrElse(0) -> ImageUrl(url) }
-            .toSet[(Int, ImageUrl)]
+            .map { case s"$position:$url" => position.toIntOption.getOrElse(0) -> ImageUri(url) }
+            .toSet[(Int, ImageUri)]
             .toList
             .sortBy(_._1)
             .map(_._2)

@@ -40,7 +40,7 @@ trait DataSet {
   val datasetCreators:                   Set[Person]
   val datasetParts:                      List[DataSetPartArtifact]
   val datasetKeywords:                   List[Keyword]
-  val datasetImages:                     List[ImageUrl]
+  val datasetImages:                     List[ImageUri]
   val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]
   val overrideDatasetTopmostDerivedFrom: Option[TopmostDerivedFrom]
 
@@ -78,7 +78,7 @@ object DataSet {
                          creators:                   Set[Person],
                          partsFactories:             List[Activity => DataSetPartArtifact],
                          keywords:                   List[Keyword] = Nil,
-                         images:                     List[ImageUrl] = Nil,
+                         images:                     List[ImageUri] = Nil,
                          overrideTopmostSameAs:      Option[TopmostSameAs] = None,
                          overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   )(activity:                                        Activity): DataSetEntity =
@@ -100,7 +100,7 @@ object DataSet {
       override val datasetCreators:                   Set[Person]                = creators
       override val datasetParts:                      List[DataSetPartArtifact]  = partsFactories.map(_.apply(activity))
       override val datasetKeywords:                   List[Keyword]              = keywords
-      override val datasetImages:                     List[ImageUrl]             = images
+      override val datasetImages:                     List[ImageUri]             = images
       override val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]      = overrideTopmostSameAs
       override val overrideDatasetTopmostDerivedFrom: Option[TopmostDerivedFrom] = overrideTopmostDerivedFrom
     }
@@ -116,7 +116,7 @@ object DataSet {
                       creators:                   Set[Person],
                       partsFactories:             List[Activity => DataSetPartArtifact],
                       keywords:                   List[Keyword] = Nil,
-                      images:                     List[ImageUrl] = Nil,
+                      images:                     List[ImageUri] = Nil,
                       overrideTopmostSameAs:      Option[TopmostSameAs] = None,
                       overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   )(activity:                                     Activity): DataSetEntity =
@@ -138,7 +138,7 @@ object DataSet {
       override val datasetCreators:                   Set[Person]                = creators
       override val datasetParts:                      List[DataSetPartArtifact]  = partsFactories.map(_.apply(activity))
       override val datasetKeywords:                   List[Keyword]              = keywords
-      override val datasetImages:                     List[ImageUrl]             = images
+      override val datasetImages:                     List[ImageUri]             = images
       override val overrideDatasetTopmostSameAs:      Option[TopmostSameAs]      = overrideTopmostSameAs
       override val overrideDatasetTopmostDerivedFrom: Option[TopmostDerivedFrom] = overrideTopmostDerivedFrom
     }
@@ -194,7 +194,7 @@ object DataSet {
         .getOrFail
     }
 
-  private def imageUrlEncoder(datasetEntityId: EntityId): JsonLDEncoder[(ImageUrl, Int)] = JsonLDEncoder.instance {
+  private def imageUrlEncoder(datasetEntityId: EntityId): JsonLDEncoder[(ImageUri, Int)] = JsonLDEncoder.instance {
     case (imageUrl, position) =>
       JsonLD.entity(datasetEntityId / "images" / position,
                     EntityTypes of schema / "ImageObject",

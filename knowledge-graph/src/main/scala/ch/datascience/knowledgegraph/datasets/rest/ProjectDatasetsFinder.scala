@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import ProjectDatasetsFinder._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, ImageUrl, InitialVersion, Name, SameAs, Title}
+import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, InitialVersion, Name, SameAs, Title}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore._
@@ -35,7 +35,7 @@ private trait ProjectDatasetsFinder[Interpretation[_]] {
 
 private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
-  type ProjectDataset  = (Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUrl])
+  type ProjectDataset  = (Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUri])
 }
 
 private class IOProjectDatasetsFinder(
@@ -110,13 +110,13 @@ private object IOProjectDatasetsFinder {
       case (sameAs, _)            => Left(sameAs)
     }
 
-    def toListOfImageUrls(urlString: Option[String]): List[ImageUrl] =
+    def toListOfImageUrls(urlString: Option[String]): List[ImageUri] =
       urlString
         .map(
           _.split(",")
             .map(_.trim)
-            .map { case s"$position:$url" => position.toIntOption.getOrElse(0) -> ImageUrl(url) }
-            .toSet[(Int, ImageUrl)]
+            .map { case s"$position:$url" => position.toIntOption.getOrElse(0) -> ImageUri(url) }
+            .toSet[(Int, ImageUri)]
             .toList
             .sortBy(_._1)
             .map(_._2)

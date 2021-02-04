@@ -25,7 +25,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Identifier, ImageUrl, InitialVersion, Name, Title}
+import ch.datascience.graph.model.datasets.{Identifier, ImageUri, InitialVersion, Name, Title}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.server.EndpointTester._
@@ -127,7 +127,7 @@ class ProjectDatasetsEndpointSpec
       logger
     ).getProjectDatasets _
 
-    lazy val toJson: ((Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUrl])) => Json = {
+    lazy val toJson: ((Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUri])) => Json = {
       case (id, initialVersion, title, name, Left(sameAs), images) =>
         json"""{
           "identifier": ${id.value},
@@ -173,6 +173,6 @@ class ProjectDatasetsEndpointSpec
     title                   <- datasetTitles
     name                    <- datasetNames
     sameAsEitherDerivedFrom <- Gen.oneOf(datasetSameAs map (Left(_)), datasetDerivedFroms map (Right(_)))
-    images                  <- listOf(imageUrls)
+    images                  <- listOf(imageUris)
   } yield (id, initialVersion, title, name, sameAsEitherDerivedFrom, images)
 }

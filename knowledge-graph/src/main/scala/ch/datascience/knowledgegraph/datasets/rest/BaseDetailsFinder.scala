@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.datasets.{Identifier, ImageUrl, Keyword}
+import ch.datascience.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
@@ -58,7 +58,7 @@ private class BaseDetailsFinder(
       renku  -> "renku",
       schema -> "schema"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?publishedDate ?imageIdentifier
+    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?publishedDate
         |WHERE {
         |    ?datasetId schema:identifier "$identifier";
         |               schema:identifier ?identifier;
@@ -102,8 +102,8 @@ private class BaseDetailsFinder(
         |""".stripMargin
   )
 
-  def findImages(identifier: Identifier): IO[List[ImageUrl]] =
-    queryExpecting[List[ImageUrl]](using = queryImages(identifier))
+  def findImages(identifier: Identifier): IO[List[ImageUri]] =
+    queryExpecting[List[ImageUri]](using = queryImages(identifier))
 
   private def queryImages(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - image urls",
@@ -192,12 +192,12 @@ private object BaseDetailsFinder {
     _.downField("results").downField("bindings").as(decodeList[Keyword])
   }
 
-  private implicit lazy val imagesDecoder: Decoder[List[ImageUrl]] = {
+  private implicit lazy val imagesDecoder: Decoder[List[ImageUri]] = {
 
-    implicit val imageDecoder: Decoder[ImageUrl] =
-      _.downField("contentUrl").downField("value").as[String].map(ImageUrl.apply)
+    implicit val imageDecoder: Decoder[ImageUri] =
+      _.downField("contentUrl").downField("value").as[String].map(ImageUri.apply)
 
-    _.downField("results").downField("bindings").as(decodeList[ImageUrl])
+    _.downField("results").downField("bindings").as(decodeList[ImageUri])
   }
 
   private def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =
