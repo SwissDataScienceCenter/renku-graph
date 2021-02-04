@@ -67,10 +67,10 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
       .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))
       .status shouldBe Accepted
 
-    `events processed`(projectId)
+    `wait for events to be processed`(projectId)
   }
 
-  def `events processed`(projectId: projects.Id): Assertion = eventually {
+  def `wait for events to be processed`(projectId: projects.Id): Assertion = eventually {
     val response = eventLogClient.fetchProcessingStatus(projectId)
     response.status                                              shouldBe Ok
     response.bodyAsJson.hcursor.downField("progress").as[Double] shouldBe Right(100d)

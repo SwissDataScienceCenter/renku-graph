@@ -19,7 +19,6 @@
 package ch.datascience.knowledgegraph.projects
 
 import java.time.temporal.ChronoUnit.DAYS
-
 import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls => urls, _}
@@ -35,6 +34,8 @@ import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.knowledgegraph.projects.rest.GitLabProjectFinder.GitLabProject
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import org.scalacheck.Gen
+
+import java.time.Instant.now
 
 object ProjectsGenerators {
 
@@ -87,7 +88,10 @@ object ProjectsGenerators {
       maybeParent = maybeParent.map { parent =>
         parent.copy(
           created = parent.created.copy(
-            date = DateCreated(created.date.value.plus(2, DAYS))
+            date = DateCreated {
+              val newDate = created.date.value.plus(2, DAYS)
+              if ((newDate compareTo now) < 0) newDate else now
+            }
           )
         )
       }

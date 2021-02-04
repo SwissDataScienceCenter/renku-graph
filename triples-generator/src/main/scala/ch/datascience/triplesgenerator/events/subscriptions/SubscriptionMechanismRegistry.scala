@@ -19,9 +19,9 @@
 package ch.datascience.triplesgenerator.events
 package subscriptions
 
-import cats.{MonadError, Parallel}
-import cats.syntax.all._
 import cats.effect.{ContextShift, Effect, IO, Timer}
+import cats.syntax.all._
+import cats.{MonadError, Parallel}
 import ch.datascience.graph.model.events.CategoryName
 import io.chrisdavenport.log4cats.Logger
 
@@ -52,17 +52,30 @@ class SubscriptionMechanismRegistryImpl[Interpretation[_]: Effect](
 
 object SubscriptionMechanismRegistry {
 
+  import SubscriptionPayloadComposer._
+
   def apply(logger:     Logger[IO])(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[SubscriptionMechanismRegistry[IO]] = for {
     awaitingGenerationSubscription <-
-      SubscriptionMechanism(categories.awaitinggeneration.EventHandler.categoryName, logger)
+      SubscriptionMechanism(
+        categories.awaitinggeneration.EventHandler.categoryName,
+        categories.awaitinggeneration.subscriptions.PayloadComposer.payloadsComposerFactory,
+        logger
+      )
     membersSyncSubscription <-
-      SubscriptionMechanism(categories.membersync.EventHandler.categoryName, logger)
+      SubscriptionMechanism(
+        categories.membersync.EventHandler.categoryName,
+        categoryAndUrlPayloadsComposerFactory,
+        logger
+      )
     triplesGeneratedSubscription <-
-      SubscriptionMechanism(categories.triplesgenerated.EventHandler.categoryName, logger)
+      SubscriptionMechanism(categories.triplesgenerated.EventHandler.categoryName,
+                            categoryAndUrlPayloadsComposerFactory,
+                            logger
+      )
   } yield new SubscriptionMechanismRegistryImpl[IO](awaitingGenerationSubscription,
                                                     membersSyncSubscription,
                                                     triplesGeneratedSubscription

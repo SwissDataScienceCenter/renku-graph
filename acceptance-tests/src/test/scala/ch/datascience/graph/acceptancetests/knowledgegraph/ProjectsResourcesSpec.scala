@@ -160,7 +160,7 @@ class ProjectsResourcesSpec
         NonEmptyList.of(dataset1Committer, persons.generateOne.copy(maybeGitLabId = user.id.some)).map(_.asMember())
       )
 
-      `events processed`(project.id)
+      `wait for events to be processed`(project.id)
 
       And("the project exists in GitLab")
       `GET <gitlabApi>/projects/:path returning OK with`(project,
@@ -209,12 +209,7 @@ object ProjectsResources {
     "visibility":  ${project.visibility.value},
     "created":     ${project.created.toJson},
     "updatedAt":   ${project.updatedAt.value},
-    "urls": {
-      "ssh":       ${project.urls.ssh.value},
-      "http":      ${project.urls.http.value},
-      "web":       ${project.urls.web.value},
-      "readme":    ${project.urls.maybeReadme.map(_.value)}
-    },
+    "urls":        ${project.urls.toJson},
     "forking":     ${project.forking.toJson},
     "tags":        ${project.tags.map(_.value).toList},
     "starsCount":  ${project.starsCount.value},
@@ -232,6 +227,16 @@ object ProjectsResources {
       Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
     )
+  }
+
+  private implicit class UrlsOps(urls: Urls) {
+    import ch.datascience.json.JsonOps._
+
+    lazy val toJson: Json = json"""{
+      "ssh":       ${urls.ssh.value},
+      "http":      ${urls.http.value},
+      "web":       ${urls.web.value}
+    }""" addIfDefined ("readme" -> urls.maybeReadme.map(_.value))
   }
 
   private implicit class CreationOps(created: Creation) {

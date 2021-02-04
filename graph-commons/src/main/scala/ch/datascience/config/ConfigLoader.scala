@@ -20,12 +20,11 @@ package ch.datascience.config
 
 import cats.MonadError
 import cats.syntax.all._
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
 import com.typesafe.config.Config
 import pureconfig._
 import pureconfig.error.{CannotConvert, ConfigReaderFailures}
 
-import scala.jdk.CollectionConverters.ListHasAsScala
 import scala.language.implicitConversions
 
 abstract class ConfigLoader[Interpretation[_]](implicit ME: MonadError[Interpretation, Throwable]) {
@@ -62,5 +61,18 @@ object ConfigLoader {
         ttApply
           .from(value)
           .leftMap(exception => CannotConvert(value, ttApply.getClass.toString, exception.getMessage))
+      }
+
+  implicit def intTinyTypeReader[TT <: IntTinyType](implicit ttApply: TinyTypeFactory[TT]): ConfigReader[TT] =
+    ConfigReader
+      .fromString[TT] { stringValue =>
+        stringValue.toIntOption
+          .map { intValue =>
+            ttApply
+              .from(intValue)
+              .leftMap(exception => CannotConvert(stringValue, ttApply.getClass.toString, exception.getMessage))
+          }
+          .getOrElse(Left(CannotConvert(stringValue, ttApply.getClass.toString, "Not an int value")))
+
       }
 }

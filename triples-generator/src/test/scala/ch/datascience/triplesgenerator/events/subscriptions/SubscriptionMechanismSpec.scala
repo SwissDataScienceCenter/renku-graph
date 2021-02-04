@@ -21,10 +21,11 @@ package ch.datascience.triplesgenerator.events.subscriptions
 import cats.effect.{IO, Timer}
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
+import ch.datascience.generators.Generators.{exceptions, jsons}
 import ch.datascience.graph.model.EventsGenerators.categoryNames
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
+import io.circe.Json
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
@@ -47,29 +48,31 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
   "notifyAvailability" should {
 
     "send subscription for events" in new TestCase {
-      val subscriberUrl = subscriberUrls.generateOne
-      urlFinder.`expected findSubscriberUrl responses`.add(subscriberUrl.pure[IO])
+      val payload = jsons.generateOne
+      payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
-      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> IO.unit)
+      subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
 
       subscriber.renewSubscription().unsafeRunSync() shouldBe ((): Unit)
     }
 
-    "fail if finding the subscriber url fails" in new TestCase {
+    "fail if composing the subscription payload fails" in new TestCase {
       val exception = exceptions.generateOne
-      urlFinder.`expected findSubscriberUrl responses`.add(exception.raiseError[IO, SubscriberUrl])
+      payloadComposer.`expected prepareSubscriptionPayload responses`.add(
+        exception.raiseError[IO, Json]
+      )
 
       intercept[Exception] {
         subscriber.renewSubscription().unsafeRunSync()
       } shouldBe exception
     }
 
-    "fail if posting the subscriber url fails" in new TestCase {
-      val subscriberUrl = subscriberUrls.generateOne
-      urlFinder.`expected findSubscriberUrl responses`.add(subscriberUrl.pure[IO])
+    "fail if posting the subscription payload fails" in new TestCase {
+      val payload = jsons.generateOne
+      payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
       val exception = exceptions.generateOne
-      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> exception.raiseError[IO, Unit])
+      subscriptionSender.`expected postToEventLog responses`.add(payload -> exception.raiseError[IO, Unit])
 
       intercept[Exception] {
         subscriber.renewSubscription().unsafeRunSync()
@@ -81,48 +84,50 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
 
     "send/resend subscription for events" in new TestCase {
 
-      val subscriberUrl = subscriberUrls.generateOne
-      urlFinder.`expected findSubscriberUrl responses`.add(subscriberUrl.pure[IO])
+      val payload = jsons.generateOne
+      payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
-      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> IO.unit)
-
-      subscriber.run().unsafeRunAsyncAndForget()
-
-      eventually {
-        logger.loggedOnly(
-          Info(s"$categoryName: Subscribed for events with $subscriberUrl")
-        )
-      }
-    }
-
-    "log an error and retry if finding Subscriber URL fails" in new TestCase {
-
-      val exception = exceptions.generateOne
-      urlFinder.`expected findSubscriberUrl responses`.add(exception.raiseError[IO, SubscriberUrl])
-      val subscriberUrl = subscriberUrls.generateOne
-      urlFinder.`expected findSubscriberUrl responses`.add(subscriberUrl.pure[IO])
-
-      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> IO.unit)
+      subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
 
       subscriber.run().unsafeRunAsyncAndForget()
 
       eventually {
         logger.loggedOnly(
-          Error(s"$categoryName: Finding subscriber URL failed", exception),
-          Info(s"$categoryName: Subscribed for events with $subscriberUrl")
+          Info(s"$categoryName: Subscribed for events with $payload")
         )
       }
     }
 
-    "log an error and retry if sending Subscription URL fails" in new TestCase {
-
-      val subscriberUrl = subscriberUrls.generateOne
-      urlFinder.`expected findSubscriberUrl default response`.set(subscriberUrl.pure[IO])
+    "log an error and retry if composing subscription payload fails" in new TestCase {
 
       val exception = exceptions.generateOne
-      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> exception.raiseError[IO, Unit])
-      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> exception.raiseError[IO, Unit])
-      subscriptionSender.`expected postToEventLog responses`.add(subscriberUrl -> IO.unit)
+      payloadComposer.`expected prepareSubscriptionPayload responses`.add(
+        exception.raiseError[IO, Json]
+      )
+      val payload = jsons.generateOne
+      payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
+
+      subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
+
+      subscriber.run().unsafeRunAsyncAndForget()
+
+      eventually {
+        logger.loggedOnly(
+          Error(s"$categoryName: Composing subscription payload failed", exception),
+          Info(s"$categoryName: Subscribed for events with $payload")
+        )
+      }
+    }
+
+    "log an error and retry if sending subscription payload fails" in new TestCase {
+
+      val payload = jsons.generateOne
+      payloadComposer.`expected prepareSubscriptionPayload default response`.set(payload.pure[IO])
+
+      val exception = exceptions.generateOne
+      subscriptionSender.`expected postToEventLog responses`.add(payload -> exception.raiseError[IO, Unit])
+      subscriptionSender.`expected postToEventLog responses`.add(payload -> exception.raiseError[IO, Unit])
+      subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
 
       subscriber.run().unsafeRunAsyncAndForget()
 
@@ -130,7 +135,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
         logger.loggedOnly(
           Error(s"$categoryName: Subscribing for events failed", exception),
           Error(s"$categoryName: Subscribing for events failed", exception),
-          Info(s"$categoryName: Subscribed for events with $subscriberUrl")
+          Info(s"$categoryName: Subscribed for events with $payload")
         )
       }
     }
@@ -141,30 +146,30 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
   private trait TestCase {
     val categoryName = categoryNames.generateOne
 
-    val urlFinder = new SubscriptionUrlFinder[IO] {
-      val `expected findSubscriberUrl responses`        = new ConcurrentLinkedQueue[IO[SubscriberUrl]]()
-      val `expected findSubscriberUrl default response` = new AtomicReference[IO[SubscriberUrl]]()
+    val payloadComposer = new SubscriptionPayloadComposer[IO] {
+      val `expected prepareSubscriptionPayload responses`        = new ConcurrentLinkedQueue[IO[Json]]()
+      val `expected prepareSubscriptionPayload default response` = new AtomicReference[IO[Json]]()
 
-      override def findSubscriberUrl(): IO[SubscriberUrl] =
-        Option(`expected findSubscriberUrl responses`.poll())
-          .getOrElse(`expected findSubscriberUrl default response`.get())
+      override def prepareSubscriptionPayload(): IO[Json] =
+        Option(`expected prepareSubscriptionPayload responses`.poll())
+          .getOrElse(`expected prepareSubscriptionPayload default response`.get())
     }
 
     val subscriptionSender = new SubscriptionSender[IO] {
-      val `expected postToEventLog responses` = new ConcurrentLinkedQueue[(SubscriberUrl, IO[Unit])]()
+      val `expected postToEventLog responses` = new ConcurrentLinkedQueue[(Json, IO[Unit])]()
 
-      override def postToEventLog(subscriberUrl: SubscriberUrl): IO[Unit] =
+      override def postToEventLog(payload: Json): IO[Unit] =
         Option {
-          val (expectedSubscriberUrl, response) = `expected postToEventLog responses`.poll()
-          if (subscriberUrl == expectedSubscriberUrl) response
-          else fail(s"Expected $expectedSubscriberUrl in the postToEventLog but got $subscriberUrl")
+          val (expectedPayload, response) = `expected postToEventLog responses`.poll()
+          if (payload == expectedPayload) response
+          else fail(s"Expected $expectedPayload in the postToEventLog but got $payload")
         }
           .getOrElse(`expected postToEventLog responses`.asScala.last._2)
     }
 
     val logger = TestLogger[IO]()
     val subscriber = new SubscriptionMechanismImpl(categoryName,
-                                                   urlFinder,
+                                                   payloadComposer,
                                                    subscriptionSender,
                                                    logger,
                                                    initialDelay = 5 millis,

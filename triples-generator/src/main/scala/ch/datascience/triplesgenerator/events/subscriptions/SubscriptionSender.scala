@@ -21,45 +21,33 @@ package ch.datascience.triplesgenerator.events.subscriptions
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.http.client.IORestClient
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Json
 
 import scala.concurrent.ExecutionContext
 
 private trait SubscriptionSender[Interpretation[_]] {
-  def postToEventLog(subscriberUrl: SubscriberUrl): Interpretation[Unit]
+  def postToEventLog(subscriptionPayload: Json): Interpretation[Unit]
 }
 
 private class IOSubscriptionSender(
     eventLogUrl:             EventLogUrl,
-    categoryName:            CategoryName,
     logger:                  Logger[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient(Throttler.noThrottling, logger)
     with SubscriptionSender[IO] {
 
   import cats.effect._
-  import io.circe.Encoder
-  import io.circe.literal._
-  import io.circe.syntax._
   import org.http4s.Method.POST
   import org.http4s.Status.Accepted
   import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
-  override def postToEventLog(subscriberUrl: SubscriberUrl): IO[Unit] = for {
+  override def postToEventLog(subscriptionPayload: Json): IO[Unit] = for {
     uri           <- validateUri(s"$eventLogUrl/subscriptions")
-    sendingResult <- send(request(POST, uri).withEntity(subscriberUrl.asJson))(mapResponse)
+    sendingResult <- send(request(POST, uri).withEntity(subscriptionPayload))(mapResponse)
   } yield sendingResult
-
-  private implicit lazy val entityEncoder: Encoder[SubscriberUrl] =
-    Encoder.instance[SubscriberUrl] { url =>
-      json"""{
-        "categoryName":  ${categoryName.value},
-        "subscriberUrl": ${url.value}
-      }"""
-    }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
     case (Accepted, _, _) => IO.unit
@@ -68,15 +56,12 @@ private class IOSubscriptionSender(
 
 private object IOSubscriptionSender {
   def apply(
-      categoryName: CategoryName,
-      logger:       Logger[IO]
+      logger: Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[SubscriptionSender[IO]] =
-    for {
-      eventLogUrl <- EventLogUrl[IO]()
-    } yield new IOSubscriptionSender(eventLogUrl, categoryName, logger)
-
+  ): IO[SubscriptionSender[IO]] = for {
+    eventLogUrl <- EventLogUrl[IO]()
+  } yield new IOSubscriptionSender(eventLogUrl, logger)
 }

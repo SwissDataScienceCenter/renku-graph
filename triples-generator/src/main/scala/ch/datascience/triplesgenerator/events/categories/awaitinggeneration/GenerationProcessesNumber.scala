@@ -16,28 +16,24 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.config
+package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
 import cats.MonadError
 import ch.datascience.config.ConfigLoader
-import ch.datascience.tinytypes.constraints.{Url, UrlOps, UrlResourceRenderer}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 
-final class RenkuBaseUrl private (val value: String) extends AnyVal with StringTinyType
-object RenkuBaseUrl
-    extends TinyTypeFactory[RenkuBaseUrl](new RenkuBaseUrl(_))
-    with Url
-    with UrlOps[RenkuBaseUrl]
-    with UrlResourceRenderer[RenkuBaseUrl] {
+private[events] final class GenerationProcessesNumber private (val value: Int) extends AnyVal with IntTinyType
+private object GenerationProcessesNumber
+    extends TinyTypeFactory[GenerationProcessesNumber](new GenerationProcessesNumber(_)) {
 
   import ConfigLoader._
   import com.typesafe.config.{Config, ConfigFactory}
   import pureconfig.ConfigReader
 
-  private implicit val renkuBaseUrlReader: ConfigReader[RenkuBaseUrl] = stringTinyTypeReader(this)
+  private implicit val configReader: ConfigReader[GenerationProcessesNumber] = intTinyTypeReader(this)
 
   def apply[Interpretation[_]](
       config:    Config = ConfigFactory.load()
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[RenkuBaseUrl] =
-    find[Interpretation, RenkuBaseUrl]("services.renku.url", config)
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[GenerationProcessesNumber] =
+    find[Interpretation, GenerationProcessesNumber]("generation-processes-number", config)
 }
