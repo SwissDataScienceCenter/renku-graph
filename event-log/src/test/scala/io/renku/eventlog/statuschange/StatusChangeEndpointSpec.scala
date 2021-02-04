@@ -140,6 +140,24 @@ class StatusChangeEndpointSpec
       logger.expectNoLogs()
     }
 
+    s"return $NotFound if the command does not find the event" in new TestCase {
+
+      val eventId = command.eventId
+
+      (commandsRunner.run _)
+        .expects(command)
+        .returning(UpdateResult.NotFound.pure[IO])
+
+      val request = Request[IO]()
+
+      val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
+
+      response.status                          shouldBe NotFound
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event not found")
+
+    }
+
     s"return $BadRequest when parsing the payload fails" in new TestCase {
 
       val eventId = command.eventId
