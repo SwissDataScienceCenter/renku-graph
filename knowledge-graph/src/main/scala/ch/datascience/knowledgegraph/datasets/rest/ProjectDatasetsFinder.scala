@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import ProjectDatasetsFinder._
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, InitialVersion, Name, SameAs, Title}
+import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, InitialVersion, Name, SameAs, Title}
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore._
@@ -35,7 +35,7 @@ private trait ProjectDatasetsFinder[Interpretation[_]] {
 
 private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
-  type ProjectDataset  = (Identifier, InitialVersion, Title, Name, SameAsOrDerived)
+  type ProjectDataset  = (Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUri])
 }
 
 private class IOProjectDatasetsFinder(
@@ -61,7 +61,7 @@ private class IOProjectDatasetsFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX prov: <http://www.w3.org/ns/prov#>"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion
+    s"""|SELECT ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
         |    ?datasetId rdf:type <http://schema.org/Dataset>;
         |               schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
@@ -74,16 +74,25 @@ private class IOProjectDatasetsFinder(
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    FILTER NOT EXISTS { ?otherDsId prov:wasDerivedFrom/schema:url ?datasetId }
         |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
-        |
+        |    
         |    FILTER NOT EXISTS { 
         |      # Removing dataset that have an activity that invalidates them
         |      ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
         |                         prov:atLocation ?metaDataLocation ;
         |                         schema:isPartOf ${ResourceId(renkuBaseUrl, path).showAs[RdfResource]};
         |                         prov:wasInvalidatedBy ?invalidationActivity .	
-        |      }
+        |    }
+        |    OPTIONAL { 
+        |      ?datasetId   schema:image ?imageId .
+        |      ?imageId     schema:position ?imagePosition ;
+        |                   schema:contentUrl ?imageUrl .
+        |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |    }
         |}
+        |
+        |GROUP BY ?identifier ?name ?alternateName ?topmostSameAs ?maybeDerivedFrom ?initialVersion 
         |ORDER BY ?name
+        |
         |""".stripMargin
   )
 }
@@ -101,6 +110,19 @@ private object IOProjectDatasetsFinder {
       case (sameAs, _)            => Left(sameAs)
     }
 
+    def toListOfImageUrls(urlString: Option[String]): List[ImageUri] =
+      urlString
+        .map(
+          _.split(",")
+            .map(_.trim)
+            .map { case s"$position:$url" => position.toIntOption.getOrElse(0) -> ImageUri(url) }
+            .toSet[(Int, ImageUri)]
+            .toList
+            .sortBy(_._1)
+            .map(_._2)
+        )
+        .getOrElse(Nil)
+
     implicit val recordDecoder: Decoder[ProjectDataset] = { cursor =>
       for {
         id               <- cursor.downField("identifier").downField("value").as[Identifier]
@@ -109,7 +131,8 @@ private object IOProjectDatasetsFinder {
         sameAs           <- cursor.downField("topmostSameAs").downField("value").as[SameAs]
         maybeDerivedFrom <- cursor.downField("maybeDerivedFrom").downField("value").as[Option[DerivedFrom]]
         initialVersion   <- cursor.downField("initialVersion").downField("value").as[InitialVersion]
-      } yield (id, initialVersion, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom))
+        images           <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
+      } yield (id, initialVersion, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom), images)
     }
 
     _.downField("results").downField("bindings").as(decodeList[ProjectDataset])

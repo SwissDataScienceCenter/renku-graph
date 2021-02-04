@@ -110,6 +110,7 @@ package object rest {
             datasetCreators = dataSet.published.creators map toPerson,
             datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
             datasetKeywords = dataSet.keywords,
+            datasetImages = dataSet.images,
             overrideTopmostSameAs = topmostSameAs.some
           ) -> dataSet
 
@@ -136,6 +137,7 @@ package object rest {
               datasetCreators = dataSet.published.creators map toPerson,
               datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
               datasetKeywords = dataSet.keywords,
+              datasetImages = dataSet.images,
               overrideTopmostSameAs = topmostSameAs.some
             ) -> dataSet.copy(
               id = dataSetId,
@@ -239,6 +241,7 @@ package object rest {
             datasetCreators = dataSet.published.creators map toPerson,
             datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
             datasetKeywords = dataSet.keywords,
+            datasetImages = dataSet.images,
             overrideTopmostDerivedFrom = topmostDerivedFrom.some
           )
 
@@ -263,6 +266,7 @@ package object rest {
               datasetCreators = dataSet.published.creators map toPerson,
               datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
               datasetKeywords = dataSet.keywords,
+              datasetImages = dataSet.images,
               overrideTopmostDerivedFrom = topmostDerivedFrom.some
             )
           }

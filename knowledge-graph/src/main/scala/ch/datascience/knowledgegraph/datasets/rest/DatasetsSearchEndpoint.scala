@@ -95,14 +95,15 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   }
 
   private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
-    case DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount) =>
+    case DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount, images) =>
       json"""
       {
         "identifier": $id,
         "title": $title,
         "name": $name,
         "published": $published,
-        "projectsCount": $projectsCount
+        "projectsCount": $projectsCount,
+        "images": $images
       }"""
         .addIfDefined("description" -> maybeDescription)
         .deepMerge(_links(Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))))
@@ -170,7 +171,7 @@ object IODatasetsSearchEndpoint {
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new DatasetsSearchEndpoint[IO](
       new IODatasetsFinder(rdfStoreConfig,
-                           new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger, timeRecorder),
+                           new CreatorsFinder(rdfStoreConfig, ApplicationLogger, timeRecorder),
                            ApplicationLogger,
                            timeRecorder
       ),

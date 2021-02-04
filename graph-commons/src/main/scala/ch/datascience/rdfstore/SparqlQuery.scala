@@ -87,7 +87,7 @@ object SparqlQuery {
     def include[Interpretation[_]](
         pagingRequest: PagingRequest
     )(implicit ME:     MonadError[Interpretation, Throwable]): Interpretation[SparqlQuery] =
-      if (sparqlQuery.body.trim.matches("(?si)^.*(ORDER[ ]+BY[ ]+(ASC|DESC)[ ]*\\([ ]*\\?\\w+[ ]*\\))$"))
+      if (sparqlQuery.body.trim.matches("(?si)^.*(ORDER[ ]+BY[ ]+((ASC|DESC)[ ]*\\([ ]*\\?\\w+[ ]*\\)[ ]*)+)$"))
         sparqlQuery.copy(maybePagingRequest = Some(pagingRequest)).pure[Interpretation]
       else
         new Exception("Sparql query cannot be used for paging as there's no ending ORDER BY clause")
