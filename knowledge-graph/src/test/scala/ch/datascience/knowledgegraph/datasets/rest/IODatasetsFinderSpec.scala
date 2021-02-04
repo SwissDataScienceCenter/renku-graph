@@ -815,7 +815,7 @@ class IODatasetsFinderSpec
     private val timeRecorder = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     val datasetsFinder = new IODatasetsFinder(
       rdfStoreConfig,
-      new CreatorsFinder(rdfStoreConfig, renkuBaseUrl, logger, timeRecorder),
+      new CreatorsFinder(rdfStoreConfig, logger, timeRecorder),
       logger,
       timeRecorder
     )
@@ -857,7 +857,8 @@ class IODatasetsFinderSpec
       dataset.name,
       dataset.maybeDescription,
       dataset.published,
-      ProjectsCount(projectsCount)
+      ProjectsCount(projectsCount),
+      dataset.images
     )
   }
 

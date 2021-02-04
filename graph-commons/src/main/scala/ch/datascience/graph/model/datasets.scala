@@ -63,6 +63,9 @@ object datasets {
   final class Url private (val value: String) extends AnyVal with StringTinyType
   implicit object Url extends TinyTypeFactory[Url](new Url(_)) with constraints.Url
 
+  final class ImageUri private (val value: String) extends AnyVal with StringTinyType
+  implicit object ImageUri extends TinyTypeFactory[ImageUri](new ImageUri(_)) with constraints.RelativePath
+
   final class DerivedFrom private (val value: String) extends AnyVal with StringTinyType
   implicit object DerivedFrom extends TinyTypeFactory[DerivedFrom](new DerivedFrom(_)) with constraints.Url {
 
@@ -163,4 +166,5 @@ object datasets {
 
   final class PartLocation private (val value: String) extends AnyVal with RelativePathTinyType
   implicit object PartLocation extends TinyTypeFactory[PartLocation](new PartLocation(_)) with RelativePath
+
 }

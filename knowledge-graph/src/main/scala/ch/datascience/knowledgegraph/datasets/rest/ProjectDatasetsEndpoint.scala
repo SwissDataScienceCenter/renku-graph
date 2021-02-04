@@ -77,14 +77,15 @@ class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
   }
 
   private implicit val datasetEncoder: Encoder[ProjectDataset] =
-    Encoder.instance[ProjectDataset] { case (id, initialVersion, title, name, sameAsOrDerived) =>
+    Encoder.instance[ProjectDataset] { case (id, initialVersion, title, name, sameAsOrDerived, images) =>
       json"""{
           "identifier": ${id.toString},
           "versions": {
             "initial": ${initialVersion.toString}
           },
           "title": ${title.toString},
-          "name": ${name.toString}
+          "name": ${name.toString},
+          "images": ${images.map(_.value)}
         }"""
         .deepMerge(sameAsOrDerived.asJson)
         .deepMerge(

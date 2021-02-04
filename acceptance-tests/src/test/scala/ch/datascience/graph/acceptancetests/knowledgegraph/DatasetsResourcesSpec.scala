@@ -124,7 +124,8 @@ class DatasetsResourcesSpec
           maybeDatasetDescription = dataset1.maybeDescription,
           maybeDatasetPublishedDate = dataset1.published.maybeDate,
           datasetCreators = dataset1.published.creators.map(toPerson),
-          datasetParts = dataset1.parts.map(part => (part.name, part.atLocation))
+          datasetParts = dataset1.parts.map(part => (part.name, part.atLocation)),
+          datasetImages = dataset1.images
         ),
         nonModifiedDataSetCommit(
           commitId = dataset2CommitId,
@@ -145,7 +146,8 @@ class DatasetsResourcesSpec
           maybeDatasetDescription = dataset2.maybeDescription,
           maybeDatasetPublishedDate = dataset2.published.maybeDate,
           datasetCreators = dataset2.published.creators.map(toPerson),
-          datasetParts = dataset2.parts.map(part => (part.name, part.atLocation))
+          datasetParts = dataset2.parts.map(part => (part.name, part.atLocation)),
+          datasetImages = dataset2.images
         ),
         modifiedDataSetCommit(
           committedDate = modifiedDataset2.projects.head.created.date.toUnsafe(date => CommittedDate.from(date.value)),
@@ -167,7 +169,8 @@ class DatasetsResourcesSpec
           maybeDatasetDescription = modifiedDataset2.maybeDescription,
           maybeDatasetPublishedDate = modifiedDataset2.published.maybeDate,
           datasetCreators = modifiedDataset2.published.creators.map(toPerson),
-          datasetParts = modifiedDataset2.parts.map(part => (part.name, part.atLocation))
+          datasetParts = modifiedDataset2.parts.map(part => (part.name, part.atLocation)),
+          datasetImages = modifiedDataset2.images
         )
       )
 
@@ -423,7 +426,8 @@ class DatasetsResourcesSpec
         maybeDatasetSameAs = dataset.sameAs.some,
         maybeDatasetDescription = dataset.maybeDescription,
         maybeDatasetPublishedDate = dataset.published.maybeDate,
-        datasetCreators = dataset.published.creators map toPerson
+        datasetCreators = dataset.published.creators map toPerson,
+        datasetImages = dataset.images
       )
 
     def toDatasetProject(project: Project) =
@@ -443,7 +447,8 @@ object DatasetsResources {
     },
     "title": ${dataset.title.value},
     "name": ${dataset.name.value},
-    "sameAs": ${dataset.sameAs.value}
+    "sameAs": ${dataset.sameAs.value},
+    "images": ${dataset.images.map(_.value)}
   }""" deepMerge {
     _links(
       Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.id),
@@ -458,7 +463,8 @@ object DatasetsResources {
     },
     "title": ${dataset.title.value},
     "name": ${dataset.name.value},
-    "derivedFrom": ${dataset.derivedFrom.value}
+    "derivedFrom": ${dataset.derivedFrom.value},
+    "images": ${dataset.images.map(_.value)}
   }""" deepMerge {
     _links(
       Rel("details")         -> Href(renkuResourcesUrl / "datasets" / dataset.id),
@@ -478,7 +484,8 @@ object DatasetsResources {
       "title": ${dataset.title.value},
       "name": ${dataset.name.value},
       "published": ${dataset.published},
-      "projectsCount": ${dataset.projects.size}
+      "projectsCount": ${dataset.projects.size},
+      "images": ${dataset.images.map(_.value)}
     }"""
       .addIfDefined("description" -> dataset.maybeDescription)
       .deepMerge {
