@@ -19,6 +19,7 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.MonadError
+import cats.data.EitherT.fromOption
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
@@ -29,11 +30,10 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.circe.{Decoder, DecodingFailure, HCursor}
+import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage, EventProcessingTime}
-import org.http4s.circe.jsonOf
-import org.http4s.{EntityDecoder, Request}
+import org.http4s.{MediaType, Request}
 
 import java.time.Instant
 
@@ -72,38 +72,29 @@ object ToSkipped {
       underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
-  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), Option[
-    ChangeStatusCommand[Interpretation]
-  ]] =
-    Kleisli { eventIdAndRequest =>
-      val (eventId, request) = eventIdAndRequest
-      (for {
-        content <- request.as[(EventMessage, Option[EventProcessingTime])](ME, entityDecoder[Interpretation]())
-        (maybeMessage, maybeProcessingTime) = content
-      } yield (ToSkipped[Interpretation](
-        eventId,
-        maybeMessage,
-        underTriplesGenerationGauge,
-        maybeProcessingTime
-      ): ChangeStatusCommand[Interpretation]).some) recoverWith (_ =>
-        Option.empty[ChangeStatusCommand[Interpretation]].pure[Interpretation]
-      )
-
+  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
+    Kleisli { case (eventId, request) =>
+      request
+        .has[Interpretation](mediaType = MediaType.application.json) {
+          {
+            for {
+              _                   <- request.validate(status = Skipped)
+              maybeProcessingTime <- request.getProcessingTime
+              maybeMessage        <- request.getMessage
+              message <-
+                fromOption[Interpretation](maybeMessage,
+                                           PayloadMalformed("No message property in status change payload")
+                )
+                  .leftWiden[CommandFindingResult]
+            } yield CommandFound(
+              ToSkipped[Interpretation](
+                eventId,
+                message,
+                underTriplesGenerationGauge,
+                maybeProcessingTime
+              )
+            )
+          }.merge
+        }
     }
-
-  private def entityDecoder[Interpretation[_]: Sync]()
-      : EntityDecoder[Interpretation, (EventMessage, Option[EventProcessingTime])] = {
-    implicit val decoder: Decoder[(EventMessage, Option[EventProcessingTime])] = { (cursor: HCursor) =>
-      (for {
-        status              <- cursor.downField("status").as[EventStatus]
-        message             <- cursor.downField("message").as[EventMessage]
-        maybeProcessingTime <- cursor.downField("processingTime").as[Option[EventProcessingTime]]
-      } yield status match {
-        case EventStatus.Skipped => Right((message, maybeProcessingTime))
-        case _                   => Left(DecodingFailure("Invalid event status", Nil))
-      }).flatten
-    }
-    jsonOf[Interpretation, (EventMessage, Option[EventProcessingTime])]
-  }
-
 }

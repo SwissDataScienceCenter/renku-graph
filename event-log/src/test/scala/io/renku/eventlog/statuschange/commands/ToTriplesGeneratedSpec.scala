@@ -20,6 +20,7 @@ package io.renku.eventlog.statuschange.commands
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
 import ch.datascience.graph.model.events.EventStatus
@@ -32,7 +33,9 @@ import io.circe.Json
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
+import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
+import org.http4s.circe.jsonEncoder
 import org.http4s.headers.`Content-Type`
 import org.http4s.multipart.{Multipart, Part}
 import org.http4s.{MediaType, Request}
@@ -141,7 +144,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     }
 
     "factory" should {
-      "decode properly a request" in new TestCase {
+      "return a CommandFound when properly decoding a request" in new TestCase {
         val triples             = eventPayloads.generateOne
         val maybeProcessingTime = eventProcessingTimes.generateOption
         val expected =
@@ -173,13 +176,13 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
         val request = Request[IO]().withEntity(body).withHeaders(body.headers)
 
         val actual = ToTriplesGenerated
-          .factory[IO](underTriplesGenerationGauge, awaitingTransformationGauge)
+          .factory(underTriplesGenerationGauge, awaitingTransformationGauge)
           .run((eventId, request))
-        actual.unsafeRunSync() shouldBe Some(expected)
+        actual.unsafeRunSync() shouldBe CommandFound(expected)
       }
 
       EventStatus.all.filterNot(status => status == TriplesGenerated) foreach { eventStatus =>
-        s"return None if the decoding failed because of wrong status: $eventStatus " in new TestCase {
+        s"return Not supported if the decoding failed because of wrong status: $eventStatus " in new TestCase {
           val triples             = eventPayloads.generateOne
           val maybeProcessingTime = eventProcessingTimes.generateOption
           val payloadStr          = json"""{ "schemaVersion": ${schemaVersion.value}, "payload": ${triples.value}  }"""
@@ -187,9 +190,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
             Vector(
               Part.formData[IO](
                 "event",
-                (json"""{
-            "status": ${eventStatus.value}
-          }""" deepMerge maybeProcessingTime
+                (json"""{ "status": ${eventStatus.value} }""" deepMerge maybeProcessingTime
                   .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
                   .getOrElse(Json.obj())).noSpaces,
                 `Content-Type`(MediaType.application.json)
@@ -201,13 +202,24 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
           val actual =
             ToTriplesGenerated
-              .factory[IO](underTriplesGenerationGauge, awaitingTransformationGauge)
+              .factory(underTriplesGenerationGauge, awaitingTransformationGauge)
               .run((eventId, request))
-          actual.unsafeRunSync() shouldBe None
+          actual.unsafeRunSync() shouldBe NotSupported
         }
       }
 
-      s"return None if the decoding failed because of schema version is missing " in new TestCase {
+      s"return Not supported if the decoding failed because of wrong request type" in new TestCase {
+        val body    = jsons.generateOne
+        val request = Request[IO]().withEntity(body)
+
+        val actual =
+          ToTriplesGenerated
+            .factory(underTriplesGenerationGauge, awaitingTransformationGauge)
+            .run((eventId, request))
+        actual.unsafeRunSync() shouldBe NotSupported
+      }
+
+      s"return Payload Malformed if the decoding failed because of schema version is missing " in new TestCase {
         val triples             = eventPayloads.generateOne
         val maybeProcessingTime = eventProcessingTimes.generateOption
         val payloadStr          = json"""{ "payload": ${triples.value}  }"""
@@ -216,9 +228,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           Vector(
             Part.formData[IO](
               "event",
-              (json"""{
-            "status": ${EventStatus.TriplesGenerated.value}
-          }""" deepMerge maybeProcessingTime
+              (json"""{ "status": ${EventStatus.TriplesGenerated.value} }""" deepMerge maybeProcessingTime
                 .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
                 .getOrElse(Json.obj())).noSpaces,
               `Content-Type`(MediaType.application.json)
@@ -231,12 +241,14 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
         val actual =
           ToTriplesGenerated
-            .factory[IO](underTriplesGenerationGauge, awaitingTransformationGauge)
+            .factory(underTriplesGenerationGauge, awaitingTransformationGauge)
             .run((eventId, request))
-        actual.unsafeRunSync() shouldBe None
+        actual.unsafeRunSync() shouldBe PayloadMalformed(
+          "Attempt to decode value on failed cursor: DownField(schemaVersion)"
+        )
       }
 
-      s"return None if the decoding failed because of missing payload " in new TestCase {
+      s"return Payload Malformed if the decoding failed because of missing payload " in new TestCase {
         val maybeProcessingTime = eventProcessingTimes.generateOption
         val payloadStr          = json"""{ "schemaVersion": ${schemaVersion.value}}"""
 
@@ -244,9 +256,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           Vector(
             Part.formData[IO](
               "event",
-              (json"""{
-            "status": ${EventStatus.TriplesGenerated.value}
-          }""" deepMerge maybeProcessingTime
+              (json"""{ "status": ${EventStatus.TriplesGenerated.value} }""" deepMerge maybeProcessingTime
                 .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
                 .getOrElse(Json.obj())).noSpaces,
               `Content-Type`(MediaType.application.json)
@@ -259,11 +269,33 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
         val actual =
           ToTriplesGenerated
-            .factory[IO](underTriplesGenerationGauge, awaitingTransformationGauge)
+            .factory(underTriplesGenerationGauge, awaitingTransformationGauge)
             .run((eventId, request))
-        actual.unsafeRunSync() shouldBe None
+        actual.unsafeRunSync() shouldBe PayloadMalformed(
+          "Attempt to decode value on failed cursor: DownField(payload)"
+        )
+      }
+
+      "return PayloadMalformed if the decoding failed because no  status is present " in new TestCase {
+        val triples    = eventPayloads.generateOne
+        val payloadStr = json"""{ "schemaVersion": ${schemaVersion.value}, "payload": ${triples.value}  }"""
+
+        val body = Multipart[IO](
+          Vector(
+            Part.formData[IO]("event", json"""{ }""".noSpaces, `Content-Type`(MediaType.application.json)),
+            Part.formData[IO]("payload", payloadStr.noSpaces)
+          )
+        )
+        val request = Request[IO]().withEntity(body).withHeaders(body.headers)
+
+        val actual = ToTriplesGenerated
+          .factory[IO](underTriplesGenerationGauge, awaitingTransformationGauge)
+          .run((eventId, request))
+
+        actual.unsafeRunSync() shouldBe PayloadMalformed("No status property in status change payload")
       }
     }
+
   }
 
   private trait TestCase {

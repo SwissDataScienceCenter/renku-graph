@@ -20,18 +20,14 @@ package ch.datascience.triplesgenerator.events
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.http.ErrorMessage.ErrorMessage
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.InfoMessage
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage.ErrorMessage
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
-import io.circe.Encoder
-import io.circe.literal._
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -45,6 +41,50 @@ import org.scalatest.wordspec.AnyWordSpec
 class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "processEvent" should {
+
+    s"$BadRequest if the request is not a multipart request" in new TestCase {
+
+      givenReProvisioningStatusSet(false)
+
+      val response = processEvent(Request()).unsafeRunSync()
+
+      response.status                          shouldBe BadRequest
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Not multipart request")
+
+      logger.expectNoLogs()
+    }
+
+    s"$BadRequest if there is no event part in the request" in new TestCase {
+
+      givenReProvisioningStatusSet(false)
+
+      val multipart =
+        Multipart[IO](Vector(Part.formData[IO](nonEmptyStrings().generateOne, nonEmptyStrings().generateOne)))
+
+      val response = processEvent(Request().withEntity(multipart).withHeaders(multipart.headers)).unsafeRunSync()
+
+      response.status                          shouldBe BadRequest
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Missing event part")
+
+      logger.expectNoLogs()
+    }
+
+    s"$BadRequest if there the event part in the request is malformed" in new TestCase {
+
+      givenReProvisioningStatusSet(false)
+
+      val multipart = Multipart[IO](Vector(Part.formData[IO]("event", "")))
+
+      val response = processEvent(Request().withEntity(multipart).withHeaders(multipart.headers)).unsafeRunSync()
+
+      response.status                          shouldBe BadRequest
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event body")
+
+      logger.expectNoLogs()
+    }
 
     s"$Accepted if one of the handlers accepts the given payload" in new TestCase {
 
@@ -132,6 +172,24 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       (handler0.handle _)
         .expects(requestContent)
         .returning(EventSchedulingResult.SchedulingError(exceptions.generateOne).pure[IO])
+
+      val response = processEvent(request).unsafeRunSync()
+
+      response.status                           shouldBe InternalServerError
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Failed to schedule event")
+
+      logger.expectNoLogs()
+
+    }
+
+    s"$InternalServerError if the handler fails" in new TestCase {
+
+      givenReProvisioningStatusSet(false)
+
+      (handler0.handle _)
+        .expects(requestContent)
+        .returning(exceptions.generateOne.raiseError[IO, EventSchedulingResult])
 
       val response = processEvent(request).unsafeRunSync()
 

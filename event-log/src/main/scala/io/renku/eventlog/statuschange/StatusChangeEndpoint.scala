@@ -29,6 +29,7 @@ import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands._
 import org.http4s.Request
 import org.http4s.dsl.Http4sDsl
@@ -38,7 +39,7 @@ import scala.util.control.NonFatal
 class StatusChangeEndpoint[Interpretation[_]: Effect](
     statusUpdatesRunner: StatusUpdatesRunner[Interpretation],
     commandFactories: Set[
-      Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), Option[ChangeStatusCommand[Interpretation]]]
+      Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult]
     ],
     logger:    Logger[Interpretation]
 )(implicit ME: MonadError[Interpretation, Throwable])
@@ -58,14 +59,16 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
       eventId: CompoundEventId,
       request: Request[Interpretation],
       commandFactories: List[
-        Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), Option[ChangeStatusCommand[Interpretation]]]
+        Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult]
       ]
   ): Interpretation[Response[Interpretation]] = commandFactories match {
-    case Nil => BadRequest(ErrorMessage("Invalid event"))
+    case Nil => BadRequest(ErrorMessage("No event command found"))
     case head :: tail =>
       head(eventId -> request).flatMap {
-        case Some(command) => run(command).flatMap(_.asHttpResponse) recoverWith httpResponse
-        case None          => tryCommandFactory(eventId, request, tail)
+        case command: CommandFound[Interpretation] =>
+          run(command.command).flatMap(_.asHttpResponse) recoverWith httpResponse
+        case NotSupported              => tryCommandFactory(eventId, request, tail)
+        case PayloadMalformed(message) => BadRequest(ErrorMessage(message))
       }
   }
 

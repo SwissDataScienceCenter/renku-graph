@@ -36,10 +36,10 @@ import ch.datascience.metrics.LabeledGauge
 import doobie.free.connection.ConnectionIO
 import eu.timepit.refined.api.Refined
 import io.circe.Json
-import io.circe.literal._
 import io.circe.syntax._
 import io.prometheus.client.Gauge
 import io.renku.eventlog.EventContentGenerators._
+import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.{EventLogDB, EventProcessingTime}
@@ -125,7 +125,7 @@ class StatusChangeEndpointSpec
         logger.loggedOnly(Error(errorMessage.value))
       }
 
-    s"return $BadRequest if decoding payload fails" in new TestCase {
+    s"return $BadRequest if all the commands return NotSupported" in new TestCase {
 
       val eventId = compoundEventIds.generateOne
 
@@ -133,13 +133,25 @@ class StatusChangeEndpointSpec
 
       val response = changeStatusWithFailingDecode()(eventId, request).unsafeRunSync()
 
-      response.status      shouldBe BadRequest
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage(
-        s"Invalid event"
-      )
+      response.status                          shouldBe BadRequest
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("No event command found")
 
       logger.expectNoLogs()
+    }
+
+    s"return $BadRequest when parsing the payload fails" in new TestCase {
+
+      val eventId = command.eventId
+      val request = Request[IO]()
+      val message = nonEmptyStrings().generateOne
+
+      val response = changeStatusWithPayloadMalformed(message)(eventId, request).unsafeRunSync()
+
+      response.status                   shouldBe BadRequest
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(message).asJson
+
     }
 
     s"return $InternalServerError when updating event status fails" in new TestCase {
@@ -171,14 +183,21 @@ class StatusChangeEndpointSpec
     def changeStatusWithSuccessfulDecode(command: ChangeStatusCommand[IO]) =
       new StatusChangeEndpoint[IO](
         commandsRunner,
-        Set(Kleisli(_ => command.some.pure[IO])),
+        Set(Kleisli(_ => (CommandFound(command): CommandFindingResult).pure[IO])),
+        logger
+      ).changeStatus _
+
+    def changeStatusWithPayloadMalformed(message: String) =
+      new StatusChangeEndpoint[IO](
+        commandsRunner,
+        Set(Kleisli(_ => (PayloadMalformed(message): CommandFindingResult).pure[IO])),
         logger
       ).changeStatus _
 
     def changeStatusWithFailingDecode() =
       new StatusChangeEndpoint[IO](
         commandsRunner,
-        Set(Kleisli(_ => Option.empty[ChangeStatusCommand[IO]].pure[IO])),
+        Set(Kleisli(_ => (NotSupported: CommandFindingResult).pure[IO])),
         logger
       ).changeStatus _
 

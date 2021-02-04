@@ -20,12 +20,13 @@ package ch.datascience.triplesgenerator
 package events.categories.awaitinggeneration
 
 import cats.MonadError
-import cats.data.{EitherT, NonEmptyList}
+import cats.data.EitherT.{fromEither, fromOption}
+import cats.data.NonEmptyList
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.RenkuVersionPair
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody, EventId}
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.EventSchedulingResult
@@ -45,23 +46,17 @@ private[events] class EventHandler[Interpretation[_]: Effect](
     ME: MonadError[Interpretation, Throwable]
 ) extends events.EventHandler[Interpretation] {
 
-  import ch.datascience.graph.model.projects
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import currentVersionPair.schemaVersion
   import eventBodyDeserializer.toCommitEvents
   import eventsProcessingRunner.scheduleForProcessing
-  import io.circe.Decoder
-  import org.http4s._
-  import org.http4s.circe._
 
   override val categoryName: CategoryName = EventHandler.categoryName
 
   override def handle(requestContent: EventRequestContent): Interpretation[EventSchedulingResult] = {
     for {
-      eventId <-
-        EitherT.fromEither(requestContent.event.as[CompoundEventId]).leftMap(_ => UnsupportedEventType)
-      eventBody <-
-        EitherT.fromOption[Interpretation](requestContent.maybePayload.map(EventBody.apply), BadRequest)
+      _            <- fromEither[Interpretation](requestContent.event.validateCategoryName)
+      eventId      <- fromEither(requestContent.event.getEventId)
+      eventBody    <- fromOption[Interpretation](requestContent.maybePayload.map(EventBody.apply), BadRequest)
       commitEvents <- toCommitEvents(eventBody).toRightT(recoverTo = BadRequest)
       result <- scheduleForProcessing(eventId, commitEvents, schemaVersion).toRightT
                   .semiflatTap(logger.log(eventId -> commitEvents))
@@ -72,16 +67,6 @@ private[events] class EventHandler[Interpretation[_]: Effect](
   private implicit lazy val eventInfoToString: ((CompoundEventId, NonEmptyList[CommitEvent])) => String = {
     case (eventId, events) => s"$eventId, projectPath = ${events.head.project.path}"
   }
-
-  private implicit lazy val payloadDecoder: EntityDecoder[Interpretation, CompoundEventId] =
-    jsonOf[Interpretation, CompoundEventId]
-
-  private implicit val eventDecoder: Decoder[CompoundEventId] = implicit cursor =>
-    for {
-      _         <- validateCategoryName
-      id        <- cursor.downField("id").as[EventId]
-      projectId <- cursor.downField("project").downField("id").as[projects.Id]
-    } yield CompoundEventId(id, projectId)
 }
 
 private[events] object EventHandler {

@@ -33,10 +33,9 @@ class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers 
 
       val actualJson = TriplesGeneratedEventEncoder.encodeEvent(event)
 
-      actualJson.hcursor.downField("categoryName").as[String]  shouldBe Right("TRIPLES_GENERATED")
-      actualJson.hcursor.downField("id").as[String]            shouldBe Right(event.id.id.value)
-      actualJson.hcursor.downField("schemaVersion").as[String] shouldBe Right(event.schemaVersion.value)
-      actualJson.hcursor.downField("project").as[Json]         shouldBe Right(json"""{
+      actualJson.hcursor.downField("categoryName").as[String] shouldBe Right("TRIPLES_GENERATED")
+      actualJson.hcursor.downField("id").as[String]           shouldBe Right(event.id.id.value)
+      actualJson.hcursor.downField("project").as[Json]        shouldBe Right(json"""{
                                                                                "id": ${event.id.projectId.value},
                                                                                "path": ${event.projectPath.value}
                                                                               }""")
@@ -48,7 +47,9 @@ class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers 
     "serialize TriplesGeneratedEvent payload to a string" in {
       val event = triplesGeneratedEvents.generateOne
 
-      TriplesGeneratedEventEncoder.encodePayload(event) shouldBe event.payload.value.some
+      TriplesGeneratedEventEncoder.encodePayload(
+        event
+      ) shouldBe json"""{ "payload": ${event.payload.value}, "schemaVersion": ${event.schemaVersion.value} }""".noSpaces.some
     }
   }
 }

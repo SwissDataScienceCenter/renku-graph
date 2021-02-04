@@ -38,16 +38,16 @@ private object TriplesGeneratedEventEncoder extends EventEncoder[TriplesGenerate
 
   import io.circe.Json
   import io.circe.literal.JsonStringContext
-  // TODO add  project path
+
   override def encodeEvent(event: TriplesGeneratedEvent): Json = json"""{
     "categoryName": ${SubscriptionCategory.name.value},
     "id":           ${event.id.id.value},
     "project": {
       "id":         ${event.id.projectId.value},
       "path": ${event.projectPath.value}
-    },
-    "schemaVersion":${event.schemaVersion.value}
+    }
   }"""
 
-  override def encodePayload(event: TriplesGeneratedEvent): Option[String] = event.payload.value.some
+  override def encodePayload(event: TriplesGeneratedEvent): Option[String] =
+    json"""{"payload":${event.payload.value}, "schemaVersion": ${event.schemaVersion.value} }""".noSpaces.some
 }

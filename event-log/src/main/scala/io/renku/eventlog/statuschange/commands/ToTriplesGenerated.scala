@@ -19,7 +19,8 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.MonadError
-import cats.data.{EitherT, Kleisli, NonEmptyList, OptionT}
+import cats.data.EitherT.{fromEither, fromOption, right}
+import cats.data.{EitherT, Kleisli, NonEmptyList}
 import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
@@ -27,19 +28,17 @@ import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, Triples
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, events, projects}
 import ch.datascience.metrics.LabeledGauge
-import doobie.free.connection.ConnectionIO
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.circe.Decoder.decodeOption
-import io.circe.{Decoder, DecodingFailure, HCursor, Json, parser}
+import io.circe.{Decoder, HCursor, Json, parser}
+import io.renku.eventlog.statuschange.commands.CommandFindingResult._
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
-import io.renku.eventlog.{EventLogDB, EventMessage, EventPayload, EventProcessingTime}
-import org.http4s.circe.jsonOf
-import org.http4s.multipart.Multipart
-import org.http4s.{EntityDecoder, Request}
+import io.renku.eventlog.{EventLogDB, EventPayload, EventProcessingTime}
+import org.http4s.multipart.{Multipart, Part}
+import org.http4s.{MediaType, Request}
 
 import java.time.Instant
+import scala.util.control.NonFatal
 
 private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
     eventId:                     CompoundEventId,
@@ -97,50 +96,56 @@ object ToTriplesGenerated {
                                        awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
-  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), Option[
-    ChangeStatusCommand[Interpretation]
-  ]] =
-    Kleisli { eventIdAndRequest =>
-      val (eventId, request) = eventIdAndRequest
-      (for {
-        multipart <- OptionT.liftF(request.as[Multipart[Interpretation]])
-        eventJson <-
-          OptionT.liftF(multipart.parts.find(_.name.contains("event")).map(_.as[Json]).get)
-        payloadStr <-
-          OptionT.liftF(
-            multipart.parts.find(_.name.contains("payload")).map(_.as[String]).get
-          )
-
-        maybeProcessingTime <-
-          OptionT.fromOption[Interpretation](eventJson.as[Option[EventProcessingTime]](decoder).toOption)
-        payloadJson <- OptionT.fromOption[Interpretation](parser.parse(payloadStr).toOption)
-        parsedPayload <- OptionT
-                           .fromOption[Interpretation](payloadJson.as[(SchemaVersion, EventPayload)].toOption)
-        (schemaVersion, eventPayload) = parsedPayload
-      } yield (ToTriplesGenerated[Interpretation](eventId,
-                                                  eventPayload,
-                                                  schemaVersion,
-                                                  underTriplesGenerationGauge,
-                                                  awaitingTransformationGauge,
-                                                  maybeProcessingTime
-      ): ChangeStatusCommand[Interpretation])).value recoverWith (_ =>
-        Option.empty[ChangeStatusCommand[Interpretation]].pure[Interpretation]
-      )
-
+  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
+    Kleisli { case (eventId, request) =>
+      request
+        .has[Interpretation](mediaType = MediaType.multipart.`form-data`) {
+          {
+            for {
+              multipart <- right[CommandFindingResult](request.as[Multipart[Interpretation]])
+              eventJson <- fromOption[Interpretation](multipart.parts.find(_.name.contains("event")),
+                                                      PayloadMalformed("No event part in change status payload")
+                           ).flatMapF(toJson[Interpretation]).leftWiden[CommandFindingResult]
+              _                   <- fromEither[Interpretation](eventJson.validate(status = TriplesGenerated))
+              maybeProcessingTime <- fromEither[Interpretation](eventJson.getProcessingTime)
+              payloadJson <- fromOption[Interpretation](multipart.parts.find(_.name.contains("payload")),
+                                                        PayloadMalformed("No payload part in change status payload")
+                             ).flatMap(stringToJson[Interpretation])
+              parsedPayload <-
+                fromEither[Interpretation](payloadJson.as[(SchemaVersion, EventPayload)].toPayloadMalFormed)
+            } yield CommandFound(
+              ToTriplesGenerated[Interpretation](eventId,
+                                                 parsedPayload._2,
+                                                 parsedPayload._1,
+                                                 underTriplesGenerationGauge,
+                                                 awaitingTransformationGauge,
+                                                 maybeProcessingTime
+              )
+            )
+          }.merge
+        }
     }
 
-  implicit val decoder: Decoder[Option[EventProcessingTime]] = { (cursor: HCursor) =>
-    (for {
-      status <- cursor.downField("status").as[EventStatus]
-      maybeProcessingTime <-
-        cursor.downField("processingTime").as[Option[EventProcessingTime]](decodeOption(EventProcessingTime.decoder))
-    } yield status match {
-      case EventStatus.TriplesGenerated => Right(maybeProcessingTime)
-      case _                            => Left(DecodingFailure("Invalid event status", Nil))
-    }).flatten
+  private implicit class EitherOps[R](either: Either[Throwable, R]) {
+    lazy val toPayloadMalFormed: Either[CommandFindingResult, R] =
+      either.leftMap(e => PayloadMalformed(e.getMessage)).leftWiden[CommandFindingResult]
   }
 
-  implicit val payloadDecoder: Decoder[(SchemaVersion, EventPayload)] = (cursor: HCursor) =>
+  private def toJson[Interpretation[_]: Sync](
+      part: Part[Interpretation]
+  ): Interpretation[Either[CommandFindingResult, Json]] =
+    part.as[Json].map(_.asRight[CommandFindingResult]).recover { case NonFatal(_) =>
+      PayloadMalformed("Cannot parse change status payload").asLeft[Json]
+    }
+
+  private def stringToJson[Interpretation[_]: Sync](
+      part: Part[Interpretation]
+  ): EitherT[Interpretation, CommandFindingResult, Json] =
+    EitherT(part.as[String].map(_.asRight[CommandFindingResult]).recover { case NonFatal(_) =>
+      PayloadMalformed("Cannot parse change status payload").asLeft[String]
+    }).subflatMap[CommandFindingResult, Json](parser.parse(_).leftMap(e => PayloadMalformed(e.getMessage)))
+
+  private implicit val payloadDecoder: Decoder[(SchemaVersion, EventPayload)] = (cursor: HCursor) =>
     for {
       schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
       payload       <- cursor.downField("payload").as[EventPayload]

@@ -30,11 +30,12 @@ import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeOption
-import io.circe.{Decoder, DecodingFailure, HCursor}
-import io.renku.eventlog.{EventLogDB, EventMessage, EventProcessingTime}
+import io.circe.{Decoder, HCursor}
+import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+import io.renku.eventlog.{EventLogDB, EventProcessingTime}
 import org.http4s.circe.jsonOf
-import org.http4s.{EntityDecoder, Request}
+import org.http4s.{EntityDecoder, MediaType, Request}
 
 import java.time.Instant
 
@@ -75,34 +76,31 @@ object ToTriplesStore {
       underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
-  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), Option[
-    ChangeStatusCommand[Interpretation]
-  ]] =
-    Kleisli { eventIdAndRequest =>
-      val (eventId, request) = eventIdAndRequest
-      (for {
-        maybeProcessingTime <- request.as[Option[EventProcessingTime]](ME, entityDecoder[Interpretation]())
-      } yield (ToTriplesStore[Interpretation](
-        eventId,
-        underTriplesGenerationGauge,
-        maybeProcessingTime
-      ): ChangeStatusCommand[Interpretation]).some) recoverWith (_ =>
-        Option.empty[ChangeStatusCommand[Interpretation]].pure[Interpretation]
-      )
+  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
+    Kleisli { case (eventId, request) =>
+      request
+        .has[Interpretation](mediaType = MediaType.application.json) {
+          {
+            for {
+              _                   <- request.validate(status = TriplesStore)
+              maybeProcessingTime <- request.getProcessingTime
+            } yield CommandFound(
+              ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge, maybeProcessingTime)
+            )
+          }.merge
+        }
 
     }
 
-  private def entityDecoder[Interpretation[_]: Sync](): EntityDecoder[Interpretation, Option[EventProcessingTime]] = {
-    implicit val decoder: Decoder[Option[EventProcessingTime]] = { (cursor: HCursor) =>
-      (for {
-        maybeStatus <- cursor.downField("status").as[EventStatus]
+  private implicit def entityDecoder[Interpretation[_]: Sync]()
+      : EntityDecoder[Interpretation, (EventStatus, Option[EventProcessingTime])] = {
+    implicit val decoder: Decoder[(EventStatus, Option[EventProcessingTime])] = { (cursor: HCursor) =>
+      for {
+        status <- cursor.downField("status").as[EventStatus]
         maybeProcessingTime <-
           cursor.downField("processingTime").as[Option[EventProcessingTime]](decodeOption(EventProcessingTime.decoder))
-      } yield maybeStatus match {
-        case EventStatus.TriplesStore => Right(maybeProcessingTime)
-        case _                        => Left(DecodingFailure("Invalid event status", Nil))
-      }).flatten
+      } yield status -> maybeProcessingTime
     }
-    jsonOf[Interpretation, Option[EventProcessingTime]]
+    jsonOf[Interpretation, (EventStatus, Option[EventProcessingTime])]
   }
 }

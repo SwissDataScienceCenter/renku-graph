@@ -24,7 +24,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
@@ -59,7 +58,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .returning(EventSchedulingResult.Accepted.pure[IO])
 
         val requestContent: EventRequestContent =
-          requestContent((eventId, project, schemaVersion).asJson(eventEncoder), eventBody.value.some)
+          requestContent((eventId, project).asJson(eventEncoder), eventBody.value.some)
 
         handler.handle(requestContent).unsafeRunSync() shouldBe Accepted
 
@@ -84,7 +83,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .returning(EventSchedulingResult.Busy.pure[IO])
 
         val requestContent: EventRequestContent =
-          requestContent((eventId, project, schemaVersion).asJson(eventEncoder), eventBody.value.some)
+          requestContent((eventId, project).asJson(eventEncoder), eventBody.value.some)
 
         handler.handle(requestContent).unsafeRunSync() shouldBe Busy
 
@@ -105,7 +104,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     s"return $BadRequest if event body is not present" in new TestCase {
 
       val requestContent: EventRequestContent =
-        requestContent((eventId, project, schemaVersion).asJson(eventEncoder), eventBody.value.some)
+        requestContent((eventId, project).asJson(eventEncoder), eventBody.value.some)
 
       (eventBodyDeserializer.toTriplesGeneratedEvent _)
         .expects(eventId, project, schemaVersion, eventBody)
@@ -129,7 +128,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         .returning(exception.raiseError[IO, EventSchedulingResult])
 
       val requestContent: EventRequestContent =
-        requestContent((eventId, project, schemaVersion).asJson(eventEncoder), eventBody.value.some)
+        requestContent((eventId, project).asJson(eventEncoder), eventBody.value.some)
 
       handler.handle(requestContent).unsafeRunSync() shouldBe SchedulingError(exception)
 
@@ -159,16 +158,15 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
       EventRequestContent(event, maybePayload)
   }
 
-  private implicit lazy val eventEncoder: Encoder[(CompoundEventId, Project, SchemaVersion)] =
-    Encoder.instance[(CompoundEventId, Project, SchemaVersion)] { case (eventId, project, schemaVersion) =>
+  private implicit lazy val eventEncoder: Encoder[(CompoundEventId, Project)] =
+    Encoder.instance[(CompoundEventId, Project)] { case (eventId, project) =>
       json"""{
         "categoryName": "TRIPLES_GENERATED",
         "id":           ${eventId.id.value},
         "project": {
           "id" :        ${eventId.projectId.value},
           "path": ${project.path.value}
-        },
-        "schemaVersion": ${schemaVersion.value}
+        }
       }"""
     }
 

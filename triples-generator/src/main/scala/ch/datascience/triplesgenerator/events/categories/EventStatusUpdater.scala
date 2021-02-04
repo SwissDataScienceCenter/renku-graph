@@ -30,9 +30,7 @@ import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonEncoder
-import org.http4s.headers.`Content-Type`
-import org.http4s.multipart.{Multipart, Part}
-import org.http4s.{MediaType, Status, Uri}
+import org.http4s.{Status, Uri}
 
 import java.io.{PrintWriter, StringWriter}
 import scala.concurrent.ExecutionContext
@@ -88,7 +86,7 @@ private class IOEventStatusUpdater(
   ): IO[Unit] = sendStatusChange(
     eventId,
     eventContent = EventRequestContent(
-      json"""{"status": "TRIPLES_GENERATED"}""",
+      json"""{"status": "TRIPLES_GENERATED" }""",
       maybePayload =
         (json"""{"payload": ${payload.value.noSpaces}, "schemaVersion": ${schemaVersion.value} }""").noSpaces.some
     ),
@@ -154,16 +152,10 @@ private class IOEventStatusUpdater(
   private def createRequest(uri: Uri, eventRequestContent: EventRequestContent) =
     eventRequestContent.maybePayload match {
       case Some(payload) =>
-        val multipart = Multipart[IO](
-          Vector(
-            Part
-              .formData[IO]("event", eventRequestContent.event.noSpaces, `Content-Type`(MediaType.application.json)),
-            Part.formData[IO]("payload", payload)
-          )
-        )
-        request(PATCH, uri)
-          .withEntity(multipart)
-          .withHeaders(multipart.headers)
+        request(PATCH, uri).withMultipartBuilder
+          .addPart("event", eventRequestContent.event)
+          .addPart("payload", payload)
+          .build()
       case None =>
         request(PATCH, uri).withEntity(eventRequestContent.event)
     }

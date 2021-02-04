@@ -29,11 +29,10 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.circe.{Decoder, DecodingFailure, HCursor}
+import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage, EventProcessingTime}
-import org.http4s.circe.jsonOf
-import org.http4s.{EntityDecoder, Request}
+import org.http4s.{MediaType, Request}
 
 import java.time.Instant
 
@@ -71,37 +70,25 @@ object ToGenerationNonRecoverableFailure {
 
   def factory[Interpretation[_]: Sync](underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path])(
       implicit ME: MonadError[Interpretation, Throwable]
-  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), Option[
-    ChangeStatusCommand[Interpretation]
-  ]] =
-    Kleisli { eventIdAndRequest =>
-      val (eventId, request) = eventIdAndRequest
-      (for {
-        content <- request.as[(Option[EventMessage], Option[EventProcessingTime])](ME, entityDecoder[Interpretation]())
-        (maybeMessage, maybeProcessingTime) = content
-      } yield (ToGenerationNonRecoverableFailure[Interpretation](eventId,
-                                                                 maybeMessage,
-                                                                 underTriplesGenerationGauge,
-                                                                 maybeProcessingTime
-      ): ChangeStatusCommand[Interpretation]).some) recoverWith (_ =>
-        Option.empty[ChangeStatusCommand[Interpretation]].pure[Interpretation]
-      )
+  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
+    Kleisli { case (eventId, request) =>
+      request
+        .has[Interpretation](mediaType = MediaType.application.json) {
+          {
+
+            for {
+              _                   <- request.validate(status = GenerationNonRecoverableFailure)
+              maybeProcessingTime <- request.getProcessingTime
+              maybeMessage        <- request.getMessage
+            } yield CommandFound(
+              ToGenerationNonRecoverableFailure[Interpretation](eventId,
+                                                                maybeMessage,
+                                                                underTriplesGenerationGauge,
+                                                                maybeProcessingTime
+              )
+            )
+          }.merge
+        }
 
     }
-
-  private def entityDecoder[Interpretation[_]: Sync]()
-      : EntityDecoder[Interpretation, (Option[EventMessage], Option[EventProcessingTime])] = {
-    implicit val decoder: Decoder[(Option[EventMessage], Option[EventProcessingTime])] = { (cursor: HCursor) =>
-      (for {
-        status              <- cursor.downField("status").as[EventStatus]
-        maybeMessage        <- cursor.downField("message").as[Option[EventMessage]]
-        maybeProcessingTime <- cursor.downField("processingTime").as[Option[EventProcessingTime]]
-      } yield status match {
-        case EventStatus.GenerationNonRecoverableFailure => Right((maybeMessage, maybeProcessingTime))
-        case _                                           => Left(DecodingFailure("Invalid event status", Nil))
-      }).flatten
-    }
-    jsonOf[Interpretation, (Option[EventMessage], Option[EventProcessingTime])]
-  }
-
 }

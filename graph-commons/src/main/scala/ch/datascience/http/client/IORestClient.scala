@@ -38,6 +38,7 @@ import org.http4s.client.blaze.BlazeClientBuilder
 import org.http4s.client.{Client, ConnectionFailure}
 import org.http4s.headers.{Authorization, `Content-Type`}
 import org.http4s.multipart.{Multipart, Part}
+import org.http4s.util.CaseInsensitiveString
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.{Duration, FiniteDuration}
@@ -224,8 +225,8 @@ abstract class IORestClient[ThrottlingTarget](
           encoder:                PartEncoder[PartType]
       ): MultipartBuilder =
         new MultipartBuilder(request,
-                             parts :+ Part
-                               .formData[IO](name, encoder.encodeValue(value), encoder.contentType)
+                             Part
+                               .formData[IO](name, encoder.encodeValue(value), encoder.contentType) +: parts
         )
 
       def maybeAddPart[PartType](name: String, maybeValue: Option[PartType])(implicit
@@ -236,7 +237,9 @@ abstract class IORestClient[ThrottlingTarget](
 
       def build(): Request[IO] = {
         val multipart = Multipart[IO](parts)
-        request.withEntity(multipart).withHeaders(multipart.headers)
+        request
+          .withEntity(multipart)
+          .withHeaders(multipart.headers.filterNot(_.name == CaseInsensitiveString("transfer-encoding")))
       }
     }
   }
