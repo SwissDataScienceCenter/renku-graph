@@ -35,7 +35,7 @@ private class ProjectPropertiesRemover extends (JsonLDTriples => JsonLDTriples) 
   private def toJsonWithoutCreatorDetails(json: Json): Json =
     root.`@type`.each.string.getAll(json) match {
       case types if types.contains("http://schema.org/Project") =>
-        json.remove(schema / "creator").remove(schema / "dateCreated")
+        json.remove(schema / "creator").remove(schema / "dateCreated").remove(schema / "name")
       case _ => json
     }
 }

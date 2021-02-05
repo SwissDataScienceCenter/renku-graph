@@ -80,32 +80,35 @@ private class UpdatesCreatorImpl(
 
   private object `when project has a creator` {
     def unapply(maybeProject: Option[GitLabProject]): Option[(GitLabCreator, GitLabProject)] = maybeProject match {
-      case Some(project @ GitLabProject(_, _, _, _, Some(creator))) => (creator -> project).some
-      case _                                                        => None
+      case Some(project @ GitLabProject(_, _, _, _, _, Some(creator))) => (creator -> project).some
+      case _                                                           => None
     }
   }
 
   private object `when project has no creator` {
     def unapply(maybeProject: Option[GitLabProject]): Option[GitLabProject] = maybeProject match {
-      case Some(project @ GitLabProject(_, _, _, _, None)) => project.some
-      case _                                               => None
+      case Some(project @ GitLabProject(_, _, _, _, _, None)) => project.some
+      case _                                                  => None
     }
   }
 
   private def updateProjectAndSwapCreator(gitLabProject: GitLabProject, existingUserResource: users.ResourceId) =
-    updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
+    upsertName(gitLabProject.path, gitLabProject.name) ++
+      updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
       swapCreator(gitLabProject.path, existingUserResource) ++
       updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
       upsertVisibility(gitLabProject.path, gitLabProject.visibility)
 
   private def updateProjectAndAddCreator(gitLabProject: GitLabProject, creator: GitLabCreator) =
-    updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
+    upsertName(gitLabProject.path, gitLabProject.name) ++
+      updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
       addNewCreator(gitLabProject.path, creator) ++
       updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
       upsertVisibility(gitLabProject.path, gitLabProject.visibility)
 
   private def updateProjectAndUnlinkCreator(gitLabProject: GitLabProject) =
-    updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
+    upsertName(gitLabProject.path, gitLabProject.name) ++
+      updateWasDerivedFrom(gitLabProject.path, gitLabProject.maybeParentPath) ++
       unlinkCreator(gitLabProject.path) ++
       updateDateCreated(gitLabProject.path, gitLabProject.dateCreated) ++
       upsertVisibility(gitLabProject.path, gitLabProject.visibility)

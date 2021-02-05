@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.tri
 
 import ch.datascience.graph.Schemas._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
-import ch.datascience.graph.model.projects.{DateCreated, Path, ResourceId, Visibility}
+import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery
@@ -148,6 +148,23 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
             |WHERE  {
             |  OPTIONAL { $rdfResource renku:projectVisibility ?maybeVisibility } 
             |  BIND (IF(BOUND(?maybeVisibility), ?maybeVisibility, "nonexisting") AS ?visibility)
+            |}
+            |""".stripMargin
+      )
+    )
+  }
+
+  def upsertName(projectPath: Path, name: Name): List[SparqlQuery] = {
+    val rdfResource = ResourceId(renkuBaseUrl, projectPath).showAs[RdfResource]
+    List(
+      SparqlQuery.of(
+        name = "upsert - project name",
+        Prefixes.of(schema -> "schema"),
+        s"""|DELETE { $rdfResource schema:name ?name }
+            |INSERT { $rdfResource schema:name '$name' }
+            |WHERE  {
+            |  OPTIONAL { $rdfResource schema:name schema:previousName }  # NOT SURE IF WE NEED THIS LINE
+            |  BIND (IF(BOUND(?previousName), ?previousName, "nonexisting") AS ?name)
             |}
             |""".stripMargin
       )

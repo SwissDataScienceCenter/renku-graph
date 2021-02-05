@@ -44,7 +44,7 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
 
   "ProjectPropertiesRemover" should {
 
-    "remove schema:dateCreated and schema:creator properties from all the Project entities in the given JSON" in {
+    "remove schema:dateCreated, and schema:creator, and schema:alternateName properties from all the Project entities in the given JSON" in {
       forAll { project: Project =>
         val triples = JsonLDTriples {
           JsonLD
@@ -63,16 +63,18 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
             .toJson
         }
 
-        // assume there are createdDates and creators initially
+        // assume there are names, createdDates and creators initially
         triples.collectAllProjects shouldBe Set(
           TransformedProject(
             project,
+            project.name.some,
             project.dateCreated.some,
             project.maybeCreator.asJsonLD.entityId
           ).some,
           project.maybeParentProject.map { parent =>
             TransformedProject(
               parent,
+              parent.name.some,
               parent.dateCreated.some,
               parent.maybeCreator.asJsonLD.entityId
             )
@@ -82,12 +84,14 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
         removeProperties(triples).collectAllProjects shouldBe Set(
           TransformedProject(
             project,
+            maybeName = None,
             maybeCreatedDate = None,
             maybeCreatorId = None
           ).some,
           project.maybeParentProject.map { parent =>
             TransformedProject(
               parent,
+              maybeName = None,
               maybeCreatedDate = None,
               maybeCreatorId = None
             )
@@ -140,7 +144,7 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
   }
 
   case class TransformedProject(id:                 ResourceId,
-                                name:               List[Name],
+                                maybeName:          List[Name],
                                 maybeDateCreated:   List[DateCreated],
                                 maybeCreator:       Option[users.ResourceId],
                                 maybeParentProject: Option[ResourceId],
@@ -149,6 +153,7 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
 
   object TransformedProject {
     def apply(project:          Project,
+              maybeName:        Option[Name],
               maybeCreatedDate: Option[DateCreated],
               maybeCreatorId:   Option[EntityId]
     ): TransformedProject =
@@ -156,7 +161,7 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
         project.asJsonLD.entityId
           .map(id => ResourceId(id))
           .getOrElse(fail("Project's entityId finding problem")),
-        List(project.name),
+        maybeName.map(List(_)).getOrElse(Nil),
         maybeCreatedDate.map(List(_)).getOrElse(Nil),
         maybeCreatorId.map(id => users.ResourceId(id)),
         project.maybeParentProject.flatMap(_.asJsonLD.entityId).map(id => ResourceId(id)),

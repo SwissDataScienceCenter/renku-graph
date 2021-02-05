@@ -24,7 +24,7 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.{DateCreated, Path, Visibility}
+import ch.datascience.graph.model.projects.{DateCreated, Name, Path, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError._
@@ -55,13 +55,14 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
       )
     }
 
-    "update the wasDerivedFrom triple, recreate dateCreated and update the project creator & visibility" +
+    "update the name, wasDerivedFrom triple, recreate dateCreated and update the project creator & visibility" +
       "if user with GitLabId exists in KG" in new TestCase {
 
         val gitLabId = userGitLabIds.generateOne
 
         val gitLabProject = given {
           gitLabProjects(event.project.path).generateOne.copy(
+            name = projectNames.generateOne,
             maybeCreator = gitLabCreator(gitLabId).generateSome
           )
         }.existsInGitLab
@@ -71,6 +72,11 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           creatorId = creatorResourceId,
           forGitLabId = gitLabId
         ).existsInKG
+
+        val nameUpsert = (updatesQueryCreator
+          .upsertName(_: Path, _: Name))
+          .expects(gitLabProject.path, gitLabProject.name)
+          .returningUpdates
 
         val wasDerivedFromUpdates = (updatesQueryCreator
           .updateWasDerivedFrom(_: Path, _: Option[Path]))
@@ -93,11 +99,11 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .returningUpdates
 
         updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-          List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated, visibilityUpsert).flatten
+          List(nameUpsert, wasDerivedFromUpdates, creatorUpdates, recreateDateCreated, visibilityUpsert).flatten
         )
       }
 
-    "update the wasDerivedFrom triple, recreate dateCreated, create a new creator and update the project creator & visibility" +
+    "upsert name, update the wasDerivedFrom triple, recreate dateCreated, create a new creator and update the project creator & visibility" +
       "if Gitlab project's creator has an email and the user does not exist in KG" in new TestCase {
 
         val gitLabId = userGitLabIds.generateOne
@@ -107,6 +113,11 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
         }.existsInGitLab
 
         givenNoUser(forGitLabId = gitLabId).existsInKG
+
+        val nameUpsert = (updatesQueryCreator
+          .upsertName(_: Path, _: Name))
+          .expects(gitLabProject.path, gitLabProject.name)
+          .returningUpdates
 
         val wasDerivedFromUpdates = (updatesQueryCreator
           .updateWasDerivedFrom(_: Path, _: Option[Path]))
@@ -129,7 +140,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .returningUpdates
 
         updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-          List(wasDerivedFromUpdates, creatorUpdates, recreateDateCreated, visibilityUpsert).flatten
+          List(nameUpsert, wasDerivedFromUpdates, creatorUpdates, recreateDateCreated, visibilityUpsert).flatten
         )
       }
 
@@ -139,6 +150,11 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
         val gitLabProject = given {
           gitLabProjects(event.project.path).generateOne.copy(maybeCreator = None)
         }.existsInGitLab
+
+        val nameUpsert = (updatesQueryCreator
+          .upsertName(_: Path, _: Name))
+          .expects(gitLabProject.path, gitLabProject.name)
+          .returningUpdates
 
         val wasDerivedFromUpdates = (updatesQueryCreator
           .updateWasDerivedFrom(_: Path, _: Option[Path]))
@@ -161,7 +177,7 @@ class UpdatesCreatorSpec extends AnyWordSpec with MockFactory with should.Matche
           .returningUpdates
 
         updatesCreator.create(event).generateUpdates().value.unsafeRunSync() shouldBe Right(
-          List(wasDerivedFromUpdates, unlinkCreatorUpdates, recreateDateCreated, visibilityUpsert).flatten
+          List(nameUpsert, wasDerivedFromUpdates, unlinkCreatorUpdates, recreateDateCreated, visibilityUpsert).flatten
         )
       }
 

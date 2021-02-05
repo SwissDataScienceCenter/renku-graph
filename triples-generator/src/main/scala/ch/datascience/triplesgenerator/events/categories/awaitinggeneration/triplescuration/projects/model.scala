@@ -18,11 +18,12 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.projects
 
-import ch.datascience.graph.model.projects.{DateCreated, Path, Visibility}
+import ch.datascience.graph.model.projects.{DateCreated, Name, Path, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.{Email, GitLabId}
 
 private final case class GitLabProject(path:            Path,
+                                       name:            Name,
                                        visibility:      Visibility,
                                        dateCreated:     DateCreated,
                                        maybeParentPath: Option[Path],
