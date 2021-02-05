@@ -24,7 +24,7 @@ import cats.syntax.all._
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, SchedulingError, UnsupportedEventType}
+import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, UnsupportedEventType}
 import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.categories.models.Project
 import io.chrisdavenport.log4cats.Logger
@@ -74,13 +74,13 @@ private trait EventHandler[Interpretation[_]] {
         .leftMap(_ => UnsupportedEventType)
         .void
 
-    lazy val getProject: Either[EventSchedulingResult, Project] = json.as[Project].leftMap(_ => UnsupportedEventType)
+    lazy val getProject: Either[EventSchedulingResult, Project] = json.as[Project].leftMap(_ => BadRequest)
 
     lazy val getEventId: Either[EventSchedulingResult, CompoundEventId] =
-      json.as[CompoundEventId].leftMap(_ => UnsupportedEventType)
+      json.as[CompoundEventId].leftMap(_ => BadRequest)
 
     lazy val getProjectPath: Either[EventSchedulingResult, projects.Path] =
-      json.hcursor.downField("project").downField("path").as[projects.Path].leftMap(_ => UnsupportedEventType)
+      json.hcursor.downField("project").downField("path").as[projects.Path].leftMap(_ => BadRequest)
   }
 
   private implicit val eventIdDecoder: Decoder[CompoundEventId] = { implicit cursor =>

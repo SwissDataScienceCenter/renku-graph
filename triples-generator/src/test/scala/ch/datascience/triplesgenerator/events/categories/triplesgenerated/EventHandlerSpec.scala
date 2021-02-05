@@ -58,7 +58,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .returning(EventSchedulingResult.Accepted.pure[IO])
 
         val requestContent: EventRequestContent =
-          requestContent((eventId, project).asJson(eventEncoder), eventBody.value.some)
+          requestContent((eventId, project).asJson(eventEncoder), bodyContent.some)
 
         handler.handle(requestContent).unsafeRunSync() shouldBe Accepted
 
@@ -83,7 +83,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .returning(EventSchedulingResult.Busy.pure[IO])
 
         val requestContent: EventRequestContent =
-          requestContent((eventId, project).asJson(eventEncoder), eventBody.value.some)
+          requestContent((eventId, project).asJson(eventEncoder), bodyContent.some)
 
         handler.handle(requestContent).unsafeRunSync() shouldBe Busy
 
@@ -104,11 +104,17 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     s"return $BadRequest if event body is not present" in new TestCase {
 
       val requestContent: EventRequestContent =
-        requestContent((eventId, project).asJson(eventEncoder), eventBody.value.some)
+        requestContent((eventId, project).asJson(eventEncoder), None)
 
-      (eventBodyDeserializer.toTriplesGeneratedEvent _)
-        .expects(eventId, project, schemaVersion, eventBody)
-        .returning(exceptions.generateOne.raiseError[IO, TriplesGeneratedEvent])
+      handler.handle(requestContent).unsafeRunSync() shouldBe BadRequest
+
+      logger.expectNoLogs()
+    }
+
+    s"return $BadRequest if event body is malformed" in new TestCase {
+
+      val requestContent: EventRequestContent =
+        requestContent((eventId, project).asJson(eventEncoder), jsons.generateOne.noSpaces.some)
 
       handler.handle(requestContent).unsafeRunSync() shouldBe BadRequest
 
@@ -128,7 +134,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
         .returning(exception.raiseError[IO, EventSchedulingResult])
 
       val requestContent: EventRequestContent =
-        requestContent((eventId, project).asJson(eventEncoder), eventBody.value.some)
+        requestContent((eventId, project).asJson(eventEncoder), bodyContent.some)
 
       handler.handle(requestContent).unsafeRunSync() shouldBe SchedulingError(exception)
 
@@ -148,6 +154,8 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val projectPath   = projectPaths.generateOne
     val project       = Project(eventId.projectId, projectPath)
     val schemaVersion = projectSchemaVersions.generateOne
+
+    val bodyContent = json"""{ "schemaVersion": ${schemaVersion.value}, "payload": ${eventBody.value} }""".noSpaces
 
     val processingRunner      = mock[EventsProcessingRunner[IO]]
     val eventBodyDeserializer = mock[EventBodyDeserializer[IO]]
