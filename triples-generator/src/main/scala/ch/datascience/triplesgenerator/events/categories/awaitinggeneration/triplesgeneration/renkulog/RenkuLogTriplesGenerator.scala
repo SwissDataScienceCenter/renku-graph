@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
-import java.security.SecureRandom
+import cats.Applicative
 import cats.data.EitherT
 import cats.data.EitherT.{right, rightT}
 import cats.effect.{ContextShift, IO, Timer}
@@ -27,13 +27,14 @@ import ch.datascience.graph.config.{GitLabUrl, RenkuLogTimeout}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.GenerationResult._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.{GenerationResult, TriplesGenerator}
 
+import java.security.SecureRandom
 import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
 import scala.util.control.NonFatal
@@ -47,7 +48,10 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
 )(implicit contextShift: ContextShift[IO])
     extends TriplesGenerator[IO] {
 
+  private val applicative = Applicative[IO]
+
   import ammonite.ops.{Path, root}
+  import applicative._
   import file._
   import gitRepoUrlFinder._
 
@@ -91,8 +95,9 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
       case false => IO.unit
       case true =>
         for {
-          _ <- git.rm(gitAttributeFilePath)
-          _ <- git.checkoutCurrent()
+          repoDirty <- git.status.map(_.contains(gitAttributeFileName))
+          _         <- whenA(repoDirty)(git.rm(gitAttributeFilePath))
+          _         <- whenA(repoDirty)(git.checkoutCurrent())
         } yield ()
     }
   }

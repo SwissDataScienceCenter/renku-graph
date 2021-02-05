@@ -132,6 +132,10 @@ private object Commands {
       %%("git", "rm", fileName)(repositoryDirectory.value)
     }.void
 
+    def status(implicit repositoryDirectory: RepositoryPath): IO[String] = IO {
+      %%("git", "status")(repositoryDirectory.value).out.string
+    }
+
     private val recoverableErrors = Set("SSL_ERROR_SYSCALL",
                                         "the remote end hung up unexpectedly",
                                         "The requested URL returned error: 502",
