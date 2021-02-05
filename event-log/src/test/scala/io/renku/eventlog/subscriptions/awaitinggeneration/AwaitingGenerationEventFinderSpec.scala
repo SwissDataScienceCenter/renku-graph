@@ -283,7 +283,7 @@ private class AwaitingGenerationEventFinderSpec
 
     val waitingEventsGauge    = mock[LabeledGauge[IO, Path]]
     val underProcessingGauge  = mock[LabeledGauge[IO, Path]]
-    val projectPrioritisation = mock[ProjectPrioritisation]
+    val projectPrioritisation = mock[ProjectPrioritisation[IO]]
     val queriesExecTimes      = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val maxProcessingTime     = Duration.ofMillis(durations(max = 10 hours).generateOne.toMillis)
 

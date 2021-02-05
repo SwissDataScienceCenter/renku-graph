@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
@@ -26,31 +27,87 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.EventDate
-import io.renku.eventlog.subscriptions.ProjectIds
+import io.renku.eventlog.subscriptions.{Capacity, ProjectIds, Subscribers}
 import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.time.Instant.now
 import scala.concurrent.duration._
 import scala.language.postfixOps
+import scala.util.Try
 
-private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers {
+private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers with MockFactory {
+
   import ProjectPrioritisation._
   import Priority._
 
   "prioritize" should {
 
-    "return an empty list if there are no projects" in {
+    "do not discard projects events if " +
+      "current occupancy per project = 0, " +
+      "total occupancy = 0, " +
+      "total capacity = 10" in new TestCase {
+
+        `given totalCapacity`(10)
+
+        val projects = List(
+          projectInfos.generateOne,
+          projectInfos.generateOne
+        ).map(_.copy(currentOccupancy = 0, latestEventDate = EventDate(now)))
+
+        projectPrioritisation.prioritise(projects).noPriority shouldBe projects.map(_.toIdsAndPath)
+      }
+
+    "do not discard projects events if " +
+      "current occupancy per project > 0, " +
+      "total occupancy < max free spots, " +
+      "total capacity = 10" in new TestCase {
+
+        `given totalCapacity`(10)
+
+        val projects = List(
+          projectInfos.generateOne,
+          projectInfos.generateOne
+        ).map(_.copy(currentOccupancy = positiveInts(max = 3).generateOne, latestEventDate = EventDate(now)))
+
+        projectPrioritisation.prioritise(projects).noPriority shouldBe projects.map(_.toIdsAndPath)
+      }
+
+    "discard all project events with " +
+      "current occupancy > 0, " +
+      "total occupancy >= max free spots, " +
+      "total capacity = 10" in new TestCase {
+
+        `given totalCapacity`(10)
+
+        val projects = List(
+          projectInfos.generateOne.copy(currentOccupancy = 8),
+          projectInfos.generateOne.copy(currentOccupancy = 1),
+          projectInfos.generateOne.copy(currentOccupancy = 0)
+        ).map(_.copy(latestEventDate = EventDate(now)))
+
+        projectPrioritisation.prioritise(projects).noPriority shouldBe List(projects.last.toIdsAndPath)
+      }
+
+    "return an empty list if there are no projects" in new TestCase {
+      `given no totalCapacity`
+
       projectPrioritisation.prioritise(Nil) shouldBe Nil
     }
 
-    "put priority MaxPriority if the list contains only one project" in {
+    "put MaxPriority if the list contains only one project" in new TestCase {
+      `given no totalCapacity`
+
       val project = projectInfos.generateOne
 
       projectPrioritisation.prioritise(List(project)) shouldBe List((project.toIdsAndPath, MaxPriority))
     }
 
-    "put priority MaxPriority if projects' event dates are within and hour and currentOccupancy is 0" in {
+    "put priority MaxPriority if projects' event dates are within and hour and currentOccupancy is 0" in new TestCase {
+      `given no totalCapacity`
+
       val project1 = projectInfos.generateOne.copy(currentOccupancy = 0)
       val project2 = projectInfos.generateOne.copy(
         latestEventDate = project1.latestEventDate.plus(durations(max = 59 minutes).generateOne),
@@ -64,7 +121,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
     }
 
     "put the MinPriority to the project with the older events" +
-      "if projects event dates are not within an hour and currentOccupancy is 0" in {
+      "if projects event dates are not within an hour and currentOccupancy is 0" in new TestCase {
+        `given no totalCapacity`
+
         val project1 = projectInfos.generateOne.copy(currentOccupancy = 0)
         val project2 = projectInfos.generateOne.copy(
           latestEventDate = project1.latestEventDate.plus(durations(min = 61 minutes, max = 5 hours).generateOne),
@@ -78,7 +137,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
       }
 
     "compute the priority using the event date only " +
-      "if projects' event dates are not within an hour and currentOccupancy is 0" in {
+      "if projects' event dates are not within an hour and currentOccupancy is 0" in new TestCase {
+        `given no totalCapacity`
+
         val project1 = projectInfos.generateOne.copy(currentOccupancy = 0)
         val project2 = projectInfos.generateOne.copy(
           latestEventDate = project1.latestEventDate.plus(durations(min = 61 minutes, max = 5 hours).generateOne),
@@ -102,7 +163,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
       }
 
     "put MinPriority to one of the projects " +
-      "if projects' event dates are within an hour and they have the same currentOccupancy > 0" in {
+      "if projects' event dates are within an hour and they have the same currentOccupancy > 0" in new TestCase {
+        `given no totalCapacity`
+
         val currentOccupancy: Int Refined NonNegative = 1
         val project1 = projectInfos.generateOne.copy(currentOccupancy = currentOccupancy)
         val project2 = projectInfos.generateOne.copy(
@@ -120,7 +183,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
         priority                shouldBe MinPriority
       }
 
-    "put MaxPriority to the project with current occupancy 0 while other has > 0" in {
+    "put MaxPriority to the project with current occupancy 0 while other has > 0" in new TestCase {
+      `given no totalCapacity`
+
       val currentOccupancy: Int Refined NonNegative = 1
       val project1 = projectInfos.generateOne.copy(currentOccupancy = currentOccupancy)
       val project2 = projectInfos.generateOne.copy(
@@ -139,7 +204,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
     }
 
     "discard project with too high occupancy " +
-      "- case when projects' event dates are within an hour" in {
+      "- case when projects' event dates are within an hour" in new TestCase {
+        `given no totalCapacity`
+
         val project1 = projectInfos.generateOne.copy(
           currentOccupancy = 5
         )
@@ -163,7 +230,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
       }
 
     "discard project with too high occupancy " +
-      "- case when projects' event dates are not within an hour" in {
+      "- case when projects' event dates are not within an hour" in new TestCase {
+        `given no totalCapacity`
+
         val project1 = projectInfos.generateOne.copy(
           currentOccupancy = 1
         )
@@ -187,7 +256,22 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
       }
   }
 
-  private lazy val projectPrioritisation = new ProjectPrioritisation()
+  private trait TestCase {
+    val subscribers                = mock[Subscribers[Try]]
+    lazy val projectPrioritisation = new ProjectPrioritisationImpl(subscribers)
+
+    def `given no totalCapacity` =
+      (() => subscribers.getTotalCapacity)
+        .expects()
+        .returning(None)
+        .atLeastOnce()
+
+    def `given totalCapacity`(capacity: Int) =
+      (() => subscribers.getTotalCapacity)
+        .expects()
+        .returning(Capacity(capacity).some)
+        .atLeastOnce()
+  }
 
   private implicit lazy val projectInfos: Gen[ProjectInfo] = for {
     projectId        <- projectIds
@@ -203,5 +287,9 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
 
   private implicit class ProjectInfoOps(projectInfo: ProjectInfo) {
     lazy val toIdsAndPath = ProjectIds(projectInfo.id, projectInfo.path)
+  }
+
+  private implicit class ResultsOps(results: List[(ProjectIds, Priority)]) {
+    lazy val noPriority: List[ProjectIds] = results.map(_._1)
   }
 }
