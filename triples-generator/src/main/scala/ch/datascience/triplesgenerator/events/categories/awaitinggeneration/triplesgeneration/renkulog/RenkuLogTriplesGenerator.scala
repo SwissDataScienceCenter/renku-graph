@@ -86,7 +86,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
     for {
       repositoryUrl <- findRepositoryUrl(commitEvent.project.path, maybeAccessToken).toRight
       _             <- git.clone(repositoryUrl, workDirectory)
-      _             <- (git.checkout(commitEvent.commitId)).toRight
+      _             <- git.checkout(commitEvent.commitId).toRight
     } yield ()
 
   private def cleanUpRepository()(implicit repoDirectory: RepositoryPath) = {
@@ -95,9 +95,9 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
       case false => IO.unit
       case true =>
         for {
-          repoDirty <- git.status.map(_.contains(gitAttributeFileName))
+          repoDirty <- git.status.map(status => !status.contains("nothing to commit"))
           _         <- whenA(repoDirty)(git.rm(gitAttributeFilePath))
-          _         <- whenA(repoDirty)(git.checkoutCurrent())
+          _         <- whenA(repoDirty)(git.`reset --hard`)
         } yield ()
     }
   }
@@ -105,7 +105,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
   private def processEvent(
       commitEvent:          CommitEvent
   )(implicit repoDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
-    (git.findCommitMessage(commitEvent.commitId)).toRight flatMap {
+    git.findCommitMessage(commitEvent.commitId).toRight flatMap {
       case message if message contains "renku migrate" => rightT[IO, ProcessingRecoverableError](MigrationEvent)
       case _                                           => migrateAndLog(commitEvent)
     }
@@ -114,7 +114,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
       commitEvent:          CommitEvent
   )(implicit repoDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
     for {
-      _       <- (renku.migrate(commitEvent)).toRight
+      _       <- renku.migrate(commitEvent).toRight
       triples <- findTriples(commitEvent)
     } yield Triples(triples)
 

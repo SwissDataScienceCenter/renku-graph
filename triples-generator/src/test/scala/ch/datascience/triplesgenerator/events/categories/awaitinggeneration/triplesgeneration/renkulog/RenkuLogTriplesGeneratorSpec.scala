@@ -87,7 +87,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         (git
           .status(_: RepositoryPath))
           .expects(repositoryDirectory)
-          .returning(sentences().generateOne.value.pure[IO])
+          .returning(sentenceContaining("nothing to commit").generateOne.value.pure[IO])
 
         (git
           .findCommitMessage(_: CommitId)(_: RepositoryPath))
@@ -116,7 +116,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
     "create a temp directory, " +
       "clone the repo into it, " +
       "check out the commit, " +
-      "clean the repo if .gitattributes files is unstaged" +
+      "clean the repo if it's not clean " +
       "verify it's not a migration commit, " +
       "call 'renku migrate', " +
       "call 'renku log' without --revision when no parent commit, " +
@@ -148,12 +148,12 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         (git
           .status(_: RepositoryPath))
           .expects(repositoryDirectory)
-          .returning(sentenceContaining(".gitattributes").generateOne.value.pure[IO])
+          .returning(sentences().generateOne.value.pure[IO])
 
         (git.rm(_: Path)(_: RepositoryPath)).expects(dirtyRepoFilePath, repositoryDirectory).returning(IO.unit)
 
         (git
-          .checkoutCurrent()(_: RepositoryPath))
+          .`reset --hard`(_: RepositoryPath))
           .expects(repositoryDirectory)
           .returning(IO.unit)
 
@@ -594,7 +594,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       (git
         .status(_: RepositoryPath))
         .expects(repositoryDirectory)
-        .returning(sentenceContaining(".gitattributes").generateOne.value.pure[IO])
+        .returning(sentences().generateOne.value.pure[IO])
 
       val exception = exceptions.generateOne
       (git
@@ -642,13 +642,13 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       (git
         .status(_: RepositoryPath))
         .expects(repositoryDirectory)
-        .returning(sentenceContaining(".gitattributes").generateOne.value.pure[IO])
+        .returning(sentences().generateOne.value.pure[IO])
 
       (git.rm(_: Path)(_: RepositoryPath)).expects(dirtyRepoFilePath, repositoryDirectory).returning(IO.unit)
 
       val exception = exceptions.generateOne
       (git
-        .checkoutCurrent()(_: RepositoryPath))
+        .`reset --hard`(_: RepositoryPath))
         .expects(repositoryDirectory)
         .returning(IO.raiseError(exception))
 

@@ -102,20 +102,17 @@ private object Commands {
     import cats.syntax.all._
     import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 
-    def checkout(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): IO[Unit] =
-      IO {
-        %%("git", "checkout", commitId.value)(repositoryDirectory.value)
-      }.void
+    def checkout(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): IO[Unit] = IO {
+      %%("git", "checkout", commitId.value)(repositoryDirectory.value)
+    }.void
 
-    def checkoutCurrent()(implicit repositoryDirectory: RepositoryPath): IO[Unit] =
-      IO {
-        %%("git", "checkout", ".")(repositoryDirectory.value)
-      }.void
+    def `reset --hard`(implicit repositoryDirectory: RepositoryPath): IO[Unit] = IO {
+      %%("git", "reset", "--hard")(repositoryDirectory.value)
+    }.void
 
-    def findCommitMessage(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): IO[String] =
-      IO {
-        %%("git", "log", "--format=%B", "-n", "1", commitId.value)(repositoryDirectory.value)
-      }.map(_.out.string.trim)
+    def findCommitMessage(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): IO[String] = IO {
+      %%("git", "log", "--format=%B", "-n", "1", commitId.value)(repositoryDirectory.value)
+    }.map(_.out.string.trim)
 
     def clone(
         repositoryUrl:               ServiceUrl,
