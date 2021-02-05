@@ -21,6 +21,7 @@ package io.renku.eventlog.init
 import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
+import doobie.implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -37,7 +38,7 @@ class EventLogTableRenamerSpec extends AnyWordSpec with DbInitSpec with should.M
 
   "run" should {
 
-    "rename the 'event_log' table 'event'" in new TestCase {
+    "rename the 'event_log' table to 'event' when 'event' does not exist" in new TestCase {
 
       tableExists("event_log") shouldBe true
 
@@ -49,7 +50,7 @@ class EventLogTableRenamerSpec extends AnyWordSpec with DbInitSpec with should.M
       logger.loggedOnly(Info("'event_log' table renamed to 'event'"))
     }
 
-    "do nothing if the 'event' table already exists" in new TestCase {
+    "do nothing if the 'event' table already exists and 'event_log' does not exist" in new TestCase {
 
       tableExists("event_log") shouldBe true
 
@@ -66,10 +67,52 @@ class EventLogTableRenamerSpec extends AnyWordSpec with DbInitSpec with should.M
 
       logger.loggedOnly(Info("'event' table already exists"))
     }
+
+    "drop 'event_log' table if both the 'event' and 'event_log' tables exist" in new TestCase {
+
+      tableExists("event_log") shouldBe true
+
+      tableRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+
+      tableExists("event_log") shouldBe false
+      tableExists("event")     shouldBe true
+
+      logger.loggedOnly(Info("'event_log' table renamed to 'event'"))
+
+      logger.reset()
+
+      createEventLogTable() shouldBe ((): Unit)
+
+      tableExists("event_log") shouldBe true
+      tableExists("event")     shouldBe true
+
+      tableRenamer.run().unsafeRunSync() shouldBe ((): Unit)
+
+      tableExists("event_log") shouldBe false
+      tableExists("event")     shouldBe true
+
+      logger.loggedOnly(Info("'event_log' table dropped"))
+    }
   }
 
   private trait TestCase {
     val logger       = TestLogger[IO]()
     val tableRenamer = new EventLogTableRenamerImpl[IO](transactor, logger)
+  }
+
+  private def createEventLogTable(): Unit = execute {
+    sql"""
+    CREATE TABLE IF NOT EXISTS event_log(
+      event_id       varchar   NOT NULL,
+      project_id     int4      NOT NULL,
+      status         varchar   NOT NULL,
+      created_date   timestamp NOT NULL,
+      execution_date timestamp NOT NULL,
+      event_date     timestamp NOT NULL,
+      event_body     text      NOT NULL,
+      message        varchar,
+      PRIMARY KEY (event_id, project_id)
+    );
+    """.update.run.map(_ => ())
   }
 }
