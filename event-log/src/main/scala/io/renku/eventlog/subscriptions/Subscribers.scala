@@ -27,13 +27,15 @@ import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
 
 private trait Subscribers[Interpretation[_]] {
-  def add(subscriberUrl: SubscriberUrl): Interpretation[Unit]
+  def add(subscriptionInfo: SubscriptionInfo): Interpretation[Unit]
 
   def delete(subscriberUrl: SubscriberUrl): Interpretation[Unit]
 
   def markBusy(subscriberUrl: SubscriberUrl): Interpretation[Unit]
 
   def runOnSubscriber(f: SubscriberUrl => Interpretation[Unit]): Interpretation[Unit]
+
+  def getTotalCapacity: Option[Capacity]
 }
 
 private class SubscribersImpl private[subscriptions] (
@@ -43,15 +45,18 @@ private class SubscribersImpl private[subscriptions] (
 )(implicit contextShift: ContextShift[IO])
     extends Subscribers[IO] {
 
-  override def add(subscriberUrl: SubscriberUrl): IO[Unit] = for {
-    wasAdded <- subscribersRegistry add subscriberUrl
-    _        <- Applicative[IO].whenA(wasAdded)(logger.info(s"$categoryName: $subscriberUrl added"))
+  private val applicative = Applicative[IO]
+  import applicative._
+
+  override def add(subscriptionInfo: SubscriptionInfo): IO[Unit] = for {
+    wasAdded <- subscribersRegistry add subscriptionInfo
+    _        <- whenA(wasAdded)(logger.info(s"$categoryName: $subscriptionInfo added"))
   } yield ()
 
   override def delete(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
       removed <- subscribersRegistry delete subscriberUrl
-      _       <- Applicative[IO].whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))
+      _       <- whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))
     } yield ()
 
   override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =
@@ -63,6 +68,8 @@ private class SubscribersImpl private[subscriptions] (
       subscriberUrl          <- subscriberUrlReference.get
       _                      <- f(subscriberUrl)
     } yield ()
+
+  def getTotalCapacity: Option[Capacity] = subscribersRegistry.getTotalCapacity
 }
 
 private object Subscribers {

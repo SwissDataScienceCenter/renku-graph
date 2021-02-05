@@ -90,7 +90,7 @@ object IOSubscriptionsEndpoint {
 
   import cats.effect.{ContextShift, IO}
 
-  def apply[T <: SubscriptionCategoryPayload](
+  def apply[T <: SubscriptionInfo](
       subscriptionCategoryRegistry: SubscriptionCategoryRegistry[IO],
       logger:                       Logger[IO]
   )(implicit contextShift:          ContextShift[IO]): IO[SubscriptionsEndpoint[IO]] = IO {

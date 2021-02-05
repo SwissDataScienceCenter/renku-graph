@@ -19,6 +19,7 @@
 package io.renku.eventlog.subscriptions.membersync
 
 import io.renku.eventlog.subscriptions
+import io.renku.eventlog.subscriptions.{Capacity, SubscriberUrl}
 
-private case class SubscriptionCategoryPayload(override val subscriberUrl: subscriptions.SubscriberUrl)
-    extends subscriptions.SubscriptionCategoryPayload
+private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl, maybeCapacity: Option[Capacity])
+    extends subscriptions.SubscriptionInfo

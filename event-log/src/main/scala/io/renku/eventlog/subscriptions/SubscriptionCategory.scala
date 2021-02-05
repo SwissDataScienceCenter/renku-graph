@@ -46,17 +46,19 @@ private[subscriptions] object SubscriptionCategory {
   }
 }
 
-private class SubscriptionCategoryImpl[Interpretation[_]: Effect, PayloadType <: SubscriptionCategoryPayload](
+private class SubscriptionCategoryImpl[Interpretation[_]: Effect, SubscriptionInfoType <: SubscriptionInfo](
     val name:          CategoryName,
     subscribers:       Subscribers[Interpretation],
     eventsDistributor: EventsDistributor[Interpretation],
-    deserializer:      SubscriptionRequestDeserializer[Interpretation, PayloadType]
+    deserializer:      SubscriptionRequestDeserializer[Interpretation, SubscriptionInfoType]
 ) extends SubscriptionCategory[Interpretation] {
 
   override def run(): Interpretation[Unit] = eventsDistributor.run()
 
-  override def register(payload: Json): Interpretation[RegistrationResult] = (for {
-    subscriptionPayload <- OptionT(deserializer.deserialize(payload))
-    _                   <- OptionT.liftF(subscribers.add(subscriptionPayload.subscriberUrl))
-  } yield subscriptionPayload).map(_ => AcceptedRegistration).getOrElse(RejectedRegistration)
+  override def register(payload: Json): Interpretation[RegistrationResult] = {
+    for {
+      subscriptionInfo <- OptionT(deserializer deserialize payload)
+      _                <- OptionT.liftF(subscribers add subscriptionInfo)
+    } yield subscriptionInfo
+  }.map(_ => AcceptedRegistration).getOrElse(RejectedRegistration)
 }

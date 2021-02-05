@@ -35,7 +35,7 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
-import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds, SubscriptionTypeSerializers}
+import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds, Subscribers, SubscriptionTypeSerializers}
 
 import java.time.{Duration, Instant}
 import scala.language.postfixOps
@@ -50,7 +50,7 @@ private class AwaitingGenerationEventFinderImpl(
     now:                   () => Instant = () => Instant.now,
     maxProcessingTime:     Duration,
     projectsFetchingLimit: Int Refined Positive,
-    projectPrioritisation: ProjectPrioritisation,
+    projectPrioritisation: ProjectPrioritisation[IO],
     pickRandomlyFrom:      List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size)
 )(implicit ME:             Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
@@ -177,17 +177,18 @@ private object IOAwaitingGenerationEventFinder {
 
   def apply(
       transactor:           DbTransactor[IO, EventLogDB],
+      subscribers:          Subscribers[IO],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name]
-  )(implicit contextShift:  ContextShift[IO]): IO[EventFinder[IO, AwaitingGenerationEvent]] = IO {
-    new AwaitingGenerationEventFinderImpl(transactor,
-                                          waitingEventsGauge,
-                                          underProcessingGauge,
-                                          queriesExecTimes,
-                                          maxProcessingTime = MaxProcessingTime,
-                                          projectsFetchingLimit = ProjectsFetchingLimit,
-                                          projectPrioritisation = new ProjectPrioritisation()
-    )
-  }
+  )(implicit contextShift:  ContextShift[IO]): IO[EventFinder[IO, AwaitingGenerationEvent]] = for {
+    projectPrioritisation <- ProjectPrioritisation(subscribers)
+  } yield new AwaitingGenerationEventFinderImpl(transactor,
+                                                waitingEventsGauge,
+                                                underProcessingGauge,
+                                                queriesExecTimes,
+                                                maxProcessingTime = MaxProcessingTime,
+                                                projectsFetchingLimit = ProjectsFetchingLimit,
+                                                projectPrioritisation = projectPrioritisation
+  )
 }
