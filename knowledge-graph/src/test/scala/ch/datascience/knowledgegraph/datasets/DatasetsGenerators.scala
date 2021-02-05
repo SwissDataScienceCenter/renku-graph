@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DerivedFrom, InitialVersion, SameAs, Url}
+import ch.datascience.graph.model.datasets.{DerivedFrom, ImageUri, InitialVersion, SameAs, Url}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.entities.DataSet
 import eu.timepit.refined.auto._
@@ -46,6 +46,7 @@ object DatasetsGenerators {
       sameAs           <- sameAs
       maybeDescription <- Gen.option(datasetDescriptions)
       keywords         <- listOf(datasetKeywords)
+      images           <- listOf(imageUris)
       published        <- datasetPublishingInfos
       part             <- listOf(datasetParts)
       projects         <- projects
@@ -60,7 +61,8 @@ object DatasetsGenerators {
       published,
       part,
       projects.toList,
-      keywords
+      keywords,
+      images
     )
 
   def modifiedDatasetsOnFirstProject(
@@ -72,6 +74,7 @@ object DatasetsGenerators {
       id        <- datasetIdentifiers
       published <- datasetPublishingInfos
       keywords  <- listOf(datasetKeywords)
+      imageUrls <- listOf(imageUris)
     } yield ModifiedDataset(
       id,
       dataset.title,
@@ -83,7 +86,8 @@ object DatasetsGenerators {
       published,
       dataset.parts,
       List(dataset.projects.headOption getOrElse (throw new IllegalStateException("No projects on a dataset"))),
-      keywords
+      keywords,
+      imageUrls
     )
 
   implicit lazy val datasetCreators: Gen[DatasetCreator] = for {

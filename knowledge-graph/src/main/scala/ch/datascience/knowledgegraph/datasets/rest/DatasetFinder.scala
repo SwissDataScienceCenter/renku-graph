@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.graph.model.datasets.{Identifier, Keyword}
+import ch.datascience.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
@@ -49,11 +49,13 @@ private class IODatasetFinder(
     for {
       maybeDetailsFiber <- findBaseDetails(identifier).start
       keywordsFiber     <- findKeywords(identifier).start
+      imagesFiber       <- findImages(identifier).start
       creatorsFiber     <- findCreators(identifier).start
       partsFiber        <- findParts(identifier).start
       projectsFiber     <- findProjects(identifier).start
       maybeDetails      <- maybeDetailsFiber.join
       keywords          <- keywordsFiber.join
+      imageUrls         <- imagesFiber.join
       creators          <- creatorsFiber.join
       parts             <- partsFiber.join
       projects          <- projectsFiber.join
@@ -62,7 +64,8 @@ private class IODatasetFinder(
         published = details.published.copy(creators = creators),
         parts = parts,
         projects = projects,
-        keywords = keywords
+        keywords = keywords,
+        images = imageUrls
       )
     }
 
@@ -70,13 +73,14 @@ private class IODatasetFinder(
     def copy(published: DatasetPublishing,
              parts:     List[DatasetPart],
              projects:  List[DatasetProject],
-             keywords:  List[Keyword]
+             keywords:  List[Keyword],
+             images:    List[ImageUri]
     ): Dataset =
       dataset match {
         case ds: NonModifiedDataset =>
-          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords)
+          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords, images = images)
         case ds: ModifiedDataset =>
-          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords)
+          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords, images = images)
       }
   }
 }
@@ -86,7 +90,6 @@ private object IODatasetFinder {
   def apply(
       timeRecorder:   SparqlQueryTimeRecorder[IO],
       rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
       logger:         Logger[IO] = ApplicationLogger
   )(implicit
       executionContext: ExecutionContext,
@@ -94,11 +97,10 @@ private object IODatasetFinder {
       timer:            Timer[IO]
   ): IO[DatasetFinder[IO]] =
     for {
-      config       <- rdfStoreConfig
-      renkuBaseUrl <- renkuBaseUrl
+      config <- rdfStoreConfig
     } yield new IODatasetFinder(
       new BaseDetailsFinder(config, logger, timeRecorder),
-      new CreatorsFinder(config, renkuBaseUrl, logger, timeRecorder),
+      new CreatorsFinder(config, logger, timeRecorder),
       new PartsFinder(config, logger, timeRecorder),
       new ProjectsFinder(config, logger, timeRecorder)
     )

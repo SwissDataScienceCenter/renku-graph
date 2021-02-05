@@ -33,7 +33,6 @@ import scala.concurrent.ExecutionContext
 
 private class CreatorsFinder(
     rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
     logger:                  Logger[IO],
     timeRecorder:            SparqlQueryTimeRecorder[IO]
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])

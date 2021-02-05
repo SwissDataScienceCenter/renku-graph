@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.datasets.{Identifier, Keyword}
+import ch.datascience.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
@@ -46,7 +46,9 @@ private class BaseDetailsFinder(
   import ch.datascience.graph.Schemas._
 
   def findBaseDetails(identifier: Identifier): IO[Option[Dataset]] =
-    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier)) flatMap toSingleDataset
+    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier)) flatMap { dataset =>
+      toSingleDataset(dataset)
+    }
 
   private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - details",
@@ -61,13 +63,13 @@ private class BaseDetailsFinder(
         |    ?datasetId schema:identifier "$identifier";
         |               schema:identifier ?identifier;
         |               rdf:type <http://schema.org/Dataset>;
-        |               schema:isPartOf ?projectId; 
+        |               schema:isPartOf ?projectId;   
         |               schema:url ?url;
         |               schema:name ?name;
         |               schema:alternateName ?alternateName;
         |               prov:atLocation ?location ;
         |               renku:topmostSameAs ?topmostSameAs;
-        |               renku:topmostDerivedFrom/schema:identifier ?initialVersion.
+        |               renku:topmostDerivedFrom/schema:identifier ?initialVersion
         |               
         |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
         |    FILTER NOT EXISTS {
@@ -81,6 +83,7 @@ private class BaseDetailsFinder(
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    OPTIONAL { ?datasetId schema:description ?description }.
         |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate }.
+        |    
         |}
         |""".stripMargin
   )
@@ -96,6 +99,23 @@ private class BaseDetailsFinder(
         |    ?datasetId schema:identifier "$identifier" ;
         |               schema:keywords ?keyword .
         |}ORDER BY ASC(?keyword)
+        |""".stripMargin
+  )
+
+  def findImages(identifier: Identifier): IO[List[ImageUri]] =
+    queryExpecting[List[ImageUri]](using = queryImages(identifier))
+
+  private def queryImages(identifier: Identifier) = SparqlQuery.of(
+    name = "ds by id - image urls",
+    Prefixes.of(schema -> "schema"),
+    s"""|SELECT DISTINCT ?contentUrl
+        |WHERE {
+        |    ?datasetId schema:identifier "$identifier" ;
+        |               schema:image ?imageId .
+        |    ?imageId   a schema:ImageObject;
+        |               schema:contentUrl ?contentUrl ;
+        |               schema:position ?position .
+        |}ORDER BY ASC(?position)
         |""".stripMargin
   )
 
@@ -140,7 +160,8 @@ private object BaseDetailsFinder {
             DatasetPublishing(maybePublishedDate, Set.empty),
             parts = List.empty,
             projects = List.empty,
-            keywords = List.empty
+            keywords = List.empty,
+            images = List.empty
           )
         case None =>
           NonModifiedDataset(
@@ -154,7 +175,8 @@ private object BaseDetailsFinder {
             DatasetPublishing(maybePublishedDate, Set.empty),
             parts = List.empty,
             projects = List.empty,
-            keywords = List.empty
+            keywords = List.empty,
+            images = List.empty
           )
       }
     }
@@ -162,12 +184,20 @@ private object BaseDetailsFinder {
     _.downField("results").downField("bindings").as(decodeList(dataset))
   }
 
-  private implicit val keywordsDecoder: Decoder[List[Keyword]] = {
+  private implicit lazy val keywordsDecoder: Decoder[List[Keyword]] = {
 
     implicit val keywordDecoder: Decoder[Keyword] =
       _.downField("keyword").downField("value").as[String].map(Keyword.apply)
 
     _.downField("results").downField("bindings").as(decodeList[Keyword])
+  }
+
+  private implicit lazy val imagesDecoder: Decoder[List[ImageUri]] = {
+
+    implicit val imageDecoder: Decoder[ImageUri] =
+      _.downField("contentUrl").downField("value").as[String].map(ImageUri.apply)
+
+    _.downField("results").downField("bindings").as(decodeList[ImageUri])
   }
 
   private def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =

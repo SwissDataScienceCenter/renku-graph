@@ -16,16 +16,20 @@ This is a microservice which provides API for the Graph DB.
 
 #### GET /knowledge-graph/datasets?query=\<phrase\>&sort=\<property\>:asc|desc&page=\<page\>&per_page=\<per_page\>
 
-Finds datasets which `title`, `description` or creator `name` matches the given `phrase` or returns all the datasets if no `query` parameter is given.
+Finds datasets which `title`, `description` or creator `name` matches the given `phrase` or returns all the datasets if
+no `query` parameter is given.
 
-NOTES: 
+NOTES:
+
 * the `phrase` query parameter has to be url encoded and it cannot be blank.
-* the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`, `datePublished` and `projectsCount`.
+* the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`
+  , `datePublished` and `projectsCount`.
 * the `page` query parameter is optional and defaults to `1`.
 * the `per_page` query parameter is optional and defaults to `20`.
 
 **Response**
 ****
+
 | Status                     | Description                                                                                    |
 |----------------------------|------------------------------------------------------------------------------------------------|
 | OK (200)                   | If there are datasets for the project or `[]` if nothing is found                              |
@@ -46,7 +50,8 @@ Response headers:
 
 Link response header example:
 
-Assuming the total is `30` and the URL `https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=2&per_page=10`
+Assuming the total is `30` and the
+URL `https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=2&per_page=10`
 
 ```
 Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=1&per_page=10>; rel="prev"
@@ -56,6 +61,7 @@ Link: <https://renku/knowledge-graph/datasets?query=phrase&sort=name:asc&page=3&
 ```
 
 Response body example:
+
 ```
 [  
    {  
@@ -76,6 +82,7 @@ Response body example:
         ]
       },
       "projectsCount": 2,
+      "images": ["image.png"],
       "_links":[  
          {  
             "rel":"details",
@@ -94,6 +101,7 @@ Response body example:
         ]
       },
       "projectsCount": 1,
+      "images": ["https://blah.com/image.png"],
       "_links":[  
          {  
             "rel":"details",
@@ -117,6 +125,7 @@ Finds details of the dataset with the given `id`.
 | INTERNAL SERVER ERROR (500)| Otherwise                     |
 
 Response body example:
+
 ```
 {
   "_links" : [
@@ -198,9 +207,13 @@ Response body example:
       }
     }
   ],
-  keywords: [
+  "keywords": [
     "rldzpwo",
     "gfioui"
+  ],
+  "images": [
+    "https://renku.io/dataset1/23423423.jpg",
+    "image.png"
   ]
 }
 ```
@@ -232,6 +245,7 @@ Endpoint to perform GraphQL queries on the Knowledge Graph data.
 * Lineage
 
 Query example:
+
 ```
 {
   "query": "{ 
@@ -243,7 +257,9 @@ Query example:
 }
 
 ```
+
 Response body example:
+
 ```
 {
   "data": {
@@ -302,6 +318,7 @@ There's no need for a security headers for public projects.
 | INTERNAL SERVER ERROR (500)| Otherwise                                                |
 
 Response body example:
+
 ```
 {
   "identifier":  123,
@@ -380,6 +397,7 @@ Finds list of datasets of the project with the given `namespace/name`.
 | INTERNAL SERVER ERROR (500)| Otherwise                                                         |
 
 Response body example:
+
 ```
 [  
    {  
@@ -390,7 +408,8 @@ Response body example:
       "title": "rmDaYfpehl",
       "name": "mniouUnmal",
       "sameAs": "http://host/url1",
-      "derivedFrom" : "http://host/url1",  
+      "derivedFrom" : "http://host/url1",
+      "images": [],
       "_links": [  
          {  
             "rel": "details",
@@ -410,6 +429,7 @@ Response body example:
       "name": "a",
       "sameAs" : "http://host/url2",                  // optional property when no "derivedFrom" exists
       "derivedFrom" : "http://host/url2",             // optional property when no "sameAs" exists
+      "images": ["image.png"],
       "_links": [  
          {  
             "rel": "details",
@@ -436,6 +456,7 @@ Verifies service health.
 | INTERNAL SERVER ERROR (500)| Otherwise               |
 
 **A curl command example**
+
 ```
 curl -X POST -v -H "Content-Type: application/json" http://localhost:9004/knowledge-graph/graphql -d '{ "query": "{ lineage(projectPath: \"<namespace>/<project-name>\") { nodes { id label } edges { source target } } }"}'
 ```

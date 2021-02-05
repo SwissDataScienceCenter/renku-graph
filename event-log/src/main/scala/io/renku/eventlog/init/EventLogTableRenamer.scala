@@ -41,14 +41,19 @@ private class EventLogTableRenamerImpl[Interpretation[_]](
     transactor: DbTransactor[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventLogTableRenamer[Interpretation] {
+    extends EventLogTableRenamer[Interpretation]
+    with EventTableCheck[Interpretation] {
 
   private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
     checkOldTableExists flatMap {
       case false => logger info "'event' table already exists"
-      case true  => renameTable()
+      case true =>
+        whenEventTableExists(
+          dropOldTable(),
+          otherwise = renameTable()
+        )
     }
 
   private def checkOldTableExists: Interpretation[Boolean] =
@@ -61,5 +66,10 @@ private class EventLogTableRenamerImpl[Interpretation[_]](
   private def renameTable() = for {
     _ <- execute(sql"ALTER TABLE event_log RENAME TO event")
     _ <- logger info "'event_log' table renamed to 'event'"
+  } yield ()
+
+  private def dropOldTable() = for {
+    _ <- execute(sql"DROP TABLE IF EXISTS event_log")
+    _ <- logger info "'event_log' table dropped"
   } yield ()
 }
