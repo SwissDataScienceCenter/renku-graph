@@ -39,6 +39,17 @@ package object commands {
     case class PayloadMalformed(message: String) extends CommandFindingResult
   }
 
+  def when[Interpretation[_]](request: Request[Interpretation], has: MediaType)(
+      f:                               => Interpretation[CommandFindingResult]
+  )(implicit
+      ME: MonadError[Interpretation, Throwable]
+  ): Interpretation[CommandFindingResult] =
+    if (
+      request.contentType
+        .exists(p => p.mediaType.mainType == has.mainType && p.mediaType.subType == has.subType)
+    ) f
+    else (NotSupported: CommandFindingResult).pure[Interpretation]
+
   implicit class RequestOps[Interpretation[_]: Sync](request: Request[Interpretation]) {
     private implicit val jsonEntityDecoder = jsonOf[Interpretation, Json]
 
@@ -53,15 +64,6 @@ package object commands {
     lazy val getMessage: EitherT[Interpretation, CommandFindingResult, Option[EventMessage]] = EitherT(
       request.as[Json].map(_.getMessage)
     )
-
-    def has[Interpretation[_]](mediaType: MediaType)(f: => Interpretation[CommandFindingResult])(implicit
-        ME:                               MonadError[Interpretation, Throwable]
-    ): Interpretation[CommandFindingResult] =
-      if (
-        request.contentType
-          .exists(p => p.mediaType.mainType == mediaType.mainType && p.mediaType.subType == mediaType.subType)
-      ) f
-      else (NotSupported: CommandFindingResult).pure[Interpretation]
   }
 
   implicit class JsonOps(json: Json) {

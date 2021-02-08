@@ -78,17 +78,16 @@ object ToTriplesStore {
       ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
     Kleisli { case (eventId, request) =>
-      request
-        .has[Interpretation](mediaType = MediaType.application.json) {
-          {
-            for {
-              _                   <- request.validate(status = TriplesStore)
-              maybeProcessingTime <- request.getProcessingTime
-            } yield CommandFound(
-              ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge, maybeProcessingTime)
-            )
-          }.merge
-        }
+      when(request, has = MediaType.application.json) {
+        {
+          for {
+            _                   <- request.validate(status = TriplesStore)
+            maybeProcessingTime <- request.getProcessingTime
+          } yield CommandFound(
+            ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge, maybeProcessingTime)
+          )
+        }.merge
+      }
 
     }
 

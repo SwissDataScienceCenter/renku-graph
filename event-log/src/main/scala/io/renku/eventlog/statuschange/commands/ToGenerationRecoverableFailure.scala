@@ -80,23 +80,22 @@ object ToGenerationRecoverableFailure {
       ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
     Kleisli { case (eventId, request) =>
-      request
-        .has[Interpretation](mediaType = MediaType.application.json) {
-          {
-            for {
-              _                   <- request.validate(status = GenerationRecoverableFailure)
-              maybeProcessingTime <- request.getProcessingTime
-              maybeMessage        <- request.getMessage
-            } yield CommandFound(
-              ToGenerationRecoverableFailure[Interpretation](
-                eventId,
-                maybeMessage,
-                awaitingTriplesGenerationGauge,
-                underTriplesGenerationGauge,
-                maybeProcessingTime
-              )
+      when(request, has = MediaType.application.json) {
+        {
+          for {
+            _                   <- request.validate(status = GenerationRecoverableFailure)
+            maybeProcessingTime <- request.getProcessingTime
+            maybeMessage        <- request.getMessage
+          } yield CommandFound(
+            ToGenerationRecoverableFailure[Interpretation](
+              eventId,
+              maybeMessage,
+              awaitingTriplesGenerationGauge,
+              underTriplesGenerationGauge,
+              maybeProcessingTime
             )
-          }.merge
-        }
+          )
+        }.merge
+      }
     }
 }

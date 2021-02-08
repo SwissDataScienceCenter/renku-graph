@@ -98,32 +98,31 @@ object ToTriplesGenerated {
       ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
     Kleisli { case (eventId, request) =>
-      request
-        .has[Interpretation](mediaType = MediaType.multipart.`form-data`) {
-          {
-            for {
-              multipart <- right[CommandFindingResult](request.as[Multipart[Interpretation]])
-              eventJson <- fromOption[Interpretation](multipart.parts.find(_.name.contains("event")),
-                                                      PayloadMalformed("No event part in change status payload")
-                           ).flatMapF(toJson[Interpretation]).leftWiden[CommandFindingResult]
-              _                   <- fromEither[Interpretation](eventJson.validate(status = TriplesGenerated))
-              maybeProcessingTime <- fromEither[Interpretation](eventJson.getProcessingTime)
-              payloadJson <- fromOption[Interpretation](multipart.parts.find(_.name.contains("payload")),
-                                                        PayloadMalformed("No payload part in change status payload")
-                             ).flatMap(stringToJson[Interpretation])
-              parsedPayload <-
-                fromEither[Interpretation](payloadJson.as[(SchemaVersion, EventPayload)].toPayloadMalFormed)
-            } yield CommandFound(
-              ToTriplesGenerated[Interpretation](eventId,
-                                                 parsedPayload._2,
-                                                 parsedPayload._1,
-                                                 underTriplesGenerationGauge,
-                                                 awaitingTransformationGauge,
-                                                 maybeProcessingTime
-              )
+      when(request, has = MediaType.multipart.`form-data`) {
+        {
+          for {
+            multipart <- right[CommandFindingResult](request.as[Multipart[Interpretation]])
+            eventJson <- fromOption[Interpretation](multipart.parts.find(_.name.contains("event")),
+                                                    PayloadMalformed("No event part in change status payload")
+                         ).flatMapF(toJson[Interpretation]).leftWiden[CommandFindingResult]
+            _                   <- fromEither[Interpretation](eventJson.validate(status = TriplesGenerated))
+            maybeProcessingTime <- fromEither[Interpretation](eventJson.getProcessingTime)
+            payloadJson <- fromOption[Interpretation](multipart.parts.find(_.name.contains("payload")),
+                                                      PayloadMalformed("No payload part in change status payload")
+                           ).flatMap(stringToJson[Interpretation])
+            parsedPayload <-
+              fromEither[Interpretation](payloadJson.as[(SchemaVersion, EventPayload)].toPayloadMalFormed)
+          } yield CommandFound(
+            ToTriplesGenerated[Interpretation](eventId,
+                                               parsedPayload._2,
+                                               parsedPayload._1,
+                                               underTriplesGenerationGauge,
+                                               awaitingTransformationGauge,
+                                               maybeProcessingTime
             )
-          }.merge
-        }
+          )
+        }.merge
+      }
     }
 
   private implicit class EitherOps[R](either: Either[Throwable, R]) {

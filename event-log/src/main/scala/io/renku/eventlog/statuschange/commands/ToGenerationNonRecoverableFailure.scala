@@ -72,23 +72,21 @@ object ToGenerationNonRecoverableFailure {
       implicit ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
     Kleisli { case (eventId, request) =>
-      request
-        .has[Interpretation](mediaType = MediaType.application.json) {
-          {
-
-            for {
-              _                   <- request.validate(status = GenerationNonRecoverableFailure)
-              maybeProcessingTime <- request.getProcessingTime
-              maybeMessage        <- request.getMessage
-            } yield CommandFound(
-              ToGenerationNonRecoverableFailure[Interpretation](eventId,
-                                                                maybeMessage,
-                                                                underTriplesGenerationGauge,
-                                                                maybeProcessingTime
-              )
+      when(request, has = MediaType.application.json) {
+        {
+          for {
+            _                   <- request.validate(status = GenerationNonRecoverableFailure)
+            maybeProcessingTime <- request.getProcessingTime
+            maybeMessage        <- request.getMessage
+          } yield CommandFound(
+            ToGenerationNonRecoverableFailure[Interpretation](eventId,
+                                                              maybeMessage,
+                                                              underTriplesGenerationGauge,
+                                                              maybeProcessingTime
             )
-          }.merge
-        }
+          )
+        }.merge
+      }
 
     }
 }

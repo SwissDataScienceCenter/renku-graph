@@ -74,27 +74,24 @@ object ToSkipped {
       ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
     Kleisli { case (eventId, request) =>
-      request
-        .has[Interpretation](mediaType = MediaType.application.json) {
-          {
-            for {
-              _                   <- request.validate(status = Skipped)
-              maybeProcessingTime <- request.getProcessingTime
-              maybeMessage        <- request.getMessage
-              message <-
-                fromOption[Interpretation](maybeMessage,
-                                           PayloadMalformed("No message property in status change payload")
-                )
-                  .leftWiden[CommandFindingResult]
-            } yield CommandFound(
-              ToSkipped[Interpretation](
-                eventId,
-                message,
-                underTriplesGenerationGauge,
-                maybeProcessingTime
-              )
+      when(request, has = MediaType.application.json) {
+        {
+          for {
+            _                   <- request.validate(status = Skipped)
+            maybeProcessingTime <- request.getProcessingTime
+            maybeMessage        <- request.getMessage
+            message <-
+              fromOption[Interpretation](maybeMessage, PayloadMalformed("No message property in status change payload"))
+                .leftWiden[CommandFindingResult]
+          } yield CommandFound(
+            ToSkipped[Interpretation](
+              eventId,
+              message,
+              underTriplesGenerationGauge,
+              maybeProcessingTime
             )
-          }.merge
-        }
+          )
+        }.merge
+      }
     }
 }
