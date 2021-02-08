@@ -44,7 +44,7 @@ class ProjectPropertiesRemoverSpec extends AnyWordSpec with ScalaCheckPropertyCh
 
   "ProjectPropertiesRemover" should {
 
-    "remove schema:dateCreated, and schema:creator, and schema:alternateName properties from all the Project entities in the given JSON" in {
+    "remove schema:dateCreated, and schema:creator, and schema:name properties from all the Project entities in the given JSON" in {
       forAll { project: Project =>
         val triples = JsonLDTriples {
           JsonLD

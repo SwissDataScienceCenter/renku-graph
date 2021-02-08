@@ -163,7 +163,7 @@ private class UpdatesQueryCreator(renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitL
         s"""|DELETE { $rdfResource schema:name ?name }
             |INSERT { $rdfResource schema:name '$name' }
             |WHERE  {
-            |  OPTIONAL { $rdfResource schema:name schema:previousName }  # NOT SURE IF WE NEED THIS LINE
+            |  OPTIONAL { $rdfResource schema:name ?previousName }
             |  BIND (IF(BOUND(?previousName), ?previousName, "nonexisting") AS ?name)
             |}
             |""".stripMargin
