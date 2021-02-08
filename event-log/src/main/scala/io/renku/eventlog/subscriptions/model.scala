@@ -19,9 +19,9 @@
 package io.renku.eventlog.subscriptions
 
 import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, Url}
-import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
-import ch.datascience.tinytypes.{InstantTinyType, StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonNegativeInt, Url}
+import ch.datascience.tinytypes.json.TinyTypeDecoders.{intDecoder, stringDecoder}
+import ch.datascience.tinytypes._
 import io.circe.Decoder
 
 import java.time.Instant
@@ -30,12 +30,30 @@ private final case class ProjectIds(id: projects.Id, path: projects.Path)
 
 private final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
 private object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url {
-  implicit val subscriberUrlDecoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
+  implicit val decoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
+}
+
+private final class Capacity private (val value: Int) extends AnyVal with IntTinyType
+private object Capacity extends TinyTypeFactory[Capacity](new Capacity(_)) with NonNegativeInt {
+  implicit val decoder: Decoder[Capacity] = intDecoder(Capacity)
 }
 
 final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
 object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_)) with InstantNotInTheFuture
 
-private trait SubscriptionCategoryPayload {
-  def subscriberUrl: SubscriberUrl
+private trait SubscriptionInfo extends Product with Serializable {
+  val subscriberUrl: SubscriberUrl
+  val maybeCapacity: Option[Capacity]
+
+  override def equals(obj: Any): Boolean = obj match {
+    case info: SubscriptionInfo => info.subscriberUrl == subscriberUrl
+    case _ => false
+  }
+
+  override def hashCode(): Int = subscriberUrl.hashCode()
+
+  override lazy val toString = {
+    val capacityAsString = maybeCapacity.map(capacity => s" with capacity $capacity").getOrElse("")
+    s"$subscriberUrl$capacityAsString"
+  }
 }

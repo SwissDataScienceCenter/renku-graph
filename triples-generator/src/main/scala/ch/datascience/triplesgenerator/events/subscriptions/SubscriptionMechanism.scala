@@ -49,6 +49,7 @@ private class SubscriptionMechanismImpl(
   import applicative._
   import cats.effect.concurrent.Ref
   import cats.syntax.all._
+  import io.circe.Json
   import subscriptionPayloadComposer._
   import subscriptionSender._
 
@@ -74,7 +75,7 @@ private class SubscriptionMechanismImpl(
       payload      <- prepareSubscriptionPayload()
       postingError <- postToEventLog(payload).map(_ => false).recoverWith(logPostError)
       shouldLog    <- initOrError getAndSet postingError
-      _            <- whenA(shouldLog && !postingError)(logger.info(s"$categoryName: Subscribed for events with $payload"))
+      _            <- whenA(shouldLog && !postingError)(logInfo(payload))
       _            <- timer sleep renewDelay
     } yield ()
   } recoverWith logSubscriberUrlError
@@ -91,6 +92,13 @@ private class SubscriptionMechanismImpl(
       _ <- logger.error(exception)(s"$categoryName: Subscribing for events failed")
       _ <- timer sleep initialDelay
     } yield true
+  }
+
+  private def logInfo(payload: Json) =
+    logger.info(s"$categoryName: Subscribed for events with ${payload.subscriberUrl}")
+
+  private implicit class PayloadOps(json: Json) {
+    lazy val subscriberUrl: String = json.hcursor.downField("subscriberUrl").as[String].getOrElse("")
   }
 }
 
