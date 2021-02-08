@@ -40,21 +40,21 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
     "adds the given subscriber to the registry and logs info when it was added" in new TestCase {
 
       (subscribersRegistry.add _)
-        .expects(subscriberUrl)
+        .expects(subscriptionInfo)
         .returning(true.pure[IO])
 
-      subscribers.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
 
-      logger.loggedOnly(Info(s"$categoryName: $subscriberUrl added"))
+      logger.loggedOnly(Info(s"$categoryName: $subscriptionInfo added"))
     }
 
     "adds the given subscriber to the registry and do not log info message when it was already added" in new TestCase {
 
       (subscribersRegistry.add _)
-        .expects(subscriberUrl)
+        .expects(subscriptionInfo)
         .returning(false.pure[IO])
 
-      subscribers.add(subscriberUrl).unsafeRunSync() shouldBe ((): Unit)
+      subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
 
       logger.expectNoLogs()
     }
@@ -137,12 +137,25 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
     }
   }
 
+  "getTotalCapacity" should {
+
+    "return totalCapacity fetched from the registry" in new TestCase {
+      val maybeCapacity = capacities.generateOption
+      (() => subscribersRegistry.getTotalCapacity)
+        .expects()
+        .returning(maybeCapacity)
+
+      subscribers.getTotalCapacity shouldBe maybeCapacity
+    }
+  }
+
   private implicit val cs:    ContextShift[IO] = IO.contextShift(global)
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val categoryName  = categoryNames.generateOne
-    val subscriberUrl = subscriberUrls.generateOne
+    val categoryName     = categoryNames.generateOne
+    val subscriptionInfo = subscriptionInfos.generateOne
+    val subscriberUrl    = subscriptionInfo.subscriberUrl
 
     val subscribersRegistry = mock[SubscribersRegistry]
     val logger              = TestLogger[IO]()

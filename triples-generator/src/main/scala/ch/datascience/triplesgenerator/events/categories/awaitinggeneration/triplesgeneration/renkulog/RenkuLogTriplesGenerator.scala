@@ -18,6 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
+import cats.Applicative
 import cats.data.EitherT
 import cats.data.EitherT.{right, rightT}
 import cats.effect.{ContextShift, IO, Timer}
@@ -47,7 +48,10 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
 )(implicit contextShift: ContextShift[IO])
     extends TriplesGenerator[IO] {
 
+  private val applicative = Applicative[IO]
+
   import ammonite.ops.{Path, root}
+  import applicative._
   import file._
   import gitRepoUrlFinder._
 
@@ -82,7 +86,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
     for {
       repositoryUrl <- findRepositoryUrl(commitEvent.project.path, maybeAccessToken).toRight
       _             <- git.clone(repositoryUrl, workDirectory)
-      _             <- (git.checkout(commitEvent.commitId)).toRight
+      _             <- git.checkout(commitEvent.commitId).toRight
     } yield ()
 
   private def cleanUpRepository()(implicit repoDirectory: RepositoryPath) = {
@@ -91,8 +95,9 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
       case false => IO.unit
       case true =>
         for {
-          _ <- git.rm(gitAttributeFilePath)
-          _ <- git.checkoutCurrent()
+          repoDirty <- git.status.map(status => !status.contains("nothing to commit"))
+          _         <- whenA(repoDirty)(git.rm(gitAttributeFilePath))
+          _         <- whenA(repoDirty)(git.`reset --hard`)
         } yield ()
     }
   }
@@ -100,7 +105,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
   private def processEvent(
       commitEvent:          CommitEvent
   )(implicit repoDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
-    (git.findCommitMessage(commitEvent.commitId)).toRight flatMap {
+    git.findCommitMessage(commitEvent.commitId).toRight flatMap {
       case message if message contains "renku migrate" => rightT[IO, ProcessingRecoverableError](MigrationEvent)
       case _                                           => migrateAndLog(commitEvent)
     }
@@ -109,7 +114,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
       commitEvent:          CommitEvent
   )(implicit repoDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
     for {
-      _       <- (renku.migrate(commitEvent)).toRight
+      _       <- renku.migrate(commitEvent).toRight
       triples <- findTriples(commitEvent)
     } yield Triples(triples)
 

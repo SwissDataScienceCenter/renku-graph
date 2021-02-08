@@ -32,6 +32,7 @@ import org.scalatest.wordspec.AnyWordSpec
 class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
+
     "return unit when event distributor run succeeds" in new TestCase {
       (eventsDistributor.run _)
         .expects()
@@ -55,14 +56,14 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
 
   "register" should {
     "return the subscriber URL if the statuses are valid" in new TestCase {
-      val subscriptionCategoryPayload = subscriptionCategoryPayloads.generateOne
-      val payload                     = jsons.generateOne
+      val subscriptionInfo = subscriptionInfos.generateOne
+      val payload          = jsons.generateOne
       (deserializer.deserialize _)
         .expects(payload)
-        .returning(subscriptionCategoryPayload.some.pure[IO])
+        .returning(subscriptionInfo.some.pure[IO])
 
       (subscribers.add _)
-        .expects(subscriptionCategoryPayload.subscriberUrl)
+        .expects(subscriptionInfo)
         .returning(().pure[IO])
 
       subscriptionCategory.register(payload).unsafeRunSync() shouldBe AcceptedRegistration
@@ -78,16 +79,16 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
     }
 
     "fail if adding the subscriber url fails" in new TestCase {
-      val subscriptionCategoryPayload = subscriptionCategoryPayloads.generateOne
-      val exception                   = exceptions.generateOne
-      val payload                     = jsons.generateOne
+      val subscriptionInfo = subscriptionInfos.generateOne
+      val exception        = exceptions.generateOne
+      val payload          = jsons.generateOne
 
       (deserializer.deserialize _)
         .expects(payload)
-        .returning(subscriptionCategoryPayload.some.pure[IO])
+        .returning(subscriptionInfo.some.pure[IO])
 
       (subscribers.add _)
-        .expects(subscriptionCategoryPayload.subscriberUrl)
+        .expects(subscriptionInfo)
         .returning(exception.raiseError[IO, Unit])
 
       intercept[Exception] {
@@ -101,9 +102,9 @@ class SubscriptionCategorySpec extends AnyWordSpec with MockFactory with should.
     val subscribers       = mock[Subscribers[IO]]
     val testCategoryName  = categoryNames.generateOne
 
-    val deserializer = mock[SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload]]
+    val deserializer = mock[SubscriptionRequestDeserializer[IO, SubscriptionInfo]]
 
-    val subscriptionCategory = new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](
+    val subscriptionCategory = new SubscriptionCategoryImpl[IO, SubscriptionInfo](
       testCategoryName,
       subscribers,
       eventsDistributor,

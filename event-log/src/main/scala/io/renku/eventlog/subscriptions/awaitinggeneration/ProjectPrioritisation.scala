@@ -18,24 +18,51 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import java.time.Duration
-
+import cats.MonadError
 import cats.data.NonEmptyList
+import cats.syntax.all._
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.{BigDecimalTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
 import io.renku.eventlog.EventDate
-import io.renku.eventlog.subscriptions.ProjectIds
 import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
+import io.renku.eventlog.subscriptions.{Capacity, ProjectIds, Subscribers}
 
-private class ProjectPrioritisation {
+import java.time.Duration
+
+private trait ProjectPrioritisation[Interpretation[_]] {
+  def prioritise(projects: List[ProjectInfo]): List[(ProjectIds, Priority)]
+}
+
+private class ProjectPrioritisationImpl[Interpretation[_]](subscribers: Subscribers[Interpretation])
+    extends ProjectPrioritisation[Interpretation] {
   import ProjectPrioritisation.Priority._
 
-  def prioritise(projects: List[ProjectInfo]): List[(ProjectIds, Priority)] =
-    correctPrioritiesUsingOccupancyPerProject(findPrioritiesBasedOnMostRecentActivity(projects))
+  override def prioritise(projects: List[ProjectInfo]): List[(ProjectIds, Priority)] =
+    (rejectProjectsAboveOccupancyThreshold _ >>>
+      findPrioritiesBasedOnLatestEventDate >>>
+      correctPrioritiesUsingOccupancyPerProject)(projects)
 
-  private lazy val findPrioritiesBasedOnMostRecentActivity
+  private def rejectProjectsAboveOccupancyThreshold(projects: List[ProjectInfo]): List[ProjectInfo] =
+    subscribers.getTotalCapacity
+      .map(_.value)
+      .map { totalCapacity =>
+        val threshold = if ((totalCapacity * .1).ceil.intValue() < 2) 2 else (totalCapacity * .1).ceil.intValue()
+        projects match {
+          case Nil => Nil
+          case projects =>
+            val totalOccupancy = projects.map(_.currentOccupancy.value).sum
+            projects.foldLeft(List.empty[ProjectInfo]) { (acc, project) =>
+              if (project.currentOccupancy.value == 0) acc :+ project
+              else if (totalOccupancy < totalCapacity - threshold) acc :+ project
+              else acc
+            }
+        }
+      }
+      .getOrElse(projects)
+
+  private lazy val findPrioritiesBasedOnLatestEventDate
       : List[ProjectInfo] => List[(ProjectIds, Priority, Int Refined NonNegative)] = {
     case Nil => Nil
     case ProjectInfo(projectId, projectPath, _, currentOccupancy) :: Nil =>
@@ -64,7 +91,7 @@ private class ProjectPrioritisation {
     case prioritiesList =>
       val prioritiesCorrectedByOccupancy = prioritiesList.map(
         correctPriority(
-          processingCapacity = (prioritiesList map toOccupancy).sum,
+          totalCapacity = subscribers.getTotalCapacity getOrElse Capacity((prioritiesList map toOccupancy).sum),
           totalPriority = (prioritiesList map toPriority).sum
         )
       )
@@ -77,13 +104,13 @@ private class ProjectPrioritisation {
         .map(alignItemType)
   }
 
-  private def correctPriority(processingCapacity: Int,
-                              totalPriority:      BigDecimal
+  private def correctPriority(totalCapacity: Capacity,
+                              totalPriority: BigDecimal
   ): ((ProjectIds, Priority, Int Refined NonNegative)) => (ProjectIds, BigDecimal) = {
     case (project, currentPriority, currentOccupancy) if currentOccupancy.value == 0 =>
       project -> currentPriority.value
     case (project, currentPriority, currentOccupancy) =>
-      val maxOccupancy = currentPriority.value * processingCapacity / totalPriority
+      val maxOccupancy = currentPriority.value * totalCapacity.value / totalPriority
       val correctedPriority =
         if (currentOccupancy.value >= maxOccupancy) BigDecimal(0d)
         else currentPriority.value * (maxOccupancy / currentOccupancy.value)
@@ -112,6 +139,11 @@ private class ProjectPrioritisation {
 }
 
 private object ProjectPrioritisation {
+
+  def apply[Interpretation[_]](subscribers: Subscribers[Interpretation])(implicit
+      ME:                                   MonadError[Interpretation, Throwable]
+  ): Interpretation[ProjectPrioritisation[Interpretation]] =
+    ME.catchNonFatal(new ProjectPrioritisationImpl[Interpretation](subscribers))
 
   final case class ProjectInfo(id:               projects.Id,
                                path:             projects.Path,
