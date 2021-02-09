@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.membersync
+package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{DbTransactor, SqlQuery}
@@ -38,17 +38,16 @@ private[subscriptions] object SubscriptionCategory {
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers      <- Subscribers(categoryName, logger)
-    eventsFinder     <- MemberSyncEventFinder(transactor, queriesExecTimes)
-    dispatchRecovery <- LoggingDispatchRecovery[IO, MemberSyncEvent](categoryName, logger)
-    eventsDistributor <-
-      IOEventsDistributor(categoryName,
-                          transactor,
-                          subscribers,
-                          eventsFinder,
-                          MemberSyncEventEncoder,
-                          dispatchRecovery,
-                          logger
-      )
+    eventsFinder     <- ZombieEventsFinder(transactor, queriesExecTimes)
+    dispatchRecovery <- LoggingDispatchRecovery[IO, ZombieEvent](categoryName, logger)
+    eventsDistributor <- IOEventsDistributor(categoryName,
+                                             transactor,
+                                             subscribers,
+                                             eventsFinder,
+                                             ZombieEventEncoder,
+                                             dispatchRecovery,
+                                             logger
+                         )
     deserializer <-
       SubscriptionRequestDeserializer[IO, SubscriptionCategoryPayload](categoryName, SubscriptionCategoryPayload.apply)
   } yield new SubscriptionCategoryImpl[IO, SubscriptionCategoryPayload](categoryName,
@@ -57,3 +56,6 @@ private[subscriptions] object SubscriptionCategory {
                                                                         deserializer
   )
 }
+
+private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl, maybeCapacity: Option[Capacity])
+    extends subscriptions.SubscriptionInfo

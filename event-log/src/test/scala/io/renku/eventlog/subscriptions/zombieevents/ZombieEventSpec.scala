@@ -16,25 +16,20 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.membersync
+package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.MonadError
-import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.subscriptions.{DispatchRecovery, SubscriberUrl}
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-import scala.language.postfixOps
-import scala.util.control.NonFatal
+class ZombieEventSpec extends AnyWordSpec with should.Matchers {
 
-private object DispatchRecovery {
+  "toString" should {
 
-  def apply[Interpretation[_]](
-      logger: Logger[Interpretation]
-  )(implicit
-      ME: MonadError[Interpretation, Throwable]
-  ): Interpretation[DispatchRecovery[Interpretation, MemberSyncEvent]] =
-    ME.catchNonFatal { (url: SubscriberUrl, categoryEvent: MemberSyncEvent) =>
-      { case NonFatal(exception) =>
-        logger.error(exception)(s"$categoryName: $categoryEvent, url = $url failed")
-      }
+    "print out the id and status" in {
+      val event = ZombieEvent(compoundEventIds.generateOne, eventStatuses.generateOne)
+      event.toString shouldBe s"ZombieEvent ${event.eventId}, status = ${event.status}"
     }
+  }
 }

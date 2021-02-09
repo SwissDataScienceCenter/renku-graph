@@ -326,7 +326,8 @@ As a good practice, the subscription should be renewed periodically in case of r
 ```json
 {
   "categoryName": "AWAITING_GENERATION",
-  "subscriberUrl": "http://host/path"
+  "subscriberUrl": "http://host/path",
+  "capacity": 4
 }
 ```
 
@@ -389,6 +390,30 @@ As a good practice, the subscription should be renewed periodically in case of r
 }
 ```
 
+- **ZOMBIE_CHASING**
+
+**Request**
+
+```json
+{
+  "categoryName": "ZOMBIE_CHASING",
+  "subscriberUrl": "http://host/path"
+}
+```
+
+**Response**
+
+```json
+{
+  "categoryName": "MEMBER_SYNC",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12
+  },
+  "status": "GENERATING_TRIPLES|TRANSFORMING_TRIPLES"
+}
+```
+
 **Response**
 
 | Status                     | Description                                                                                         |
@@ -435,7 +460,7 @@ Event-log uses relational database as an internal storage. The DB has the follow
 |-------------------------------------------|
 | event_id        VARCHAR    PK FK NOT NULL |
 | project_id      INT4       PK FK NOT NULL |
-| status          VARCHAR          NOT NULL |
+| status          VARCHAR    PK    NOT NULL |
 | processing_time INTERVAL         NOT NULL |
 
 ## Trying out

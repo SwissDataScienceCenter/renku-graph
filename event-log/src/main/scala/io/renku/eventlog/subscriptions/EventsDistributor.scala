@@ -142,10 +142,3 @@ private object IOEventsDistributor {
                                       onErrorSleep = OnErrorSleep
     )
 }
-
-private trait DispatchRecovery[Interpretation[_], CategoryEvent] {
-  def recover(
-      url:           SubscriberUrl,
-      categoryEvent: CategoryEvent
-  ): PartialFunction[Throwable, Interpretation[Unit]]
-}

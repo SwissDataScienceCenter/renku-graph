@@ -32,7 +32,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.{Duration, Instant}
+import java.time.Duration
 
 class MemberSyncEventFinderSpec
     extends AnyWordSpec
@@ -70,15 +70,15 @@ class MemberSyncEventFinderSpec
       "and a last sync time less than a minute ago" in new TestCase {
         val compoundId0  = compoundEventIds.generateOne
         val projectPath0 = projectPaths.generateOne
-        val eventDate0   = EventDate(generateInstant(lessThanAgo = Duration.ofMinutes(59)))
-        val lastSynced0  = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofSeconds(62)))
+        val eventDate0   = EventDate(relativeTimestamps(lessThanAgo = Duration.ofMinutes(59)).generateOne)
+        val lastSynced0  = LastSyncedDate(relativeTimestamps(moreThanAgo = Duration.ofSeconds(62)).generateOne)
         upsertProject(compoundId0, projectPath0, eventDate0)
         upsertLastSynced(compoundId0.projectId, categoryName, lastSynced0)
 
         val compoundId1  = compoundEventIds.generateOne
         val projectPath1 = projectPaths.generateOne
-        val eventDate1   = EventDate(generateInstant(lessThanAgo = Duration.ofMinutes(59)))
-        val lastSynced1  = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofSeconds(58)))
+        val eventDate1   = EventDate(relativeTimestamps(lessThanAgo = Duration.ofMinutes(59)).generateOne)
+        val lastSynced1  = LastSyncedDate(relativeTimestamps(lessThanAgo = Duration.ofSeconds(58)).generateOne)
         upsertProject(compoundId1, projectPath1, eventDate1)
         upsertLastSynced(compoundId1.projectId, categoryName, lastSynced1)
 
@@ -92,17 +92,19 @@ class MemberSyncEventFinderSpec
       "and a last sync time less than an hour ago" in new TestCase {
         val compoundId0  = compoundEventIds.generateOne
         val projectPath0 = projectPaths.generateOne
-        val eventDate0 =
-          EventDate(generateInstant(lessThanAgo = Duration.ofHours(23), moreThanAgo = Duration.ofMinutes(65)))
-        val lastSynced0 = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofMinutes(65)))
+        val eventDate0 = EventDate(
+          relativeTimestamps(lessThanAgo = Duration.ofHours(23), moreThanAgo = Duration.ofMinutes(65)).generateOne
+        )
+        val lastSynced0 = LastSyncedDate(relativeTimestamps(moreThanAgo = Duration.ofMinutes(65)).generateOne)
         upsertProject(compoundId0, projectPath0, eventDate0)
         upsertLastSynced(compoundId0.projectId, categoryName, lastSynced0)
 
         val compoundId1  = compoundEventIds.generateOne
         val projectPath1 = projectPaths.generateOne
-        val eventDate1 =
-          EventDate(generateInstant(lessThanAgo = Duration.ofHours(23), moreThanAgo = Duration.ofMinutes(65)))
-        val lastSynced1 = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofMinutes(55)))
+        val eventDate1 = EventDate(
+          relativeTimestamps(lessThanAgo = Duration.ofHours(23), moreThanAgo = Duration.ofMinutes(65)).generateOne
+        )
+        val lastSynced1 = LastSyncedDate(relativeTimestamps(lessThanAgo = Duration.ofMinutes(55)).generateOne)
         upsertProject(compoundId1, projectPath1, eventDate1)
         upsertLastSynced(compoundId1.projectId, categoryName, lastSynced1)
 
@@ -116,15 +118,15 @@ class MemberSyncEventFinderSpec
       "and a last sync time less than a day ago" in new TestCase {
         val compoundId0  = compoundEventIds.generateOne
         val projectPath0 = projectPaths.generateOne
-        val eventDate0   = EventDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
-        val lastSynced0  = LastSyncedDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
+        val eventDate0   = EventDate(relativeTimestamps(moreThanAgo = Duration.ofHours(25)).generateOne)
+        val lastSynced0  = LastSyncedDate(relativeTimestamps(moreThanAgo = Duration.ofHours(25)).generateOne)
         upsertProject(compoundId0, projectPath0, eventDate0)
         upsertLastSynced(compoundId0.projectId, categoryName, lastSynced0)
 
         val compoundId1  = compoundEventIds.generateOne
         val projectPath1 = projectPaths.generateOne
-        val eventDate1   = EventDate(generateInstant(moreThanAgo = Duration.ofHours(25)))
-        val lastSynced1  = LastSyncedDate(generateInstant(lessThanAgo = Duration.ofHours(23)))
+        val eventDate1   = EventDate(relativeTimestamps(moreThanAgo = Duration.ofHours(25)).generateOne)
+        val lastSynced1  = LastSyncedDate(relativeTimestamps(lessThanAgo = Duration.ofHours(23)).generateOne)
         upsertProject(compoundId1, projectPath1, eventDate1)
         upsertLastSynced(compoundId1.projectId, categoryName, lastSynced1)
 
@@ -138,8 +140,5 @@ class MemberSyncEventFinderSpec
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
 
     val finder = new MemberSyncEventFinderImpl(transactor, queriesExecTimes)
-
-    def generateInstant(lessThanAgo: Duration = Duration.ofDays(365 * 5), moreThanAgo: Duration = Duration.ZERO) =
-      timestamps(min = Instant.now.minus(lessThanAgo), max = Instant.now.minus(moreThanAgo)).generateOne
   }
 }

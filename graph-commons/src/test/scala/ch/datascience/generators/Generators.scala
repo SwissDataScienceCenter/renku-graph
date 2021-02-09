@@ -33,6 +33,7 @@ import io.circe.{Encoder, Json}
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 
+import java.time.Instant.now
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
 
@@ -201,25 +202,37 @@ object Generators {
 
   def timestamps(
       min: Instant = Instant.EPOCH,
-      max: Instant = Instant.now().plus(2000, JAVA_DAYS)
+      max: Instant = now().plus(2000, JAVA_DAYS)
   ): Gen[Instant] =
     Gen
       .choose(min.toEpochMilli, max.toEpochMilli)
       .map(Instant.ofEpochMilli)
 
+  def relativeTimestamps(
+      lessThanAgo: Duration = Duration.ofDays(365 * 5),
+      moreThanAgo: Duration = Duration.ZERO
+  ): Gen[Instant] = {
+    if ((lessThanAgo compareTo moreThanAgo) < 0)
+      throw new IllegalArgumentException(
+        s"relativeTimestamps with lessThanAgo = $lessThanAgo and moreThanAgo = $moreThanAgo"
+      )
+
+    timestamps(min = now.minus(lessThanAgo), max = now.minus(moreThanAgo))
+  }
+
   val timestampsNotInTheFuture: Gen[Instant] =
     Gen
-      .choose(Instant.EPOCH.toEpochMilli, Instant.now().toEpochMilli)
+      .choose(Instant.EPOCH.toEpochMilli, now().toEpochMilli)
       .map(Instant.ofEpochMilli)
 
   def timestampsNotInTheFuture(butOlderThan: Instant): Gen[Instant] =
     Gen
-      .choose(butOlderThan.toEpochMilli, Instant.now().toEpochMilli)
+      .choose(butOlderThan.toEpochMilli, now().toEpochMilli)
       .map(Instant.ofEpochMilli)
 
   val timestampsInTheFuture: Gen[Instant] =
     Gen
-      .choose(Instant.now().plus(10, JAVA_MINS).toEpochMilli, Instant.now().plus(2000, JAVA_DAYS).toEpochMilli)
+      .choose(now().plus(10, JAVA_MINS).toEpochMilli, now().plus(2000, JAVA_DAYS).toEpochMilli)
       .map(Instant.ofEpochMilli)
 
   val zonedDateTimes: Gen[ZonedDateTime] =
@@ -236,7 +249,12 @@ object Generators {
       .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
       .map(_.toLocalDate)
 
-  val notNegativeJavaDurations = javaDurations(min = 0, max = 20000)
+  val notNegativeJavaDurations: Gen[Duration] = javaDurations(min = 0, max = 20000)
+
+  def javaDurations(
+      min: Duration = Duration.ZERO,
+      max: Duration = Duration.ofDays(20)
+  ): Gen[Duration] = javaDurations(min.toMillis, max.toMillis)
 
   def javaDurations(min: Long, max: Long): Gen[Duration] =
     Gen
@@ -306,6 +324,9 @@ object Generators {
     implicit class GenOps[T](generator: Gen[T]) {
 
       def generateOne: T = generateExample(generator)
+
+      def generateAs[TT <: TinyType { type V = T }](implicit ttFactory: T => TT): TT =
+        generateExample(generator map ttFactory)
 
       def generateList(ofSize: Int Refined Positive): List[T] =
         generateNonEmptyList(minElements = ofSize, maxElements = ofSize).toList
