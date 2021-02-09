@@ -27,7 +27,7 @@ import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{Id, Path, Visibility}
+import ch.datascience.graph.model.projects.{Id, Name, Path, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
@@ -69,13 +69,15 @@ object GitLab {
 
   def `GET <gitlabApi>/projects/:id returning OK`(
       projectId:          Id,
+      projectName:        Name = projectNames.generateOne,
       projectVisibility:  Visibility
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId").withAccessTokenInHeader
         .willReturn(okJson(json"""{
           "id":                  ${projectId.value}, 
-          "visibility":          ${projectVisibility.value}, 
+          "visibility":          ${projectVisibility.value},
+          "name":                ${projectName.value},
           "path_with_namespace": ${projectPaths.generateOne.value}
         }""".noSpaces))
     }
@@ -159,16 +161,18 @@ object GitLab {
   def `GET <gitlabApi>/projects/:id returning OK with Project Path`(
       project:            Project
   )(implicit accessToken: AccessToken): Unit =
-    `GET <gitlabApi>/projects/:id returning OK with Project Path`(project.id, project.path)
+    `GET <gitlabApi>/projects/:id returning OK with Project Path`(project.id, project.path, project.name)
 
   def `GET <gitlabApi>/projects/:id returning OK with Project Path`(
       projectId:          Id,
-      projectPath:        Path
+      projectPath:        Path,
+      projectName:        Name = projectNames.generateOne
   )(implicit accessToken: AccessToken): Unit = {
     stubFor {
       get(s"/api/v4/projects/$projectId").withAccessTokenInHeader
         .willReturn(okJson(json"""{
           "id":                  ${projectId.value},
+          "name":                ${projectName.value},
           "path_with_namespace": ${projectPath.value}
         }""".noSpaces))
     }
@@ -239,6 +243,7 @@ object GitLab {
           okJson(
             json"""{
               "id":                   ${project.id.value},
+              "name":                 ${project.name.value},
               "description":          ${project.maybeDescription.map(_.value)},
               "visibility":           ${project.visibility.value},
               "path_with_namespace":  ${project.path.value},
