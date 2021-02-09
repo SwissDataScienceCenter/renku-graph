@@ -19,18 +19,18 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
-import io.circe.Encoder
+import io.renku.eventlog.subscriptions.EventEncoder
 
 private case class ZombieEvent(eventId: CompoundEventId, status: EventStatus) {
   override lazy val toString: String = s"$ZombieEvent $eventId, status = $status"
 }
 
-private object ZombieEventEncoder extends Encoder[ZombieEvent] {
+private object ZombieEventEncoder extends EventEncoder[ZombieEvent] {
 
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def apply(event: ZombieEvent): Json = json"""{
+  override def encodeEvent(event: ZombieEvent): Json = json"""{
     "categoryName": ${categoryName.value},
     "id":           ${event.eventId.id.value},
     "project": {
@@ -38,4 +38,6 @@ private object ZombieEventEncoder extends Encoder[ZombieEvent] {
     },
     "status":       ${event.status.value}
   }"""
+
+  override def encodePayload(categoryEvent: ZombieEvent): Option[String] = None
 }

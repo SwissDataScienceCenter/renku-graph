@@ -18,13 +18,11 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import io.circe.Encoder
 import io.circe.literal._
-import io.circe.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import cats.syntax.all._
 
 class AwaitingGenerationEventEncoderSpec extends AnyWordSpec with should.Matchers {
 
