@@ -20,8 +20,8 @@ package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.tri
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectVisibilities}
-import ch.datascience.graph.model.projects.{DateCreated, ResourceId, Visibility}
+import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectVisibilities}
+import ch.datascience.graph.model.projects.{DateCreated, Name, ResourceId, Visibility}
 import ch.datascience.graph.model.{projects, users}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.entities.EntitiesGenerators._
@@ -113,8 +113,8 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
     "replace the current Project's creator with the given one" in new TestCase {
       val creator1 = persons.generateOne
       val creator2 = persons.generateOne
-      val project1 = entitiesProjects(creator1.some).generateOne
-      val project2 = entitiesProjects(creator2.some).generateOne
+      val project1 = entitiesProjects(maybeCreator = creator1.some).generateOne
+      val project2 = entitiesProjects(maybeCreator = creator2.some).generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 
@@ -133,8 +133,8 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
     "add a new creator to the Project when there is no creator linked to the project" in new TestCase {
       val creator1 = persons.generateOne
-      val project1 = entitiesProjects(None).generateOne
-      val project2 = entitiesProjects(creator1.some).generateOne
+      val project1 = entitiesProjects(maybeCreator = None).generateOne
+      val project2 = entitiesProjects(maybeCreator = creator1.some).generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 
@@ -156,8 +156,8 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
     "remove creator from the project" in new TestCase {
       val creator1 = persons.generateOne
       val creator2 = persons.generateOne
-      val project1 = entitiesProjects(creator1.some).generateOne
-      val project2 = entitiesProjects(creator2.some).generateOne
+      val project1 = entitiesProjects(maybeCreator = creator1.some).generateOne
+      val project2 = entitiesProjects(maybeCreator = creator2.some).generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 
@@ -179,8 +179,8 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
     "create a new Person and link it to the given Project replacing the old creator on the project" in new TestCase {
       val creator1 = persons.generateOne
       val creator2 = persons.generateOne
-      val project1 = entitiesProjects(creator1.some).generateOne
-      val project2 = entitiesProjects(creator2.some).generateOne
+      val project1 = entitiesProjects(maybeCreator = creator1.some).generateOne
+      val project2 = entitiesProjects(maybeCreator = creator2.some).generateOne
 
       loadToStore(project1.asJsonLD, project2.asJsonLD)
 
@@ -282,6 +282,23 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
 
   }
 
+  "upsertName" should {
+    "update the Project's name" in new TestCase {
+      val initialName: projects.Name = projectNames.generateOne
+      val project = entitiesProjects(name = initialName).generateOne
+      loadToStore(project.asJsonLD)
+
+      val newName = projectNames.generateDifferentThan(initialName)
+
+      findName(project.resourceId) shouldBe initialName
+
+      updatesQueryCreator.upsertName(project.path, newName).runAll.unsafeRunSync()
+
+      findName(project.resourceId) shouldBe newName
+
+    }
+  }
+
   private trait TestCase {
     val updatesQueryCreator = new UpdatesQueryCreator(renkuBaseUrl, gitLabApiUrl)
   }
@@ -360,4 +377,15 @@ class UpdatesQueryCreatorSpec extends AnyWordSpec with InMemoryRdfStore with Mat
     ).unsafeRunSync()
       .flatMap(row => row.get("visibility").map(visibility => Visibility.apply(visibility.toLowerCase)))
       .headOption
+
+  private def findName(projectId: ResourceId): Name =
+    runQuery(
+      s"""|SELECT ?name
+          |WHERE {
+          |  ${projectId.showAs[RdfResource]} schema:name ?name
+          |}
+          |""".stripMargin
+    ).unsafeRunSync()
+      .flatMap(row => row.get("name").map(name => Name(name)))
+      .head
 }

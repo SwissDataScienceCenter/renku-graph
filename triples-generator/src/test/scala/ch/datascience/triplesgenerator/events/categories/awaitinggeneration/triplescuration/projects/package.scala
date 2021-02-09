@@ -22,7 +22,7 @@ import ch.datascience.generators.CommonGraphGenerators.{fusekiBaseUrls, gitLabUr
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.projects.{Path, Visibility}
+import ch.datascience.graph.model.projects.{Name, Path, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.Email
 import ch.datascience.rdfstore.FusekiBaseUrl
@@ -44,11 +44,12 @@ package object projects {
       maybeParentPaths: Gen[Option[Path]] = projectPaths.toGeneratorOfOptions
   ): Gen[GitLabProject] =
     for {
+      name            <- projectNames
       visibility      <- projectVisibilities
       maybeParentPath <- maybeParentPaths
       maybeCreator    <- gitLabCreator().toGeneratorOfOptions
       dateCreated     <- projectCreatedDates
-    } yield GitLabProject(projectPath, visibility, dateCreated, maybeParentPath, maybeCreator)
+    } yield GitLabProject(projectPath, name, visibility, dateCreated, maybeParentPath, maybeCreator)
 
   private[projects] def gitLabCreator(gitLabId: users.GitLabId = userGitLabIds.generateOne,
                                       name:     users.Name = userNames.generateOne
@@ -63,15 +64,15 @@ package object projects {
 
   implicit val entitiesProjects: Gen[Project] = entitiesProjects(
     maybeCreator = persons.generateOption,
-    maybeParentProject = entitiesProjects(persons.generateOption).generateOption
+    maybeParentProject = entitiesProjects(maybeCreator = persons.generateOption).generateOption
   )
 
-  def entitiesProjects(maybeCreator:       Option[Person] = persons.generateOption,
+  def entitiesProjects(name:               Name = projectNames.generateOne,
+                       maybeCreator:       Option[Person] = persons.generateOption,
                        maybeParentProject: Option[Project] = None,
                        maybeVisibility:    Option[Visibility] = None
   ): Gen[Project] = for {
     path        <- projectPaths
-    name        <- projectNames
     createdDate <- projectCreatedDates
     version     <- projectSchemaVersions
   } yield Project(path,
