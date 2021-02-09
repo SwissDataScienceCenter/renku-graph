@@ -340,7 +340,7 @@ All events are sent as multipart requests
 }
 ```
 
-**Response**
+**Event example**
 
 `event` part:
 
@@ -371,7 +371,7 @@ All events are sent as multipart requests
 }
 ```
 
-**Response**
+**Event example**
 
 `event` part:
 
@@ -406,7 +406,7 @@ All events are sent as multipart requests
 }
 ```
 
-**Response**
+**Event example**
 
 `event` part:
 
@@ -430,7 +430,9 @@ All events are sent as multipart requests
 }
 ```
 
-**Response**
+**Event example**
+
+`event` part:
 
 ```json
 {
