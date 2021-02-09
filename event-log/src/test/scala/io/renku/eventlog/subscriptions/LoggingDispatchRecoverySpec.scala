@@ -16,27 +16,27 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.membersync
+package io.renku.eventlog.subscriptions
 
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
-import io.renku.eventlog.subscriptions.Generators.subscriberUrls
+import io.renku.eventlog.subscriptions.Generators.{categoryNames, subscriberUrls}
+import io.renku.eventlog.subscriptions.TestCategoryEvent.testCategoryEvents
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.{Success, Try}
 
-class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFactory {
+class LoggingDispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFactory {
 
   "recover" should {
 
     "log an error" in new TestCase {
-      val event      = MemberSyncEvent(projectPaths.generateOne)
+      val event      = testCategoryEvents.generateOne
       val exception  = exceptions.generateOne
       val subscriber = subscriberUrls.generateOne
 
@@ -49,7 +49,8 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
   }
 
   private trait TestCase {
+    val categoryName      = categoryNames.generateOne
     val logger            = TestLogger[Try]()
-    val Success(recovery) = DispatchRecovery[Try](logger)
+    val Success(recovery) = LoggingDispatchRecovery[Try, TestCategoryEvent](categoryName, logger)
   }
 }

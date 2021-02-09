@@ -335,11 +335,12 @@ All events are sent as multipart requests
 ```json
 {
   "categoryName": "AWAITING_GENERATION",
-  "subscriberUrl": "http://host/path"
+  "subscriberUrl": "http://host/path",
+  "capacity": 4
 }
 ```
 
-**Response**
+**Event example**
 
 `event` part:
 
@@ -370,7 +371,7 @@ All events are sent as multipart requests
 }
 ```
 
-**Response**
+**Event example**
 
 `event` part:
 
@@ -405,7 +406,7 @@ All events are sent as multipart requests
 }
 ```
 
-**Response**
+**Event example**
 
 `event` part:
 
@@ -415,6 +416,32 @@ All events are sent as multipart requests
   "project": {
     "path": "namespace/project-name"
   }
+}
+```
+
+- **ZOMBIE_CHASING**
+
+**Request**
+
+```json
+{
+  "categoryName": "ZOMBIE_CHASING",
+  "subscriberUrl": "http://host/path"
+}
+```
+
+**Event example**
+
+`event` part:
+
+```json
+{
+  "categoryName": "MEMBER_SYNC",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12
+  },
+  "status": "GENERATING_TRIPLES|TRANSFORMING_TRIPLES"
 }
 ```
 
@@ -464,7 +491,7 @@ Event-log uses relational database as an internal storage. The DB has the follow
 |-------------------------------------------|
 | event_id        VARCHAR    PK FK NOT NULL |
 | project_id      INT4       PK FK NOT NULL |
-| status          VARCHAR          NOT NULL |
+| status          VARCHAR    PK    NOT NULL |
 | processing_time INTERVAL         NOT NULL |
 
 ## Trying out

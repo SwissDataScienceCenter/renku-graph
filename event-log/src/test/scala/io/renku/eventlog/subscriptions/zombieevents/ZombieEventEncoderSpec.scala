@@ -16,35 +16,41 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.awaitinggeneration
+package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators._
 import io.circe.literal._
+import io.renku.eventlog.subscriptions.EventEncoder
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class AwaitingGenerationEventEncoderSpec extends AnyWordSpec with should.Matchers {
+class ZombieEventEncoderSpec extends AnyWordSpec with should.Matchers {
 
   "encodeEvent" should {
 
-    "serialize AwaitingGenerationEvent to Json" in {
-      val event = awaitingGenerationEvents.generateOne
+    "serialize ZombieEvent to Json" in {
+      val event = ZombieEvent(compoundEventIds.generateOne, eventStatuses.generateOne)
 
-      AwaitingGenerationEventEncoder.encodeEvent(event) shouldBe json"""{
-        "categoryName": "AWAITING_GENERATION",
-        "id":           ${event.id.id.value},
+      encoder.encodeEvent(event) shouldBe json"""{
+        "categoryName": "ZOMBIE_CHASING",
+        "id":           ${event.eventId.id.value},
         "project": {
-          "id":         ${event.id.projectId.value}
-        }
+          "id":         ${event.eventId.projectId.value}
+        },
+        "status":       ${event.status.value}
       }"""
     }
   }
-  "encodePayload" should {
-    "serialize AwaitingGenerationEvent payload to a String" in {
-      val event = awaitingGenerationEvents.generateOne
 
-      AwaitingGenerationEventEncoder.encodePayload(event) shouldBe event.body.value.some
+  "encodePayload" should {
+
+    "return None" in {
+      encoder.encodePayload(
+        ZombieEvent(compoundEventIds.generateOne, eventStatuses.generateOne)
+      ) shouldBe None
     }
   }
+
+  private lazy val encoder: EventEncoder[ZombieEvent] = ZombieEventEncoder
 }

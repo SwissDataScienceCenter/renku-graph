@@ -62,7 +62,7 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
     if (givenServerRunning) 3030
     else
       Refined.unsafeApply {
-        (shuffle((3000 to 3500).toList) find notUsedPort)
+        (shuffle((3000 to 30000).toList) find notUsedPort)
           .getOrElse(throw new Exception("Cannot find not used port for Fuseki"))
       }
 

@@ -86,7 +86,7 @@ trait EventLogDataProvisioning {
                                    eventStatus:     EventStatus,
                                    schemaVersion:   SchemaVersion,
                                    maybePayload:    Option[EventPayload]
-  ) = (eventStatus, maybePayload) match {
+  ): Unit = (eventStatus, maybePayload) match {
     case (TriplesGenerated | TransformationRecoverableFailure | TransformingTriples, Some(payload)) =>
       execute {
         sql"""|INSERT INTO
@@ -99,4 +99,15 @@ trait EventLogDataProvisioning {
     case _ => ()
   }
 
+  protected def upsertProcessingTime(compoundEventId: CompoundEventId,
+                                     eventStatus:     EventStatus,
+                                     processingTime:  EventProcessingTime
+  ): Unit = execute {
+    sql"""|INSERT INTO
+          |status_processing_time (event_id, project_id, status, processing_time)
+          |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $eventStatus, $processingTime)
+          |ON CONFLICT (event_id, project_id, status)
+          |DO UPDATE SET processing_time = excluded.processing_time
+      """.stripMargin.update.run.void
+  }
 }

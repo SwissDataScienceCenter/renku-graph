@@ -29,6 +29,7 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.{HOURS, MINUTES, SECONDS}
+import java.time.{Duration => JavaDuration}
 import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
@@ -141,6 +142,28 @@ class EventProcessingTimeSpec extends AnyWordSpec with ScalaCheckPropertyChecks 
         val Left(exception) = EventProcessingTime.from(duration).map(_.value)
         exception          shouldBe an[IllegalArgumentException]
         exception.getMessage should startWith(s"${EventProcessingTime.typeName} cannot have a negative duration")
+      }
+    }
+  }
+
+  "*" should {
+
+    "multiply the given processing time by the given value" in {
+      forAll(eventProcessingTimes, positiveInts()) { (processingTime, multiplier) =>
+        processingTime * multiplier shouldBe EventProcessingTime(
+          JavaDuration.ofMillis(processingTime.value.toMillis * multiplier.value)
+        )
+      }
+    }
+  }
+
+  "/" should {
+
+    "divide the given processing time by the given value" in {
+      forAll(eventProcessingTimes, positiveInts()) { (processingTime, multiplier) =>
+        processingTime / multiplier shouldBe EventProcessingTime(
+          JavaDuration.ofMillis(processingTime.value.toMillis / multiplier.value)
+        )
       }
     }
   }
