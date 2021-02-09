@@ -48,6 +48,7 @@ object DatasetsGenerators {
       keywords         <- listOf(datasetKeywords)
       images           <- listOf(imageUris)
       published        <- datasetPublishingInfos
+      created          <- datasetCreatedDates
       part             <- listOf(datasetParts)
       projects         <- projects
     } yield NonModifiedDataset(
@@ -59,6 +60,7 @@ object DatasetsGenerators {
       DatasetVersions(InitialVersion(id)),
       maybeDescription,
       published,
+      created,
       part,
       projects.toList,
       keywords,
@@ -73,6 +75,7 @@ object DatasetsGenerators {
     for {
       id        <- datasetIdentifiers
       published <- datasetPublishingInfos
+      created   <- datasetCreatedDates
       keywords  <- listOf(datasetKeywords)
       imageUrls <- listOf(imageUris)
     } yield ModifiedDataset(
@@ -84,6 +87,7 @@ object DatasetsGenerators {
       versionsOverride getOrElse DatasetVersions(dataset.versions.initial),
       dataset.maybeDescription,
       published,
+      created,
       dataset.parts,
       List(dataset.projects.headOption getOrElse (throw new IllegalStateException("No projects on a dataset"))),
       keywords,

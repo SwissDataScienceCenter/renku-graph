@@ -144,6 +144,7 @@ private object BaseDetailsFinder {
         sameAs             <- extract[SameAs]("topmostSameAs")
         initialVersion     <- extract[InitialVersion]("initialVersion")
         maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate")
+        dateCreated        <- extract[DateCreated]("dateCreated")
         maybeDescription <- extract[Option[String]]("description")
                               .map(blankToNone)
                               .flatMap(toOption[Description])
@@ -158,6 +159,7 @@ private object BaseDetailsFinder {
             DatasetVersions(initialVersion),
             maybeDescription,
             DatasetPublishing(maybePublishedDate, Set.empty),
+            dateCreated,
             parts = List.empty,
             projects = List.empty,
             keywords = List.empty,
@@ -173,6 +175,7 @@ private object BaseDetailsFinder {
             DatasetVersions(initialVersion),
             maybeDescription,
             DatasetPublishing(maybePublishedDate, Set.empty),
+            dateCreated,
             parts = List.empty,
             projects = List.empty,
             keywords = List.empty,
