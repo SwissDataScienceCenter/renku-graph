@@ -103,6 +103,7 @@ class GitLabInfoFinderSpec
   private def projectJson(project: GitLabProject, maybeCreatorId: Option[users.GitLabId]): Json =
     json"""{
       "path_with_namespace": ${project.path.value},
+      "name":                ${project.name.value},
       "created_at":          ${project.dateCreated.value},
       "visibility":          ${project.visibility.value}
     }"""

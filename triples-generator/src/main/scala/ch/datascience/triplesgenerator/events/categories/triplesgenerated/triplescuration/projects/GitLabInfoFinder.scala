@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
-import ch.datascience.graph.model.projects.{DateCreated, Path}
+import ch.datascience.graph.model.projects.{DateCreated, Name, Path}
 import ch.datascience.graph.model.{projects, users}
 import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.http.client.{AccessToken, IORestClient}
@@ -96,13 +96,14 @@ private class IOGitLabInfoFinder(
     implicit val decoder: Decoder[ProjectAndCreatorId] = cursor =>
       for {
         path           <- cursor.downField("path_with_namespace").as[projects.Path]
+        name           <- cursor.downField("name").as[projects.Name]
         visibility     <- cursor.downField("visibility").as[projects.Visibility]
         dateCreated    <- cursor.downField("created_at").as[projects.DateCreated]
         maybeCreatorId <- cursor.downField("creator_id").as[Option[users.GitLabId]]
         maybeParentPath <- cursor
                              .downField("forked_from_project")
                              .as[Option[projects.Path]](decodeOption(parentPathDecoder))
-      } yield GitLabProject(path, visibility, dateCreated, maybeParentPath, maybeCreator = None) -> maybeCreatorId
+      } yield GitLabProject(path, name, visibility, dateCreated, maybeParentPath, maybeCreator = None) -> maybeCreatorId
 
     jsonOf[IO, ProjectAndCreatorId]
   }
