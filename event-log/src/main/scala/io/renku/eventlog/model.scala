@@ -115,19 +115,3 @@ final class EventPayload private (val value: String) extends AnyVal with StringT
 object EventPayload extends TinyTypeFactory[EventPayload](new EventPayload(_)) with NonBlank {
   implicit val decoder: Decoder[EventPayload] = stringDecoder(EventPayload)
 }
-
-final class EventProcessingTime private (val value: Duration) extends AnyVal with DurationTinyType
-object EventProcessingTime
-    extends TinyTypeFactory[EventProcessingTime](new EventProcessingTime(_))
-    with DurationNotNegative {
-  implicit val decoder: Decoder[EventProcessingTime] = durationDecoder(EventProcessingTime)
-
-  implicit class EventProcessingTimeOps(processingTime: EventProcessingTime) {
-
-    def *(multiplier: Int Refined Positive): EventProcessingTime =
-      EventProcessingTime(Duration.ofMillis(processingTime.value.toMillis * multiplier.value))
-
-    def /(multiplier: Int Refined Positive): EventProcessingTime =
-      EventProcessingTime(Duration.ofMillis(processingTime.value.toMillis / multiplier.value))
-  }
-}

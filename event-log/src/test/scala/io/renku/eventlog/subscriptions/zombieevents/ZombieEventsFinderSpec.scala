@@ -25,14 +25,14 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{EventProcessingTime, ExecutionDate, InMemoryEventLogDbSpec}
+import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

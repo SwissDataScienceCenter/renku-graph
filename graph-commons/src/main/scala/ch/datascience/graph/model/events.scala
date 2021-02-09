@@ -21,10 +21,13 @@ package ch.datascience.graph.model
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
+import ch.datascience.tinytypes.json.TinyTypeDecoders.durationDecoder
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
 import io.circe.Decoder
 import io.circe.Decoder.decodeString
 
-import java.time.{Clock, Instant}
+import java.time.{Clock, Duration, Instant}
 
 object events {
 
@@ -149,4 +152,19 @@ object events {
     }
   }
 
+  final class EventProcessingTime private (val value: Duration) extends AnyVal with DurationTinyType
+  object EventProcessingTime
+      extends TinyTypeFactory[EventProcessingTime](new EventProcessingTime(_))
+      with DurationNotNegative {
+    implicit val decoder: Decoder[EventProcessingTime] = durationDecoder(EventProcessingTime)
+
+    implicit class EventProcessingTimeOps(processingTime: EventProcessingTime) {
+
+      def *(multiplier: Int Refined Positive): EventProcessingTime =
+        EventProcessingTime(Duration.ofMillis(processingTime.value.toMillis * multiplier.value))
+
+      def /(multiplier: Int Refined Positive): EventProcessingTime =
+        EventProcessingTime(Duration.ofMillis(processingTime.value.toMillis / multiplier.value))
+    }
+  }
 }

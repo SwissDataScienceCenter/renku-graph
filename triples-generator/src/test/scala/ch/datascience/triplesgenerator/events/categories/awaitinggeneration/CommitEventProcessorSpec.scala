@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.data.EitherT.{leftT, rightT}
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -80,7 +81,7 @@ class CommitEventProcessorSpec
       val commitEvents = commitsLists().generateOne
 
       givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
-        .returning(context.pure(maybeAccessToken))
+        .returning(maybeAccessToken.pure[Try])
 
       val commitsAndTriples = generateTriples(forCommits = commitEvents)
 

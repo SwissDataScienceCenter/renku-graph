@@ -60,9 +60,6 @@ object EventContentGenerators {
     path <- projectPaths
   } yield EventProject(id, path)
 
-  implicit lazy val eventProcessingTimes: Gen[EventProcessingTime] =
-    javaDurations(min = Duration ofMinutes 10).map(EventProcessingTime.apply)
-
   implicit val eventPayloads: Gen[EventPayload] = for {
     content <- jsons
   } yield EventPayload(content.noSpaces)

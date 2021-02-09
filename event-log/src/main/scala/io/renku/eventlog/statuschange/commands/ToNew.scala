@@ -24,14 +24,14 @@ import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
+import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.{EventLogDB, EventProcessingTime}
 import org.http4s.{MediaType, Request}
 
 import java.time.Instant

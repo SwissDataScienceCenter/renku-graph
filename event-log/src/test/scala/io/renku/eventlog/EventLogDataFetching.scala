@@ -18,10 +18,10 @@
 
 package io.renku.eventlog
 
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventStatus}
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
-import doobie.util.fragment.Fragment
 import doobie.implicits._
+import doobie.util.fragment.Fragment
 
 trait EventLogDataFetching {
   self: InMemoryEventLogDb =>

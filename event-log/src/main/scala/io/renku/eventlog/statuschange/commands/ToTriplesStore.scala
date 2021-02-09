@@ -24,16 +24,16 @@ import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.circe.Decoder.decodeOption
 import io.circe.{Decoder, HCursor}
+import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.{EventLogDB, EventProcessingTime}
 import org.http4s.circe.jsonOf
 import org.http4s.{EntityDecoder, MediaType, Request}
 
@@ -57,7 +57,7 @@ final case class ToTriplesStore[Interpretation[_]](
     Nil
   )
 
-  lazy val upsertEventStatus =
+  private lazy val upsertEventStatus =
     sql"""|UPDATE event
           |SET status = $status, execution_date = ${now()}
           |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
