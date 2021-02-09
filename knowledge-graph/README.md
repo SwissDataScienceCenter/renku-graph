@@ -305,8 +305,8 @@ Finds details of the project with the given `namespace/name`. The endpoint requi
 in the request for non-public projects. Supported headers are:
 
 - `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
-- `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab There's no need for a security headers for public
-  projects.
+- `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
+- There's no need for a security headers for public projects
 
 **Response**
 
