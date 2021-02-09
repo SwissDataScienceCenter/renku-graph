@@ -122,7 +122,7 @@ private object IOEventsDistributor {
       transactor:           DbTransactor[IO, EventLogDB],
       subscribers:          Subscribers[IO],
       eventsFinder:         EventFinder[IO, CategoryEvent],
-      categoryEventEncoder: Encoder[CategoryEvent],
+      categoryEventEncoder: EventEncoder[CategoryEvent],
       dispatchRecovery:     DispatchRecovery[IO, CategoryEvent],
       logger:               Logger[IO]
   )(implicit

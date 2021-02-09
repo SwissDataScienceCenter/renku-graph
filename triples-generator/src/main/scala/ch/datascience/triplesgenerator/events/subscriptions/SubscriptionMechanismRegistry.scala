@@ -71,5 +71,13 @@ object SubscriptionMechanismRegistry {
         categoryAndUrlPayloadsComposerFactory,
         logger
       )
-  } yield new SubscriptionMechanismRegistryImpl[IO](awaitingGenerationSubscription, membersSyncSubscription)
+    triplesGeneratedSubscription <-
+      SubscriptionMechanism(categories.triplesgenerated.EventHandler.categoryName,
+                            categoryAndUrlPayloadsComposerFactory,
+                            logger
+      )
+  } yield new SubscriptionMechanismRegistryImpl[IO](awaitingGenerationSubscription,
+                                                    membersSyncSubscription,
+                                                    triplesGeneratedSubscription
+  )
 }

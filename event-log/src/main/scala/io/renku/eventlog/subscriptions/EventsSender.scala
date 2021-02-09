@@ -25,8 +25,10 @@ import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.IORestClient.SleepAfterConnectionIssue
 import ch.datascience.http.client.RestClientError.ConnectivityException
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Encoder
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
+import org.http4s.MediaType
+import org.http4s.headers.`Content-Type`
+import org.http4s.multipart.{Multipart, Part}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -45,7 +47,7 @@ private object EventsSender {
 }
 
 private class EventsSenderImpl[CategoryEvent](
-    categoryEventEncoder: Encoder[CategoryEvent],
+    categoryEventEncoder: EventEncoder[CategoryEvent],
     logger:               Logger[IO],
     retryInterval:        FiniteDuration = SleepAfterConnectionIssue
 )(implicit
@@ -59,16 +61,20 @@ private class EventsSenderImpl[CategoryEvent](
   import SendingResult._
   import cats.effect._
   import cats.syntax.all._
-  import io.circe.syntax._
   import org.http4s.Method.POST
   import org.http4s.Status._
-  import org.http4s.circe._
   import org.http4s.{Request, Response, Status}
 
   def sendEvent(subscriberUrl: SubscriberUrl, categoryEvent: CategoryEvent): IO[SendingResult] = {
     for {
-      uri           <- validateUri(subscriberUrl.value)
-      sendingResult <- send(request(POST, uri).withEntity(categoryEvent.asJson(categoryEventEncoder)))(mapResponse)
+      uri <- validateUri(subscriberUrl.value)
+      sendingResult <-
+        send(
+          request(POST, uri).withMultipartBuilder
+            .addPart("event", categoryEventEncoder.encodeEvent(categoryEvent))
+            .maybeAddPart("payload", categoryEventEncoder.encodePayload(categoryEvent))
+            .build()
+        )(mapResponse)
     } yield sendingResult
   } recoverWith connectivityException(to = Misdelivered)
 
@@ -87,7 +93,7 @@ private class EventsSenderImpl[CategoryEvent](
 
 private object IOEventsSender {
   def apply[CategoryEvent](
-      categoryEventEncoder: Encoder[CategoryEvent],
+      categoryEventEncoder: EventEncoder[CategoryEvent],
       logger:               Logger[IO]
   )(implicit
       executionContext: ExecutionContext,

@@ -28,7 +28,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.SubscriptionCategory.{AcceptedRegistration, RejectedRegistration}
-import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry.{NoCategoriesAvailable, SubscriptionResult, SuccesfulSubscription, UnsupportedPayload}
+import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry.{SubscriptionResult, SuccessfulSubscription, UnsupportedPayload}
 
 import scala.concurrent.ExecutionContext
 
@@ -41,9 +41,8 @@ trait SubscriptionCategoryRegistry[Interpretation[_]] {
 
 private[subscriptions] object SubscriptionCategoryRegistry {
   sealed trait SubscriptionResult
-  final case object SuccesfulSubscription extends SubscriptionResult
+  final case object SuccessfulSubscription extends SubscriptionResult
   final case class UnsupportedPayload(message: String) extends SubscriptionResult
-  final case object NoCategoriesAvailable extends SubscriptionResult
 }
 
 private[subscriptions] class SubscriptionCategoryRegistryImpl[Interpretation[_]: Effect: Applicative](
@@ -54,13 +53,14 @@ private[subscriptions] class SubscriptionCategoryRegistryImpl[Interpretation[_]:
   override def run(): Interpretation[Unit] = categories.toList.map(_.run()).parSequence.void
 
   override def register(subscriptionRequest: Json): Interpretation[SubscriptionResult] =
-    if (categories.isEmpty) { (NoCategoriesAvailable: SubscriptionResult).pure[Interpretation] }
-    else {
+    if (categories.isEmpty) {
+      (UnsupportedPayload("No category supports this payload"): SubscriptionResult).pure[Interpretation]
+    } else {
       categories.toList
         .traverse(_.register(subscriptionRequest))
         .map(registrationRequests => registrationRequests.reduce(_ |+| _))
         .map {
-          case AcceptedRegistration => SuccesfulSubscription
+          case AcceptedRegistration => SuccessfulSubscription
           case RejectedRegistration => UnsupportedPayload("No category supports this payload")
         }
     }

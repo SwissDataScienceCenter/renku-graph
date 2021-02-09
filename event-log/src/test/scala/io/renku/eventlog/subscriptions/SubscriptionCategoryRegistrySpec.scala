@@ -62,12 +62,12 @@ private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFact
       val categories =
         Set[SubscriptionCategory[IO]](new SuccessfulRegistration {}, SubscriptionCategoryWithoutRegistration)
       val registry = new SubscriptionCategoryRegistryImpl[IO](categories)
-      registry.register(payload).unsafeRunSync() shouldBe SuccesfulSubscription
+      registry.register(payload).unsafeRunSync() shouldBe SuccessfulSubscription
     }
 
     "return a request error when there are no categories" in new TestCase {
       val registry = new SubscriptionCategoryRegistryImpl[IO](Set.empty)
-      registry.register(payload).unsafeRunSync() shouldBe NoCategoriesAvailable
+      registry.register(payload).unsafeRunSync() shouldBe UnsupportedPayload("No category supports this payload")
     }
 
     "return a request error when no category can handle the payload" in new TestCase {

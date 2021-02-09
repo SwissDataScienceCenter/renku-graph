@@ -18,30 +18,38 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import io.circe.Encoder
+import io.circe.Json
 import io.circe.literal._
-import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class TriplesGeneratedEventEncoderSpec extends AnyWordSpec with should.Matchers {
-
-  private implicit val encoder: Encoder[TriplesGeneratedEvent] = TriplesGeneratedEventEncoder
-
-  "encoder" should {
+  "encodeEvent" should {
 
     "serialize TriplesGeneratedEvent to Json" in {
       val event = triplesGeneratedEvents.generateOne
 
-      event.asJson shouldBe json"""{
-        "categoryName": "TRIPLES_GENERATED",
-        "id":           ${event.id.id.value},
-        "project": {
-          "id":         ${event.id.projectId.value}
-        },
-        "body":         ${event.payload.value}
-      }"""
+      val actualJson = TriplesGeneratedEventEncoder.encodeEvent(event)
+
+      actualJson.hcursor.downField("categoryName").as[String] shouldBe Right("TRIPLES_GENERATED")
+      actualJson.hcursor.downField("id").as[String]           shouldBe Right(event.id.id.value)
+      actualJson.hcursor.downField("project").as[Json]        shouldBe Right(json"""{
+                                                                               "id": ${event.id.projectId.value},
+                                                                               "path": ${event.projectPath.value}
+                                                                              }""")
+
+    }
+  }
+
+  "encodePayload" should {
+    "serialize TriplesGeneratedEvent payload to a string" in {
+      val event = triplesGeneratedEvents.generateOne
+
+      TriplesGeneratedEventEncoder.encodePayload(
+        event
+      ) shouldBe json"""{ "payload": ${event.payload.value}, "schemaVersion": ${event.schemaVersion.value} }""".noSpaces.some
     }
   }
 }

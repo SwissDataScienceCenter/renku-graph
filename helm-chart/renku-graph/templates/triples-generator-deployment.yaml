@@ -79,6 +79,8 @@ spec:
               {{- end }}
             - name: GENERATION_PROCESSES_NUMBER
               value: "{{ .Values.triplesGenerator.generationProcessesNumber }}"
+            - name: TRANSFORMATION_PROCESSES_NUMBER
+              value: "{{ .Values.triplesGenerator.transformationProcessesNumber }}"
             - name: THREADS_NUMBER
               value: "{{ .Values.triplesGenerator.threadsNumber }}"
             - name: JAVA_OPTS
