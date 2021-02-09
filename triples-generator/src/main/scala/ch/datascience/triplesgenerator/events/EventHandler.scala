@@ -21,25 +21,25 @@ package ch.datascience.triplesgenerator.events
 import cats.MonadError
 import cats.data.EitherT
 import cats.syntax.all._
-import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId}
+import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, SchedulingError}
+import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, UnsupportedEventType}
+import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
+import ch.datascience.triplesgenerator.events.categories.models.Project
 import io.chrisdavenport.log4cats.Logger
-import io.circe.{Decoder, DecodingFailure, HCursor}
-import org.http4s.Request
+import io.circe.{Decoder, DecodingFailure, Json}
 
 import scala.util.control.NonFatal
 
 private trait EventHandler[Interpretation[_]] {
   val categoryName: CategoryName
-  def handle(request: Request[Interpretation]): Interpretation[EventSchedulingResult]
-
-  protected def validateCategoryName(implicit cursor: HCursor): Decoder.Result[CategoryName] =
-    cursor.downField("categoryName").as[CategoryName] flatMap checkCategoryName
+  def handle(request: EventRequestContent): Interpretation[EventSchedulingResult]
 
   private lazy val checkCategoryName: CategoryName => Decoder.Result[CategoryName] = {
     case name @ `categoryName` => Right(name)
-    case other                 => Left(DecodingFailure(s"$other not supported by $categoryName", Nil))
+    case other =>
+      Left(DecodingFailure(s"$other not supported by $categoryName", Nil))
   }
 
   protected implicit class EitherTOps[T](
@@ -65,6 +65,36 @@ private trait EventHandler[Interpretation[_]] {
     private lazy val asSchedulingError: PartialFunction[Throwable, Either[EventSchedulingResult, T]] = {
       case NonFatal(exception) => Left(SchedulingError(exception))
     }
+
+  }
+  implicit class JsonOps(json: Json) {
+
+    lazy val validateCategoryName: Either[EventSchedulingResult, Unit] =
+      (json.hcursor.downField("categoryName").as[CategoryName] flatMap checkCategoryName)
+        .leftMap(_ => UnsupportedEventType)
+        .void
+
+    lazy val getProject: Either[EventSchedulingResult, Project] = json.as[Project].leftMap(_ => BadRequest)
+
+    lazy val getEventId: Either[EventSchedulingResult, CompoundEventId] =
+      json.as[CompoundEventId].leftMap(_ => BadRequest)
+
+    lazy val getProjectPath: Either[EventSchedulingResult, projects.Path] =
+      json.hcursor.downField("project").downField("path").as[projects.Path].leftMap(_ => BadRequest)
+  }
+
+  private implicit val eventIdDecoder: Decoder[CompoundEventId] = { implicit cursor =>
+    for {
+      id        <- cursor.downField("id").as[EventId]
+      projectId <- cursor.downField("project").downField("id").as[projects.Id]
+    } yield CompoundEventId(id, projectId)
+  }
+
+  private implicit val projectDecoder: Decoder[Project] = { implicit cursor =>
+    for {
+      projectId   <- cursor.downField("project").downField("id").as[projects.Id]
+      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
+    } yield Project(projectId, projectPath)
   }
 
   protected implicit class LoggerOps(

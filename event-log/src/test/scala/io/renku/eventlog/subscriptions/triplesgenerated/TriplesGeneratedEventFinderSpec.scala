@@ -65,14 +65,16 @@ private class TriplesGeneratedEventFinderSpec
           status = TriplesGenerated,
           eventDate = EventDate(now.minus(1, H)),
           projectId = projectId,
-          projectPath = projectPath
+          projectPath = projectPath,
+          payloadSchemaVersion = schemaVersion
         )
 
         val (event2Id, _, _, _, eventPayload2) = createEvent(
           status = TransformationRecoverableFailure,
           EventDate(now.minus(5, H)),
           projectId = projectId,
-          projectPath = projectPath
+          projectPath = projectPath,
+          payloadSchemaVersion = schemaVersion
         )
 
         findEvents(TransformingTriples) shouldBe List.empty
@@ -86,7 +88,7 @@ private class TriplesGeneratedEventFinderSpec
         )
 
         finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(event2Id, projectPath, eventPayload2)
+          TriplesGeneratedEvent(event2Id, projectPath, eventPayload2, schemaVersion)
         )
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event2Id, executionDate))
@@ -100,7 +102,7 @@ private class TriplesGeneratedEventFinderSpec
         )
 
         finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(event1Id, projectPath, eventPayload1)
+          TriplesGeneratedEvent(event1Id, projectPath, eventPayload1, schemaVersion)
         )
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate), (event2Id, executionDate))
@@ -124,21 +126,24 @@ private class TriplesGeneratedEventFinderSpec
         val (event1Id, _, event1Date, _, eventPayload1) = createEvent(
           status = TriplesGenerated,
           projectId = projectId,
-          projectPath = projectPath
+          projectPath = projectPath,
+          payloadSchemaVersion = schemaVersion
         )
 
         val (_, _, event2Date, _, _) = createEvent(
           status = TransformationRecoverableFailure,
           executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
           projectId = projectId,
-          projectPath = projectPath
+          projectPath = projectPath,
+          payloadSchemaVersion = schemaVersion
         )
 
         val (_, _, event3Date, _, _) = createEvent(
           status = TriplesGenerated,
           executionDate = ExecutionDate(timestampsInTheFuture.generateOne),
           projectId = projectId,
-          projectPath = projectPath
+          projectPath = projectPath,
+          payloadSchemaVersion = schemaVersion
         )
 
         findEvents(TransformingTriples) shouldBe List.empty
@@ -153,7 +158,7 @@ private class TriplesGeneratedEventFinderSpec
         )
 
         finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(event1Id, projectPath, eventPayload1)
+          TriplesGeneratedEvent(event1Id, projectPath, eventPayload1, schemaVersion)
         )
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((event1Id, executionDate))
@@ -173,7 +178,8 @@ private class TriplesGeneratedEventFinderSpec
 
         val (eventId, _, eventDate, projectPath, eventPayload1) = createEvent(
           status = TransformingTriples,
-          executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes + 1, MIN))
+          executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes + 1, MIN)),
+          payloadSchemaVersion = schemaVersion
         )
 
         expectAwaitingTransformationGaugeDecrement(projectPath)
@@ -185,7 +191,7 @@ private class TriplesGeneratedEventFinderSpec
         )
 
         finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(eventId, projectPath, eventPayload1)
+          TriplesGeneratedEvent(eventId, projectPath, eventPayload1, schemaVersion)
         )
 
         findEvents(TransformingTriples).noBatchDate shouldBe List((eventId, executionDate))
@@ -308,6 +314,7 @@ private class TriplesGeneratedEventFinderSpec
   }
 
   private trait TestCase extends TestCaseCommons {
+    val schemaVersion = projectSchemaVersions.generateOne
 
     val finder = new TriplesGeneratedEventFinderImpl(
       transactor,

@@ -36,6 +36,7 @@ import io.renku.eventlog.creation.{EventCreationEndpoint, EventPersister}
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
+import io.renku.eventlog.statuschange.commands.{ToGenerationNonRecoverableFailure, ToGenerationRecoverableFailure, ToNew, ToSkipped, ToTransformationNonRecoverableFailure, ToTriplesGenerated, ToTriplesStore}
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.{SubscriptionCategoryRegistry, SubscriptionsEndpoint}
 import org.http4s.MediaType.application
@@ -221,10 +222,19 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
                                  underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
                                  logger:                          Logger[IO]
   ) extends StatusChangeEndpoint[IO](updateCommandsRunner,
-                                     awaitingTriplesGenerationGauge,
-                                     underTriplesGenerationGauge,
-                                     awaitingTransformationGauge,
-                                     underTriplesTransformationGauge,
+                                     Set(
+                                       ToTriplesStore.factory(underTriplesGenerationGauge),
+                                       ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
+                                       ToTriplesGenerated.factory(underTriplesGenerationGauge,
+                                                                  awaitingTransformationGauge
+                                       ),
+                                       ToSkipped.factory(underTriplesGenerationGauge),
+                                       ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),
+                                       ToGenerationRecoverableFailure.factory(awaitingTriplesGenerationGauge,
+                                                                              underTriplesGenerationGauge
+                                       ),
+                                       ToTransformationNonRecoverableFailure.factory(underTriplesTransformationGauge)
+                                     ),
                                      logger
       )
 }

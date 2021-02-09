@@ -19,20 +19,27 @@
 package ch.datascience.triplesgenerator.events
 
 import cats.MonadError
+import cats.data.EitherT
+import cats.data.EitherT.right
 import cats.effect.{Effect, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.RenkuVersionPair
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
+import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Json
+import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
+import org.http4s.multipart.Multipart
 import org.http4s.{Request, Response}
 
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
 trait EventEndpoint[Interpretation[_]] {
   def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
@@ -47,26 +54,39 @@ class EventEndpointImpl[Interpretation[_]: Effect](
 
   import EventSchedulingResult._
   import cats.syntax.all._
-  import ch.datascience.http.InfoMessage._
   import ch.datascience.http.InfoMessage
+  import ch.datascience.http.InfoMessage._
   import org.http4s._
 
   override def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] =
     reProvisioningStatus.isReProvisioning() flatMap { isReProvisioning =>
       if (isReProvisioning) ServiceUnavailable(InfoMessage("Temporarily unavailable: currently re-provisioning"))
-      else tryNextHandler(request, eventHandlers) flatMap toHttpResult
+      else {
+        for {
+          multipart    <- toMultipart(request)
+          eventJson    <- toEvent(multipart)
+          maybePayload <- getPayload(multipart)
+          result <-
+            right[Response[Interpretation]](
+              tryNextHandler(EventRequestContent(eventJson, maybePayload), eventHandlers).flatMap(toHttpResult)
+            )
+        } yield result
+      }.merge recoverWith { case NonFatal(error) =>
+        toHttpResult(EventSchedulingResult.SchedulingError(error))
+      }
     }
 
-  private def tryNextHandler(request:  Request[Interpretation],
-                             handlers: List[EventHandler[Interpretation]]
+  private def tryNextHandler(requestContent: EventRequestContent,
+                             handlers:       List[EventHandler[Interpretation]]
   ): Interpretation[EventSchedulingResult] =
     handlers.headOption match {
       case Some(handler) =>
-        handler.handle(request).flatMap {
-          case UnsupportedEventType => tryNextHandler(request, handlers.tail)
+        handler.handle(requestContent).flatMap {
+          case UnsupportedEventType => tryNextHandler(requestContent, handlers.tail)
           case otherResult          => otherResult.pure[Interpretation]
         }
-      case None => (UnsupportedEventType: EventSchedulingResult).pure[Interpretation]
+      case None =>
+        (UnsupportedEventType: EventSchedulingResult).pure[Interpretation]
     }
 
   private lazy val toHttpResult: EventSchedulingResult => Interpretation[Response[Interpretation]] = {
@@ -76,6 +96,38 @@ class EventEndpointImpl[Interpretation[_]: Effect](
     case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
     case EventSchedulingResult.SchedulingError(_)   => InternalServerError(ErrorMessage("Failed to schedule event"))
   }
+
+  private def toMultipart(
+      request: Request[Interpretation]
+  ): EitherT[Interpretation, Response[Interpretation], Multipart[Interpretation]] = EitherT {
+    request.as[Multipart[Interpretation]].map(_.asRight[Response[Interpretation]]) recoverWith { case NonFatal(_) =>
+      BadRequest(ErrorMessage("Not multipart request")).map(_.asLeft[Multipart[Interpretation]])
+    }
+  }
+
+  private def toEvent(multipart: Multipart[Interpretation]): EitherT[Interpretation, Response[Interpretation], Json] =
+    EitherT {
+      multipart.parts
+        .find(_.name.contains("event"))
+        .map(_.as[Json].map(_.asRight[Response[Interpretation]]).recoverWith { case NonFatal(_) =>
+          BadRequest(ErrorMessage("Malformed event body")).map(_.asLeft[Json])
+        })
+        .getOrElse(BadRequest(ErrorMessage("Missing event part")).map(_.asLeft[Json]))
+    }
+
+  private def getPayload(
+      multipart: Multipart[Interpretation]
+  ): EitherT[Interpretation, Response[Interpretation], Option[String]] = EitherT {
+    multipart.parts
+      .find(_.name.contains("payload"))
+      .map {
+        _.as[String].map(_.some.asRight[Response[Interpretation]]).recoverWith { case NonFatal(_) =>
+          BadRequest(ErrorMessage("Malformed event payload")).map(_.asLeft[Option[String]])
+        }
+      }
+      .getOrElse(Option.empty[String].asRight[Response[Interpretation]].pure[Interpretation])
+  }
+
 }
 
 object IOEventEndpoint {
@@ -104,8 +156,16 @@ object IOEventEndpoint {
                                    )
 
       membersSyncHandler <- categories.membersync.EventHandler(gitLabThrottler, logger, timeRecorder)
+      triplesGeneratedHandler <- categories.triplesgenerated.EventHandler(metricsRegistry,
+                                                                          gitLabThrottler,
+                                                                          timeRecorder,
+                                                                          subscriptionMechanismRegistry,
+                                                                          logger
+                                 )
     } yield new EventEndpointImpl[IO](
-      List(awaitingGenerationHandler, membersSyncHandler),
+      List(awaitingGenerationHandler, membersSyncHandler, triplesGeneratedHandler),
       reProvisioningStatus
     )
+
+  case class EventRequestContent(event: Json, maybePayload: Option[String])
 }

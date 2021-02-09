@@ -20,7 +20,7 @@ package io.renku.eventlog
 
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.constraints.{BoundedInstant, DurationNotNegative, InstantNotInTheFuture, NonBlank, NonNegativeInt}
+import ch.datascience.tinytypes.constraints.{BoundedInstant, DurationNotNegative, InstantNotInTheFuture, NonBlank}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes._
 import eu.timepit.refined.api.Refined

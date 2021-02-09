@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import cats.data.NonEmptyList
-import cats.effect.Bracket
+import cats.MonadError
+import cats.data.{Kleisli, NonEmptyList}
+import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus._
@@ -28,8 +29,13 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.{EventLogDB, EventProcessingTime}
+import io.circe.Decoder.decodeOption
+import io.circe.{Decoder, HCursor}
+import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+import io.renku.eventlog.{EventLogDB, EventProcessingTime}
+import org.http4s.circe.jsonOf
+import org.http4s.{EntityDecoder, MediaType, Request}
 
 import java.time.Instant
 
@@ -43,11 +49,10 @@ final case class ToTriplesStore[Interpretation[_]](
 
   override lazy val status: EventStatus = TriplesStore
 
-// TODO temporary status change from TriplesGenerated to triples store in the end only TransformingTriples can be transformed to TriplesStore
   override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
     SqlQuery(
       query = upsertEventStatus,
-      name = "triples_generated-transforming_triples->triples_store"
+      name = "transforming_triples->triples_store"
     ),
     Nil
   )
@@ -55,7 +60,7 @@ final case class ToTriplesStore[Interpretation[_]](
   lazy val upsertEventStatus =
     sql"""|UPDATE event
           |SET status = $status, execution_date = ${now()}
-          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND (status = ${TriplesGenerated: EventStatus} OR status = ${TransformingTriples: EventStatus})
+          |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
           |""".stripMargin.update.run
 
   override def updateGauges(
@@ -63,5 +68,38 @@ final case class ToTriplesStore[Interpretation[_]](
   )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
     case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesGenerationGauge.decrement
     case _                    => ME.unit
+  }
+}
+
+object ToTriplesStore {
+  def factory[Interpretation[_]: Sync](
+      underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
+  )(implicit
+      ME: MonadError[Interpretation, Throwable]
+  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
+    Kleisli { case (eventId, request) =>
+      when(request, has = MediaType.application.json) {
+        {
+          for {
+            _                   <- request.validate(status = TriplesStore)
+            maybeProcessingTime <- request.getProcessingTime
+          } yield CommandFound(
+            ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge, maybeProcessingTime)
+          )
+        }.merge
+      }
+
+    }
+
+  private implicit def entityDecoder[Interpretation[_]: Sync]()
+      : EntityDecoder[Interpretation, (EventStatus, Option[EventProcessingTime])] = {
+    implicit val decoder: Decoder[(EventStatus, Option[EventProcessingTime])] = { (cursor: HCursor) =>
+      for {
+        status <- cursor.downField("status").as[EventStatus]
+        maybeProcessingTime <-
+          cursor.downField("processingTime").as[Option[EventProcessingTime]](decodeOption(EventProcessingTime.decoder))
+      } yield status -> maybeProcessingTime
+    }
+    jsonOf[Interpretation, (EventStatus, Option[EventProcessingTime])]
   }
 }

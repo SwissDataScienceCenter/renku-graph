@@ -18,8 +18,10 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import cats.data.NonEmptyList
-import cats.effect.Bracket
+import cats.MonadError
+import cats.data.EitherT.fromOption
+import cats.data.{Kleisli, NonEmptyList}
+import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus._
@@ -28,8 +30,10 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
+import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage, EventProcessingTime}
+import org.http4s.{MediaType, Request}
 
 import java.time.Instant
 
@@ -61,4 +65,33 @@ final case class ToSkipped[Interpretation[_]](
     case UpdateResult.Updated => findProjectPath(eventId) flatMap underProcessingGauge.decrement
     case _                    => ME.unit
   }
+}
+
+object ToSkipped {
+  def factory[Interpretation[_]: Sync](
+      underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
+  )(implicit
+      ME: MonadError[Interpretation, Throwable]
+  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
+    Kleisli { case (eventId, request) =>
+      when(request, has = MediaType.application.json) {
+        {
+          for {
+            _                   <- request.validate(status = Skipped)
+            maybeProcessingTime <- request.getProcessingTime
+            maybeMessage        <- request.getMessage
+            message <-
+              fromOption[Interpretation](maybeMessage, PayloadMalformed("No message property in status change payload"))
+                .leftWiden[CommandFindingResult]
+          } yield CommandFound(
+            ToSkipped[Interpretation](
+              eventId,
+              message,
+              underTriplesGenerationGauge,
+              maybeProcessingTime
+            )
+          )
+        }.merge
+      }
+    }
 }

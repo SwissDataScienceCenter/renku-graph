@@ -51,6 +51,7 @@ class WebhookCreationSpec
     Scenario("Graph Services hook is present on the project in GitLab") {
 
       val projectId = projectIds.generateOne
+
       implicit val accessToken: AccessToken = accessTokens.generateOne
       Given("api user is authenticated")
       `GET <gitlabApi>/user returning OK`()

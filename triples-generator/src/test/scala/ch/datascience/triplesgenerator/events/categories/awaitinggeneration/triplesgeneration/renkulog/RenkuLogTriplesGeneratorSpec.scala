@@ -33,12 +33,13 @@ import ch.datascience.graph.model.events.{CommitId, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent._
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.GenerationResult.{MigrationEvent, Triples}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.RepositoryPath
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, Project}
+import ch.datascience.triplesgenerator.events.categories.models.Project
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory

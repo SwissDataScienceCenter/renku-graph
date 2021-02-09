@@ -19,15 +19,16 @@
 package io.renku.eventlog.subscriptions
 
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
 import io.renku.eventlog.EventContentGenerators._
 import org.scalacheck.Gen
 
 package object triplesgenerated {
 
   private[triplesgenerated] lazy val triplesGeneratedEvents: Gen[TriplesGeneratedEvent] = for {
-    eventId     <- compoundEventIds
-    projectPath <- projectPaths
-    payload     <- eventPayloads
-  } yield TriplesGeneratedEvent(eventId, projectPath, payload)
+    eventId       <- compoundEventIds
+    projectPath   <- projectPaths
+    payload       <- eventPayloads
+    schemaVersion <- projectSchemaVersions
+  } yield TriplesGeneratedEvent(eventId, projectPath, payload, schemaVersion)
 }

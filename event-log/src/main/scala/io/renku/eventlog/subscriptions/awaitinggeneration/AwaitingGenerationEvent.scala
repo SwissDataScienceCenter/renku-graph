@@ -18,25 +18,28 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
+import cats.syntax.all._
 import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.graph.model.projects
-import io.circe.Encoder
+import io.renku.eventlog.subscriptions.EventEncoder
 
 private final case class AwaitingGenerationEvent(id: CompoundEventId, projectPath: projects.Path, body: EventBody) {
   override lazy val toString: String = s"$AwaitingGenerationEvent $id, projectPath = $projectPath"
 }
 
-private object AwaitingGenerationEventEncoder extends Encoder[AwaitingGenerationEvent] {
+private object AwaitingGenerationEventEncoder extends EventEncoder[AwaitingGenerationEvent] {
 
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def apply(event: AwaitingGenerationEvent): Json = json"""{
+  override def encodeEvent(event: AwaitingGenerationEvent): Json = json"""{
     "categoryName": ${SubscriptionCategory.name.value},
     "id":           ${event.id.id.value},
     "project": {
       "id":         ${event.id.projectId.value}
-    },
-    "body":         ${event.body.value}
+    }
   }"""
+
+  override def encodePayload(event: AwaitingGenerationEvent): Option[String] =
+    event.body.value.some
 }
