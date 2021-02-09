@@ -29,16 +29,18 @@ import ch.datascience.metrics.LabeledHistogram
 import doobie.free.connection.ConnectionOp
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{EventLogDB, EventProcessingTime, TypeSerializers}
 
 import java.time.{Duration, Instant}
 
-private class ZombieEventsFinderImpl(transactor:        DbTransactor[IO, EventLogDB],
-                                     maxProcessingTime: EventProcessingTime,
-                                     queriesExecTimes:  LabeledHistogram[IO, SqlQuery.Name],
-                                     now:               () => Instant = () => Instant.now
-)(implicit ME:                                          Bracket[IO, Throwable], contextShift: ContextShift[IO])
+private class ZombieEventsFinderImpl(transactor:             DbTransactor[IO, EventLogDB],
+                                     maxProcessingTime:      EventProcessingTime,
+                                     maxProcessingTimeRatio: Int Refined Positive,
+                                     queriesExecTimes:       LabeledHistogram[IO, SqlQuery.Name],
+                                     now:                    () => Instant = () => Instant.now
+)(implicit ME:                                               Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, ZombieEvent]
     with TypeSerializers {
@@ -48,17 +50,17 @@ private class ZombieEventsFinderImpl(transactor:        DbTransactor[IO, EventLo
   private val zombieMessage: String = "Zombie Event"
 
   override def popEvent(): IO[Option[ZombieEvent]] = {
-    findProcessingTimes >>= lookForZombie >>= markEventTaken
+    findPotentialZombies >>= lookForZombie >>= markEventTaken
   } transact transactor.get
 
-  private def findProcessingTimes: Free[ConnectionOp, List[(projects.Id, EventStatus, EventProcessingTime)]] =
+  private def findPotentialZombies: Free[ConnectionOp, List[(projects.Id, EventStatus, EventProcessingTime)]] =
     for {
       projectsAndStatuses <- queryProjectsToCheck
       projectsAndTimes <- projectsAndStatuses.map { case (id, status) =>
                             queryProcessingTimes(id, status).map((id, status, _))
                           }.sequence
     } yield projectsAndTimes.map {
-      case (id, status, Nil)   => (id, status, maxProcessingTime / 2)
+      case (id, status, Nil)   => (id, status, maxProcessingTime / maxProcessingTimeRatio)
       case (id, status, times) => (id, status, times.sorted.reverse.apply(times.size / 2))
     }
 
@@ -108,7 +110,7 @@ private class ZombieEventsFinderImpl(transactor:        DbTransactor[IO, EventLo
               |WHERE project_id = $projectId 
               |  AND status = $status
               |  AND (message IS NULL OR message <> $zombieMessage)
-              |  AND ((${now()} - evt.execution_date) > ${processingTime * 2})
+              |  AND ((${now()} - evt.execution_date) > ${processingTime * maxProcessingTimeRatio})
               |LIMIT 1
     """.stripMargin
           .query[(CompoundEventId, EventStatus)]
@@ -141,12 +143,13 @@ private class ZombieEventsFinderImpl(transactor:        DbTransactor[IO, EventLo
 
 private object ZombieEventsFinder {
 
-  private val MaxProcessingTime: EventProcessingTime = EventProcessingTime(Duration ofHours 1)
+  private val MaxProcessingTimeRatio: Int Refined Positive = 2
+  private val MaxProcessingTime:      EventProcessingTime  = EventProcessingTime(Duration ofHours 1)
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
-    new ZombieEventsFinderImpl(transactor, MaxProcessingTime, queriesExecTimes)
+    new ZombieEventsFinderImpl(transactor, MaxProcessingTime, MaxProcessingTimeRatio, queriesExecTimes)
   }
 }

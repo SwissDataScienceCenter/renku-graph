@@ -28,7 +28,9 @@ import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.TestLabeledHistogram
+import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.{EventProcessingTime, ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalacheck.Gen
@@ -120,14 +122,15 @@ class ZombieEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           eventId,
           GeneratingTriples,
           relativeTimestamps(
-            moreThanAgo = (medianProcessingTime * 2).value plusMinutes positiveInts().generateOne.value
+            moreThanAgo =
+              (medianProcessingTime * maxProcessingTimeRatio).value plusMinutes positiveInts().generateOne.value
           ).generateAs(ExecutionDate)
         )
         addEvent(
           compoundEventIds.generateOne.copy(projectId = projectId),
           GeneratingTriples,
           relativeTimestamps(
-            lessThanAgo = (medianProcessingTime * 2).value minusMinutes 2
+            lessThanAgo = (medianProcessingTime * maxProcessingTimeRatio).value minusMinutes 2
           ).generateAs(ExecutionDate)
         )
 
@@ -162,14 +165,15 @@ class ZombieEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           eventId,
           TransformingTriples,
           relativeTimestamps(
-            moreThanAgo = (medianProcessingTime * 2).value plusMinutes positiveInts().generateOne.value
+            moreThanAgo =
+              (medianProcessingTime * maxProcessingTimeRatio).value plusMinutes positiveInts().generateOne.value
           ).generateAs(ExecutionDate)
         )
         addEvent(
           compoundEventIds.generateOne.copy(projectId = projectId),
           TransformingTriples,
           relativeTimestamps(
-            lessThanAgo = (medianProcessingTime * 2).value minusMinutes 2
+            lessThanAgo = (medianProcessingTime * maxProcessingTimeRatio).value minusMinutes 2
           ).generateAs(ExecutionDate)
         )
 
@@ -181,9 +185,10 @@ class ZombieEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
   private trait TestCase {
 
     val maxProcessingTime = javaDurations(min = Duration.ofHours(1)).generateAs(EventProcessingTime)
-    val queriesExecTimes  = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val maxProcessingTimeRatio: Int Refined Positive = 2
+    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
 
-    val finder = new ZombieEventsFinderImpl(transactor, maxProcessingTime, queriesExecTimes)
+    val finder = new ZombieEventsFinderImpl(transactor, maxProcessingTime, maxProcessingTimeRatio, queriesExecTimes)
   }
 
   private def addEvent(eventId: CompoundEventId, status: EventStatus, executionDate: ExecutionDate): Unit =
