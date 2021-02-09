@@ -58,7 +58,7 @@ private class BaseDetailsFinder(
       renku  -> "renku",
       schema -> "schema"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?publishedDate
+    s"""|SELECT DISTINCT ?identifier ?name ?dateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?publishedDate
         |WHERE {
         |    ?datasetId schema:identifier "$identifier";
         |               schema:identifier ?identifier;
@@ -69,6 +69,7 @@ private class BaseDetailsFinder(
         |               schema:alternateName ?alternateName;
         |               prov:atLocation ?location ;
         |               renku:topmostSameAs ?topmostSameAs;
+        |               schema:dateCreated ?dateCreated;
         |               renku:topmostDerivedFrom/schema:identifier ?initialVersion
         |               
         |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .

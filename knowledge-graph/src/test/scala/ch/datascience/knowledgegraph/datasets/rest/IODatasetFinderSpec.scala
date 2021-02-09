@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DateCreatedInProject, InitialVersion, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, InitialVersion, TopmostSameAs}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.EntityGenerators.invalidationEntity
@@ -58,6 +58,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset.copy(
               sameAs = dataset.entityId.asSameAs,
               parts = dataset.parts.sorted,
+              created = DateCreated(addedToProject.date.value),
               projects = List(DatasetProject(project.path, project.name, addedToProject)),
               keywords = dataset.keywords.sorted
             )
@@ -89,6 +90,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             datasetFinder.findDataset(dataset1.id).unsafeRunSync() shouldBe Some(
               dataset1.copy(
                 parts = dataset1.parts.sorted,
+                created = DateCreated(addedToProject1.date.value),
                 projects = List(DatasetProject(project1.path, project1.name, addedToProject1),
                                 DatasetProject(project2.path, project2.name, addedToProject2)
                 ).sorted,
@@ -99,6 +101,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             datasetFinder.findDataset(dataset2.id).unsafeRunSync() shouldBe Some(
               dataset2.copy(
                 parts = dataset2.parts.sorted,
+                created = DateCreated(addedToProject2.date.value),
                 projects = List(DatasetProject(project1.path, project1.name, addedToProject1),
                                 DatasetProject(project2.path, project2.name, addedToProject2)
                 ).sorted,
@@ -131,6 +134,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
             dataset.copy(
               parts = dataset.parts.sorted,
+              created = DateCreated(addedToProject.date.value),
               projects = List(DatasetProject(project.path, project.name, addedToProject)).sorted,
               keywords = dataset.keywords.sorted
             )
@@ -138,6 +142,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           datasetFinder.findDataset(modifiedDataset.id).unsafeRunSync() shouldBe Some(
             modifiedDataset.copy(
               parts = modifiedDataset.parts.sorted,
+              created = DateCreated(modifiedOnProject.date.value),
               projects = List(DatasetProject(project.path, project.name, modifiedOnProject)).sorted,
               keywords = modifiedDataset.keywords.sorted
             )
@@ -183,6 +188,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             sourceDataset.copy(
               sameAs = sourceDataset.entityId.asSameAs,
               parts = sourceDataset.parts.sorted,
+              created = DateCreated(addedToProject1.date.value),
               projects = List(
                 DatasetProject(project1.path, project1.name, addedToProject1),
                 DatasetProject(project2.path, project2.name, addedToProject2),
@@ -196,6 +202,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             dataset2.copy(
               sameAs = sourceDataset.entityId.asSameAs,
               parts = dataset2.parts.sorted,
+              created = DateCreated(addedToProject2.date.value),
               projects = List(
                 DatasetProject(project1.path, project1.name, addedToProject1),
                 DatasetProject(project2.path, project2.name, addedToProject2),
@@ -234,6 +241,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               dataset.copy(
                 sameAs = dataset.entityId.asSameAs,
                 parts = dataset.parts.sorted,
+                created = DateCreated(addedToProject.date.value),
                 projects = List(
                   DatasetProject(sourceProject.path, sourceProject.name, addedToProject),
                   DatasetProject(forkProject.path, forkProject.name, addedToProject)
@@ -274,6 +282,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
               dataset.copy(
                 parts = dataset.parts.sorted,
+                created = DateCreated(addedToProject1.date.value),
                 projects = List(
                   DatasetProject(project1.path, project1.name, addedToProject1),
                   DatasetProject(project2.path, project2.name, addedToProject2),
@@ -286,6 +295,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             datasetFinder.findDataset(forkedDataset.id).unsafeRunSync() shouldBe Some(
               forkedDataset.copy(
                 parts = dataset.parts.sorted,
+                created = DateCreated(addedToProject2.date.value),
                 projects = List(
                   DatasetProject(project1.path, project1.name, addedToProject1),
                   DatasetProject(project2.path, project2.name, addedToProject2),
@@ -319,6 +329,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               datasetOnGrandparent.copy(
                 sameAs = datasetOnGrandparent.entityId.asSameAs,
                 parts = datasetOnGrandparent.parts.sorted,
+                created = DateCreated(addedToProject.date.value),
                 projects = List(
                   DatasetProject(grandparentProject.path, grandparentProject.name, addedToProject),
                   DatasetProject(parentProject.path, parentProject.name, addedToProject),
@@ -362,6 +373,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
             dataset.copy(
               parts = dataset.parts.sorted,
+              created = DateCreated(addedToProject.date.value),
               projects = List(DatasetProject(project.path, project.name, addedToProject)).sorted,
               keywords = dataset.keywords.sorted
             )
@@ -369,6 +381,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           datasetFinder.findDataset(modifiedDataset.id).unsafeRunSync() shouldBe Some(
             modifiedDataset.copy(
               parts = modifiedDataset.parts.sorted,
+              created = DateCreated(modifiedOnProject.date.value),
               projects = List(
                 DatasetProject(project.path, project.name, modifiedOnProject),
                 DatasetProject(forkedProject.path, forkedProject.name, modifiedOnProject)
@@ -419,6 +432,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         datasetFinder.findDataset(dataset1.id).unsafeRunSync() shouldBe Some(
           dataset1.copy(
             parts = dataset1.parts.sorted,
+            created = DateCreated(dataset1Project.created.date.value),
             projects = List(
               dataset1Project,
               dataset2Project,
@@ -458,6 +472,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         dataset1.copy(
           sameAs = dataset1.entityId.asSameAs,
           parts = dataset1.parts.sorted,
+          created = DateCreated(dataset1Project.created.date.value),
           projects = List(
             dataset1Project,
             dataset2Project,
@@ -502,6 +517,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           dataset2.copy(
             sameAs = dataset1.entityId.asSameAs,
             parts = dataset2.parts.sorted,
+            created = DateCreated(dataset2Project.created.date.value),
             projects = List(
               dataset1Project,
               dataset2Project,
@@ -515,6 +531,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           dataset3.copy(
             sameAs = dataset1.entityId.asSameAs,
             parts = dataset3.parts.sorted,
+            created = DateCreated(dataset3Project.created.date.value),
             projects = List(
               dataset1Project,
               dataset2Project,
@@ -581,6 +598,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         datasetFinder.findDataset(dataset1.id).unsafeRunSync() shouldBe Some(
           dataset1.copy(
             parts = dataset1.parts.sorted,
+            created = DateCreated(dataset1Project.created.date.value),
             sameAs = dataset1.entityId.asSameAs,
             projects = List(dataset1Project, dataset2Project).sorted,
             keywords = dataset1.keywords.sorted
@@ -589,6 +607,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         datasetFinder.findDataset(modifiedDataset2.id).unsafeRunSync() shouldBe Some(
           modifiedDataset2.copy(
             parts = modifiedDataset2.parts.sorted,
+            created = DateCreated(dataset2ModifiedProject.created.date.value),
             projects = List(dataset2ModifiedProject, dataset3Project).sorted,
             keywords = modifiedDataset2.keywords.sorted
           )
