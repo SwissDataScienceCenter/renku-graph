@@ -18,34 +18,36 @@
 
 package io.renku.eventlog.statuschange
 
+import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.http.ErrorMessage.ErrorMessage
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.InfoMessage
+import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.compoundEventIds
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.metrics.LabeledGauge
-import io.circe.literal._
+import doobie.free.connection.ConnectionIO
+import eu.timepit.refined.api.Refined
+import io.circe.Json
 import io.circe.syntax._
-import io.circe.{Encoder, Json}
 import io.prometheus.client.Gauge
 import io.renku.eventlog.EventContentGenerators._
+import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
+import io.renku.eventlog.{EventLogDB, EventProcessingTime}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
-import org.http4s.implicits._
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -59,250 +61,129 @@ class StatusChangeEndpointSpec
 
   "changeStatus" should {
 
-    val scenarios = Table(
-      "status" -> "command builder",
-      TriplesStore -> ToTriplesStore[IO](compoundEventIds.generateOne,
-                                         underTriplesGenerationGauge,
-                                         eventProcessingTimes.generateOption
-      ),
-      Skipped -> ToSkipped[IO](compoundEventIds.generateOne,
-                               eventMessages.generateOne,
-                               underTriplesGenerationGauge,
-                               eventProcessingTimes.generateOption
-      ),
-      New -> ToNew[IO](compoundEventIds.generateOne,
-                       awaitingTriplesGenerationGauge,
-                       underTriplesGenerationGauge,
-                       eventProcessingTimes.generateOption
-      ),
-      TriplesGenerated -> ToTriplesGenerated[IO](
-        compoundEventIds.generateOne,
-        eventPayloads.generateOne,
-        projectSchemaVersions.generateOne,
-        underTriplesGenerationGauge,
-        awaitingTriplesTransformationGauge,
-        eventProcessingTimes.generateOption
-      ),
-      GenerationRecoverableFailure -> ToGenerationRecoverableFailure[IO](
-        compoundEventIds.generateOne,
-        eventMessages.generateOption,
-        awaitingTriplesGenerationGauge,
-        underTriplesGenerationGauge,
-        eventProcessingTimes.generateOption
-      ),
-      GenerationNonRecoverableFailure -> ToGenerationNonRecoverableFailure[IO](compoundEventIds.generateOne,
-                                                                               eventMessages.generateOption,
-                                                                               underTriplesGenerationGauge,
-                                                                               eventProcessingTimes.generateOption
-      ),
-      TransformationRecoverableFailure -> ToTransformationRecoverableFailure[IO](
-        compoundEventIds.generateOne,
-        eventMessages.generateOption,
-        awaitingTriplesTransformationGauge,
-        underTriplesTransformationGauge,
-        eventProcessingTimes.generateOption
-      ),
-      TransformationNonRecoverableFailure -> ToTransformationNonRecoverableFailure[IO](
-        compoundEventIds.generateOne,
-        eventMessages.generateOption,
-        underTriplesTransformationGauge,
-        eventProcessingTimes.generateOption
-      )
-    )
-    forAll(scenarios) { (status, command) =>
-      "decode payload from the body, " +
-        "perform status update " +
-        s"and return $Ok if all went fine - $status status case" in new TestCase {
+    "decode payload from the body, " +
+      "perform status update " +
+      s"and return $Ok if all went fine status case" in new TestCase {
 
-          command.status shouldBe status
+        val eventId = command.eventId
 
-          val eventId = command.eventId
+        (commandsRunner.run _)
+          .expects(command)
+          .returning(Updated.pure[IO])
 
-          (commandsRunner.run _)
-            .expects(command)
-            .returning(Updated.pure[IO])
+        val request = Request[IO]()
 
-          val request = Request(
-            Method.PATCH,
-            uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-          ).withEntity(command.asJson)
+        val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
 
-          val response = changeStatus(eventId, request).unsafeRunSync()
+        response.status                          shouldBe Ok
+        response.contentType                     shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event status updated")
 
-          response.status                          shouldBe Ok
-          response.contentType                     shouldBe Some(`Content-Type`(application.json))
-          response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event status updated")
+        logger.expectNoLogs()
+      }
 
-          logger.expectNoLogs()
-        }
+    "decode payload from the body, " +
+      "perform status update " +
+      s"and return $Conflict if no event gets updated - status case" in new TestCase {
 
-      "decode payload from the body, " +
-        "perform status update " +
-        s"and return $Conflict if no event gets updated - $status status case" in new TestCase {
+        val eventId = command.eventId
 
-          val eventId = command.eventId
+        (commandsRunner.run _)
+          .expects(command)
+          .returning(UpdateResult.Conflict.pure[IO])
 
-          (commandsRunner.run _)
-            .expects(command)
-            .returning(UpdateResult.Conflict.pure[IO])
+        val request = Request[IO]()
 
-          val request = Request(
-            Method.PATCH,
-            uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-          ).withEntity(command.asJson)
+        val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
 
-          val response = changeStatus(eventId, request).unsafeRunSync()
+        response.status                          shouldBe Conflict
+        response.contentType                     shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event status cannot be updated")
 
-          response.status                          shouldBe Conflict
-          response.contentType                     shouldBe Some(`Content-Type`(application.json))
-          response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event status cannot be updated")
+        logger.expectNoLogs()
+      }
 
-          logger.expectNoLogs()
-        }
+    "decode payload from the body, " +
+      "perform status update " +
+      s"and return $InternalServerError if there was an error during update - status case" in new TestCase {
 
-      "decode payload from the body, " +
-        "perform status update " +
-        s"and return $InternalServerError if there was an error during update - $status status case" in new TestCase {
+        val eventId = command.eventId
 
-          val eventId = command.eventId
+        val errorMessage = nonBlankStrings().generateOne
+        (commandsRunner.run _)
+          .expects(command)
+          .returning(UpdateResult.Failure(errorMessage).pure[IO])
 
-          val errorMessage = nonBlankStrings().generateOne
-          (commandsRunner.run _)
-            .expects(command)
-            .returning(UpdateResult.Failure(errorMessage).pure[IO])
+        val request = Request[IO]()
 
-          val request = Request(
-            Method.PATCH,
-            uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-          ).withEntity(command.asJson)
+        val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
 
-          val response = changeStatus(eventId, request).unsafeRunSync()
+        response.status                          shouldBe InternalServerError
+        response.contentType                     shouldBe Some(`Content-Type`(application.json))
+        response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage.value)
 
-          response.status                          shouldBe InternalServerError
-          response.contentType                     shouldBe Some(`Content-Type`(application.json))
-          response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage.value)
+        logger.loggedOnly(Error(errorMessage.value))
+      }
 
-          logger.loggedOnly(Error(errorMessage.value))
-        }
-    }
-
-    s"return $BadRequest if decoding payload fails" in new TestCase {
+    s"return $BadRequest if all the commands return NotSupported" in new TestCase {
 
       val eventId = compoundEventIds.generateOne
 
-      val payload = json"""{}"""
-      val request = Request(
-        Method.PATCH,
-        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(payload)
+      val request = Request[IO]()
 
-      val response = changeStatus(eventId, request).unsafeRunSync()
+      val response = changeStatusWithFailingDecode()(eventId, request).unsafeRunSync()
 
-      response.status      shouldBe BadRequest
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage(
-        s"Invalid message body: Could not decode JSON: $payload"
-      )
+      response.status                          shouldBe BadRequest
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("No event command found")
 
       logger.expectNoLogs()
     }
 
-    s"return $BadRequest for $Skipped status with no message" in new TestCase {
+    s"return $NotFound if the command does not find the event" in new TestCase {
 
-      val eventId = compoundEventIds.generateOne
+      val eventId = command.eventId
 
-      val payload = json"""{"status": ${Skipped.value}}"""
-      val request = Request(
-        Method.PATCH,
-        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(payload)
+      (commandsRunner.run _)
+        .expects(command)
+        .returning(UpdateResult.NotFound.pure[IO])
 
-      val response = changeStatus(eventId, request).unsafeRunSync()
+      val request = Request[IO]()
 
-      response.status                           shouldBe BadRequest
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("SKIPPED status needs a message")
+      val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
 
-      logger.expectNoLogs()
+      response.status                          shouldBe NotFound
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event not found")
+
     }
 
-    s"return $BadRequest for $TriplesGenerated status with no payload" in new TestCase {
+    s"return $BadRequest when parsing the payload fails" in new TestCase {
 
-      val eventId = compoundEventIds.generateOne
+      val eventId = command.eventId
+      val request = Request[IO]()
+      val message = nonEmptyStrings().generateOne
 
-      val payload =
-        json"""{"status": ${TriplesGenerated.value}, "schemaVersion": ${projectSchemaVersions.generateOne.value} }"""
-      val request = Request(
-        Method.PATCH,
-        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(payload)
+      val response = changeStatusWithPayloadMalformed(message)(eventId, request).unsafeRunSync()
 
-      val response = changeStatus(eventId, request).unsafeRunSync()
+      response.status                   shouldBe BadRequest
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(message).asJson
 
-      response.status                           shouldBe BadRequest
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("TRIPLES_GENERATED status needs a payload")
-
-      logger.expectNoLogs()
-    }
-
-    s"return $BadRequest for $TriplesGenerated status with no schema version" in new TestCase {
-
-      val eventId = compoundEventIds.generateOne
-
-      val payload = json"""{"status": ${TriplesGenerated.value}, "payload": ${eventPayloads.generateOne.value} }"""
-      val request = Request(
-        Method.PATCH,
-        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(payload)
-
-      val response = changeStatus(eventId, request).unsafeRunSync()
-
-      response.status                           shouldBe BadRequest
-      response.contentType                      shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("TRIPLES_GENERATED status needs a schemaVersion")
-
-      logger.expectNoLogs()
-    }
-
-    s"return $BadRequest for unsupported status" in new TestCase {
-
-      val eventId = compoundEventIds.generateOne
-
-      val payload = json"""{"status": "GENERATING_TRIPLES"}"""
-      val request = Request(
-        Method.PATCH,
-        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(payload)
-
-      val response = changeStatus(eventId, request).unsafeRunSync()
-
-      response.status      shouldBe BadRequest
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
-        "Transition to 'GENERATING_TRIPLES' status unsupported"
-      )
-
-      logger.expectNoLogs()
     }
 
     s"return $InternalServerError when updating event status fails" in new TestCase {
 
-      val eventId        = compoundEventIds.generateOne
-      val processingTime = eventProcessingTimes.generateSome
+      val eventId = command.eventId
 
-      val command: ChangeStatusCommand[IO] = ToTriplesStore(eventId, underTriplesGenerationGauge, processingTime)
       val exception = exceptions.generateOne
       (commandsRunner.run _)
         .expects(command)
         .returning(exception.raiseError[IO, UpdateResult])
 
-      val request = Request(
-        Method.PATCH,
-        uri"events" / eventId.id.toString / "projects" / eventId.projectId.toString / "status"
-      ).withEntity(command.asJson)
+      val request = Request[IO]()
 
-      val response = changeStatus(eventId, request).unsafeRunSync()
+      val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
 
       response.status                   shouldBe InternalServerError
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
@@ -315,82 +196,43 @@ class StatusChangeEndpointSpec
   private trait TestCase {
     val commandsRunner = mock[StatusUpdatesRunner[IO]]
     val logger         = TestLogger[IO]()
-    val changeStatus = new StatusChangeEndpoint[IO](
-      commandsRunner,
-      awaitingTriplesGenerationGauge,
-      underTriplesGenerationGauge,
-      awaitingTriplesTransformationGauge,
-      underTriplesTransformationGauge,
-      logger
-    ).changeStatus _
-  }
+    val command        = changeStatusCommands.generateOne
 
-  implicit val commandEncoder: Encoder[ChangeStatusCommand[IO]] = Encoder.instance[ChangeStatusCommand[IO]] {
-    case command: ToNew[IO] =>
-      json"""{
-        "status": ${command.status.value}
-      }""" deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToTriplesStore[IO] =>
-      json"""{
-        "status": ${command.status.value} 
-      }""" deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToSkipped[IO] =>
-      json"""{
-        "status": ${command.status.value},
-        "message": ${command.message.value}
-      }""" deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToTriplesGenerated[IO] =>
-      json"""{
-        "status": ${command.status.value},
-        "payload": ${command.payload.value},
-        "schemaVersion": ${command.schemaVersion.value} 
-      }""" deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToGenerationRecoverableFailure[IO] =>
-      json"""{
-        "status": ${command.status.value}
-      }""" deepMerge command.maybeMessage
-        .map(m => json"""{"message": ${m.value}}""")
-        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToGenerationNonRecoverableFailure[IO] =>
-      json"""{
-        "status": ${command.status.value}
-      }""" deepMerge command.maybeMessage
-        .map(m => json"""{"message": ${m.value}}""")
-        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToTransformationRecoverableFailure[IO] =>
-      json"""{
-        "status": ${command.status.value}
-      }""" deepMerge command.maybeMessage
-        .map(m => json"""{"message": ${m.value}}""")
-        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-    case command: ToTransformationNonRecoverableFailure[IO] =>
-      json"""{
-        "status": ${command.status.value}
-      }""" deepMerge command.maybeMessage
-        .map(m => json"""{"message": ${m.value}}""")
-        .getOrElse(Json.obj()) deepMerge command.maybeProcessingTime
-        .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-        .getOrElse(Json.obj())
-  }
+    def changeStatusWithSuccessfulDecode(command: ChangeStatusCommand[IO]) =
+      new StatusChangeEndpoint[IO](
+        commandsRunner,
+        Set(Kleisli(_ => (CommandFound(command): CommandFindingResult).pure[IO])),
+        logger
+      ).changeStatus _
 
-  private lazy val awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path] = new GaugeStub
-  private lazy val underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path] = new GaugeStub
-  private lazy val awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path] = new GaugeStub
-  private lazy val underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path] = new GaugeStub
+    def changeStatusWithPayloadMalformed(message: String) =
+      new StatusChangeEndpoint[IO](
+        commandsRunner,
+        Set(Kleisli(_ => (PayloadMalformed(message): CommandFindingResult).pure[IO])),
+        logger
+      ).changeStatus _
+
+    def changeStatusWithFailingDecode() =
+      new StatusChangeEndpoint[IO](
+        commandsRunner,
+        Set(Kleisli(_ => (NotSupported: CommandFindingResult).pure[IO])),
+        logger
+      ).changeStatus _
+
+    private case class MockChangeStatusCommand() extends ChangeStatusCommand[IO] {
+      val eventId: CompoundEventId = compoundEventIds.generateOne
+      val status:  EventStatus     = eventStatuses.generateOne
+      val queries: NonEmptyList[SqlQuery[Int]] =
+        nonEmptyStrings().generateNonEmptyList().map(s => SqlQuery[Int](1.pure[ConnectionIO], Refined.unsafeApply(s)))
+      def updateGauges(updateResult: UpdateResult)(implicit
+          transactor:                DbTransactor[IO, EventLogDB]
+      ): IO[Unit] = ().pure[IO]
+
+      def maybeProcessingTime: Option[EventProcessingTime] = eventProcessingTimes.generateOption
+    }
+
+    lazy val changeStatusCommands: Gen[ChangeStatusCommand[IO]] = Gen.const(MockChangeStatusCommand())
+  }
 
   private class GaugeStub extends LabeledGauge[IO, projects.Path] {
     override def set(labelValue: (projects.Path, Double)) = IO.unit

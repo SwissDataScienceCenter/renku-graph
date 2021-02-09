@@ -23,7 +23,7 @@ import cats.effect.Effect
 import ch.datascience.http.ErrorMessage
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
-import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry.{NoCategoriesAvailable, SubscriptionResult, UnsupportedPayload}
+import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry.{SubscriptionResult, UnsupportedPayload}
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal
@@ -56,12 +56,12 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
 
   private def badRequestIfError(eitherErrorSuccess: SubscriptionResult): Interpretation[Unit] =
     eitherErrorSuccess match {
-      case NoCategoriesAvailable       => ME.raiseError[Unit](new Exception("No subscription categories found"))
       case UnsupportedPayload(message) => ME.raiseError[Unit](BadRequestError(message))
       case _                           => ME.unit
     }
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+    case NotFoundError => NotFound("Category not found")
     case exception: BadRequestError =>
       BadRequest {
         Option(exception.getCause) map ErrorMessage.apply getOrElse ErrorMessage(exception.getMessage)
@@ -76,13 +76,15 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
 
 object SubscriptionsEndpoint {
 
-  sealed trait BadRequestError extends Throwable
+  private sealed trait BadRequestError extends Throwable
 
-  object BadRequestError {
+  private object BadRequestError {
     def apply(message: String): BadRequestError = new Exception(message) with BadRequestError
 
     def apply(cause: Throwable): BadRequestError = new Exception(cause) with BadRequestError
   }
+
+  private case object NotFoundError extends Throwable
 
 }
 
@@ -90,7 +92,7 @@ object IOSubscriptionsEndpoint {
 
   import cats.effect.{ContextShift, IO}
 
-  def apply[T <: SubscriptionCategoryPayload](
+  def apply[T <: SubscriptionInfo](
       subscriptionCategoryRegistry: SubscriptionCategoryRegistry[IO],
       logger:                       Logger[IO]
   )(implicit contextShift:          ContextShift[IO]): IO[SubscriptionsEndpoint[IO]] = IO {

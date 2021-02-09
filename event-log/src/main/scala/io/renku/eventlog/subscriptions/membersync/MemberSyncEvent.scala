@@ -19,21 +19,23 @@
 package io.renku.eventlog.subscriptions.membersync
 
 import ch.datascience.graph.model.projects
-import io.circe.Encoder
+import io.renku.eventlog.subscriptions.EventEncoder
 
 private final case class MemberSyncEvent(projectPath: projects.Path) {
   override lazy val toString: String = s"$MemberSyncEvent projectPath = $projectPath"
 }
 
-private object MemberSyncEventEncoder extends Encoder[MemberSyncEvent] {
+private object MemberSyncEventEncoder extends EventEncoder[MemberSyncEvent] {
 
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def apply(event: MemberSyncEvent): Json = json"""{
+  override def encodeEvent(event: MemberSyncEvent): Json = json"""{
     "categoryName": ${categoryName.value},
     "project": {
       "path":       ${event.projectPath.value}
     }
   }"""
+
+  override def encodePayload(categoryEvent: MemberSyncEvent): Option[String] = None
 }

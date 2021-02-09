@@ -1,8 +1,10 @@
 # triples-generator
 
 This is a microservice which:
+
 - listens to notification from the Event Log,
-- clones the Git project, checks out the commit `id` in order to create RDF triples by invoking `renku log --format rdf`,
+- clones the Git project, checks out the commit `id` in order to create RDF triples by invoking `renku log --format rdf`
+  ,
 - uploads the generated triples to Jena Fuseki
 
 ## API
@@ -20,47 +22,87 @@ Accepts an event for triples generation.
 
 - **AWAITING_GENERATION**
 
-**Request**
+**Multipart Request**
+
+`event` part:
 
 ```json
 {
   "categoryName": "AWAITING_GENERATION",
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id":   123
-  },
-  "body":   "JSON payload"
+    "id": 12
+  }
 }
 ```
 
-Event Body example:
+`payload` part as a string:
+
+```
+"JSON payload as string"
+```
+
+`payload` example:
 
 ```json
 {
-  "id":            "df654c3b1bd105a29d658f78f6380a842feac879",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "parents": [
     "f307326be71b17b90db5caaf47bcd44710fe119f"
   ],
   "project": {
-    "id":    123,
+    "id": 123,
     "path": "namespace/project-name"
   }
 }
 ```
 
+- **TRIPLES_GENERATED**
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "TRIPLES_GENERATED",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12,
+    "path": "project/path"
+  }
+}
+```
+
+`payload` part as a string:
+
+```
+"JSON payload as string"
+```
+
+`payload` example:
+
+```json
+{
+  "payload": "json-ld payload as string",
+  "schemaVersion": "8"
+}
+```
+
 - **MEMBER_SYNC**
 
-**Request**
+**Multipart Request**
+
+`event` part:
 
 ```json
 {
   "categoryName": "MEMBER_SYNC",
   "project": {
-    "path":       "namespace/project-name"
+    "path": "namespace/project-name"
   }
 }
 ```
-
 
 ##### Response
 

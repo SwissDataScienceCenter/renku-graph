@@ -67,7 +67,8 @@ trait Sensitive extends Any {
 }
 
 abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
-    extends From[TT]
+    extends (TT#V => TT)
+    with From[TT]
     with Constraints[TT#V]
     with ValueTransformation[TT#V]
     with TinyTypeOrdering[TT]

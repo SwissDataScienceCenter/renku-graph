@@ -19,17 +19,13 @@
 package io.renku.eventlog
 
 import cats.data.NonEmptyList
-import doobie.syntax.all._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
-import doobie.Meta
 import doobie.util.meta.{LegacyInstantMetaInstance, LegacyLocalDateMetaInstance}
 import doobie.util.{Get, Put, Read}
 import org.postgresql.util.PGInterval
 
 import java.time.{Duration, Instant}
-import java.util.GregorianCalendar
-import java.util.concurrent.TimeUnit
 
 object TypeSerializers extends TypeSerializers
 
@@ -65,12 +61,12 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
   implicit val eventStatusGet: Get[EventStatus] = Get[String].tmap(EventStatus.apply)
   implicit val eventStatusPut: Put[EventStatus] = Put[String].contramap(_.value)
 
-  val nanosPerSecond = 1000000000L
-  val secsPerMinute  = 60
-  val secsPerHour    = 3600
-  val secsPerDay     = 86400
-  val secsPerMonth   = 30 * secsPerDay
-  val secsPerYear    = (365.25 * secsPerDay).toInt
+  private val nanosPerSecond = 1000000000L
+  private val secsPerMinute  = 60
+  private val secsPerHour    = 3600
+  private val secsPerDay     = 86400
+  private val secsPerMonth   = 30 * secsPerDay
+  private val secsPerYear    = (365.25 * secsPerDay).toInt
 
   implicit val statusProcessingTimeGet: Get[EventProcessingTime] =
     Get.Advanced.other[PGInterval](NonEmptyList.of("interval")).tmap { pgInterval =>

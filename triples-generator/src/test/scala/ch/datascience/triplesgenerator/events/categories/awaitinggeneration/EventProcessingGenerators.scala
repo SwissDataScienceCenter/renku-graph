@@ -18,13 +18,11 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
-import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
+import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import ch.datascience.graph.model.events.EventId
+import ch.datascience.triplesgenerator.events.categories.Generators._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.scalacheck.Gen
 
@@ -39,22 +37,7 @@ private object EventProcessingGenerators {
     case Some(parentId) => CommitEventWithParent(EventId(commitId.value), project, commitId, parentId)
   }
 
-  implicit lazy val projects: Gen[Project] = for {
-    projectId <- projectIds
-    path      <- projectPaths
-  } yield Project(projectId, path)
-
-  lazy val curationRecoverableErrors: Gen[CurationRecoverableError] = for {
-    message   <- nonEmptyStrings()
-    exception <- exceptions
-  } yield CurationRecoverableError(message, exception)
-
   lazy val generationRecoverableErrors: Gen[GenerationRecoverableError] = for {
     message <- nonEmptyStrings()
   } yield GenerationRecoverableError(message)
-
-  lazy val processingRecoverableErrors: Gen[ProcessingRecoverableError] = Gen.oneOf(
-    curationRecoverableErrors,
-    generationRecoverableErrors
-  )
 }

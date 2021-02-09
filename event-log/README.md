@@ -182,13 +182,22 @@ Currently, only status changing payloads are allowed:
 **Notice** `CONFLICT (409)` returned when current event status is different from `TRIPLES_GENERATED`.
 
 - for transitioning event from status `GENERATING_TRIPLES` to `TRIPLES_GENERATED`
+- a multipart request is required with the `event` part as follow
 
 ```json
 {
   "status": "TRIPLES_GENERATED",
-  "payload": "json-ld as string",
-  "schemaVersion": "schema version of the triples",
   "processing_time (optional)": "PT2.023S"
+}
+
+```
+
+- and a `payload` part as a __STRING encoded json__
+
+```json
+{
+  "payload": "json-ld as string",
+  "schemaVersion": "schema version of the triples"
 }
 ```
 
@@ -312,12 +321,12 @@ Response body examples:
 
 #### POST /subscriptions
 
-Adds a subscription to the events with certain statuses. Once a service gets successfully subscribed by receiving an
-ACCEPTED, event-log service will start distributing events with the given `statuses` to the URL presented in the request
-body. Currently, event-log allows subscriptions to `NEW` and `RECOVERABLE_FAILURE` statuses only.
+Allow subscription for __categories__ specified bellow.
 
 **NOTICE:**
 As a good practice, the subscription should be renewed periodically in case of restart or URL change.
+
+All events are sent as multipart requests
 
 - **AWAITING_GENERATION**
 
@@ -326,11 +335,14 @@ As a good practice, the subscription should be renewed periodically in case of r
 ```json
 {
   "categoryName": "AWAITING_GENERATION",
-  "subscriberUrl": "http://host/path"
+  "subscriberUrl": "http://host/path",
+  "capacity": 4
 }
 ```
 
-**Response**
+**Event example**
+
+`event` part:
 
 ```json
 {
@@ -338,9 +350,14 @@ As a good practice, the subscription should be renewed periodically in case of r
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id": 12
-  },
-  "body": "JSON payload"
+  }
 }
+```
+
+`payload` part as a string:
+
+```
+"JSON payload as string"
 ```
 
 - **TRIPLES_GENERATED**
@@ -354,16 +371,27 @@ As a good practice, the subscription should be renewed periodically in case of r
 }
 ```
 
-**Response**
+**Event example**
+
+`event` part:
 
 ```json
 {
   "categoryName": "TRIPLES_GENERATED",
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12
-  },
-  "body": "JSON payload"
+    "id": 12,
+    "path": "project/path"
+  }
+}
+```
+
+`payload` part as a string:
+
+```json
+{
+  "payload": "json-ld payload as string",
+  "schemaVersion": "8"
 }
 ```
 
@@ -378,14 +406,42 @@ As a good practice, the subscription should be renewed periodically in case of r
 }
 ```
 
-**Response**
+**Event example**
+
+`event` part:
 
 ```json
 {
   "categoryName": "MEMBER_SYNC",
   "project": {
-    "path":       "namespace/project-name"
-  } 
+    "path": "namespace/project-name"
+  }
+}
+```
+
+- **ZOMBIE_CHASING**
+
+**Request**
+
+```json
+{
+  "categoryName": "ZOMBIE_CHASING",
+  "subscriberUrl": "http://host/path"
+}
+```
+
+**Event example**
+
+`event` part:
+
+```json
+{
+  "categoryName": "MEMBER_SYNC",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12
+  },
+  "status": "GENERATING_TRIPLES|TRANSFORMING_TRIPLES"
 }
 ```
 
@@ -435,7 +491,7 @@ Event-log uses relational database as an internal storage. The DB has the follow
 |-------------------------------------------|
 | event_id        VARCHAR    PK FK NOT NULL |
 | project_id      INT4       PK FK NOT NULL |
-| status          VARCHAR          NOT NULL |
+| status          VARCHAR    PK    NOT NULL |
 | processing_time INTERVAL         NOT NULL |
 
 ## Trying out

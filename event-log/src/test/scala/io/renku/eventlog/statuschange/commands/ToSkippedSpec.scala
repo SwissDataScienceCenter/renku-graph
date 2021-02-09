@@ -18,25 +18,32 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import java.time.Instant
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
-import doobie.implicits._
 import eu.timepit.refined.auto._
+import io.circe.Json
+import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, eventProcessingTimes, executionDates}
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
+import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
+import org.http4s.circe.jsonEncoder
+import org.http4s.headers.`Content-Type`
+import org.http4s.{MediaType, Request}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import java.time.Instant
 
 class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
@@ -106,6 +113,70 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
           histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
     }
+    "factory" should {
+      "return a CommandFound when properly decoding a request" in new TestCase {
+        val message             = eventMessages.generateOne
+        val maybeProcessingTime = eventProcessingTimes.generateOption
+        val expected =
+          ToSkipped(eventId, message, underTriplesGenerationGauge, maybeProcessingTime)
+
+        val body = json"""{
+            "status": ${EventStatus.Skipped.value},
+            "message": ${message.value}
+          }""" deepMerge maybeProcessingTime
+          .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+          .getOrElse(Json.obj())
+
+        val request = Request[IO]().withEntity(body)
+
+        val actual = ToSkipped.factory[IO](underTriplesGenerationGauge).run((eventId, request))
+        actual.unsafeRunSync() shouldBe CommandFound(expected)
+      }
+
+      EventStatus.all.filterNot(status => status == Skipped) foreach { eventStatus =>
+        s"return NotSupported if the decoding failed with status: $eventStatus " in new TestCase {
+          val body = json"""{ "status": ${eventStatus.value} }"""
+
+          val request = Request[IO]().withEntity(body)
+
+          val actual = ToSkipped.factory[IO](underTriplesGenerationGauge).run((eventId, request))
+
+          actual.unsafeRunSync() shouldBe NotSupported
+        }
+      }
+
+      "return PayloadMalformed if the decoding failed because no message  is present" in new TestCase {
+        val message             = eventMessages.generateOne
+        val maybeProcessingTime = eventProcessingTimes.generateOption
+
+        val body = json"""{
+            "status": ${EventStatus.Skipped.value} }""" deepMerge maybeProcessingTime
+          .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
+          .getOrElse(Json.obj())
+
+        val request = Request[IO]().withEntity(body)
+
+        val actual = ToSkipped.factory[IO](underTriplesGenerationGauge).run((eventId, request))
+        actual.unsafeRunSync() shouldBe PayloadMalformed("No message property in status change payload")
+      }
+      "return PayloadMalformed if the decoding failed because no status is present " in new TestCase {
+        val request = Request[IO]().withEntity(json"""{ }""")
+
+        val actual = ToSkipped.factory[IO](underTriplesGenerationGauge).run((eventId, request))
+
+        actual.unsafeRunSync() shouldBe PayloadMalformed("No status property in status change payload")
+      }
+
+      "return NotSupported if the decoding failed because of unsupported content type " in new TestCase {
+        val request =
+          Request[IO]().withEntity(jsons.generateOne).withHeaders(`Content-Type`(MediaType.multipart.`form-data`))
+
+        val actual = ToSkipped.factory[IO](underTriplesGenerationGauge).run((eventId, request))
+
+        actual.unsafeRunSync() shouldBe NotSupported
+      }
+    }
+
   }
 
   private trait TestCase {

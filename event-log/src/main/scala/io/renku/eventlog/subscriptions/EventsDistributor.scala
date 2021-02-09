@@ -122,7 +122,7 @@ private object IOEventsDistributor {
       transactor:           DbTransactor[IO, EventLogDB],
       subscribers:          Subscribers[IO],
       eventsFinder:         EventFinder[IO, CategoryEvent],
-      categoryEventEncoder: Encoder[CategoryEvent],
+      categoryEventEncoder: EventEncoder[CategoryEvent],
       dispatchRecovery:     DispatchRecovery[IO, CategoryEvent],
       logger:               Logger[IO]
   )(implicit
@@ -141,11 +141,4 @@ private object IOEventsDistributor {
                                       noEventSleep = NoEventSleep,
                                       onErrorSleep = OnErrorSleep
     )
-}
-
-private trait DispatchRecovery[Interpretation[_], CategoryEvent] {
-  def recover(
-      url:           SubscriberUrl,
-      categoryEvent: CategoryEvent
-  ): PartialFunction[Throwable, Interpretation[Unit]]
 }

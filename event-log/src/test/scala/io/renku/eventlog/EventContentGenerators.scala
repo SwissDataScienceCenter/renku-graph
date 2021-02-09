@@ -23,10 +23,8 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import org.scalacheck.Gen
-import eu.timepit.refined.auto._
 
-import java.util.concurrent.TimeUnit
-import scala.concurrent.duration.FiniteDuration
+import java.time.Duration
 import scala.language.postfixOps
 
 object EventContentGenerators {
@@ -63,7 +61,7 @@ object EventContentGenerators {
   } yield EventProject(id, path)
 
   implicit lazy val eventProcessingTimes: Gen[EventProcessingTime] =
-    notNegativeJavaDurations.map(EventProcessingTime.apply)
+    javaDurations(min = Duration ofMinutes 10).map(EventProcessingTime.apply)
 
   implicit val eventPayloads: Gen[EventPayload] = for {
     content <- jsons

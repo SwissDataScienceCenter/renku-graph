@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.statuschange.commands
 
-import cats.data.NonEmptyList
-import cats.effect.Bracket
+import cats.MonadError
+import cats.data.{Kleisli, NonEmptyList}
+import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus._
@@ -28,8 +29,10 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
+import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage, EventProcessingTime}
+import org.http4s.{MediaType, Request}
 
 import java.time.Instant
 
@@ -61,4 +64,29 @@ final case class ToGenerationNonRecoverableFailure[Interpretation[_]](
     case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesGenerationGauge.decrement
     case _                    => ME.unit
   }
+}
+
+object ToGenerationNonRecoverableFailure {
+
+  def factory[Interpretation[_]: Sync](underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path])(
+      implicit ME: MonadError[Interpretation, Throwable]
+  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
+    Kleisli { case (eventId, request) =>
+      when(request, has = MediaType.application.json) {
+        {
+          for {
+            _                   <- request.validate(status = GenerationNonRecoverableFailure)
+            maybeProcessingTime <- request.getProcessingTime
+            maybeMessage        <- request.getMessage
+          } yield CommandFound(
+            ToGenerationNonRecoverableFailure[Interpretation](eventId,
+                                                              maybeMessage,
+                                                              underTriplesGenerationGauge,
+                                                              maybeProcessingTime
+            )
+          )
+        }.merge
+      }
+
+    }
 }

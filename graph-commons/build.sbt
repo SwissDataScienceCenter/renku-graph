@@ -46,7 +46,7 @@ libraryDependencies += "org.typelevel" %% "cats-core"   % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-effect" % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-free"   % catsVersion
 
-val http4sVersion = "0.21.15"
+val http4sVersion = "0.21.16"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
@@ -57,15 +57,15 @@ libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sVersi
 // Test dependencies
 libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.27.2" % Test
 
-val jenaVersion = "3.16.0" // leave at 3.16 until the Docker image version can catch up. 3.17 made changes with \\\\
+val jenaVersion = "3.14.0"
 libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % Test
 
 libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.1.0"   % Test
-libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.2 is broken
+libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.1 is broken
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
-libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.2"   % Test // 3.2.3 seems to break List comparison
+libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.3"   % Test
 
 val testContainersScalaVersion = "0.38.8"
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test

@@ -19,49 +19,57 @@
 package io.renku.eventlog.statuschange
 
 import cats.MonadError
+import cats.data.Kleisli
 import cats.effect.{ContextShift, Effect}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.{SchemaVersion, projects}
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.graph.model.projects
+import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
-import io.renku.eventlog.{EventLogDB, EventMessage, EventPayload, EventProcessingTime, ExecutionDate}
+import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
+import io.renku.eventlog.statuschange.commands._
+import org.http4s.Request
 import org.http4s.dsl.Http4sDsl
 
-import java.time.Instant
 import scala.util.control.NonFatal
 
 class StatusChangeEndpoint[Interpretation[_]: Effect](
-    statusUpdatesRunner:                StatusUpdatesRunner[Interpretation],
-    awaitingTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
-    underTriplesGenerationGauge:        LabeledGauge[Interpretation, projects.Path],
-    awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
-    underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
-    logger:                             Logger[Interpretation]
-)(implicit ME:                          MonadError[Interpretation, Throwable])
+    statusUpdatesRunner: StatusUpdatesRunner[Interpretation],
+    commandFactories: Set[
+      Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult]
+    ],
+    logger:    Logger[Interpretation]
+)(implicit ME: MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
 
-  import ch.datascience.http.InfoMessage._
   import ch.datascience.http.InfoMessage
-  import org.http4s.circe._
-  import org.http4s.{EntityDecoder, Request, Response}
+  import ch.datascience.http.InfoMessage._
+  import org.http4s.{Request, Response}
   import statusUpdatesRunner.run
 
   def changeStatus(eventId: CompoundEventId,
                    request: Request[Interpretation]
-  ): Interpretation[Response[Interpretation]] = {
-    for {
-      command      <- request.as[ChangeStatusCommand[Interpretation]](ME, findDecoder(eventId)) recoverWith badRequest
-      updateResult <- run(command)
-      response     <- updateResult.asHttpResponse
-    } yield response
-  } recoverWith httpResponse
+  ): Interpretation[Response[Interpretation]] =
+    tryCommandFactory(eventId, request, commandFactories.toList)
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[ChangeStatusCommand[Interpretation]]] = {
-    case NonFatal(exception) => ME.raiseError(BadRequestError(exception))
+  private def tryCommandFactory(
+      eventId: CompoundEventId,
+      request: Request[Interpretation],
+      commandFactories: List[
+        Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult]
+      ]
+  ): Interpretation[Response[Interpretation]] = commandFactories match {
+    case Nil => BadRequest(ErrorMessage("No event command found"))
+    case head :: tail =>
+      head(eventId -> request).flatMap {
+        case command: CommandFound[Interpretation] =>
+          run(command.command).flatMap(_.asHttpResponse) recoverWith httpResponse
+        case NotSupported              => tryCommandFactory(eventId, request, tail)
+        case PayloadMalformed(message) => BadRequest(ErrorMessage(message))
+      }
   }
 
   private implicit class ResultOps(result: UpdateResult) {
@@ -85,96 +93,39 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
-  private def findDecoder(
-      eventId: CompoundEventId
-  ): EntityDecoder[Interpretation, ChangeStatusCommand[Interpretation]] = {
-    import ch.datascience.graph.model.events.EventStatus
-    import ch.datascience.graph.model.events.EventStatus._
-    import commands._
-    import io.circe.{Decoder, HCursor}
-    implicit val commandDecoder: Decoder[ChangeStatusCommand[Interpretation]] = (cursor: HCursor) =>
-      for {
-        status              <- cursor.downField("status").as[EventStatus]
-        maybeMessage        <- cursor.downField("message").as[Option[EventMessage]]
-        maybePayload        <- cursor.downField("payload").as[Option[EventPayload]]
-        maybeSchemaVersion  <- cursor.downField("schemaVersion").as[Option[SchemaVersion]]
-        maybeProcessingTime <- cursor.downField("processingTime").as[Option[EventProcessingTime]]
-      } yield status match {
-        case TriplesStore =>
-          ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge, maybeProcessingTime)
-        case New =>
-          ToNew[Interpretation](eventId,
-                                awaitingTriplesGenerationGauge,
-                                underTriplesGenerationGauge,
-                                maybeProcessingTime
-          )
-        case TriplesGenerated =>
-          ToTriplesGenerated[Interpretation](
-            eventId,
-            maybePayload getOrElse (throw new Exception(s"$status status needs a payload")),
-            maybeSchemaVersion getOrElse (throw new Exception(s"$status status needs a schemaVersion")),
-            underTriplesGenerationGauge,
-            awaitingTriplesTransformationGauge,
-            maybeProcessingTime
-          )
-        case Skipped =>
-          ToSkipped[Interpretation](eventId,
-                                    maybeMessage getOrElse (throw new Exception(s"$status status needs a message")),
-                                    underTriplesGenerationGauge,
-                                    maybeProcessingTime
-          )
-        case GenerationRecoverableFailure =>
-          ToGenerationRecoverableFailure[Interpretation](eventId,
-                                                         maybeMessage,
-                                                         awaitingTriplesGenerationGauge,
-                                                         underTriplesGenerationGauge,
-                                                         maybeProcessingTime
-          )
-        case GenerationNonRecoverableFailure =>
-          ToGenerationNonRecoverableFailure[Interpretation](eventId,
-                                                            maybeMessage,
-                                                            underTriplesGenerationGauge,
-                                                            maybeProcessingTime
-          )
-        case TransformationRecoverableFailure =>
-          ToTransformationRecoverableFailure[Interpretation](eventId,
-                                                             maybeMessage,
-                                                             awaitingTriplesTransformationGauge,
-                                                             underTriplesTransformationGauge,
-                                                             maybeProcessingTime
-          )
-        case TransformationNonRecoverableFailure =>
-          ToTransformationNonRecoverableFailure[Interpretation](eventId,
-                                                                maybeMessage,
-                                                                underTriplesTransformationGauge,
-                                                                maybeProcessingTime
-          )
-        case other => throw new Exception(s"Transition to '$other' status unsupported")
-      }
-
-    jsonOf[Interpretation, ChangeStatusCommand[Interpretation]]
-  }
 }
 
 object IOStatusChangeEndpoint {
   import cats.effect.IO
 
   def apply(
-      transactor:                      DbTransactor[IO, EventLogDB],
-      awaitTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
-      awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
-      underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:                LabeledHistogram[IO, SqlQuery.Name],
-      logger:                          Logger[IO]
-  )(implicit contextShift:             ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
+      transactor:                         DbTransactor[IO, EventLogDB],
+      awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
+      underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
+      awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
+      underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path],
+      queriesExecTimes:                   LabeledHistogram[IO, SqlQuery.Name],
+      logger:                             Logger[IO]
+  )(implicit contextShift:                ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {
       statusUpdatesRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
     } yield new StatusChangeEndpoint(statusUpdatesRunner,
-                                     awaitTriplesGenerationGauge,
-                                     underTriplesGenerationGauge,
-                                     awaitingTransformationGauge,
-                                     underTriplesTransformationGauge,
+                                     Set(
+                                       ToTriplesStore.factory(underTriplesGenerationGauge),
+                                       ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
+                                       ToTriplesGenerated.factory(underTriplesGenerationGauge,
+                                                                  awaitingTriplesTransformationGauge
+                                       ),
+                                       ToSkipped.factory(underTriplesGenerationGauge),
+                                       ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),
+                                       ToGenerationRecoverableFailure.factory(awaitingTriplesGenerationGauge,
+                                                                              underTriplesGenerationGauge
+                                       ),
+                                       ToTransformationNonRecoverableFailure.factory(underTriplesTransformationGauge),
+                                       ToTransformationRecoverableFailure.factory(awaitingTriplesTransformationGauge,
+                                                                                  underTriplesTransformationGauge
+                                       )
+                                     ),
                                      logger
     )
 }

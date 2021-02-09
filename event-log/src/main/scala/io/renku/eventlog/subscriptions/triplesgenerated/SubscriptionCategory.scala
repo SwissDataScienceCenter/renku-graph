@@ -24,7 +24,7 @@ import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.subscriptions.{IOEventsDistributor, Subscribers, SubscriptionCategoryImpl, SubscriptionCategoryPayload, SubscriptionRequestDeserializer}
+import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.{EventLogDB, subscriptions}
 
 import scala.concurrent.ExecutionContext

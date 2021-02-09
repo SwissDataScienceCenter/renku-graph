@@ -25,6 +25,7 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.{CommitId, EventBody, EventId}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
+import ch.datascience.triplesgenerator.events.categories.models.Project
 import io.circe._
 import org.scalacheck.Gen
 import org.scalacheck.Gen.choose

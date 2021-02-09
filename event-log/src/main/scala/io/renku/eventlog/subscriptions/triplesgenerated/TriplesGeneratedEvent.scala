@@ -19,26 +19,35 @@
 package io.renku.eventlog.subscriptions.triplesgenerated
 
 import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.projects
-import io.circe.Encoder
+import ch.datascience.graph.model.{SchemaVersion, projects}
+import cats.syntax.all._
 import io.renku.eventlog.EventPayload
+import io.renku.eventlog.subscriptions.EventEncoder
 
-private final case class TriplesGeneratedEvent(id: CompoundEventId, projectPath: projects.Path, payload: EventPayload) {
+private final case class TriplesGeneratedEvent(id:            CompoundEventId,
+                                               projectPath:   projects.Path,
+                                               payload:       EventPayload,
+                                               schemaVersion: SchemaVersion
+) {
   override lazy val toString: String =
     s"$TriplesGeneratedEvent $id, projectPath = $projectPath"
+
 }
 
-private object TriplesGeneratedEventEncoder extends Encoder[TriplesGeneratedEvent] {
+private object TriplesGeneratedEventEncoder extends EventEncoder[TriplesGeneratedEvent] {
 
   import io.circe.Json
   import io.circe.literal.JsonStringContext
 
-  override def apply(event: TriplesGeneratedEvent): Json = json"""{
+  override def encodeEvent(event: TriplesGeneratedEvent): Json = json"""{
     "categoryName": ${SubscriptionCategory.name.value},
     "id":           ${event.id.id.value},
     "project": {
-      "id":         ${event.id.projectId.value}
-    },
-    "body":${event.payload.value}
+      "id":         ${event.id.projectId.value},
+      "path": ${event.projectPath.value}
+    }
   }"""
+
+  override def encodePayload(event: TriplesGeneratedEvent): Option[String] =
+    json"""{"payload":${event.payload.value}, "schemaVersion": ${event.schemaVersion.value} }""".noSpaces.some
 }

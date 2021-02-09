@@ -26,15 +26,15 @@ import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.tinytypes.constraints.Url
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEventProcessor.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.GenerationResult.Triples
 import com.typesafe.config.{Config, ConfigFactory}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 
-import languageFeature.higherKinds
 import scala.concurrent.ExecutionContext
+import scala.languageFeature.higherKinds
 
 // This TriplesGenerator supposed to be used by the acceptance-tests only
 

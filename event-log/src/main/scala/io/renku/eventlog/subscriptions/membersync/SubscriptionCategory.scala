@@ -20,7 +20,6 @@ package io.renku.eventlog.subscriptions.membersync
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.metrics.LabeledHistogram
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.subscriptions._
@@ -40,7 +39,7 @@ private[subscriptions] object SubscriptionCategory {
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers      <- Subscribers(categoryName, logger)
     eventsFinder     <- MemberSyncEventFinder(transactor, queriesExecTimes)
-    dispatchRecovery <- DispatchRecovery[IO](logger)
+    dispatchRecovery <- LoggingDispatchRecovery[IO, MemberSyncEvent](categoryName, logger)
     eventsDistributor <-
       IOEventsDistributor(categoryName,
                           transactor,

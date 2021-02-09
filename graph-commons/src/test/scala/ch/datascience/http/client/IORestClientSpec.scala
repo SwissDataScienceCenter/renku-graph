@@ -19,7 +19,6 @@
 package ch.datascience.http.client
 
 import java.util.concurrent.TimeoutException
-
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.ServiceUrl
@@ -36,14 +35,15 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.chrisdavenport.log4cats.Logger
+import io.circe.Json
 import io.prometheus.client.Histogram
-import org.http4s.Method.GET
+import org.http4s.Method.{GET, POST}
 import org.http4s.client.ConnectionFailure
-import org.http4s.{Request, Response, Status}
+import org.http4s.{MediaType, Request, Response, Status}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
+import MediaType._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
@@ -268,6 +268,40 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
     }
   }
 
+  "multipart builder" should {
+    "successfully build a multipart request" in new TestCase {
+
+      val jsonPart = nonEmptyStrings().generateOne -> jsons.generateOne
+      val textPart = nonEmptyStrings().generateOne -> nonEmptyStrings().generateOne
+
+      stubFor {
+        post("/resource")
+          .withMultipartRequestBody(
+            aMultipart(jsonPart._1)
+              .withBody(equalToJson(jsonPart._2.noSpaces))
+              .withHeader("Content-Type", equalTo(s"${application.json.mainType}/${application.json.subType}"))
+          )
+          .withMultipartRequestBody(
+            aMultipart(textPart._1)
+              .withBody(equalTo(textPart._2))
+              .withHeader("Content-Type", equalTo(s"${text.plain.mainType}/${text.plain.subType}"))
+          )
+          .withHeader(
+            "Content-Type",
+            containing(s"${multipart.`form-data`.mainType}/${multipart.`form-data`.subType}")
+          )
+          .willReturn(ok("1"))
+      }
+
+      verifyThrottling()
+
+      client.callMultipartEndpoint(jsonPart, textPart).unsafeRunSync() shouldBe 1
+      verify {
+        postRequestedFor(urlEqualTo("/resource")).withoutHeader("Transfer-encoding")
+      }
+    }
+  }
+
   private trait TestCase {
     val histogramLabel: String Refined NonEmpty = "label"
     val histogram             = Histogram.build("histogram", "help").labelNames(histogramLabel.value).create()
@@ -312,6 +346,17 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
         uri         <- validateUri(s"$hostUrl/resource")
         accessToken <- send(HttpRequest(request(GET, uri), requestName))(mapResponse)
       } yield accessToken
+
+    def callMultipartEndpoint(jsonPart: (String, Json), textPart: (String, String)): IO[Int] = for {
+      uri <- validateUri(s"$hostUrl/resource")
+      response <-
+        send(
+          request(POST, uri).withMultipartBuilder
+            .addPart(jsonPart._1, jsonPart._2)
+            .addPart(textPart._1, textPart._2)
+            .build()
+        )(mapResponse)
+    } yield response
 
     private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Int]] = {
       case (Status.Ok, _, response) => response.as[String].map(_.toInt)

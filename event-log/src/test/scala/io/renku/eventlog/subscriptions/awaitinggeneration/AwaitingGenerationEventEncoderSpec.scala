@@ -18,30 +18,33 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import io.circe.Encoder
 import io.circe.literal._
-import io.circe.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class AwaitingGenerationEventEncoderSpec extends AnyWordSpec with should.Matchers {
 
-  private implicit val encoder: Encoder[AwaitingGenerationEvent] = AwaitingGenerationEventEncoder
-
-  "encoder" should {
+  "encodeEvent" should {
 
     "serialize AwaitingGenerationEvent to Json" in {
       val event = awaitingGenerationEvents.generateOne
 
-      event.asJson shouldBe json"""{
+      AwaitingGenerationEventEncoder.encodeEvent(event) shouldBe json"""{
         "categoryName": "AWAITING_GENERATION",
         "id":           ${event.id.id.value},
         "project": {
           "id":         ${event.id.projectId.value}
-        },
-        "body":         ${event.body.value}
+        }
       }"""
+    }
+  }
+  "encodePayload" should {
+    "serialize AwaitingGenerationEvent payload to a String" in {
+      val event = awaitingGenerationEvents.generateOne
+
+      AwaitingGenerationEventEncoder.encodePayload(event) shouldBe event.body.value.some
     }
   }
 }
