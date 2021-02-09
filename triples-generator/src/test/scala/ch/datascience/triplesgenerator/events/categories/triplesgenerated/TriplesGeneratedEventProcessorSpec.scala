@@ -223,11 +223,11 @@ class TriplesGeneratedEventProcessorSpec
 
   "eventsProcessingTimes histogram" should {
 
-    "have 'events_processing_times' name" in {
+    "have 'triples_transformation_processing_times' name" in {
       eventsProcessingTimes.startTimer().observeDuration()
 
       eventsProcessingTimes.collect().asScala.headOption.map(_.name) shouldBe Some(
-        "events_processing_times"
+        "triples_transformation_processing_times"
       )
     }
 
@@ -336,7 +336,7 @@ class TriplesGeneratedEventProcessorSpec
         .collect()
         .asScala
         .flatMap(_.samples.asScala.map(_.name))
-        .exists(_ startsWith "events_processing_times") shouldBe true
+        .exists(_ startsWith "triples_transformation_processing_times") shouldBe true
   }
 
 }
