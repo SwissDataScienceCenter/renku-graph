@@ -93,15 +93,17 @@ private class CommitEventProcessor[Interpretation[_]](
   private def generateAndUpdateStatus(
       commit:                  CommitEvent,
       currentSchemaVersion:    SchemaVersion
-  )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[TriplesGenerationResult] = {
-    generateTriples(commit) map {
-      case MigrationEvent      => Skipped(commit, MigrationEvent.toString):                   TriplesGenerationResult
-      case Triples(rawTriples) => TriplesGenerated(commit, rawTriples, currentSchemaVersion): TriplesGenerationResult
-    }
-  }.leftSemiflatMap(toRecoverableError(commit))
-    .merge
-    .recoverWith(toNonRecoverableFailure(commit))
-    .flatTap(updateEventLog)
+  )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[TriplesGenerationResult] =
+    generateTriples(commit)
+      .map {
+        case MigrationEvent      => Skipped(commit, MigrationEvent.toString)
+        case Triples(rawTriples) => TriplesGenerated(commit, rawTriples, currentSchemaVersion)
+      }
+      .widen[TriplesGenerationResult]
+      .leftSemiflatMap(toRecoverableError(commit))
+      .merge
+      .recoverWith(toNonRecoverableFailure(commit))
+      .flatTap(updateEventLog)
 
   private def updateEventLog(uploadingResults: TriplesGenerationResult): Interpretation[Unit] = {
     uploadingResults match {
