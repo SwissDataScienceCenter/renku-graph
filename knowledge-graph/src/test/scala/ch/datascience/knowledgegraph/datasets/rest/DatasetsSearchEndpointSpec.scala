@@ -125,7 +125,11 @@ class DatasetsSearchEndpointSpec
     import DatasetsSearchEndpoint.Sort._
 
     "list only name, datePublished and projectsCount" in {
-      DatasetsSearchEndpoint.Sort.properties shouldBe Set(TitleProperty, DatePublishedProperty, ProjectsCountProperty)
+      DatasetsSearchEndpoint.Sort.properties shouldBe Set(TitleProperty,
+                                                          DatePublishedProperty,
+                                                          DateCreatedProperty,
+                                                          ProjectsCountProperty
+      )
     }
   }
 

@@ -21,9 +21,9 @@ no `query` parameter is given.
 
 NOTES:
 
-* the `phrase` query parameter has to be url encoded and it cannot be blank.
-* the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`
-  , `datePublished`, `dateCreated` and `projectsCount`.
+* the `query` query parameter has to be url-encoded and it cannot be blank.
+* the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`,
+  `datePublished`, `dateCreated` and `projectsCount`.
 * the `page` query parameter is optional and defaults to `1`.
 * the `per_page` query parameter is optional and defaults to `20`.
 
@@ -81,6 +81,7 @@ Response body example:
           }
         ]
       },
+      "created": "2012-10-15T10:00:00.000Z",
       "projectsCount": 2,
       "images": ["image.png"],
       "_links":[  
@@ -100,6 +101,7 @@ Response body example:
           }
         ]
       },
+      "created": "2012-11-15T10:00:00.000Z",
       "projectsCount": 1,
       "images": ["https://blah.com/image.png"],
       "_links":[  

@@ -153,7 +153,12 @@ object DatasetsSearchEndpoint {
     final case object DateCreatedProperty   extends Property("dateCreated") with SearchProperty
     final case object ProjectsCountProperty extends Property("projectsCount") with SearchProperty
 
-    override lazy val properties: Set[SearchProperty] = Set(TitleProperty, DatePublishedProperty, ProjectsCountProperty)
+    override lazy val properties: Set[SearchProperty] = Set(
+      TitleProperty,
+      DatePublishedProperty,
+      DateCreatedProperty,
+      ProjectsCountProperty
+    )
   }
 }
 
