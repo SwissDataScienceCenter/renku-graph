@@ -158,6 +158,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       url              <- cursor.downField("url").as[Url]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
       published        <- cursor.downField("published").as[DatasetPublishing]
+      created          <- cursor.downField("created").as[DateCreated]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
       projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
       keywords         <- cursor.downField("keywords").as[List[Keyword]]
@@ -175,6 +176,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                            versions,
                            maybeDescription,
                            published,
+                           created,
                            parts,
                            projects,
                            keywords,
@@ -191,6 +193,7 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                           versions,
                           maybeDescription,
                           published,
+                          created,
                           parts,
                           projects,
                           keywords,

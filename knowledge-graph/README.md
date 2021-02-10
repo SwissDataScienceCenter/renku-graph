@@ -23,7 +23,7 @@ NOTES:
 
 * the `phrase` query parameter has to be url encoded and it cannot be blank.
 * the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`
-  , `datePublished` and `projectsCount`.
+  , `datePublished`, `dateCreated` and `projectsCount`.
 * the `page` query parameter is optional and defaults to `1`.
 * the `per_page` query parameter is optional and defaults to `20`.
 
@@ -301,11 +301,12 @@ Response body example:
 
 #### GET /knowledge-graph/projects/:namespace/:name
 
-Finds details of the project with the given `namespace/name`.
-The endpoint requires an authorization token to be passed in the request for non-public projects. Supported headers are:
+Finds details of the project with the given `namespace/name`. The endpoint requires an authorization token to be passed
+in the request for non-public projects. Supported headers are:
+
 - `Authorization: Bearer <token>` with OAuth Token obtained from GitLab
 - `PRIVATE-TOKEN: <token>` with user's Personal Access Token in GitLab
-There's no need for a security headers for public projects.
+- There's no need for a security headers for public projects
 
 **Response**
 

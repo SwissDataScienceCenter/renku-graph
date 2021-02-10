@@ -92,6 +92,7 @@ class DatasetEndpoint[Interpretation[_]: Effect](
         ("versions" -> dataset.versions.asJson).some,
         dataset.maybeDescription.map(description => "description" -> description.asJson),
         ("published" -> dataset.published.asJson).some,
+        ("created" -> dataset.created.asJson).some,
         ("hasPart" -> dataset.parts.asJson).some,
         ("isPartOf" -> dataset.projects.asJson).some,
         ("keywords" -> dataset.keywords.asJson).some,
