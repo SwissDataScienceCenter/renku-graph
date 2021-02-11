@@ -58,7 +58,7 @@ class LineageQuerySpec
     *                                                   sha7 plot_data +----------------+
     *                                                                                   |
     *                                                                                   v
-    * sha3 zhbikes+---------------> sha8 renku run +------->bikesParquet +------------>sha9 renku run+------> plot_data
+    * sha3 zhbikes+---------------> sha8 renku run +------->bikesParquet +------------>sha9 renku run+------> grid_plot
     *                                       ^                                                +
     *                                       |                                                |
     * sha7 clean_data +--------------------+                                                 +-----------> cumulative
@@ -67,7 +67,7 @@ class LineageQuerySpec
   Feature("GraphQL query to find lineage") {
 
     /**
-      *  ========================================== EXPECTED GRAPH  =====================================================
+      *  ========================================== EXPECTED GRAPH  ====================================================
       *  When looking for figs/grid_plot of commit 9
       *                                                   sha7 plot_data +--------------+
       *                                                                                 |
