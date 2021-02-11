@@ -19,7 +19,7 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{Description, Identifier, ImageUri, Name, PublishedDate, Title}
+import ch.datascience.graph.model.datasets.{DateCreated, Description, Identifier, ImageUri, Name, PublishedDate, Title}
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
@@ -51,6 +51,7 @@ private object DatasetsFinder {
       name:             Name,
       maybeDescription: Option[Description],
       published:        DatasetPublishing,
+      dateCreate:       DateCreated,
       projectsCount:    ProjectsCount,
       images:           List[ImageUri]
   )
@@ -100,7 +101,7 @@ private class IODatasetsFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX text: <http://jena.apache.org/text#>"
     ),
-    s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs ?projectsCount (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+    s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?dateCreated ?maybeDerivedFrom ?sameAs ?projectsCount (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
         |  {
         |    SELECT (MIN(?dsId) AS ?dsIdExample) ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
@@ -151,7 +152,8 @@ private class IODatasetsFinder(
         |          schema:identifier ?identifier;
         |          schema:name ?name ;
         |          schema:alternateName ?alternateName;
-        |          schema:isPartOf ?projectId.
+        |          schema:isPartOf ?projectId ;
+        |          schema:dateCreated ?dateCreated .
         |    OPTIONAL { 
         |      ?dsIdExample schema:image ?imageId .
         |      ?imageId     schema:position ?imagePosition ;
@@ -168,7 +170,7 @@ private class IODatasetsFinder(
         |    }
         |  }
         |}
-        |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDerivedFrom ?sameAs ?projectsCount
+        |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?dateCreated ?maybeDerivedFrom ?sameAs ?projectsCount
         |${`ORDER BY`(sort)}
         |""".stripMargin
   )
@@ -176,6 +178,7 @@ private class IODatasetsFinder(
   private def `ORDER BY`(sort: Sort.By): String = sort.property match {
     case Sort.TitleProperty         => s"ORDER BY ${sort.direction}(?name)"
     case Sort.DatePublishedProperty => s"ORDER BY ${sort.direction}(?maybePublishedDate)"
+    case Sort.DateCreatedProperty   => s"ORDER BY ${sort.direction}(?dateCreated)"
     case Sort.ProjectsCountProperty => s"ORDER BY ${sort.direction}(?projectsCount)"
   }
 
@@ -215,6 +218,7 @@ private object IODatasetsFinder {
       id                 <- cursor.downField("identifier").downField("value").as[Identifier]
       title              <- cursor.downField("name").downField("value").as[Title]
       name               <- cursor.downField("alternateName").downField("value").as[Name]
+      dateCreated        <- cursor.downField("dateCreated").downField("value").as[DateCreated]
       maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
       projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
       images             <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
@@ -230,6 +234,7 @@ private object IODatasetsFinder {
       name,
       maybeDescription,
       DatasetPublishing(maybePublishedDate, Set.empty),
+      dateCreated,
       projectsCount,
       images
     )

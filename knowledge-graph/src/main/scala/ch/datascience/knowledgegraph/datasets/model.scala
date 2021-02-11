@@ -32,6 +32,7 @@ object model {
     val url:              Url
     val maybeDescription: Option[Description]
     val published:        DatasetPublishing
+    val created:          DateCreated
     val parts:            List[DatasetPart]
     val projects:         List[DatasetProject]
     val keywords:         List[Keyword]
@@ -47,6 +48,7 @@ object model {
                                       versions:         DatasetVersions,
                                       maybeDescription: Option[Description],
                                       published:        DatasetPublishing,
+                                      created:          DateCreated,
                                       parts:            List[DatasetPart],
                                       projects:         List[DatasetProject],
                                       keywords:         List[Keyword],
@@ -61,6 +63,7 @@ object model {
                                    versions:         DatasetVersions,
                                    maybeDescription: Option[Description],
                                    published:        DatasetPublishing,
+                                   created:          DateCreated,
                                    parts:            List[DatasetPart],
                                    projects:         List[DatasetProject],
                                    keywords:         List[Keyword],

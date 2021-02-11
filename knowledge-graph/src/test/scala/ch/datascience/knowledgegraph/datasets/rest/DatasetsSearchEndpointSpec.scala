@@ -125,7 +125,11 @@ class DatasetsSearchEndpointSpec
     import DatasetsSearchEndpoint.Sort._
 
     "list only name, datePublished and projectsCount" in {
-      DatasetsSearchEndpoint.Sort.properties shouldBe Set(TitleProperty, DatePublishedProperty, ProjectsCountProperty)
+      DatasetsSearchEndpoint.Sort.properties shouldBe Set(TitleProperty,
+                                                          DatePublishedProperty,
+                                                          DateCreatedProperty,
+                                                          ProjectsCountProperty
+      )
     }
   }
 
@@ -154,12 +158,13 @@ class DatasetsSearchEndpointSpec
     ).searchForDatasets _
 
     lazy val toJson: DatasetSearchResult => Json = {
-      case DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount, images) =>
+      case DatasetSearchResult(id, title, name, maybeDescription, published, created, projectsCount, images) =>
         json"""{
           "identifier": $id,
           "title": $title,
           "name": $name,
           "published": $published,
+          "created": $created,
           "projectsCount": ${projectsCount.value},
           "images": ${images.map(_.value)},
           "_links": [{
@@ -197,7 +202,8 @@ class DatasetsSearchEndpointSpec
     name             <- datasetNames
     maybeDescription <- Gen.option(datasetDescriptions)
     published        <- datasetPublishingInfos
+    created          <- datasetCreatedDates
     projectsCount    <- nonNegativeInts() map (_.value) map ProjectsCount.apply
     images           <- listOf(imageUris)
-  } yield DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount, images)
+  } yield DatasetSearchResult(id, title, name, maybeDescription, published, created, projectsCount, images)
 }

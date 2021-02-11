@@ -16,7 +16,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": 20,
-  "iteration": 1612789264898,
+  "iteration": 1612887556162,
   "links": [],
   "panels": [
     {
@@ -743,19 +743,19 @@
       "steppedLine": false,
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(events_processing_times_bucket{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[15m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(triples_generation_processing_times_bucket{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[15m])) by (le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "95th percentile",
+          "legendFormat": "Triples generation - 95th percentile",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.50, sum(rate(events_processing_times_bucket{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[15m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(triples_generation_processing_times_bucket{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[15m])) by (le))",
           "format": "time_series",
           "interval": "",
           "intervalFactor": 1,
-          "legendFormat": "50th percentile",
+          "legendFormat": "Triples generation - 50th percentile",
           "refId": "B"
         },
         {
@@ -765,6 +765,22 @@
           "intervalFactor": 1,
           "legendFormat": "rate (events/second)",
           "refId": "C"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(triples_transformation_processing_times_bucket{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[15m])) by (le))",
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "Triples transformation - 95th percentile",
+          "refId": "D"
+        },
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(triples_transformation_processing_times_bucket{kubernetes_name=\"[[kube_env_name]]-triples-generator\"}[15m])) by (le))",
+          "format": "time_series",
+          "interval": "",
+          "intervalFactor": 1,
+          "legendFormat": "Triples transformation - 50th percentile",
+          "refId": "E"
         }
       ],
       "thresholds": [],
@@ -1211,5 +1227,5 @@
   "timezone": "",
   "title": "Renku Event Log",
   "uid": "cb9J1WBZz",
-  "version": 18
+  "version": 19
 }

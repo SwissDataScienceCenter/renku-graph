@@ -423,6 +423,7 @@ class DatasetsResourcesSpec
         datasetIdentifier = overriddenIdentifier getOrElse dataset.id,
         datasetTitle = dataset.title,
         datasetName = dataset.name,
+        datasetCreatedDate = dataset.created,
         maybeDatasetSameAs = dataset.sameAs.some,
         maybeDatasetDescription = dataset.maybeDescription,
         maybeDatasetPublishedDate = dataset.published.maybeDate,
@@ -484,6 +485,7 @@ object DatasetsResources {
       "title": ${dataset.title.value},
       "name": ${dataset.name.value},
       "published": ${dataset.published},
+      "created": ${dataset.created}, 
       "projectsCount": ${dataset.projects.size},
       "images": ${dataset.images.map(_.value)}
     }"""

@@ -106,7 +106,7 @@ package object rest {
             maybeDatasetSameAs = if (noSameAs) None else dataSet.sameAs.some,
             maybeDatasetDescription = dataSet.maybeDescription,
             maybeDatasetPublishedDate = dataSet.published.maybeDate,
-            datasetCreatedDate = firstDatasetDateCreated,
+            datasetCreatedDate = dataSet.created,
             datasetCreators = dataSet.published.creators map toPerson,
             datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
             datasetKeywords = dataSet.keywords,
@@ -133,7 +133,7 @@ package object rest {
               maybeDatasetSameAs = sameAs.some,
               maybeDatasetDescription = dataSet.maybeDescription,
               maybeDatasetPublishedDate = dataSet.published.maybeDate,
-              datasetCreatedDate = projectDateCreated,
+              datasetCreatedDate = dataSet.created,
               datasetCreators = dataSet.published.creators map toPerson,
               datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
               datasetKeywords = dataSet.keywords,
@@ -154,6 +154,9 @@ package object rest {
 
     def changePublishedDateTo(maybeDate: Option[PublishedDate]): NonModifiedDataset =
       dataSet.copy(published = dataSet.published.copy(maybeDate = maybeDate))
+
+    def changeCreatedDateTo(createdDate: DateCreated): NonModifiedDataset =
+      dataSet.copy(created = createdDate)
 
     def addAll(projects: List[DatasetProject]): NonModifiedDataset =
       dataSet.copy(projects = dataSet.projects ++ projects)
@@ -237,7 +240,7 @@ package object rest {
             datasetDerivedFrom = dataSet.derivedFrom,
             maybeDatasetDescription = dataSet.maybeDescription,
             maybeDatasetPublishedDate = dataSet.published.maybeDate,
-            datasetCreatedDate = DateCreated(firstDatasetDateCreated.value),
+            datasetCreatedDate = dataSet.created,
             datasetCreators = dataSet.published.creators map toPerson,
             datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
             datasetKeywords = dataSet.keywords,
@@ -262,7 +265,7 @@ package object rest {
               datasetDerivedFrom = dataSet.derivedFrom,
               maybeDatasetDescription = dataSet.maybeDescription,
               maybeDatasetPublishedDate = dataSet.published.maybeDate,
-              datasetCreatedDate = DateCreated(projectDateCreated.value),
+              datasetCreatedDate = dataSet.created,
               datasetCreators = dataSet.published.creators map toPerson,
               datasetParts = dataSet.parts.map(part => (part.name, part.atLocation)),
               datasetKeywords = dataSet.keywords,

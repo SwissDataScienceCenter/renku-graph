@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DateCreatedInProject, InitialVersion, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, InitialVersion, TopmostSameAs}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.EntityGenerators.invalidationEntity
@@ -564,6 +564,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           versions = DatasetVersions(InitialVersion(dataset3Id)),
           maybeDescription = datasetDescriptions.generateSome,
           published = modifiedDataset2.published,
+          created = modifiedDataset2.created,
           parts = modifiedDataset2.parts,
           projects = List(dataset3Project),
           keywords = modifiedDataset2.keywords,
