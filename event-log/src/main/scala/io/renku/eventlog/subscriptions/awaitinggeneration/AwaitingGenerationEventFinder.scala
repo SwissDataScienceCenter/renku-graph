@@ -172,7 +172,7 @@ private class AwaitingGenerationEventFinderImpl(
 
 private object IOAwaitingGenerationEventFinder {
 
-  private val MaxProcessingTime:     Duration             = Duration.ofHours(24)
+  private val MaxProcessingTime:     Duration             = Duration.ofDays(7)
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
   def apply(
