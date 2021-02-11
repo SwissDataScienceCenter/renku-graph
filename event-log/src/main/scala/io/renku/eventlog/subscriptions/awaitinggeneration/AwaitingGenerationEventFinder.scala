@@ -95,7 +95,7 @@ private class AwaitingGenerationEventFinderImpl(
         ORDER BY proj.latest_event_date DESC
         LIMIT ${projectsFetchingLimit.value}
       ) proj
-      """ 
+      """
     }.query[(projects.Id, projects.Path, EventDate, Int)]
     .map { case (projectId, projectPath, eventDate, currentOccupancy) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy)) }
     .to[List],
@@ -114,13 +114,13 @@ private class AwaitingGenerationEventFinderImpl(
                OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
            GROUP BY project_id
          ) oldest_event_date
-         JOIN event evt ON oldest_event_date.project_id = evt.project_id 
+         JOIN event evt ON oldest_event_date.project_id = evt.project_id
            AND oldest_event_date.min_event_date = evt.event_date
            AND ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
-               OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})) 
+               OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
          LIMIT 1
          """
-    }.query[AwaitingGenerationEvent].option, 
+    }.query[AwaitingGenerationEvent].option,
     name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest")
   )
   // format: on
@@ -148,7 +148,7 @@ private class AwaitingGenerationEventFinderImpl(
   }
 
   private def updateStatus(commitEventId: CompoundEventId) = SqlQuery(
-    sql"""|UPDATE event 
+    sql"""|UPDATE event
           |SET status = ${GeneratingTriples: EventStatus}, execution_date = ${now()}
           |WHERE (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status <> ${GeneratingTriples: EventStatus})
           |  OR (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
@@ -172,7 +172,7 @@ private class AwaitingGenerationEventFinderImpl(
 
 private object IOAwaitingGenerationEventFinder {
 
-  private val MaxProcessingTime:     Duration             = Duration.ofHours(24)
+  private val MaxProcessingTime:     Duration             = Duration.ofDays(7)
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
   def apply(
