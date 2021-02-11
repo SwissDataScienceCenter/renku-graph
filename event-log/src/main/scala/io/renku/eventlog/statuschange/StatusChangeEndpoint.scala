@@ -111,7 +111,7 @@ object IOStatusChangeEndpoint {
       statusUpdatesRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
     } yield new StatusChangeEndpoint(statusUpdatesRunner,
                                      Set(
-                                       ToTriplesStore.factory(underTriplesGenerationGauge),
+                                       ToTriplesStore.factory(underTriplesTransformationGauge),
                                        ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
                                        ToTriplesGenerated.factory(underTriplesGenerationGauge,
                                                                   awaitingTriplesTransformationGauge
