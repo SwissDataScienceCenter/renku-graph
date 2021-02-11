@@ -341,7 +341,7 @@ object bundles extends Schemas {
         `sha8 renku run`:  NodeDef,
         `sha8 parquet`:    NodeDef,
         `sha9 renku run`:  NodeDef,
-        `sha9 plot_data`:  NodeDef,
+        `sha9 grid_plot`:  NodeDef,
         `sha9 cumulative`: NodeDef,
         `sha10 zhbikes`:   NodeDef,
         `sha12 parquet`:   NodeDef
