@@ -53,7 +53,30 @@ class LineageQuerySpec
   private val (jsons, examplarData) = exemplarLineageFlow(project.path)
   import examplarData._
 
+  /**
+    *  ========================================== ORIGINAL GRAPH  ======================================================
+    *                                                   sha7 plot_data +----------------+
+    *                                                                                   |
+    *                                                                                   v
+    * sha3 zhbikes+---------------> sha8 renku run +------->bikesParquet +------------>sha9 renku run+------> grid_plot
+    *                                       ^                                                +
+    *                                       |                                                |
+    * sha7 clean_data +--------------------+                                                 +-----------> cumulative
+    */
+
   Feature("GraphQL query to find lineage") {
+
+    /**
+      *  ========================================== EXPECTED GRAPH  ====================================================
+      *  When looking for figs/grid_plot of commit 9
+      *                                                   sha7 plot_data +--------------+
+      *                                                                                 |
+      *                                                                                 v                   ------------
+      * sha3 zhbikes+---------------> sha8 renku run +------->bikesParquet +------->sha9 renku run+------> | grid_plot |
+      *                                       ^                                                            ------------
+      *                                       |
+      * sha7 clean_data +--------------------+
+      */
 
     Scenario("As a user I would like to find project's lineage with a GraphQL query") {
 
@@ -137,8 +160,7 @@ class LineageQuerySpec
       json"""{"source": ${`sha7 clean_data`.location}, "target": ${`sha8 renku run`.location}}""",
       json"""{"source": ${`sha8 renku run`.location},  "target": ${`sha8 parquet`.location}}""",
       json"""{"source": ${`sha8 parquet`.location},    "target": ${`sha9 renku run`.location}}""",
-      json"""{"source": ${`sha9 renku run`.location},  "target": ${`sha9 plot_data`.location}}""",
-      json"""{"source": ${`sha9 renku run`.location},  "target": ${`sha9 cumulative`.location}}"""
+      json"""{"source": ${`sha9 renku run`.location},  "target": ${`sha9 grid_plot`.location}}"""
     )
   }
 
@@ -150,8 +172,7 @@ class LineageQuerySpec
       json"""{"id": ${`sha8 renku run`.location},  "location": ${`sha8 renku run`.location},  "label": ${`sha8 renku run`.label},  "type": ${`sha8 renku run`.singleWordType} }""",
       json"""{"id": ${`sha8 parquet`.location},    "location": ${`sha8 parquet`.location},    "label": ${`sha8 parquet`.label},    "type": ${`sha8 parquet`.singleWordType}   }""",
       json"""{"id": ${`sha9 renku run`.location},  "location": ${`sha9 renku run`.location},  "label": ${`sha9 renku run`.label},  "type": ${`sha9 renku run`.singleWordType} }""",
-      json"""{"id": ${`sha9 plot_data`.location},  "location": ${`sha9 plot_data`.location},  "label": ${`sha9 plot_data`.label},  "type": ${`sha9 plot_data`.singleWordType} }""",
-      json"""{"id": ${`sha9 cumulative`.location}, "location": ${`sha9 cumulative`.location}, "label": ${`sha9 cumulative`.label}, "type": ${`sha9 cumulative`.singleWordType} }"""
+      json"""{"id": ${`sha9 grid_plot`.location},  "location": ${`sha9 grid_plot`.location},  "label": ${`sha9 grid_plot`.label},  "type": ${`sha9 grid_plot`.singleWordType} }"""
     )
   }
 
