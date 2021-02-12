@@ -20,14 +20,12 @@ package io.renku.eventlog
 
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.constraints.{BoundedInstant, DurationNotNegative, InstantNotInTheFuture, NonBlank}
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
+import ch.datascience.tinytypes.constraints.{BoundedInstant, InstantNotInTheFuture, NonBlank}
+import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder
 
-import java.time.{Duration, Instant}
+import java.time.Instant
 
 sealed trait Event extends CompoundId {
   def id:        EventId

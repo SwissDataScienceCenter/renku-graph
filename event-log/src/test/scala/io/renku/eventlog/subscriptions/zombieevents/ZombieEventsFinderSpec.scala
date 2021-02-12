@@ -18,11 +18,10 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.syntax.all._
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.EventsGenerators.{eventProcessingTimes, _}
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
@@ -31,7 +30,7 @@ import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.eventlog.EventContentGenerators.{executionDates, _}
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -39,7 +38,6 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
-import java.time.Instant.now
 
 class ZombieEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
@@ -101,19 +99,21 @@ class ZombieEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
       "and it's in the status for more than the (median from last 3 events) * 2" in new TestCase {
 
         val projectId = projectIds.generateOne
-        val oldProcessingTimes =
-          eventProcessingTimes.generateNonEmptyList().toList.mapWithIndex { case (processingTime, idx) =>
-            addEvent(idx,
-                     projectId,
-                     currentStatus = Gen.oneOf(TriplesGenerated, TriplesStore).generateOne,
-                     processingInfo = GeneratingTriples -> processingTime
-            )
-            processingTime
-          }
+        val datesAndProcessingTimes = {
+          for {
+            executionDate  <- executionDates
+            processingTime <- eventProcessingTimes
+          } yield addEvent(projectId,
+                           executionDate,
+                           currentEventStatus = Gen.oneOf(TriplesGenerated, TriplesStore).generateOne,
+                           processingTime,
+                           processingTimeStatus = GeneratingTriples
+          )
+        }.generateNonEmptyList().toList
 
         val medianProcessingTime = {
-          val threeMostRecentTimes = oldProcessingTimes.reverse.take(3)
-          val sortedTimes          = threeMostRecentTimes.sorted.reverse
+          val threeMostEvents = datesAndProcessingTimes.sortBy(_._1).reverse.take(3)
+          val sortedTimes     = threeMostEvents.map(_._2).sorted.reverse
           sortedTimes(sortedTimes.size / 2)
         }
 
@@ -144,19 +144,21 @@ class ZombieEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
       "and it's in the status for more than the (median from last 3 events) * 2" in new TestCase {
 
         val projectId = projectIds.generateOne
-        val oldProcessingTimes =
-          eventProcessingTimes.generateNonEmptyList().toList.mapWithIndex { case (processingTime, idx) =>
-            addEvent(idx,
-                     projectId,
-                     currentStatus = TriplesStore,
-                     processingInfo = TransformingTriples -> processingTime
-            )
-            processingTime
-          }
+        val datesAndProcessingTimes = {
+          for {
+            executionDate  <- executionDates
+            processingTime <- eventProcessingTimes
+          } yield addEvent(projectId,
+                           executionDate,
+                           currentEventStatus = TriplesStore,
+                           processingTime,
+                           processingTimeStatus = TransformingTriples
+          )
+        }.generateNonEmptyList().toList
 
         val medianProcessingTime = {
-          val threeMostRecentTimes = oldProcessingTimes.reverse.take(3)
-          val sortedTimes          = threeMostRecentTimes.sorted.reverse
+          val threeMostEvents = datesAndProcessingTimes.sortBy(_._1).reverse.take(3)
+          val sortedTimes     = threeMostEvents.map(_._2).sorted.reverse
           sortedTimes(sortedTimes.size / 2)
         }
 
@@ -200,14 +202,15 @@ class ZombieEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
       eventBodies.generateOne
     )
 
-  private def addEvent(index:          Int,
-                       projectId:      projects.Id,
-                       currentStatus:  EventStatus,
-                       processingInfo: (EventStatus, EventProcessingTime)
-  ): Unit = {
-    val eventId                  = compoundEventIds.generateOne.copy(projectId = projectId)
-    val (status, processingTime) = processingInfo
-    addEvent(eventId, currentStatus, ExecutionDate(now.minus(processingTime.value).plusSeconds(index + 5)))
-    upsertProcessingTime(eventId, status, processingTime)
+  private def addEvent(projectId:            projects.Id,
+                       executionDate:        ExecutionDate,
+                       currentEventStatus:   EventStatus,
+                       processingTime:       EventProcessingTime,
+                       processingTimeStatus: EventStatus
+  ): (ExecutionDate, EventProcessingTime) = {
+    val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
+    addEvent(eventId, currentEventStatus, executionDate)
+    upsertProcessingTime(eventId, processingTimeStatus, processingTime)
+    executionDate -> processingTime
   }
 }
