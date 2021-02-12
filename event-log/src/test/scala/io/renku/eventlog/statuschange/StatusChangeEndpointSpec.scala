@@ -24,8 +24,8 @@ import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes, eventStatuses}
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.server.EndpointTester._
@@ -38,11 +38,10 @@ import eu.timepit.refined.api.Refined
 import io.circe.Json
 import io.circe.syntax._
 import io.prometheus.client.Gauge
-import io.renku.eventlog.EventContentGenerators._
+import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
-import io.renku.eventlog.{EventLogDB, EventProcessingTime}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._

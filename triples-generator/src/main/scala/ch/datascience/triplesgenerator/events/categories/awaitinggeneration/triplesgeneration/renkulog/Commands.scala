@@ -110,10 +110,6 @@ private object Commands {
       %%("git", "reset", "--hard")(repositoryDirectory.value)
     }.void
 
-    def findCommitMessage(commitId: CommitId)(implicit repositoryDirectory: RepositoryPath): IO[String] = IO {
-      %%("git", "log", "--format=%B", "-n", "1", commitId.value)(repositoryDirectory.value)
-    }.map(_.out.string.trim)
-
     def clone(
         repositoryUrl:               ServiceUrl,
         workDirectory:               Path

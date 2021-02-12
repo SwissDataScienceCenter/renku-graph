@@ -23,14 +23,14 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events._
-import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.constraints.{DurationNotNegative, NonBlank}
 import io.circe.Json
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import java.time.temporal.ChronoUnit._
-import java.time.{Clock, Instant, ZoneId}
+import java.time.temporal.ChronoUnit.{HOURS, SECONDS}
+import java.time.{Clock, Instant, ZoneId, Duration => JavaDuration}
 
 class EventStatusSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -160,6 +160,54 @@ class BatchDateSpec extends AnyWordSpec with should.Matchers {
       BatchDate(clock).value shouldBe fixedNow
 
       Clock.system(systemZone)
+    }
+  }
+}
+
+class EventProcessingTimeSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+
+  "EventProcessingTime" should {
+
+    "have the DurationNotNegative constraint" in {
+      EventProcessingTime shouldBe an[DurationNotNegative]
+    }
+
+    "be instantiatable from any non negative finite durations" in {
+      forAll(notNegativeJavaDurations) { body =>
+        EventProcessingTime.from(body).map(_.value) shouldBe Right(body)
+      }
+    }
+
+    "throw an error if it is instantiated with a negative finite duration" in {
+      forAll(
+        javaDurations(min = -2000, max = -1)
+      ) { duration =>
+        val Left(exception) = EventProcessingTime.from(duration).map(_.value)
+        exception          shouldBe an[IllegalArgumentException]
+        exception.getMessage should startWith(s"${EventProcessingTime.typeName} cannot have a negative duration")
+      }
+    }
+  }
+
+  "*" should {
+
+    "multiply the given processing time by the given value" in {
+      forAll(eventProcessingTimes, positiveInts()) { (processingTime, multiplier) =>
+        processingTime * multiplier shouldBe EventProcessingTime(
+          JavaDuration.ofMillis(processingTime.value.toMillis * multiplier.value)
+        )
+      }
+    }
+  }
+
+  "/" should {
+
+    "divide the given processing time by the given value" in {
+      forAll(eventProcessingTimes, positiveInts()) { (processingTime, multiplier) =>
+        processingTime / multiplier shouldBe EventProcessingTime(
+          JavaDuration.ofMillis(processingTime.value.toMillis / multiplier.value)
+        )
+      }
     }
   }
 }

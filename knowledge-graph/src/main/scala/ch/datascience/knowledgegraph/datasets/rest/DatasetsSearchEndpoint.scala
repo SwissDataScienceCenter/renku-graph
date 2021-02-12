@@ -23,20 +23,20 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config._
 import ch.datascience.config.renku.ResourceUrl
-import ch.datascience.http.InfoMessage._
-import ch.datascience.graph.config.RenkuBaseUrl
+import ch.datascience.graph.model.datasets.PublishedDate
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.rest.paging.PagingRequest
-import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPublishing}
+import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.tinytypes.constraints.NonBlank
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
+import org.http4s._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
-import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Response}
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -95,14 +95,14 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   }
 
   private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
-    case DatasetSearchResult(id, title, name, maybeDescription, published, dateCreated, projectsCount, images) =>
+    case DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, images) =>
       json"""
       {
         "identifier": $id,
         "title": $title,
         "name": $name,
-        "published": $published,
-        "created": $dateCreated,
+        "published": ${creators -> dates.maybeDatePublished},
+        "date": ${dates.date},
         "projectsCount": $projectsCount,
         "images": $images
       }"""
@@ -110,12 +110,18 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
         .deepMerge(_links(Link(Rel("details") -> Href(renkuResourcesUrl / "datasets" / id))))
   }
 
-  private implicit lazy val publishingEncoder: Encoder[DatasetPublishing] = Encoder.instance[DatasetPublishing] {
-    case DatasetPublishing(maybeDate, creators) =>
-      json"""{
-        "creator": $creators
-      }""" addIfDefined "datePublished" -> maybeDate
-  }
+  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[PublishedDate])] =
+    Encoder.instance[(Set[DatasetCreator], Option[PublishedDate])] {
+      case (creators, Some(date)) =>
+        json"""{
+          "creator": $creators,
+          "datePublished": $date
+        }"""
+      case (creators, None) =>
+        json"""{
+          "creator": $creators
+        }"""
+    }
 
   private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
     case DatasetCreator(maybeEmail, name, _) =>
@@ -149,14 +155,14 @@ object DatasetsSearchEndpoint {
 
     sealed trait SearchProperty             extends Property
     final case object TitleProperty         extends Property("title") with SearchProperty
+    final case object DateProperty          extends Property("date") with SearchProperty
     final case object DatePublishedProperty extends Property("datePublished") with SearchProperty
-    final case object DateCreatedProperty   extends Property("dateCreated") with SearchProperty
     final case object ProjectsCountProperty extends Property("projectsCount") with SearchProperty
 
     override lazy val properties: Set[SearchProperty] = Set(
       TitleProperty,
+      DateProperty,
       DatePublishedProperty,
-      DateCreatedProperty,
       ProjectsCountProperty
     )
   }

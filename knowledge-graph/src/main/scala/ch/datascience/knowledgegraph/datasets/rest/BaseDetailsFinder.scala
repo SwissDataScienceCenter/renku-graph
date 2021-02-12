@@ -27,7 +27,7 @@ import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
-import io.circe.HCursor
+import io.circe.{DecodingFailure, HCursor}
 
 import scala.concurrent.ExecutionContext
 
@@ -58,7 +58,7 @@ private class BaseDetailsFinder(
       renku  -> "renku",
       schema -> "schema"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?dateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?publishedDate
+    s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybePublishedDate
         |WHERE {
         |    ?datasetId schema:identifier "$identifier";
         |               schema:identifier ?identifier;
@@ -69,7 +69,6 @@ private class BaseDetailsFinder(
         |               schema:alternateName ?alternateName;
         |               prov:atLocation ?location ;
         |               renku:topmostSameAs ?topmostSameAs;
-        |               schema:dateCreated ?dateCreated;
         |               renku:topmostDerivedFrom/schema:identifier ?initialVersion
         |               
         |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
@@ -83,8 +82,8 @@ private class BaseDetailsFinder(
         |               
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    OPTIONAL { ?datasetId schema:description ?description }.
-        |    OPTIONAL { ?datasetId schema:datePublished ?publishedDate }.
-        |    
+        |    OPTIONAL { ?datasetId schema:dateCreated ?maybeDateCreated }.
+        |    OPTIONAL { ?datasetId schema:datePublished ?maybePublishedDate }.
         |}
         |""".stripMargin
   )
@@ -144,11 +143,14 @@ private object BaseDetailsFinder {
         maybeDerivedFrom   <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
         sameAs             <- extract[SameAs]("topmostSameAs")
         initialVersion     <- extract[InitialVersion]("initialVersion")
-        maybePublishedDate <- extract[Option[PublishedDate]]("publishedDate")
-        dateCreated        <- extract[DateCreated]("dateCreated")
+        maybePublishedDate <- extract[Option[PublishedDate]]("maybePublishedDate")
+        maybeDateCreated   <- extract[Option[DateCreated]]("maybeDateCreated")
         maybeDescription <- extract[Option[String]]("description")
                               .map(blankToNone)
                               .flatMap(toOption[Description])
+        dates <- Dates
+                   .from(maybeDateCreated, maybePublishedDate)
+                   .leftMap(e => DecodingFailure(e.getMessage, Nil))
       } yield maybeDerivedFrom match {
         case Some(derivedFrom) =>
           ModifiedDataset(
@@ -159,8 +161,8 @@ private object BaseDetailsFinder {
             derivedFrom,
             DatasetVersions(initialVersion),
             maybeDescription,
-            DatasetPublishing(maybePublishedDate, Set.empty),
-            dateCreated,
+            creators = Set.empty,
+            dates = dates,
             parts = List.empty,
             projects = List.empty,
             keywords = List.empty,
@@ -175,8 +177,8 @@ private object BaseDetailsFinder {
             sameAs,
             DatasetVersions(initialVersion),
             maybeDescription,
-            DatasetPublishing(maybePublishedDate, Set.empty),
-            dateCreated,
+            creators = Set.empty,
+            dates = dates,
             parts = List.empty,
             projects = List.empty,
             keywords = List.empty,

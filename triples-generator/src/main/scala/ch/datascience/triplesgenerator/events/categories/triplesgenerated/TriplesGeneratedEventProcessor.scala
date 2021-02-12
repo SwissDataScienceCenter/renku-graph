@@ -19,9 +19,10 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
 import cats.MonadError
-import cats.data.EitherT
+import cats.data.EitherT.right
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.graph.model.events.EventProcessingTime
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
@@ -37,6 +38,7 @@ import ch.datascience.triplesgenerator.events.categories.{EventStatusUpdater, IO
 import io.chrisdavenport.log4cats.Logger
 import io.prometheus.client.Histogram
 
+import java.time.Duration
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
@@ -64,19 +66,15 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   import triplesCurator._
   import uploader._
 
-  def process(triplesGeneratedEvent: TriplesGeneratedEvent): Interpretation[Unit] =
-    measureExecutionTime {
-      for {
-        maybeAccessToken <- findAccessToken(triplesGeneratedEvent.project.path) recoverWith rollback(
-                              triplesGeneratedEvent
-                            )
-        results <-
-          transformTriplesAndUpload(triplesGeneratedEvent)(maybeAccessToken)
-        uploadingResults <- updateEventLog(triplesGeneratedEvent, results)
-      } yield uploadingResults
-    }.flatMap(
-      logSummary(triplesGeneratedEvent)
-    ) recoverWith logError(triplesGeneratedEvent)
+  def process(triplesGeneratedEvent: TriplesGeneratedEvent): Interpretation[Unit] = {
+    for {
+      maybeAccessToken <- findAccessToken(triplesGeneratedEvent.project.path)
+                            .recoverWith(rollback(triplesGeneratedEvent))
+      results <- measureExecutionTime(transformAndUpload(triplesGeneratedEvent)(maybeAccessToken))
+      _       <- updateEventLog(results)
+      _       <- logSummary(triplesGeneratedEvent)(results)
+    } yield ()
+  } recoverWith logError(triplesGeneratedEvent)
 
   private def logError(event: TriplesGeneratedEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -84,16 +82,13 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
         s"$categoryName: Triples Generated Event processing failure: ${event.compoundEventId}, projectPath: ${event.project.path}"
       )
   }
-  private def transformTriplesAndUpload(
+
+  private def transformAndUpload(
       triplesGeneratedEvent:   TriplesGeneratedEvent
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
       curatedTriples <- transform(triplesGeneratedEvent).leftSemiflatMap(toUploadingError(triplesGeneratedEvent))
-      result <- EitherT
-                  .liftF[Interpretation, UploadingResult, UploadingResult](
-                    upload(curatedTriples).flatMap(toUploadingResult(triplesGeneratedEvent, _))
-                  )
-
+      result         <- right[UploadingResult](upload(curatedTriples).flatMap(toUploadingResult(triplesGeneratedEvent, _)))
     } yield result
   }.merge recoverWith nonRecoverableFailure(triplesGeneratedEvent)
 
@@ -136,31 +131,26 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   ): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
     case curationError @ CurationRecoverableError(message, _) =>
       logger
-        .error(curationError)(
-          s"${logMessageCommon(triplesGeneratedEvent)} $message"
-        )
+        .error(curationError)(s"${logMessageCommon(triplesGeneratedEvent)} $message")
         .map(_ => RecoverableError(triplesGeneratedEvent, curationError))
   }
 
-  private def updateEventLog(event: TriplesGeneratedEvent, uploadingResults: UploadingResult) = {
-    for {
-      _ <- uploadingResults match {
-             case Uploaded(event) => markEventDone(event.compoundEventId)
-             case RecoverableError(event, cause) =>
-               markEventTransformationFailedRecoverably(event.compoundEventId, cause)
-             case NonRecoverableError(event, cause) =>
-               markEventTransformationFailedNonRecoverably(event.compoundEventId, cause)
-           }
-    } yield uploadingResults
-  } recoverWith logEventLogUpdateError(event, uploadingResults)
+  private lazy val updateEventLog: ((ElapsedTime, UploadingResult)) => Interpretation[Unit] = {
+    case (elapsedTime, Uploaded(event)) =>
+      markEventDone(event.compoundEventId, EventProcessingTime(Duration ofMillis elapsedTime.value))
+        .recoverWith(logEventLogUpdateError(event, "done"))
+    case (_, RecoverableError(event, cause)) =>
+      markEventTransformationFailedRecoverably(event.compoundEventId, cause)
+        .recoverWith(logEventLogUpdateError(event, "as failed recoverably"))
+    case (_, NonRecoverableError(event, cause)) =>
+      markEventTransformationFailedNonRecoverably(event.compoundEventId, cause)
+        .recoverWith(logEventLogUpdateError(event, "as failed nonrecoverably"))
+  }
 
-  private def logEventLogUpdateError(
-      event:            TriplesGeneratedEvent,
-      uploadingResults: UploadingResult
-  ): PartialFunction[Throwable, Interpretation[UploadingResult]] = { case NonFatal(exception) =>
-    logger
-      .error(exception)(s"${logMessageCommon(event)} failed to mark as TriplesStore in the Event Log")
-      .map(_ => uploadingResults)
+  private def logEventLogUpdateError(event:   TriplesGeneratedEvent,
+                                     message: String
+  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)(s"${logMessageCommon(event)} failed to mark $message in the Event Log")
   }
 
   private def logSummary(
@@ -181,9 +171,10 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   ): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = { case NonFatal(exception) =>
     markTriplesGenerated(triplesGeneratedEvent.compoundEventId,
                          triplesGeneratedEvent.triples,
-                         triplesGeneratedEvent.schemaVersion
-    )
-      .flatMap(_ => ME.raiseError(new Exception("transformation failure -> Event rolled back", exception)))
+                         triplesGeneratedEvent.schemaVersion,
+                         maybeProcessingTime = None
+    ) >> new Exception("transformation failure -> Event rolled back", exception)
+      .raiseError[Interpretation, Option[AccessToken]]
   }
 
   private sealed trait UploadingResult extends Product with Serializable {

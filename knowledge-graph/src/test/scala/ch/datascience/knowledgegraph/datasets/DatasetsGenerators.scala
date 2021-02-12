@@ -24,7 +24,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DerivedFrom, ImageUri, InitialVersion, SameAs, Url}
+import ch.datascience.graph.model.datasets.{DerivedFrom, InitialVersion, SameAs, Url}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.entities.DataSet
 import eu.timepit.refined.auto._
@@ -47,8 +47,8 @@ object DatasetsGenerators {
       maybeDescription <- Gen.option(datasetDescriptions)
       keywords         <- listOf(datasetKeywords)
       images           <- listOf(imageUris)
-      published        <- datasetPublishingInfos
-      created          <- datasetCreatedDates
+      creators         <- nonEmptySet(datasetCreators, maxElements = 4)
+      dates            <- datasetDates
       part             <- listOf(datasetParts)
       projects         <- projects
     } yield NonModifiedDataset(
@@ -59,8 +59,8 @@ object DatasetsGenerators {
       sameAs,
       DatasetVersions(InitialVersion(id)),
       maybeDescription,
-      published,
-      created,
+      creators,
+      dates,
       part,
       projects.toList,
       keywords,
@@ -74,7 +74,8 @@ object DatasetsGenerators {
   )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[ModifiedDataset] =
     for {
       id        <- datasetIdentifiers
-      published <- datasetPublishingInfos
+      creators  <- nonEmptySet(datasetCreators, maxElements = 4)
+      dates     <- datasetDates
       keywords  <- listOf(datasetKeywords)
       imageUrls <- listOf(imageUris)
     } yield ModifiedDataset(
@@ -85,8 +86,8 @@ object DatasetsGenerators {
       derivedFromOverride getOrElse DerivedFrom(DataSet.entityId(dataset.id)),
       versionsOverride getOrElse DatasetVersions(dataset.versions.initial),
       dataset.maybeDescription,
-      published,
-      dataset.created,
+      creators,
+      dates,
       dataset.parts,
       List(dataset.projects.headOption getOrElse (throw new IllegalStateException("No projects on a dataset"))),
       keywords,
@@ -98,11 +99,6 @@ object DatasetsGenerators {
     name             <- userNames
     maybeAffiliation <- Gen.option(userAffiliations)
   } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
-
-  implicit lazy val datasetPublishingInfos: Gen[DatasetPublishing] = for {
-    maybePublishedDate <- Gen.option(datasetPublishedDates)
-    creators           <- nonEmptySet(datasetCreators, maxElements = 4)
-  } yield DatasetPublishing(maybePublishedDate, creators)
 
   private implicit lazy val datasetCreatorsOrdering: Order[DatasetCreator] =
     (creator1: DatasetCreator, creator2: DatasetCreator) => creator1.name compareTo creator2.name

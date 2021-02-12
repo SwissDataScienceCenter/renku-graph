@@ -35,8 +35,7 @@ trait DataSet {
   val maybeDatasetSameAs:                Option[SameAs]
   val maybeDatasetDerivedFrom:           Option[DerivedFrom]
   val maybeDatasetDescription:           Option[Description]
-  val maybeDatasetPublishedDate:         Option[PublishedDate]
-  val datasetCreatedDate:                DateCreated
+  val datasetDates:                      Dates
   val datasetCreators:                   Set[Person]
   val datasetParts:                      List[DataSetPartArtifact]
   val datasetKeywords:                   List[Keyword]
@@ -73,8 +72,7 @@ object DataSet {
                          url:                        Url,
                          maybeSameAs:                Option[SameAs] = None,
                          maybeDescription:           Option[Description] = None,
-                         maybePublishedDate:         Option[PublishedDate] = None,
-                         createdDate:                DateCreated,
+                         dates:                      Dates,
                          creators:                   Set[Person],
                          partsFactories:             List[Activity => DataSetPartArtifact],
                          keywords:                   List[Keyword] = Nil,
@@ -95,8 +93,7 @@ object DataSet {
       override val maybeDatasetSameAs:                Option[SameAs]             = maybeSameAs
       override val maybeDatasetDerivedFrom:           Option[DerivedFrom]        = None
       override val maybeDatasetDescription:           Option[Description]        = maybeDescription
-      override val maybeDatasetPublishedDate:         Option[PublishedDate]      = maybePublishedDate
-      override val datasetCreatedDate:                DateCreated                = createdDate
+      override val datasetDates:                      Dates                      = dates
       override val datasetCreators:                   Set[Person]                = creators
       override val datasetParts:                      List[DataSetPartArtifact]  = partsFactories.map(_.apply(activity))
       override val datasetKeywords:                   List[Keyword]              = keywords
@@ -111,8 +108,7 @@ object DataSet {
                       url:                        Url,
                       derivedFrom:                DerivedFrom,
                       maybeDescription:           Option[Description] = None,
-                      maybePublishedDate:         Option[PublishedDate] = None,
-                      createdDate:                DateCreated,
+                      dates:                      Dates,
                       creators:                   Set[Person],
                       partsFactories:             List[Activity => DataSetPartArtifact],
                       keywords:                   List[Keyword] = Nil,
@@ -133,8 +129,7 @@ object DataSet {
       override val maybeDatasetSameAs:                Option[SameAs]             = None
       override val maybeDatasetDerivedFrom:           Option[DerivedFrom]        = derivedFrom.some
       override val maybeDatasetDescription:           Option[Description]        = maybeDescription
-      override val maybeDatasetPublishedDate:         Option[PublishedDate]      = maybePublishedDate
-      override val datasetCreatedDate:                DateCreated                = createdDate
+      override val datasetDates:                      Dates                      = dates
       override val datasetCreators:                   Set[Person]                = creators
       override val datasetParts:                      List[DataSetPartArtifact]  = partsFactories.map(_.apply(activity))
       override val datasetKeywords:                   List[Keyword]              = keywords
@@ -167,8 +162,8 @@ object DataSet {
           schema / "sameAs"            -> entity.maybeDatasetSameAs.asJsonLD,
           prov / "wasDerivedFrom"      -> entity.maybeDatasetDerivedFrom.asJsonLD,
           schema / "description"       -> entity.maybeDatasetDescription.asJsonLD,
-          schema / "datePublished"     -> entity.maybeDatasetPublishedDate.asJsonLD,
-          schema / "dateCreated"       -> entity.datasetCreatedDate.asJsonLD,
+          schema / "datePublished"     -> entity.datasetDates.maybeDatePublished.asJsonLD,
+          schema / "dateCreated"       -> entity.datasetDates.maybeDateCreated.asJsonLD,
           schema / "creator"           -> entity.datasetCreators.asJsonLD,
           schema / "hasPart"           -> entity.datasetParts.asJsonLD,
           schema / "keywords"          -> entity.datasetKeywords.asJsonLD,

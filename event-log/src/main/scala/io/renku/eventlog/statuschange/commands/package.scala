@@ -22,10 +22,10 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.effect.Sync
 import cats.syntax.all._
-import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.{EventProcessingTime, EventStatus}
 import io.circe.Json
+import io.renku.eventlog.EventMessage
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{NotSupported, PayloadMalformed}
-import io.renku.eventlog.{EventMessage, EventProcessingTime}
 import org.http4s.circe.jsonOf
 import org.http4s.{MediaType, Request}
 

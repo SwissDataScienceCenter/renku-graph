@@ -19,7 +19,6 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{Identifier, ImageUri, Keyword}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.ApplicationLogger
@@ -61,7 +60,7 @@ private class IODatasetFinder(
       projects          <- projectsFiber.join
     } yield maybeDetails map { details =>
       details.copy(
-        published = details.published.copy(creators = creators),
+        creators = creators,
         parts = parts,
         projects = projects,
         keywords = keywords,
@@ -70,17 +69,17 @@ private class IODatasetFinder(
     }
 
   private implicit class DatasetOps(dataset: Dataset) {
-    def copy(published: DatasetPublishing,
-             parts:     List[DatasetPart],
-             projects:  List[DatasetProject],
-             keywords:  List[Keyword],
-             images:    List[ImageUri]
+    def copy(creators: Set[DatasetCreator],
+             parts:    List[DatasetPart],
+             projects: List[DatasetProject],
+             keywords: List[Keyword],
+             images:   List[ImageUri]
     ): Dataset =
       dataset match {
         case ds: NonModifiedDataset =>
-          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords, images = images)
+          ds.copy(creators = creators, parts = parts, projects = projects, keywords = keywords, images = images)
         case ds: ModifiedDataset =>
-          ds.copy(published = published, parts = parts, projects = projects, keywords = keywords, images = images)
+          ds.copy(creators = creators, parts = parts, projects = projects, keywords = keywords, images = images)
       }
   }
 }

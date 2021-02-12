@@ -26,10 +26,10 @@ import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DerivedFrom, Description, Identifier, ImageUri, Keyword, Name, PartLocation, PartName, PublishedDate, SameAs, Title, TopmostDerivedFrom, TopmostSameAs, Url}
+import ch.datascience.graph.model.datasets.{Dates, DerivedFrom, Description, Identifier, ImageUri, Keyword, Name, PartLocation, PartName, SameAs, Title, TopmostDerivedFrom, TopmostSameAs, Url}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.projects.{DateCreated, Path, Visibility}
-import ch.datascience.graph.model.{CliVersion, GraphModelGenerators, SchemaVersion, datasets, projects}
+import ch.datascience.graph.model._
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream
 import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
@@ -117,8 +117,7 @@ object bundles extends Schemas {
       datasetUrl:                 Url = datasetUrls.generateOne,
       maybeDatasetSameAs:         Option[SameAs] = Gen.option(datasetSameAs).generateOne,
       maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
-      maybeDatasetPublishedDate:  Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
-      datasetCreatedDate:         datasets.DateCreated = datasets.DateCreated(committedDate.value),
+      dates:                      Dates = datasetDates.generateOne,
       datasetCreators:            Set[Person] = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
       datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
@@ -138,8 +137,7 @@ object bundles extends Schemas {
       datasetUrl,
       maybeDatasetSameAs,
       maybeDatasetDescription,
-      maybeDatasetPublishedDate,
-      datasetCreatedDate,
+      dates,
       datasetCreators,
       datasetParts,
       datasetKeywords,
@@ -168,8 +166,7 @@ object bundles extends Schemas {
       datasetUrl:                 Url = datasetUrls.generateOne,
       maybeDatasetSameAs:         Option[SameAs] = Gen.option(datasetSameAs).generateOne,
       maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
-      maybeDatasetPublishedDate:  Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
-      datasetCreatedDate:         datasets.DateCreated = datasets.DateCreated(committedDate.value),
+      dates:                      Dates = datasetDates.generateOne,
       datasetCreators:            Set[Person] = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
       datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
@@ -198,8 +195,7 @@ object bundles extends Schemas {
           datasetUrl,
           maybeDatasetSameAs,
           maybeDatasetDescription,
-          maybeDatasetPublishedDate,
-          datasetCreatedDate,
+          dates,
           datasetCreators,
           datasetParts.map { case (name, location) =>
             DataSetPart.factory(name, location, None)(_)
@@ -233,8 +229,7 @@ object bundles extends Schemas {
       datasetUrl:                 Url = datasetUrls.generateOne,
       datasetDerivedFrom:         DerivedFrom = datasetDerivedFroms.generateOne,
       maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
-      maybeDatasetPublishedDate:  Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
-      datasetCreatedDate:         datasets.DateCreated = datasets.DateCreated(committedDate.value),
+      dates:                      Dates = datasetDates.generateOne,
       datasetCreators:            Set[Person] = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
       datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
@@ -254,8 +249,7 @@ object bundles extends Schemas {
       datasetUrl,
       datasetDerivedFrom,
       maybeDatasetDescription,
-      maybeDatasetPublishedDate,
-      datasetCreatedDate,
+      dates,
       datasetCreators,
       datasetParts,
       datasetKeywords,
@@ -284,8 +278,7 @@ object bundles extends Schemas {
       datasetUrl:                 Url = datasetUrls.generateOne,
       datasetDerivedFrom:         DerivedFrom = datasetDerivedFroms.generateOne,
       maybeDatasetDescription:    Option[Description] = Gen.option(datasetDescriptions).generateOne,
-      maybeDatasetPublishedDate:  Option[PublishedDate] = Gen.option(datasetPublishedDates).generateOne,
-      datasetCreatedDate:         datasets.DateCreated = datasets.DateCreated(committedDate.value),
+      dates:                      Dates = datasetDates.generateOne,
       datasetCreators:            Set[Person] = setOf(persons).generateOne,
       datasetParts:               List[(PartName, PartLocation)] = listOf(dataSetParts).generateOne,
       datasetKeywords:            List[Keyword] = listOf(GraphModelGenerators.datasetKeywords).generateOne,
@@ -314,8 +307,7 @@ object bundles extends Schemas {
           datasetUrl,
           datasetDerivedFrom,
           maybeDatasetDescription,
-          maybeDatasetPublishedDate,
-          datasetCreatedDate,
+          dates,
           datasetCreators,
           datasetParts.map { case (name, location) =>
             DataSetPart.factory(name, location, None)(_)
@@ -379,7 +371,7 @@ object bundles extends Schemas {
             title = datasets.Title("zhbikes"),
             name = datasets.Name("zhbikes"),
             url = datasetUrls.generateOne,
-            createdDate = datasetCreatedDates.generateOne,
+            dates = datasetDates.generateOne,
             creators = dataSetCreators,
             partsFactories = partsFactories
           )

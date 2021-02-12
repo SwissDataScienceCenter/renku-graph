@@ -24,7 +24,7 @@ import cats.implicits.catsSyntaxOptionId
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime}
 import ch.datascience.http.client.IORestClient
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
@@ -36,17 +36,17 @@ import java.io.{PrintWriter, StringWriter}
 import scala.concurrent.ExecutionContext
 
 private trait EventStatusUpdater[Interpretation[_]] {
-  def markEventNew(eventId:               CompoundEventId): Interpretation[Unit]
-  def markEventDone(eventId:              CompoundEventId): Interpretation[Unit]
-  def markTriplesGenerated(eventId:       CompoundEventId,
-                           payload:       JsonLDTriples,
-                           schemaVersion: SchemaVersion
+  def markEventNew(eventId:                     CompoundEventId): Interpretation[Unit]
+  def markEventDone(eventId:                    CompoundEventId, processingTime: EventProcessingTime): Interpretation[Unit]
+  def markTriplesGenerated(eventId:             CompoundEventId,
+                           payload:             JsonLDTriples,
+                           schemaVersion:       SchemaVersion,
+                           maybeProcessingTime: Option[EventProcessingTime]
   ): Interpretation[Unit]
   def markEventFailedRecoverably(eventId:                  CompoundEventId, exception: Throwable): Interpretation[Unit]
   def markEventFailedNonRecoverably(eventId:               CompoundEventId, exception: Throwable): Interpretation[Unit]
   def markEventTransformationFailedRecoverably(eventId:    CompoundEventId, exception: Throwable): Interpretation[Unit]
   def markEventTransformationFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): Interpretation[Unit]
-  def markEventSkipped(eventId:                            CompoundEventId, message:   String):    Interpretation[Unit]
 }
 
 private class IOEventStatusUpdater(
@@ -74,21 +74,28 @@ private class IOEventStatusUpdater(
     responseMapping = okConflictAsSuccess
   )
 
-  override def markEventDone(eventId: CompoundEventId): IO[Unit] = sendStatusChange(
-    eventId,
-    eventContent = EventRequestContent(json"""{"status": "TRIPLES_STORE"}""", None),
-    responseMapping = okConflictAsSuccess
-  )
+  override def markEventDone(eventId: CompoundEventId, processingTime: EventProcessingTime): IO[Unit] =
+    sendStatusChange(
+      eventId,
+      eventContent = EventRequestContent(
+        event = json"""{"status": "TRIPLES_STORE", "processing_time": $processingTime}""",
+        maybePayload = None
+      ),
+      responseMapping = okConflictAsSuccess
+    )
 
-  override def markTriplesGenerated(eventId:       CompoundEventId,
-                                    payload:       JsonLDTriples,
-                                    schemaVersion: SchemaVersion
+  override def markTriplesGenerated(eventId:             CompoundEventId,
+                                    payload:             JsonLDTriples,
+                                    schemaVersion:       SchemaVersion,
+                                    maybeProcessingTime: Option[EventProcessingTime]
   ): IO[Unit] = sendStatusChange(
     eventId,
     eventContent = EventRequestContent(
-      json"""{"status": "TRIPLES_GENERATED" }""",
+      event = json"""{"status": "TRIPLES_GENERATED"}""" deepMerge maybeProcessingTime
+        .map(time => json"""{"processing_time": $time}""")
+        .getOrElse(Json.Null),
       maybePayload =
-        (json"""{"payload": ${payload.value.noSpaces}, "schemaVersion": ${schemaVersion.value} }""").noSpaces.some
+        json"""{"payload": ${payload.value.noSpaces}, "schemaVersion": ${schemaVersion.value} }""".noSpaces.some
     ),
     responseMapping = okConflictAsSuccess
   )
@@ -128,13 +135,6 @@ private class IOEventStatusUpdater(
         EventRequestContent(json"""{"status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
                             None
         ),
-      responseMapping = okConflictAsSuccess
-    )
-
-  def markEventSkipped(eventId: CompoundEventId, message: String): IO[Unit] =
-    sendStatusChange(
-      eventId,
-      eventContent = EventRequestContent(event = json"""{"status": "SKIPPED", "message": $message}""", None),
       responseMapping = okConflictAsSuccess
     )
 

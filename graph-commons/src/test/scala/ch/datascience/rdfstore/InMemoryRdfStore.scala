@@ -45,7 +45,7 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, Suite}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.global
 import scala.language.{postfixOps, reflectiveCalls}
-import scala.util.Random.shuffle
+import scala.util.Random.nextInt
 import scala.xml.Elem
 
 trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
@@ -61,10 +61,9 @@ trait InMemoryRdfStore extends BeforeAndAfterAll with BeforeAndAfter {
   private lazy val fusekiServerPort: Int Refined Positive =
     if (givenServerRunning) 3030
     else
-      Refined.unsafeApply {
-        (shuffle((3000 to 30000).toList) find notUsedPort)
-          .getOrElse(throw new Exception("Cannot find not used port for Fuseki"))
-      }
+      (Option(nextInt(30000) + 3000) find notUsedPort)
+        .map(Refined.unsafeApply[Int, Positive])
+        .getOrElse(fusekiServerPort)
 
   private lazy val notUsedPort: Int => Boolean = { port =>
     Validated

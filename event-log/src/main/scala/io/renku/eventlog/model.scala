@@ -20,14 +20,12 @@ package io.renku.eventlog
 
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.constraints.{BoundedInstant, DurationNotNegative, InstantNotInTheFuture, NonBlank}
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes._
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.Positive
+import ch.datascience.tinytypes.constraints.{BoundedInstant, InstantNotInTheFuture, NonBlank}
+import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder
 
-import java.time.{Duration, Instant}
+import java.time.Instant
 
 sealed trait Event extends CompoundId {
   def id:        EventId
@@ -114,20 +112,4 @@ object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) w
 final class EventPayload private (val value: String) extends AnyVal with StringTinyType
 object EventPayload extends TinyTypeFactory[EventPayload](new EventPayload(_)) with NonBlank {
   implicit val decoder: Decoder[EventPayload] = stringDecoder(EventPayload)
-}
-
-final class EventProcessingTime private (val value: Duration) extends AnyVal with DurationTinyType
-object EventProcessingTime
-    extends TinyTypeFactory[EventProcessingTime](new EventProcessingTime(_))
-    with DurationNotNegative {
-  implicit val decoder: Decoder[EventProcessingTime] = durationDecoder(EventProcessingTime)
-
-  implicit class EventProcessingTimeOps(processingTime: EventProcessingTime) {
-
-    def *(multiplier: Int Refined Positive): EventProcessingTime =
-      EventProcessingTime(Duration.ofMillis(processingTime.value.toMillis * multiplier.value))
-
-    def /(multiplier: Int Refined Positive): EventProcessingTime =
-      EventProcessingTime(Duration.ofMillis(processingTime.value.toMillis / multiplier.value))
-  }
 }
