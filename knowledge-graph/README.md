@@ -23,7 +23,7 @@ NOTES:
 
 * the `query` query parameter has to be url-encoded and it cannot be blank.
 * the `sort` query parameter is optional and defaults to `title:asc`. Allowed property names are: `title`,
-  `datePublished`, `dateCreated` and `projectsCount`.
+  `datePublished`, `date` and `projectsCount`.
 * the `page` query parameter is optional and defaults to `1`.
 * the `per_page` query parameter is optional and defaults to `20`.
 
@@ -81,7 +81,7 @@ Response body example:
           }
         ]
       },
-      "created": "2012-10-15T10:00:00.000Z",
+      "date": "2012-10-14T03:02:25.639Z",            // either datePublished or dateCreated
       "projectsCount": 2,
       "images": ["image.png"],
       "_links":[  
@@ -101,7 +101,7 @@ Response body example:
           }
         ]
       },
-      "created": "2012-11-15T10:00:00.000Z",
+      "date": "2012-11-15T10:00:00.000Z",            // either datePublished or dateCreated
       "projectsCount": 1,
       "images": ["https://blah.com/image.png"],
       "_links":[  
@@ -163,6 +163,7 @@ Response body example:
       }
     ]
   },
+  "created" : "2012-10-15T03:02:25.639Z",         // optional property
   "hasPart" : [
     {
       "name" : "o",

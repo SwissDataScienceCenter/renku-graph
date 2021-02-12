@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{DateCreated, Description, PublishedDate, Title}
+import ch.datascience.graph.model.datasets.{DateCreated, Dates, Description, PublishedDate, Title}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
@@ -522,7 +522,7 @@ class IODatasetsFinderSpec
         .findDatasets(Some(phrases.generateOne), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
 
-      result.results          shouldBe empty
+      result.results.isEmpty  shouldBe true
       result.pagingInfo.total shouldBe Total(0)
     }
 
@@ -540,7 +540,8 @@ class IODatasetsFinderSpec
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe empty
+        .results
+        .isEmpty shouldBe true
     }
 
     "return datasets matching the criteria excluding datasets which were modified and does not match anymore" in new TestCase {
@@ -609,7 +610,8 @@ class IODatasetsFinderSpec
       datasetsFinder
         .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
         .unsafeRunSync()
-        .results shouldBe empty
+        .results
+        .isEmpty shouldBe true
     }
 
     "return datasets matching the criteria excluding datasets which were modified on forks and does not match anymore" in new TestCase {
@@ -672,7 +674,7 @@ class IODatasetsFinderSpec
           .findDatasets(Some(phrase), Sort.By(TitleProperty, Direction.Asc), PagingRequest.default)
           .unsafeRunSync()
 
-        result.results shouldBe empty
+        result.results.isEmpty shouldBe true
 
         result.pagingInfo.total shouldBe Total(0)
       }
@@ -723,17 +725,22 @@ class IODatasetsFinderSpec
 
       results shouldBe datasetsAndJsons
         .flatMap(_.toDatasetSearchResult(results))
-        .sortBy(_.published.maybeDate)
+        .sortBy(_.dates.maybeDatePublished)
         .reverse
     }
 
-    s"return datasets with name, description or creator matching the given phrase sorted by $DateCreatedProperty" in new TestCase {
+    s"return datasets with name, description or creator matching the given phrase sorted by $DateProperty" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, dataset2, dataset3) = addPhrase(
         phrase,
-        nonModifiedDatasets().generateOne changeCreatedDateTo DateCreated(Instant.now() minus (1, ChronoUnit.DAYS)),
-        nonModifiedDatasets().generateOne changeCreatedDateTo DateCreated(Instant.now() minus (2, ChronoUnit.DAYS)),
-        nonModifiedDatasets().generateOne changeCreatedDateTo DateCreated(Instant.now())
+        nonModifiedDatasets().generateOne.copy(dates = Dates(DateCreated(Instant.now() minus (1, ChronoUnit.DAYS)))),
+        nonModifiedDatasets().generateOne.copy(dates =
+          Dates(
+            DateCreated(Instant.now() minus (5, ChronoUnit.DAYS)),
+            PublishedDate(LocalDate.now().minusDays(2))
+          )
+        ),
+        nonModifiedDatasets().generateOne.copy(dates = Dates(DateCreated(Instant.now())))
       )
 
       val datasetsAndJsons = List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne)
@@ -742,13 +749,13 @@ class IODatasetsFinderSpec
       loadToStore(datasetsAndJsons.flatten.jsonLDs: _*)
 
       val results = datasetsFinder
-        .findDatasets(Some(phrase), Sort.By(DateCreatedProperty, Direction.Desc), PagingRequest.default)
+        .findDatasets(Some(phrase), Sort.By(DateProperty, Direction.Desc), PagingRequest.default)
         .unsafeRunSync()
         .results
 
       results shouldBe datasetsAndJsons
         .flatMap(_.toDatasetSearchResult(results))
-        .sortBy(_.dateCreate)
+        .sortBy(_.dates.date)
         .reverse
     }
 
@@ -861,13 +868,11 @@ class IODatasetsFinderSpec
       maybeDescription = Some(sentenceContaining(nonEmptyPhrase).map(_.value).map(Description.apply).generateOne)
     )
     val dataset3 = dataset3Orig.copy(
-      published = dataset3Orig.published.copy(
-        creators = Set(
-          DatasetCreator(
-            userEmails.generateOption,
-            sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne,
-            userAffiliations.generateOption
-          )
+      creators = Set(
+        DatasetCreator(
+          userEmails.generateOption,
+          sentenceContaining(nonEmptyPhrase).map(_.value).map(UserName.apply).generateOne,
+          userAffiliations.generateOption
         )
       )
     )
@@ -882,8 +887,8 @@ class IODatasetsFinderSpec
       dataset.title,
       dataset.name,
       dataset.maybeDescription,
-      dataset.published,
-      dataset.created,
+      dataset.creators,
+      dataset.dates,
       ProjectsCount(projectsCount),
       dataset.images
     )

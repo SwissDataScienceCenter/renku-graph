@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.renku
-import ch.datascience.graph.model.datasets.Identifier
+import ch.datascience.graph.model.datasets.{Identifier, PublishedDate}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.http.{ErrorMessage, InfoMessage}
@@ -91,8 +91,8 @@ class DatasetEndpoint[Interpretation[_]: Effect](
         },
         ("versions" -> dataset.versions.asJson).some,
         dataset.maybeDescription.map(description => "description" -> description.asJson),
-        ("published" -> dataset.published.asJson).some,
-        ("created" -> dataset.created.asJson).some,
+        ("published" -> (dataset.creators -> dataset.dates.maybeDatePublished).asJson).some,
+        dataset.dates.maybeDateCreated.map(date => "created" -> date.asJson),
         ("hasPart" -> dataset.parts.asJson).some,
         ("isPartOf" -> dataset.projects.asJson).some,
         ("keywords" -> dataset.keywords.asJson).some,
@@ -105,15 +105,18 @@ class DatasetEndpoint[Interpretation[_]: Effect](
   }
   // format: on
 
-  private implicit lazy val publishingEncoder: Encoder[DatasetPublishing] = Encoder.instance[DatasetPublishing] {
-    published =>
-      Json.obj(
-        List(
-          published.maybeDate.map(date => "datePublished" -> date.asJson),
-          ("creator" -> published.creators.toList.asJson).some
-        ).flatten: _*
-      )
-  }
+  private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[PublishedDate])] =
+    Encoder.instance[(Set[DatasetCreator], Option[PublishedDate])] {
+      case (creators, Some(published)) =>
+        Json.obj(
+          "datePublished" -> published.asJson,
+          "creator"       -> creators.toList.asJson
+        )
+      case (creators, None) =>
+        Json.obj(
+          "creator" -> creators.toList.asJson
+        )
+    }
 
   // format: off
   private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] { creator =>

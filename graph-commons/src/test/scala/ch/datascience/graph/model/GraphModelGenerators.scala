@@ -132,8 +132,16 @@ object GraphModelGenerators {
   implicit val datasetTopmostDerivedFroms: Gen[TopmostDerivedFrom] = datasetDerivedFroms.map(TopmostDerivedFrom.apply)
   implicit val datasetPublishedDates:      Gen[PublishedDate]      = localDatesNotInTheFuture map PublishedDate.apply
   implicit val datasetCreatedDates:        Gen[DateCreated]        = timestampsNotInTheFuture map DateCreated.apply
-  implicit val datasetKeywords:            Gen[Keyword]            = nonBlankStrings(minLength = 5) map (_.value) map Keyword.apply
-  implicit val datasetPartNames:           Gen[PartName]           = nonBlankStrings(minLength = 5) map (v => PartName(v.value))
+  implicit val datasetDates: Gen[Dates] = Gen.oneOf(
+    for {
+      published <- datasetPublishedDates
+      created   <- datasetCreatedDates
+    } yield Dates.AllDatasetDates(published, created),
+    datasetCreatedDates.map(Dates.RenkuDatasetDates),
+    datasetPublishedDates.map(Dates.ImportedDatasetDates)
+  )
+  implicit val datasetKeywords:  Gen[Keyword]  = nonBlankStrings(minLength = 5) map (_.value) map Keyword.apply
+  implicit val datasetPartNames: Gen[PartName] = nonBlankStrings(minLength = 5) map (v => PartName(v.value))
   implicit val datasetPartLocations: Gen[PartLocation] =
     relativePaths(minSegments = 2, maxSegments = 2)
       .map(path => s"data/$path")

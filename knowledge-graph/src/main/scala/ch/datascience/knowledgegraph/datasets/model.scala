@@ -31,8 +31,8 @@ object model {
     val name:             Name
     val url:              Url
     val maybeDescription: Option[Description]
-    val published:        DatasetPublishing
-    val created:          DateCreated
+    val creators:         Set[DatasetCreator]
+    val dates:            Dates
     val parts:            List[DatasetPart]
     val projects:         List[DatasetProject]
     val keywords:         List[Keyword]
@@ -47,8 +47,8 @@ object model {
                                       sameAs:           SameAs,
                                       versions:         DatasetVersions,
                                       maybeDescription: Option[Description],
-                                      published:        DatasetPublishing,
-                                      created:          DateCreated,
+                                      creators:         Set[DatasetCreator],
+                                      dates:            Dates,
                                       parts:            List[DatasetPart],
                                       projects:         List[DatasetProject],
                                       keywords:         List[Keyword],
@@ -62,15 +62,14 @@ object model {
                                    derivedFrom:      DerivedFrom,
                                    versions:         DatasetVersions,
                                    maybeDescription: Option[Description],
-                                   published:        DatasetPublishing,
-                                   created:          DateCreated,
+                                   creators:         Set[DatasetCreator],
+                                   dates:            Dates,
                                    parts:            List[DatasetPart],
                                    projects:         List[DatasetProject],
                                    keywords:         List[Keyword],
                                    images:           List[ImageUri]
   ) extends Dataset
 
-  final case class DatasetPublishing(maybeDate: Option[PublishedDate], creators: Set[DatasetCreator])
   final case class DatasetCreator(maybeEmail: Option[Email], name: UserName, maybeAffiliation: Option[Affiliation])
 
   final case class DatasetPart(name: PartName, atLocation: PartLocation)
