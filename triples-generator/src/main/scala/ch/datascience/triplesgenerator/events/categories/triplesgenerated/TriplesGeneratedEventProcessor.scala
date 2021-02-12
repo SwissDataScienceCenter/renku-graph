@@ -137,7 +137,7 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
 
   private lazy val updateEventLog: ((ElapsedTime, UploadingResult)) => Interpretation[Unit] = {
     case (elapsedTime, Uploaded(event)) =>
-      markEventDone(event.compoundEventId, EventProcessingTime(Duration ofMillis elapsedTime.value).some)
+      markEventDone(event.compoundEventId, EventProcessingTime(Duration ofMillis elapsedTime.value))
         .recoverWith(logEventLogUpdateError(event, "done"))
     case (_, RecoverableError(event, cause)) =>
       markEventTransformationFailedRecoverably(event.compoundEventId, cause)

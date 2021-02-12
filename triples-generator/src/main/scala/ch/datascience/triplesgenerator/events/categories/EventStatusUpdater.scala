@@ -37,7 +37,7 @@ import scala.concurrent.ExecutionContext
 
 private trait EventStatusUpdater[Interpretation[_]] {
   def markEventNew(eventId:                     CompoundEventId): Interpretation[Unit]
-  def markEventDone(eventId:                    CompoundEventId, maybeProcessingTime: Option[EventProcessingTime]): Interpretation[Unit]
+  def markEventDone(eventId:                    CompoundEventId, processingTime: EventProcessingTime): Interpretation[Unit]
   def markTriplesGenerated(eventId:             CompoundEventId,
                            payload:             JsonLDTriples,
                            schemaVersion:       SchemaVersion,
@@ -74,13 +74,11 @@ private class IOEventStatusUpdater(
     responseMapping = okConflictAsSuccess
   )
 
-  override def markEventDone(eventId: CompoundEventId, maybeProcessingTime: Option[EventProcessingTime]): IO[Unit] =
+  override def markEventDone(eventId: CompoundEventId, processingTime: EventProcessingTime): IO[Unit] =
     sendStatusChange(
       eventId,
       eventContent = EventRequestContent(
-        event = json"""{"status": "TRIPLES_STORE"}""" deepMerge maybeProcessingTime
-          .map(time => json"""{"processing_time": $time}""")
-          .getOrElse(Json.Null),
+        event = json"""{"status": "TRIPLES_STORE", "processing_time": $processingTime}""",
         maybePayload = None
       ),
       responseMapping = okConflictAsSuccess

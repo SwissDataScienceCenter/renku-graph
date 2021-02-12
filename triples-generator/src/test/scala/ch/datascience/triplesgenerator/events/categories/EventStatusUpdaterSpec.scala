@@ -71,42 +71,38 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
     Set(Ok, Conflict, NotFound) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
-        val maybeProcessingTime = eventProcessingTimes.generateOption
+        val processingTime = eventProcessingTimes.generateOne
 
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withRequestBody(
               equalToJson(
-                json"""{"status": "TRIPLES_STORE"}"""
-                  .addIfDefined("processing_time" -> maybeProcessingTime)
-                  .spaces2
+                json"""{"status": "TRIPLES_STORE", "processing_time": $processingTime}""".spaces2
               )
             )
             .willReturn(aResponse().withStatus(status.code))
         }
 
-        updater.markEventDone(eventId, maybeProcessingTime).unsafeRunSync() shouldBe ((): Unit)
+        updater.markEventDone(eventId, processingTime).unsafeRunSync() shouldBe ((): Unit)
       }
     }
 
     s"fail if remote responds with status different than $Ok" in new TestCase {
-      val maybeProcessingTime = eventProcessingTimes.generateOption
-      val status              = BadRequest
+      val processingTime = eventProcessingTimes.generateOne
+      val status         = BadRequest
 
       stubFor {
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
           .withRequestBody(
             equalToJson(
-              json"""{"status": "TRIPLES_STORE"}"""
-                .addIfDefined("processing_time" -> maybeProcessingTime)
-                .spaces2
+              json"""{"status": "TRIPLES_STORE", "processing_time": $processingTime}""".spaces2
             )
           )
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
-        updater.markEventDone(eventId, maybeProcessingTime).unsafeRunSync() shouldBe ((): Unit)
+        updater.markEventDone(eventId, processingTime).unsafeRunSync() shouldBe ((): Unit)
       }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
   }

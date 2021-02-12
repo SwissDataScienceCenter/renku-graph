@@ -191,9 +191,9 @@ class TriplesGeneratedEventProcessorSpec
 
       val exception = exceptions.generateOne
       (eventStatusUpdater
-        .markEventDone(_: CompoundEventId, _: Option[EventProcessingTime]))
+        .markEventDone(_: CompoundEventId, _: EventProcessingTime))
         .expects(triplesGeneratedEvent.compoundEventId,
-                 EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value)).some
+                 EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
         )
         .returning(context.raiseError(exception))
 
@@ -309,8 +309,8 @@ class TriplesGeneratedEventProcessorSpec
 
     def expectEventMarkedAsDone(compoundEventId: CompoundEventId) =
       (eventStatusUpdater
-        .markEventDone(_: CompoundEventId, _: Option[EventProcessingTime]))
-        .expects(compoundEventId, EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value)).some)
+        .markEventDone(_: CompoundEventId, _: EventProcessingTime))
+        .expects(compoundEventId, EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value)))
         .returning(context.unit)
 
     def expectEventMarkedAsTriplesGenerated(event: TriplesGeneratedEvent) =
