@@ -21,76 +21,102 @@ package ch.datascience.knowledgegraph.lineage
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.knowledgegraph.lineage.LineageGenerators._
-import ch.datascience.knowledgegraph.lineage.model.{Edge, EdgeMap, Lineage}
-import eu.timepit.refined.auto._
+import ch.datascience.knowledgegraph.lineage.model.EdgeMap
+import ch.datascience.knowledgegraph.lineage.model.Node.Location
+import io.renku.jsonld.EntityId
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.util.{Random, Try}
+import scala.util.Try
 
 class EdgesTrimmerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
+  /**
+    *             i _
+    *                 \
+    *  a -- B -- c -- H -- j
+    *  e _/   \_ d
+    *    \_ F -- g
+    *
+    *   x -- Z -- y
+    *
+    *   trim on a should return B c d H j
+    *   trim on c should return a B c e H j
+    *   trim on d should return a B e
+    *   trim on e should return B c d F g H j
+    *   trim on g should return e F
+    *   trim on i should return H j
+    *   trim on j should return a B c e H i
+    */
+
   "trim" should {
+    val a = Location("a")
+    val c = Location("c")
+    val d = Location("d")
+    val e = Location("e")
+    val g = Location("g")
+    val i = Location("i")
+    val j = Location("j")
+    val x = Location("x")
+    val y = Location("y")
+    val B = EntityId.of("B")
+    val F = EntityId.of("F")
+    val H = EntityId.of("H")
+    val Z = EntityId.of("Z")
 
-    "return the given edges map if there is only one graph connected to the given location" in new TestCase {
-      forAll { lineage: Lineage =>
-        val location = Random.shuffle(lineage.locationNodes.toList).head.location
-        val edgesMap = lineage.toEdgesMap
+    val graph = Map[EntityId, (Set[Location], Set[Location])](
+      B -> (Set(a, e), Set(c, d)),
+      F -> (Set(e), Set(g)),
+      H -> (Set(c, i), Set(j)),
+      Z -> (Set(x), Set(y))
+    )
 
-        edgesTrimmer.trim(edgesMap, location) shouldBe edgesMap.pure[Try]
-      }
+    "return a B c d H j when looking for a" in new TestCase {
+      edgesTrimmer.trim(graph, a) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+        B -> (Set(a), Set(c, d)),
+        H -> (Set(c), Set(j))
+      ).pure[Try]
     }
 
-    "return an edges map without graphs not connected to the given location" in new TestCase {
-      forAll { (lineage1: Lineage, lineage2: Lineage) =>
-        val location                = Random.shuffle(lineage1.locationNodes.toList).head.location
-        val Lineage(edges1, nodes1) = lineage1
-        val Lineage(edges2, nodes2) = lineage2
-        val mergedLineages          = Lineage.from[Try](edges1 ++ edges2, nodes1 ++ nodes2).fold(throw _, identity)
-
-        edgesTrimmer.trim(mergedLineages.toEdgesMap, location) shouldBe lineage1.toEdgesMap.pure[Try]
-      }
+    "return a B c e H j when looking for c" in new TestCase {
+      edgesTrimmer.trim(graph, c) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+        B -> (Set(a, e), Set(c)),
+        H -> (Set(c), Set(j))
+      ).pure[Try]
     }
 
-    "return an edges map containing all graphs connected to the given file but the ones not connected" in new TestCase {
-      forAll { (lineage1: Lineage, lineage2: Lineage, lineage3: Lineage) =>
-        val location                   = Random.shuffle(lineage1.locationNodes.toList).head.location
-        val Lineage(edges1, nodes1)    = lineage1
-        val Lineage(edges2, nodes2)    = lineage2
-        val Lineage(edges3, nodes3)    = lineage3
-        val commonLocationNode         = Random.shuffle(lineage1.locationNodes.toList).head
-        val someLineage3RunPlanNode    = Random.shuffle(lineage3.processRunNodes.toList).head
-        val lineage1And3ConnectionEdge = Edge(commonLocationNode.location, someLineage3RunPlanNode.location)
-        val mergedLineages: Lineage =
-          Lineage
-            .from[Try](edges1 ++ edges2 ++ edges3 + lineage1And3ConnectionEdge, nodes1 ++ nodes2 ++ nodes3)
-            .fold(throw _, identity)
-
-        edgesTrimmer.trim(mergedLineages.toEdgesMap, location) shouldBe Lineage
-          .from[Try](edges1 ++ edges3 + lineage1And3ConnectionEdge, nodes1 ++ nodes3)
-          .map(_.toEdgesMap)
-      }
+    "return a B e when looking for d" in new TestCase {
+      edgesTrimmer.trim(graph, d) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+        B -> (Set(a, e), Set(d))
+      ).pure[Try]
     }
 
-    "return all edges sharing the same location" in new TestCase {
-      forAll { lineage: Lineage =>
-        val commonLocation         = Random.shuffle(lineage.locationNodes.toList).head.location
-        val additionalRunPlanNodes = processRunNodes.generateNonEmptyList(minElements = 2).toList.toSet
-        val additionalEdges = additionalRunPlanNodes.map { runPlanNode =>
-          if (Random.nextBoolean()) Edge(runPlanNode.location, commonLocation)
-          else Edge(commonLocation, runPlanNode.location)
-        }
-        val lineageWithSharedLocation = Lineage
-          .from[Try](lineage.edges ++ additionalEdges, lineage.nodes ++ additionalRunPlanNodes)
-          .fold(throw _, identity)
-        val edgesMap = lineageWithSharedLocation.toEdgesMap
+    "return B c d F g H j when looking for e" in new TestCase {
+      edgesTrimmer.trim(graph, e) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+        B -> (Set(e), Set(c, d)),
+        H -> (Set(c), Set(j)),
+        F -> (Set(e), Set(g))
+      ).pure[Try]
+    }
 
-        edgesTrimmer.trim(
-          edgesMap,
-          location = Random.shuffle(lineage.locationNodes.toList).head.location
-        ) shouldBe edgesMap.pure[Try]
-      }
+    "return e F when looking for g" in new TestCase {
+      edgesTrimmer.trim(graph, g) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+        F -> (Set(e), Set(g))
+      ).pure[Try]
+    }
+
+    "return H j when looking for i" in new TestCase {
+      edgesTrimmer.trim(graph, i) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+        H -> (Set(i), Set(j))
+      ).pure[Try]
+    }
+
+    "return a B c e H i when looking for j" in new TestCase {
+      edgesTrimmer.trim(graph, j) shouldBe Map[EntityId, (Set[Location], Set[Location])](
+        B -> (Set(a, e), Set(c)),
+        H -> (Set(c, i), Set(j))
+      ).pure[Try]
     }
 
     "return an empty edges map if the given location does not exists in the given edges map" in new TestCase {

@@ -40,11 +40,11 @@ import org.http4s.{EntityDecoder, MediaType, Request}
 import java.time.Instant
 
 final case class ToTriplesStore[Interpretation[_]](
-    eventId:                     CompoundEventId,
-    underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-    maybeProcessingTime:         Option[EventProcessingTime],
-    now:                         () => Instant = () => Instant.now
-)(implicit ME:                   Bracket[Interpretation, Throwable])
+    eventId:                         CompoundEventId,
+    underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+    maybeProcessingTime:             Option[EventProcessingTime],
+    now:                             () => Instant = () => Instant.now
+)(implicit ME:                       Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
   override lazy val status: EventStatus = TriplesStore
@@ -66,14 +66,14 @@ final case class ToTriplesStore[Interpretation[_]](
   override def updateGauges(
       updateResult:      UpdateResult
   )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesGenerationGauge.decrement
+    case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesTransformationGauge.decrement
     case _                    => ME.unit
   }
 }
 
 object ToTriplesStore {
   def factory[Interpretation[_]: Sync](
-      underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
+      underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
@@ -84,7 +84,7 @@ object ToTriplesStore {
             _                   <- request.validate(status = TriplesStore)
             maybeProcessingTime <- request.getProcessingTime
           } yield CommandFound(
-            ToTriplesStore[Interpretation](eventId, underTriplesGenerationGauge, maybeProcessingTime)
+            ToTriplesStore[Interpretation](eventId, underTriplesTransformationGauge, maybeProcessingTime)
           )
         }.merge
       }

@@ -25,7 +25,7 @@ import ch.datascience.generators.Generators
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Description, PublishedDate, Title}
+import ch.datascience.graph.model.datasets.{DateCreated, Description, PublishedDate, Title}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
@@ -51,7 +51,8 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import java.time.LocalDate
+import java.time.temporal.ChronoUnit
+import java.time.{Instant, LocalDate}
 
 class IODatasetsFinderSpec
     extends AnyWordSpec
@@ -726,6 +727,31 @@ class IODatasetsFinderSpec
         .reverse
     }
 
+    s"return datasets with name, description or creator matching the given phrase sorted by $DateCreatedProperty" in new TestCase {
+      val phrase = phrases.generateOne
+      val (dataset1, dataset2, dataset3) = addPhrase(
+        phrase,
+        nonModifiedDatasets().generateOne changeCreatedDateTo DateCreated(Instant.now() minus (1, ChronoUnit.DAYS)),
+        nonModifiedDatasets().generateOne changeCreatedDateTo DateCreated(Instant.now() minus (2, ChronoUnit.DAYS)),
+        nonModifiedDatasets().generateOne changeCreatedDateTo DateCreated(Instant.now())
+      )
+
+      val datasetsAndJsons = List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne)
+        .map(_.toJsonLDsAndDatasets(noSameAs = false)())
+
+      loadToStore(datasetsAndJsons.flatten.jsonLDs: _*)
+
+      val results = datasetsFinder
+        .findDatasets(Some(phrase), Sort.By(DateCreatedProperty, Direction.Desc), PagingRequest.default)
+        .unsafeRunSync()
+        .results
+
+      results shouldBe datasetsAndJsons
+        .flatMap(_.toDatasetSearchResult(results))
+        .sortBy(_.dateCreate)
+        .reverse
+    }
+
     s"return datasets with name, description or creator matching the given phrase sorted by $ProjectsCountProperty" in new TestCase {
       val phrase = phrases.generateOne
       val (dataset1, dataset2, dataset3) = addPhrase(
@@ -857,6 +883,7 @@ class IODatasetsFinderSpec
       dataset.name,
       dataset.maybeDescription,
       dataset.published,
+      dataset.created,
       ProjectsCount(projectsCount),
       dataset.images
     )

@@ -95,13 +95,14 @@ class DatasetsSearchEndpoint[Interpretation[_]: Effect](
   }
 
   private implicit val datasetEncoder: Encoder[DatasetSearchResult] = Encoder.instance[DatasetSearchResult] {
-    case DatasetSearchResult(id, title, name, maybeDescription, published, projectsCount, images) =>
+    case DatasetSearchResult(id, title, name, maybeDescription, published, dateCreated, projectsCount, images) =>
       json"""
       {
         "identifier": $id,
         "title": $title,
         "name": $name,
         "published": $published,
+        "created": $dateCreated,
         "projectsCount": $projectsCount,
         "images": $images
       }"""
@@ -149,9 +150,15 @@ object DatasetsSearchEndpoint {
     sealed trait SearchProperty             extends Property
     final case object TitleProperty         extends Property("title") with SearchProperty
     final case object DatePublishedProperty extends Property("datePublished") with SearchProperty
+    final case object DateCreatedProperty   extends Property("dateCreated") with SearchProperty
     final case object ProjectsCountProperty extends Property("projectsCount") with SearchProperty
 
-    override lazy val properties: Set[SearchProperty] = Set(TitleProperty, DatePublishedProperty, ProjectsCountProperty)
+    override lazy val properties: Set[SearchProperty] = Set(
+      TitleProperty,
+      DatePublishedProperty,
+      DateCreatedProperty,
+      ProjectsCountProperty
+    )
   }
 }
 
@@ -166,7 +173,6 @@ object IODatasetsSearchEndpoint {
   ): IO[DatasetsSearchEndpoint[IO]] =
     for {
       rdfStoreConfig        <- RdfStoreConfig[IO]()
-      renkuBaseUrl          <- RenkuBaseUrl[IO]()
       renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new DatasetsSearchEndpoint[IO](

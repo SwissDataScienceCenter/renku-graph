@@ -21,23 +21,23 @@ package ch.datascience.knowledgegraph
 import cats.data.{EitherT, OptionT}
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
-import ch.datascience.http.ErrorMessage.ErrorMessage
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.InfoMessage
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.http.server.security.ProjectAuthorizer
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.Path
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage.ErrorMessage
+import ch.datascience.http.InfoMessage._
+import ch.datascience.http.rest.SortBy
 import ch.datascience.http.rest.SortBy.Direction
 import ch.datascience.http.rest.paging.PagingRequest
 import ch.datascience.http.rest.paging.model.{Page, PerPage}
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.http.server.security.EndpointSecurityException
 import ch.datascience.http.server.security.EndpointSecurityException.AuthorizationFailure
 import ch.datascience.http.server.security.model.AuthUser
-import ch.datascience.http.server.security.EndpointSecurityException
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
@@ -48,6 +48,7 @@ import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -117,48 +118,53 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with ScalaChec
         response.status shouldBe Ok
       }
 
-    s"define a GET /knowledge-graph/datasets?query=<phrase>&sort=name:desc endpoint returning $Ok when ${query.parameterName} and ${Sort.sort.parameterName} parameters given" in new TestCase {
-      forAll(phrases, sortBys(Sort)) { (phrase, sortBy) =>
-        val request = Request[IO](
-          Method.GET,
-          uri"knowledge-graph/datasets"
-            .withQueryParam("query", phrase.value)
-            .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
-        )
-        (datasetsSearchEndpoint
-          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
-          .expects(phrase.some, sortBy, PagingRequest.default)
-          .returning(IO.pure(Response[IO](Ok)))
+    Sort.properties foreach { sortProperty =>
+      val sortBy = Sort.By(sortProperty, Gen.oneOf(SortBy.Direction.Asc, SortBy.Direction.Desc).generateOne)
 
-        val response = routes.call(request)
+      s"define a GET /knowledge-graph/datasets?query=<phrase>&sort=name:desc endpoint returning $Ok " +
+        s"when '${query.parameterName}' and 'sort=${sortBy.property}:${sortBy.direction}' parameters given" in new TestCase {
+          val phrase = phrases.generateOne
+          val request = Request[IO](
+            Method.GET,
+            uri"knowledge-graph/datasets"
+              .withQueryParam("query", phrase.value)
+              .withQueryParam("sort", s"${sortBy.property}:${sortBy.direction}")
+          )
+          (datasetsSearchEndpoint
+            .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+            .expects(phrase.some, sortBy, PagingRequest.default)
+            .returning(IO.pure(Response[IO](Ok)))
 
-        response.status shouldBe Ok
+          val response = routes.call(request)
 
-        routesMetrics.clearRegistry()
-      }
+          response.status shouldBe Ok
+
+          routesMetrics.clearRegistry()
+        }
     }
 
-    s"define a GET /knowledge-graph/datasets?query=<phrase>&page=<page>&per_page=<per_page> endpoint returning $Ok when query, ${PagingRequest.Decoders.page.parameterName} and ${PagingRequest.Decoders.perPage.parameterName} parameters given" in new TestCase {
-      forAll(phrases, pages, perPages) { (phrase, page, perPage) =>
-        val request = Request[IO](
-          Method.GET,
-          uri"knowledge-graph/datasets"
-            .withQueryParam("query", phrase.value)
-            .withQueryParam("page", page.value)
-            .withQueryParam("per_page", perPage.value)
-        )
-        (datasetsSearchEndpoint
-          .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
-          .expects(phrase.some, Sort.By(TitleProperty, Direction.Asc), PagingRequest(page, perPage))
-          .returning(IO.pure(Response[IO](Ok)))
+    s"define a GET /knowledge-graph/datasets?query=<phrase>&page=<page>&per_page=<per_page> endpoint returning $Ok " +
+      s"when query, ${PagingRequest.Decoders.page.parameterName} and ${PagingRequest.Decoders.perPage.parameterName} parameters given" in new TestCase {
+        forAll(phrases, pages, perPages) { (phrase, page, perPage) =>
+          val request = Request[IO](
+            Method.GET,
+            uri"knowledge-graph/datasets"
+              .withQueryParam("query", phrase.value)
+              .withQueryParam("page", page.value)
+              .withQueryParam("per_page", perPage.value)
+          )
+          (datasetsSearchEndpoint
+            .searchForDatasets(_: Option[Phrase], _: Sort.By, _: PagingRequest))
+            .expects(phrase.some, Sort.By(TitleProperty, Direction.Asc), PagingRequest(page, perPage))
+            .returning(IO.pure(Response[IO](Ok)))
 
-        val response = routes.call(request)
+          val response = routes.call(request)
 
-        response.status shouldBe Ok
+          response.status shouldBe Ok
 
-        routesMetrics.clearRegistry()
+          routesMetrics.clearRegistry()
+        }
       }
-    }
 
     s"define a GET /knowledge-graph/datasets?query=<phrase> endpoint returning $BadRequest " +
       s"for invalid ${query.parameterName} parameter " +

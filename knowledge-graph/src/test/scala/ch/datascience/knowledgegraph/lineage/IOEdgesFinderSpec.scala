@@ -62,7 +62,7 @@ class IOEdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalS
         ),
         `sha9 renku run`.toEntityId -> (
           Set(`sha7 plot_data`.toNodeLocation, `sha8 parquet`.toNodeLocation),
-          Set(`sha9 plot_data`.toNodeLocation, `sha9 cumulative`.toNodeLocation)
+          Set(`sha9 grid_plot`.toNodeLocation, `sha9 cumulative`.toNodeLocation)
         )
       )
 
