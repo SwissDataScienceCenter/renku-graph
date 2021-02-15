@@ -70,7 +70,7 @@ private class IOEventStatusUpdater(
 
   override def markEventNew(eventId: CompoundEventId): IO[Unit] = sendStatusChange(
     eventId,
-    eventContent = EventRequestContent(json"""{"status": "NEW"}""", None),
+    eventContent = EventRequestContent(json"""{"status": "NEW"}""", maybePayload = None),
     responseMapping = okConflictAsSuccess
   )
 
@@ -78,7 +78,10 @@ private class IOEventStatusUpdater(
     sendStatusChange(
       eventId,
       eventContent = EventRequestContent(
-        event = json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""",
+        event = json"""{
+          "status": "TRIPLES_STORE", 
+          "processingTime": $processingTime
+        }""",
         maybePayload = None
       ),
       responseMapping = okConflictAsSuccess
@@ -91,11 +94,15 @@ private class IOEventStatusUpdater(
   ): IO[Unit] = sendStatusChange(
     eventId,
     eventContent = EventRequestContent(
-      event = json"""{"status": "TRIPLES_GENERATED"}""" deepMerge maybeProcessingTime
+      event = json"""{
+        "status": "TRIPLES_GENERATED"
+      }""" deepMerge maybeProcessingTime
         .map(time => json"""{"processingTime": $time}""")
-        .getOrElse(Json.Null),
-      maybePayload =
-        json"""{"payload": ${payload.value.noSpaces}, "schemaVersion": ${schemaVersion.value} }""".noSpaces.some
+        .getOrElse(Json.obj()),
+      maybePayload = json"""{
+        "payload": ${payload.value.noSpaces},
+        "schemaVersion": ${schemaVersion.value}
+      }""".noSpaces.some
     ),
     responseMapping = okConflictAsSuccess
   )
@@ -113,7 +120,7 @@ private class IOEventStatusUpdater(
       eventId,
       eventContent =
         EventRequestContent(json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
-                            None
+                            maybePayload = None
         ),
       responseMapping = okConflictAsSuccess
     )
@@ -123,7 +130,7 @@ private class IOEventStatusUpdater(
       eventId,
       eventContent =
         EventRequestContent(json"""{"status": "TRANSFORMATION_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
-                            None
+                            maybePayload = None
         ),
       responseMapping = okConflictAsSuccess
     )
