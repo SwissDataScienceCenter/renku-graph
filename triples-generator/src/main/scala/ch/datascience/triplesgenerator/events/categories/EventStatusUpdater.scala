@@ -78,7 +78,7 @@ private class IOEventStatusUpdater(
     sendStatusChange(
       eventId,
       eventContent = EventRequestContent(
-        event = json"""{"status": "TRIPLES_STORE", "processing_time": $processingTime}""",
+        event = json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""",
         maybePayload = None
       ),
       responseMapping = okConflictAsSuccess
@@ -92,7 +92,7 @@ private class IOEventStatusUpdater(
     eventId,
     eventContent = EventRequestContent(
       event = json"""{"status": "TRIPLES_GENERATED"}""" deepMerge maybeProcessingTime
-        .map(time => json"""{"processing_time": $time}""")
+        .map(time => json"""{"processingTime": $time}""")
         .getOrElse(Json.Null),
       maybePayload =
         json"""{"payload": ${payload.value.noSpaces}, "schemaVersion": ${schemaVersion.value} }""".noSpaces.some
