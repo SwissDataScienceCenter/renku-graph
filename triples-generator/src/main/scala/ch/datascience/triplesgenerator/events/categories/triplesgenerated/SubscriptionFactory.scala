@@ -40,10 +40,9 @@ object SubscriptionFactory {
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
-  ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] =
-    for {
-      subscriptionMechanism <-
-        SubscriptionMechanism(categoryName, categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort), logger)
-      handler <- EventHandler(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
-    } yield handler -> subscriptionMechanism
+  ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
+    subscriptionMechanism <-
+      SubscriptionMechanism(categoryName, categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort), logger)
+    handler <- EventHandler(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
+  } yield handler -> subscriptionMechanism
 }

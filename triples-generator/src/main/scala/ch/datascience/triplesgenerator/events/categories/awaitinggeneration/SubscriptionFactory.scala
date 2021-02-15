@@ -41,10 +41,9 @@ object SubscriptionFactory {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] =
-    for {
-      subscriptionMechanism <- SubscriptionMechanism(categoryName, payloadsComposerFactory, logger)
-      handler <-
-        EventHandler(currentVersionPair, metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
-    } yield handler -> subscriptionMechanism
+  ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
+    subscriptionMechanism <- SubscriptionMechanism(categoryName, payloadsComposerFactory, logger)
+    handler <-
+      EventHandler(currentVersionPair, metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
+  } yield handler -> subscriptionMechanism
 }

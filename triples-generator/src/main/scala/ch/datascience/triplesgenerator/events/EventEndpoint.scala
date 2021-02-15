@@ -64,10 +64,9 @@ class EventEndpointImpl[Interpretation[_]: Effect](
           multipart    <- toMultipart(request)
           eventJson    <- toEvent(multipart)
           maybePayload <- getPayload(multipart)
-          result <-
-            right[Response[Interpretation]](
-              handlersRegistry.handle(EventRequestContent(eventJson, maybePayload)) >>= toHttpResult
-            )
+          result <- right[Response[Interpretation]](
+                      handlersRegistry.handle(EventRequestContent(eventJson, maybePayload)) >>= toHttpResult
+                    )
         } yield result
       }.merge recoverWith { case NonFatal(error) =>
         toHttpResult(EventSchedulingResult.SchedulingError(error))
@@ -85,9 +84,12 @@ class EventEndpointImpl[Interpretation[_]: Effect](
   private def toMultipart(
       request: Request[Interpretation]
   ): EitherT[Interpretation, Response[Interpretation], Multipart[Interpretation]] = EitherT {
-    request.as[Multipart[Interpretation]].map(_.asRight[Response[Interpretation]]) recoverWith { case NonFatal(_) =>
-      BadRequest(ErrorMessage("Not multipart request")).map(_.asLeft[Multipart[Interpretation]])
-    }
+    request
+      .as[Multipart[Interpretation]]
+      .map(_.asRight[Response[Interpretation]])
+      .recoverWith { case NonFatal(_) =>
+        BadRequest(ErrorMessage("Not multipart request")).map(_.asLeft[Multipart[Interpretation]])
+      }
   }
 
   private def toEvent(multipart: Multipart[Interpretation]): EitherT[Interpretation, Response[Interpretation], Json] =
