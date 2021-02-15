@@ -28,9 +28,8 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.triplesgenerator.events.EventSchedulingResult
+import ch.datascience.triplesgenerator.events.{EventRequestContent, EventSchedulingResult}
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.categories.models.Project
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import io.circe.literal._
@@ -160,7 +159,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val processingRunner      = mock[EventsProcessingRunner[IO]]
     val eventBodyDeserializer = mock[EventBodyDeserializer[IO]]
     val logger                = TestLogger[IO]()
-    val handler               = new EventHandler[IO](processingRunner, eventBodyDeserializer, logger)
+    val handler               = new EventHandler[IO](categoryName, processingRunner, eventBodyDeserializer, logger)
 
     def requestContent(event: Json, maybePayload: Option[String]): EventRequestContent =
       EventRequestContent(event, maybePayload)

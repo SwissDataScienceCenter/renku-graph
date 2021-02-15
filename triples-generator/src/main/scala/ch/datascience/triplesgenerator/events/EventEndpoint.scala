@@ -28,8 +28,6 @@ import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
-import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
@@ -46,13 +44,12 @@ trait EventEndpoint[Interpretation[_]] {
 }
 
 class EventEndpointImpl[Interpretation[_]: Effect](
-    eventHandlers:        List[EventHandler[Interpretation]],
+    handlersRegistry:     SubscriptionsRegistry[Interpretation],
     reProvisioningStatus: ReProvisioningStatus[Interpretation]
 )(implicit ME:            MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation]
     with EventEndpoint[Interpretation] {
 
-  import EventSchedulingResult._
   import cats.syntax.all._
   import ch.datascience.http.InfoMessage
   import ch.datascience.http.InfoMessage._
@@ -68,25 +65,12 @@ class EventEndpointImpl[Interpretation[_]: Effect](
           maybePayload <- getPayload(multipart)
           result <-
             right[Response[Interpretation]](
-              tryNextHandler(EventRequestContent(eventJson, maybePayload), eventHandlers).flatMap(toHttpResult)
+              handlersRegistry.handle(EventRequestContent(eventJson, maybePayload)) >>= toHttpResult
             )
         } yield result
       }.merge recoverWith { case NonFatal(error) =>
         toHttpResult(EventSchedulingResult.SchedulingError(error))
       }
-    }
-
-  private def tryNextHandler(requestContent: EventRequestContent,
-                             handlers:       List[EventHandler[Interpretation]]
-  ): Interpretation[EventSchedulingResult] =
-    handlers.headOption match {
-      case Some(handler) =>
-        handler.handle(requestContent).flatMap {
-          case UnsupportedEventType => tryNextHandler(requestContent, handlers.tail)
-          case otherResult          => otherResult.pure[Interpretation]
-        }
-      case None =>
-        (UnsupportedEventType: EventSchedulingResult).pure[Interpretation]
     }
 
   private lazy val toHttpResult: EventSchedulingResult => Interpretation[Response[Interpretation]] = {
@@ -134,38 +118,17 @@ object IOEventEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply(
-      currentVersionPair:            RenkuVersionPair,
-      metricsRegistry:               MetricsRegistry[IO],
-      gitLabThrottler:               Throttler[IO, GitLab],
-      timeRecorder:                  SparqlQueryTimeRecorder[IO],
-      subscriptionMechanismRegistry: SubscriptionMechanismRegistry[IO],
-      reProvisioningStatus:          ReProvisioningStatus[IO],
-      logger:                        Logger[IO]
+      currentVersionPair:    RenkuVersionPair,
+      metricsRegistry:       MetricsRegistry[IO],
+      gitLabThrottler:       Throttler[IO, GitLab],
+      timeRecorder:          SparqlQueryTimeRecorder[IO],
+      subscriptionsRegistry: SubscriptionsRegistry[IO],
+      reProvisioningStatus:  ReProvisioningStatus[IO],
+      logger:                Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
-  ): IO[EventEndpoint[IO]] =
-    for {
-      awaitingGenerationHandler <- categories.awaitinggeneration.EventHandler(currentVersionPair,
-                                                                              metricsRegistry,
-                                                                              gitLabThrottler,
-                                                                              timeRecorder,
-                                                                              subscriptionMechanismRegistry,
-                                                                              logger
-                                   )
+  ): IO[EventEndpoint[IO]] = IO(new EventEndpointImpl[IO](subscriptionsRegistry, reProvisioningStatus))
 
-      membersSyncHandler <- categories.membersync.EventHandler(gitLabThrottler, logger, timeRecorder)
-      triplesGeneratedHandler <- categories.triplesgenerated.EventHandler(metricsRegistry,
-                                                                          gitLabThrottler,
-                                                                          timeRecorder,
-                                                                          subscriptionMechanismRegistry,
-                                                                          logger
-                                 )
-    } yield new EventEndpointImpl[IO](
-      List(awaitingGenerationHandler, membersSyncHandler, triplesGeneratedHandler),
-      reProvisioningStatus
-    )
-
-  case class EventRequestContent(event: Json, maybePayload: Option[String])
 }

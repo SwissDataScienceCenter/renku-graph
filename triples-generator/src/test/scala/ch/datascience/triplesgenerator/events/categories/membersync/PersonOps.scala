@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories
+package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
@@ -24,11 +24,11 @@ import ch.datascience.graph.model.users.ResourceId
 import ch.datascience.rdfstore.entities.Person
 import io.renku.jsonld.syntax._
 
-package object membersync {
+private object PersonOps {
 
-  private[membersync] implicit class PersonsOps(persons: Set[Person])(implicit
-      renkuBaseUrl:                                      RenkuBaseUrl,
-      gitLabApiUrl:                                      GitLabApiUrl
+  implicit class PersonsOps(persons: Set[Person])(implicit
+      renkuBaseUrl:                  RenkuBaseUrl,
+      gitLabApiUrl:                  GitLabApiUrl
   ) {
 
     lazy val toKGProjectMembers: Set[KGProjectMember] = persons.flatMap { member =>

@@ -25,7 +25,6 @@ import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, UnsupportedEventType}
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.categories.models.Project
 import io.chrisdavenport.log4cats.Logger
 import io.circe.{Decoder, DecodingFailure, Json}

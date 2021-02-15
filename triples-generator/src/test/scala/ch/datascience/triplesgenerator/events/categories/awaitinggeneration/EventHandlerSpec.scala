@@ -29,9 +29,8 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
-import ch.datascience.triplesgenerator.events.{EventSchedulingResult, eventRequestContents}
+import ch.datascience.triplesgenerator.events.{EventRequestContent, EventSchedulingResult, eventRequestContents}
 import ch.datascience.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import io.circe.literal._
 import io.circe.syntax._
@@ -153,7 +152,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val eventBodyDeserializer = mock[EventBodyDeserializer[IO]]
     val renkuVersionPair      = renkuVersionPairs.generateOne
     val logger                = TestLogger[IO]()
-    val handler               = new EventHandler[IO](processingRunner, eventBodyDeserializer, renkuVersionPair, logger)
+    val handler               = new EventHandler[IO](categoryName, processingRunner, eventBodyDeserializer, renkuVersionPair, logger)
     def requestContent(event: Json, maybePayload: Option[String]): EventRequestContent =
       EventRequestContent(event, maybePayload)
   }

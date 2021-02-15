@@ -42,7 +42,7 @@ private class SubscriptionPayloadComposerImpl[Interpretation[_]](
     findSubscriberUrl() map (CategoryAndUrlPayload(categoryName, _).asJson)
 }
 
-private object SubscriptionPayloadComposer {
+private[events] object SubscriptionPayloadComposer {
 
   lazy val categoryAndUrlPayloadsComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
     Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>

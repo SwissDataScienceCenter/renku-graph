@@ -27,7 +27,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
+import ch.datascience.triplesgenerator.events.SubscriptionsRegistry
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningJsonLD.{Running, objectType}
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
@@ -124,9 +124,9 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     private val logger                  = TestLogger[IO]()
     private val timeRecorder            = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     private val statusCacheCheckTimeRef = Ref.of[IO, Long](0L).unsafeRunSync()
-    val subscriptionMechanismRegistry   = mock[SubscriptionMechanismRegistry[IO]]
+    val subscriptionsRegistry           = mock[SubscriptionsRegistry[IO]]
 
-    val reProvisioningStatus = new ReProvisioningStatusImpl(subscriptionMechanismRegistry,
+    val reProvisioningStatus = new ReProvisioningStatusImpl(subscriptionsRegistry,
                                                             rdfStoreConfig,
                                                             renkuBaseUrl,
                                                             logger,
@@ -137,7 +137,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     )
 
     def expectNotificationSent =
-      (subscriptionMechanismRegistry.renewAllSubscriptions _)
+      (subscriptionsRegistry.renewAllSubscriptions _)
         .expects()
         .returning(IO.unit)
   }

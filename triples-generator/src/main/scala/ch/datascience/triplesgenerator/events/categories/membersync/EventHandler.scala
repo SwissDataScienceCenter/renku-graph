@@ -27,16 +27,16 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events
-import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import ch.datascience.triplesgenerator.events.EventSchedulingResult.Accepted
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
+import ch.datascience.triplesgenerator.events.{EventRequestContent, EventSchedulingResult}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 private[events] class EventHandler[Interpretation[_]](
-    membersSynchronizer: MembersSynchronizer[Interpretation],
-    logger:              Logger[Interpretation]
+    override val categoryName: CategoryName,
+    membersSynchronizer:       MembersSynchronizer[Interpretation],
+    logger:                    Logger[Interpretation]
 )(implicit
     ME:           MonadError[Interpretation, Throwable],
     contextShift: ContextShift[Interpretation],
@@ -45,8 +45,6 @@ private[events] class EventHandler[Interpretation[_]](
 
   import ch.datascience.graph.model.projects
   import membersSynchronizer._
-
-  override val categoryName: CategoryName = EventHandler.categoryName
 
   override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
     for {
@@ -66,8 +64,6 @@ private[events] class EventHandler[Interpretation[_]](
 }
 
 private[events] object EventHandler {
-  val categoryName: CategoryName = CategoryName("MEMBER_SYNC")
-
   def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(
       implicit
       executionContext: ExecutionContext,
@@ -75,5 +71,5 @@ private[events] object EventHandler {
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
     membersSynchronizer <- MembersSynchronizer(gitLabThrottler, logger, timeRecorder)
-  } yield new EventHandler[IO](membersSynchronizer, logger)
+  } yield new EventHandler[IO](categoryName, membersSynchronizer, logger)
 }

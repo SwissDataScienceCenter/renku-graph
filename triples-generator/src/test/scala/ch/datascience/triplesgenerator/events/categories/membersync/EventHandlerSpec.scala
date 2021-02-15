@@ -27,8 +27,7 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
-import ch.datascience.triplesgenerator.events.eventRequestContents
+import ch.datascience.triplesgenerator.events.{EventRequestContent, eventRequestContents}
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -89,7 +88,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     val membersSynchronizer = mock[MembersSynchronizer[IO]]
     val logger              = TestLogger[IO]()
-    val handler             = new EventHandler[IO](membersSynchronizer, logger)
+    val handler             = new EventHandler[IO](categoryName, membersSynchronizer, logger)
 
     def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
   }

@@ -27,7 +27,7 @@ import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.Gene
 import ch.datascience.triplesgenerator.events.subscriptions.{IOSubscriptionUrlFinder, SubscriptionPayloadComposer, SubscriptionUrlFinder}
 import io.circe.Json
 
-private[events] class PayloadComposer[Interpretation[_]](
+private[awaitinggeneration] class PayloadComposer[Interpretation[_]](
     categoryName: CategoryName,
     capacity:     GenerationProcessesNumber,
     urlFinder:    SubscriptionUrlFinder[Interpretation]
@@ -40,7 +40,7 @@ private[events] class PayloadComposer[Interpretation[_]](
     findSubscriberUrl() map (Payload(categoryName, _, capacity).asJson)
 }
 
-private[events] object PayloadComposer {
+private[awaitinggeneration] object PayloadComposer {
 
   lazy val payloadsComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
     Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>

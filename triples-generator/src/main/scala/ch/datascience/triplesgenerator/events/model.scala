@@ -18,12 +18,16 @@
 
 package ch.datascience.triplesgenerator.events
 
-private sealed trait EventSchedulingResult extends Product with Serializable
+import io.circe.Json
 
-private object EventSchedulingResult {
+sealed trait EventSchedulingResult extends Product with Serializable
+
+object EventSchedulingResult {
   case object Accepted             extends EventSchedulingResult
   case object Busy                 extends EventSchedulingResult
   case object UnsupportedEventType extends EventSchedulingResult
   case object BadRequest           extends EventSchedulingResult
   final case class SchedulingError(throwable: Throwable) extends EventSchedulingResult
 }
+
+case class EventRequestContent(event: Json, maybePayload: Option[String])

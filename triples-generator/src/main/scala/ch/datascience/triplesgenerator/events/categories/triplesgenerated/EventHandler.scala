@@ -28,20 +28,20 @@ import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.EventSchedulingResult
 import ch.datascience.triplesgenerator.events.EventSchedulingResult._
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.categories.models.Project
-import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
+import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanism
+import ch.datascience.triplesgenerator.events.{EventRequestContent, EventSchedulingResult}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.parser
 
 import scala.concurrent.ExecutionContext
 
 private[events] class EventHandler[Interpretation[_]: Effect](
-    eventsProcessingRunner: EventsProcessingRunner[Interpretation],
-    eventBodyDeserializer:  EventBodyDeserializer[Interpretation],
-    logger:                 Logger[Interpretation]
+    override val categoryName: CategoryName,
+    eventsProcessingRunner:    EventsProcessingRunner[Interpretation],
+    eventBodyDeserializer:     EventBodyDeserializer[Interpretation],
+    logger:                    Logger[Interpretation]
 )(implicit
     ME: MonadError[Interpretation, Throwable]
 ) extends events.EventHandler[Interpretation] {
@@ -51,8 +51,6 @@ private[events] class EventHandler[Interpretation[_]: Effect](
   import io.circe.Decoder
 
   private type IdAndBody = (CompoundEventId, EventBody)
-
-  override val categoryName: CategoryName = EventHandler.categoryName
 
   override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
 
@@ -88,21 +86,18 @@ private[events] class EventHandler[Interpretation[_]: Effect](
 
 private[events] object EventHandler {
 
-  val categoryName: CategoryName = CategoryName("TRIPLES_GENERATED")
-
   def apply(
-      metricsRegistry:               MetricsRegistry[IO],
-      gitLabThrottler:               Throttler[IO, GitLab],
-      timeRecorder:                  SparqlQueryTimeRecorder[IO],
-      subscriptionMechanismRegistry: SubscriptionMechanismRegistry[IO],
-      logger:                        Logger[IO]
+      metricsRegistry:       MetricsRegistry[IO],
+      gitLabThrottler:       Throttler[IO, GitLab],
+      timeRecorder:          SparqlQueryTimeRecorder[IO],
+      subscriptionMechanism: SubscriptionMechanism[IO],
+      logger:                Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    subscriptionMechanism <- subscriptionMechanismRegistry(categoryName)
     processingRunner <-
       IOEventsProcessingRunner(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
-  } yield new EventHandler[IO](processingRunner, EventBodyDeserializer(), logger)
+  } yield new EventHandler[IO](categoryName, processingRunner, EventBodyDeserializer(), logger)
 }

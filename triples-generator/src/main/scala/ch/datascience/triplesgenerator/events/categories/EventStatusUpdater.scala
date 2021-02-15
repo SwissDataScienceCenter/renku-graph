@@ -27,7 +27,7 @@ import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime}
 import ch.datascience.http.client.IORestClient
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
+import ch.datascience.triplesgenerator.events.EventRequestContent
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonEncoder
 import org.http4s.{Status, Uri}

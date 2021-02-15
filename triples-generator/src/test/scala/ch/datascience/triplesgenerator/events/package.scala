@@ -20,7 +20,6 @@ package ch.datascience.triplesgenerator
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{jsons, nonEmptyStrings}
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import org.scalacheck.Gen
 
 package object events {
