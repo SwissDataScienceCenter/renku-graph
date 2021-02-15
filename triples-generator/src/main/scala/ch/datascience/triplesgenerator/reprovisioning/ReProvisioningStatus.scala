@@ -61,7 +61,9 @@ private class ReProvisioningStatusImpl(
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with ReProvisioningStatus[IO] {
 
+  private val applicative = Applicative[IO]
   import ReProvisioningJsonLD._
+  import applicative._
   import subscriptionsRegistry._
 
   private val runningStatusCheckStarted = new AtomicBoolean(false)
@@ -119,7 +121,7 @@ private class ReProvisioningStatusImpl(
     } yield ()
 
   private def triggerPeriodicStatusCheck(): IO[Unit] =
-    Applicative[IO].whenA(!runningStatusCheckStarted.get()) {
+    whenA(!runningStatusCheckStarted.get()) {
       runningStatusCheckStarted set true
       periodicStatusCheck.start.void
     }

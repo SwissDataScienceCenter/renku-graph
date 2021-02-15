@@ -111,7 +111,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
 
       clearStatus()
 
-      sleep((statusRefreshInterval + (100 millis)).toMillis)
+      sleep((statusRefreshInterval + (200 millis)).toMillis)
 
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
     }
