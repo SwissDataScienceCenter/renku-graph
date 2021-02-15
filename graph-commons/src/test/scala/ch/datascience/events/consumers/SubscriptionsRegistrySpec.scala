@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events
+package ch.datascience.events.consumers
 
 import cats.Parallel
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
+import ch.datascience.events.consumers.EventSchedulingResult._
+import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.triplesgenerator.events.EventSchedulingResult._
-import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanism
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

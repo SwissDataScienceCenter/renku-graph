@@ -16,18 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events
+package ch.datascience.events
 
-import io.circe.Json
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.{jsons, nonEmptyStrings}
+import org.scalacheck.Gen
 
-sealed trait EventSchedulingResult extends Product with Serializable
+package object consumers {
 
-object EventSchedulingResult {
-  case object Accepted             extends EventSchedulingResult
-  case object Busy                 extends EventSchedulingResult
-  case object UnsupportedEventType extends EventSchedulingResult
-  case object BadRequest           extends EventSchedulingResult
-  final case class SchedulingError(throwable: Throwable) extends EventSchedulingResult
+  implicit val eventRequestContents: Gen[EventRequestContent] = for {
+    event        <- jsons
+    maybePayload <- nonEmptyStrings().toGeneratorOfOptions
+  } yield EventRequestContent(event, maybePayload)
 }
-
-case class EventRequestContent(event: Json, maybePayload: Option[String])

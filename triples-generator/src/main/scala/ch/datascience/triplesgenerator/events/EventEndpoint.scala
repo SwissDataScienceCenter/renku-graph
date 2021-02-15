@@ -24,6 +24,7 @@ import cats.data.EitherT.right
 import cats.effect.{Effect, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
+import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, SubscriptionsRegistry}
 import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.MetricsRegistry

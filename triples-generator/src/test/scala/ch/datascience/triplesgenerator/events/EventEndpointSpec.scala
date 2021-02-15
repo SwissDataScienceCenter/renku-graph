@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.events
 
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.events.consumers.{EventSchedulingResult, SubscriptionsRegistry, _}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.ErrorMessage.ErrorMessage

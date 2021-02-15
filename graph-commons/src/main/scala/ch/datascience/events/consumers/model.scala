@@ -16,26 +16,18 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.subscriptions
+package ch.datascience.events.consumers
 
-import ch.datascience.graph.model.events.CategoryName
+import io.circe.Json
 
-private[events] trait SubscriptionPayload extends Product with Serializable {
-  val categoryName:  CategoryName
-  val subscriberUrl: SubscriberUrl
+sealed trait EventSchedulingResult extends Product with Serializable
+
+object EventSchedulingResult {
+  case object Accepted             extends EventSchedulingResult
+  case object Busy                 extends EventSchedulingResult
+  case object UnsupportedEventType extends EventSchedulingResult
+  case object BadRequest           extends EventSchedulingResult
+  final case class SchedulingError(throwable: Throwable) extends EventSchedulingResult
 }
 
-private case class CategoryAndUrlPayload(categoryName: CategoryName, subscriberUrl: SubscriberUrl)
-    extends SubscriptionPayload
-
-private object CategoryAndUrlPayload {
-  import io.circe.Encoder
-  import io.circe.literal._
-
-  implicit val encoder: Encoder[CategoryAndUrlPayload] = Encoder.instance[CategoryAndUrlPayload] { payload =>
-    json"""{
-        "categoryName":  ${payload.categoryName.value},
-        "subscriberUrl": ${payload.subscriberUrl.value}
-      }"""
-  }
-}
+case class EventRequestContent(event: Json, maybePayload: Option[String])

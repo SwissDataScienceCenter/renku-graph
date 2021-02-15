@@ -22,12 +22,12 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits.catsSyntaxOptionId
 import ch.datascience.control.Throttler
+import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime}
 import ch.datascience.http.client.IORestClient
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.events.EventRequestContent
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonEncoder
 import org.http4s.{Status, Uri}

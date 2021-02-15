@@ -22,11 +22,11 @@ import cats.Applicative
 import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.events.consumers.SubscriptionsRegistry
 import ch.datascience.graph.Schemas.rdf
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
-import ch.datascience.triplesgenerator.events.SubscriptionsRegistry
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger

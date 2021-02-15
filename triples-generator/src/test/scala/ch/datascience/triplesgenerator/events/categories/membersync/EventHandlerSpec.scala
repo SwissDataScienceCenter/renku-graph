@@ -19,6 +19,8 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.effect.IO
+import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
+import ch.datascience.events.consumers.{EventRequestContent, eventRequestContents}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -26,8 +28,6 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
-import ch.datascience.triplesgenerator.events.{EventRequestContent, eventRequestContents}
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}

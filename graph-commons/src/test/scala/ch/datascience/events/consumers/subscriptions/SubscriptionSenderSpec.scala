@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.subscriptions
+package ch.datascience.events.consumers.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._

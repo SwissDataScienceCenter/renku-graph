@@ -16,16 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.events.consumers
 
-import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.{jsons, nonEmptyStrings}
-import org.scalacheck.Gen
+import ch.datascience.graph.model.events.CategoryName
 
-package object events {
+trait EventHandler[Interpretation[_]] {
+  val categoryName: CategoryName
+  def handle(request: EventRequestContent): Interpretation[EventSchedulingResult]
 
-  implicit val eventRequestContents: Gen[EventRequestContent] = for {
-    event        <- jsons
-    maybePayload <- nonEmptyStrings().toGeneratorOfOptions
-  } yield EventRequestContent(event, maybePayload)
 }

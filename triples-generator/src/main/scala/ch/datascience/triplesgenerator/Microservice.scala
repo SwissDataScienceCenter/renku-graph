@@ -24,6 +24,8 @@ import ch.datascience.config.GitLab
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
+import ch.datascience.events.consumers
+import ch.datascience.events.consumers.SubscriptionsRegistry
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
@@ -31,7 +33,7 @@ import ch.datascience.microservices.IOMicroservice
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
 import ch.datascience.triplesgenerator.config.{IOVersionCompatibilityConfig, TriplesGeneration}
-import ch.datascience.triplesgenerator.events.{IOEventEndpoint, SubscriptionsRegistry, categories}
+import ch.datascience.triplesgenerator.events.IOEventEndpoint
 import ch.datascience.triplesgenerator.init._
 import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
 import eu.timepit.refined.api.Refined
@@ -70,25 +72,25 @@ object Microservice extends IOMicroservice {
       gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
       gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
       sparqlTimeRecorder      <- SparqlQueryTimeRecorder(metricsRegistry)
-      awaitingGenerationSubscription <- categories.awaitinggeneration.SubscriptionFactory(renkuVersionPairs.head,
-                                                                                          metricsRegistry,
-                                                                                          gitLabThrottler,
-                                                                                          sparqlTimeRecorder,
-                                                                                          ApplicationLogger
+      awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory(renkuVersionPairs.head,
+                                                                                                 metricsRegistry,
+                                                                                                 gitLabThrottler,
+                                                                                                 sparqlTimeRecorder,
+                                                                                                 ApplicationLogger
                                         )
 
       membersSyncSubscription <-
-        categories.membersync.SubscriptionFactory(gitLabThrottler, ApplicationLogger, sparqlTimeRecorder)
+        events.categories.membersync.SubscriptionFactory(gitLabThrottler, ApplicationLogger, sparqlTimeRecorder)
       triplesGeneratedSubscription <-
-        categories.triplesgenerated.SubscriptionFactory(metricsRegistry,
-                                                        gitLabThrottler,
-                                                        sparqlTimeRecorder,
-                                                        ApplicationLogger
+        events.categories.triplesgenerated.SubscriptionFactory(metricsRegistry,
+                                                               gitLabThrottler,
+                                                               sparqlTimeRecorder,
+                                                               ApplicationLogger
         )
-      subscriptionsRegistry <- SubscriptionsRegistry(ApplicationLogger,
-                                                     awaitingGenerationSubscription,
-                                                     membersSyncSubscription,
-                                                     triplesGeneratedSubscription
+      subscriptionsRegistry <- consumers.SubscriptionsRegistry(ApplicationLogger,
+                                                               awaitingGenerationSubscription,
+                                                               membersSyncSubscription,
+                                                               triplesGeneratedSubscription
                                )
 
       reProvisioningStatus <- ReProvisioningStatus(subscriptionsRegistry, ApplicationLogger, sparqlTimeRecorder)

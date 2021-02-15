@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.IO
 import cats.effect.concurrent.Ref
+import ch.datascience.events.consumers.SubscriptionsRegistry
 import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.Schemas._
@@ -27,7 +28,6 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.events.SubscriptionsRegistry
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningJsonLD.{Running, objectType}
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory

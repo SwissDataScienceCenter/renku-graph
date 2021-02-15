@@ -29,10 +29,10 @@ import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
-import ch.datascience.triplesgenerator.events.EventSchedulingResult._
+import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.triplesgenerator.events.categories.models.Project
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
-import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanism
+import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive

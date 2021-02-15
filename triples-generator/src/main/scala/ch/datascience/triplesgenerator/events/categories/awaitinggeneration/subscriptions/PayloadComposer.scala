@@ -24,7 +24,8 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
-import ch.datascience.triplesgenerator.events.subscriptions.{IOSubscriptionUrlFinder, SubscriptionPayloadComposer, SubscriptionUrlFinder}
+import ch.datascience.events.consumers.subscriptions.{IOSubscriptionUrlFinder, SubscriptionPayloadComposer, SubscriptionUrlFinder}
+import ch.datascience.triplesgenerator.Microservice
 import io.circe.Json
 
 private[awaitinggeneration] class PayloadComposer[Interpretation[_]](
@@ -45,7 +46,7 @@ private[awaitinggeneration] object PayloadComposer {
   lazy val payloadsComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
     Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>
       for {
-        subscriptionUrlFinder <- IOSubscriptionUrlFinder()
+        subscriptionUrlFinder <- IOSubscriptionUrlFinder(Microservice.ServicePort)
         capacity              <- GenerationProcessesNumber[IO]()
       } yield new PayloadComposer[IO](categoryName, capacity, subscriptionUrlFinder)
     }

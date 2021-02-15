@@ -24,11 +24,12 @@ import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
+import ch.datascience.events.consumers
+import ch.datascience.events.consumers.EventSchedulingResult.Accepted
+import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events
-import ch.datascience.triplesgenerator.events.EventSchedulingResult.Accepted
-import ch.datascience.triplesgenerator.events.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.triplesgenerator.events.categories.EventHandlerOps
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -41,7 +42,8 @@ private[events] class EventHandler[Interpretation[_]](
     ME:           MonadError[Interpretation, Throwable],
     contextShift: ContextShift[Interpretation],
     concurrent:   Concurrent[Interpretation]
-) extends events.EventHandler[Interpretation] {
+) extends consumers.EventHandler[Interpretation]
+    with EventHandlerOps[Interpretation] {
 
   import ch.datascience.graph.model.projects
   import membersSynchronizer._

@@ -21,6 +21,8 @@ package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.events.consumers.EventSchedulingResult._
+import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, eventRequestContents}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
@@ -28,9 +30,7 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventBody}
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.triplesgenerator.events.EventSchedulingResult._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
-import ch.datascience.triplesgenerator.events.{EventRequestContent, EventSchedulingResult, eventRequestContents}
 import ch.datascience.triplesgenerator.generators.VersionGenerators.renkuVersionPairs
 import io.circe.literal._
 import io.circe.syntax._

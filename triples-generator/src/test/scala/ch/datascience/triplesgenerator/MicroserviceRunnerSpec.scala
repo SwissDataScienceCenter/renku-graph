@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator
 
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
+import ch.datascience.events.consumers.SubscriptionsRegistry
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
@@ -27,7 +28,6 @@ import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.interpreters.{IOSentryInitializer, TestLogger}
 import ch.datascience.testtools.MockedRunnableCollaborators
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
-import ch.datascience.triplesgenerator.events.SubscriptionsRegistry
 import ch.datascience.triplesgenerator.init.{CliVersionCompatibilityVerifier, IOFusekiDatasetInitializer}
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioning
 import org.scalamock.scalatest.MockFactory
