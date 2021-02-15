@@ -77,7 +77,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withRequestBody(
               equalToJson(
-                json"""{"status": "TRIPLES_STORE", "processing_time": $processingTime}""".spaces2
+                json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2
               )
             )
             .willReturn(aResponse().withStatus(status.code))
@@ -95,7 +95,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
           .withRequestBody(
             equalToJson(
-              json"""{"status": "TRIPLES_STORE", "processing_time": $processingTime}""".spaces2
+              json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2
             )
           )
           .willReturn(aResponse().withStatus(status.code))
@@ -120,7 +120,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
                 .withBody(
                   equalToJson(
                     json"""{"status": "TRIPLES_GENERATED"}"""
-                      .addIfDefined("processing_time" -> maybeProcessingTime)
+                      .addIfDefined("processingTime" -> maybeProcessingTime)
                       .spaces2
                   )
                 )
@@ -153,7 +153,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
               .withBody(
                 equalToJson(
                   json"""{"status": "TRIPLES_GENERATED"}"""
-                    .addIfDefined("processing_time" -> maybeProcessingTime)
+                    .addIfDefined("processingTime" -> maybeProcessingTime)
                     .spaces2
                 )
               )
