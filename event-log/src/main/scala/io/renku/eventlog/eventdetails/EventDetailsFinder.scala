@@ -16,55 +16,47 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.latestevents
+package io.renku.eventlog.eventdetails
 
 import cats.effect.{Bracket, IO}
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
-import ch.datascience.events.consumers.Project
-import ch.datascience.graph.model.events.{EventBody, EventId}
+import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
-import io.renku.eventlog.latestevents.LatestEventsFinder.IdProjectBody
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
 
-trait LatestEventsFinder[Interpretation[_]] {
-  def findAllLatestEvents(): Interpretation[List[IdProjectBody]]
+private trait EventDetailsFinder[Interpretation[_]] {
+  def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]]
 }
 
-class LatestEventsFinderImpl(
+private class EventDetailsFinderImpl(
     transactor:       DbTransactor[IO, EventLogDB],
     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
-    with LatestEventsFinder[IO]
+    with EventDetailsFinder[IO]
     with TypeSerializers {
 
-  import LatestEventsFinder._
   import eu.timepit.refined.auto._
 
-  override def findAllLatestEvents(): IO[List[IdProjectBody]] =
-    measureExecutionTime(findEvents) transact transactor.get
+  override def findDetails(eventId: CompoundEventId): IO[Option[CompoundEventId]] =
+    measureExecutionTime(find(eventId)) transact transactor.get
 
-  private def findEvents = SqlQuery(
-    sql"""|SELECT evt.event_id, evt.project_id, prj.project_path, evt.event_body
-          |FROM event evt
-          |JOIN project prj ON evt.project_id = prj.project_id AND evt.event_date = prj.latest_event_date
+  private def find(eventId: CompoundEventId) = SqlQuery(
+    sql"""|SELECT evt.event_id, evt.project_id
+          |FROM event evt WHERE evt.event_id = ${eventId.id} and evt.project_id = ${eventId.projectId} 
           |""".stripMargin
-      .query[(EventId, Project, EventBody)]
-      .to[List],
-    name = "latest projects events"
+      .query[CompoundEventId]
+      .option,
+    name = "find event details"
   )
 }
 
-object LatestEventsFinder {
-  type IdProjectBody = (EventId, Project, EventBody)
-}
-
-object IOLatestEventsFinder {
+private object EventDetailsFinder {
   def apply(
       transactor:       DbTransactor[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-  ): IO[LatestEventsFinder[IO]] = IO {
-    new LatestEventsFinderImpl(transactor, queriesExecTimes)
+  ): IO[EventDetailsFinder[IO]] = IO {
+    new EventDetailsFinderImpl(transactor, queriesExecTimes)
   }
 }

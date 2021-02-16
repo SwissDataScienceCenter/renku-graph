@@ -113,9 +113,12 @@ object Generators {
       set  <- Gen.containerOfN[Set, T](size, generator)
     } yield set
 
-  def listOf[T](generator: Gen[T], maxElements: Int Refined Positive = 5): Gen[List[T]] =
+  def listOf[T](generator:   Gen[T],
+                minElements: Int Refined NonNegative = 0,
+                maxElements: Int Refined Positive = 5
+  ): Gen[List[T]] =
     for {
-      size <- choose(0, maxElements.value)
+      size <- choose(minElements.value, maxElements.value)
       list <- Gen.listOfN(size, generator)
     } yield list
 

@@ -7,8 +7,9 @@ This is a microservice which provides CRUD operations for Event Log DB.
 | Method | Path                                    | Description                                                    |
 |--------|-----------------------------------------|----------------------------------------------------------------|
 |  GET   | ```/events?latest_per_project=true```   | Finds events for all the projects with the latest `event_date` |
+|  GET   | ```/events/:event-id/:project-id```     | Retrieve chosen event's data                                   |
 |  PATCH | ```/events```                           | Changes events' data by applying the given patch               |
-|  POST  | ```/events```                           | Creates an event with either a `NEW` or `SKIPPED` status       |
+|  POST  | ```/events```                           | Send an event for processing                                   |
 |  PATCH | ```/events/:event-id/:project-id```     | Updates chosen event's data                                    |
 |  GET   | ```/metrics```                          | Returns Prometheus metrics of the service                      |
 |  GET   | ```/ping```                             | Verifies service health                                        |
@@ -41,6 +42,29 @@ Response body example:
 }
 ```
 
+#### GET /events/:event-id/:project-id`
+
+Find event details.
+
+**Response**
+
+| Status                     | Description                                                   |
+|----------------------------|---------------------------------------------------------------|
+| OK (200)                   | If the details are found                                      |
+| NOT_FOUND (404)            | If the event does not exists                                  |
+| INTERNAL SERVER ERROR (500)| When there are problems                                       |
+
+Response body example:
+
+```json
+{
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 123
+  }
+}
+```
+
 #### PATCH /events
 
 Changes events' data by applying the given patch.
@@ -66,13 +90,23 @@ Be aware that the given patch affects all the events in the Event Log.
 
 #### POST /events
 
-Creates an event with either the `NEW` or `SKIPPED` status.
+Accepts an event as multipart requests.
 
-**Request**
+##### Supported event categories:
+
+- **CREATION**
+
+  Creates an event with either the `NEW` or `SKIPPED` status.
+
+**Multipart Request**
+
+`event` part:
+
 In the case of a *NEW* event
 
 ```json
 {
+  "categoryName": "CREATION",
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id": 123,
@@ -89,6 +123,7 @@ In the case of a *SKIPPED* event. Note that a non-blank `message` is required.
 
 ```json
 {
+  "categoryName": "CREATION",
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
     "id": 123,
@@ -102,39 +137,11 @@ In the case of a *SKIPPED* event. Note that a non-blank `message` is required.
 }
 ```
 
-Event Body example:
-
-```json
-{
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
-  "message": "some text",
-  "committedDate": "2001-09-04T10:48:29.457Z",
-  "author": {
-    "name": "author name",
-    "email": "author@mail.com"
-    // optional
-  },
-  "committer": {
-    "name": "committer name",
-    "email": "committer@mail.com"
-    // optional
-  },
-  "parents": [
-    "f307326be71b17b90db5caaf47bcd44710fe119f"
-  ],
-  "project": {
-    "id": 123,
-    "path": "namespace/project-name"
-  }
-}
-```
-
 **Response**
 
 | Status                     | Description                                                                          |
 |----------------------------|--------------------------------------------------------------------------------------|
-| OK (200)                   | When event with the given `id` for the given project already exists in the Event Log |
-| CREATED (201)              | When a new event was created in the Event Log                                        |
+| ACCEPTED (202)             | When event is accepted                                                               |
 | BAD_REQUEST (400)          | When request body is not a valid JSON Event                                          |
 | INTERNAL SERVER ERROR (500)| When there are problems with event creation                                          |
 

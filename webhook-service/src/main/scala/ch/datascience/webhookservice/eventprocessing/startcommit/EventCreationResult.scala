@@ -18,9 +18,9 @@
 
 package ch.datascience.webhookservice.eventprocessing.startcommit
 
-private sealed trait SendingResult extends Product with Serializable
-private object SendingResult {
-  final case object Created extends SendingResult
-  final case object Existed extends SendingResult
-  final case object Failed  extends SendingResult
+private sealed trait EventCreationResult extends Product with Serializable
+private object EventCreationResult {
+  final case object Created extends EventCreationResult
+  final case object Existed extends EventCreationResult
+  final case object Failed  extends EventCreationResult
 }

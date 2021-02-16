@@ -31,7 +31,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info, Warn}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.webhookservice.commits.{CommitInfo, LatestCommitFinder}
-import ch.datascience.webhookservice.eventprocessing.startcommit.IOCommitToEventLog
+import ch.datascience.webhookservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
 import ch.datascience.webhookservice.eventprocessing.{Project, StartCommit}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.missedevents.LatestEventsFetcher.LatestProjectCommit
@@ -269,7 +269,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
     val accessTokenFinder     = mock[AccessTokenFinder[IO]]
     val latestCommitFinder    = mock[LatestCommitFinder[IO]]
     val projectInfoFinder     = mock[ProjectInfoFinder[IO]]
-    val commitToEventLog      = mock[IOCommitToEventLog]
+    val commitToEventLog      = mock[CommitToEventLog[IO]]
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
     val eventsLoader = new IOMissedEventsLoader(

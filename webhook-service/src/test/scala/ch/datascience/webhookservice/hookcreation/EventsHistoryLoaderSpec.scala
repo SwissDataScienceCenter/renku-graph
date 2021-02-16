@@ -20,7 +20,6 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats.MonadError
 import cats.data.OptionT
-
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -29,7 +28,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.webhookservice.commits.{CommitInfo, LatestCommitFinder}
-import ch.datascience.webhookservice.eventprocessing.startcommit.TryCommitToEventLog
+import ch.datascience.webhookservice.eventprocessing.startcommit.CommitToEventLog
 import ch.datascience.webhookservice.eventprocessing.{Project, StartCommit}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.project.ProjectInfo
@@ -112,7 +111,7 @@ class EventsHistoryLoaderSpec extends AnyWordSpec with MockFactory with should.M
     val context = MonadError[Try, Throwable]
 
     val latestCommitFinder = mock[LatestCommitFinder[Try]]
-    val commitToEventLog   = mock[TryCommitToEventLog]
+    val commitToEventLog   = mock[CommitToEventLog[Try]]
     val logger             = TestLogger[Try]()
     val eventsHistoryLoader = new EventsHistoryLoader[Try](
       latestCommitFinder,

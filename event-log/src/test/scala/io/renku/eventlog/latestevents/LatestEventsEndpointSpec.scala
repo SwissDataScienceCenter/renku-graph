@@ -20,20 +20,21 @@ package io.renku.eventlog.latestevents
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.http.InfoMessage._
+import ch.datascience.events.consumers.Project
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.{EventBody, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import io.circe.syntax._
 import io.circe.{Decoder, Json}
+import io.renku.eventlog.Event
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.latestevents.LatestEventsFinder._
-import io.renku.eventlog.{Event, EventProject}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
@@ -118,7 +119,7 @@ class LatestEventsEndpointSpec extends AnyWordSpec with MockFactory with should.
       projectId   <- cursor.downField("project").downField("id").as[projects.Id]
       projectPath <- cursor.downField("project").downField("path").as[projects.Path]
       body        <- cursor.downField("body").as[EventBody]
-    } yield (id, EventProject(projectId, projectPath), body)
+    } yield (id, Project(projectId, projectPath), body)
   }
 
   private implicit def entityDecoder[E](implicit decoder: Decoder[E]): EntityDecoder[IO, E] =

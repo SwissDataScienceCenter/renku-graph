@@ -31,6 +31,7 @@ import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.metrics.LabeledGauge
 import io.chrisdavenport.log4cats.Logger
+import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
@@ -82,6 +83,21 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
         response.contentType        shouldBe Some(`Content-Type`(application.json))
         response.body[ErrorMessage] shouldBe ErrorMessage("'latest-per-project' parameter with invalid value")
       }
+
+    "define a GET /events/:event-id/:project-:id endpoint" in new TestCase {
+      val eventId = compoundEventIds.generateOne
+
+      val request = Request[IO](
+        method = GET,
+        uri"events" / eventId.id.toString / eventId.projectId.toString
+      )
+
+      (eventDetailsEndpoint.getDetails _).expects(eventId).returning(Response[IO](Ok).pure[IO])
+
+      val response = routes.call(request)
+
+      response.status shouldBe Ok
+    }
 
     "define a PATCH /events endpoint" in new TestCase {
       val request = Request[IO](PATCH, uri"events")
@@ -189,6 +205,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     val routesMetrics            = TestRoutesMetrics()
     val statusChangeEndpoint     = mock[TestStatusChangeEndpoint]
     val subscriptionsEndpoint    = mock[TestSubscriptionEndpoint]
+    val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
     val routes = new MicroserviceRoutes[IO](
       eventEndpoint,
       latestEventsEndpoint,
@@ -196,6 +213,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       eventsPatchingEndpoint,
       statusChangeEndpoint,
       subscriptionsEndpoint,
+      eventDetailsEndpoint,
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))
   }

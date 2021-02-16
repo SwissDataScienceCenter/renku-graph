@@ -31,6 +31,7 @@ import ch.datascience.microservices.IOMicroservice
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
+import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
 import io.renku.eventlog.init.{DbInitializer, IODbInitializer}
@@ -118,6 +119,7 @@ object Microservice extends IOMicroservice {
                                     ApplicationLogger
                                   )
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
+        eventDetailsEndpoint  <- EventDetailsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         microserviceRoutes =
           new MicroserviceRoutes[IO](
             eventEndpoint,
@@ -126,6 +128,7 @@ object Microservice extends IOMicroservice {
             eventsPatchingEndpoint,
             statusChangeEndpoint,
             subscriptionsEndpoint,
+            eventDetailsEndpoint,
             new RoutesMetrics[IO](metricsRegistry)
           ).routes
         exitCode <- microserviceRoutes.use { routes =>

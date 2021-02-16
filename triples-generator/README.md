@@ -11,12 +11,12 @@ This is a microservice which:
 
 | Method | Path                            | Description                             |
 |--------|---------------------------------|-----------------------------------------|
-| POST   | ```/events```                   | To send an event for triples generation |
+| POST   | ```/events```                   | To send an event for processing         |
 | GET    | ```/ping```                     | To check if service is healthy          |
 
 #### POST /events
 
-Accepts an event for triples generation.
+Accepts an event as multipart requests.
 
 ##### Supported event categories:
 
@@ -108,7 +108,7 @@ Accepts an event for triples generation.
 
 | Status                     | Description                                                                  |
 |----------------------------|------------------------------------------------------------------------------|
-| ACCEPTED (202)             | When event is accepted for triples generation                                |
+| ACCEPTED (202)             | When event is accepted                                                       |
 | BAD_REQUEST (400)          | When request body is not a valid JSON Event                                  |
 | TOO_MANY_REQUESTS (429)    | When server is busy dealing with other requests and cannot take any more now |
 | INTERNAL SERVER ERROR (500)| When there are problems with event creation                                  |

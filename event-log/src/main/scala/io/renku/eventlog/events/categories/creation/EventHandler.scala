@@ -1,3 +1,21 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.eventlog.events.categories.creation
 
 import cats.MonadError
@@ -7,7 +25,7 @@ import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, Project}
 import ch.datascience.graph.model.events.{BatchDate, CategoryName, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -23,9 +41,7 @@ private[events] class EventHandler[Interpretation[_]](
     eventPersister:            EventPersister[Interpretation],
     logger:                    Logger[Interpretation]
 )(implicit
-    ME:           MonadError[Interpretation, Throwable],
-    contextShift: ContextShift[Interpretation],
-    concurrent:   Concurrent[Interpretation]
+    ME: MonadError[Interpretation, Throwable]
 ) extends consumers.EventHandler[Interpretation] {
 
   import ch.datascience.graph.model.projects
@@ -53,7 +69,7 @@ private[events] class EventHandler[Interpretation[_]](
       case None | Some(EventStatus.New) =>
         for {
           id        <- cursor.downField("id").as[EventId]
-          project   <- cursor.downField("project").as[EventProject]
+          project   <- cursor.downField("project").as[Project]
           date      <- cursor.downField("date").as[EventDate]
           batchDate <- cursor.downField("batchDate").as[BatchDate]
           body      <- cursor.downField("body").as[EventBody]
@@ -61,7 +77,7 @@ private[events] class EventHandler[Interpretation[_]](
       case Some(EventStatus.Skipped) =>
         for {
           id        <- cursor.downField("id").as[EventId]
-          project   <- cursor.downField("project").as[EventProject]
+          project   <- cursor.downField("project").as[Project]
           date      <- cursor.downField("date").as[EventDate]
           batchDate <- cursor.downField("batchDate").as[BatchDate]
           body      <- cursor.downField("body").as[EventBody]
@@ -80,11 +96,11 @@ private[events] class EventHandler[Interpretation[_]](
       }
       .leftMap(_ => DecodingFailure("Invalid Skipped Event message", Nil))
 
-  implicit val projectDecoder: Decoder[EventProject] = (cursor: HCursor) =>
+  implicit val projectDecoder: Decoder[Project] = (cursor: HCursor) =>
     for {
       id   <- cursor.downField("id").as[projects.Id]
       path <- cursor.downField("path").as[projects.Path]
-    } yield EventProject(id, path)
+    } yield Project(id, path)
 }
 
 private[events] object EventHandler {
