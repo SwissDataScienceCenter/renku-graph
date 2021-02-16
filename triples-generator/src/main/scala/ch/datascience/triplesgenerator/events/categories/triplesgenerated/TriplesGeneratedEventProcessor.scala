@@ -29,7 +29,6 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.EventHandler.categoryName
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{IOTriplesCurator, TriplesTransformer}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._

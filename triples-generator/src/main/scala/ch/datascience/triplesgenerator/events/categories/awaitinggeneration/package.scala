@@ -16,14 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events
+package ch.datascience.triplesgenerator.events.categories
 
-private sealed trait EventSchedulingResult extends Product with Serializable
+import ch.datascience.graph.model.events.CategoryName
 
-private object EventSchedulingResult {
-  case object Accepted             extends EventSchedulingResult
-  case object Busy                 extends EventSchedulingResult
-  case object UnsupportedEventType extends EventSchedulingResult
-  case object BadRequest           extends EventSchedulingResult
-  final case class SchedulingError(throwable: Throwable) extends EventSchedulingResult
+package object awaitinggeneration {
+  val categoryName: CategoryName = CategoryName("AWAITING_GENERATION")
 }

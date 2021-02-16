@@ -16,22 +16,24 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.subscriptions
+package ch.datascience.events.consumers.subscriptions
 
 import cats.MonadError
 import ch.datascience.tinytypes.constraints.Url
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import ch.datascience.triplesgenerator.Microservice
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
 
 final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
 object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url
 
-private[events] trait SubscriptionUrlFinder[Interpretation[_]] {
+trait SubscriptionUrlFinder[Interpretation[_]] {
   def findSubscriberUrl(): Interpretation[SubscriberUrl]
 }
 
-private class SubscriptionUrlFinderImpl[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable])
-    extends SubscriptionUrlFinder[Interpretation] {
+private class SubscriptionUrlFinderImpl[Interpretation[_]](microservicePort: Int Refined Positive)(implicit
+    ME:                                                                      MonadError[Interpretation, Throwable]
+) extends SubscriptionUrlFinder[Interpretation] {
 
   import java.net.NetworkInterface
   import cats.syntax.all._
@@ -42,7 +44,7 @@ private class SubscriptionUrlFinderImpl[Interpretation[_]]()(implicit ME: MonadE
       case None =>
         new Exception("Cannot find service IP").raiseError[Interpretation, SubscriberUrl]
       case Some(address) =>
-        SubscriberUrl(s"http://${address.getHostAddress}:${Microservice.ServicePort}/events").pure[Interpretation]
+        SubscriberUrl(s"http://${address.getHostAddress}:${microservicePort}/events").pure[Interpretation]
     }
 
   private def findAddress = ME.catchNonFatal {
@@ -57,10 +59,10 @@ private class SubscriptionUrlFinderImpl[Interpretation[_]]()(implicit ME: MonadE
   }
 }
 
-private[events] object IOSubscriptionUrlFinder {
+object IOSubscriptionUrlFinder {
   import cats.effect.IO
 
-  def apply(): IO[SubscriptionUrlFinder[IO]] = IO {
-    new SubscriptionUrlFinderImpl[IO]()
+  def apply(microservicePort: Int Refined Positive): IO[SubscriptionUrlFinder[IO]] = IO {
+    new SubscriptionUrlFinderImpl[IO](microservicePort)
   }
 }

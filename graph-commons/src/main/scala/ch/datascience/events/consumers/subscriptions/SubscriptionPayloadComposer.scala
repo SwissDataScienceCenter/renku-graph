@@ -16,16 +16,18 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.subscriptions
+package ch.datascience.events.consumers.subscriptions
 
 import cats.MonadError
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
 import io.circe.Json
 
-private[events] trait SubscriptionPayloadComposer[Interpretation[_]] {
+trait SubscriptionPayloadComposer[Interpretation[_]] {
   def prepareSubscriptionPayload(): Interpretation[Json]
 }
 
@@ -42,12 +44,14 @@ private class SubscriptionPayloadComposerImpl[Interpretation[_]](
     findSubscriberUrl() map (CategoryAndUrlPayload(categoryName, _).asJson)
 }
 
-private object SubscriptionPayloadComposer {
+object SubscriptionPayloadComposer {
 
-  lazy val categoryAndUrlPayloadsComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
+  def categoryAndUrlPayloadsComposerFactory(
+      microservicePort: Int Refined Positive
+  ): Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
     Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>
       for {
-        subscriptionUrlFinder <- IOSubscriptionUrlFinder()
+        subscriptionUrlFinder <- IOSubscriptionUrlFinder(microservicePort)
       } yield new SubscriptionPayloadComposerImpl[IO](categoryName, subscriptionUrlFinder)
     }
 }

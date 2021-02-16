@@ -43,7 +43,6 @@ import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecove
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.Generators._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.EventHandler.categoryName
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.IOCommitEventProcessor.eventsProcessingTimesBuilder
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError

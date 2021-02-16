@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.IO
 import cats.effect.concurrent.Ref
+import ch.datascience.events.consumers.SubscriptionsRegistry
 import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.Schemas._
@@ -27,7 +28,6 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore.{InMemoryRdfStore, SparqlQuery, SparqlQueryTimeRecorder}
-import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningJsonLD.{Running, objectType}
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
@@ -111,7 +111,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
 
       clearStatus()
 
-      sleep((statusRefreshInterval + (100 millis)).toMillis)
+      sleep((statusRefreshInterval + (200 millis)).toMillis)
 
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
     }
@@ -124,9 +124,9 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     private val logger                  = TestLogger[IO]()
     private val timeRecorder            = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     private val statusCacheCheckTimeRef = Ref.of[IO, Long](0L).unsafeRunSync()
-    val subscriptionMechanismRegistry   = mock[SubscriptionMechanismRegistry[IO]]
+    val subscriptionsRegistry           = mock[SubscriptionsRegistry[IO]]
 
-    val reProvisioningStatus = new ReProvisioningStatusImpl(subscriptionMechanismRegistry,
+    val reProvisioningStatus = new ReProvisioningStatusImpl(subscriptionsRegistry,
                                                             rdfStoreConfig,
                                                             renkuBaseUrl,
                                                             logger,
@@ -137,7 +137,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     )
 
     def expectNotificationSent =
-      (subscriptionMechanismRegistry.renewAllSubscriptions _)
+      (subscriptionsRegistry.renewAllSubscriptions _)
         .expects()
         .returning(IO.unit)
   }

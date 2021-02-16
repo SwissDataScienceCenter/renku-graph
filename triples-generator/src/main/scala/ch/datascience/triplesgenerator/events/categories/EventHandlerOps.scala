@@ -16,31 +16,24 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events
+package ch.datascience.triplesgenerator.events.categories
 
 import cats.MonadError
 import cats.data.EitherT
 import cats.syntax.all._
+import ch.datascience.events.consumers.{EventHandler, EventSchedulingResult}
+import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, UnsupportedEventType}
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId}
 import ch.datascience.graph.model.projects
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import ch.datascience.triplesgenerator.events.EventSchedulingResult.{Accepted, BadRequest, SchedulingError, UnsupportedEventType}
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import ch.datascience.triplesgenerator.events.categories.models.Project
 import io.chrisdavenport.log4cats.Logger
 import io.circe.{Decoder, DecodingFailure, Json}
+import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
 import scala.util.control.NonFatal
 
-private trait EventHandler[Interpretation[_]] {
-  val categoryName: CategoryName
-  def handle(request: EventRequestContent): Interpretation[EventSchedulingResult]
-
-  private lazy val checkCategoryName: CategoryName => Decoder.Result[CategoryName] = {
-    case name @ `categoryName` => Right(name)
-    case other =>
-      Left(DecodingFailure(s"$other not supported by $categoryName", Nil))
-  }
+private[events] trait EventHandlerOps[Interpretation[_]] {
+  self: EventHandler[Interpretation] =>
 
   protected implicit class EitherTOps[T](
       operation: Interpretation[T]
@@ -110,5 +103,11 @@ private trait EventHandler[Interpretation[_]] {
           logger.error(exception)(s"$categoryName: ${toString(eventInfo)} -> $SchedulingError")
         case _ => ME.unit
       }
+  }
+
+  private lazy val checkCategoryName: CategoryName => Decoder.Result[CategoryName] = {
+    case name @ `categoryName` => Right(name)
+    case other =>
+      Left(DecodingFailure(s"$other not supported by $categoryName", Nil))
   }
 }

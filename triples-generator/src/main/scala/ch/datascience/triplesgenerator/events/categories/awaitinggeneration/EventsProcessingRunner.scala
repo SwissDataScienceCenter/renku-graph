@@ -25,13 +25,13 @@ import cats.effect.concurrent.Semaphore
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
+import ch.datascience.events.consumers.EventSchedulingResult
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.EventSchedulingResult
-import ch.datascience.triplesgenerator.events.EventSchedulingResult._
-import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanism
+import EventSchedulingResult._
+import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import com.typesafe.config.{Config, ConfigFactory}
 import io.chrisdavenport.log4cats.Logger
 

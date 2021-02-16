@@ -31,7 +31,6 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.logging.TestExecutionTimeRecorder
-import ch.datascience.triplesgenerator.events.categories.membersync.EventHandler.categoryName
 import ch.datascience.triplesgenerator.events.categories.membersync.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

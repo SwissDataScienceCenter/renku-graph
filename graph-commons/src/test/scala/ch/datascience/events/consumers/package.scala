@@ -16,14 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator
+package ch.datascience.events
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{jsons, nonEmptyStrings}
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
 import org.scalacheck.Gen
 
-package object events {
+package object consumers {
 
   implicit val eventRequestContents: Gen[EventRequestContent] = for {
     event        <- jsons

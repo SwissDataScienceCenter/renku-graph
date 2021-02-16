@@ -20,6 +20,7 @@ package ch.datascience.triplesgenerator.events
 
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.events.consumers.{EventSchedulingResult, SubscriptionsRegistry, _}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.ErrorMessage.ErrorMessage
@@ -90,11 +91,7 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       givenReProvisioningStatusSet(false)
 
-      (handler0.handle _)
-        .expects(requestContent)
-        .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
-
-      (handler1.handle _)
+      (subscriptionsRegistry.handle _)
         .expects(requestContent)
         .returning(EventSchedulingResult.Accepted.pure[IO])
 
@@ -110,11 +107,7 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
     s"$BadRequest if none of the handlers supports the given payload" in new TestCase {
       givenReProvisioningStatusSet(false)
 
-      (handler0.handle _)
-        .expects(requestContent)
-        .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
-
-      (handler1.handle _)
+      (subscriptionsRegistry.handle _)
         .expects(requestContent)
         .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
 
@@ -131,11 +124,7 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
     s"$BadRequest if one of the handlers supports the given payload but it's malformed" in new TestCase {
       givenReProvisioningStatusSet(false)
 
-      (handler0.handle _)
-        .expects(requestContent)
-        .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
-
-      (handler1.handle _)
+      (subscriptionsRegistry.handle _)
         .expects(requestContent)
         .returning(EventSchedulingResult.BadRequest.pure[IO])
 
@@ -152,7 +141,7 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
     s"$TooManyRequests if the handler returns ${EventSchedulingResult.Busy}" in new TestCase {
       givenReProvisioningStatusSet(false)
 
-      (handler0.handle _)
+      (subscriptionsRegistry.handle _)
         .expects(requestContent)
         .returning(EventSchedulingResult.Busy.pure[IO])
 
@@ -169,7 +158,7 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
     s"$InternalServerError if the handler returns ${EventSchedulingResult.SchedulingError}" in new TestCase {
       givenReProvisioningStatusSet(false)
 
-      (handler0.handle _)
+      (subscriptionsRegistry.handle _)
         .expects(requestContent)
         .returning(EventSchedulingResult.SchedulingError(exceptions.generateOne).pure[IO])
 
@@ -187,7 +176,7 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
 
       givenReProvisioningStatusSet(false)
 
-      (handler0.handle _)
+      (subscriptionsRegistry.handle _)
         .expects(requestContent)
         .returning(exceptions.generateOne.raiseError[IO, EventSchedulingResult])
 
@@ -231,14 +220,12 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       .withEntity(multipartContent)
       .withHeaders(multipartContent.headers)
 
-    val handler0 = mock[EventHandler[IO]]
-    val handler1 = mock[EventHandler[IO]]
+    val subscriptionsRegistry = mock[SubscriptionsRegistry[IO]]
 
-    val eventHandlers        = List(handler0, handler1)
     val reProvisioningStatus = mock[ReProvisioningStatus[IO]]
     val logger               = TestLogger[IO]()
     val processEvent = new EventEndpointImpl[IO](
-      eventHandlers,
+      subscriptionsRegistry,
       reProvisioningStatus
     ).processEvent _
 

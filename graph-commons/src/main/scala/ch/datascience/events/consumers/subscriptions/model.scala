@@ -16,27 +16,25 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events
-package categories.awaitinggeneration.subscriptions
+package ch.datascience.events.consumers.subscriptions
 
 import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 
-private final case class Payload(categoryName:  CategoryName,
-                                 subscriberUrl: SubscriberUrl,
-                                 capacity:      GenerationProcessesNumber
-) extends ch.datascience.events.consumers.subscriptions.SubscriptionPayload
+trait SubscriptionPayload extends Product with Serializable {
+  val categoryName:  CategoryName
+  val subscriberUrl: SubscriberUrl
+}
 
-private object Payload {
+case class CategoryAndUrlPayload(categoryName: CategoryName, subscriberUrl: SubscriberUrl) extends SubscriptionPayload
+
+object CategoryAndUrlPayload {
   import io.circe.Encoder
   import io.circe.literal._
 
-  implicit val encoder: Encoder[Payload] = Encoder.instance[Payload] { payload =>
+  implicit val encoder: Encoder[CategoryAndUrlPayload] = Encoder.instance[CategoryAndUrlPayload] { payload =>
     json"""{
         "categoryName":  ${payload.categoryName.value},
-        "subscriberUrl": ${payload.subscriberUrl.value},
-        "capacity":      ${payload.capacity.value}
+        "subscriberUrl": ${payload.subscriberUrl.value}
       }"""
   }
 }

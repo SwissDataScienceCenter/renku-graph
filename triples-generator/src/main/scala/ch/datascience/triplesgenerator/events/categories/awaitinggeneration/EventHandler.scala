@@ -25,32 +25,33 @@ import cats.data.NonEmptyList
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
+import ch.datascience.events.consumers
+import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
 import ch.datascience.graph.model.RenkuVersionPair
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.EventSchedulingResult
-import ch.datascience.triplesgenerator.events.EventSchedulingResult._
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
-import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
+import ch.datascience.events.consumers.EventSchedulingResult._
+import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
+import ch.datascience.triplesgenerator.events.categories.EventHandlerOps
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 private[events] class EventHandler[Interpretation[_]: Effect](
-    eventsProcessingRunner: EventsProcessingRunner[Interpretation],
-    eventBodyDeserializer:  EventBodyDeserializer[Interpretation],
-    currentVersionPair:     RenkuVersionPair,
-    logger:                 Logger[Interpretation]
+    override val categoryName: CategoryName,
+    eventsProcessingRunner:    EventsProcessingRunner[Interpretation],
+    eventBodyDeserializer:     EventBodyDeserializer[Interpretation],
+    currentVersionPair:        RenkuVersionPair,
+    logger:                    Logger[Interpretation]
 )(implicit
     ME: MonadError[Interpretation, Throwable]
-) extends events.EventHandler[Interpretation] {
+) extends consumers.EventHandler[Interpretation]
+    with EventHandlerOps[Interpretation] {
 
   import currentVersionPair.schemaVersion
   import eventBodyDeserializer.toCommitEvents
   import eventsProcessingRunner.scheduleForProcessing
-
-  override val categoryName: CategoryName = EventHandler.categoryName
 
   override def handle(requestContent: EventRequestContent): Interpretation[EventSchedulingResult] = {
     for {
@@ -69,24 +70,21 @@ private[events] class EventHandler[Interpretation[_]: Effect](
   }
 }
 
-private[events] object EventHandler {
-
-  val categoryName: CategoryName = CategoryName("AWAITING_GENERATION")
+object EventHandler {
 
   def apply(
-      currentVersionPair:            RenkuVersionPair,
-      metricsRegistry:               MetricsRegistry[IO],
-      gitLabThrottler:               Throttler[IO, GitLab],
-      timeRecorder:                  SparqlQueryTimeRecorder[IO],
-      subscriptionMechanismRegistry: SubscriptionMechanismRegistry[IO],
-      logger:                        Logger[IO]
+      currentVersionPair:    RenkuVersionPair,
+      metricsRegistry:       MetricsRegistry[IO],
+      gitLabThrottler:       Throttler[IO, GitLab],
+      timeRecorder:          SparqlQueryTimeRecorder[IO],
+      subscriptionMechanism: SubscriptionMechanism[IO],
+      logger:                Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    subscriptionMechanism <- subscriptionMechanismRegistry(categoryName)
     processingRunner <-
       IOEventsProcessingRunner(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
-  } yield new EventHandler[IO](processingRunner, EventBodyDeserializer(), currentVersionPair, logger)
+  } yield new EventHandler[IO](categoryName, processingRunner, EventBodyDeserializer(), currentVersionPair, logger)
 }

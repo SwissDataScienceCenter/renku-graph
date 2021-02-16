@@ -162,7 +162,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
             aMultipart("payload")
               .withBody(
                 equalToJson(
-                  json"""{"schemaVersion": ${schemaVersion.value} , "payload": ${rawTriples.value.noSpaces} }""".noSpaces
+                  json"""{"schemaVersion": ${schemaVersion.value} , "payload": ${rawTriples.value.noSpaces}}""".noSpaces
                 )
               )
           )
@@ -170,9 +170,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       }
 
       intercept[Exception] {
-        updater
-          .markTriplesGenerated(eventId, rawTriples, schemaVersion, maybeProcessingTime)
-          .unsafeRunSync() shouldBe ((): Unit)
+        updater.markTriplesGenerated(eventId, rawTriples, schemaVersion, maybeProcessingTime).unsafeRunSync()
       }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
   }

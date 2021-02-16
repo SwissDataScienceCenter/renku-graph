@@ -24,6 +24,8 @@ import ch.datascience.config.GitLab
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
+import ch.datascience.events.consumers
+import ch.datascience.events.consumers.SubscriptionsRegistry
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
@@ -32,7 +34,6 @@ import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.config.certificates.GitCertificateInstaller
 import ch.datascience.triplesgenerator.config.{IOVersionCompatibilityConfig, TriplesGeneration}
 import ch.datascience.triplesgenerator.events.IOEventEndpoint
-import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import ch.datascience.triplesgenerator.init._
 import ch.datascience.triplesgenerator.reprovisioning.{IOReProvisioning, ReProvisioning, ReProvisioningStatus}
 import eu.timepit.refined.api.Refined
@@ -57,47 +58,64 @@ object Microservice extends IOMicroservice {
 
   protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
 
-  override def run(args: List[String]): IO[ExitCode] =
-    for {
-      certificateLoader             <- CertificateLoader[IO](ApplicationLogger)
-      gitCertificateInstaller       <- GitCertificateInstaller[IO](ApplicationLogger)
-      fusekiDatasetInitializer      <- IOFusekiDatasetInitializer()
-      subscriptionMechanismRegistry <- SubscriptionMechanismRegistry(ApplicationLogger)
-      triplesGeneration             <- TriplesGeneration[IO]()
-      sentryInitializer             <- SentryInitializer[IO]()
-      metricsRegistry               <- MetricsRegistry()
-      renkuVersionPairs             <- IOVersionCompatibilityConfig(ApplicationLogger)
-      cliVersionCompatChecker       <- IOCliVersionCompatibilityChecker(triplesGeneration, renkuVersionPairs)
-      gitLabRateLimit               <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-      gitLabThrottler               <- Throttler[IO, GitLab](gitLabRateLimit)
-      sparqlTimeRecorder            <- SparqlQueryTimeRecorder(metricsRegistry)
-      reProvisioningStatus          <- ReProvisioningStatus(subscriptionMechanismRegistry, ApplicationLogger, sparqlTimeRecorder)
-      reProvisioning                <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)
-      eventProcessingEndpoint <- IOEventEndpoint(renkuVersionPairs.head,
-                                                 metricsRegistry,
-                                                 gitLabThrottler,
-                                                 sparqlTimeRecorder,
-                                                 subscriptionMechanismRegistry,
-                                                 reProvisioningStatus,
-                                                 ApplicationLogger
-                                 )
-      microserviceRoutes =
-        new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry)).routes
-      exitCode <- microserviceRoutes.use { routes =>
-                    new MicroserviceRunner(
-                      certificateLoader,
-                      gitCertificateInstaller,
-                      sentryInitializer,
-                      cliVersionCompatChecker,
-                      fusekiDatasetInitializer,
-                      subscriptionMechanismRegistry,
-                      reProvisioning,
-                      new HttpServer[IO](serverPort = ServicePort.value, routes),
-                      subProcessesCancelTokens,
-                      ApplicationLogger
-                    ).run()
-                  }
-    } yield exitCode
+  override def run(args: List[String]): IO[ExitCode] = for {
+    certificateLoader        <- CertificateLoader[IO](ApplicationLogger)
+    gitCertificateInstaller  <- GitCertificateInstaller[IO](ApplicationLogger)
+    fusekiDatasetInitializer <- IOFusekiDatasetInitializer()
+
+    triplesGeneration       <- TriplesGeneration[IO]()
+    sentryInitializer       <- SentryInitializer[IO]()
+    metricsRegistry         <- MetricsRegistry()
+    renkuVersionPairs       <- IOVersionCompatibilityConfig(ApplicationLogger)
+    cliVersionCompatChecker <- IOCliVersionCompatibilityChecker(triplesGeneration, renkuVersionPairs)
+    gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+    gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
+    sparqlTimeRecorder      <- SparqlQueryTimeRecorder(metricsRegistry)
+    awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory(renkuVersionPairs.head,
+                                                                                               metricsRegistry,
+                                                                                               gitLabThrottler,
+                                                                                               sparqlTimeRecorder,
+                                                                                               ApplicationLogger
+                                      )
+    membersSyncSubscription <-
+      events.categories.membersync.SubscriptionFactory(gitLabThrottler, ApplicationLogger, sparqlTimeRecorder)
+    triplesGeneratedSubscription <- events.categories.triplesgenerated.SubscriptionFactory(metricsRegistry,
+                                                                                           gitLabThrottler,
+                                                                                           sparqlTimeRecorder,
+                                                                                           ApplicationLogger
+                                    )
+    subscriptionsRegistry <- consumers.SubscriptionsRegistry(ApplicationLogger,
+                                                             awaitingGenerationSubscription,
+                                                             membersSyncSubscription,
+                                                             triplesGeneratedSubscription
+                             )
+    reProvisioningStatus <- ReProvisioningStatus(subscriptionsRegistry, ApplicationLogger, sparqlTimeRecorder)
+    reProvisioning       <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)
+    eventProcessingEndpoint <- IOEventEndpoint(renkuVersionPairs.head,
+                                               metricsRegistry,
+                                               gitLabThrottler,
+                                               sparqlTimeRecorder,
+                                               subscriptionsRegistry,
+                                               reProvisioningStatus,
+                                               ApplicationLogger
+                               )
+    microserviceRoutes =
+      new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry)).routes
+    exitCode <- microserviceRoutes.use { routes =>
+                  new MicroserviceRunner(
+                    certificateLoader,
+                    gitCertificateInstaller,
+                    sentryInitializer,
+                    cliVersionCompatChecker,
+                    fusekiDatasetInitializer,
+                    subscriptionsRegistry,
+                    reProvisioning,
+                    new HttpServer[IO](serverPort = ServicePort.value, routes),
+                    subProcessesCancelTokens,
+                    ApplicationLogger
+                  ).run()
+                }
+  } yield exitCode
 }
 
 private class MicroserviceRunner(
@@ -106,23 +124,25 @@ private class MicroserviceRunner(
     sentryInitializer:               SentryInitializer[IO],
     cliVersionCompatibilityVerifier: CliVersionCompatibilityVerifier[IO],
     datasetInitializer:              FusekiDatasetInitializer[IO],
-    subscriptionMechanismRegistry:   SubscriptionMechanismRegistry[IO],
+    subscriptionsRegistry:           SubscriptionsRegistry[IO],
     reProvisioning:                  ReProvisioning[IO],
     httpServer:                      HttpServer[IO],
     subProcessesCancelTokens:        ConcurrentHashMap[CancelToken[IO], Unit],
     logger:                          Logger[IO]
 )(implicit contextShift:             ContextShift[IO]) {
 
-  def run(): IO[ExitCode] = (for {
-    _        <- certificateLoader.run()
-    _        <- gitCertificateInstaller.run()
-    _        <- sentryInitializer.run()
-    _        <- cliVersionCompatibilityVerifier.run()
-    _        <- datasetInitializer.run()
-    _        <- subscriptionMechanismRegistry.run().start.map(gatherCancelToken)
-    _        <- reProvisioning.run().start.map(gatherCancelToken)
-    exitCode <- httpServer.run()
-  } yield exitCode) recoverWith logAndThrow(logger)
+  def run(): IO[ExitCode] = {
+    for {
+      _        <- certificateLoader.run()
+      _        <- gitCertificateInstaller.run()
+      _        <- sentryInitializer.run()
+      _        <- cliVersionCompatibilityVerifier.run()
+      _        <- datasetInitializer.run()
+      _        <- subscriptionsRegistry.run().start.map(gatherCancelToken)
+      _        <- reProvisioning.run().start.map(gatherCancelToken)
+      exitCode <- httpServer.run()
+    } yield exitCode
+  } recoverWith logAndThrow(logger)
 
   private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
     subProcessesCancelTokens.put(fiber.cancel, ())

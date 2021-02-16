@@ -31,7 +31,6 @@ import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.EventHandler.categoryName
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.events.categories.{EventStatusUpdater, IOEventStatusUpdater}
 import io.chrisdavenport.log4cats.Logger
