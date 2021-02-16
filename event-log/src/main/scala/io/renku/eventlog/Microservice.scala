@@ -26,7 +26,7 @@ import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics._
 import ch.datascience.microservices.IOMicroservice
-import io.renku.eventlog.creation.IOEventCreationEndpoint
+import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
 import io.renku.eventlog.init.{DbInitializer, IODbInitializer}
 import io.renku.eventlog.latestevents.IOLatestEventsEndpoint
@@ -79,12 +79,12 @@ object Microservice extends IOMicroservice {
             MetricsConfigProvider(),
             ApplicationLogger
           )
-        eventCreationEndpoint <- IOEventCreationEndpoint(
-                                   transactor,
-                                   awaitingGenerationGauge,
-                                   queriesExecTimes,
-                                   ApplicationLogger
-                                 )
+        eventEndpoint <- EventEndpoint(
+                           transactor,
+                           awaitingGenerationGauge,
+                           queriesExecTimes,
+                           ApplicationLogger
+                         )
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
@@ -114,7 +114,7 @@ object Microservice extends IOMicroservice {
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptionCategoryRegistry, ApplicationLogger)
         microserviceRoutes =
           new MicroserviceRoutes[IO](
-            eventCreationEndpoint,
+            eventEndpoint,
             latestEventsEndpoint,
             processingStatusEndpoint,
             eventsPatchingEndpoint,

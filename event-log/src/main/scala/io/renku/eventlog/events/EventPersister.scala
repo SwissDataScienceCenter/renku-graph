@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.creation
+package io.renku.eventlog.events
 
 import java.time.Instant
 

@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.creation
+package io.renku.eventlog.events
 
 import cats.effect.IO
 import cats.syntax.all._
@@ -35,7 +35,7 @@ import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
-import io.renku.eventlog.creation.EventPersister.Result
+import io.renku.eventlog.events.EventPersister.Result
 import io.renku.eventlog.{Event, EventProject}
 import org.http4s.MediaType._
 import org.http4s.Status._
@@ -46,7 +46,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "addEvent" should {
 
@@ -143,7 +143,7 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
     unacceptableStatuses.foreach { invalidStatus =>
       s"return $BadRequest if status was $invalidStatus" in new TestCase {
 
-        val randomEvent          = events.generateOne
+        val randomEvent          = newOrSkippedEvents.generateOne
         val payloadInvalidStatus = randomEvent.asJson.deepMerge(json"""{"status": ${invalidStatus.value} }""")
 
         val request  = Request(Method.POST, uri"events").withEntity(payloadInvalidStatus)
@@ -200,7 +200,7 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
 
     val persister = mock[EventPersister[IO]]
     val logger    = TestLogger[IO]()
-    val addEvent  = new EventCreationEndpoint[IO](persister, logger).addEvent _
+    val addEvent  = new EventEndpointImpl[IO](persister, logger).addEvent _
   }
 
   private implicit def eventEncoder[T <: Event]: Encoder[T] = Encoder.instance[T] {
@@ -208,14 +208,13 @@ class EventCreationEndpointSpec extends AnyWordSpec with MockFactory with should
     case event: SkippedEvent => toJson(event) deepMerge json"""{ "message":    ${event.message.value} }"""
   }
 
-  private def toJson(event: Event): Json =
-    json"""{
-      "id":         ${event.id.value},
-      "project":    ${event.project},
-      "date":       ${event.date.value},
-      "batchDate":  ${event.batchDate.value},
-      "body":       ${event.body.value},
-      "status":     ${event.status.value}
+  private def toJson(event: Event): Json = json"""{
+    "id":         ${event.id.value},
+    "project":    ${event.project},
+    "date":       ${event.date.value},
+    "batchDate":  ${event.batchDate.value},
+    "body":       ${event.body.value},
+    "status":     ${event.status.value}
   }"""
 
   private implicit lazy val projectEncoder: Encoder[EventProject] = Encoder.instance[EventProject] { project =>

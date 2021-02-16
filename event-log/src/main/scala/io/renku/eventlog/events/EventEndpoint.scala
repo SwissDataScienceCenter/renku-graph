@@ -16,37 +16,42 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.creation
+package io.renku.eventlog.events
 
 import cats.MonadError
 import cats.effect.Effect
 import cats.syntax.all._
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.InfoMessage
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.{BatchDate, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.circe.DecodingFailure
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog._
-import io.renku.eventlog.creation.EventPersister.Result
+import io.renku.eventlog.events.EventPersister.Result
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
 
 import scala.util.control.NonFatal
 
-class EventCreationEndpoint[Interpretation[_]: Effect](
+trait EventEndpoint[Interpretation[_]] {
+  def addEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
+}
+
+class EventEndpointImpl[Interpretation[_]: Effect](
     eventAdder: EventPersister[Interpretation],
     logger:     Logger[Interpretation]
 )(implicit ME:  MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+    extends Http4sDsl[Interpretation]
+    with EventEndpoint[Interpretation] {
 
-  import EventCreationEndpoint._
+  import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eventAdder._
+  import io.circe.{Decoder, HCursor}
   import org.http4s.circe._
 
   def addEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
@@ -86,11 +91,6 @@ class EventCreationEndpoint[Interpretation[_]: Effect](
 
   private implicit lazy val eventEntityDecoder: EntityDecoder[Interpretation, Event] =
     jsonOf[Interpretation, Event]
-}
-
-object EventCreationEndpoint {
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  import io.circe.{Decoder, HCursor}
 
   private implicit val eventDecoder: Decoder[Event] = (cursor: HCursor) =>
     cursor.downField("status").as[Option[EventStatus]] flatMap {
@@ -129,10 +129,9 @@ object EventCreationEndpoint {
       id   <- cursor.downField("id").as[projects.Id]
       path <- cursor.downField("path").as[projects.Path]
     } yield EventProject(id, path)
-
 }
 
-object IOEventCreationEndpoint {
+object EventEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply(
@@ -140,8 +139,8 @@ object IOEventCreationEndpoint {
       waitingEventsGauge:  LabeledGauge[IO, projects.Path],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
       logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[EventCreationEndpoint[IO]] =
+  )(implicit contextShift: ContextShift[IO]): IO[EventEndpoint[IO]] =
     for {
       eventPersister <- IOEventPersister(transactor, waitingEventsGauge, queriesExecTimes)
-    } yield new EventCreationEndpoint[IO](eventPersister, logger)
+    } yield new EventEndpointImpl[IO](eventPersister, logger)
 }

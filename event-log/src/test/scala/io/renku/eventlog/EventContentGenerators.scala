@@ -24,7 +24,6 @@ import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import org.scalacheck.Gen
 
-import java.time.Duration
 import scala.language.postfixOps
 
 object EventContentGenerators {
@@ -52,8 +51,7 @@ object EventContentGenerators {
     message   <- eventMessages
   } yield SkippedEvent(eventId, project, date, batchDate, body, message)
 
-  implicit lazy val events: Gen[Event] =
-    Gen.oneOf(newEvents, skippedEvents)
+  implicit lazy val newOrSkippedEvents: Gen[Event] = Gen.oneOf(newEvents, skippedEvents)
 
   implicit lazy val eventProjects: Gen[EventProject] = for {
     id   <- projectIds

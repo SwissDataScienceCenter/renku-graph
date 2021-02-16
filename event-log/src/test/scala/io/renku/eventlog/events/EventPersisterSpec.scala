@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.creation
+package io.renku.eventlog.events
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.HOURS
@@ -34,7 +34,7 @@ import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
-import io.renku.eventlog.creation.EventPersister.Result._
+import io.renku.eventlog.events.EventPersister.Result._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

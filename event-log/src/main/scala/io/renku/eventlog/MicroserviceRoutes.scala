@@ -27,7 +27,7 @@ import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.RoutesMetrics
-import io.renku.eventlog.creation.EventCreationEndpoint
+import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.LatestEventsEndpoint
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
@@ -39,7 +39,7 @@ import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Respons
 import scala.util.Try
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
-    eventCreationEndpoint:    EventCreationEndpoint[F],
+    eventEndpoint:            EventEndpoint[F],
     latestEventsEndpoint:     LatestEventsEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
     eventsPatchingEndpoint:   EventsPatchingEndpoint[F],
@@ -51,7 +51,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 
   import LatestPerProjectParameter._
   import ProjectIdParameter._
-  import eventCreationEndpoint._
+  import eventEndpoint._
   import eventsPatchingEndpoint._
   import latestEventsEndpoint._
   import org.http4s.HttpRoutes
