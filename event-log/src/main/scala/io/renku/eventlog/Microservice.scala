@@ -90,7 +90,13 @@ object Microservice extends IOMicroservice {
                                                                                queriesExecTimes,
                                                                                ApplicationLogger
                                 )
-        eventConsumersRegistry   <- consumers.EventConsumersRegistry(ApplicationLogger, creationSubscription)
+        zombieEventsSubscription <- events.categories.zombieevents.SubscriptionFactory(transactor,
+                                                                                       awaitingGenerationGauge,
+                                                                                       queriesExecTimes,
+                                                                                       ApplicationLogger
+                                    )
+        eventConsumersRegistry <-
+          consumers.EventConsumersRegistry(ApplicationLogger, creationSubscription, zombieEventsSubscription)
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)

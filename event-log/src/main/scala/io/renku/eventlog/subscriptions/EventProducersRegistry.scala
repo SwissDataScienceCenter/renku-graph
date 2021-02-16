@@ -90,11 +90,13 @@ object EventProducersRegistry {
                                                                       queriesExecTimes,
                                                                       logger
                                 )
+    zombieEventsCategory <- zombieevents.SubscriptionCategory(transactor, queriesExecTimes, logger)
   } yield new EventProducersRegistryImpl(
     Set[SubscriptionCategory[IO]](
       awaitingGenerationCategory,
       memberSyncCategory,
-      triplesGeneratedCategory
+      triplesGeneratedCategory,
+      zombieEventsCategory
     )
   )
 }

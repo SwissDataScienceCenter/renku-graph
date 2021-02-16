@@ -48,9 +48,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .expects(projectPath)
           .returning(IO.unit)
 
-        val requestContent: EventRequestContent = requestContent(projectPath.asJson(eventEncoder))
+        val request = requestContent(projectPath.asJson(eventEncoder))
 
-        handler.handle(requestContent).unsafeRunSync() shouldBe Accepted
+        handler.handle(request).unsafeRunSync() shouldBe Accepted
 
         logger.loggedOnly(
           Info(
@@ -61,8 +61,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     s"return $UnsupportedEventType if event is of wrong category" in new TestCase {
 
-      val payload = jsons.generateOne.asJson
-      val request = eventRequestContents.generateOne.copy(event = payload)
+      val request = eventRequestContents.generateOne.copy(event = jsons.generateOne.asJson)
 
       handler.handle(request).unsafeRunSync() shouldBe UnsupportedEventType
 
@@ -71,14 +70,14 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     s"return $BadRequest if project path is malformed" in new TestCase {
 
-      val requestContent: EventRequestContent = requestContent(json"""{
+      val request = requestContent(json"""{
         "categoryName": "MEMBER_SYNC",
         "project": {
           "path" :      ${nonNegativeInts().generateOne.value}
         }
       }""")
 
-      handler.handle(requestContent).unsafeRunSync() shouldBe BadRequest
+      handler.handle(request).unsafeRunSync() shouldBe BadRequest
 
       logger.expectNoLogs()
     }

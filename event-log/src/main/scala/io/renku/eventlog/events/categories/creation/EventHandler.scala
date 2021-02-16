@@ -20,7 +20,7 @@ package io.renku.eventlog.events.categories.creation
 
 import cats.MonadError
 import cats.data.EitherT.fromEither
-import cats.effect.{Concurrent, ContextShift, IO, Timer}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.events.consumers
@@ -36,7 +36,7 @@ import io.renku.eventlog._
 
 import scala.concurrent.ExecutionContext
 
-private[events] class EventHandler[Interpretation[_]](
+private class EventHandler[Interpretation[_]](
     override val categoryName: CategoryName,
     eventPersister:            EventPersister[Interpretation],
     logger:                    Logger[Interpretation]
@@ -103,7 +103,7 @@ private[events] class EventHandler[Interpretation[_]](
     } yield Project(id, path)
 }
 
-private[events] object EventHandler {
+private object EventHandler {
   def apply(transactor:         DbTransactor[IO, EventLogDB],
             waitingEventsGauge: LabeledGauge[IO, projects.Path],
             queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name],
