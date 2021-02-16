@@ -37,7 +37,7 @@ import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
 import io.renku.eventlog.statuschange.commands.{ToGenerationNonRecoverableFailure, ToGenerationRecoverableFailure, ToNew, ToSkipped, ToTransformationNonRecoverableFailure, ToTriplesGenerated, ToTriplesStore}
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
-import io.renku.eventlog.subscriptions.{SubscriptionCategoryRegistry, SubscriptionsEndpoint}
+import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
 import org.http4s.MediaType.application
 import org.http4s.Method.{GET, PATCH, POST}
 import org.http4s.Status._
@@ -95,8 +95,8 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "define a POST /events endpoint" in new TestCase {
       val request        = Request[IO](POST, uri"events")
-      val expectedStatus = Gen.oneOf(Created, Ok).generateOne
-      (eventEndpoint.addEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
+      val expectedStatus = Gen.oneOf(Accepted, BadRequest, InternalServerError, TooManyRequests).generateOne
+      (eventEndpoint.processEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
 
       val response = routes.call(request)
 
@@ -205,7 +205,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
   class TestProcessingStatusEndpoint(processingStatusFinder: ProcessingStatusFinder[IO], logger: Logger[IO])
       extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
   class TestSubscriptionEndpoint(
-      subscriptionCategoryRegistry: SubscriptionCategoryRegistry[IO],
+      subscriptionCategoryRegistry: EventProducersRegistry[IO],
       logger:                       Logger[IO]
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
   class TestStatusChangeEndpoint(updateCommandsRunner:            StatusUpdatesRunner[IO],

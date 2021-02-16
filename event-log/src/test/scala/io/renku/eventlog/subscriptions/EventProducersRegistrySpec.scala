@@ -26,20 +26,20 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CategoryName
 import io.circe.Json
 import io.renku.eventlog.subscriptions.SubscriptionCategory._
-import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry._
+import io.renku.eventlog.subscriptions.EventProducersRegistry._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.global
 
-private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers {
+private class EventProducersRegistrySpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "run" should {
 
     "return unit when all of the categories return Unit" in new TestCase {
       val categories = Set[SubscriptionCategory[IO]](SubscriptionCategoryWithoutRegistration)
-      val registry   = new SubscriptionCategoryRegistryImpl[IO](categories)
+      val registry   = new EventProducersRegistryImpl[IO](categories)
       registry.run().unsafeRunSync() shouldBe ()
     }
 
@@ -49,7 +49,7 @@ private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFact
         override def raisedException: Exception = exception
       }
       val categories = Set[SubscriptionCategory[IO]](SubscriptionCategoryWithoutRegistration, failingRun)
-      val registry   = new SubscriptionCategoryRegistryImpl[IO](categories)
+      val registry   = new EventProducersRegistryImpl[IO](categories)
       intercept[Exception] {
         registry.run().unsafeRunSync()
       } shouldBe exception
@@ -61,18 +61,18 @@ private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFact
     "return SuccessfulSubscription when at least one of the categories returns Some" in new TestCase {
       val categories =
         Set[SubscriptionCategory[IO]](new SuccessfulRegistration {}, SubscriptionCategoryWithoutRegistration)
-      val registry = new SubscriptionCategoryRegistryImpl[IO](categories)
+      val registry = new EventProducersRegistryImpl[IO](categories)
       registry.register(payload).unsafeRunSync() shouldBe SuccessfulSubscription
     }
 
     "return a request error when there are no categories" in new TestCase {
-      val registry = new SubscriptionCategoryRegistryImpl[IO](Set.empty)
+      val registry = new EventProducersRegistryImpl[IO](Set.empty)
       registry.register(payload).unsafeRunSync() shouldBe UnsupportedPayload("No category supports this payload")
     }
 
     "return a request error when no category can handle the payload" in new TestCase {
       val categories = Set[SubscriptionCategory[IO]](SubscriptionCategoryWithoutRegistration)
-      val registry   = new SubscriptionCategoryRegistryImpl[IO](categories)
+      val registry   = new EventProducersRegistryImpl[IO](categories)
       registry.register(payload).unsafeRunSync() shouldBe UnsupportedPayload("No category supports this payload")
     }
 
@@ -82,7 +82,7 @@ private class SubscriptionCategoryRegistrySpec extends AnyWordSpec with MockFact
         override def raisedException: Exception = exception
       }
       val categories = Set[SubscriptionCategory[IO]](failingRegistration, SubscriptionCategoryWithoutRegistration)
-      val registry   = new SubscriptionCategoryRegistryImpl[IO](categories)
+      val registry   = new EventProducersRegistryImpl[IO](categories)
       intercept[Exception] {
         registry.register(payload).unsafeRunSync()
       } shouldBe exception

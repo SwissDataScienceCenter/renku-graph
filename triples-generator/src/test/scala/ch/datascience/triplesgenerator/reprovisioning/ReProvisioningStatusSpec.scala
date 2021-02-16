@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.reprovisioning
 
 import cats.effect.IO
 import cats.effect.concurrent.Ref
-import ch.datascience.events.consumers.SubscriptionsRegistry
+import ch.datascience.events.consumers.EventConsumersRegistry
 import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.Schemas._
@@ -124,9 +124,9 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     private val logger                  = TestLogger[IO]()
     private val timeRecorder            = new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger))
     private val statusCacheCheckTimeRef = Ref.of[IO, Long](0L).unsafeRunSync()
-    val subscriptionsRegistry           = mock[SubscriptionsRegistry[IO]]
+    val eventConsumersRegistry          = mock[EventConsumersRegistry[IO]]
 
-    val reProvisioningStatus = new ReProvisioningStatusImpl(subscriptionsRegistry,
+    val reProvisioningStatus = new ReProvisioningStatusImpl(eventConsumersRegistry,
                                                             rdfStoreConfig,
                                                             renkuBaseUrl,
                                                             logger,
@@ -137,7 +137,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
     )
 
     def expectNotificationSent =
-      (subscriptionsRegistry.renewAllSubscriptions _)
+      (eventConsumersRegistry.renewAllSubscriptions _)
         .expects()
         .returning(IO.unit)
   }

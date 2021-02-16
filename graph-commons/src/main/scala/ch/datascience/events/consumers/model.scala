@@ -18,7 +18,10 @@
 
 package ch.datascience.events.consumers
 
+import ch.datascience.graph.model.projects
 import io.circe.Json
+
+final case class Project(id: projects.Id, path: projects.Path)
 
 sealed trait EventSchedulingResult extends Product with Serializable
 

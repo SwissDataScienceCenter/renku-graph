@@ -19,128 +19,94 @@
 package io.renku.eventlog.events
 
 import cats.MonadError
+import cats.data.EitherT
+import cats.data.EitherT.right
 import cats.effect.Effect
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.{BatchDate, EventBody, EventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.graph.model.projects.{Id, Path}
+import ch.datascience.events.consumers.{EventConsumersRegistry, EventRequestContent, EventSchedulingResult}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
-import io.circe.DecodingFailure
-import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
-import io.renku.eventlog._
-import io.renku.eventlog.events.EventPersister.Result
+import io.circe.Json
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{EntityDecoder, Request, Response}
+import org.http4s.multipart.Multipart
+import org.http4s.{Request, Response}
 
 import scala.util.control.NonFatal
 
 trait EventEndpoint[Interpretation[_]] {
-  def addEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
+  def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]]
 }
 
 class EventEndpointImpl[Interpretation[_]: Effect](
-    eventAdder: EventPersister[Interpretation],
-    logger:     Logger[Interpretation]
-)(implicit ME:  MonadError[Interpretation, Throwable])
+    eventConsumersRegistry: EventConsumersRegistry[Interpretation]
+)(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation]
     with EventEndpoint[Interpretation] {
 
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  import eventAdder._
-  import io.circe.{Decoder, HCursor}
   import org.http4s.circe._
 
-  def addEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
+  def processEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
-      event         <- request.as[Event] recoverWith badRequest
-      storingResult <- storeNewEvent(event)
-      _             <- logInfo(event, storingResult)
-      response      <- storingResult.asHttpResponse
-    } yield response
-  } recoverWith httpResponse
-
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[Event]] = { case NonFatal(exception) =>
-    ME.raiseError(BadRequestError(exception))
+      multipart    <- toMultipart(request)
+      eventJson    <- toEvent(multipart)
+      maybePayload <- getPayload(multipart)
+      result <- right[Response[Interpretation]](
+                  eventConsumersRegistry.handle(EventRequestContent(eventJson, maybePayload)) >>= toHttpResult
+                )
+    } yield result
+  }.merge recoverWith { case NonFatal(error) =>
+    toHttpResult(EventSchedulingResult.SchedulingError(error))
   }
 
-  private implicit class ResultOps(result: Result) {
-    lazy val asHttpResponse: Interpretation[Response[Interpretation]] = result match {
-      case Result.Created => Created(InfoMessage("Event created"))
-      case Result.Existed => Ok(InfoMessage("Event existed"))
-    }
+  private lazy val toHttpResult: EventSchedulingResult => Interpretation[Response[Interpretation]] = {
+    case EventSchedulingResult.Accepted             => Accepted(InfoMessage("Event accepted"))
+    case EventSchedulingResult.Busy                 => TooManyRequests(InfoMessage("Too many events to handle"))
+    case EventSchedulingResult.UnsupportedEventType => BadRequest(ErrorMessage("Unsupported Event Type"))
+    case EventSchedulingResult.BadRequest           => BadRequest(ErrorMessage("Malformed event"))
+    case EventSchedulingResult.SchedulingError(_)   => InternalServerError(ErrorMessage("Failed to schedule event"))
   }
 
-  private def logInfo(event: Event, result: Result): Interpretation[Unit] = result match {
-    case Result.Created => logger.info(s"Event ${event.compoundEventId}, projectPath = ${event.project.path} added")
-    case _              => ME.unit
-  }
-
-  private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case BadRequestError(exception) => BadRequest(ErrorMessage(exception))
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage("Event creation failed")
-      logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
-  }
-
-  private case class BadRequestError(cause: Throwable) extends Exception(cause)
-
-  private implicit lazy val eventEntityDecoder: EntityDecoder[Interpretation, Event] =
-    jsonOf[Interpretation, Event]
-
-  private implicit val eventDecoder: Decoder[Event] = (cursor: HCursor) =>
-    cursor.downField("status").as[Option[EventStatus]] flatMap {
-      case None | Some(EventStatus.New) =>
-        for {
-          id        <- cursor.downField("id").as[EventId]
-          project   <- cursor.downField("project").as[EventProject]
-          date      <- cursor.downField("date").as[EventDate]
-          batchDate <- cursor.downField("batchDate").as[BatchDate]
-          body      <- cursor.downField("body").as[EventBody]
-        } yield NewEvent(id, project, date, batchDate, body)
-      case Some(EventStatus.Skipped) =>
-        for {
-          id        <- cursor.downField("id").as[EventId]
-          project   <- cursor.downField("project").as[EventProject]
-          date      <- cursor.downField("date").as[EventDate]
-          batchDate <- cursor.downField("batchDate").as[BatchDate]
-          body      <- cursor.downField("body").as[EventBody]
-          message   <- verifyMessage(cursor.downField("message").as[Option[String]])
-        } yield SkippedEvent(id, project, date, batchDate, body, message)
-      case Some(invalidStatus) =>
-        Left(DecodingFailure(s"Status $invalidStatus is not valid. Only NEW or SKIPPED are accepted", Nil))
-    }
-
-  private def verifyMessage(result: Decoder.Result[Option[String]]) =
-    result
-      .map(blankToNone)
-      .flatMap {
-        case None          => Left(DecodingFailure(s"Skipped Status requires message", Nil))
-        case Some(message) => EventMessage.from(message.value)
+  private def toMultipart(
+      request: Request[Interpretation]
+  ): EitherT[Interpretation, Response[Interpretation], Multipart[Interpretation]] = EitherT {
+    request
+      .as[Multipart[Interpretation]]
+      .map(_.asRight[Response[Interpretation]])
+      .recoverWith { case NonFatal(_) =>
+        BadRequest(ErrorMessage("Not multipart request")).map(_.asLeft[Multipart[Interpretation]])
       }
-      .leftMap(_ => DecodingFailure("Invalid Skipped Event message", Nil))
+  }
 
-  implicit val projectDecoder: Decoder[EventProject] = (cursor: HCursor) =>
-    for {
-      id   <- cursor.downField("id").as[projects.Id]
-      path <- cursor.downField("path").as[projects.Path]
-    } yield EventProject(id, path)
+  private def toEvent(multipart: Multipart[Interpretation]): EitherT[Interpretation, Response[Interpretation], Json] =
+    EitherT {
+      multipart.parts
+        .find(_.name.contains("event"))
+        .map(_.as[Json].map(_.asRight[Response[Interpretation]]).recoverWith { case NonFatal(_) =>
+          BadRequest(ErrorMessage("Malformed event body")).map(_.asLeft[Json])
+        })
+        .getOrElse(BadRequest(ErrorMessage("Missing event part")).map(_.asLeft[Json]))
+    }
+
+  private def getPayload(
+      multipart: Multipart[Interpretation]
+  ): EitherT[Interpretation, Response[Interpretation], Option[String]] = EitherT {
+    multipart.parts
+      .find(_.name.contains("payload"))
+      .map {
+        _.as[String].map(_.some.asRight[Response[Interpretation]]).recoverWith { case NonFatal(_) =>
+          BadRequest(ErrorMessage("Malformed event payload")).map(_.asLeft[Option[String]])
+        }
+      }
+      .getOrElse(Option.empty[String].asRight[Response[Interpretation]].pure[Interpretation])
+  }
 }
 
 object EventEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
-      waitingEventsGauge:  LabeledGauge[IO, projects.Path],
-      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[EventEndpoint[IO]] =
-    for {
-      eventPersister <- IOEventPersister(transactor, waitingEventsGauge, queriesExecTimes)
-    } yield new EventEndpointImpl[IO](eventPersister, logger)
+      subscriptionsRegistry: EventConsumersRegistry[IO]
+  )(implicit contextShift:   ContextShift[IO]): IO[EventEndpoint[IO]] = IO {
+    new EventEndpointImpl[IO](subscriptionsRegistry)
+  }
 }

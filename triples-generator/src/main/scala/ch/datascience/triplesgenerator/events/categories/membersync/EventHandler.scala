@@ -29,7 +29,6 @@ import ch.datascience.events.consumers.EventSchedulingResult.Accepted
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.categories.EventHandlerOps
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -42,8 +41,7 @@ private[events] class EventHandler[Interpretation[_]](
     ME:           MonadError[Interpretation, Throwable],
     contextShift: ContextShift[Interpretation],
     concurrent:   Concurrent[Interpretation]
-) extends consumers.EventHandler[Interpretation]
-    with EventHandlerOps[Interpretation] {
+) extends consumers.EventHandler[Interpretation] {
 
   import ch.datascience.graph.model.projects
   import membersSynchronizer._

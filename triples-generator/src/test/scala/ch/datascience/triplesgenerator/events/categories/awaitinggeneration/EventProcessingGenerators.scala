@@ -18,10 +18,10 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
+import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.generators.Generators.nonEmptyStrings
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventId
-import ch.datascience.triplesgenerator.events.categories.Generators._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import org.scalacheck.Gen

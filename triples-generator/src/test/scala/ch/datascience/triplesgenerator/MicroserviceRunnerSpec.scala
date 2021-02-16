@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator
 
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
-import ch.datascience.events.consumers.SubscriptionsRegistry
+import ch.datascience.events.consumers.EventConsumersRegistry
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
@@ -54,7 +54,7 @@ class MicroserviceRunnerSpec
         given(sentryInitializer).succeeds(returning = ())
         given(cliVersionCompatChecker).succeeds(returning = ())
         given(datasetInitializer).succeeds(returning = ())
-        given(subscriptionsRegistry).succeeds(returning = ())
+        given(eventConsumersRegistry).succeeds(returning = ())
         given(reProvisioning).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -147,7 +147,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
-      given(subscriptionsRegistry).succeeds(returning = ())
+      given(eventConsumersRegistry).succeeds(returning = ())
       given(reProvisioning).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(httpServer).fails(becauseOf = exception)
@@ -168,7 +168,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
-      given(subscriptionsRegistry).fails(becauseOf = exceptions.generateOne)
+      given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
       given(reProvisioning).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -182,7 +182,7 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(cliVersionCompatChecker).succeeds(returning = ())
       given(datasetInitializer).succeeds(returning = ())
-      given(subscriptionsRegistry).succeeds(returning = ())
+      given(eventConsumersRegistry).succeeds(returning = ())
       given(reProvisioning).fails(becauseOf = exceptions.generateOne)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -197,7 +197,7 @@ class MicroserviceRunnerSpec
     val sentryInitializer       = mock[IOSentryInitializer]
     val cliVersionCompatChecker = mock[CliVersionCompatibilityVerifier[IO]]
     val datasetInitializer      = mock[IOFusekiDatasetInitializer]
-    val subscriptionsRegistry   = mock[SubscriptionsRegistry[IO]]
+    val eventConsumersRegistry  = mock[EventConsumersRegistry[IO]]
     val reProvisioning          = mock[ReProvisioning[IO]]
     val httpServer              = mock[IOHttpServer]
     val logger                  = TestLogger[IO]()
@@ -208,7 +208,7 @@ class MicroserviceRunnerSpec
       sentryInitializer,
       cliVersionCompatChecker,
       datasetInitializer,
-      subscriptionsRegistry,
+      eventConsumersRegistry,
       reProvisioning,
       httpServer,
       new ConcurrentHashMap[CancelToken[IO], Unit](),

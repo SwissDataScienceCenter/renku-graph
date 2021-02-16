@@ -19,8 +19,9 @@
 package ch.datascience.triplesgenerator.events.categories.membersync
 
 import cats.effect.IO
+import ch.datascience.events.consumers.ConsumersModelGenerators._
+import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest, UnsupportedEventType}
-import ch.datascience.events.consumers.{EventRequestContent, eventRequestContents}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths

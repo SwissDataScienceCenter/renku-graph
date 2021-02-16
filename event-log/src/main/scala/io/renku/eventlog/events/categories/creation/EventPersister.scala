@@ -16,9 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.events
-
-import java.time.Instant
+package io.renku.eventlog.events.categories.creation
 
 import EventPersister.Result
 import Result._
@@ -37,6 +35,8 @@ import doobie.util.fragments.in
 import eu.timepit.refined.auto._
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog.{Event, EventLogDB}
+
+import java.time.Instant
 
 trait EventPersister[Interpretation[_]] {
   def storeNewEvent(event: Event): Interpretation[Result]

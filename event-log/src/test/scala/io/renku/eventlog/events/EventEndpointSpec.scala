@@ -20,207 +20,157 @@ package io.renku.eventlog.events
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.http.ErrorMessage.ErrorMessage
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.InfoMessage
+import ch.datascience.events.consumers.ConsumersModelGenerators.eventRequestContents
+import ch.datascience.events.consumers.EventSchedulingResult.SchedulingError
+import ch.datascience.events.consumers.{EventConsumersRegistry, EventSchedulingResult}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.events.EventStatus
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage.ErrorMessage
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.server.EndpointTester._
-import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import io.circe.literal._
-import io.circe.syntax._
-import io.circe.{Encoder, Json}
-import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
-import io.renku.eventlog.events.EventPersister.Result
-import io.renku.eventlog.{Event, EventProject}
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
 import org.http4s.implicits._
+import org.http4s.multipart.{Multipart, Part}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
-  "addEvent" should {
+  "processEvent" should {
 
-    "decode an Event from the request, " +
-      "create it in the Event Log " +
-      s"and return $Created " +
-      "if there's no such an event in the Log yet" in new TestCase {
+    s"$BadRequest if the request is not a multipart request" in new TestCase {
 
-        val event = newEvents.generateOne
-        (persister.storeNewEvent _)
-          .expects(event)
-          .returning(Result.Created.pure[IO])
+      val response = processEvent(Request()).unsafeRunSync()
 
-        val request = Request(Method.POST, uri"events").withEntity(event.asJson)
-
-        val response = addEvent(request).unsafeRunSync()
-
-        response.status                          shouldBe Created
-        response.contentType                     shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event created")
-
-        logger.loggedOnly(Info(s"Event ${event.compoundEventId}, projectPath = ${event.project.path} added"))
-      }
-
-    "decode an Event from the request, " +
-      "create it in the Event Log " +
-      s"and return $Ok " +
-      "if such an event was already in the Log" in new TestCase {
-
-        val event = newEvents.generateOne
-        (persister.storeNewEvent _)
-          .expects(event)
-          .returning(Result.Existed.pure[IO])
-
-        val request = Request(Method.POST, uri"events").withEntity(event.asJson)
-
-        val response = addEvent(request).unsafeRunSync()
-
-        response.status                          shouldBe Ok
-        response.contentType                     shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
-
-        logger.expectNoLogs()
-      }
-
-    s"return $Ok if status was SKIPPED *and* the message is not blank" in new TestCase {
-      val event = skippedEvents.generateOne
-      (persister.storeNewEvent _)
-        .expects(event)
-        .returning(Result.Existed.pure[IO])
-      val request  = Request(Method.POST, uri"events").withEntity(event.asJson)
-      val response = addEvent(request).unsafeRunSync()
-      response.status                          shouldBe Ok
+      response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
-
-      logger.expectNoLogs()
+      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Not multipart request")
     }
 
-    s"return $BadRequest if status was SKIPPED *but* the message is blank" in new TestCase {
+    s"$BadRequest if there is no event part in the request" in new TestCase {
 
-      val invalidPayload: Json = skippedEvents.generateOne.asJson.hcursor
-        .downField("status")
-        .delete
-        .as[Json]
-        .fold(throw _, identity)
-        .deepMerge(json"""{"status": ${blankStrings().generateOne}}""")
-      val request  = Request(Method.POST, uri"events").withEntity(invalidPayload)
-      val response = addEvent(request).unsafeRunSync()
-      response.status      shouldBe BadRequest
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
-        s"Invalid message body: Could not decode JSON: ${invalidPayload.toString}"
+      val multipart = Multipart[IO](
+        Vector(Part.formData[IO](nonEmptyStrings().generateOne, nonEmptyStrings().generateOne))
       )
 
-      logger.expectNoLogs()
-    }
+      val response = processEvent(Request().withEntity(multipart).withHeaders(multipart.headers)).unsafeRunSync()
 
-    s"set default status to NEW if no status is provided" in new TestCase {
-      val newEvent = newEvents.generateOne
-      (persister.storeNewEvent _)
-        .expects(newEvent)
-        .returning(Result.Existed.pure[IO])
-      val payloadWithoutStatus = newEvent.asJson.hcursor.downField("status").delete.as[Json].fold(throw _, identity)
-      val request              = Request(Method.POST, uri"events").withEntity(payloadWithoutStatus)
-      val response             = addEvent(request).unsafeRunSync()
-      response.status                          shouldBe Ok
+      response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
-      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event existed")
-
-      logger.expectNoLogs()
+      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Missing event part")
     }
 
-    unacceptableStatuses.foreach { invalidStatus =>
-      s"return $BadRequest if status was $invalidStatus" in new TestCase {
+    s"$BadRequest if there the event part in the request is malformed" in new TestCase {
 
-        val randomEvent          = newOrSkippedEvents.generateOne
-        val payloadInvalidStatus = randomEvent.asJson.deepMerge(json"""{"status": ${invalidStatus.value} }""")
+      val multipart = Multipart[IO](Vector(Part.formData[IO]("event", "")))
 
-        val request  = Request(Method.POST, uri"events").withEntity(payloadInvalidStatus)
-        val response = addEvent(request).unsafeRunSync()
-        response.status      shouldBe BadRequest
-        response.contentType shouldBe Some(`Content-Type`(application.json))
-        response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
-          s"Invalid message body: Could not decode JSON: $payloadInvalidStatus"
-        )
-        logger.expectNoLogs()
-      }
+      val response = processEvent(Request().withEntity(multipart).withHeaders(multipart.headers)).unsafeRunSync()
 
+      response.status                          shouldBe BadRequest
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event body")
     }
 
-    s"return $BadRequest if decoding Event from the request fails" in new TestCase {
+    s"$Accepted if one of the handlers accepts the given payload" in new TestCase {
 
-      val payload = jsons.generateOne
-      val request = Request(Method.POST, uri"events").withEntity(payload)
+      (eventConsumersRegistry.handle _)
+        .expects(requestContent)
+        .returning(EventSchedulingResult.Accepted.pure[IO])
 
-      val response = addEvent(request).unsafeRunSync()
+      val response = processEvent(request).unsafeRunSync()
 
-      response.status      shouldBe BadRequest
-      response.contentType shouldBe Some(`Content-Type`(application.json))
-      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage(
-        s"Invalid message body: Could not decode JSON: $payload"
-      )
-
-      logger.expectNoLogs()
+      response.status                          shouldBe Accepted
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event accepted")
     }
 
-    s"return $InternalServerError when storing Event in the Log fails" in new TestCase {
+    s"$BadRequest if none of the handlers supports the given payload" in new TestCase {
 
-      val event     = newEvents.generateOne
-      val exception = exceptions.generateOne
-      (persister.storeNewEvent _)
-        .expects(event)
-        .returning(exception.raiseError[IO, EventPersister.Result])
+      (eventConsumersRegistry.handle _)
+        .expects(requestContent)
+        .returning(EventSchedulingResult.UnsupportedEventType.pure[IO])
 
-      val request = Request(Method.POST, uri"events").withEntity(event.asJson)
+      val response = processEvent(request).unsafeRunSync()
 
-      val response = addEvent(request).unsafeRunSync()
+      response.status                           shouldBe BadRequest
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Unsupported Event Type")
+    }
 
-      response.status                   shouldBe InternalServerError
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Event creation failed").asJson
+    s"$BadRequest if one of the handlers supports the given payload but it's malformed" in new TestCase {
 
-      logger.loggedOnly(Error("Event creation failed", exception))
+      (eventConsumersRegistry.handle _)
+        .expects(requestContent)
+        .returning(EventSchedulingResult.BadRequest.pure[IO])
+
+      val response = processEvent(request).unsafeRunSync()
+
+      response.status                           shouldBe BadRequest
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event")
+    }
+
+    s"$TooManyRequests if the handler returns ${EventSchedulingResult.Busy}" in new TestCase {
+
+      (eventConsumersRegistry.handle _)
+        .expects(requestContent)
+        .returning(EventSchedulingResult.Busy.pure[IO])
+
+      val response = processEvent(request).unsafeRunSync()
+
+      response.status                          shouldBe TooManyRequests
+      response.contentType                     shouldBe Some(`Content-Type`(application.json))
+      response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Too many events to handle")
+    }
+
+    s"$InternalServerError if the handler returns $SchedulingError" in new TestCase {
+
+      (eventConsumersRegistry.handle _)
+        .expects(requestContent)
+        .returning(SchedulingError(exceptions.generateOne).pure[IO])
+
+      val response = processEvent(request).unsafeRunSync()
+
+      response.status                           shouldBe InternalServerError
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Failed to schedule event")
+    }
+
+    s"$InternalServerError if the handler fails" in new TestCase {
+
+      (eventConsumersRegistry.handle _)
+        .expects(requestContent)
+        .returning(exceptions.generateOne.raiseError[IO, EventSchedulingResult])
+
+      val response = processEvent(request).unsafeRunSync()
+
+      response.status                           shouldBe InternalServerError
+      response.contentType                      shouldBe Some(`Content-Type`(application.json))
+      response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Failed to schedule event")
     }
   }
-
-  private lazy val unacceptableStatuses = EventStatus.all.diff(Set(EventStatus.New, EventStatus.Skipped))
 
   private trait TestCase {
+    val requestContent = eventRequestContents.generateOne
 
-    val persister = mock[EventPersister[IO]]
-    val logger    = TestLogger[IO]()
-    val addEvent  = new EventEndpointImpl[IO](persister, logger).addEvent _
-  }
+    private val multipartContent: Multipart[IO] = Multipart[IO](
+      Vector(
+        Part
+          .formData[IO]("event", requestContent.event.noSpaces, `Content-Type`(MediaType.application.json))
+          .some,
+        requestContent.maybePayload.map(Part.formData[IO]("payload", _))
+      ).flatten
+    )
+    val request = Request(Method.POST, uri"events")
+      .withEntity(multipartContent)
+      .withHeaders(multipartContent.headers)
 
-  private implicit def eventEncoder[T <: Event]: Encoder[T] = Encoder.instance[T] {
-    case event: NewEvent     => toJson(event)
-    case event: SkippedEvent => toJson(event) deepMerge json"""{ "message":    ${event.message.value} }"""
-  }
-
-  private def toJson(event: Event): Json = json"""{
-    "id":         ${event.id.value},
-    "project":    ${event.project},
-    "date":       ${event.date.value},
-    "batchDate":  ${event.batchDate.value},
-    "body":       ${event.body.value},
-    "status":     ${event.status.value}
-  }"""
-
-  private implicit lazy val projectEncoder: Encoder[EventProject] = Encoder.instance[EventProject] { project =>
-    json"""{
-      "id":   ${project.id.value},
-      "path": ${project.path.value}
-    }"""
+    val eventConsumersRegistry = mock[EventConsumersRegistry[IO]]
+    val processEvent           = new EventEndpointImpl[IO](eventConsumersRegistry).processEvent _
   }
 }

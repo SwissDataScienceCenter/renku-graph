@@ -18,6 +18,7 @@
 
 package ch.datascience.events.consumers
 
+import ConsumersModelGenerators._
 import cats.Parallel
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
@@ -31,7 +32,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.global
 
-class SubscriptionsRegistrySpec extends AnyWordSpec with should.Matchers with MockFactory {
+class EventConsumersRegistrySpec extends AnyWordSpec with should.Matchers with MockFactory {
   "run" should {
 
     "start all the subscriptionMechanisms" in new TestCase {
@@ -157,6 +158,6 @@ class SubscriptionsRegistrySpec extends AnyWordSpec with should.Matchers with Mo
     val subscriptionMechanism1 = mock[SubscriptionMechanism[IO]]
 
     val registry =
-      new SubscriptionsRegistryImpl[IO](List(handler0, handler1), List(subscriptionMechanism0, subscriptionMechanism1))
+      new EventConsumersRegistryImpl[IO](List(handler0, handler1), List(subscriptionMechanism0, subscriptionMechanism1))
   }
 }

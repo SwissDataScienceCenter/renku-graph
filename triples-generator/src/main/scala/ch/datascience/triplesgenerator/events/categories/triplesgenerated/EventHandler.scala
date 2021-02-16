@@ -25,15 +25,13 @@ import cats.effect.{ContextShift, Effect, IO, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.events.consumers.EventSchedulingResult._
+import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
+import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, Project}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.events.consumers.EventSchedulingResult._
-import ch.datascience.triplesgenerator.events.categories.models.Project
-import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.triplesgenerator.events.categories.EventHandlerOps
 import io.chrisdavenport.log4cats.Logger
 import io.circe.parser
 
@@ -46,8 +44,7 @@ private[events] class EventHandler[Interpretation[_]: Effect](
     logger:                    Logger[Interpretation]
 )(implicit
     ME: MonadError[Interpretation, Throwable]
-) extends consumers.EventHandler[Interpretation]
-    with EventHandlerOps[Interpretation] {
+) extends consumers.EventHandler[Interpretation] {
 
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eventsProcessingRunner.scheduleForProcessing

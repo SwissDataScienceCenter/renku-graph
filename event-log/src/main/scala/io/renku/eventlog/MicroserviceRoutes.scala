@@ -62,7 +62,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
-    case request @ POST  -> Root / "events"                                            => addEvent(request)
+    case request @ POST  -> Root / "events"                                            => processEvent(request)
     case request @ PATCH -> Root / "events"                                            => triggerEventsPatching(request)
     case           GET   -> Root / "events" :? `latest-per-project`(maybeValue)        => maybeFindLatestEvents(maybeValue)
     case request @ PATCH -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => changeStatus(CompoundEventId(eventId, projectId), request)

@@ -24,6 +24,7 @@ import cats.data.EitherT._
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.config.ServiceUrl
+import ch.datascience.events.consumers.Project
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -38,7 +39,6 @@ import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.Comm
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.RepositoryPath
-import ch.datascience.triplesgenerator.events.categories.models.Project
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
