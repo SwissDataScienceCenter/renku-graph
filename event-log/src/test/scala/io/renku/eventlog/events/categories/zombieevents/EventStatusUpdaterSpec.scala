@@ -21,19 +21,19 @@ package io.renku.eventlog.events.categories.zombieevents
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.compoundEventIds
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventStatus}
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New}
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, _}
+import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples}
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
+import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.{CreatedDate, EventDate, EventMessage, ExecutionDate, InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.eventlog.EventContentGenerators._
+import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
-import ch.datascience.graph.model.EventsGenerators._
-import io.renku.eventlog.EventContentGenerators._
 import org.scalatest.wordspec.AnyWordSpec
-import doobie.implicits._
 
 import java.time.Instant
 
@@ -46,21 +46,51 @@ class EventStatusUpdaterSpec
 
   "changeStatus" should {
 
-    s"update event status to $New " +
-      s"if event has status $GeneratingTriples and so the event in the DB" in new TestCase {
+    List(GeneratingTriples, TransformingTriples).foreach { processingStatus =>
+      s"update event status to $New " +
+        s"if event has status $processingStatus and so the event in the DB" in new TestCase {
+          val eventId = compoundEventIds.generateOne
+          addEvent(eventId, processingStatus)
 
-        val eventId = compoundEventIds.generateOne
-        addEvent(eventId, GeneratingTriples)
+          findEventStatus(eventId) shouldBe processingStatus
 
-        findEventStatus(eventId) shouldBe GeneratingTriples
+          // verification of the relevant gauges needs to be checked
+          (waitingEventsGauge.decrement _).expects(projectPaths.generateOne).returning(IO.unit)
+          queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
 
-        // verification of the relevant gauges needs to be checked
-//        waitingEventsGauge
+          updater.changeStatus(ZombieEvent(eventId, processingStatus)).unsafeRunSync() shouldBe ()
 
-        updater.changeStatus(ZombieEvent(eventId, GeneratingTriples)).unsafeRunSync() shouldBe ()
+          findEventStatus(eventId) shouldBe New
+        }
+    }
 
-        findEventStatus(eventId) shouldBe New
-      }
+    EventStatus.all.filterNot(status => status == GeneratingTriples || status == TransformingTriples).foreach {
+      processingStatus =>
+        s"do nothing if event has status $processingStatus" in new TestCase {
+
+          val eventId = compoundEventIds.generateOne
+          addEvent(eventId, processingStatus)
+
+          findEventStatus(eventId) shouldBe processingStatus
+          queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
+
+          updater.changeStatus(ZombieEvent(eventId, processingStatus)).unsafeRunSync() shouldBe ()
+
+          findEventStatus(eventId) shouldBe processingStatus
+        }
+    }
+
+    "do nothing if the event does not exists " in new TestCase {
+      val eventId          = compoundEventIds.generateOne
+      val processingStatus = eventStatuses.generateOne
+
+      queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
+
+      updater.changeStatus(ZombieEvent(eventId, processingStatus)).unsafeRunSync() shouldBe ()
+
+      findEventStatus(eventId) shouldBe processingStatus
+    }
+
   }
 
   private trait TestCase {
@@ -71,6 +101,7 @@ class EventStatusUpdaterSpec
 
     val now = Instant.now()
     currentTime.expects().returning(now)
+
   }
 
   private def addEvent(eventId: CompoundEventId, status: EventStatus): Unit =
@@ -84,4 +115,5 @@ class EventStatusUpdaterSpec
       .query[EventStatus]
       .unique
   }
+
 }
