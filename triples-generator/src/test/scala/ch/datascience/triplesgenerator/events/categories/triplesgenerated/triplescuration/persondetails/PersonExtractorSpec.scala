@@ -33,9 +33,11 @@ import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import eu.timepit.refined.auto._
 import io.circe.Json
+import io.circe.literal.JsonStringContext
 import io.circe.optics.JsonOptics._
 import io.circe.optics.JsonPath.root
-import io.renku.jsonld.JsonLD
+import io.circe.literal._
+import io.renku.jsonld.{JsonLD, Property}
 import io.renku.jsonld.syntax._
 import monocle.function.Plated
 import org.scalamock.scalatest.MockFactory
@@ -44,16 +46,53 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.collection.mutable
+import scala.tools.nsc.interactive.Lexer.MalformedInput
 import scala.util.{Failure, Success, Try}
 
 class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFactory with AppendedClues {
 
   "extractPersons" should {
 
-    "remove name and email properties from all the Person entities found in the given Json " in new TestCase {
+//    "remove name and email properties from all the Person entities found in the given Json " in new TestCase {
+//      val jsonTriples = JsonLDTriples {
+//        nonModifiedDataSetCommit(
+//          committer = entities.Person(userNames.generateOne, userEmails.generateOne)
+//        )(
+//          projectPath = projectPaths.generateOne,
+//          maybeProjectCreator = entities.Person(userNames.generateOne, userEmails.generateOne).some
+//        )(
+//          datasetCreators = nonEmptyList(entities.EntitiesGenerators.persons, minElements = 5, maxElements = 10)
+//            .retryUntil(atLeastOneWithoutEmail)
+//            .generateOne
+//            .toList
+//            .toSet
+//        ).toJson
+//      }
+//
+//      val Success((updatedTriples, foundPersons)) = personExtractor extractPersons jsonTriples
+//
+//      val originalPersons = jsonTriples.collectAllPersons
+//
+//      val actual   = foundPersons.map(person => (person.id, person.name.some, person.maybeEmail))
+//      val expected = originalPersons.map(person => (person.id, person.maybeName, person.maybeEmail))
+//      actual shouldBe expected
+//
+//      val updatedPersons = updatedTriples.collectAllPersons
+//
+//      updatedPersons.foldLeft(true) {
+//        case (acc, Person(_, None, None, _)) => acc
+//        case _                               => false
+//      } shouldBe true withClue "One person contained a name or an email"
+//    }
+
+    "choose a single name when there are multiple" in new TestCase {
+
+      val userName       = userNames.generateOne
+      val secondUserName = userNames.generateOne
+
       val jsonTriples = JsonLDTriples {
-        nonModifiedDataSetCommit(
-          committer = entities.Person(userNames.generateOne, userEmails.generateOne)
+        val dataSetCommit = nonModifiedDataSetCommit(
+          committer = entities.Person(userName, userEmails.generateOne)
         )(
           projectPath = projectPaths.generateOne,
           maybeProjectCreator = entities.Person(userNames.generateOne, userEmails.generateOne).some
@@ -63,23 +102,43 @@ class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFact
             .generateOne
             .toList
             .toSet
-        ).toJson
+        )
+
+        val personJson = json"""[  {
+    "@id" : "mailto:ooVt2tf%@hpirz",
+    "@type" : [
+      "http://www.w3.org/ns/prov#Person",
+      "http://schema.org/Person"
+    ],
+    "http://www.w3.org/2000/01/rdf-schema#label" : {
+      "@value" : "es mqlb"
+    },
+    "http://schema.org/affiliation" : {
+      "@value" : "tefotcvry"
+    },
+    "http://schema.org/email" : {
+      "@value" : "ooVt2tf%@hpirz"
+    },
+    "http://schema.org/name" : [
+       { "@value": ${userName.value}},
+       { "@value": ${secondUserName.value}}
+    ]
+  }]""" //,
+
+        val togetherWithNewPerson: Either[JsonLD.MalformedJsonLD, Option[Json]] = dataSetCommit.asJsonLD.flatten.map {
+          flattened =>
+            for {
+              rest        <- flattened.toJson.asArray
+              personArray <- personJson.asArray
+            } yield Json.fromValues(personArray ++ rest)
+
+        }
+        val Right(Some(value)) = togetherWithNewPerson
+        value
       }
 
       val Success((updatedTriples, foundPersons)) = personExtractor extractPersons jsonTriples
 
-      val originalPersons = jsonTriples.collectAllPersons
-
-      val actual   = foundPersons.map(person => (person.id, person.name.some, person.maybeEmail))
-      val expected = originalPersons.map(person => (person.id, person.maybeName, person.maybeEmail))
-      actual shouldBe expected
-
-      val updatedPersons = updatedTriples.collectAllPersons
-
-      updatedPersons.foldLeft(true) {
-        case (acc, Person(_, None, None, _)) => acc
-        case _                               => false
-      } shouldBe true withClue "One person contained a name or an email"
     }
 
     "do not modify person objects if there are no names and emails" in new TestCase {

@@ -19,14 +19,16 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 package persondetails
 
-import cats.MonadError
+import cats.{Monad, MonadError}
 import cats.data.EitherT
 import cats.effect.{ContextShift, Timer}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
+import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.chrisdavenport.log4cats.Logger
 
@@ -38,8 +40,10 @@ private[triplescuration] trait PersonDetailsUpdater[Interpretation[_]] {
   ): CurationResults[Interpretation]
 }
 
-private class PersonDetailsUpdaterImpl[Interpretation[_]](
+private class PersonDetailsUpdaterImpl[Interpretation[_]: Monad](
     personExtractor:                 PersonExtractor[Interpretation],
+    commitIdExtractor:               CommitIdExtractor[Interpretation],
+    commitCommitterFinder:           CommitCommitterFinder[Interpretation],
     accessTokenFinder:               AccessTokenFinder[Interpretation],
     projectMembersFinder:            GitLabProjectMembersFinder[Interpretation],
     personsAndProjectMembersMatcher: PersonsAndProjectMembersMatcher,
@@ -50,6 +54,7 @@ private class PersonDetailsUpdaterImpl[Interpretation[_]](
   import IOAccessTokenFinder._
   import accessTokenFinder._
   import personExtractor._
+  import commitIdExtractor._
   import personsAndProjectMembersMatcher._
   import projectMembersFinder._
   import updatesCreator._
@@ -58,11 +63,11 @@ private class PersonDetailsUpdaterImpl[Interpretation[_]](
                           projectPath:    projects.Path
   ): CurationResults[Interpretation] =
     for {
-      triplesAndPersons <- extractPersons(curatedTriples.triples).toRightT
-      (updatedTriples, persons) = triplesAndPersons
-      maybeAccessToken <- findAccessToken(projectPath).toRightT
+      triplesAndPersons <- getTriplesAndTrimmedPersons(curatedTriples.triples)
+      (updatedTriples, trimmedPersons) = triplesAndPersons
+      maybeAccessToken <- findAccessToken(projectPath)
       projectMembers   <- findProjectMembers(projectPath)(maybeAccessToken)
-      personsWithGitlabIds = merge(persons, projectMembers)
+      personsWithGitlabIds = merge(trimmedPersons, projectMembers)
       newUpdatesGroups     = personsWithGitlabIds map prepareUpdates[Interpretation]
     } yield CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
 
@@ -70,6 +75,32 @@ private class PersonDetailsUpdaterImpl[Interpretation[_]](
     lazy val toRightT: EitherT[Interpretation, ProcessingRecoverableError, T] =
       EitherT.right[ProcessingRecoverableError](out)
   }
+
+  private def getTriplesAndTrimmedPersons(triples: JsonLDTriples): Interpretation[(JsonLDTriples, Set[Person])] =
+    for {
+      triplesAndPersons <- extractPersons(triples).toRightT
+      (triples, personDatas) = triplesAndPersons
+      commitId       <- commitIdExtractor.extractCommitId(triples).toRightT
+      trimmedPersons <- trimPersons(personDatas, commitId).toRightT
+    } yield trimmedPersons
+
+  private def trimPersons(personDatas: Set[PersonData], commitId: CommitId): Interpretation[Set[Person]] =
+    personDatas.map {
+      case (_, name :: names, _)     => tryToGetPersonFromGitLab(commitId)
+      case (id, name :: Nil, emails) => Some(Person(id, name, emails.headOption))
+    }.flatten
+
+  // use extractCommitId
+
+  // maybeEmail <- verify emails. if multiple, fail interpretation
+  // if there is no email but there are multiple names, we can't do anything
+  // verifyNames. if multiple, call gitlab to get single name for commit
+  //                                commitInfoFinder (see other examples) will return a committer and author, both with name and email
+  //                                try to match based on that response. it could be either but it should be committer
+  //                                 if we can match, then we use it for the name in the person, else fail. failures defined in FailureOps
+  //
+
+  def tryToGetPersonFromGitLab(commitId: CommitId): Option[Person] = ???
 }
 
 private[triplescuration] object PersonDetailsUpdater {
@@ -89,6 +120,8 @@ private[triplescuration] object PersonDetailsUpdater {
     gitLabUrl            <- GitLabUrl[IO]()
   } yield new PersonDetailsUpdaterImpl[IO](
     PersonExtractor[IO](),
+    IOCommitIdExtractor(),
+    IOCommitCommitterFinder(),
     accessTokenFinder,
     projectMembersFinder,
     new PersonsAndProjectMembersMatcher(),
