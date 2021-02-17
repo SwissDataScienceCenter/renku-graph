@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 
 import cats.MonadError
+import ch.datascience.graph.model.events.EventId
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
@@ -52,7 +53,8 @@ private[events] class TriplesTransformerImpl[Interpretation[_]](
     for {
       triplesWithPersonDetails <- updatePersonDetails(
                                     CuratedTriples(triplesGeneratedEvent.triples, updatesGroups = Nil),
-                                    triplesGeneratedEvent.project.path
+                                    triplesGeneratedEvent.project.path,
+                                    triplesGeneratedEvent.eventId
                                   )
       triplesWithForkInfo         <- updateProjectInfo(triplesGeneratedEvent, triplesWithPersonDetails)
       triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithForkInfo)

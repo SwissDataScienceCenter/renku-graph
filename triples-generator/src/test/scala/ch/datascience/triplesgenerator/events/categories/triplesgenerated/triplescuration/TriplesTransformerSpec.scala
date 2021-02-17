@@ -49,7 +49,8 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(CuratedTriples[Try](triplesGeneratedEvent.triples, updatesGroups = Nil),
-                 triplesGeneratedEvent.project.path
+                 triplesGeneratedEvent.project.path,
+                 triplesGeneratedEvent.eventId
         )
         .returning(triplesWithPersonDetails.toRightT)
 
@@ -72,7 +73,8 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val exception = exceptions.generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(CuratedTriples[Try](triplesGeneratedEvent.triples, updatesGroups = Nil),
-                 triplesGeneratedEvent.project.path
+                 triplesGeneratedEvent.project.path,
+                 triplesGeneratedEvent.eventId
         )
         .returning(exception.toEitherTError)
 
@@ -84,7 +86,8 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(CuratedTriples[Try](triplesGeneratedEvent.triples, updatesGroups = Nil),
-                 triplesGeneratedEvent.project.path
+                 triplesGeneratedEvent.project.path,
+                 triplesGeneratedEvent.eventId
         )
         .returning(triplesWithPersonDetails.toRightT)
 
@@ -102,7 +105,8 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(CuratedTriples[Try](triplesGeneratedEvent.triples, updatesGroups = Nil),
-                 triplesGeneratedEvent.project.path
+                 triplesGeneratedEvent.project.path,
+                 triplesGeneratedEvent.eventId
         )
         .returning(triplesWithPersonDetails.toRightT)
 
@@ -125,7 +129,8 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
       (personDetailsUpdater.updatePersonDetails _)
         .expects(CuratedTriples[Try](triplesGeneratedEvent.triples, updatesGroups = Nil),
-                 triplesGeneratedEvent.project.path
+                 triplesGeneratedEvent.project.path,
+                 triplesGeneratedEvent.eventId
         )
         .returning(exception.toLeftT)
 
@@ -137,7 +142,8 @@ class TriplesTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
       val triplesWithPersonDetails = curatedTriplesObjects[Try].generateOne
       (personDetailsUpdater.updatePersonDetails _)
         .expects(CuratedTriples[Try](triplesGeneratedEvent.triples, updatesGroups = Nil),
-                 triplesGeneratedEvent.project.path
+                 triplesGeneratedEvent.project.path,
+                 triplesGeneratedEvent.eventId
         )
         .returning(triplesWithPersonDetails.toRightT)
 

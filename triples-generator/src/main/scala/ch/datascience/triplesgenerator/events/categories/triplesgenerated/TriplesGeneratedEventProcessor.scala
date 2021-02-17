@@ -88,7 +88,10 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
       triplesGeneratedEvent:   TriplesGeneratedEvent
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
-      curatedTriples <- transform(triplesGeneratedEvent).leftSemiflatMap(toUploadingError(triplesGeneratedEvent))
+      curatedTriples <-
+        transform(triplesGeneratedEvent).leftSemiflatMap(
+          toUploadingError(triplesGeneratedEvent)
+        )
       result <- EitherT
                   .liftF[Interpretation, UploadingResult, UploadingResult](
                     upload(curatedTriples).flatMap(toUploadingResult(triplesGeneratedEvent, _))
