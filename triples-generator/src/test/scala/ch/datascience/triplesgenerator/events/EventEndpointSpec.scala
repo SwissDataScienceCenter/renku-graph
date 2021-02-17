@@ -20,14 +20,14 @@ package ch.datascience.triplesgenerator.events
 
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.{EventSchedulingResult, SubscriptionsRegistry, _}
+import ch.datascience.events.consumers.ConsumersModelGenerators._
+import ch.datascience.events.consumers._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
-import ch.datascience.interpreters.TestLogger
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
 import org.http4s.MediaType._
 import org.http4s.Status._
@@ -52,8 +52,6 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
       response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Not multipart request")
-
-      logger.expectNoLogs()
     }
 
     s"$BadRequest if there is no event part in the request" in new TestCase {
@@ -68,8 +66,6 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
       response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Missing event part")
-
-      logger.expectNoLogs()
     }
 
     s"$BadRequest if there the event part in the request is malformed" in new TestCase {
@@ -83,8 +79,6 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       response.status                          shouldBe BadRequest
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
       response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event body")
-
-      logger.expectNoLogs()
     }
 
     s"$Accepted if one of the handlers accepts the given payload" in new TestCase {
@@ -100,8 +94,6 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       response.status                          shouldBe Accepted
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
       response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event accepted")
-
-      logger.expectNoLogs()
     }
 
     s"$BadRequest if none of the handlers supports the given payload" in new TestCase {
@@ -116,9 +108,6 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       response.status                           shouldBe BadRequest
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Unsupported Event Type")
-
-      logger.expectNoLogs()
-
     }
 
     s"$BadRequest if one of the handlers supports the given payload but it's malformed" in new TestCase {
@@ -133,9 +122,6 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       response.status                           shouldBe BadRequest
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Malformed event")
-
-      logger.expectNoLogs()
-
     }
 
     s"$TooManyRequests if the handler returns ${EventSchedulingResult.Busy}" in new TestCase {
@@ -150,9 +136,6 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       response.status                          shouldBe TooManyRequests
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
       response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage("Too many events to handle")
-
-      logger.expectNoLogs()
-
     }
 
     s"$InternalServerError if the handler returns ${EventSchedulingResult.SchedulingError}" in new TestCase {
@@ -167,9 +150,6 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       response.status                           shouldBe InternalServerError
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Failed to schedule event")
-
-      logger.expectNoLogs()
-
     }
 
     s"$InternalServerError if the handler fails" in new TestCase {
@@ -185,9 +165,6 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       response.status                           shouldBe InternalServerError
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("Failed to schedule event")
-
-      logger.expectNoLogs()
-
     }
 
     s"return $ServiceUnavailable if re-provisioning flag set to true" in new TestCase {
@@ -201,8 +178,6 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage(
         "Temporarily unavailable: currently re-provisioning"
       )
-
-      logger.expectNoLogs()
     }
   }
 
@@ -220,10 +195,9 @@ class EventEndpointSpec extends AnyWordSpec with MockFactory with should.Matcher
       .withEntity(multipartContent)
       .withHeaders(multipartContent.headers)
 
-    val subscriptionsRegistry = mock[SubscriptionsRegistry[IO]]
+    val subscriptionsRegistry = mock[EventConsumersRegistry[IO]]
 
     val reProvisioningStatus = mock[ReProvisioningStatus[IO]]
-    val logger               = TestLogger[IO]()
     val processEvent = new EventEndpointImpl[IO](
       subscriptionsRegistry,
       reProvisioningStatus

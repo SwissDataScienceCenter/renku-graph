@@ -25,7 +25,7 @@ import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.events.consumers
-import ch.datascience.events.consumers.SubscriptionsRegistry
+import ch.datascience.events.consumers.EventConsumersRegistry
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
@@ -84,21 +84,14 @@ object Microservice extends IOMicroservice {
                                                                                            sparqlTimeRecorder,
                                                                                            ApplicationLogger
                                     )
-    subscriptionsRegistry <- consumers.SubscriptionsRegistry(ApplicationLogger,
-                                                             awaitingGenerationSubscription,
-                                                             membersSyncSubscription,
-                                                             triplesGeneratedSubscription
-                             )
-    reProvisioningStatus <- ReProvisioningStatus(subscriptionsRegistry, ApplicationLogger, sparqlTimeRecorder)
-    reProvisioning       <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)
-    eventProcessingEndpoint <- IOEventEndpoint(renkuVersionPairs.head,
-                                               metricsRegistry,
-                                               gitLabThrottler,
-                                               sparqlTimeRecorder,
-                                               subscriptionsRegistry,
-                                               reProvisioningStatus,
-                                               ApplicationLogger
-                               )
+    eventConsumersRegistry <- consumers.EventConsumersRegistry(ApplicationLogger,
+                                                               awaitingGenerationSubscription,
+                                                               membersSyncSubscription,
+                                                               triplesGeneratedSubscription
+                              )
+    reProvisioningStatus    <- ReProvisioningStatus(eventConsumersRegistry, ApplicationLogger, sparqlTimeRecorder)
+    reProvisioning          <- IOReProvisioning(reProvisioningStatus, renkuVersionPairs, sparqlTimeRecorder, ApplicationLogger)
+    eventProcessingEndpoint <- IOEventEndpoint(eventConsumersRegistry, reProvisioningStatus)
     microserviceRoutes =
       new MicroserviceRoutes[IO](eventProcessingEndpoint, new RoutesMetrics[IO](metricsRegistry)).routes
     exitCode <- microserviceRoutes.use { routes =>
@@ -108,7 +101,7 @@ object Microservice extends IOMicroservice {
                     sentryInitializer,
                     cliVersionCompatChecker,
                     fusekiDatasetInitializer,
-                    subscriptionsRegistry,
+                    eventConsumersRegistry,
                     reProvisioning,
                     new HttpServer[IO](serverPort = ServicePort.value, routes),
                     subProcessesCancelTokens,
@@ -124,7 +117,7 @@ private class MicroserviceRunner(
     sentryInitializer:               SentryInitializer[IO],
     cliVersionCompatibilityVerifier: CliVersionCompatibilityVerifier[IO],
     datasetInitializer:              FusekiDatasetInitializer[IO],
-    subscriptionsRegistry:           SubscriptionsRegistry[IO],
+    eventConsumersRegistry:          EventConsumersRegistry[IO],
     reProvisioning:                  ReProvisioning[IO],
     httpServer:                      HttpServer[IO],
     subProcessesCancelTokens:        ConcurrentHashMap[CancelToken[IO], Unit],
@@ -138,7 +131,7 @@ private class MicroserviceRunner(
       _        <- sentryInitializer.run()
       _        <- cliVersionCompatibilityVerifier.run()
       _        <- datasetInitializer.run()
-      _        <- subscriptionsRegistry.run().start.map(gatherCancelToken)
+      _        <- eventConsumersRegistry.run().start.map(gatherCancelToken)
       _        <- reProvisioning.run().start.map(gatherCancelToken)
       exitCode <- httpServer.run()
     } yield exitCode

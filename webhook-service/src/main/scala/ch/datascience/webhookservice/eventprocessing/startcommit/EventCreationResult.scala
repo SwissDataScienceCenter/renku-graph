@@ -16,16 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories
+package ch.datascience.webhookservice.eventprocessing.startcommit
 
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import ch.datascience.triplesgenerator.events.categories.models.Project
-import org.scalacheck.Gen
-
-object Generators {
-
-  implicit lazy val projects: Gen[Project] = for {
-    projectId <- projectIds
-    path      <- projectPaths
-  } yield Project(projectId, path)
+private sealed trait EventCreationResult extends Product with Serializable
+private object EventCreationResult {
+  final case object Created extends EventCreationResult
+  final case object Existed extends EventCreationResult
+  final case object Failed  extends EventCreationResult
 }

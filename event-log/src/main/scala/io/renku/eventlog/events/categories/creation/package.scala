@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.startcommit
+package io.renku.eventlog.events.categories
 
-private sealed trait SendingResult extends Product with Serializable
-private object SendingResult {
-  final case object Created extends SendingResult
-  final case object Existed extends SendingResult
-  final case object Failed  extends SendingResult
+import ch.datascience.graph.model.events.CategoryName
+
+package object creation {
+  val categoryName: CategoryName = CategoryName("CREATION")
 }

@@ -96,6 +96,7 @@ object events {
       override val value: String = "NEW"
     }
 
+    type GeneratingTriples = GeneratingTriples.type
     final case object GeneratingTriples extends EventStatus {
       override val value: String = "GENERATING_TRIPLES"
     }
@@ -104,6 +105,7 @@ object events {
       override val value: String = "TRIPLES_GENERATED"
     }
 
+    type TransformingTriples = TransformingTriples.type
     final case object TransformingTriples extends EventStatus {
       override val value: String = "TRANSFORMING_TRIPLES"
     }

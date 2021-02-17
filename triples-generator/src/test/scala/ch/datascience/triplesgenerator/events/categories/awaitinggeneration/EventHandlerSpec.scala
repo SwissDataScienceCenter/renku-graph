@@ -21,8 +21,9 @@ package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.events.consumers.EventSchedulingResult._
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, eventRequestContents}
+import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies}
@@ -158,7 +159,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
   }
 
   private implicit lazy val eventEncoder: Encoder[CompoundEventId] =
-    Encoder.instance[CompoundEventId] { case (eventId) =>
+    Encoder.instance[CompoundEventId] { case eventId =>
       json"""{
         "categoryName": "AWAITING_GENERATION",
         "id":           ${eventId.id.value},

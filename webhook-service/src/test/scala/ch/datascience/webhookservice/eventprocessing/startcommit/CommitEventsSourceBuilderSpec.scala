@@ -32,7 +32,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.webhookservice.commits.{CommitInfo, CommitInfoFinder}
 import ch.datascience.webhookservice.eventprocessing.CommitEvent
 import ch.datascience.webhookservice.eventprocessing.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
-import ch.datascience.webhookservice.eventprocessing.startcommit.SendingResult._
+import ch.datascience.webhookservice.eventprocessing.startcommit.EventCreationResult._
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import eu.timepit.refined.auto._
@@ -215,7 +215,7 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
             SendExpectations[NewCommitEvent](startCommit.id, Created),
             SendExpectations[NewCommitEvent](level2Info2.id, Created)
           )
-        ) shouldBe exception.raiseError[Try, List[SendingResult]]
+        ) shouldBe exception.raiseError[Try, List[EventCreationResult]]
       }
 
     "fail mapping the events " +
@@ -232,16 +232,16 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
         givenFindingCommitInfoReturns(level1Info, level2Infos)
 
         val exception = exceptions.generateOne
-        val failingSend: CommitEvent => Try[SendingResult] = event =>
-          if (event.id == level2Info1.id) exception.raiseError[Try, SendingResult]
+        val failingSend: CommitEvent => Try[EventCreationResult] = event =>
+          if (event.id == level2Info1.id) exception.raiseError[Try, EventCreationResult]
           else Created.pure[Try]
-        source.transformEventsWith(failingSend) shouldBe exception.raiseError[Try, List[SendingResult]]
+        source.transformEventsWith(failingSend) shouldBe exception.raiseError[Try, List[EventCreationResult]]
       }
   }
 
   private case class SendExpectations[E <: CommitEvent](
       commitId:             CommitId,
-      sendingResult:        SendingResult
+      creationResult:       EventCreationResult
   )(implicit val eventType: ClassTag[E])
 
   private trait TestCase {
@@ -252,7 +252,7 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
     val fixedNow         = Instant.now
     private val clock    = Clock.fixed(fixedNow, ZoneId.systemDefault)
 
-    def send(returning: SendExpectations[_ <: CommitEvent]*): CommitEvent => Try[SendingResult] =
+    def send(returning: SendExpectations[_ <: CommitEvent]*): CommitEvent => Try[EventCreationResult] =
       event => {
         val sendExpectations = returning
           .find { case SendExpectations(id, _) => id == event.id }
@@ -260,7 +260,7 @@ class CommitEventsSourceBuilderSpec extends AnyWordSpec with MockFactory with sh
 
         event.getClass        shouldBe sendExpectations.eventType.runtimeClass
         event.batchDate.value shouldBe fixedNow
-        sendExpectations.sendingResult.pure[Try]
+        sendExpectations.creationResult.pure[Try]
       }
 
     val commitInfoFinder      = mock[CommitInfoFinder[Try]]

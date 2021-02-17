@@ -20,25 +20,25 @@ package io.renku.eventlog
 
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
-import ch.datascience.http.ErrorMessage.ErrorMessage
-import ch.datascience.http.InfoMessage.InfoMessage
-import ch.datascience.http.InfoMessage
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage.ErrorMessage
+import ch.datascience.http.InfoMessage.InfoMessage
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.metrics.LabeledGauge
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.creation.{EventCreationEndpoint, EventPersister}
+import io.renku.eventlog.eventdetails.EventDetailsEndpoint
+import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
 import io.renku.eventlog.statuschange.commands.{ToGenerationNonRecoverableFailure, ToGenerationRecoverableFailure, ToNew, ToSkipped, ToTransformationNonRecoverableFailure, ToTriplesGenerated, ToTriplesStore}
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
-import io.renku.eventlog.subscriptions.{SubscriptionCategoryRegistry, SubscriptionsEndpoint}
+import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
 import org.http4s.MediaType.application
 import org.http4s.Method.{GET, PATCH, POST}
 import org.http4s.Status._
@@ -84,6 +84,21 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
         response.body[ErrorMessage] shouldBe ErrorMessage("'latest-per-project' parameter with invalid value")
       }
 
+    "define a GET /events/:event-id/:project-:id endpoint" in new TestCase {
+      val eventId = compoundEventIds.generateOne
+
+      val request = Request[IO](
+        method = GET,
+        uri"events" / eventId.id.toString / eventId.projectId.toString
+      )
+
+      (eventDetailsEndpoint.getDetails _).expects(eventId).returning(Response[IO](Ok).pure[IO])
+
+      val response = routes.call(request)
+
+      response.status shouldBe Ok
+    }
+
     "define a PATCH /events endpoint" in new TestCase {
       val request = Request[IO](PATCH, uri"events")
 
@@ -96,8 +111,8 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
     "define a POST /events endpoint" in new TestCase {
       val request        = Request[IO](POST, uri"events")
-      val expectedStatus = Gen.oneOf(Created, Ok).generateOne
-      (eventCreationEndpoint.addEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
+      val expectedStatus = Gen.oneOf(Accepted, BadRequest, InternalServerError, TooManyRequests).generateOne
+      (eventEndpoint.processEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
 
       val response = routes.call(request)
 
@@ -169,7 +184,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
         response.body[ErrorMessage] shouldBe ErrorMessage("'project-id' parameter with invalid value")
       }
 
-    "define a POST /subscriptions endpoint" in new TestCase with TestCase2 {
+    "define a POST /subscriptions endpoint" in new TestCase {
       val request = Request[IO](POST, uri"subscriptions")
 
       (subscriptionsEndpoint.addSubscription _).expects(request).returning(Response[IO](Accepted).pure[IO])
@@ -182,37 +197,33 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
   private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
 
-  private trait TestCase2 {
-    self: TestCase =>
-  }
-
   private trait TestCase {
     val latestEventsEndpoint     = mock[TestLatestEventsEndpoint]
-    val eventCreationEndpoint    = mock[TestEventCreationEndpoint]
+    val eventEndpoint            = mock[EventEndpoint[IO]]
     val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]
     val eventsPatchingEndpoint   = mock[EventsPatchingEndpoint[IO]]
     val routesMetrics            = TestRoutesMetrics()
     val statusChangeEndpoint     = mock[TestStatusChangeEndpoint]
     val subscriptionsEndpoint    = mock[TestSubscriptionEndpoint]
+    val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
     val routes = new MicroserviceRoutes[IO](
-      eventCreationEndpoint,
+      eventEndpoint,
       latestEventsEndpoint,
       processingStatusEndpoint,
       eventsPatchingEndpoint,
       statusChangeEndpoint,
       subscriptionsEndpoint,
+      eventDetailsEndpoint,
       routesMetrics
     ).routes.map(_.or(notAvailableResponse))
   }
 
-  class TestEventCreationEndpoint(eventAdder: EventPersister[IO], logger: Logger[IO])
-      extends EventCreationEndpoint[IO](eventAdder, logger)
   class TestLatestEventsEndpoint(latestEventsFinder: LatestEventsFinder[IO], logger: Logger[IO])
       extends LatestEventsEndpoint[IO](latestEventsFinder, logger)
   class TestProcessingStatusEndpoint(processingStatusFinder: ProcessingStatusFinder[IO], logger: Logger[IO])
       extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
   class TestSubscriptionEndpoint(
-      subscriptionCategoryRegistry: SubscriptionCategoryRegistry[IO],
+      subscriptionCategoryRegistry: EventProducersRegistry[IO],
       logger:                       Logger[IO]
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
   class TestStatusChangeEndpoint(updateCommandsRunner:            StatusUpdatesRunner[IO],

@@ -27,24 +27,29 @@ import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFin
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.webhookservice.eventprocessing.commitevent._
+import ch.datascience.webhookservice.eventprocessing.startcommit.EventCreationResult.{Created, Existed, Failed}
 import ch.datascience.webhookservice.eventprocessing.{CommitEvent, StartCommit}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class CommitToEventLog[Interpretation[_]: Monad](
+trait CommitToEventLog[Interpretation[_]] {
+  def storeCommitsInEventLog(startCommit: StartCommit): Interpretation[Unit]
+}
+
+class CommitToEventLogImpl[Interpretation[_]: Monad](
     accessTokenFinder:     AccessTokenFinder[Interpretation],
     commitEventsSource:    CommitEventsSourceBuilder[Interpretation],
     commitEventSender:     CommitEventSender[Interpretation],
+    eventDetailsFinder:    EventDetailsFinder[Interpretation],
     logger:                Logger[Interpretation],
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
     clock:                 java.time.Clock = java.time.Clock.systemDefaultZone()
-)(implicit ME:             MonadError[Interpretation, Throwable]) {
+)(implicit ME:             MonadError[Interpretation, Throwable])
+    extends CommitToEventLog[Interpretation] {
 
-  import CommitEventSender.EventSendingResult._
   import IOAccessTokenFinder._
-  import SendingResult._
   import accessTokenFinder._
   import commitEventSender._
   import commitEventsSource._
@@ -60,25 +65,35 @@ class CommitToEventLog[Interpretation[_]: Monad](
       } yield sendingResults
     } flatMap logSummary(startCommit) recoverWith loggingError(startCommit)
 
-  private def sendEvent(startCommit: StartCommit)(commitEvent: CommitEvent): Interpretation[SendingResult] =
-    send(commitEvent)
-      .map {
-        case EventCreated => Created
-        case EventExisted => Existed
+  private def sendEvent(startCommit: StartCommit)(commitEvent: CommitEvent): Interpretation[EventCreationResult] =
+    eventDetailsFinder
+      .checkIfExists(commitEvent.id, commitEvent.project.id)
+      .flatMap {
+        case true => Existed.pure[Interpretation].widen[EventCreationResult]
+        case false =>
+          send(commitEvent)
+            .map(_ => Created)
+            .widen[EventCreationResult]
+            .recover { case NonFatal(exception) =>
+              logger.error(exception)(logMessageFor(startCommit, "storing in the event log failed", Some(commitEvent)))
+              Failed
+            }
       }
       .recover { case NonFatal(exception) =>
-        logger.error(exception)(logMessageFor(startCommit, "storing in the event log failed", Some(commitEvent)))
+        logger.error(exception)(logMessageFor(startCommit, "finding event in the event log failed", Some(commitEvent)))
         Failed
       }
 
-  private lazy val eventFindingException: PartialFunction[Throwable, Interpretation[List[SendingResult]]] = {
-    case NonFatal(exception) => EventFindingException(exception).raiseError[Interpretation, List[SendingResult]]
+  private lazy val eventFindingException: PartialFunction[Throwable, Interpretation[List[EventCreationResult]]] = {
+    case NonFatal(exception) => EventFindingException(exception).raiseError[Interpretation, List[EventCreationResult]]
   }
 
   private case class EventFindingException(cause: Throwable)
       extends RuntimeException("finding commit events failed", cause)
 
-  private def logSummary(startCommit: StartCommit): ((ElapsedTime, List[SendingResult])) => Interpretation[Unit] = {
+  private def logSummary(
+      startCommit: StartCommit
+  ): ((ElapsedTime, List[EventCreationResult])) => Interpretation[Unit] = {
     case (_, Nil) => ME.unit
     case (elapsedTime, sendingResults) =>
       val groupedByType = sendingResults groupBy identity
@@ -128,10 +143,12 @@ object IOCommitToEventLog {
       eventSender               <- IOCommitEventSender(logger)
       accessTokenFinder         <- IOAccessTokenFinder(logger)
       commitEventsSourceBuilder <- IOCommitEventsSourceBuilder(gitLabThrottler)
-    } yield new CommitToEventLog[IO](
+      eventDetailsFinder        <- EventDetailsFinder(logger)
+    } yield new CommitToEventLogImpl[IO](
       accessTokenFinder,
       commitEventsSourceBuilder,
       eventSender,
+      eventDetailsFinder,
       logger,
       executionTimeRecorder
     )

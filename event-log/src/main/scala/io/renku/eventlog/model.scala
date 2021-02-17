@@ -18,6 +18,7 @@
 
 package io.renku.eventlog
 
+import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes._
@@ -29,7 +30,7 @@ import java.time.Instant
 
 sealed trait Event extends CompoundId {
   def id:        EventId
-  def project:   EventProject
+  def project:   Project
   def date:      EventDate
   def batchDate: BatchDate
   def body:      EventBody
@@ -48,7 +49,7 @@ object Event {
 
   final case class NewEvent(
       id:        EventId,
-      project:   EventProject,
+      project:   Project,
       date:      EventDate,
       batchDate: BatchDate,
       body:      EventBody
@@ -61,7 +62,7 @@ object Event {
 
   final case class SkippedEvent(
       id:        EventId,
-      project:   EventProject,
+      project:   Project,
       date:      EventDate,
       batchDate: BatchDate,
       body:      EventBody,
@@ -73,8 +74,6 @@ object Event {
 
   }
 }
-
-final case class EventProject(id: projects.Id, path: projects.Path)
 
 final class EventDate private (val value: Instant) extends AnyVal with InstantTinyType
 object EventDate extends TinyTypeFactory[EventDate](new EventDate(_)) with BoundedInstant {

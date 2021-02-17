@@ -28,18 +28,18 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait SubscriptionsRegistry[Interpretation[_]] {
+trait EventConsumersRegistry[Interpretation[_]] {
   def handle(requestContent: EventRequestContent): Interpretation[EventSchedulingResult]
   def renewAllSubscriptions(): Interpretation[Unit]
   def run():                   Interpretation[Unit]
 }
 
-class SubscriptionsRegistryImpl[Interpretation[_]](eventHandlers:           List[EventHandler[Interpretation]],
-                                                   subscriptionsMechanisms: List[SubscriptionMechanism[Interpretation]]
+class EventConsumersRegistryImpl[Interpretation[_]](eventHandlers:           List[EventHandler[Interpretation]],
+                                                    subscriptionsMechanisms: List[SubscriptionMechanism[Interpretation]]
 )(implicit
     ME:       MonadError[Interpretation, Throwable],
     parallel: Parallel[Interpretation]
-) extends SubscriptionsRegistry[Interpretation] {
+) extends EventConsumersRegistry[Interpretation] {
   override def handle(requestContent: EventRequestContent): Interpretation[EventSchedulingResult] =
     tryNextHandler(requestContent, eventHandlers)
 
@@ -68,13 +68,12 @@ class SubscriptionsRegistryImpl[Interpretation[_]](eventHandlers:           List
     subscriptionsMechanisms.map(_.renewSubscription()).parSequence.void
 }
 
-object SubscriptionsRegistry {
+object EventConsumersRegistry {
   def apply(logger:     Logger[IO], subscriptionFactories: (EventHandler[IO], SubscriptionMechanism[IO])*)(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[SubscriptionsRegistry[IO]] =
-    IO(
-      new SubscriptionsRegistryImpl[IO](subscriptionFactories.toList.map(_._1), subscriptionFactories.toList.map(_._2))
-    )
+  ): IO[EventConsumersRegistry[IO]] = IO {
+    new EventConsumersRegistryImpl[IO](subscriptionFactories.toList.map(_._1), subscriptionFactories.toList.map(_._2))
+  }
 }

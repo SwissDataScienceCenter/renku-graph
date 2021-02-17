@@ -20,11 +20,12 @@ package io.renku.eventlog.latestevents
 
 import cats.effect.{Bracket, IO}
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.{EventBody, EventId}
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
 import io.renku.eventlog.latestevents.LatestEventsFinder.IdProjectBody
-import io.renku.eventlog.{EventLogDB, EventProject, TypeSerializers}
+import io.renku.eventlog.{EventLogDB, TypeSerializers}
 
 trait LatestEventsFinder[Interpretation[_]] {
   def findAllLatestEvents(): Interpretation[List[IdProjectBody]]
@@ -49,14 +50,14 @@ class LatestEventsFinderImpl(
           |FROM event evt
           |JOIN project prj ON evt.project_id = prj.project_id AND evt.event_date = prj.latest_event_date
           |""".stripMargin
-      .query[(EventId, EventProject, EventBody)]
+      .query[(EventId, Project, EventBody)]
       .to[List],
     name = "latest projects events"
   )
 }
 
 object LatestEventsFinder {
-  type IdProjectBody = (EventId, EventProject, EventBody)
+  type IdProjectBody = (EventId, Project, EventBody)
 }
 
 object IOLatestEventsFinder {

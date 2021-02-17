@@ -131,4 +131,12 @@ object SubscriptionMechanism {
                                         initialDelay,
                                         RenewDelay
   )
+
+  def noOpSubscriptionMechanism(category: CategoryName): SubscriptionMechanism[IO] = new SubscriptionMechanism[IO] {
+    override lazy val categoryName: CategoryName = category
+
+    override def renewSubscription(): IO[Unit] = IO.unit
+
+    override def run(): IO[Unit] = IO.unit
+  }
 }

@@ -16,10 +16,7 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.creation
-
-import java.time.Instant
-import java.time.temporal.ChronoUnit.HOURS
+package io.renku.eventlog.events.categories.creation
 
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
@@ -34,10 +31,13 @@ import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
-import io.renku.eventlog.creation.EventPersister.Result._
+import io.renku.eventlog.events.categories.creation.EventPersister.Result._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import java.time.Instant
+import java.time.temporal.ChronoUnit.HOURS
 
 class EventPersisterSpec
     extends AnyWordSpec

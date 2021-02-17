@@ -22,15 +22,9 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.data.EitherT.right
 import cats.effect.{Effect, Timer}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, SubscriptionsRegistry}
-import ch.datascience.graph.model.RenkuVersionPair
+import ch.datascience.events.consumers.{EventConsumersRegistry, EventRequestContent, EventSchedulingResult}
 import ch.datascience.http.ErrorMessage
-import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
-import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -45,9 +39,9 @@ trait EventEndpoint[Interpretation[_]] {
 }
 
 class EventEndpointImpl[Interpretation[_]: Effect](
-    handlersRegistry:     SubscriptionsRegistry[Interpretation],
-    reProvisioningStatus: ReProvisioningStatus[Interpretation]
-)(implicit ME:            MonadError[Interpretation, Throwable])
+    eventConsumersRegistry: EventConsumersRegistry[Interpretation],
+    reProvisioningStatus:   ReProvisioningStatus[Interpretation]
+)(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation]
     with EventEndpoint[Interpretation] {
 
@@ -65,7 +59,7 @@ class EventEndpointImpl[Interpretation[_]: Effect](
           eventJson    <- toEvent(multipart)
           maybePayload <- getPayload(multipart)
           result <- right[Response[Interpretation]](
-                      handlersRegistry.handle(EventRequestContent(eventJson, maybePayload)) >>= toHttpResult
+                      eventConsumersRegistry.handle(EventRequestContent(eventJson, maybePayload)) >>= toHttpResult
                     )
         } yield result
       }.merge recoverWith { case NonFatal(error) =>
@@ -121,17 +115,12 @@ object IOEventEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply(
-      currentVersionPair:    RenkuVersionPair,
-      metricsRegistry:       MetricsRegistry[IO],
-      gitLabThrottler:       Throttler[IO, GitLab],
-      timeRecorder:          SparqlQueryTimeRecorder[IO],
-      subscriptionsRegistry: SubscriptionsRegistry[IO],
-      reProvisioningStatus:  ReProvisioningStatus[IO],
-      logger:                Logger[IO]
+      eventConsumersRegistry: EventConsumersRegistry[IO],
+      reProvisioningStatus:   ReProvisioningStatus[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
-  ): IO[EventEndpoint[IO]] = IO(new EventEndpointImpl[IO](subscriptionsRegistry, reProvisioningStatus))
+  ): IO[EventEndpoint[IO]] = IO(new EventEndpointImpl[IO](eventConsumersRegistry, reProvisioningStatus))
 
 }

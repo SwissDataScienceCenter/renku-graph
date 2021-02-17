@@ -41,10 +41,10 @@ private class SubscriptionUrlFinderImpl[Interpretation[_]](microservicePort: Int
 
   override def findSubscriberUrl(): Interpretation[SubscriberUrl] =
     findAddress flatMap {
+      case Some(address) =>
+        SubscriberUrl(s"http://${address.getHostAddress}:$microservicePort/events").pure[Interpretation]
       case None =>
         new Exception("Cannot find service IP").raiseError[Interpretation, SubscriberUrl]
-      case Some(address) =>
-        SubscriberUrl(s"http://${address.getHostAddress}:${microservicePort}/events").pure[Interpretation]
     }
 
   private def findAddress = ME.catchNonFatal {

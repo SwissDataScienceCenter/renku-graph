@@ -18,13 +18,12 @@
 
 package io.renku.eventlog
 
+import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import org.scalacheck.Gen
 
-import java.time.Duration
 import scala.language.postfixOps
 
 object EventContentGenerators {
@@ -37,7 +36,7 @@ object EventContentGenerators {
 
   lazy val newEvents: Gen[NewEvent] = for {
     eventId   <- eventIds
-    project   <- eventProjects
+    project   <- projects
     date      <- eventDates
     batchDate <- batchDates
     body      <- eventBodies
@@ -45,20 +44,14 @@ object EventContentGenerators {
 
   lazy val skippedEvents: Gen[SkippedEvent] = for {
     eventId   <- eventIds
-    project   <- eventProjects
+    project   <- projects
     date      <- eventDates
     batchDate <- batchDates
     body      <- eventBodies
     message   <- eventMessages
   } yield SkippedEvent(eventId, project, date, batchDate, body, message)
 
-  implicit lazy val events: Gen[Event] =
-    Gen.oneOf(newEvents, skippedEvents)
-
-  implicit lazy val eventProjects: Gen[EventProject] = for {
-    id   <- projectIds
-    path <- projectPaths
-  } yield EventProject(id, path)
+  implicit lazy val newOrSkippedEvents: Gen[Event] = Gen.oneOf(newEvents, skippedEvents)
 
   implicit val eventPayloads: Gen[EventPayload] = for {
     content <- jsons

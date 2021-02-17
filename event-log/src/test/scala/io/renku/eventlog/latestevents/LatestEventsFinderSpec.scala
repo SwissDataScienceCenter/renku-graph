@@ -18,18 +18,19 @@
 
 package io.renku.eventlog.latestevents
 
-import java.time.Instant.now
-import java.time.temporal.ChronoUnit._
-
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
+import ch.datascience.events.consumers.ConsumersModelGenerators._
 import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+
+import java.time.Instant.now
+import java.time.temporal.ChronoUnit._
 
 class LatestEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
 
@@ -41,7 +42,7 @@ class LatestEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
     "return (projectId, eventBody) tuples with the youngest eventId (event_date wise) " +
       "for all the projects in the db" in new TestCase {
-        val project1 = eventProjects.generateOne
+        val project1 = projects.generateOne
         storeEvent(
           compoundEventIds.generateOne.copy(projectId = project1.id),
           eventStatuses.generateOne,
@@ -62,7 +63,7 @@ class LatestEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           projectPath = project1.path
         )
 
-        val project2          = eventProjects.generateOne
+        val project2          = projects.generateOne
         val eventIdProject2   = compoundEventIds.generateOne.copy(projectId = project2.id)
         val eventBodyProject2 = eventBodies.generateOne
         storeEvent(

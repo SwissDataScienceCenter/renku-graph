@@ -22,11 +22,11 @@ import cats.MonadError
 import cats.data.NonEmptyList
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent.{CommitEventWithParent, CommitEventWithoutParent}
-import ch.datascience.triplesgenerator.events.categories.models.Project
 import io.circe.parser._
 import io.circe.{Decoder, DecodingFailure, Error, HCursor, ParsingFailure}
 

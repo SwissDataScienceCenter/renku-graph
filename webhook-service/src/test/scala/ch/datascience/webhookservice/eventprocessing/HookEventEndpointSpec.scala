@@ -32,7 +32,7 @@ import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.crypto.IOHookTokenCrypto
-import ch.datascience.webhookservice.eventprocessing.startcommit.IOCommitToEventLog
+import ch.datascience.webhookservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
 import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.model.HookToken
 import io.circe.Json
@@ -184,7 +184,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
         )
     }.generateOne
 
-    val commitToEventLog = mock[IOCommitToEventLog]
+    val commitToEventLog = mock[CommitToEventLog[IO]]
     val hookTokenCrypto  = mock[IOHookTokenCrypto]
     val processPushEvent = new HookEventEndpointImpl[IO](
       hookTokenCrypto,

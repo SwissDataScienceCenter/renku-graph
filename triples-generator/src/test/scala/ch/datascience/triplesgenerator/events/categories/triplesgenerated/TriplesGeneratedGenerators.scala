@@ -18,11 +18,11 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
+import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectSchemaVersions
-import ch.datascience.triplesgenerator.events.categories.Generators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import org.scalacheck.Gen
 
