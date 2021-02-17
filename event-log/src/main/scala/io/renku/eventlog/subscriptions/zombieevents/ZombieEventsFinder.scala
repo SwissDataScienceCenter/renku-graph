@@ -144,7 +144,7 @@ private class ZombieEventsFinderImpl(transactor:             DbTransactor[IO, Ev
 private object ZombieEventsFinder {
 
   private val MaxProcessingTimeRatio: Int Refined Positive = 2
-  private val MaxProcessingTime:      EventProcessingTime  = EventProcessingTime(Duration ofHours 1)
+  private val MaxProcessingTime:      EventProcessingTime  = EventProcessingTime(Duration ofDays 7)
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],

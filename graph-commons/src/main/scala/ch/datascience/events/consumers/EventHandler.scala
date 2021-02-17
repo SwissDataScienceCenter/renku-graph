@@ -83,6 +83,14 @@ trait EventHandler[Interpretation[_]] {
           logger.error(exception)(s"$categoryName: ${toString(eventInfo)} -> $SchedulingError")
         case _ => ME.unit
       }
+
+    def logInfo[EventInfo](eventInfo: EventInfo, message: String)(implicit
+        toString:                     EventInfo => String
+    ): Interpretation[Unit] = logger.info(s"$categoryName: ${toString(eventInfo)} -> $message")
+
+    def logError[EventInfo](eventInfo: EventInfo, exception: Throwable)(implicit
+        toString:                      EventInfo => String
+    ): Interpretation[Unit] = logger.error(exception)(s"$categoryName: ${toString(eventInfo)} -> Failure")
   }
 
   protected implicit class EitherTOps[T](

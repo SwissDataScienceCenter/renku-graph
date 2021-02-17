@@ -32,10 +32,13 @@ import scala.concurrent.ExecutionContext
 
 object SubscriptionFactory {
 
-  def apply(transactor:         DbTransactor[IO, EventLogDB],
-            waitingEventsGauge: LabeledGauge[IO, projects.Path],
-            queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name],
-            logger:             Logger[IO]
+  def apply(transactor:                         DbTransactor[IO, EventLogDB],
+            awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
+            underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
+            awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
+            underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path],
+            queriesExecTimes:                   LabeledHistogram[IO, SqlQuery.Name],
+            logger:                             Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
@@ -43,6 +46,14 @@ object SubscriptionFactory {
   ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
     subscriptionMechanism <-
       SubscriptionMechanism(categoryName, categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort), logger)
-    handler <- EventHandler(transactor, waitingEventsGauge, queriesExecTimes, logger)
+    handler <- EventHandler(
+                 transactor,
+                 queriesExecTimes,
+                 awaitingTriplesGenerationGauge,
+                 underTriplesGenerationGauge,
+                 awaitingTriplesTransformationGauge,
+                 underTriplesTransformationGauge,
+                 logger
+               )
   } yield handler -> subscriptionMechanism
 }

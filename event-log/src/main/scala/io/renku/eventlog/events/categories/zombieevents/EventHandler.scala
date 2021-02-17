@@ -18,16 +18,16 @@
 
 package io.renku.eventlog.events.categories.zombieevents
 
-import cats.MonadError
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
+import cats.{Applicative, MonadError}
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
-import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
@@ -35,11 +35,16 @@ import io.circe.{Decoder, DecodingFailure}
 import io.renku.eventlog._
 
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
 private class EventHandler[Interpretation[_]](
-    override val categoryName: CategoryName,
-    statusUpdater:             EventStatusUpdater[Interpretation],
-    logger:                    Logger[Interpretation]
+    override val categoryName:          CategoryName,
+    statusUpdater:                      EventStatusUpdater[Interpretation],
+    awaitingTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
+    underTriplesGenerationGauge:        LabeledGauge[Interpretation, projects.Path],
+    awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+    underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
+    logger:                             Logger[Interpretation]
 )(implicit
     ME:           MonadError[Interpretation, Throwable],
     contextShift: ContextShift[Interpretation],
@@ -48,7 +53,6 @@ private class EventHandler[Interpretation[_]](
 
   import ch.datascience.graph.model.projects
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  import statusUpdater._
 
   override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
     for {
@@ -56,6 +60,7 @@ private class EventHandler[Interpretation[_]](
       event <- fromEither[Interpretation](
                  request.event.as[ZombieEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
                )
+
       result <- (contextShift.shift *> concurrent
                   .start(changeStatus(event))).toRightT
                   .map(_ => Accepted)
@@ -64,31 +69,71 @@ private class EventHandler[Interpretation[_]](
     } yield result
   }.merge
 
+  private def changeStatus(event: ZombieEvent): Interpretation[Unit] = {
+    for {
+      result <- statusUpdater.changeStatus(event)
+      _      <- Applicative[Interpretation].whenA(result == Updated)(updateGauges(event))
+      _      <- logger.logInfo(event, result.toString)
+    } yield ()
+  } recoverWith { case NonFatal(exception) => logger.logError(event, exception) }
+
+  private lazy val updateGauges: ZombieEvent => Interpretation[Unit] = {
+    case GeneratingTriplesZombieEvent(_, projectPath) =>
+      for {
+        _ <- awaitingTriplesGenerationGauge.increment(projectPath)
+        _ <- underTriplesGenerationGauge.decrement(projectPath)
+      } yield ()
+    case TransformingTriplesZombieEvent(_, projectPath) =>
+      for {
+        _ <- awaitingTriplesTransformationGauge.increment(projectPath)
+        _ <- underTriplesTransformationGauge.decrement(projectPath)
+      } yield ()
+  }
+
   private implicit lazy val eventInfoToString: ZombieEvent => String = { event =>
-    s"${event.eventId}, status = ${event.status}"
+    s"${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
   }
 
   private implicit val eventDecoder: Decoder[ZombieEvent] = { cursor =>
     for {
-      id        <- cursor.downField("id").as[EventId]
-      projectId <- cursor.downField("project").downField("id").as[projects.Id]
-      status    <- cursor.downField("status").as[EventStatus]
-      _ <- if (status == GeneratingTriples || status == TransformingTriples) ().asRight[DecodingFailure]
-           else DecodingFailure(s"$status is an illegal status for ZombieEvent", Nil).asLeft[Unit]
-    } yield ZombieEvent(CompoundEventId(id, projectId), status)
+      id          <- cursor.downField("id").as[EventId]
+      projectId   <- cursor.downField("project").downField("id").as[projects.Id]
+      projectPath <- cursor.downField("project").downField("path").as[projects.Path]
+      status      <- cursor.downField("status").as[EventStatus]
+      zombieEvent <- status match {
+                       case GeneratingTriples =>
+                         GeneratingTriplesZombieEvent(CompoundEventId(id, projectId), projectPath)
+                           .asRight[DecodingFailure]
+                       case TransformingTriples =>
+                         TransformingTriplesZombieEvent(CompoundEventId(id, projectId), projectPath)
+                           .asRight[DecodingFailure]
+                       case _ =>
+                         DecodingFailure(s"$status is an illegal status for ZombieEvent", Nil).asLeft[ZombieEvent]
+                     }
+    } yield zombieEvent
   }
 }
 
 private object EventHandler {
-  def apply(transactor:         DbTransactor[IO, EventLogDB],
-            waitingEventsGauge: LabeledGauge[IO, projects.Path],
-            queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name],
-            logger:             Logger[IO]
+  def apply(transactor:                         DbTransactor[IO, EventLogDB],
+            queriesExecTimes:                   LabeledHistogram[IO, SqlQuery.Name],
+            awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
+            underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
+            awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
+            underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path],
+            logger:                             Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    statusUpdater <- EventStatusUpdater(transactor, waitingEventsGauge, queriesExecTimes)
-  } yield new EventHandler[IO](categoryName, statusUpdater, logger)
+    statusUpdater <- EventStatusUpdater(transactor, queriesExecTimes)
+  } yield new EventHandler[IO](categoryName,
+                               statusUpdater,
+                               awaitingTriplesGenerationGauge,
+                               underTriplesGenerationGauge,
+                               awaitingTriplesTransformationGauge,
+                               underTriplesTransformationGauge,
+                               logger
+  )
 }

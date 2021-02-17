@@ -18,19 +18,17 @@
 
 package io.renku.eventlog.events.categories.zombieevents
 
-import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, _}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples}
+import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
+import ch.datascience.metrics.TestLabeledHistogram
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec, TypeSerializers}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -46,73 +44,82 @@ class EventStatusUpdaterSpec
 
   "changeStatus" should {
 
-    List(GeneratingTriples, TransformingTriples).foreach { processingStatus =>
-      s"update event status to $New " +
-        s"if event has status $processingStatus and so the event in the DB" in new TestCase {
-          val eventId = compoundEventIds.generateOne
-          addEvent(eventId, processingStatus)
+    s"update event status to $New " +
+      s"if event has status $GeneratingTriples and so the event in the DB" in new TestCase {
 
-          findEventStatus(eventId) shouldBe processingStatus
+        addEvent(GeneratingTriples)
 
-          // verification of the relevant gauges needs to be checked
-          (waitingEventsGauge.decrement _).expects(projectPaths.generateOne).returning(IO.unit)
-          queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
+        findEventStatus(eventId) shouldBe (GeneratingTriples, executionDate)
 
-          updater.changeStatus(ZombieEvent(eventId, processingStatus)).unsafeRunSync() shouldBe ()
+        updater.changeStatus(GeneratingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
 
-          findEventStatus(eventId) shouldBe New
-        }
-    }
+        queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
 
-    EventStatus.all.filterNot(status => status == GeneratingTriples || status == TransformingTriples).foreach {
-      processingStatus =>
-        s"do nothing if event has status $processingStatus" in new TestCase {
+        findEventStatus(eventId) shouldBe (New, ExecutionDate(now))
 
-          val eventId = compoundEventIds.generateOne
-          addEvent(eventId, processingStatus)
+      }
 
-          findEventStatus(eventId) shouldBe processingStatus
-          queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
+    s"update event status to $TriplesGenerated " +
+      s"if event has status $TransformingTriples and so the event in the DB" in new TestCase {
+        addEvent(TransformingTriples)
 
-          updater.changeStatus(ZombieEvent(eventId, processingStatus)).unsafeRunSync() shouldBe ()
+        findEventStatus(eventId) shouldBe (TransformingTriples, executionDate)
 
-          findEventStatus(eventId) shouldBe processingStatus
-        }
-    }
+        updater.changeStatus(TransformingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
 
-    "do nothing if the event does not exists " in new TestCase {
-      val eventId          = compoundEventIds.generateOne
-      val processingStatus = eventStatuses.generateOne
+        queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
+
+        findEventStatus(eventId) shouldBe (TriplesGenerated, ExecutionDate(now))
+      }
+
+    "do nothing if the event does not exists" in new TestCase {
+
+      val otherEventId = compoundEventIds.generateOne
+
+      addEvent(GeneratingTriples)
+
+      findEventStatus(eventId) shouldBe (GeneratingTriples, executionDate)
+
+      updater
+        .changeStatus(GeneratingTriplesZombieEvent(otherEventId, projectPath))
+        .unsafeRunSync() shouldBe NotUpdated
 
       queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
 
-      updater.changeStatus(ZombieEvent(eventId, processingStatus)).unsafeRunSync() shouldBe ()
-
-      findEventStatus(eventId) shouldBe processingStatus
+      findEventStatus(eventId) shouldBe (GeneratingTriples, executionDate)
     }
 
   }
 
   private trait TestCase {
-    val currentTime        = mockFunction[Instant]
-    val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
-    val queriesExecTimes   = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val updater            = new EventStatusUpdaterImpl(transactor, waitingEventsGauge, queriesExecTimes, currentTime)
+    val currentTime      = mockFunction[Instant]
+    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val updater          = new EventStatusUpdaterImpl(transactor, queriesExecTimes, currentTime)
+
+    val eventId       = compoundEventIds.generateOne
+    val projectPath   = projectPaths.generateOne
+    val executionDate = executionDates.generateOne
 
     val now = Instant.now()
     currentTime.expects().returning(now)
 
+    def addEvent(status: EventStatus): Unit =
+      storeEvent(eventId,
+                 status,
+                 executionDate,
+                 eventDates.generateOne,
+                 eventBodies.generateOne,
+                 projectPath = projectPath
+      )
+
   }
 
-  private def addEvent(eventId: CompoundEventId, status: EventStatus): Unit =
-    storeEvent(eventId, status, executionDates.generateOne, eventDates.generateOne, eventBodies.generateOne)
-
-  def findEventStatus(compoundEventId: CompoundEventId): EventStatus = execute {
-    sql"""|SELECT status
+  def findEventStatus(compoundEventId: CompoundEventId): (EventStatus, ExecutionDate) = execute {
+    sql"""|SELECT status, execution_date
           |FROM event  
           |WHERE event_id = ${compoundEventId.id} AND project_id = ${compoundEventId.projectId}
           |""".stripMargin
-      .query[EventStatus]
+      .query[(EventStatus, ExecutionDate)]
       .unique
   }
 

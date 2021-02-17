@@ -137,6 +137,26 @@ In the case of a *SKIPPED* event. Note that a non-blank `message` is required.
 }
 ```
 
+- **ZOMBIE_CHASING**
+
+Changes the status of a zombie event
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "ZOMBIE_CHASING",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12,
+    "path": "namespace/project-name"
+  },
+  "status": "GENERATING_TRIPLES|TRANSFORMING_TRIPLES"
+}
+```
+
 **Response**
 
 | Status                     | Description                                                                          |
@@ -443,10 +463,11 @@ All events are sent as multipart requests
 
 ```json
 {
-  "categoryName": "MEMBER_SYNC",
+  "categoryName": "ZOMBIE_CHASING",
   "id": "df654c3b1bd105a29d658f78f6380a842feac879",
   "project": {
-    "id": 12
+    "id": 12,
+    "path": "namespace/project-name"
   },
   "status": "GENERATING_TRIPLES|TRANSFORMING_TRIPLES"
 }

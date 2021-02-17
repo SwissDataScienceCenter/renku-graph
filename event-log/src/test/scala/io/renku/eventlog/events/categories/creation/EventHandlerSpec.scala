@@ -27,8 +27,10 @@ import ch.datascience.events.consumers.{EventRequestContent, Project}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level._
+import ch.datascience.metrics.LabeledGauge
 import io.circe.literal.JsonStringContext
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -121,7 +123,8 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     val logger         = TestLogger[IO]()
     val eventPersister = mock[EventPersister[IO]]
-    val handler        = new EventHandler[IO](categoryName, eventPersister, logger)
+
+    val handler = new EventHandler[IO](categoryName, eventPersister, logger)
 
   }
   private def toJson(event: Event): Json =
