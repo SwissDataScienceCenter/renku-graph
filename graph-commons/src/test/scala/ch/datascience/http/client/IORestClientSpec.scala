@@ -250,7 +250,7 @@ class IORestClientSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
 
       stubFor {
         get("/resource")
-          .willReturn(ok("1").withFixedDelay((requestTimeout.toMillis + 200).toInt))
+          .willReturn(ok("1").withFixedDelay((requestTimeout.toMillis + 500).toInt))
       }
 
       val exception = intercept[ConnectivityException] {
