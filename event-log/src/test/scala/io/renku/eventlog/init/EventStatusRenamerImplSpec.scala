@@ -37,7 +37,7 @@ class EventStatusRenamerImplSpec
     with DbInitSpec
     with should.Matchers
     with EventLogDataProvisioning
-    with EventLogDataFetching {
+    with EventDataFetching {
   protected override lazy val migrationsToRun: List[Migration] = List(
     eventLogTableCreator,
     projectPathAdder,

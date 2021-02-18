@@ -18,17 +18,17 @@
 
 package io.renku.eventlog.events.categories.zombieevents
 
+import cats.syntax.all._
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, _}
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples, TriplesGenerated}
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.metrics.TestLabeledHistogram
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec, TypeSerializers}
+import io.renku.eventlog._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -49,27 +49,26 @@ class EventStatusUpdaterSpec
 
         addEvent(GeneratingTriples)
 
-        findEventStatus(eventId) shouldBe (GeneratingTriples, executionDate)
+        findEvent(eventId) shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
 
         updater.changeStatus(GeneratingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
 
         queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
 
-        findEventStatus(eventId) shouldBe (New, ExecutionDate(now))
-
+        findEvent(eventId) shouldBe (ExecutionDate(now), New, None).some
       }
 
     s"update event status to $TriplesGenerated " +
       s"if event has status $TransformingTriples and so the event in the DB" in new TestCase {
         addEvent(TransformingTriples)
 
-        findEventStatus(eventId) shouldBe (TransformingTriples, executionDate)
+        findEvent(eventId) shouldBe (executionDate, TransformingTriples, Some(zombieMessage)).some
 
         updater.changeStatus(TransformingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
 
         queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
 
-        findEventStatus(eventId) shouldBe (TriplesGenerated, ExecutionDate(now))
+        findEvent(eventId) shouldBe (ExecutionDate(now), TriplesGenerated, None).some
       }
 
     "do nothing if the event does not exists" in new TestCase {
@@ -78,7 +77,7 @@ class EventStatusUpdaterSpec
 
       addEvent(GeneratingTriples)
 
-      findEventStatus(eventId) shouldBe (GeneratingTriples, executionDate)
+      findEvent(eventId) shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
 
       updater
         .changeStatus(GeneratingTriplesZombieEvent(otherEventId, projectPath))
@@ -86,9 +85,8 @@ class EventStatusUpdaterSpec
 
       queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
 
-      findEventStatus(eventId) shouldBe (GeneratingTriples, executionDate)
+      findEvent(eventId) shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
     }
-
   }
 
   private trait TestCase {
@@ -99,6 +97,7 @@ class EventStatusUpdaterSpec
     val eventId       = compoundEventIds.generateOne
     val projectPath   = projectPaths.generateOne
     val executionDate = executionDates.generateOne
+    val zombieMessage = EventMessage("Zombie Event")
 
     val now = Instant.now()
     currentTime.expects().returning(now)
@@ -109,18 +108,8 @@ class EventStatusUpdaterSpec
                  executionDate,
                  eventDates.generateOne,
                  eventBodies.generateOne,
-                 projectPath = projectPath
+                 projectPath = projectPath,
+                 maybeMessage = Some(zombieMessage)
       )
-
   }
-
-  def findEventStatus(compoundEventId: CompoundEventId): (EventStatus, ExecutionDate) = execute {
-    sql"""|SELECT status, execution_date
-          |FROM event  
-          |WHERE event_id = ${compoundEventId.id} AND project_id = ${compoundEventId.projectId}
-          |""".stripMargin
-      .query[(EventStatus, ExecutionDate)]
-      .unique
-  }
-
 }

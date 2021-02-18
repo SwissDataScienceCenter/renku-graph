@@ -23,7 +23,7 @@ import ch.datascience.graph.model.projects
 import doobie.implicits._
 import doobie.util.fragment.Fragment
 
-trait EventLogDataFetching {
+trait EventDataFetching {
   self: InMemoryEventLogDb =>
 
   // format: off
