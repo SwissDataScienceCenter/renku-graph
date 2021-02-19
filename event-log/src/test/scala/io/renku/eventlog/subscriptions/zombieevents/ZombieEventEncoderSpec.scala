@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import io.circe.literal._
 import io.renku.eventlog.subscriptions.EventEncoder
 import org.scalatest.matchers.should
@@ -30,13 +31,14 @@ class ZombieEventEncoderSpec extends AnyWordSpec with should.Matchers {
   "encodeEvent" should {
 
     "serialize ZombieEvent to Json" in {
-      val event = ZombieEvent(compoundEventIds.generateOne, eventStatuses.generateOne)
+      val event = ZombieEvent(compoundEventIds.generateOne, projectPaths.generateOne, eventStatuses.generateOne)
 
       encoder.encodeEvent(event) shouldBe json"""{
         "categoryName": "ZOMBIE_CHASING",
         "id":           ${event.eventId.id.value},
         "project": {
-          "id":         ${event.eventId.projectId.value}
+          "id":         ${event.eventId.projectId.value},
+          "path":       ${event.projectPath.value}
         },
         "status":       ${event.status.value}
       }"""
@@ -47,7 +49,7 @@ class ZombieEventEncoderSpec extends AnyWordSpec with should.Matchers {
 
     "return None" in {
       encoder.encodePayload(
-        ZombieEvent(compoundEventIds.generateOne, eventStatuses.generateOne)
+        ZombieEvent(compoundEventIds.generateOne, projectPaths.generateOne, eventStatuses.generateOne)
       ) shouldBe None
     }
   }
