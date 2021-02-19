@@ -105,15 +105,16 @@ private class ZombieEventsFinderImpl(transactor:             DbTransactor[IO, Ev
   private def queryZombieEvent(projectId: projects.Id, status: EventStatus, processingTime: EventProcessingTime) =
     measureExecutionTime {
       SqlQuery(
-        sql"""|SELECT evt.event_id, evt.project_id, evt.status
+        sql"""|SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
               |FROM event evt
-              |WHERE project_id = $projectId 
-              |  AND status = $status
-              |  AND (message IS NULL OR message <> $zombieMessage)
+              |JOIN project proj ON evt.project_id = proj.project_id
+              |WHERE evt.project_id = $projectId 
+              |  AND evt.status = $status
+              |  AND (evt.message IS NULL OR evt.message <> $zombieMessage)
               |  AND ((${now()} - evt.execution_date) > ${processingTime * maxProcessingTimeRatio})
               |LIMIT 1
-    """.stripMargin
-          .query[(CompoundEventId, EventStatus)]
+              |""".stripMargin
+          .query[(CompoundEventId, projects.Path, EventStatus)]
           .map(ZombieEvent.tupled.apply _)
           .option,
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find")

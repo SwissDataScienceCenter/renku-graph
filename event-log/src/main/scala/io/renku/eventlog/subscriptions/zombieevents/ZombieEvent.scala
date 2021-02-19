@@ -19,10 +19,11 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
+import ch.datascience.graph.model.projects
 import io.renku.eventlog.subscriptions.EventEncoder
 
-private case class ZombieEvent(eventId: CompoundEventId, status: EventStatus) {
-  override lazy val toString: String = s"$ZombieEvent $eventId, status = $status"
+private case class ZombieEvent(eventId: CompoundEventId, projectPath: projects.Path, status: EventStatus) {
+  override lazy val toString: String = s"$ZombieEvent $eventId, projectPath = $projectPath, status = $status"
 }
 
 private object ZombieEventEncoder extends EventEncoder[ZombieEvent] {
@@ -34,7 +35,8 @@ private object ZombieEventEncoder extends EventEncoder[ZombieEvent] {
     "categoryName": ${categoryName.value},
     "id":           ${event.eventId.id.value},
     "project": {
-      "id":         ${event.eventId.projectId.value}
+      "id":         ${event.eventId.projectId.value},
+      "path":       ${event.projectPath.value}
     },
     "status":       ${event.status.value}
   }"""

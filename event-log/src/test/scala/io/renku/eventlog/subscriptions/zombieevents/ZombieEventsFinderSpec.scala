@@ -21,8 +21,8 @@ package io.renku.eventlog.subscriptions.zombieevents
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{eventProcessingTimes, _}
-import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -30,7 +30,7 @@ import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
-import io.renku.eventlog.EventContentGenerators.{executionDates, _}
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
@@ -64,7 +64,7 @@ class ZombieEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           ).generateAs(ExecutionDate)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, GeneratingTriples))
+        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, GeneratingTriples))
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
@@ -89,7 +89,7 @@ class ZombieEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           ).generateAs(ExecutionDate)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, TransformingTriples))
+        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, TransformingTriples))
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
@@ -134,7 +134,7 @@ class ZombieEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           ).generateAs(ExecutionDate)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, GeneratingTriples))
+        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, GeneratingTriples))
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
@@ -179,38 +179,40 @@ class ZombieEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           ).generateAs(ExecutionDate)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, TransformingTriples))
+        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, TransformingTriples))
         finder.popEvent().unsafeRunSync() shouldBe None
       }
   }
 
   private trait TestCase {
 
+    val projectPath = projectPaths.generateOne
+
     val maxProcessingTime = javaDurations(min = Duration.ofHours(1)).generateAs(EventProcessingTime)
     val maxProcessingTimeRatio: Int Refined Positive = 2
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
 
     val finder = new ZombieEventsFinderImpl(transactor, maxProcessingTime, maxProcessingTimeRatio, queriesExecTimes)
-  }
 
-  private def addEvent(eventId: CompoundEventId, status: EventStatus, executionDate: ExecutionDate): Unit =
-    storeEvent(
+    def addEvent(eventId: CompoundEventId, status: EventStatus, executionDate: ExecutionDate): Unit = storeEvent(
       eventId,
       status,
       executionDate,
       eventDates.generateOne,
-      eventBodies.generateOne
+      eventBodies.generateOne,
+      projectPath = projectPath
     )
 
-  private def addEvent(projectId:            projects.Id,
-                       executionDate:        ExecutionDate,
-                       currentEventStatus:   EventStatus,
-                       processingTime:       EventProcessingTime,
-                       processingTimeStatus: EventStatus
-  ): (ExecutionDate, EventProcessingTime) = {
-    val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
-    addEvent(eventId, currentEventStatus, executionDate)
-    upsertProcessingTime(eventId, processingTimeStatus, processingTime)
-    executionDate -> processingTime
+    def addEvent(projectId:            projects.Id,
+                 executionDate:        ExecutionDate,
+                 currentEventStatus:   EventStatus,
+                 processingTime:       EventProcessingTime,
+                 processingTimeStatus: EventStatus
+    ): (ExecutionDate, EventProcessingTime) = {
+      val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
+      addEvent(eventId, currentEventStatus, executionDate)
+      upsertProcessingTime(eventId, processingTimeStatus, processingTime)
+      executionDate -> processingTime
+    }
   }
 }
