@@ -59,4 +59,9 @@ private object PersonDetailsGenerators {
   )
 
   implicit val persons: Gen[Person] = persons()(renkuBaseUrls.generateOne, gitLabUrls.generateOne.apiV4)
+
+  implicit lazy val commitPersons: Gen[CommitPerson] = for {
+    userName  <- userNames
+    userEmail <- userEmails
+  } yield CommitPerson(userName, userEmail)
 }

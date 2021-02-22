@@ -1,5 +1,6 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
+import cats.data.NonEmptyList
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -8,7 +9,7 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.{userEmails, userNames, userResourceIds, _}
 import ch.datascience.graph.model.events.EventId
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
+import PersonDetailsGenerators.commitPersons
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -20,15 +21,33 @@ import scala.util.{Failure, Success, Try}
 private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with MockFactory {
   "getTriplesAndTrimmedPersons" should {
 
-    "return person with one name" +
-      "case when the person has one email and multiple names" in new TestCase {
+    "return person with one name " +
+      "case when the person has one name and one email" in new TestCase {
+
+        val email        = userEmails.generateOne
+        val expectedName = userNames.generateOne
+        val personData   = PersonRawData(userResourceIds.generateOne, List(expectedName), List(email))
+
+        (personExtractor.extractPersons _)
+          .expects(triples)
+          .returning((expectedTriples, Set(personData)))
+
+        val expectedPerson = Person(personData.id, None, expectedName, email.some)
+
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectPath, eventId) shouldBe Success(
+          expectedTriples -> Set(expectedPerson)
+        )
+      }
+
+    "return person with one name " +
+      "case when the person has multiple names and one email" in new TestCase {
 
         val email        = userEmails.generateOne
         val expectedName = userNames.generateOne
         val personData =
-          (userResourceIds.generateOne,
-           userNames.toGeneratorOfNonEmptyList(2).generateOne.toList :+ expectedName,
-           List(email)
+          PersonRawData(userResourceIds.generateOne,
+                        userNames.toGeneratorOfNonEmptyList(2).generateOne.toList :+ expectedName,
+                        List(email)
           )
 
         val commitPerson       = CommitPerson(expectedName, email)
@@ -37,21 +56,25 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
           .expects(triples)
           .returning((expectedTriples, Set(personData)))
 
-        val expectedPerson = Person(personData._1, None, expectedName, email.some)
+        val expectedPerson = Person(personData.id, None, expectedName, email.some)
 
         (commitCommiterFinder.findCommitPeople _)
           .expects(projectPath, commitId)
-          .returning(Success(otherCommitPersons.toSet + commitPerson))
+          .returning(Success(CommitPersonInfo(commitId, NonEmptyList(commitPerson, otherCommitPersons))))
 
-        personTrimmer.getTriplesAndTrimmedPersons(triples, eventId) shouldBe (expectedTriples, expectedPerson)
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectPath, eventId) shouldBe Success(
+          expectedTriples -> Set(
+            expectedPerson
+          )
+        )
       }
 
-    "return person with one name" +
-      "case when the person has one email and no name" in new TestCase {
+    "return person with one name " +
+      "case when the person has no name and one email" in new TestCase {
 
         val email        = userEmails.generateOne
         val expectedName = userNames.generateOne
-        val personData   = (userResourceIds.generateOne, List.empty[Name], List(email))
+        val personData   = PersonRawData(userResourceIds.generateOne, List.empty[Name], List(email))
 
         val commitPerson       = CommitPerson(expectedName, email)
         val otherCommitPersons = listOf(commitPersons).generateOne
@@ -59,57 +82,35 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
           .expects(triples)
           .returning((expectedTriples, Set(personData)))
 
-        val expectedPerson = Person(personData._1, None, expectedName, email.some)
+        val expectedPerson = Person(personData.id, None, expectedName, email.some)
 
         (commitCommiterFinder.findCommitPeople _)
           .expects(projectPath, commitId)
-          .returning(Success(otherCommitPersons.toSet + commitPerson))
+          .returning(Success(CommitPersonInfo(commitId, NonEmptyList(commitPerson, otherCommitPersons))))
 
-        personTrimmer.getTriplesAndTrimmedPersons(triples, eventId) shouldBe (expectedTriples, expectedPerson)
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectPath, eventId) shouldBe Success(
+          expectedTriples -> Set(
+            expectedPerson
+          )
+        )
       }
 
-    List(
-      ("multiple names",
-       userNames.toGeneratorOfNonEmptyList(2).generateOne.toList,
-       "Multiple names for person in generated JSON-LD"
-      ),
-      ("no name", List.empty[Name], "No names for person in generated JSON-LD")
-    )
-      .foreach { case (title, names, exceptionMessage) =>
-        s"fail if there's a Person entity with $title and gitlab does not find the person" in new TestCase {
-
-          val email      = userEmails.generateOne
-          val personData = (userResourceIds.generateOne, names, List(email))
-
-          val otherCommitPersons = listOf(commitPersons).generateOne
-
-          (personExtractor.extractPersons _)
-            .expects(triples)
-            .returning((expectedTriples, Set(personData)))
-
-          (commitCommiterFinder.findCommitPeople _)
-            .expects(projectPath, commitId)
-            .returning(Success(otherCommitPersons.toSet))
-
-          val Failure(exception: Exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, eventId)
-          exception.getMessage shouldBe exceptionMessage
-        }
-      }
-
-    "return person with one name" +
-      "case when the person has one name and one email" in new TestCase {
-
-        val email        = userEmails.generateOne
+    "return person with one name " +
+      "case when the person has one name and no email" in new TestCase {
         val expectedName = userNames.generateOne
-        val personData   = (userResourceIds.generateOne, List(expectedName), List(email))
+        val personData   = PersonRawData(userResourceIds.generateOne, List(expectedName), List.empty[Email])
 
         (personExtractor.extractPersons _)
           .expects(triples)
           .returning((expectedTriples, Set(personData)))
 
-        val expectedPerson = Person(personData._1, None, expectedName, email.some)
+        val expectedPerson = Person(personData.id, None, expectedName, None)
 
-        personTrimmer.getTriplesAndTrimmedPersons(triples, eventId) shouldBe (expectedTriples, expectedPerson)
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectPath, eventId) shouldBe Success(
+          expectedTriples -> Set(
+            expectedPerson
+          )
+        )
       }
 
     "fail if there's a Person entity with multiple emails" in new TestCase {
@@ -117,20 +118,89 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
       val emails = userEmails.toGeneratorOfNonEmptyList(2).generateOne.toList
       val names  = listOf(userNames).generateOne
       val entityId: ResourceId = userResourceIds.generateOne
-      val personData = (entityId, names, emails)
+      val personData = PersonRawData(entityId, names, emails)
 
       (personExtractor.extractPersons _)
         .expects(triples)
         .returning((expectedTriples, Set(personData)))
 
-      val Failure(exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, eventId)
+      val Failure(exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, projectPath, eventId)
 
       exception.getMessage shouldBe s"Multiple emails for person with '$entityId' id found in generated JSON-LD"
     }
 
+    "fail if there's a Person entity with multiple names and no email" in new TestCase {
+
+      val expectedNames = userNames.toGeneratorOfNonEmptyList(2).generateOne.toList
+      val personData    = PersonRawData(userResourceIds.generateOne, expectedNames, List.empty[Email])
+
+      val otherCommitPersons = commitPersons.toGeneratorOfNonEmptyList(2).generateOne
+      (personExtractor.extractPersons _)
+        .expects(triples)
+        .returning((expectedTriples, Set(personData)))
+
+      val Failure(exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, projectPath, eventId)
+      exception.getMessage shouldBe s"No email for person with id '${personData.id}' and multiple names found in generated JSON-LD"
+    }
+
+    "fail if there's a Person entity with no name and no email" in new TestCase {
+
+      val id: ResourceId = userResourceIds.generateOne
+      val personData = PersonRawData(id, List.empty[Name], List.empty[Email])
+
+      val otherCommitPersons = commitPersons.toGeneratorOfNonEmptyList(2).generateOne
+      (personExtractor.extractPersons _)
+        .expects(triples)
+        .returning((expectedTriples, Set(personData)))
+
+      val Failure(exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, projectPath, eventId)
+      exception.getMessage shouldBe s"No email and no name for person with id '$id' found in generated JSON-LD"
+    }
+
+    "fail if there's a Person entity with multiple names and the person is not in the gitlab result" in new TestCase {
+
+      val names = userNames.toGeneratorOfNonEmptyList(2).generateOne.toList
+      val email = userEmails.generateOne
+      val id: ResourceId = userResourceIds.generateOne
+      val personData = PersonRawData(id, names, List(email))
+
+      val otherCommitPersons = commitPersons.toGeneratorOfNonEmptyList(2).generateOne
+
+      (personExtractor.extractPersons _)
+        .expects(triples)
+        .returning((expectedTriples, Set(personData)))
+
+      (commitCommiterFinder.findCommitPeople _)
+        .expects(projectPath, commitId)
+        .returning(Success(CommitPersonInfo(commitId, otherCommitPersons)))
+
+      val Failure(exception: Exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, projectPath, eventId)
+      exception.getMessage shouldBe s"Could not find the email for person with id '$id' in gitlab"
+    }
+
+    "fail if there's a Person entity with no name and the person is not in the gitlab result" in new TestCase {
+
+      val email = userEmails.generateOne
+      val id: ResourceId = userResourceIds.generateOne
+      val personData = PersonRawData(id, List.empty[Name], List(email))
+
+      val otherCommitPersons = commitPersons.toGeneratorOfNonEmptyList(2).generateOne
+
+      (personExtractor.extractPersons _)
+        .expects(triples)
+        .returning((expectedTriples, Set(personData)))
+
+      (commitCommiterFinder.findCommitPeople _)
+        .expects(projectPath, commitId)
+        .returning(Success(CommitPersonInfo(commitId, otherCommitPersons)))
+
+      val Failure(exception: Exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, projectPath, eventId)
+      exception.getMessage shouldBe s"Could not find the email for person with id '$id' in gitlab"
+    }
+
     "fail if the commit finder fails" in new TestCase {
 
-      val personsRawData = personRawDataWithMultipleNames.toGeneratorOfNonEmptyList().generateOne.toList.toSet
+      val personsRawData = personRawDataWithOneEmail.toGeneratorOfNonEmptyList().generateOne.toList.toSet
 
       val expectedException = exceptions.generateOne
 
@@ -140,9 +210,9 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
       (commitCommiterFinder.findCommitPeople _)
         .expects(projectPath, commitId)
-        .returning(expectedException.raiseError[Try, Set[CommitPerson]])
+        .returning(expectedException.raiseError[Try, CommitPersonInfo])
 
-      val Failure(exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, eventId)
+      val Failure(exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, projectPath, eventId)
 
       exception.getMessage shouldBe expectedException.getMessage
     }
@@ -162,12 +232,16 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
   }
 
-  type PersonRawDatum = (ResourceId, List[Name], List[Email])
-
-  lazy val personRawDataWithMultipleNames: Gen[PersonRawDatum] = for {
+  lazy val personRawDataWithMultipleNames: Gen[PersonRawData] = for {
     id     <- userResourceIds
     names  <- userNames.toGeneratorOfNonEmptyList(2)
     emails <- listOf(userEmails)
-  } yield (id, names.toList, emails)
+  } yield PersonRawData(id, names.toList, emails)
+
+  lazy val personRawDataWithOneEmail: Gen[PersonRawData] = for {
+    id     <- userResourceIds
+    names  <- userNames.toGeneratorOfNonEmptyList(2)
+    emails <- userEmails
+  } yield PersonRawData(id, names.toList, List(emails))
 
 }

@@ -60,7 +60,8 @@ private class PersonDetailsUpdaterImpl[Interpretation[_]: Monad](
                           eventId:        EventId
   ): CurationResults[Interpretation] =
     for {
-      triplesAndPersons <- personTrimmer.getTriplesAndTrimmedPersons(curatedTriples.triples, eventId).toRightT
+      triplesAndPersons <-
+        personTrimmer.getTriplesAndTrimmedPersons(curatedTriples.triples, projectPath, eventId).toRightT
       (updatedTriples, trimmedPersons) = triplesAndPersons
       maybeAccessToken <- findAccessToken(projectPath).toRightT
       projectMembers   <- findProjectMembers(projectPath)(maybeAccessToken)

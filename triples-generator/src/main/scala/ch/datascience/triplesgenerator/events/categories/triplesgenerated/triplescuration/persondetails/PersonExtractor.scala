@@ -20,7 +20,6 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 package persondetails
 
 import cats.MonadError
-import cats.syntax.all._
 import ch.datascience.graph.Schemas._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.JsonLDTriples
@@ -34,21 +33,19 @@ import monocle.function.Plated.transform
 import scala.collection.mutable
 
 private trait PersonExtractor {
-  type PersonData = (ResourceId, List[Name], List[Email])
-
-  def extractPersons(triples: JsonLDTriples): (JsonLDTriples, Set[PersonData])
+  def extractPersons(triples: JsonLDTriples): (JsonLDTriples, Set[PersonRawData])
 }
 
 private class PersonExtractorImpl() extends PersonExtractor {
 
-  override def extractPersons(triples: JsonLDTriples): (JsonLDTriples, Set[PersonData]) = {
-    val persons     = mutable.HashSet[PersonData]()
+  override def extractPersons(triples: JsonLDTriples): (JsonLDTriples, Set[PersonRawData]) = {
+    val persons     = mutable.HashSet[PersonRawData]()
     val updatedJson = transform(toJsonWithoutPersonDetails(persons))(triples.value)
     JsonLDTriples(updatedJson) -> persons.toSet
   }
 
   private def toJsonWithoutPersonDetails(
-      persons: mutable.Set[PersonData]
+      persons: mutable.Set[PersonRawData]
   )(json:      Json): Json =
     root.`@type`.each.string.getAll(json) match {
       case types if types.contains("http://schema.org/Person") =>
@@ -65,7 +62,12 @@ private class PersonExtractorImpl() extends PersonExtractor {
     json
       .get[ResourceId]("@id")
       .flatMap { entityId =>
-        Some(entityId, json.getValues[Name]("http://schema.org/name"), json.getValues[Email]("http://schema.org/email"))
+        Some(
+          PersonRawData(entityId,
+                        json.getValues[Name]("http://schema.org/name"),
+                        json.getValues[Email]("http://schema.org/email")
+          )
+        )
       }
 
   private def removeNameAndEmail(json: Json) =

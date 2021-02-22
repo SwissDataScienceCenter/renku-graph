@@ -7,12 +7,12 @@ import ch.datascience.graph.model.users.{Email, Name}
 
 private trait CommitCommitterFinder[Interpretation[_]] {
 
-  def findCommitPeople(projectId: Path, commitId: CommitId): Interpretation[Set[CommitPerson]]
+  def findCommitPeople(projectId: Path, commitId: CommitId): Interpretation[CommitPersonInfo]
 }
 
 private class CommitCommitterFinderImpl[Interpretation[_]] extends CommitCommitterFinder[Interpretation] {
 
-  def findCommitPeople(projectId: Path, commitId: CommitId): Interpretation[Set[CommitPerson]] =
+  def findCommitPeople(projectId: Path, commitId: CommitId): Interpretation[CommitPersonInfo] =
     // if there are blank strings, None
     // if name or email isn't found, None
     ???
@@ -54,5 +54,3 @@ private class CommitCommitterFinderImpl[Interpretation[_]] extends CommitCommitt
 private object IOCommitCommitterFinder {
   def apply(): CommitCommitterFinder[IO] = new CommitCommitterFinderImpl[IO]
 }
-
-case class CommitPerson(name: Name, email: Email)

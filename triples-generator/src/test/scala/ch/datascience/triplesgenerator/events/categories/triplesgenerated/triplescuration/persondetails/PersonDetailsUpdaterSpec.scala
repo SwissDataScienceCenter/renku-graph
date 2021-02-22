@@ -53,7 +53,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
       val triplesWithoutPersonDetails = jsonLDTriples.generateOne
 
       (personTrimmer.getTriplesAndTrimmedPersons _)
-        .expects(curatedTriples.triples, eventId)
+        .expects(curatedTriples.triples, projectPath, eventId)
         .returning((triplesWithoutPersonDetails, trimmedPersons).pure[Try])
 
       val maybeAccessToken = accessTokens.generateOption
@@ -95,7 +95,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
 
       val exception = exceptions.generateOne
       (personTrimmer.getTriplesAndTrimmedPersons _)
-        .expects(curatedTriples.triples, eventId)
+        .expects(curatedTriples.triples, projectPath, eventId)
         .returning(exception.raiseError[Try, (JsonLDTriples, Set[Person])])
 
       updater.updatePersonDetails(curatedTriples, projectPath, eventId).value shouldBe exception
@@ -106,7 +106,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
 
       val triplesWithoutPersonDetails = jsonLDTriples.generateOne
       (personTrimmer.getTriplesAndTrimmedPersons _)
-        .expects(curatedTriples.triples, eventId)
+        .expects(curatedTriples.triples, projectPath, eventId)
         .returning((triplesWithoutPersonDetails, trimmedPersons).pure[Try])
 
       val exception = exceptions.generateOne
@@ -123,7 +123,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
 
       val triplesWithoutPersonDetails = jsonLDTriples.generateOne
       (personTrimmer.getTriplesAndTrimmedPersons _)
-        .expects(curatedTriples.triples, eventId)
+        .expects(curatedTriples.triples, projectPath, eventId)
         .returning((triplesWithoutPersonDetails, trimmedPersons).pure[Try])
 
       val maybeAccessToken = accessTokens.generateOption
@@ -148,7 +148,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
 
       val triplesWithoutPersonDetails = jsonLDTriples.generateOne
       (personTrimmer.getTriplesAndTrimmedPersons _)
-        .expects(curatedTriples.triples, eventId)
+        .expects(curatedTriples.triples, projectPath, eventId)
         .returning((triplesWithoutPersonDetails, trimmedPersons).pure[Try])
 
       val maybeAccessToken = accessTokens.generateOption

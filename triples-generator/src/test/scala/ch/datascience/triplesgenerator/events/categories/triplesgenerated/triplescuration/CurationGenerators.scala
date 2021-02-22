@@ -21,10 +21,8 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 import cats.MonadError
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.CommitPerson
 import eu.timepit.refined.auto._
 import io.renku.jsonld.JsonLD
 import org.scalacheck.Gen
@@ -60,9 +58,4 @@ object CurationGenerators {
       name        <- nonBlankStrings(minLength = 5)
       sparqlQuery <- sparqlQueries
     } yield CurationUpdatesGroup[Interpretation](name, sparqlQuery)
-
-  implicit lazy val commitPersons: Gen[CommitPerson] = for {
-    userName  <- userNames
-    userEmail <- userEmails
-  } yield CommitPerson(userName, userEmail)
 }
