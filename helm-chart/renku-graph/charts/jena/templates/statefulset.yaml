@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "jena.fullname" . }}
   labels:
@@ -9,8 +9,7 @@ metadata:
     heritage: {{ .Release.Service }}
 spec:
   replicas: 1
-  strategy:
-    type: Recreate
+  serviceName: {{ include "jena.fullname" . }}-headless
   selector:
     matchLabels:
       app: {{ include "jena.name" . }}
