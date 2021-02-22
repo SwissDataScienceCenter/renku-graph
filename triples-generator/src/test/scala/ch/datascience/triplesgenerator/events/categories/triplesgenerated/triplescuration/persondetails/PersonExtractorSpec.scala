@@ -19,46 +19,41 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 package persondetails
 
-import ch.datascience.generators.CommonGraphGenerators._
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.users.{Affiliation, Email, Name, ResourceId}
-import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples}
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import ch.datascience.tinytypes.json.TinyTypeEncoders._
-import io.circe.Json
+import ch.datascience.graph.model.users.{Email, Name, ResourceId}
+import ch.datascience.rdfstore.JsonLDTriples
 import io.circe.literal.JsonStringContext
-import io.circe.optics.JsonOptics._
-import io.circe.optics.JsonPath.root
-import monocle.function.Plated
+import io.circe.syntax._
+import io.circe.{Encoder, Json}
+import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import scala.collection.mutable
-import scala.util.{Success, Try}
-import cats.syntax.all._
-
 class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFactory with ScalaCheckPropertyChecks {
 
   "extractPersons" should {
 
-    "return PersonData with multiple names " in new TestCase {
+    "return PersonData with multiple names and remove the person name, label and email from the triples" in new TestCase {
       forAll { personRawData: Set[PersonRawDatum] =>
         val jsonTriples = JsonLDTriples {
           val Some(value) = personRawData.map(_.toJson.asArray.map(_.toList)).toList.sequence
           value.flatten
         }
 
-        val (_, actualPersonRawData) = personExtractor extractPersons jsonTriples
+        val (updatedTriples, actualPersonRawData) = personExtractor extractPersons jsonTriples
         actualPersonRawData shouldBe personRawData
+
+        updatedTriples.value.as[List[Json]].fold(throw _, identity) should contain theSameElementsAs personRawData
+          .map(_._1.asJson(resourceIdEncoder))
+          .toList
       }
     }
 
-    "return None when there is no resourceId" in new TestCase {
+    "not return the person when there is no resourceId" in new TestCase {
 
       val personWithoutIdJson = json"""[{
                "@type" : [
@@ -113,6 +108,18 @@ class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFact
                "http://schema.org/name" : $names
              }]"""
     }
+  }
+
+  private implicit def resourceIdEncoder = Encoder.instance[ResourceId] { case ResourceId(id) =>
+    json"""{ "@id": $id,
+            "@type" : [
+                 "http://www.w3.org/ns/prov#Person",
+                 "http://schema.org/Person"
+               ],
+              "http://schema.org/affiliation" : {
+               "@value" : "tefotcvry"
+             }
+           }"""
   }
 
 }

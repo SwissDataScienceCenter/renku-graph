@@ -56,7 +56,7 @@ private class PersonExtractorImpl() extends PersonExtractor {
           case None => json
           case Some(personData) =>
             persons.add(personData)
-            json
+            removeNameAndEmail(json)
         }
       case _ => json
     }
@@ -67,6 +67,13 @@ private class PersonExtractorImpl() extends PersonExtractor {
       .flatMap { entityId =>
         Some(entityId, json.getValues[Name]("http://schema.org/name"), json.getValues[Email]("http://schema.org/email"))
       }
+
+  private def removeNameAndEmail(json: Json) =
+    json
+      .remove(schema / "name")
+      .remove(schema / "email")
+      .remove(rdf / "label")
+      .remove(rdfs / "label")
 }
 
 private object PersonExtractor {

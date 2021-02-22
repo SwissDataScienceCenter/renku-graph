@@ -42,6 +42,7 @@ private class PersonTrimmerImpl[Interpretation[_]](personExtractor:       Person
 //      }
 //      .flatten
 //      .pure[Interpretation]
+
 }
 
 private object IOPersonTrimmer {
