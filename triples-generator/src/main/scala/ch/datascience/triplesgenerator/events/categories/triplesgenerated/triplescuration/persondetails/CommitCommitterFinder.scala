@@ -1,16 +1,34 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.config.GitLab
+import ch.datascience.control.Throttler
+import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users.{Email, Name}
+import ch.datascience.http.client.IORestClient
+import io.chrisdavenport.log4cats.Logger
+
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration.FiniteDuration
 
 private trait CommitCommitterFinder[Interpretation[_]] {
 
   def findCommitPeople(projectId: Path, commitId: CommitId): Interpretation[CommitPersonInfo]
 }
 
-private class CommitCommitterFinderImpl[Interpretation[_]] extends CommitCommitterFinder[Interpretation] {
+private class CommitCommitterFinderImpl[Interpretation[_]](
+    gitLabApiUrl:    GitLabApiUrl,
+    gitLabThrottler: Throttler[IO, GitLab],
+    logger:          Logger[IO],
+    retryInterval:   FiniteDuration = IORestClient.SleepAfterConnectionIssue
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO]
+) extends IORestClient(gitLabThrottler, logger, retryInterval = retryInterval)
+    with CommitCommitterFinder[Interpretation] {
 
   def findCommitPeople(projectId: Path, commitId: CommitId): Interpretation[CommitPersonInfo] =
     // if there are blank strings, None
