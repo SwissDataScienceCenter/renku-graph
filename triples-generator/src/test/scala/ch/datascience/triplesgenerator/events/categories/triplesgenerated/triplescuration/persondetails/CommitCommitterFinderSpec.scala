@@ -3,21 +3,20 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
-import org.scalatest.matchers.should
-import org.scalatest.wordspec.AnyWordSpec
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.graph.model.EventsGenerators._
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock.{get, okJson, stubFor}
 import io.circe.Json
 import io.circe.literal.JsonStringContext
-import org.scalacheck.Gen
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -26,10 +25,8 @@ import scala.language.postfixOps
 class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
   "findCommitPeople" should {
     "return a CommitPersonInfo 2 CommitPersons when both the author and committer were found" in new TestCase {
-
-      val author                   = commitPersons.generateOne
-      val committer                = commitPersons.generateOne
-      val expectedCommitPersonInfo = CommitPersonInfo(commitId, NonEmptyList(author, List(committer)))
+      val expectedCommitPersonInfo               = commitPersonInfos.generateOne
+      val NonEmptyList(author, committer +: Nil) = expectedCommitPersonInfo.committers
 
       stubFor {
         get(s"/api/v4/projects/${urlEncode(projectPath.toString)}/repository/commits/${urlEncode(commitId.toString)}")
@@ -84,16 +81,5 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
               "web_url": "https://gitlab.example.com/thedude/gitlab-foss/-/commit/6104942438c14ec7bd21c6cd5bd995272b3faff6"
             }
             """
-
   }
-
-  private implicit val commitPersons = for {
-    userName  <- userNames
-    userEmail <- userEmails
-  } yield CommitPerson(userName, userEmail)
-
-  private implicit val commitPersonInfos: Gen[CommitPersonInfo] = for {
-    commitId      <- commitIds
-    commitPersons <- commitPersons.toGeneratorOfNonEmptyList()
-  } yield CommitPersonInfo(commitId, commitPersons)
 }
