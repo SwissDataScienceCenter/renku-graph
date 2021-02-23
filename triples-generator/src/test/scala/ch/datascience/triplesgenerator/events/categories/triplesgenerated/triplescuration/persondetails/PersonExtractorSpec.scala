@@ -22,35 +22,37 @@ package persondetails
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators._
+import PersonDetailsGenerators._
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.rdfstore.JsonLDTriples
 import io.circe.literal.JsonStringContext
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import eu.timepit.refined.auto._
 
 class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFactory with ScalaCheckPropertyChecks {
 
   "extractPersons" should {
 
     "return PersonData with multiple names and remove the person name, label and email from the triples" in new TestCase {
-      forAll { personRawData: Set[PersonRawDatum] =>
-        val jsonTriples = JsonLDTriples {
-          val Some(value) = personRawData.map(_.toJson.asArray.map(_.toList)).toList.sequence
-          value.flatten
-        }
-
-        val (updatedTriples, actualPersonRawData) = personExtractor extractPersons jsonTriples
-        actualPersonRawData shouldBe personRawData
-
-        updatedTriples.value.as[List[Json]].fold(throw _, identity) should contain theSameElementsAs personRawData
-          .map(_._1.asJson(resourceIdEncoder))
-          .toList
+      val personRawData = personRawDataWithOneEmail.toGeneratorOfNonEmptyList().generateOne.toList.toSet
+      val jsonTriples = JsonLDTriples {
+        val Some(value) = personRawData.map(_.toJson.asArray.map(_.toList)).toList.sequence
+        value.flatten
       }
+
+      val (updatedTriples, actualPersonRawData) = personExtractor extractPersons jsonTriples
+      actualPersonRawData shouldBe personRawData
+
+      updatedTriples.value.as[List[Json]].fold(throw _, identity) should contain theSameElementsAs personRawData
+        .map(_.id.asJson(resourceIdEncoder))
+        .toList
     }
 
     "not return the person when there is no resourceId" in new TestCase {
@@ -76,24 +78,28 @@ class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFact
       }
 
       val (_, actualPersonRawData) = personExtractor extractPersons jsonTriples
-      actualPersonRawData shouldBe Set.empty[PersonRawDatum]
+      actualPersonRawData shouldBe Set.empty[PersonRawData]
 
     }
   }
 
   private trait TestCase {
     val personExtractor = new PersonExtractorImpl()
+
+    lazy val personRawDataWithOneEmail: Gen[PersonRawData] = for {
+      id     <- userResourceIds
+      names  <- userNames.toGeneratorOfNonEmptyList(2)
+      emails <- userEmails
+    } yield PersonRawData(id, names.toList, List(emails))
   }
 
-  type PersonRawDatum = (ResourceId, List[Name], List[Email])
-
-  implicit class PersonRawDatumOps(data: PersonRawDatum) {
+  implicit class PersonRawDatumOps(data: PersonRawData) {
     def toJson: Json = {
-      val names:  List[Json] = data._2.map(name => json"""{ "@value": ${name.value} }""")
-      val emails: List[Json] = data._3.map(email => json"""{ "@value": ${email.value} }""")
+      val names:  List[Json] = data.names.map(name => json"""{ "@value": ${name.value} }""")
+      val emails: List[Json] = data.emails.map(email => json"""{ "@value": ${email.value} }""")
 
       json"""[{
-               "@id" : ${data._1.value},
+               "@id" : ${data.id.value},
                "@type" : [
                  "http://www.w3.org/ns/prov#Person",
                  "http://schema.org/Person"
