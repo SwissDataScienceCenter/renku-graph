@@ -28,6 +28,7 @@ import ch.datascience.rdfstore.InMemoryRdfStore
 import ch.datascience.rdfstore.entities.EntitiesGenerators.{persons, projectEntities}
 import ch.datascience.rdfstore.entities.bundles.{gitLabApiUrl, renkuBaseUrl}
 import ch.datascience.triplesgenerator.events.categories.membersync.Generators._
+import ch.datascience.triplesgenerator.events.categories.membersync.PersonOps._
 import io.renku.jsonld.syntax._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

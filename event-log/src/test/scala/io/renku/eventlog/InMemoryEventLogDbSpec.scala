@@ -31,7 +31,7 @@ trait InMemoryEventLogDbSpec
     with EventLogDbMigrations
     with InMemoryEventLogDb
     with EventLogDataProvisioning
-    with EventLogDataFetching {
+    with EventDataFetching {
   self: TestSuite =>
 
   protected def initDb(): Unit =

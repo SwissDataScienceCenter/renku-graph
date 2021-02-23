@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.jsons
-import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies}
+import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
@@ -32,7 +32,7 @@ import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.circe.Json
 import io.circe.literal.JsonStringContext
-import io.renku.eventlog.EventContentGenerators.{eventDates, eventProcessingTimes, executionDates}
+import io.renku.eventlog.EventContentGenerators.{eventDates, executionDates}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}

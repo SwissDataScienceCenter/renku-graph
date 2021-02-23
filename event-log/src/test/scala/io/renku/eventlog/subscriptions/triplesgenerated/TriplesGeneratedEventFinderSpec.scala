@@ -41,9 +41,8 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.temporal.ChronoUnit.{HOURS => H, MINUTES => MIN}
-import java.time.{Duration, Instant}
-import scala.concurrent.duration._
+import java.time.Instant
+import java.time.temporal.ChronoUnit.{HOURS => H}
 import scala.language.postfixOps
 
 private class TriplesGeneratedEventFinderSpec
@@ -173,43 +172,6 @@ private class TriplesGeneratedEventFinderSpec
         )
       }
 
-    s"return an event with the $TransformingTriples status " +
-      "if execution date is longer than MaxProcessingTime" in new TestCase {
-
-        val (eventId, _, eventDate, projectPath, eventPayload1) = createEvent(
-          status = TransformingTriples,
-          executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes + 1, MIN)),
-          payloadSchemaVersion = schemaVersion
-        )
-
-        expectAwaitingTransformationGaugeDecrement(projectPath)
-        expectUnderTransformationGaugeIncrement(projectPath)
-
-        givenPrioritisation(
-          takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 1)),
-          returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
-        )
-
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          TriplesGeneratedEvent(eventId, projectPath, eventPayload1, schemaVersion)
-        )
-
-        findEvents(TransformingTriples).noBatchDate shouldBe List((eventId, executionDate))
-      }
-
-    s"return no event when there's one with $TransformingTriples status " +
-      "if execution date is shorter than MaxProcessingTime" in new TestCase {
-
-        createEvent(
-          status = TransformingTriples,
-          executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes - 1, MIN))
-        )
-
-        givenPrioritisation(takes = Nil, returns = Nil)
-
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
-
     "return events from all the projects" in new TestCase {
 
       val events = readyStatuses
@@ -243,7 +205,6 @@ private class TriplesGeneratedEventFinderSpec
         underTransformationGauge,
         queriesExecTimes,
         currentTime,
-        maxProcessingTime = maxProcessingTime,
         projectsFetchingLimit = 5,
         projectPrioritisation = projectPrioritisation
       )
@@ -290,7 +251,6 @@ private class TriplesGeneratedEventFinderSpec
     val underTransformationGauge    = mock[LabeledGauge[IO, Path]]
     val projectPrioritisation       = mock[ProjectPrioritisation]
     val queriesExecTimes            = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val maxProcessingTime           = Duration.ofMillis(durations(max = 10 hours).generateOne.toMillis)
 
     def expectAwaitingTransformationGaugeDecrement(projectPath: Path) =
       (awaitingTransformationGauge.decrement _)
@@ -322,7 +282,6 @@ private class TriplesGeneratedEventFinderSpec
       underTransformationGauge,
       queriesExecTimes,
       currentTime,
-      maxProcessingTime = maxProcessingTime,
       projectsFetchingLimit = 1,
       projectPrioritisation = projectPrioritisation
     )

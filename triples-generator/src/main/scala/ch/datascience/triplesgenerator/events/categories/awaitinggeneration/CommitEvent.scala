@@ -18,8 +18,9 @@
 
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
 
+import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events._
-import ch.datascience.triplesgenerator.events.categories.models.{CategoryEvent, Project}
+import ch.datascience.triplesgenerator.events.categories.models.CategoryEvent
 
 private sealed trait CommitEvent extends Product with Serializable with CategoryEvent {
   val eventId:  EventId

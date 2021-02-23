@@ -23,7 +23,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, positiveInts}
 import ch.datascience.graph.model.EventsGenerators.categoryNames
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
-import ch.datascience.triplesgenerator.events.subscriptions.{SubscriberUrl, SubscriptionUrlFinder, subscriberUrls}
+import ch.datascience.events.consumers.subscriptions.{SubscriberUrl, SubscriptionUrlFinder, subscriberUrls}
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

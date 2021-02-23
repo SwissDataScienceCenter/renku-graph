@@ -18,10 +18,11 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
+import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.events.categories.models.{CategoryEvent, Project}
+import ch.datascience.triplesgenerator.events.categories.models.CategoryEvent
 
 final case class TriplesGeneratedEvent(eventId:       EventId,
                                        project:       Project,

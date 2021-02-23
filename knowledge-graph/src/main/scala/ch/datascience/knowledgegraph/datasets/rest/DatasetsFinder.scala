@@ -19,20 +19,20 @@
 package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.graph.model.datasets.{DateCreated, Description, Identifier, ImageUri, Name, PublishedDate, Title}
+import cats.syntax.all._
+import ch.datascience.graph.model.datasets.{DateCreated, Dates, Description, Identifier, ImageUri, Name, PublishedDate, Title}
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
-import ch.datascience.knowledgegraph.datasets.model.DatasetPublishing
+import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.DatasetSearchResult
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.Phrase
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.constraints.NonNegativeInt
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.predicates.all.NonEmpty
 import io.chrisdavenport.log4cats.Logger
+import io.circe.DecodingFailure
 
 import scala.concurrent.ExecutionContext
 
@@ -50,8 +50,8 @@ private object DatasetsFinder {
       title:            Title,
       name:             Name,
       maybeDescription: Option[Description],
-      published:        DatasetPublishing,
-      dateCreate:       DateCreated,
+      creators:         Set[DatasetCreator],
+      dates:            Dates,
       projectsCount:    ProjectsCount,
       images:           List[ImageUri]
   )
@@ -92,7 +92,7 @@ private class IODatasetsFinder(
   }
 
   private def sparqlQuery(phrase: Phrase, sort: Sort.By): SparqlQuery = SparqlQuery(
-    name = queryName(phrase, "ds free-text search"),
+    name = "ds free-text search",
     Set(
       "PREFIX prov: <http://www.w3.org/ns/prov#>",
       "PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>",
@@ -101,7 +101,7 @@ private class IODatasetsFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX text: <http://jena.apache.org/text#>"
     ),
-    s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?dateCreated ?maybeDerivedFrom ?sameAs ?projectsCount (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+    s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
         |WHERE {
         |  {
         |    SELECT (MIN(?dsId) AS ?dsIdExample) ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
@@ -152,8 +152,7 @@ private class IODatasetsFinder(
         |          schema:identifier ?identifier;
         |          schema:name ?name ;
         |          schema:alternateName ?alternateName;
-        |          schema:isPartOf ?projectId ;
-        |          schema:dateCreated ?dateCreated .
+        |          schema:isPartOf ?projectId .
         |    OPTIONAL { 
         |      ?dsIdExample schema:image ?imageId .
         |      ?imageId     schema:position ?imagePosition ;
@@ -162,36 +161,32 @@ private class IODatasetsFinder(
         |    }
         |    OPTIONAL { ?dsIdExample schema:description ?maybeDescription }
         |    OPTIONAL { ?dsIdExample schema:datePublished ?maybePublishedDate }
+        |    OPTIONAL { ?dsIdExample schema:dateCreated ?maybeDateCreated }
         |    OPTIONAL { ?dsIdExample prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
         |    OPTIONAL { ?dsIdExample schema:url ?maybeUrl }
+        |    BIND (IF(BOUND(?maybePublishedDate), ?maybePublishedDate, ?maybeDateCreated) AS ?date)
         |    FILTER NOT EXISTS {
         |      ?someId prov:wasDerivedFrom/schema:url ?dsIdExample.
         |      ?someId schema:isPartOf ?projectId.
         |    }
         |  }
         |}
-        |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?dateCreated ?maybeDerivedFrom ?sameAs ?projectsCount
+        |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount
         |${`ORDER BY`(sort)}
         |""".stripMargin
   )
 
   private def `ORDER BY`(sort: Sort.By): String = sort.property match {
     case Sort.TitleProperty         => s"ORDER BY ${sort.direction}(?name)"
+    case Sort.DateProperty          => s"ORDER BY ${sort.direction}(?date)"
     case Sort.DatePublishedProperty => s"ORDER BY ${sort.direction}(?maybePublishedDate)"
-    case Sort.DateCreatedProperty   => s"ORDER BY ${sort.direction}(?dateCreated)"
     case Sort.ProjectsCountProperty => s"ORDER BY ${sort.direction}(?projectsCount)"
   }
 
   private lazy val addCreators: DatasetSearchResult => IO[DatasetSearchResult] =
     dataset =>
       findCreators(dataset.id)
-        .map(creators => dataset.copy(published = dataset.published.copy(creators = creators)))
-
-  private def queryName(phrase: Phrase, name: String Refined NonEmpty): String Refined NonEmpty =
-    phrase.value match {
-      case "*" => Refined.unsafeApply(s"$name *")
-      case _   => name
-    }
+        .map(creators => dataset.copy(creators = creators))
 }
 
 private object IODatasetsFinder {
@@ -218,7 +213,7 @@ private object IODatasetsFinder {
       id                 <- cursor.downField("identifier").downField("value").as[Identifier]
       title              <- cursor.downField("name").downField("value").as[Title]
       name               <- cursor.downField("alternateName").downField("value").as[Name]
-      dateCreated        <- cursor.downField("dateCreated").downField("value").as[DateCreated]
+      maybeDateCreated   <- cursor.downField("maybeDateCreated").downField("value").as[Option[DateCreated]]
       maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
       projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
       images             <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
@@ -228,13 +223,16 @@ private object IODatasetsFinder {
                             .as[Option[String]]
                             .map(blankToNone)
                             .flatMap(toOption[Description])
+      dates <- Dates
+                 .from(maybeDateCreated, maybePublishedDate)
+                 .leftMap(e => DecodingFailure(e.getMessage, Nil))
     } yield DatasetSearchResult(
       id,
       title,
       name,
       maybeDescription,
-      DatasetPublishing(maybePublishedDate, Set.empty),
-      dateCreated,
+      Set.empty,
+      dates,
       projectsCount,
       images
     )

@@ -19,7 +19,8 @@
 package io.renku.eventlog
 
 import cats.data.NonEmptyList
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
+import ch.datascience.events.consumers.Project
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import doobie.util.meta.{LegacyInstantMetaInstance, LegacyLocalDateMetaInstance}
 import doobie.util.{Get, Put, Read}
@@ -107,8 +108,8 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
     case (eventId, projectId) => CompoundEventId(eventId, projectId)
   }
 
-  implicit val projectRead: Read[EventProject] = Read[(projects.Id, projects.Path)].map { case (id, path) =>
-    EventProject(id, path)
+  implicit val projectRead: Read[Project] = Read[(projects.Id, projects.Path)].map { case (id, path) =>
+    Project(id, path)
   }
 
 }

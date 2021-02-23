@@ -37,7 +37,7 @@ class EventStatusRenamerImplSpec
     with DbInitSpec
     with should.Matchers
     with EventLogDataProvisioning
-    with EventLogDataFetching {
+    with EventDataFetching {
   protected override lazy val migrationsToRun: List[Migration] = List(
     eventLogTableCreator,
     projectPathAdder,
@@ -52,16 +52,16 @@ class EventStatusRenamerImplSpec
     s"rename all the events from PROCESSING to GENERATING_TRIPLES, " +
       s"RECOVERABLE_FAILURE to GENERATION_RECOVERABLE_FAILURE and " +
       s"NON_RECOVERABLE_FAILURE to GENERATION_NON_RECOVERABLE_FAILURE" in new TestCase {
-        val processingEvents = events.generateNonEmptyList(minElements = 2)
+        val processingEvents = newOrSkippedEvents.generateNonEmptyList(minElements = 2)
         processingEvents.map(event => store(event, withStatus = "PROCESSING"))
 
-        val recoverableEvents = events.generateNonEmptyList(minElements = 2)
+        val recoverableEvents = newOrSkippedEvents.generateNonEmptyList(minElements = 2)
         recoverableEvents.map(event => store(event, withStatus = "GENERATION_RECOVERABLE_FAILURE"))
 
-        val nonRecoverableEvents = events.generateNonEmptyList(minElements = 2)
+        val nonRecoverableEvents = newOrSkippedEvents.generateNonEmptyList(minElements = 2)
         nonRecoverableEvents.map(event => store(event, withStatus = "GENERATION_NON_RECOVERABLE_FAILURE"))
 
-        val otherEvents = events.generateNonEmptyList()
+        val otherEvents = newOrSkippedEvents.generateNonEmptyList()
         otherEvents.map(event => store(event, withStatus = event.status.toString))
 
         eventStatusRenamer.run().unsafeRunSync() shouldBe ((): Unit)
@@ -87,7 +87,7 @@ class EventStatusRenamerImplSpec
       }
 
     s"Not do anything if there are no events with the status PROCESSING" in new TestCase {
-      val otherEvents = events.generateNonEmptyList()
+      val otherEvents = newOrSkippedEvents.generateNonEmptyList()
       otherEvents.map(event => store(event, withStatus = event.status.toString))
 
       eventStatusRenamer.run().unsafeRunSync() shouldBe ((): Unit)

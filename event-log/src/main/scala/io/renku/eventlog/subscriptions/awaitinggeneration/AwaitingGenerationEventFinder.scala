@@ -37,7 +37,7 @@ import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.awaitinggeneration.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds, Subscribers, SubscriptionTypeSerializers}
 
-import java.time.{Duration, Instant}
+import java.time.Instant
 import scala.language.postfixOps
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
@@ -48,7 +48,6 @@ private class AwaitingGenerationEventFinderImpl(
     underProcessingGauge:  LabeledGauge[IO, projects.Path],
     queriesExecTimes:      LabeledHistogram[IO, SqlQuery.Name],
     now:                   () => Instant = () => Instant.now,
-    maxProcessingTime:     Duration,
     projectsFetchingLimit: Int Refined Positive,
     projectPrioritisation: ProjectPrioritisation[IO],
     pickRandomlyFrom:      List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size)
@@ -64,16 +63,15 @@ private class AwaitingGenerationEventFinderImpl(
       _ <- maybeUpdateMetrics(maybeProject, maybeAwaitingGenerationEvent)
     } yield maybeAwaitingGenerationEvent
 
-  private def findEventAndUpdateForProcessing() =
-    for {
-      maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
-                        .map(projectPrioritisation.prioritise)
-                        .map(selectProject)
-      maybeIdAndProjectAndBody <- maybeProject
-                                    .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
-                                    .getOrElse(Free.pure[ConnectionOp, Option[AwaitingGenerationEvent]](None))
-      maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
-    } yield maybeProject -> maybeBody
+  private def findEventAndUpdateForProcessing() = for {
+    maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
+                      .map(projectPrioritisation.prioritise)
+                      .map(selectProject)
+    maybeIdAndProjectAndBody <- maybeProject
+                                  .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
+                                  .getOrElse(Free.pure[ConnectionOp, Option[AwaitingGenerationEvent]](None))
+    maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
+  } yield maybeProject -> maybeBody
 
   // format: off
   private def findProjectsWithEventsInQueue = SqlQuery({fr"""
@@ -89,9 +87,7 @@ private class AwaitingGenerationEventFinderImpl(
           proj.latest_event_date
         FROM event evt
         JOIN project proj on evt.project_id = proj.project_id
-        WHERE ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
-          OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
-        )
+        WHERE """ ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()}
         ORDER BY proj.latest_event_date DESC
         LIMIT ${projectsFetchingLimit.value}
       ) proj
@@ -110,14 +106,14 @@ private class AwaitingGenerationEventFinderImpl(
            SELECT project_id, min(event_date) AS min_event_date
            FROM event
            WHERE project_id = ${idAndPath.id}
-             AND ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
-               OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
+             AND """ ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" 
+             AND execution_date < ${now()}
            GROUP BY project_id
          ) oldest_event_date
          JOIN event evt ON oldest_event_date.project_id = evt.project_id 
            AND oldest_event_date.min_event_date = evt.event_date
-           AND ((""" ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
-               OR (status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})) 
+           AND """ ++ `status IN`(New, GenerationRecoverableFailure) ++ fr""" 
+           AND execution_date < ${now()}
          LIMIT 1
          """
     }.query[AwaitingGenerationEvent].option, 
@@ -150,8 +146,9 @@ private class AwaitingGenerationEventFinderImpl(
   private def updateStatus(commitEventId: CompoundEventId) = SqlQuery(
     sql"""|UPDATE event 
           |SET status = ${GeneratingTriples: EventStatus}, execution_date = ${now()}
-          |WHERE (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status <> ${GeneratingTriples: EventStatus})
-          |  OR (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status = ${GeneratingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
+          |WHERE event_id = ${commitEventId.id} 
+          |  AND project_id = ${commitEventId.projectId} 
+          |  AND status <> ${GeneratingTriples: EventStatus}
           |""".stripMargin.update.run,
     name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update status")
   )
@@ -172,7 +169,6 @@ private class AwaitingGenerationEventFinderImpl(
 
 private object IOAwaitingGenerationEventFinder {
 
-  private val MaxProcessingTime:     Duration             = Duration.ofDays(7)
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
   def apply(
@@ -187,7 +183,6 @@ private object IOAwaitingGenerationEventFinder {
                                                 waitingEventsGauge,
                                                 underProcessingGauge,
                                                 queriesExecTimes,
-                                                maxProcessingTime = MaxProcessingTime,
                                                 projectsFetchingLimit = ProjectsFetchingLimit,
                                                 projectPrioritisation = projectPrioritisation
   )

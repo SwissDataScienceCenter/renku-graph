@@ -20,30 +20,20 @@ package ch.datascience.webhookservice.eventprocessing.commitevent
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.EventBody
 import ch.datascience.http.client.IORestClient
 import ch.datascience.webhookservice.eventprocessing.CommitEvent
 import ch.datascience.webhookservice.eventprocessing.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
-import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender.EventSendingResult
-import ch.datascience.webhookservice.eventprocessing.commitevent.CommitEventSender.EventSendingResult.{EventCreated, EventExisted}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
+import org.http4s.Status.Accepted
 
 import scala.concurrent.ExecutionContext
 
 trait CommitEventSender[Interpretation[_]] {
-  def send(commitEvent: CommitEvent): Interpretation[EventSendingResult]
-}
-
-object CommitEventSender {
-  sealed trait EventSendingResult extends Product with Serializable
-  object EventSendingResult {
-    case object EventCreated extends EventSendingResult
-    case object EventExisted extends EventSendingResult
-  }
+  def send(commitEvent: CommitEvent): Interpretation[Unit]
 }
 
 class IOCommitEventSender(
@@ -64,22 +54,24 @@ class IOCommitEventSender(
   import io.circe.literal._
   import io.circe.syntax._
   import org.http4s.Method.POST
-  import org.http4s.Status.{Created, Ok}
-  import org.http4s.circe._
   import org.http4s.{Request, Response}
 
-  def send(commitEvent: CommitEvent): IO[EventSendingResult] =
+  def send(commitEvent: CommitEvent): IO[Unit] =
     for {
       serialisedEvent <- serialiseToJsonString(commitEvent)
       eventBody       <- ME.fromEither(EventBody.from(serialisedEvent))
       uri             <- validateUri(s"$eventLogUrl/events")
-      sendingResult   <- send(request(POST, uri).withEntity((commitEvent -> eventBody).asJson))(mapResponse)
+      sendingResult <-
+        send(request(POST, uri).withMultipartBuilder.addPart("event", (commitEvent -> eventBody).asJson).build())(
+          mapResponse
+        )
     } yield sendingResult
 
   private implicit lazy val entityEncoder: Encoder[(CommitEvent, EventBody)] =
     Encoder.instance[(CommitEvent, EventBody)] {
       case (event: NewCommitEvent, body) =>
         json"""{
+        "categoryName": "CREATION", 
         "id":        ${event.id.value},
         "project": {
           "id":      ${event.project.id.value},
@@ -92,6 +84,7 @@ class IOCommitEventSender(
       }"""
       case (event: SkippedCommitEvent, body) =>
         json"""{
+        "categoryName": "CREATION",
         "id":        ${event.id.value},
         "project": {
           "id":      ${event.project.id.value},
@@ -105,9 +98,8 @@ class IOCommitEventSender(
       }"""
     }
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[EventSendingResult]] = {
-    case (Created, _, _) => EventCreated.pure[IO]
-    case (Ok, _, _)      => EventExisted.pure[IO]
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
+    case (Accepted, _, _) => IO.unit
   }
 }
 

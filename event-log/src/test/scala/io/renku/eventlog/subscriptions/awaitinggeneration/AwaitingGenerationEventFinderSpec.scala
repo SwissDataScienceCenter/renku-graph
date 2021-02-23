@@ -18,8 +18,8 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import java.time.temporal.ChronoUnit.{HOURS => H, MINUTES => MIN}
-import java.time.{Duration, Instant}
+import java.time.temporal.ChronoUnit.{HOURS => H}
+import java.time.Instant
 
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
@@ -42,7 +42,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.concurrent.duration._
 import scala.language.postfixOps
 
 private class AwaitingGenerationEventFinderSpec
@@ -169,42 +168,6 @@ private class AwaitingGenerationEventFinderSpec
         )
       }
 
-    s"return an event with the $GeneratingTriples status " +
-      "if execution date is longer than MaxProcessingTime" in new TestCase {
-
-        val (eventId, eventBody, eventDate, projectPath) = createEvent(
-          status = GeneratingTriples,
-          executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes + 1, MIN))
-        )
-
-        expectWaitingEventsGaugeDecrement(projectPath)
-        expectUnderProcessingGaugeIncrement(projectPath)
-
-        givenPrioritisation(
-          takes = List(ProjectInfo(eventId.projectId, projectPath, eventDate, 1)),
-          returns = List(ProjectIds(eventId.projectId, projectPath) -> MaxPriority)
-        )
-
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          AwaitingGenerationEvent(eventId, projectPath, eventBody)
-        )
-
-        findEvents(EventStatus.GeneratingTriples).noBatchDate shouldBe List((eventId, executionDate))
-      }
-
-    s"return no event when there's one with $GeneratingTriples status " +
-      "if execution date is shorter than MaxProcessingTime" in new TestCase {
-
-        createEvent(
-          status = GeneratingTriples,
-          executionDate = ExecutionDate(now.minus(maxProcessingTime.toMinutes - 1, MIN))
-        )
-
-        givenPrioritisation(takes = Nil, returns = Nil)
-
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
-
     "return events from all the projects" in new TestCase {
 
       val events = readyStatuses
@@ -238,7 +201,6 @@ private class AwaitingGenerationEventFinderSpec
         underProcessingGauge,
         queriesExecTimes,
         currentTime,
-        maxProcessingTime = maxProcessingTime,
         projectsFetchingLimit = 5,
         projectPrioritisation = projectPrioritisation
       )
@@ -285,7 +247,6 @@ private class AwaitingGenerationEventFinderSpec
     val underProcessingGauge  = mock[LabeledGauge[IO, Path]]
     val projectPrioritisation = mock[ProjectPrioritisation[IO]]
     val queriesExecTimes      = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val maxProcessingTime     = Duration.ofMillis(durations(max = 10 hours).generateOne.toMillis)
 
     def expectWaitingEventsGaugeDecrement(projectPath: Path) =
       (waitingEventsGauge.decrement _)
@@ -316,7 +277,6 @@ private class AwaitingGenerationEventFinderSpec
       underProcessingGauge,
       queriesExecTimes,
       currentTime,
-      maxProcessingTime = maxProcessingTime,
       projectsFetchingLimit = 1,
       projectPrioritisation = projectPrioritisation
     )

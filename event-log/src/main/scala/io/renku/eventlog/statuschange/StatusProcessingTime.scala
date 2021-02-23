@@ -19,25 +19,23 @@
 package io.renku.eventlog.statuschange
 
 import ch.datascience.db.SqlQuery
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import doobie.implicits._
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.renku.eventlog.{EventProcessingTime, TypeSerializers}
+import io.renku.eventlog.TypeSerializers
 
 trait StatusProcessingTime extends TypeSerializers {
   def upsertStatusProcessingTime(eventId:             CompoundEventId,
                                  status:              EventStatus,
                                  maybeProcessingTime: Option[EventProcessingTime]
-  ): Option[SqlQuery[Int]] =
-    maybeProcessingTime.map { processingTime =>
-      SqlQuery[Int](
-        query = sql"""|INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
-                      |VALUES(${eventId.id},  ${eventId.projectId}, $status, $processingTime)
-                      |ON CONFLICT (event_id, project_id, status)
-                      |DO UPDATE SET processing_time = EXCLUDED.processing_time;
-                      |""".stripMargin.update.run,
-        name = "upsert_processing_time"
-      )
-    }
+  ): Option[SqlQuery[Int]] = maybeProcessingTime.map { processingTime =>
+    SqlQuery[Int](
+      query = sql"""|INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
+                    |VALUES(${eventId.id}, ${eventId.projectId}, $status, $processingTime)
+                    |ON CONFLICT (event_id, project_id, status)
+                    |DO UPDATE SET processing_time = EXCLUDED.processing_time;
+                    |""".stripMargin.update.run,
+      name = "upsert_processing_time"
+    )
+  }
 }

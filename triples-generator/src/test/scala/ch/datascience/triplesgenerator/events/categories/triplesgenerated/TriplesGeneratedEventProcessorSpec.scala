@@ -22,12 +22,11 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
 import cats.effect.{ContextShift, IO, Timer}
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Path
@@ -41,13 +40,12 @@ import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.EventHandler.categoryName
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.IOTriplesGeneratedEventProcessor.eventsProcessingTimesBuilder
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators.curatedTriplesObjects
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{CuratedTriples, TriplesTransformer}
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult.{DeliverySuccess, InvalidTriplesFailure, InvalidUpdatesFailure, RecoverableFailure}
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.Uploader
 import io.prometheus.client.Histogram
 import org.scalacheck.Gen
@@ -57,6 +55,7 @@ import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.time.Duration
 import scala.concurrent.ExecutionContext
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.jdk.CollectionConverters._
@@ -191,13 +190,15 @@ class TriplesGeneratedEventProcessorSpec
 
       val exception = exceptions.generateOne
       (eventStatusUpdater
-        .markEventDone(_: CompoundEventId))
-        .expects(triplesGeneratedEvent.compoundEventId)
+        .markEventDone(_: CompoundEventId, _: EventProcessingTime))
+        .expects(triplesGeneratedEvent.compoundEventId,
+                 EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
+        )
         .returning(context.raiseError(exception))
 
       eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
-      logError(triplesGeneratedEvent, exception, "failed to mark as TriplesStore in the Event Log")
+      logError(triplesGeneratedEvent, exception, "failed to mark done in the Event Log")
       logSummary(triplesGeneratedEvent, isSuccessful = true)
     }
 
@@ -307,14 +308,14 @@ class TriplesGeneratedEventProcessorSpec
 
     def expectEventMarkedAsDone(compoundEventId: CompoundEventId) =
       (eventStatusUpdater
-        .markEventDone(_: CompoundEventId))
-        .expects(compoundEventId)
+        .markEventDone(_: CompoundEventId, _: EventProcessingTime))
+        .expects(compoundEventId, EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value)))
         .returning(context.unit)
 
     def expectEventMarkedAsTriplesGenerated(event: TriplesGeneratedEvent) =
       (eventStatusUpdater
-        .markTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion))
-        .expects(event.compoundEventId, event.triples, event.schemaVersion)
+        .markTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion, _: Option[EventProcessingTime]))
+        .expects(event.compoundEventId, event.triples, event.schemaVersion, None)
         .returning(context.unit)
 
     def logSummary(triplesGeneratedEvent: TriplesGeneratedEvent, isSuccessful: Boolean): Assertion =

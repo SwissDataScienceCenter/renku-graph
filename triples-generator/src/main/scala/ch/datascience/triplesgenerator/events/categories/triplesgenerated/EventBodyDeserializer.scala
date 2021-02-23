@@ -21,10 +21,10 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events._
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.events.categories.models.Project
 import io.circe.parser._
 import io.circe.{DecodingFailure, Error, ParsingFailure}
 

@@ -22,11 +22,17 @@ import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
 import ch.datascience.db.DbTransactorResource
+import ch.datascience.events.consumers
+import ch.datascience.events.consumers.EventConsumersRegistry
 import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.metrics._
 import ch.datascience.microservices.IOMicroservice
-import io.renku.eventlog.creation.IOEventCreationEndpoint
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
+import io.renku.eventlog.eventdetails.EventDetailsEndpoint
+import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
 import io.renku.eventlog.init.{DbInitializer, IODbInitializer}
 import io.renku.eventlog.latestevents.IOLatestEventsEndpoint
@@ -42,6 +48,8 @@ import scala.concurrent.ExecutionContext
 
 object Microservice extends IOMicroservice {
 
+  val ServicePort: Int Refined Positive = 9005
+
   protected implicit override val executionContext: ExecutionContext =
     ExecutionContext fromExecutorService newFixedThreadPool(ConfigSource.default.at("threads-number").loadOrThrow[Int])
 
@@ -49,11 +57,10 @@ object Microservice extends IOMicroservice {
 
   protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
 
-  override def run(args: List[String]): IO[ExitCode] =
-    for {
-      transactorResource <- new EventLogDbConfigProvider[IO](args) map DbTransactorResource[IO, EventLogDB]
-      exitCode           <- runMicroservice(transactorResource)
-    } yield exitCode
+  override def run(args: List[String]): IO[ExitCode] = for {
+    transactorResource <- new EventLogDbConfigProvider[IO](args) map DbTransactorResource[IO, EventLogDB]
+    exitCode           <- runMicroservice(transactorResource)
+  } yield exitCode
 
   private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB]) =
     transactorResource.use { transactor =>
@@ -69,22 +76,32 @@ object Microservice extends IOMicroservice {
         awaitingTransformationGauge <- AwaitingTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
         underTransformationGauge    <- UnderTransformationGauge(metricsRegistry, statsFinder, ApplicationLogger)
         underTriplesGenerationGauge <- UnderTriplesGenerationGauge(metricsRegistry, statsFinder, ApplicationLogger)
-        metricsResetScheduler <-
-          IOGaugeResetScheduler(
-            List(awaitingGenerationGauge,
-                 underTriplesGenerationGauge,
-                 awaitingTransformationGauge,
-                 underTransformationGauge
-            ),
-            MetricsConfigProvider(),
-            ApplicationLogger
-          )
-        eventCreationEndpoint <- IOEventCreationEndpoint(
-                                   transactor,
-                                   awaitingGenerationGauge,
-                                   queriesExecTimes,
+        metricsResetScheduler <- IOGaugeResetScheduler(
+                                   List(awaitingGenerationGauge,
+                                        underTriplesGenerationGauge,
+                                        awaitingTransformationGauge,
+                                        underTransformationGauge
+                                   ),
+                                   MetricsConfigProvider(),
                                    ApplicationLogger
                                  )
+        creationSubscription <- events.categories.creation.SubscriptionFactory(transactor,
+                                                                               awaitingGenerationGauge,
+                                                                               queriesExecTimes,
+                                                                               ApplicationLogger
+                                )
+        zombieEventsSubscription <- events.categories.zombieevents.SubscriptionFactory(
+                                      transactor,
+                                      awaitingGenerationGauge,
+                                      underTriplesGenerationGauge,
+                                      awaitingTransformationGauge,
+                                      underTransformationGauge,
+                                      queriesExecTimes,
+                                      ApplicationLogger
+                                    )
+        eventConsumersRegistry <-
+          consumers.EventConsumersRegistry(ApplicationLogger, creationSubscription, zombieEventsSubscription)
+        eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
         latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
@@ -102,35 +119,38 @@ object Microservice extends IOMicroservice {
                                   queriesExecTimes,
                                   ApplicationLogger
                                 )
-        subscriptionCategoryRegistry <- IOSubscriptionCategoryRegistry(
-                                          transactor,
-                                          awaitingGenerationGauge,
-                                          underTriplesGenerationGauge,
-                                          awaitingTransformationGauge,
-                                          underTransformationGauge,
-                                          queriesExecTimes,
-                                          ApplicationLogger
-                                        )
-        subscriptionsEndpoint <- IOSubscriptionsEndpoint(subscriptionCategoryRegistry, ApplicationLogger)
+        eventProducersRegistry <- EventProducersRegistry(
+                                    transactor,
+                                    awaitingGenerationGauge,
+                                    underTriplesGenerationGauge,
+                                    awaitingTransformationGauge,
+                                    underTransformationGauge,
+                                    queriesExecTimes,
+                                    ApplicationLogger
+                                  )
+        subscriptionsEndpoint <- IOSubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
+        eventDetailsEndpoint  <- EventDetailsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         microserviceRoutes =
           new MicroserviceRoutes[IO](
-            eventCreationEndpoint,
+            eventEndpoint,
             latestEventsEndpoint,
             processingStatusEndpoint,
             eventsPatchingEndpoint,
             statusChangeEndpoint,
             subscriptionsEndpoint,
+            eventDetailsEndpoint,
             new RoutesMetrics[IO](metricsRegistry)
           ).routes
         exitCode <- microserviceRoutes.use { routes =>
-                      val httpServer = new HttpServer[IO](serverPort = 9005, routes)
+                      val httpServer = new HttpServer[IO](serverPort = ServicePort.value, routes)
 
                       new MicroserviceRunner(
                         certificateLoader,
                         sentryInitializer,
                         dbInitializer,
                         eventLogMetrics,
-                        subscriptionCategoryRegistry,
+                        eventProducersRegistry,
+                        eventConsumersRegistry,
                         metricsResetScheduler,
                         httpServer,
                         subProcessesCancelTokens
@@ -141,15 +161,16 @@ object Microservice extends IOMicroservice {
 }
 
 private class MicroserviceRunner(
-    certificateLoader:            CertificateLoader[IO],
-    sentryInitializer:            SentryInitializer[IO],
-    dbInitializer:                DbInitializer[IO],
-    metrics:                      EventLogMetrics[IO],
-    subscriptionCategoryRegistry: SubscriptionCategoryRegistry[IO],
-    metricsResetScheduler:        GaugeResetScheduler[IO],
-    httpServer:                   HttpServer[IO],
-    subProcessesCancelTokens:     ConcurrentHashMap[CancelToken[IO], Unit]
-)(implicit contextShift:          ContextShift[IO]) {
+    certificateLoader:        CertificateLoader[IO],
+    sentryInitializer:        SentryInitializer[IO],
+    dbInitializer:            DbInitializer[IO],
+    metrics:                  EventLogMetrics[IO],
+    eventProducersRegistry:   EventProducersRegistry[IO],
+    eventConsumersRegistry:   EventConsumersRegistry[IO],
+    metricsResetScheduler:    GaugeResetScheduler[IO],
+    httpServer:               HttpServer[IO],
+    subProcessesCancelTokens: ConcurrentHashMap[CancelToken[IO], Unit]
+)(implicit contextShift:      ContextShift[IO]) {
 
   def run(): IO[ExitCode] = for {
     _      <- certificateLoader.run()
@@ -157,7 +178,8 @@ private class MicroserviceRunner(
     _      <- dbInitializer.run()
     _      <- metrics.run().start map gatherCancelToken
     _      <- metricsResetScheduler.run().start map gatherCancelToken
-    _      <- subscriptionCategoryRegistry.run().start map gatherCancelToken
+    _      <- eventProducersRegistry.run().start map gatherCancelToken
+    _      <- eventConsumersRegistry.run().start map gatherCancelToken
     result <- httpServer.run()
   } yield result
 

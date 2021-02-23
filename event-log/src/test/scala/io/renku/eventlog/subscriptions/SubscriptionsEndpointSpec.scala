@@ -28,7 +28,7 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
-import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry.{SubscriptionResult, SuccessfulSubscription, UnsupportedPayload}
+import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, SuccessfulSubscription, UnsupportedPayload}
 import org.http4s.MediaType.application
 import org.http4s.Status._
 import org.http4s._
@@ -118,7 +118,7 @@ class SubscriptionsEndpointSpec extends AnyWordSpec with MockFactory with should
   }
 
   private trait TestCase {
-    val subscriptionCategoryRegistry = mock[SubscriptionCategoryRegistry[IO]]
+    val subscriptionCategoryRegistry = mock[EventProducersRegistry[IO]]
     val logger                       = TestLogger[IO]()
     val addSubscription =
       new SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger).addSubscription _

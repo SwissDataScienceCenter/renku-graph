@@ -37,7 +37,7 @@ import io.renku.eventlog._
 import io.renku.eventlog.subscriptions.triplesgenerated.ProjectPrioritisation.{Priority, ProjectInfo}
 import io.renku.eventlog.subscriptions.{EventFinder, ProjectIds, SubscriptionTypeSerializers}
 
-import java.time.{Duration, Instant}
+import java.time.Instant
 import scala.language.postfixOps
 import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
@@ -48,7 +48,6 @@ private class TriplesGeneratedEventFinderImpl(
     underTransformationGauge:    LabeledGauge[IO, projects.Path],
     queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
     now:                         () => Instant = () => Instant.now,
-    maxProcessingTime:           Duration,
     projectsFetchingLimit:       Int Refined Positive,
     projectPrioritisation:       ProjectPrioritisation,
     pickRandomlyFrom:            List[ProjectIds] => Option[ProjectIds] = ids => ids.get(Random nextInt ids.size)
@@ -64,16 +63,15 @@ private class TriplesGeneratedEventFinderImpl(
       _ <- maybeUpdateMetrics(maybeProject, maybeTriplesGeneratedEvent)
     } yield maybeTriplesGeneratedEvent
 
-  private def findEventAndUpdateForProcessing() =
-    for {
-      maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
-                        .map(projectPrioritisation.prioritise)
-                        .map(selectProject)
-      maybeIdAndProjectAndBody <- maybeProject
-                                    .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
-                                    .getOrElse(Free.pure[ConnectionOp, Option[TriplesGeneratedEvent]](None))
-      maybeBody <- markAsTransformingTriples(maybeIdAndProjectAndBody)
-    } yield maybeProject -> maybeBody
+  private def findEventAndUpdateForProcessing() = for {
+    maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
+                      .map(projectPrioritisation.prioritise)
+                      .map(selectProject)
+    maybeIdAndProjectAndBody <- maybeProject
+                                  .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
+                                  .getOrElse(Free.pure[ConnectionOp, Option[TriplesGeneratedEvent]](None))
+    maybeBody <- markAsTransformingTriples(maybeIdAndProjectAndBody)
+  } yield maybeProject -> maybeBody
 
   // format: off
   private def findProjectsWithEventsInQueue = SqlQuery({fr"""
@@ -83,9 +81,8 @@ private class TriplesGeneratedEventFinderImpl(
           proj.latest_event_date
         FROM event evt
         JOIN project proj on evt.project_id = proj.project_id
-        WHERE ((""" ++ `status IN`(TriplesGenerated, TransformationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
-          OR (status = ${TransformingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
-        )
+        WHERE """ ++ `status IN`(TriplesGenerated, TransformationRecoverableFailure) ++ fr""" 
+          AND execution_date < ${now()}
         ORDER BY proj.latest_event_date DESC
         LIMIT ${projectsFetchingLimit.value}
       """ 
@@ -103,14 +100,14 @@ private class TriplesGeneratedEventFinderImpl(
            SELECT project_id, min(event_date) AS min_event_date
            FROM event
            WHERE project_id = ${idAndPath.id}
-             AND ((""" ++ `status IN`(TriplesGenerated, TransformationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
-               OR (status = ${TransformingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
+             AND """ ++ `status IN`(TriplesGenerated, TransformationRecoverableFailure) ++ fr""" 
+             AND execution_date < ${now()}
            GROUP BY project_id
          ) oldest_event_date
          JOIN event evt ON oldest_event_date.project_id = evt.project_id 
            AND oldest_event_date.min_event_date = evt.event_date
-           AND ((""" ++ `status IN`(TriplesGenerated, TransformationRecoverableFailure) ++ fr""" AND execution_date < ${now()})
-               OR (status = ${TransformingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime}))
+           AND """ ++ `status IN`(TriplesGenerated, TransformationRecoverableFailure) ++ fr""" 
+           AND execution_date < ${now()}
          JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id
            AND evt.project_id = evt_payload.project_id
          LIMIT 1
@@ -145,8 +142,9 @@ private class TriplesGeneratedEventFinderImpl(
   private def updateStatus(commitEventId: CompoundEventId) = SqlQuery(
     sql"""|UPDATE event 
           |SET status = ${TransformingTriples: EventStatus}, execution_date = ${now()}
-          |WHERE (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status <> ${TransformingTriples: EventStatus})
-          |  OR (event_id = ${commitEventId.id} AND project_id = ${commitEventId.projectId} AND status = ${TransformingTriples: EventStatus} AND execution_date < ${now() minus maxProcessingTime})
+          |WHERE event_id = ${commitEventId.id} 
+          |  AND project_id = ${commitEventId.projectId} 
+          |  AND status <> ${TransformingTriples: EventStatus}
           |""".stripMargin.update.run,
     name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - update status")
   )
@@ -167,7 +165,6 @@ private class TriplesGeneratedEventFinderImpl(
 
 private object IOTriplesGeneratedEventFinder {
 
-  private val MaxProcessingTime:     Duration             = Duration.ofHours(24)
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
   def apply(transactor:                  DbTransactor[IO, EventLogDB],
@@ -179,7 +176,6 @@ private object IOTriplesGeneratedEventFinder {
                                         awaitingTransformationGauge,
                                         underTransformationGauge,
                                         queriesExecTimes,
-                                        maxProcessingTime = MaxProcessingTime,
                                         projectsFetchingLimit = ProjectsFetchingLimit,
                                         projectPrioritisation = new ProjectPrioritisation()
     )

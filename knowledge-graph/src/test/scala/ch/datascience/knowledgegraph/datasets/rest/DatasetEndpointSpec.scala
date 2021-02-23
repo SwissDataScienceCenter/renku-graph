@@ -21,8 +21,6 @@ package ch.datascience.knowledgegraph.datasets.rest
 import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.InfoMessage
 import ch.datascience.generators.CommonGraphGenerators.{renkuBaseUrls, renkuResourcesUrls}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -32,11 +30,12 @@ import ch.datascience.graph.model.datasets._
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.Links
 import ch.datascience.http.rest.Links.Rel.Self
 import ch.datascience.http.rest.Links.{Href, Rel}
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
@@ -45,7 +44,7 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder._
 import io.circe.syntax._
-import io.circe.{Decoder, Json}
+import io.circe.{Decoder, DecodingFailure, Json}
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.circe.jsonOf
@@ -157,8 +156,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       name             <- cursor.downField("name").as[Name]
       url              <- cursor.downField("url").as[Url]
       maybeDescription <- cursor.downField("description").as[Option[Description]]
-      published        <- cursor.downField("published").as[DatasetPublishing]
-      created          <- cursor.downField("created").as[DateCreated]
+      published        <- cursor.downField("published").as[(Set[DatasetCreator], Option[PublishedDate])]
+      maybeDateCreated <- cursor.downField("created").as[Option[DateCreated]]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
       projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
       keywords         <- cursor.downField("keywords").as[List[Keyword]]
@@ -166,6 +165,9 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
       versions         <- cursor.downField("versions").as[DatasetVersions]
       images           <- cursor.downField("images").as[List[ImageUri]]
+      dates <- Dates
+                 .from(maybeDateCreated, published._2)
+                 .leftMap(e => DecodingFailure(e.getMessage, Nil))
     } yield maybeSameAs
       .map { sameAs =>
         NonModifiedDataset(id,
@@ -175,8 +177,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                            sameAs,
                            versions,
                            maybeDescription,
-                           published,
-                           created,
+                           published._1,
+                           dates,
                            parts,
                            projects,
                            keywords,
@@ -192,8 +194,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                           derivedFrom,
                           versions,
                           maybeDescription,
-                          published,
-                          created,
+                          published._1,
+                          dates,
                           parts,
                           projects,
                           keywords,
@@ -203,11 +205,11 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       )
       .getOrElse(fail("Cannot decode payload as Dataset"))
 
-  private implicit lazy val publishingDecoder: Decoder[DatasetPublishing] = cursor =>
+  private implicit lazy val publishingDecoder: Decoder[(Set[DatasetCreator], Option[PublishedDate])] = cursor =>
     for {
       maybeDate <- cursor.downField("datePublished").as[Option[PublishedDate]]
       creators  <- cursor.downField("creator").as[List[DatasetCreator]].map(_.toSet)
-    } yield DatasetPublishing(maybeDate, creators)
+    } yield creators -> maybeDate
 
   private implicit lazy val creatorDecoder: Decoder[DatasetCreator] = cursor =>
     for {

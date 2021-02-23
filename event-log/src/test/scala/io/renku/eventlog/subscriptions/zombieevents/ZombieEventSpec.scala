@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -28,8 +29,8 @@ class ZombieEventSpec extends AnyWordSpec with should.Matchers {
   "toString" should {
 
     "print out the id and status" in {
-      val event = ZombieEvent(compoundEventIds.generateOne, eventStatuses.generateOne)
-      event.toString shouldBe s"ZombieEvent ${event.eventId}, status = ${event.status}"
+      val event = ZombieEvent(compoundEventIds.generateOne, projectPaths.generateOne, eventStatuses.generateOne)
+      event.toString shouldBe s"ZombieEvent ${event.eventId}, projectPath = ${event.projectPath}, status = ${event.status}"
     }
   }
 }

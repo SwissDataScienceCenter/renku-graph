@@ -24,6 +24,8 @@ import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events._
 import org.scalacheck.Gen
 
+import java.time.Duration
+
 object EventsGenerators {
 
   implicit val categoryNames:  Gen[CategoryName]  = nonBlankStrings() map (value => CategoryName(value.value))
@@ -48,4 +50,7 @@ object EventsGenerators {
     eventId   <- eventIds
     projectId <- projectIds
   } yield CompoundEventId(eventId, projectId)
+
+  implicit lazy val eventProcessingTimes: Gen[EventProcessingTime] =
+    javaDurations(min = Duration ofMinutes 10).map(EventProcessingTime.apply)
 }

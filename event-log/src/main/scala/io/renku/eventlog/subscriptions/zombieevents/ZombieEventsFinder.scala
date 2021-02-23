@@ -23,7 +23,7 @@ import cats.free.Free
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import doobie.free.connection.ConnectionOp
@@ -31,7 +31,7 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.subscriptions.EventFinder
-import io.renku.eventlog.{EventLogDB, EventProcessingTime, TypeSerializers}
+import io.renku.eventlog.{EventLogDB, TypeSerializers}
 
 import java.time.{Duration, Instant}
 
@@ -105,15 +105,16 @@ private class ZombieEventsFinderImpl(transactor:             DbTransactor[IO, Ev
   private def queryZombieEvent(projectId: projects.Id, status: EventStatus, processingTime: EventProcessingTime) =
     measureExecutionTime {
       SqlQuery(
-        sql"""|SELECT evt.event_id, evt.project_id, evt.status
+        sql"""|SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
               |FROM event evt
-              |WHERE project_id = $projectId 
-              |  AND status = $status
-              |  AND (message IS NULL OR message <> $zombieMessage)
+              |JOIN project proj ON evt.project_id = proj.project_id
+              |WHERE evt.project_id = $projectId 
+              |  AND evt.status = $status
+              |  AND (evt.message IS NULL OR evt.message <> $zombieMessage)
               |  AND ((${now()} - evt.execution_date) > ${processingTime * maxProcessingTimeRatio})
               |LIMIT 1
-    """.stripMargin
-          .query[(CompoundEventId, EventStatus)]
+              |""".stripMargin
+          .query[(CompoundEventId, projects.Path, EventStatus)]
           .map(ZombieEvent.tupled.apply _)
           .option,
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find")
@@ -144,7 +145,7 @@ private class ZombieEventsFinderImpl(transactor:             DbTransactor[IO, Ev
 private object ZombieEventsFinder {
 
   private val MaxProcessingTimeRatio: Int Refined Positive = 2
-  private val MaxProcessingTime:      EventProcessingTime  = EventProcessingTime(Duration ofHours 1)
+  private val MaxProcessingTime:      EventProcessingTime  = EventProcessingTime(Duration ofDays 7)
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],

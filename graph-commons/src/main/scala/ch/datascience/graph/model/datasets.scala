@@ -18,9 +18,9 @@
 
 package ch.datascience.graph.model
 
-import java.time.{Instant, LocalDate}
+import java.time.{Instant, LocalDate, ZoneId}
 import java.util.UUID
-
+import cats.syntax.all._
 import ch.datascience.graph.Schemas._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
@@ -160,6 +160,39 @@ object datasets {
   implicit object PublishedDate
       extends TinyTypeFactory[PublishedDate](new PublishedDate(_))
       with LocalDateNotInTheFuture
+
+  sealed trait Dates {
+    val date: Instant
+    val maybeDateCreated:   Option[DateCreated]   = None
+    val maybeDatePublished: Option[PublishedDate] = None
+  }
+  final object Dates {
+
+    def apply(created:   DateCreated, published: PublishedDate): Dates = AllDatasetDates(published, created)
+    def apply(published: PublishedDate): Dates = ImportedDatasetDates(published)
+    def apply(created:   DateCreated): Dates = RenkuDatasetDates(created)
+
+    def from: (Option[DateCreated], Option[PublishedDate]) => Either[IllegalArgumentException, Dates] = {
+      case (Some(created), Some(published)) => AllDatasetDates(published, created).asRight[IllegalArgumentException]
+      case (Some(created), None)            => RenkuDatasetDates(created).asRight[IllegalArgumentException]
+      case (None, Some(published))          => ImportedDatasetDates(published).asRight[IllegalArgumentException]
+      case _                                => new IllegalArgumentException("No datasets dates").asLeft[Dates]
+    }
+
+    final case class ImportedDatasetDates(publishedDate: PublishedDate) extends Dates {
+      override lazy val date:          Instant               = publishedDate.value.atStartOfDay(ZoneId.systemDefault).toInstant
+      override val maybeDatePublished: Option[PublishedDate] = Some(publishedDate)
+    }
+    final case class RenkuDatasetDates(dateCreated: DateCreated) extends Dates {
+      override lazy val date:        Instant             = dateCreated.value
+      override val maybeDateCreated: Option[DateCreated] = Some(dateCreated)
+    }
+    final case class AllDatasetDates(publishedDate: PublishedDate, dateCreated: DateCreated) extends Dates {
+      override lazy val date:          Instant               = publishedDate.value.atStartOfDay(ZoneId.systemDefault).toInstant
+      override val maybeDateCreated:   Option[DateCreated]   = Some(dateCreated)
+      override val maybeDatePublished: Option[PublishedDate] = Some(publishedDate)
+    }
+  }
 
   final class PartName private (val value: String) extends AnyVal with StringTinyType
   implicit object PartName extends TinyTypeFactory[PartName](new PartName(_)) with NonBlank

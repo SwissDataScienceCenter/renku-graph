@@ -96,7 +96,6 @@ class ProjectsResourcesSpec
   private val parentProjectCommit = commitIds.generateOne
   private val dataset = nonModifiedDatasets().generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
-    published = datasetPublishingInfos.generateOne.copy(maybeDate = Some(datasetPublishedDates.generateOne)),
     projects = List(DatasetProject(project.path, project.name, addedToProjectObjects.generateOne))
   )
 

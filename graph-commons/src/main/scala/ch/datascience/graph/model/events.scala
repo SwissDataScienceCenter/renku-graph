@@ -21,10 +21,14 @@ package ch.datascience.graph.model
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
-import io.circe.Decoder
+import ch.datascience.tinytypes.json.TinyTypeDecoders.durationDecoder
+import ch.datascience.tinytypes.json.TinyTypeEncoders.durationEncoder
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.numeric.Positive
+import io.circe.{Decoder, Encoder}
 import io.circe.Decoder.decodeString
 
-import java.time.{Clock, Instant}
+import java.time.{Clock, Duration, Instant}
 
 object events {
 
@@ -92,6 +96,7 @@ object events {
       override val value: String = "NEW"
     }
 
+    type GeneratingTriples = GeneratingTriples.type
     final case object GeneratingTriples extends EventStatus {
       override val value: String = "GENERATING_TRIPLES"
     }
@@ -100,6 +105,7 @@ object events {
       override val value: String = "TRIPLES_GENERATED"
     }
 
+    type TransformingTriples = TransformingTriples.type
     final case object TransformingTriples extends EventStatus {
       override val value: String = "TRANSFORMING_TRIPLES"
     }
@@ -149,4 +155,21 @@ object events {
     }
   }
 
+  final class EventProcessingTime private (val value: Duration) extends AnyVal with DurationTinyType
+  object EventProcessingTime
+      extends TinyTypeFactory[EventProcessingTime](new EventProcessingTime(_))
+      with DurationNotNegative {
+
+    implicit val decoder: Decoder[EventProcessingTime] = durationDecoder(EventProcessingTime)
+    implicit val encoder: Encoder[EventProcessingTime] = durationEncoder
+
+    implicit class EventProcessingTimeOps(processingTime: EventProcessingTime) {
+
+      def *(multiplier: Int Refined Positive): EventProcessingTime =
+        EventProcessingTime(Duration.ofMillis(processingTime.value.toMillis * multiplier.value))
+
+      def /(multiplier: Int Refined Positive): EventProcessingTime =
+        EventProcessingTime(Duration.ofMillis(processingTime.value.toMillis / multiplier.value))
+    }
+  }
 }

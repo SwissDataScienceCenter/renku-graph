@@ -39,6 +39,8 @@ private class ProjectPrioritisationImpl[Interpretation[_]](subscribers: Subscrib
     extends ProjectPrioritisation[Interpretation] {
   import ProjectPrioritisation.Priority._
 
+  private val FreeSpotsRatio = .15
+
   override def prioritise(projects: List[ProjectInfo]): List[(ProjectIds, Priority)] =
     (rejectProjectsAboveOccupancyThreshold _ >>>
       findPrioritiesBasedOnLatestEventDate >>>
@@ -48,14 +50,16 @@ private class ProjectPrioritisationImpl[Interpretation[_]](subscribers: Subscrib
     subscribers.getTotalCapacity
       .map(_.value)
       .map { totalCapacity =>
-        val threshold = if ((totalCapacity * .1).ceil.intValue() < 2) 2 else (totalCapacity * .1).ceil.intValue()
+        val freeSpots =
+          if ((totalCapacity * FreeSpotsRatio).ceil.intValue() < 2) 2
+          else (totalCapacity * FreeSpotsRatio).ceil.intValue()
         projects match {
           case Nil => Nil
           case projects =>
             val totalOccupancy = projects.map(_.currentOccupancy.value).sum
             projects.foldLeft(List.empty[ProjectInfo]) { (acc, project) =>
               if (project.currentOccupancy.value == 0) acc :+ project
-              else if (totalOccupancy < totalCapacity - threshold) acc :+ project
+              else if (totalOccupancy < totalCapacity - freeSpots) acc :+ project
               else acc
             }
         }

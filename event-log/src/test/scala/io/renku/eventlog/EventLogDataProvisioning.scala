@@ -19,12 +19,12 @@
 package io.renku.eventlog
 
 import cats.syntax.all._
-import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
-import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventStatus}
-import ch.datascience.graph.model.projects.Path
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.{TransformationRecoverableFailure, TransformingTriples, TriplesGenerated}
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.projects.Path
 import doobie.implicits._
 
 import java.time.Instant

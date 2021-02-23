@@ -19,18 +19,18 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated
 
 import cats.MonadError
+import ch.datascience.events.consumers.Project
 import ch.datascience.generators.CommonGraphGenerators._
-import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventBody
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.events.categories.models.Project
 import io.circe._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Try}
 
 class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
 

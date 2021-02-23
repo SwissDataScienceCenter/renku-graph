@@ -22,11 +22,11 @@ import cats.Applicative
 import cats.effect.concurrent.Ref
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.events.consumers.EventConsumersRegistry
 import ch.datascience.graph.Schemas.rdf
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
-import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
@@ -49,20 +49,22 @@ trait ReProvisioningStatus[Interpretation[_]] {
 }
 
 private class ReProvisioningStatusImpl(
-    subscriptionMechanismRegistry: SubscriptionMechanismRegistry[IO],
-    rdfStoreConfig:                RdfStoreConfig,
-    renkuBaseUrl:                  RenkuBaseUrl,
-    logger:                        Logger[IO],
-    timeRecorder:                  SparqlQueryTimeRecorder[IO],
-    statusRefreshInterval:         FiniteDuration,
-    cacheRefreshInterval:          FiniteDuration,
-    lastCacheCheckTimeRef:         Ref[IO, Long]
-)(implicit executionContext:       ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    eventConsumersRegistry:  EventConsumersRegistry[IO],
+    rdfStoreConfig:          RdfStoreConfig,
+    renkuBaseUrl:            RenkuBaseUrl,
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO],
+    statusRefreshInterval:   FiniteDuration,
+    cacheRefreshInterval:    FiniteDuration,
+    lastCacheCheckTimeRef:   Ref[IO, Long]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with ReProvisioningStatus[IO] {
 
+  private val applicative = Applicative[IO]
   import ReProvisioningJsonLD._
-  import subscriptionMechanismRegistry._
+  import applicative._
+  import eventConsumersRegistry._
 
   private val runningStatusCheckStarted = new AtomicBoolean(false)
 
@@ -119,7 +121,7 @@ private class ReProvisioningStatusImpl(
     } yield ()
 
   private def triggerPeriodicStatusCheck(): IO[Unit] =
-    Applicative[IO].whenA(!runningStatusCheckStarted.get()) {
+    whenA(!runningStatusCheckStarted.get()) {
       runningStatusCheckStarted set true
       periodicStatusCheck.start.void
     }
@@ -167,10 +169,10 @@ object ReProvisioningStatus {
   private val StatusRefreshInterval: FiniteDuration = 15 seconds
 
   def apply(
-      subscriptionMechanismRegistry: SubscriptionMechanismRegistry[IO],
-      logger:                        Logger[IO],
-      timeRecorder:                  SparqlQueryTimeRecorder[IO],
-      configuration:                 Config = ConfigFactory.load()
+      eventConsumersRegistry: EventConsumersRegistry[IO],
+      logger:                 Logger[IO],
+      timeRecorder:           SparqlQueryTimeRecorder[IO],
+      configuration:          Config = ConfigFactory.load()
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
@@ -180,7 +182,7 @@ object ReProvisioningStatus {
       rdfStoreConfig        <- RdfStoreConfig[IO](configuration)
       renkuBaseUrl          <- RenkuBaseUrl[IO]()
       lastCacheCheckTimeRef <- Ref.of[IO, Long](0)
-    } yield new ReProvisioningStatusImpl(subscriptionMechanismRegistry,
+    } yield new ReProvisioningStatusImpl(eventConsumersRegistry,
                                          rdfStoreConfig,
                                          renkuBaseUrl,
                                          logger,

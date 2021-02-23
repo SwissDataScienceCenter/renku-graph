@@ -20,6 +20,7 @@ package io.renku.eventlog
 
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
+import ch.datascience.events.consumers.EventConsumersRegistry
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.http.server.IOHttpServer
@@ -28,7 +29,7 @@ import ch.datascience.metrics.GaugeResetScheduler
 import ch.datascience.testtools.MockedRunnableCollaborators
 import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.metrics.EventLogMetrics
-import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry
+import io.renku.eventlog.subscriptions.EventProducersRegistry
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -52,7 +53,8 @@ class MicroserviceRunnerSpec
         given(sentryInitializer).succeeds(returning = ())
         given(dbInitializer).succeeds(returning = ())
         given(metrics).succeeds(returning = ())
-        given(subscriptionCategoryRegistry).succeeds(returning = ())
+        given(eventProducersRegistry).succeeds(returning = ())
+        given(eventConsumersRegistry).succeeds(returning = ())
         given(gaugeScheduler).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -98,7 +100,8 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).succeeds(returning = ())
-      given(subscriptionCategoryRegistry).succeeds(returning = ())
+      given(eventProducersRegistry).succeeds(returning = ())
+      given(eventConsumersRegistry).succeeds(returning = ())
       given(gaugeScheduler).succeeds(returning = ())
       val exception = exceptions.generateOne
       given(httpServer).fails(becauseOf = exception)
@@ -108,13 +111,28 @@ class MicroserviceRunnerSpec
       } shouldBe exception
     }
 
-    "return Success ExitCode even if Events Distributor initialisation fails" in new TestCase {
+    "return Success ExitCode even if Event Producers Registry initialisation fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).succeeds(returning = ())
-      given(subscriptionCategoryRegistry).fails(becauseOf = exceptions.generateOne)
+      given(eventProducersRegistry).fails(becauseOf = exceptions.generateOne)
+      given(eventConsumersRegistry).succeeds(returning = ())
+      given(gaugeScheduler).succeeds(returning = ())
+      given(httpServer).succeeds(returning = ExitCode.Success)
+
+      runner.run().unsafeRunSync() shouldBe ExitCode.Success
+    }
+
+    "return Success ExitCode even if Event Consumers Registry initialisation fails" in new TestCase {
+
+      given(certificateLoader).succeeds(returning = ())
+      given(sentryInitializer).succeeds(returning = ())
+      given(dbInitializer).succeeds(returning = ())
+      given(metrics).succeeds(returning = ())
+      given(eventProducersRegistry).succeeds(returning = ())
+      given(eventConsumersRegistry).fails(becauseOf = exceptions.generateOne)
       given(gaugeScheduler).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -127,7 +145,8 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).fails(becauseOf = exceptions.generateOne)
-      given(subscriptionCategoryRegistry).succeeds(returning = ())
+      given(eventProducersRegistry).succeeds(returning = ())
+      given(eventConsumersRegistry).succeeds(returning = ())
       given(gaugeScheduler).succeeds(returning = ())
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -140,7 +159,8 @@ class MicroserviceRunnerSpec
       given(sentryInitializer).succeeds(returning = ())
       given(dbInitializer).succeeds(returning = ())
       given(metrics).succeeds(returning = ())
-      given(subscriptionCategoryRegistry).succeeds(returning = ())
+      given(eventProducersRegistry).succeeds(returning = ())
+      given(eventConsumersRegistry).succeeds(returning = ())
       given(gaugeScheduler).fails(becauseOf = exceptions.generateOne)
       given(httpServer).succeeds(returning = ExitCode.Success)
 
@@ -152,19 +172,21 @@ class MicroserviceRunnerSpec
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-    val certificateLoader            = mock[CertificateLoader[IO]]
-    val sentryInitializer            = mock[IOSentryInitializer]
-    val dbInitializer                = mock[DbInitializer[IO]]
-    val subscriptionCategoryRegistry = mock[SubscriptionCategoryRegistry[IO]]
-    val metrics                      = mock[EventLogMetrics[IO]]
-    val httpServer                   = mock[IOHttpServer]
-    val gaugeScheduler               = mock[GaugeResetScheduler[IO]]
+    val certificateLoader      = mock[CertificateLoader[IO]]
+    val sentryInitializer      = mock[IOSentryInitializer]
+    val dbInitializer          = mock[DbInitializer[IO]]
+    val eventProducersRegistry = mock[EventProducersRegistry[IO]]
+    val eventConsumersRegistry = mock[EventConsumersRegistry[IO]]
+    val metrics                = mock[EventLogMetrics[IO]]
+    val httpServer             = mock[IOHttpServer]
+    val gaugeScheduler         = mock[GaugeResetScheduler[IO]]
     val runner = new MicroserviceRunner(
       certificateLoader,
       sentryInitializer,
       dbInitializer,
       metrics,
-      subscriptionCategoryRegistry,
+      eventProducersRegistry,
+      eventConsumersRegistry,
       gaugeScheduler,
       httpServer,
       new ConcurrentHashMap[CancelToken[IO], Unit]()

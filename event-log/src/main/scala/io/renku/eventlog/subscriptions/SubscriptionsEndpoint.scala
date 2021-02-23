@@ -23,13 +23,13 @@ import cats.effect.Effect
 import ch.datascience.http.ErrorMessage
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
-import io.renku.eventlog.subscriptions.SubscriptionCategoryRegistry.{SubscriptionResult, UnsupportedPayload}
+import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, UnsupportedPayload}
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal
 
 class SubscriptionsEndpoint[Interpretation[_]: Effect](
-    subscriptionCategoryRegistry: SubscriptionCategoryRegistry[Interpretation],
+    subscriptionCategoryRegistry: EventProducersRegistry[Interpretation],
     logger:                       Logger[Interpretation]
 )(implicit ME:                    MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation] {
@@ -93,7 +93,7 @@ object IOSubscriptionsEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply[T <: SubscriptionInfo](
-      subscriptionCategoryRegistry: SubscriptionCategoryRegistry[IO],
+      subscriptionCategoryRegistry: EventProducersRegistry[IO],
       logger:                       Logger[IO]
   )(implicit contextShift:          ContextShift[IO]): IO[SubscriptionsEndpoint[IO]] = IO {
     new SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)

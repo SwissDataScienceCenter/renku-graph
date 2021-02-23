@@ -22,12 +22,13 @@ import cats.MonadError
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.config.renku
-import ch.datascience.http.InfoMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.datasets.PublishedDate
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.rest.paging.PagingRequest.Decoders.{page, perPage}
 import ch.datascience.http.rest.paging.model.Total
 import ch.datascience.http.rest.paging.{PagingHeaders, PagingResponse}
@@ -35,11 +36,12 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
-import ch.datascience.knowledgegraph.datasets.model.{DatasetCreator, DatasetPublishing}
+import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsFinder.{DatasetSearchResult, ProjectsCount}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Query.{Phrase, query}
 import ch.datascience.knowledgegraph.datasets.rest.DatasetsSearchEndpoint.Sort
 import ch.datascience.logging.TestExecutionTimeRecorder
+import eu.timepit.refined.auto._
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -126,8 +128,8 @@ class DatasetsSearchEndpointSpec
 
     "list only name, datePublished and projectsCount" in {
       DatasetsSearchEndpoint.Sort.properties shouldBe Set(TitleProperty,
+                                                          DateProperty,
                                                           DatePublishedProperty,
-                                                          DateCreatedProperty,
                                                           ProjectsCountProperty
       )
     }
@@ -158,13 +160,13 @@ class DatasetsSearchEndpointSpec
     ).searchForDatasets _
 
     lazy val toJson: DatasetSearchResult => Json = {
-      case DatasetSearchResult(id, title, name, maybeDescription, published, created, projectsCount, images) =>
+      case DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, images) =>
         json"""{
           "identifier": $id,
           "title": $title,
           "name": $name,
-          "published": $published,
-          "created": $created,
+          "published": ${creators -> dates.maybeDatePublished},
+          "date": ${dates.date},
           "projectsCount": ${projectsCount.value},
           "images": ${images.map(_.value)},
           "_links": [{
@@ -174,12 +176,18 @@ class DatasetsSearchEndpointSpec
         }""" addIfDefined "description" -> maybeDescription
     }
 
-    private implicit lazy val publishingEncoder: Encoder[DatasetPublishing] = Encoder.instance[DatasetPublishing] {
-      case DatasetPublishing(maybeDate, creators) =>
-        json"""{
-        "creator": $creators
-      }""" addIfDefined "datePublished" -> maybeDate
-    }
+    private implicit lazy val publishingEncoder: Encoder[(Set[DatasetCreator], Option[PublishedDate])] =
+      Encoder.instance[(Set[DatasetCreator], Option[PublishedDate])] {
+        case (creators, Some(date)) =>
+          json"""{
+          "creator": $creators,
+          "datePublished": $date
+        }"""
+        case (creators, None) =>
+          json"""{
+          "creator": $creators
+        }"""
+      }
 
     private implicit lazy val creatorEncoder: Encoder[DatasetCreator] = Encoder.instance[DatasetCreator] {
       case DatasetCreator(maybeEmail, name, _) =>
@@ -201,9 +209,9 @@ class DatasetsSearchEndpointSpec
     title            <- datasetTitles
     name             <- datasetNames
     maybeDescription <- Gen.option(datasetDescriptions)
-    published        <- datasetPublishingInfos
-    created          <- datasetCreatedDates
+    creators         <- nonEmptySet(datasetCreators, maxElements = 4)
+    dates            <- datasetDates
     projectsCount    <- nonNegativeInts() map (_.value) map ProjectsCount.apply
     images           <- listOf(imageUris)
-  } yield DatasetSearchResult(id, title, name, maybeDescription, published, created, projectsCount, images)
+  } yield DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, images)
 }

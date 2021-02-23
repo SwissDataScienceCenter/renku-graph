@@ -21,12 +21,12 @@ package categories.awaitinggeneration.subscriptions
 
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
-import ch.datascience.triplesgenerator.events.subscriptions.SubscriberUrl
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 
 private final case class Payload(categoryName:  CategoryName,
                                  subscriberUrl: SubscriberUrl,
                                  capacity:      GenerationProcessesNumber
-) extends subscriptions.SubscriptionPayload
+) extends ch.datascience.events.consumers.subscriptions.SubscriptionPayload
 
 private object Payload {
   import io.circe.Encoder

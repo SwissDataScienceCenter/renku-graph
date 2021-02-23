@@ -22,16 +22,9 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.data.EitherT.right
 import cats.effect.{Effect, Timer}
-import ch.datascience.config.GitLab
-import ch.datascience.control.Throttler
-import ch.datascience.graph.model.RenkuVersionPair
+import ch.datascience.events.consumers.{EventConsumersRegistry, EventRequestContent, EventSchedulingResult}
 import ch.datascience.http.ErrorMessage
-import ch.datascience.metrics.MetricsRegistry
-import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import ch.datascience.triplesgenerator.events.IOEventEndpoint.EventRequestContent
-import ch.datascience.triplesgenerator.events.subscriptions.SubscriptionMechanismRegistry
 import ch.datascience.triplesgenerator.reprovisioning.ReProvisioningStatus
-import io.chrisdavenport.log4cats.Logger
 import io.circe.Json
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -46,13 +39,12 @@ trait EventEndpoint[Interpretation[_]] {
 }
 
 class EventEndpointImpl[Interpretation[_]: Effect](
-    eventHandlers:        List[EventHandler[Interpretation]],
-    reProvisioningStatus: ReProvisioningStatus[Interpretation]
-)(implicit ME:            MonadError[Interpretation, Throwable])
+    eventConsumersRegistry: EventConsumersRegistry[Interpretation],
+    reProvisioningStatus:   ReProvisioningStatus[Interpretation]
+)(implicit ME:              MonadError[Interpretation, Throwable])
     extends Http4sDsl[Interpretation]
     with EventEndpoint[Interpretation] {
 
-  import EventSchedulingResult._
   import cats.syntax.all._
   import ch.datascience.http.InfoMessage
   import ch.datascience.http.InfoMessage._
@@ -66,27 +58,13 @@ class EventEndpointImpl[Interpretation[_]: Effect](
           multipart    <- toMultipart(request)
           eventJson    <- toEvent(multipart)
           maybePayload <- getPayload(multipart)
-          result <-
-            right[Response[Interpretation]](
-              tryNextHandler(EventRequestContent(eventJson, maybePayload), eventHandlers).flatMap(toHttpResult)
-            )
+          result <- right[Response[Interpretation]](
+                      eventConsumersRegistry.handle(EventRequestContent(eventJson, maybePayload)) >>= toHttpResult
+                    )
         } yield result
       }.merge recoverWith { case NonFatal(error) =>
         toHttpResult(EventSchedulingResult.SchedulingError(error))
       }
-    }
-
-  private def tryNextHandler(requestContent: EventRequestContent,
-                             handlers:       List[EventHandler[Interpretation]]
-  ): Interpretation[EventSchedulingResult] =
-    handlers.headOption match {
-      case Some(handler) =>
-        handler.handle(requestContent).flatMap {
-          case UnsupportedEventType => tryNextHandler(requestContent, handlers.tail)
-          case otherResult          => otherResult.pure[Interpretation]
-        }
-      case None =>
-        (UnsupportedEventType: EventSchedulingResult).pure[Interpretation]
     }
 
   private lazy val toHttpResult: EventSchedulingResult => Interpretation[Response[Interpretation]] = {
@@ -100,9 +78,12 @@ class EventEndpointImpl[Interpretation[_]: Effect](
   private def toMultipart(
       request: Request[Interpretation]
   ): EitherT[Interpretation, Response[Interpretation], Multipart[Interpretation]] = EitherT {
-    request.as[Multipart[Interpretation]].map(_.asRight[Response[Interpretation]]) recoverWith { case NonFatal(_) =>
-      BadRequest(ErrorMessage("Not multipart request")).map(_.asLeft[Multipart[Interpretation]])
-    }
+    request
+      .as[Multipart[Interpretation]]
+      .map(_.asRight[Response[Interpretation]])
+      .recoverWith { case NonFatal(_) =>
+        BadRequest(ErrorMessage("Not multipart request")).map(_.asLeft[Multipart[Interpretation]])
+      }
   }
 
   private def toEvent(multipart: Multipart[Interpretation]): EitherT[Interpretation, Response[Interpretation], Json] =
@@ -134,38 +115,12 @@ object IOEventEndpoint {
   import cats.effect.{ContextShift, IO}
 
   def apply(
-      currentVersionPair:            RenkuVersionPair,
-      metricsRegistry:               MetricsRegistry[IO],
-      gitLabThrottler:               Throttler[IO, GitLab],
-      timeRecorder:                  SparqlQueryTimeRecorder[IO],
-      subscriptionMechanismRegistry: SubscriptionMechanismRegistry[IO],
-      reProvisioningStatus:          ReProvisioningStatus[IO],
-      logger:                        Logger[IO]
+      eventConsumersRegistry: EventConsumersRegistry[IO],
+      reProvisioningStatus:   ReProvisioningStatus[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext,
       timer:            Timer[IO]
-  ): IO[EventEndpoint[IO]] =
-    for {
-      awaitingGenerationHandler <- categories.awaitinggeneration.EventHandler(currentVersionPair,
-                                                                              metricsRegistry,
-                                                                              gitLabThrottler,
-                                                                              timeRecorder,
-                                                                              subscriptionMechanismRegistry,
-                                                                              logger
-                                   )
+  ): IO[EventEndpoint[IO]] = IO(new EventEndpointImpl[IO](eventConsumersRegistry, reProvisioningStatus))
 
-      membersSyncHandler <- categories.membersync.EventHandler(gitLabThrottler, logger, timeRecorder)
-      triplesGeneratedHandler <- categories.triplesgenerated.EventHandler(metricsRegistry,
-                                                                          gitLabThrottler,
-                                                                          timeRecorder,
-                                                                          subscriptionMechanismRegistry,
-                                                                          logger
-                                 )
-    } yield new EventEndpointImpl[IO](
-      List(awaitingGenerationHandler, membersSyncHandler, triplesGeneratedHandler),
-      reProvisioningStatus
-    )
-
-  case class EventRequestContent(event: Json, maybePayload: Option[String])
 }

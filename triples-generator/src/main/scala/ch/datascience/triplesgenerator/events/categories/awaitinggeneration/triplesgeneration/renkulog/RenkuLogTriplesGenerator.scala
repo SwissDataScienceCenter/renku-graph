@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.tri
 
 import cats.Applicative
 import cats.data.EitherT
-import cats.data.EitherT.{right, rightT}
+import cats.data.EitherT.right
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabUrl, RenkuLogTimeout}
@@ -30,9 +30,8 @@ import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent._
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.GenerationResult._
+import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.{GitLabRepoUrlFinder, RepositoryPath}
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.{GenerationResult, TriplesGenerator}
 
 import java.security.SecureRandom
 import scala.concurrent.ExecutionContext
@@ -61,7 +60,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
 
   override def generateTriples(
       commitEvent:             CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
+  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
     EitherT {
       createRepositoryDirectory(commitEvent.project.path)
         .bracket(path => cloneCheckoutGenerate(commitEvent)(maybeAccessToken, RepositoryPath(path)))(deleteDirectory)
@@ -71,11 +70,11 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
   private def cloneCheckoutGenerate(commitEvent: CommitEvent)(implicit
       maybeAccessToken:                          Option[AccessToken],
       repoDirectory:                             RepositoryPath
-  ): IO[Either[ProcessingRecoverableError, GenerationResult]] = {
+  ): IO[Either[ProcessingRecoverableError, JsonLDTriples]] = {
     for {
       _      <- prepareRepository(commitEvent)
       _      <- cleanUpRepository().toRight
-      result <- processEvent(commitEvent)
+      result <- migrateAndLog(commitEvent)
     } yield result
   }.value
 
@@ -102,21 +101,13 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
     }
   }
 
-  private def processEvent(
-      commitEvent:          CommitEvent
-  )(implicit repoDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
-    git.findCommitMessage(commitEvent.commitId).toRight flatMap {
-      case message if message contains "renku migrate" => rightT[IO, ProcessingRecoverableError](MigrationEvent)
-      case _                                           => migrateAndLog(commitEvent)
-    }
-
   private def migrateAndLog(
       commitEvent:          CommitEvent
-  )(implicit repoDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, GenerationResult] =
+  )(implicit repoDirectory: RepositoryPath): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
     for {
       _       <- renku.migrate(commitEvent).toRight
       triples <- findTriples(commitEvent)
-    } yield Triples(triples)
+    } yield triples
 
   private implicit class IOOps[Right](io: IO[Right]) {
     lazy val toRight: EitherT[IO, ProcessingRecoverableError, Right] = right[ProcessingRecoverableError](io)
@@ -145,18 +136,17 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
 
   private def meaningfulError(
       maybeAccessToken: Option[AccessToken]
-  ): PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, GenerationResult]]] = {
-    case NonFatal(exception) =>
-      IO.raiseError {
-        (Option(exception.getMessage) -> maybeAccessToken)
-          .mapN { (message, token) =>
-            if (message contains token.value)
-              new Exception(s"Triples generation failed: ${message.replaceAll(token.value, token.toString)}")
-            else
-              new Exception("Triples generation failed", exception)
-          }
-          .getOrElse(new Exception("Triples generation failed", exception))
-      }
+  ): PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, JsonLDTriples]]] = { case NonFatal(exception) =>
+    IO.raiseError {
+      (Option(exception.getMessage) -> maybeAccessToken)
+        .mapN { (message, token) =>
+          if (message contains token.value)
+            new Exception(s"Triples generation failed: ${message.replaceAll(token.value, token.toString)}")
+          else
+            new Exception("Triples generation failed", exception)
+        }
+        .getOrElse(new Exception("Triples generation failed", exception))
+    }
   }
 }
 
