@@ -1,6 +1,6 @@
 package io.renku.eventlog.init
 
-import cats.effect.{Bracket, IO}
+import cats.effect.Bracket
 import ch.datascience.db.DbTransactor
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -34,8 +34,8 @@ private class EventDeliveryTableCreatorImpl[Interpretation[_]](
 
   private def createTable = for {
     _ <- createTableSql.run transact transactor.get
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_processing_time(event_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_processing_time(project_id)")
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON event_delivery(event_id)")
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON event_delivery(project_id)")
     _ <- logger info "'event_delivery' table created"
     _ <- foreignKeySql.run transact transactor.get
   } yield ()

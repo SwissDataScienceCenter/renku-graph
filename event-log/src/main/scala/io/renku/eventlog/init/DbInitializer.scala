@@ -44,6 +44,7 @@ class DbInitializerImpl[Interpretation[_]](
     subscriptionCategorySyncTimeTableCreator: SubscriptionCategorySyncTimeTableCreator[Interpretation],
     statusesProcessingTimeTableCreator:       StatusesProcessingTimeTableCreator[Interpretation],
     eventDeliveryTableCreator:                EventDeliveryTableCreator[Interpretation],
+    subscriberTableCreator:                   SubscriberTableCreator[Interpretation],
     logger:                                   Logger[Interpretation]
 )(implicit ME:                                Bracket[Interpretation, Throwable])
     extends DbInitializer[Interpretation] {
@@ -63,6 +64,7 @@ class DbInitializerImpl[Interpretation[_]](
       _ <- subscriptionCategorySyncTimeTableCreator.run()
       _ <- statusesProcessingTimeTableCreator.run()
       _ <- eventDeliveryTableCreator.run()
+      _ <- subscriberTableCreator.run()
       _ <- logger info "Event Log database initialization success"
     } yield ()
   } recoverWith logging
@@ -92,6 +94,7 @@ object IODbInitializer {
       SubscriptionCategorySyncTimeTableCreator(transactor, logger),
       StatusesProcessingTimeTableCreator(transactor, logger),
       EventDeliveryTableCreator(transactor, logger),
+      SubscriberTableCreator(transactor, logger),
       logger
     )
   }

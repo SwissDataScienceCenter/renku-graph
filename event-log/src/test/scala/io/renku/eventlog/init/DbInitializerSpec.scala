@@ -46,6 +46,8 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       given(eventPayloadSchemaAdder).succeeds(returning = ())
       given(subscriptionCategorySyncTimeTableCreator).succeeds(returning = ())
       given(statusProcessingTimeTableCreator).succeeds(returning = ())
+      given(eventDeliveryTableCreator).succeeds(returning = ())
+      given(subscriberTableCreator).succeeds(returning = ())
 
       dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
@@ -237,6 +239,51 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
         dbInitializer.run().unsafeRunSync()
       } shouldBe exception
     }
+    "fail if creating the event_delivery table creation fails" in new TestCase {
+
+      given(eventLogTableCreator).succeeds(returning = ())
+      given(projectPathAdder).succeeds(returning = ())
+      given(batchDateAdder).succeeds(returning = ())
+      given(viewRemover).succeeds(returning = ())
+      given(projectTableCreator).succeeds(returning = ())
+      given(projectPathRemover).succeeds(returning = ())
+      given(eventLogTableRenamer).succeeds(returning = ())
+      given(eventStatusRenamer).succeeds(returning = ())
+      given(eventPayloadTableCreator).succeeds(returning = ())
+      given(eventPayloadSchemaAdder).succeeds(returning = ())
+      given(subscriptionCategorySyncTimeTableCreator).succeeds(returning = ())
+      given(statusProcessingTimeTableCreator).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(eventDeliveryTableCreator).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        dbInitializer.run().unsafeRunSync()
+      } shouldBe exception
+    }
+
+    "fail if creating the subscriber table creation fails" in new TestCase {
+
+      given(eventLogTableCreator).succeeds(returning = ())
+      given(projectPathAdder).succeeds(returning = ())
+      given(batchDateAdder).succeeds(returning = ())
+      given(viewRemover).succeeds(returning = ())
+      given(projectTableCreator).succeeds(returning = ())
+      given(projectPathRemover).succeeds(returning = ())
+      given(eventLogTableRenamer).succeeds(returning = ())
+      given(eventStatusRenamer).succeeds(returning = ())
+      given(eventPayloadTableCreator).succeeds(returning = ())
+      given(eventPayloadSchemaAdder).succeeds(returning = ())
+      given(subscriptionCategorySyncTimeTableCreator).succeeds(returning = ())
+      given(statusProcessingTimeTableCreator).succeeds(returning = ())
+      given(eventDeliveryTableCreator).succeeds(returning = ())
+      val exception = exceptions.generateOne
+      given(subscriberTableCreator).fails(becauseOf = exception)
+
+      intercept[Exception] {
+        dbInitializer.run().unsafeRunSync()
+      } shouldBe exception
+    }
+
   }
 
   private trait TestCase {
@@ -252,6 +299,8 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
     val eventPayloadSchemaAdder                  = mock[EventPayloadSchemaVersionAdder[IO]]
     val subscriptionCategorySyncTimeTableCreator = mock[SubscriptionCategorySyncTimeTableCreator[IO]]
     val statusProcessingTimeTableCreator         = mock[StatusesProcessingTimeTableCreator[IO]]
+    val eventDeliveryTableCreator                = mock[EventDeliveryTableCreator[IO]]
+    val subscriberTableCreator                   = mock[SubscriberTableCreator[IO]]
     val logger                                   = TestLogger[IO]()
     val dbInitializer = new DbInitializerImpl[IO](
       eventLogTableCreator,
@@ -266,6 +315,8 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
       eventPayloadSchemaAdder,
       subscriptionCategorySyncTimeTableCreator,
       statusProcessingTimeTableCreator,
+      eventDeliveryTableCreator,
+      subscriberTableCreator,
       logger
     )
   }
