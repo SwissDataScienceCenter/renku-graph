@@ -31,8 +31,8 @@ import ch.datascience.graph.tokenrepository.AccessTokenFinder
 import ch.datascience.graph.tokenrepository.IOAccessTokenFinder.projectPathToPath
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.events.consumers.ConsumersModelGenerators.projects
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.Generators.projects
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
