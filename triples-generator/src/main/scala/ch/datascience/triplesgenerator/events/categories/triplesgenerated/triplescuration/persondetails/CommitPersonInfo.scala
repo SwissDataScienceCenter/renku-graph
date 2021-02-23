@@ -43,7 +43,7 @@ private object CommitPersonInfo {
                         Right(CommitPersonInfo(id, NonEmptyList(author, committer +: Nil)))
                       case (Some(author), None)    => Right(CommitPersonInfo(id, NonEmptyList(author, Nil)))
                       case (None, Some(committer)) => Right(CommitPersonInfo(id, NonEmptyList(committer, Nil)))
-                      case _                       => Left(DecodingFailure(s"No authors an no committer on the commit $id", Nil))
+                      case _                       => Left(DecodingFailure(s"No valid author and committer on the commit $id", Nil))
                     }
 
     } yield commitInfo

@@ -18,16 +18,18 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
-import ch.datascience.generators.Generators._
+import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users
 import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.rdfstore.entities
+import eu.timepit.refined.auto._
 import io.renku.jsonld.syntax._
 import org.scalacheck.Gen
-import ch.datascience.generators.CommonGraphGenerators._
 
 private object PersonDetailsGenerators {
 
@@ -64,4 +66,9 @@ private object PersonDetailsGenerators {
     userName  <- userNames
     userEmail <- userEmails
   } yield CommitPerson(userName, userEmail)
+
+  implicit lazy val commitPersonInfos: Gen[CommitPersonInfo] = for {
+    committers <- commitPersons.toGeneratorOfNonEmptyList(maxElements = 2)
+    id         <- commitIds
+  } yield CommitPersonInfo(id, committers)
 }
