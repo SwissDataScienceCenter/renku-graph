@@ -28,6 +28,7 @@ trait DbInitSpec extends InMemoryEventLogDb with EventLogDbMigrations with Befor
   self: Suite =>
 
   private val tablesToDropBeforeEachTest = List(
+    "event_delivery",
     "event_payload",
     "status_processing_time",
     "event_log",
