@@ -34,7 +34,7 @@ import scala.concurrent.ExecutionContext
 
 trait EventProducersRegistry[Interpretation[_]] {
   def run(): Interpretation[Unit]
-  def register(subscriptionRequest: Json): Interpretation[SubscriptionResult]
+  def register(subscriptionRequest: Json, serverUrl: ServerUrl): Interpretation[SubscriptionResult]
 }
 
 private[subscriptions] class EventProducersRegistryImpl[Interpretation[_]: Effect: Applicative](
@@ -44,12 +44,12 @@ private[subscriptions] class EventProducersRegistryImpl[Interpretation[_]: Effec
 
   override def run(): Interpretation[Unit] = categories.toList.map(_.run()).parSequence.void
 
-  override def register(subscriptionRequest: Json): Interpretation[SubscriptionResult] =
+  override def register(subscriptionRequest: Json, serverUrl: ServerUrl): Interpretation[SubscriptionResult] =
     if (categories.isEmpty) {
       (UnsupportedPayload("No category supports this payload"): SubscriptionResult).pure[Interpretation]
     } else {
       categories.toList
-        .traverse(_.register(subscriptionRequest))
+        .traverse(_.register(subscriptionRequest, serverUrl))
         .map(registrationRequests => registrationRequests.reduce(_ |+| _))
         .map {
           case AcceptedRegistration => SuccessfulSubscription

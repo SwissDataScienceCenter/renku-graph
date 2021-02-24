@@ -31,7 +31,7 @@ private trait SubscriptionCategory[Interpretation[_]] {
 
   def run(): Interpretation[Unit]
 
-  def register(payload: Json): Interpretation[RegistrationResult]
+  def register(payload: Json, serverUrl: ServerUrl): Interpretation[RegistrationResult]
 }
 
 private[subscriptions] object SubscriptionCategory {
@@ -55,10 +55,10 @@ private class SubscriptionCategoryImpl[Interpretation[_]: Effect, SubscriptionIn
 
   override def run(): Interpretation[Unit] = eventsDistributor.run()
 
-  override def register(payload: Json): Interpretation[RegistrationResult] = {
+  override def register(payload: Json, serverUrl: ServerUrl): Interpretation[RegistrationResult] = {
     for {
       subscriptionInfo <- OptionT(deserializer deserialize payload)
-      _                <- OptionT.liftF(subscribers add subscriptionInfo)
+      _                <- OptionT.liftF(subscribers add (subscriptionInfo, serverUrl))
     } yield subscriptionInfo
   }.map(_ => AcceptedRegistration).getOrElse(RejectedRegistration)
 }

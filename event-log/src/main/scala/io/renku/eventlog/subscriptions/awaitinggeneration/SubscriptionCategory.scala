@@ -24,7 +24,7 @@ import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.subscriptions.{IOEventsDistributor, Subscribers, SubscriptionCategoryImpl, SubscriptionRequestDeserializer}
+import io.renku.eventlog.subscriptions.{IOEventsDistributor, SubscriberTracker, Subscribers, SubscriptionCategoryImpl, SubscriptionRequestDeserializer}
 import io.renku.eventlog.{EventLogDB, subscriptions}
 
 import scala.concurrent.ExecutionContext
@@ -44,7 +44,8 @@ private[subscriptions] object SubscriptionCategory {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
-    subscribers <- Subscribers(name, logger)
+    subscriberTracker <- SubscriberTracker(transactor, queriesExecTimes, logger)
+    subscribers       <- Subscribers(name, subscriberTracker, logger)
     eventFetcher <- IOAwaitingGenerationEventFinder(transactor,
                                                     subscribers,
                                                     waitingEventsGauge,

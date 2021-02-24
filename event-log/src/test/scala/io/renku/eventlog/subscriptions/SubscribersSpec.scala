@@ -43,6 +43,8 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(subscriptionInfo)
         .returning(true.pure[IO])
 
+      (subscriberTracker.add _).expects(subscriptionInfo).returning(IO.unit)
+
       subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info(s"$categoryName: $subscriptionInfo added"))
@@ -53,6 +55,8 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (subscribersRegistry.add _)
         .expects(subscriptionInfo)
         .returning(false.pure[IO])
+
+      (subscriberTracker.add _).expects(subscriptionInfo).returning(IO.unit)
 
       subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
 
@@ -158,7 +162,8 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
     val subscriberUrl    = subscriptionInfo.subscriberUrl
 
     val subscribersRegistry = mock[SubscribersRegistry]
+    val subscriberTracker   = mock[SubscriberTracker[IO]]
     val logger              = TestLogger[IO]()
-    val subscribers         = new SubscribersImpl(categoryName, subscribersRegistry, logger)
+    val subscribers         = new SubscribersImpl(categoryName, subscribersRegistry, subscriberTracker, logger)
   }
 }

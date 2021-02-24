@@ -27,9 +27,9 @@ import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
 
 private trait Subscribers[Interpretation[_]] {
-  def add(subscriptionInfo: SubscriptionInfo): Interpretation[Unit]
+  def add(subscriptionInfo: SubscriptionInfo, serverUrl: ServerUrl): Interpretation[Unit]
 
-  def delete(subscriberUrl: SubscriberUrl): Interpretation[Unit]
+  def delete(subscriberUrl: SubscriberUrl, serverUrl: ServerUrl): Interpretation[Unit]
 
   def markBusy(subscriberUrl: SubscriberUrl): Interpretation[Unit]
 
@@ -41,19 +41,21 @@ private trait Subscribers[Interpretation[_]] {
 private class SubscribersImpl private[subscriptions] (
     categoryName:        CategoryName,
     subscribersRegistry: SubscribersRegistry,
+    subscriberTracker:   SubscriberTracker[IO],
     logger:              Logger[IO]
 )(implicit contextShift: ContextShift[IO])
     extends Subscribers[IO] {
 
   private val applicative = Applicative[IO]
+
   import applicative._
 
-  override def add(subscriptionInfo: SubscriptionInfo): IO[Unit] = for {
+  override def add(subscriptionInfo: SubscriptionInfo, serverUrl: ServerUrl): IO[Unit] = for {
     wasAdded <- subscribersRegistry add subscriptionInfo
     _        <- whenA(wasAdded)(logger.info(s"$categoryName: $subscriptionInfo added"))
   } yield ()
 
-  override def delete(subscriberUrl: SubscriberUrl): IO[Unit] =
+  override def delete(subscriberUrl: SubscriberUrl, serverUrl: ServerUrl): IO[Unit] =
     for {
       removed <- subscribersRegistry delete subscriberUrl
       _       <- whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))
@@ -77,14 +79,15 @@ private object Subscribers {
   import cats.effect.IO
 
   def apply(
-      categoryName: CategoryName,
-      logger:       Logger[IO]
+      categoryName:      CategoryName,
+      subscriberTracker: SubscriberTracker[IO],
+      logger:            Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       timer:            Timer[IO],
       executionContext: ExecutionContext
   ): IO[Subscribers[IO]] = for {
     subscribersRegistry <- SubscribersRegistry(categoryName, logger)
-    subscribers         <- IO(new SubscribersImpl(categoryName, subscribersRegistry, logger))
+    subscribers         <- IO(new SubscribersImpl(categoryName, subscribersRegistry, subscriberTracker, logger))
   } yield subscribers
 }
