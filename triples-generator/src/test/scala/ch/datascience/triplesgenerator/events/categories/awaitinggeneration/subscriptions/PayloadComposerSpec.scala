@@ -19,11 +19,12 @@
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.subscriptions
 
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions.{SubscriberUrl, subscriberUrls}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, positiveInts}
 import ch.datascience.graph.model.EventsGenerators.categoryNames
+import ch.datascience.microservices.MicroserviceUrlFinder
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
-import ch.datascience.events.consumers.subscriptions.{SubscriberUrl, SubscriptionUrlFinder, subscriberUrls}
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -61,7 +62,7 @@ class PayloadComposerSpec extends AnyWordSpec with should.Matchers with MockFact
   private trait TestCase {
     val categoryName = categoryNames.generateOne
     val capacity     = positiveInts().map(v => GenerationProcessesNumber(v.value)).generateOne
-    val urlFinder    = mock[SubscriptionUrlFinder[Try]]
+    val urlFinder    = mock[MicroserviceUrlFinder[Try]]
     val composer     = new PayloadComposer[Try](categoryName, capacity, urlFinder)
   }
 }

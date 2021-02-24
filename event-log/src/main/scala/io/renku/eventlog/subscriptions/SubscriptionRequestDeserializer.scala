@@ -19,6 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats.MonadError
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
 import io.circe.{Decoder, Json}
 

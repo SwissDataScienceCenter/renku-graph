@@ -18,11 +18,9 @@
 
 package io.renku.eventlog.subscriptions
 
-import java.lang.Thread.sleep
-import java.time.Instant
-import java.util.concurrent.ConcurrentHashMap
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Debug, Info}
@@ -34,6 +32,9 @@ import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.lang.Thread.sleep
+import java.time.Instant
+import java.util.concurrent.ConcurrentHashMap
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.language.postfixOps

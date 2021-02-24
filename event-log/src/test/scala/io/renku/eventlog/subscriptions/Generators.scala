@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings, positiveInts}
 import ch.datascience.graph.model.events.CategoryName

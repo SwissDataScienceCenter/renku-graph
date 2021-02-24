@@ -21,12 +21,13 @@ package io.renku.eventlog.subscriptions.awaitinggeneration
 import cats.effect.{Bracket, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, ToGenerationNonRecoverableFailure, UpdateResult}
 import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
-import io.renku.eventlog.subscriptions.{DispatchRecovery, SubscriberUrl}
+import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.{EventLogDB, EventMessage, subscriptions}
 
 import scala.concurrent.duration._

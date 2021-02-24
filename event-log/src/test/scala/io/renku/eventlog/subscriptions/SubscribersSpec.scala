@@ -21,6 +21,7 @@ package io.renku.eventlog.subscriptions
 import cats.effect.concurrent.Deferred
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
@@ -43,7 +44,7 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(subscriptionInfo)
         .returning(true.pure[IO])
 
-      (subscriberTracker.add _).expects(subscriptionInfo).returning(IO.unit)
+      (subscriberTracker.add _).expects(subscriberUrl).returning(IO.unit)
 
       subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
 
@@ -56,7 +57,7 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(subscriptionInfo)
         .returning(false.pure[IO])
 
-      (subscriberTracker.add _).expects(subscriptionInfo).returning(IO.unit)
+      (subscriberTracker.add _).expects(subscriberUrl).returning(IO.unit)
 
       subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
 

@@ -126,6 +126,7 @@ object Microservice extends IOMicroservice {
                                     awaitingTransformationGauge,
                                     underTransformationGauge,
                                     queriesExecTimes,
+                                    ServicePort,
                                     ApplicationLogger
                                   )
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)

@@ -23,6 +23,7 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.microservices.{IOMicroserviceUrlFinder, MicroserviceUrlFinder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
 import io.circe.Json
@@ -33,7 +34,7 @@ trait SubscriptionPayloadComposer[Interpretation[_]] {
 
 private class SubscriptionPayloadComposerImpl[Interpretation[_]](
     categoryName:          CategoryName,
-    subscriptionUrlFinder: SubscriptionUrlFinder[Interpretation]
+    subscriptionUrlFinder: MicroserviceUrlFinder[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable])
     extends SubscriptionPayloadComposer[Interpretation] {
 
@@ -51,7 +52,7 @@ object SubscriptionPayloadComposer {
   ): Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
     Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>
       for {
-        subscriptionUrlFinder <- IOSubscriptionUrlFinder(microservicePort)
+        subscriptionUrlFinder <- IOMicroserviceUrlFinder(microservicePort)
       } yield new SubscriptionPayloadComposerImpl[IO](categoryName, subscriptionUrlFinder)
     }
 }

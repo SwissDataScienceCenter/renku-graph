@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.implicits.catsSyntaxOptionId
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger

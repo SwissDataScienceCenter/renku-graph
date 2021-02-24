@@ -22,6 +22,7 @@ import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.EventsGenerators.categoryNames
+import ch.datascience.microservices.MicroserviceUrlFinder
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -57,7 +58,7 @@ class SubscriptionPayloadComposerSpec extends AnyWordSpec with should.Matchers w
 
   private trait TestCase {
     val categoryName = categoryNames.generateOne
-    val urlFinder    = mock[SubscriptionUrlFinder[Try]]
+    val urlFinder    = mock[MicroserviceUrlFinder[Try]]
     val composer     = new SubscriptionPayloadComposerImpl[Try](categoryName, urlFinder)
   }
 }

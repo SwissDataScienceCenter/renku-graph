@@ -20,49 +20,13 @@ package ch.datascience.events.consumers.subscriptions
 
 import cats.MonadError
 import ch.datascience.tinytypes.constraints.Url
+import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
+import io.circe.Decoder
 
 final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
-object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url
-
-trait SubscriptionUrlFinder[Interpretation[_]] {
-  def findSubscriberUrl(): Interpretation[SubscriberUrl]
-}
-
-private class SubscriptionUrlFinderImpl[Interpretation[_]](microservicePort: Int Refined Positive)(implicit
-    ME:                                                                      MonadError[Interpretation, Throwable]
-) extends SubscriptionUrlFinder[Interpretation] {
-
-  import java.net.NetworkInterface
-  import cats.syntax.all._
-  import scala.jdk.CollectionConverters._
-
-  override def findSubscriberUrl(): Interpretation[SubscriberUrl] =
-    findAddress flatMap {
-      case Some(address) =>
-        SubscriberUrl(s"http://${address.getHostAddress}:$microservicePort/events").pure[Interpretation]
-      case None =>
-        new Exception("Cannot find service IP").raiseError[Interpretation, SubscriberUrl]
-    }
-
-  private def findAddress = ME.catchNonFatal {
-    val ipAddresses = NetworkInterface.getNetworkInterfaces.asScala.toSeq.flatMap(p => p.getInetAddresses.asScala.toSeq)
-    ipAddresses
-      .find { address =>
-        address.getHostAddress.contains(".") &&
-        !address.isLoopbackAddress &&
-        !address.isAnyLocalAddress &&
-        !address.isLinkLocalAddress
-      }
-  }
-}
-
-object IOSubscriptionUrlFinder {
-  import cats.effect.IO
-
-  def apply(microservicePort: Int Refined Positive): IO[SubscriptionUrlFinder[IO]] = IO {
-    new SubscriptionUrlFinderImpl[IO](microservicePort)
-  }
+object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url {
+  implicit val decoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
 }

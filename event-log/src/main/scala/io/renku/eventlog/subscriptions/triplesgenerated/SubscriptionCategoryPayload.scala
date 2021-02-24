@@ -18,8 +18,9 @@
 
 package io.renku.eventlog.subscriptions.triplesgenerated
 
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import io.renku.eventlog.subscriptions
-import io.renku.eventlog.subscriptions.{Capacity, SubscriberUrl}
+import io.renku.eventlog.subscriptions.Capacity
 
 private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl, maybeCapacity: Option[Capacity])
     extends subscriptions.SubscriptionInfo

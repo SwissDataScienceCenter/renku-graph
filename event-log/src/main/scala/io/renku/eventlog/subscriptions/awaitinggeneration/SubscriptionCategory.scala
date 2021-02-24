@@ -38,14 +38,14 @@ private[subscriptions] object SubscriptionCategory {
       waitingEventsGauge:          LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
+      subscriberTracker:           SubscriberTracker[IO],
       logger:                      Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
-    subscriberTracker <- SubscriberTracker(transactor, queriesExecTimes, logger)
-    subscribers       <- Subscribers(name, subscriberTracker, logger)
+    subscribers <- Subscribers(name, subscriberTracker, logger)
     eventFetcher <- IOAwaitingGenerationEventFinder(transactor,
                                                     subscribers,
                                                     waitingEventsGauge,

@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions
 
 import cats.Applicative
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
 import io.chrisdavenport.log4cats.Logger
 
@@ -27,9 +28,9 @@ import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
 
 private trait Subscribers[Interpretation[_]] {
-  def add(subscriptionInfo: SubscriptionInfo, serverUrl: ServerUrl): Interpretation[Unit]
+  def add(subscriptionInfo: SubscriptionInfo): Interpretation[Unit]
 
-  def delete(subscriberUrl: SubscriberUrl, serverUrl: ServerUrl): Interpretation[Unit]
+  def delete(subscriberUrl: SubscriberUrl): Interpretation[Unit]
 
   def markBusy(subscriberUrl: SubscriberUrl): Interpretation[Unit]
 
@@ -50,12 +51,12 @@ private class SubscribersImpl private[subscriptions] (
 
   import applicative._
 
-  override def add(subscriptionInfo: SubscriptionInfo, serverUrl: ServerUrl): IO[Unit] = for {
+  override def add(subscriptionInfo: SubscriptionInfo): IO[Unit] = for {
     wasAdded <- subscribersRegistry add subscriptionInfo
     _        <- whenA(wasAdded)(logger.info(s"$categoryName: $subscriptionInfo added"))
   } yield ()
 
-  override def delete(subscriberUrl: SubscriberUrl, serverUrl: ServerUrl): IO[Unit] =
+  override def delete(subscriberUrl: SubscriberUrl): IO[Unit] =
     for {
       removed <- subscribersRegistry delete subscriberUrl
       _       <- whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))

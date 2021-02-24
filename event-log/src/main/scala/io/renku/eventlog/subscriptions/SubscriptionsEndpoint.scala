@@ -44,7 +44,7 @@ class SubscriptionsEndpoint[Interpretation[_]: Effect](
   def addSubscription(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
       json         <- request.asJson recoverWith badRequest
-      eitherResult <- subscriptionCategoryRegistry.register(json, ServerUrl(request.serverAddr))
+      eitherResult <- subscriptionCategoryRegistry.register(json)
       _            <- badRequestIfError(eitherResult)
       response     <- Accepted(InfoMessage("Subscription added"))
     } yield response

@@ -22,9 +22,9 @@ import cats.MonadError
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.DbTransactor
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Encoder
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 
