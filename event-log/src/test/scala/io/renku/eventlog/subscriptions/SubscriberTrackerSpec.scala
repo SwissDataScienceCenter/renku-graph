@@ -1,3 +1,21 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.renku.eventlog.subscriptions
 
 import cats.effect.IO
@@ -22,19 +40,19 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
 
       findSubscriber(subscriberUrl, sourceUrl) shouldBe None
 
-      tracker add subscriberUrl shouldBe IO.unit
+      tracker add subscriberUrl shouldBe true.pure[IO]
 
       findSubscriber(subscriberUrl, sourceUrl) shouldBe Some(subscriberUrl, sourceUrl)
     }
     "insert a new row in the subscriber table if the subscriber exists but the source_url is different" in new TestCase {
       val otherSource  = SubscriberUrl(nonEmptyStrings().generateOne)
       val otherTracker = new SubscriberTrackerImpl(transactor, queriesExecTimes, otherSource, logger)
-      otherTracker add subscriberUrl shouldBe IO.unit
+      otherTracker add subscriberUrl shouldBe true.pure[IO]
 
       findSubscriber(subscriberUrl, otherSource) shouldBe Some(subscriberUrl, otherSource)
       findSubscriber(subscriberUrl, sourceUrl)   shouldBe None
 
-      tracker add subscriberUrl shouldBe IO.unit
+      tracker add subscriberUrl shouldBe true.pure[IO]
 
       findSubscriber(subscriberUrl, otherSource) shouldBe Some(subscriberUrl, otherSource)
       findSubscriber(subscriberUrl, sourceUrl)   shouldBe Some(subscriberUrl, sourceUrl)
@@ -42,12 +60,13 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
     "do nothing if the subscriber info is already present in the table" in new TestCase {
       findSubscriber(subscriberUrl, sourceUrl) shouldBe None
 
-      tracker add subscriberUrl                shouldBe IO.unit
+      tracker add subscriberUrl                shouldBe true.pure[IO]
       findSubscriber(subscriberUrl, sourceUrl) shouldBe Some(subscriberUrl, sourceUrl)
 
-      tracker add subscriberUrl                shouldBe IO.unit
+      tracker add subscriberUrl                shouldBe true.pure[IO]
       findSubscriber(subscriberUrl, sourceUrl) shouldBe Some(subscriberUrl, sourceUrl)
     }
+
   }
 
   "remove" should {
@@ -55,20 +74,21 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
       storeSubscriberUrl(subscriberUrl, sourceUrl)
 
       findSubscriber(subscriberUrl, sourceUrl) shouldBe Some(subscriberUrl, sourceUrl)
-      tracker remove subscriberUrl             shouldBe IO.unit
+      tracker remove subscriberUrl             shouldBe true.pure[IO]
       findSubscriber(subscriberUrl, sourceUrl) shouldBe None
 
     }
     "do nothing if the subscriber does not exists" in new TestCase {
-      tracker remove subscriberUrl             shouldBe IO.unit
+      tracker remove subscriberUrl             shouldBe true.pure[IO]
       findSubscriber(subscriberUrl, sourceUrl) shouldBe None
     }
+
     "do nothing if the subscriber exists but the source_url is different than the current source url" in new TestCase {
 
       val otherSource: SubscriberUrl = subscriberUrls.generateOne
       storeSubscriberUrl(subscriberUrl, otherSource)
       findSubscriber(subscriberUrl, otherSource) shouldBe Some(subscriberUrl, otherSource)
-      tracker remove subscriberUrl               shouldBe IO.unit
+      tracker remove subscriberUrl               shouldBe true.pure[IO]
       findSubscriber(subscriberUrl, otherSource) shouldBe Some(subscriberUrl, otherSource)
       findSubscriber(subscriberUrl, sourceUrl)   shouldBe None
     }
