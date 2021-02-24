@@ -34,15 +34,15 @@ private class SubscriberTableCreatorImpl[Interpretation[_]](
 
   private def createTable = for {
     _ <- createTableSql.run transact transactor.get
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_url ON subscriber(delivery_url)")
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_url ON subscriber(delivery_url, source_url)")
     _ <- logger info "'subscriber' table created"
   } yield ()
 
   private lazy val createTableSql = sql"""
     CREATE TABLE IF NOT EXISTS subscriber(
-      delivery_url          varchar    NOT NULL,
-      source_url        varchar       NOT NULL,
-      PRIMARY KEY (delivery_url)
+      delivery_url   varchar    NOT NULL,
+      source_url     varchar    NOT NULL,
+      PRIMARY KEY (delivery_url, source_url)
     );
     """.update
 
