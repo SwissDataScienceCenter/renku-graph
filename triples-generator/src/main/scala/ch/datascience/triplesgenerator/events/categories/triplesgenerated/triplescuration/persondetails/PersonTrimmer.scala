@@ -23,7 +23,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.graph.config.{GitLabApiUrl, GitLabUrl}
+import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.{CommitId, EventId}
 import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.graph.model.{events, projects}
@@ -58,31 +58,6 @@ private class PersonTrimmerImpl[Interpretation[_]: MonadError[*[_], Throwable]](
     persons               <- trimPersons(personsWithMaybeEmail, projectId, CommitId(eventId.value), maybeAccessToken)
   } yield (updatedTriples, persons)
 
-  // maybeEmail <- verify emails. if multiple, fail interpretation
-  // verifyNames. if multiple, call gitlab to get single name for commit
-  //                                commitInfoFinder (see other examples) will return a committer and author, both with name and email
-  //                                try to match based on that response. it could be either but it should be committer
-  //                                 if we can match, then we use it for the name in the person, else fail. failures defined in FailureOps
-  //                               if there is no email but there are multiple names, we can't do anything....RAISE ERROR
-  //
-
-  //    for {
-//      triplesAndPersons <- extractPersons(triples)
-//      (updatedTriples, personDatas) = triplesAndPersons
-//      commitId       <- commitIdExtractor.extractCommitId(updatedTriples)
-//      trimmedPersons <- trimPersons(personDatas, commitId)
-//    } yield (updatedTriples, trimmedPersons)
-
-//  private def trimPersons(personDatas: Set[PersonData], commitId: CommitId): Interpretation[Set[Person]] =
-//    personDatas
-//      .map {
-//        case (id, name :: Nil, emails) => Some(Person(id, name, emails.headOption))
-//        case (_, name :: names, _)     => tryToGetPersonFromGitLab(commitId)
-//        case _                         => ???
-//      }
-//      .flatten
-//      .pure[Interpretation]
-
   private def checkForMultipleEmails(personsRawData: Set[PersonRawData]): Interpretation[Set[RawDataMaybeEmail]] =
     personsRawData
       .find(_.emails.size > 1)
@@ -102,20 +77,20 @@ private class PersonTrimmerImpl[Interpretation[_]: MonadError[*[_], Throwable]](
     val personsWithNoEmail                                       = personsDataWithNoEmail.toPersonsOrThrow
     if (withSingleEmailToCheckInGitlab.nonEmpty) {
       for {
-        commitPersonInfo <- commitCommitterFinder.findCommitPeople(projectId, commitId, maybeAccessToken)
-        persons          <- mergeRawDataWithGilabData(withSingleEmailToCheckInGitlab, commitPersonInfo)
-        noEmails         <- personsWithNoEmail
-      } yield persons ++ noEmails ++ personsFromSingleEmail
+        commitPersonInfo              <- commitCommitterFinder.findCommitPeople(projectId, commitId, maybeAccessToken)
+        personsWithDeduplicatedEmails <- mergeRawDataWithGitLabData(withSingleEmailToCheckInGitlab, commitPersonInfo)
+        personsWithoutEmails          <- personsWithNoEmail
+      } yield personsWithDeduplicatedEmails ++ personsWithoutEmails ++ personsFromSingleEmail
     } else {
       personsWithNoEmail.map(_ ++ personsFromSingleEmail)
     }
   }
 
-  private def mergeRawDataWithGilabData(personsRawData:   Set[RawDataDisregardNameSingleEmail],
-                                        commitPersonInfo: CommitPersonInfo
+  private def mergeRawDataWithGitLabData(personsRawData:   Set[RawDataDisregardNameSingleEmail],
+                                         commitPersonInfo: CommitPersonsInfo
   ): Interpretation[Set[Person]] =
     personsRawData
-      .map { case disregardNameSingleEmail =>
+      .map { disregardNameSingleEmail =>
         commitPersonInfo.committers
           .find(_.email == disregardNameSingleEmail.email)
           .map(committer =>
@@ -141,22 +116,23 @@ private class PersonTrimmerImpl[Interpretation[_]: MonadError[*[_], Throwable]](
     }
 
   private implicit class PersonsRawDataOps(persons: Set[PersonRawData]) {
-    lazy val toMaybeEmail =
+    lazy val toMaybeEmail: Set[RawDataMaybeEmail] =
       persons.map(rawPerson => RawDataMaybeEmail(rawPerson.id, rawPerson.names, rawPerson.emails.headOption))
   }
 
   private implicit class PersonsRawDataSingleEmailOps(persons: Set[RawDataSingleEmail]) {
 
-    lazy val toPersonOrToGitlab = persons.foldLeft((Set.empty[Person], Set.empty[RawDataDisregardNameSingleEmail])) {
-      case ((persons, personsWithMultipleNames), RawDataSingleEmail(id, name :: Nil, email)) =>
-        (persons + Person(id, None, name, email.some)) -> personsWithMultipleNames
-      case ((persons, personsWithMultipleNames), RawDataSingleEmail(id, _, email)) =>
-        persons -> (personsWithMultipleNames + RawDataDisregardNameSingleEmail(id, email))
-    }
+    lazy val toPersonOrToGitlab: (Set[Person], Set[RawDataDisregardNameSingleEmail]) =
+      persons.foldLeft((Set.empty[Person], Set.empty[RawDataDisregardNameSingleEmail])) {
+        case ((persons, personsWithMultipleNames), RawDataSingleEmail(id, name :: Nil, email)) =>
+          (persons + Person(id, None, name, email.some)) -> personsWithMultipleNames
+        case ((persons, personsWithMultipleNames), RawDataSingleEmail(id, _, email)) =>
+          persons -> (personsWithMultipleNames + RawDataDisregardNameSingleEmail(id, email))
+      }
   }
 
   private implicit class PersonsRawDataWithNoEmailOps(persons: Set[RawDataNoEmail]) {
-    lazy val toPersonsOrThrow = persons
+    lazy val toPersonsOrThrow: Interpretation[Set[Person]] = persons
       .map {
         case RawDataNoEmail(id, Nil) =>
           new Exception(s"No email and no name for person with id '$id' found in generated JSON-LD")

@@ -22,18 +22,18 @@ import cats.data.NonEmptyList
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.users.{Email, Name}
 
-private final case class CommitPersonInfo(
+private final case class CommitPersonsInfo(
     id:         CommitId,
     committers: NonEmptyList[CommitPerson]
 )
 
-private object CommitPersonInfo {
+private object CommitPersonsInfo {
 
   import cats.syntax.all._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
 
-  private[persondetails] implicit val commitInfoDecoder: Decoder[CommitPersonInfo] = (cursor: HCursor) => {
+  private[persondetails] implicit val commitInfoDecoder: Decoder[CommitPersonsInfo] = (cursor: HCursor) => {
 
     implicit class CursorOps(cursor: ACursor) {
       lazy val toMaybeName: Decoder.Result[Option[Name]] =
@@ -58,9 +58,9 @@ private object CommitPersonInfo {
                    }
       commitInfo <- (author, committer) match {
                       case (Some(author), Some(committer)) =>
-                        Right(CommitPersonInfo(id, NonEmptyList(author, committer +: Nil)))
-                      case (Some(author), None)    => Right(CommitPersonInfo(id, NonEmptyList(author, Nil)))
-                      case (None, Some(committer)) => Right(CommitPersonInfo(id, NonEmptyList(committer, Nil)))
+                        Right(CommitPersonsInfo(id, NonEmptyList(author, committer +: Nil)))
+                      case (Some(author), None)    => Right(CommitPersonsInfo(id, NonEmptyList(author, Nil)))
+                      case (None, Some(committer)) => Right(CommitPersonsInfo(id, NonEmptyList(committer, Nil)))
                       case _                       => Left(DecodingFailure(s"No valid author and committer on the commit $id", Nil))
                     }
 

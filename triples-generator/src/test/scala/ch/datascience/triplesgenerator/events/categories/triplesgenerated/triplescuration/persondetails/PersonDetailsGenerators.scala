@@ -67,8 +67,8 @@ private object PersonDetailsGenerators {
     userEmail <- userEmails
   } yield CommitPerson(userName, userEmail)
 
-  implicit lazy val commitPersonInfos: Gen[CommitPersonInfo] = for {
+  implicit lazy val commitPersonInfos: Gen[CommitPersonsInfo] = for {
     committers <- commitPersons.toGeneratorOfNonEmptyList(maxElements = 2)
     id         <- commitIds
-  } yield CommitPersonInfo(id, committers)
+  } yield CommitPersonsInfo(id, committers)
 }

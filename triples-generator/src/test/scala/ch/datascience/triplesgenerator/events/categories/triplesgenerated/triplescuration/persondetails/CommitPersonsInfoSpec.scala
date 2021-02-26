@@ -31,11 +31,11 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.util.Random
 
-class CommitPersonInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+class CommitPersonsInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
   "commitInfoPersonDecoder" should {
     "decode valid JSON with a valid author or committer" in {
-      forAll { commitPersonInfo: CommitPersonInfo =>
+      forAll { commitPersonInfo: CommitPersonsInfo =>
         val committersJson = commitPersonInfo.committers match {
           case NonEmptyList(author, Nil) =>
             val prefix   = if (new Random().nextBoolean()) "committer" else "author"
@@ -59,7 +59,7 @@ class CommitPersonInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
           "id":              ${commitPersonInfo.id.value}
         }""" deepMerge committersJson
 
-        jsonContent.as[CommitPersonInfo] shouldBe Right(commitPersonInfo)
+        jsonContent.as[CommitPersonsInfo] shouldBe Right(commitPersonInfo)
       }
 
     }
@@ -73,7 +73,7 @@ class CommitPersonInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
           "author_email":    ${userEmails.generateOne.value.asJson},
           "committer_name": "",
           "committer_email": ${userEmails.generateOne.value.asJson}
-        }""".as[CommitPersonInfo]
+        }""".as[CommitPersonsInfo]
 
       exception.getMessage() shouldBe s"No valid author and committer on the commit $id"
 
@@ -87,7 +87,7 @@ class CommitPersonInfoSpec extends AnyWordSpec with ScalaCheckPropertyChecks wit
           "author_email":    "",
           "committer_name": ${userNames.generateOne.value},
           "committer_email": ""
-        }""".as[CommitPersonInfo]
+        }""".as[CommitPersonsInfo]
 
       exception.getMessage() shouldBe s"No valid author and committer on the commit $id"
     }

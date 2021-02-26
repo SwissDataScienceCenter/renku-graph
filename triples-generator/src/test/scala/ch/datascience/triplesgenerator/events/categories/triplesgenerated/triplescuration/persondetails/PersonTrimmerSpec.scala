@@ -78,7 +78,7 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
         (commitCommiterFinder.findCommitPeople _)
           .expects(projectId, commitId, maybeAccessToken)
-          .returning(Success(CommitPersonInfo(commitId, NonEmptyList(commitPerson, otherCommitPersons))))
+          .returning(Success(CommitPersonsInfo(commitId, NonEmptyList(commitPerson, otherCommitPersons))))
 
         personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken) shouldBe Success(
           expectedTriples -> Set(
@@ -104,7 +104,7 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
         (commitCommiterFinder.findCommitPeople _)
           .expects(projectId, commitId, maybeAccessToken)
-          .returning(Success(CommitPersonInfo(commitId, NonEmptyList(commitPerson, otherCommitPersons))))
+          .returning(Success(CommitPersonsInfo(commitId, NonEmptyList(commitPerson, otherCommitPersons))))
 
         personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken) shouldBe Success(
           expectedTriples -> Set(
@@ -173,7 +173,7 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
       exception.getMessage shouldBe s"No email and no name for person with id '$id' found in generated JSON-LD"
     }
 
-    "fail if there's a Person entity with multiple names and the person is not in the gitlab result" in new TestCase {
+    "fail if there's a Person entity with an email and multiple names but the person is not in the gitlab result" in new TestCase {
 
       val names = userNames.toGeneratorOfNonEmptyList(2).generateOne.toList
       val email = userEmails.generateOne
@@ -188,14 +188,14 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
       (commitCommiterFinder.findCommitPeople _)
         .expects(projectId, commitId, maybeAccessToken)
-        .returning(Success(CommitPersonInfo(commitId, otherCommitPersons)))
+        .returning(Success(CommitPersonsInfo(commitId, otherCommitPersons)))
 
       val Failure(exception: Exception) =
         personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken)
       exception.getMessage shouldBe s"Could not find the email for person with id '$id' in gitlab"
     }
 
-    "fail if there's a Person entity with no name and the person is not in the gitlab result" in new TestCase {
+    "fail if there's a Person entity with an email but no name and the person is not in the gitlab result" in new TestCase {
 
       val email = userEmails.generateOne
       val id: ResourceId = userResourceIds.generateOne
@@ -209,7 +209,7 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
       (commitCommiterFinder.findCommitPeople _)
         .expects(projectId, commitId, maybeAccessToken)
-        .returning(Success(CommitPersonInfo(commitId, otherCommitPersons)))
+        .returning(Success(CommitPersonsInfo(commitId, otherCommitPersons)))
 
       val Failure(exception: Exception) =
         personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken)
@@ -228,7 +228,7 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
       (commitCommiterFinder.findCommitPeople _)
         .expects(projectId, commitId, maybeAccessToken)
-        .returning(expectedException.raiseError[Try, CommitPersonInfo])
+        .returning(expectedException.raiseError[Try, CommitPersonsInfo])
 
       val Failure(exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken)
 
