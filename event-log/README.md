@@ -522,6 +522,17 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | status          VARCHAR    PK    NOT NULL |
 | processing_time INTERVAL         NOT NULL |
 
+| subscriber                         |
+|------------------------------------|
+| source_url   VARCHAR   PK NOT NULL |
+| delivery_url VARCHAR   PK NOT NULL |
+
+| event_delivery                        |
+|---------------------------------------|
+| event_id     VARCHAR   PK FK NOT NULL |
+| project_id   INT4      PK FK NOT NULL |
+| delivery_url VARCHAR   PK NOT NULL    |
+
 ## Trying out
 
 The event-log is a part of multi-module sbt project thus it has to be built from the root level.
