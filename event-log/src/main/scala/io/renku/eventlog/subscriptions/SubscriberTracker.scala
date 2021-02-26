@@ -42,8 +42,7 @@ private class SubscriberTrackerImpl(transactor:       DbTransactor[IO, EventLogD
 
   override def add(subscriberUrl: SubscriberUrl): IO[Boolean] = measureExecutionTime(
     SqlQuery(
-      sql"""|INSERT INTO
-            |subscriber (delivery_url, source_url)
+      sql"""|INSERT INTO subscriber (delivery_url, source_url)
             |VALUES ($subscriberUrl, $sourceUrl)
             |ON CONFLICT (delivery_url, source_url)
             |DO NOTHING
@@ -61,7 +60,7 @@ private class SubscriberTrackerImpl(transactor:       DbTransactor[IO, EventLogD
     )
   ) transact transactor.get map mapToTableResult
 
-  lazy val mapToTableResult: Int => Boolean = {
+  private lazy val mapToTableResult: Int => Boolean = {
     case 0 | 1 => true
     case _     => false
   }

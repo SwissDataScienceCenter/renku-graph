@@ -24,7 +24,7 @@ import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.subscriptions.{EventDelivery, IOEventsDistributor, SubscriberTracker, Subscribers, SubscriptionCategoryImpl, SubscriptionRequestDeserializer}
+import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.{EventLogDB, subscriptions}
 
 import scala.concurrent.ExecutionContext
@@ -53,7 +53,10 @@ private[subscriptions] object SubscriptionCategory {
                                                     queriesExecTimes
                     )
     dispatchRecovery <- DispatchRecovery(transactor, underTriplesGenerationGauge, queriesExecTimes, logger)
-    eventDelivery    <- EventDelivery.noOp[IO, AwaitingGenerationEvent]
+    eventDelivery <- EventDelivery[AwaitingGenerationEvent](transactor,
+                                                            compoundEventIdExtractor = (_: AwaitingGenerationEvent).id,
+                                                            queriesExecTimes
+                     )
     eventsDistributor <- IOEventsDistributor(name,
                                              transactor,
                                              subscribers,
