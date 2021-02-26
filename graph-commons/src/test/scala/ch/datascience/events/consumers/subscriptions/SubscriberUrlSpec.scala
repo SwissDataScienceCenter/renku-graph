@@ -18,19 +18,22 @@
 
 package ch.datascience.events.consumers.subscriptions
 
-import ch.datascience.microservices.MicroserviceBaseUrl
-import ch.datascience.tinytypes.constraints.Url
-import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.collection.NonEmpty
-import io.circe.Decoder
+import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.nonBlankStrings
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
-object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url {
+class SubscriberUrlSpec extends AnyWordSpec with should.Matchers {
 
-  def apply(microserviceBaseUrl: MicroserviceBaseUrl, part: String Refined NonEmpty): SubscriberUrl =
-    SubscriberUrl((microserviceBaseUrl / part.toString()).toString)
+  "from" should {
 
-  implicit val decoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
+    "compose the SubscriberUrl from the given MicroserviceBaseUrl and '/events'" in {
+
+      val baseUrl = microserviceBaseUrls.generateOne
+      val part    = nonBlankStrings().generateOne
+
+      SubscriberUrl(baseUrl, part).value shouldBe (baseUrl / part.value).toString
+    }
+  }
 }

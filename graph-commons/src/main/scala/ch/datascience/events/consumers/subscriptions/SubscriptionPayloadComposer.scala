@@ -23,8 +23,9 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.microservices.{IOMicroserviceUrlFinder, MicroserviceUrlFinder}
+import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.Json
 
@@ -34,15 +35,17 @@ trait SubscriptionPayloadComposer[Interpretation[_]] {
 
 private class SubscriptionPayloadComposerImpl[Interpretation[_]](
     categoryName:          CategoryName,
-    subscriptionUrlFinder: MicroserviceUrlFinder[Interpretation]
+    microserviceUrlFinder: MicroserviceUrlFinder[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable])
     extends SubscriptionPayloadComposer[Interpretation] {
 
   import io.circe.syntax._
-  import subscriptionUrlFinder._
+  import microserviceUrlFinder._
 
   override def prepareSubscriptionPayload(): Interpretation[Json] =
-    findSubscriberUrl() map (CategoryAndUrlPayload(categoryName, _).asJson)
+    findBaseUrl() map newSubscriberUrl map (CategoryAndUrlPayload(categoryName, _).asJson)
+
+  private def newSubscriberUrl(baseUrl: MicroserviceBaseUrl) = SubscriberUrl(baseUrl, "events")
 }
 
 object SubscriptionPayloadComposer {
@@ -52,7 +55,7 @@ object SubscriptionPayloadComposer {
   ): Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
     Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>
       for {
-        subscriptionUrlFinder <- IOMicroserviceUrlFinder(microservicePort)
+        subscriptionUrlFinder <- MicroserviceUrlFinder(microservicePort)
       } yield new SubscriptionPayloadComposerImpl[IO](categoryName, subscriptionUrlFinder)
     }
 }

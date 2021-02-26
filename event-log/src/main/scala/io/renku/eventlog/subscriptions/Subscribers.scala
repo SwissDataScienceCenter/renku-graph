@@ -53,24 +53,24 @@ private class SubscribersImpl private[subscriptions] (
 
   override def add(subscriptionInfo: SubscriptionInfo): IO[Unit] = for {
     wasAdded <- subscribersRegistry add subscriptionInfo
+    _        <- subscriberTracker add subscriptionInfo.subscriberUrl
     _        <- whenA(wasAdded)(logger.info(s"$categoryName: $subscriptionInfo added"))
   } yield ()
 
-  override def delete(subscriberUrl: SubscriberUrl): IO[Unit] =
-    for {
-      removed <- subscribersRegistry delete subscriberUrl
-      _       <- whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))
-    } yield ()
+  override def delete(subscriberUrl: SubscriberUrl): IO[Unit] = for {
+    removed <- subscribersRegistry delete subscriberUrl
+    _       <- subscriberTracker remove subscriberUrl
+    _       <- whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))
+  } yield ()
 
   override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =
     subscribersRegistry markBusy subscriberUrl
 
-  override def runOnSubscriber(f: SubscriberUrl => IO[Unit]): IO[Unit] =
-    for {
-      subscriberUrlReference <- subscribersRegistry.findAvailableSubscriber()
-      subscriberUrl          <- subscriberUrlReference.get
-      _                      <- f(subscriberUrl)
-    } yield ()
+  override def runOnSubscriber(f: SubscriberUrl => IO[Unit]): IO[Unit] = for {
+    subscriberUrlReference <- subscribersRegistry.findAvailableSubscriber()
+    subscriberUrl          <- subscriberUrlReference.get
+    _                      <- f(subscriberUrl)
+  } yield ()
 
   def getTotalCapacity: Option[Capacity] = subscribersRegistry.getTotalCapacity
 }

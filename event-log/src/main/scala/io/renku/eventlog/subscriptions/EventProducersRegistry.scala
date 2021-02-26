@@ -80,7 +80,7 @@ object EventProducersRegistry {
       timer:            Timer[IO],
       executionContext: ExecutionContext
   ): IO[EventProducersRegistry[IO]] = for {
-    subscriberTracker <- SubscriberTracker(transactor, queriesExecTimes, microservicePort, logger)
+    subscriberTracker <- SubscriberTracker(transactor, queriesExecTimes)
     awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(transactor,
                                                                           waitingEventsGauge,
                                                                           underTriplesGenerationGauge,

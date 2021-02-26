@@ -19,10 +19,11 @@
 package ch.datascience.events.consumers.subscriptions
 
 import cats.syntax.all._
+import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.EventsGenerators.categoryNames
-import ch.datascience.microservices.MicroserviceUrlFinder
+import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -35,22 +36,22 @@ class SubscriptionPayloadComposerSpec extends AnyWordSpec with should.Matchers w
   "prepareSubscriptionPayload" should {
 
     "return CategoryAndUrlPayload containing the given CategoryName and found subscriberUrl" in new TestCase {
-      val subscriberUrl = subscriberUrls.generateOne
-      (urlFinder.findSubscriberUrl _)
+      val microserviceUrl = microserviceBaseUrls.generateOne
+      (urlFinder.findBaseUrl _)
         .expects()
-        .returning(subscriberUrl.pure[Try])
+        .returning(microserviceUrl.pure[Try])
 
       composer.prepareSubscriptionPayload() shouldBe json"""{
         "categoryName" : ${categoryName.value},
-        "subscriberUrl": ${subscriberUrl.value}
+        "subscriberUrl": ${(microserviceUrl / "events").value}
       }""".pure[Try]
     }
 
     "fail if finding subscriberUrl fails" in new TestCase {
       val exception = exceptions.generateOne
-      (urlFinder.findSubscriberUrl _)
+      (urlFinder.findBaseUrl _)
         .expects()
-        .returning(exception.raiseError[Try, SubscriberUrl])
+        .returning(exception.raiseError[Try, MicroserviceBaseUrl])
 
       composer.prepareSubscriptionPayload() shouldBe exception.raiseError[Try, CategoryAndUrlPayload]
     }

@@ -19,28 +19,32 @@
 package ch.datascience.microservices
 
 import cats.MonadError
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import ch.datascience.tinytypes.constraints.{Url, UrlOps}
+import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
+import io.circe.Decoder
 
 trait MicroserviceUrlFinder[Interpretation[_]] {
-  def findSubscriberUrl(): Interpretation[SubscriberUrl]
+  def findBaseUrl(): Interpretation[MicroserviceBaseUrl]
 }
 
 class MicroserviceUrlFinderImpl[Interpretation[_]: MonadError[*[_], Throwable]](
     microservicePort: Int Refined Positive
 ) extends MicroserviceUrlFinder[Interpretation] {
 
-  import java.net.NetworkInterface
   import cats.syntax.all._
+
+  import java.net.NetworkInterface
   import scala.jdk.CollectionConverters._
 
-  override def findSubscriberUrl(): Interpretation[SubscriberUrl] =
+  override def findBaseUrl(): Interpretation[MicroserviceBaseUrl] =
     findAddress flatMap {
       case Some(address) =>
-        SubscriberUrl(s"http://${address.getHostAddress}:$microservicePort/events").pure[Interpretation]
+        MicroserviceBaseUrl(s"http://${address.getHostAddress}:$microservicePort").pure[Interpretation]
       case None =>
-        new Exception("Cannot find service IP").raiseError[Interpretation, SubscriberUrl]
+        new Exception("Cannot find service IP").raiseError[Interpretation, MicroserviceBaseUrl]
     }
 
   private def findAddress = MonadError[Interpretation, Throwable].catchNonFatal {
@@ -55,10 +59,18 @@ class MicroserviceUrlFinderImpl[Interpretation[_]: MonadError[*[_], Throwable]](
   }
 }
 
-object IOMicroserviceUrlFinder {
+object MicroserviceUrlFinder {
   import cats.effect.IO
 
   def apply(microservicePort: Int Refined Positive): IO[MicroserviceUrlFinder[IO]] = IO {
     new MicroserviceUrlFinderImpl[IO](microservicePort)
   }
+}
+
+final class MicroserviceBaseUrl private (val value: String) extends AnyVal with StringTinyType
+object MicroserviceBaseUrl
+    extends TinyTypeFactory[MicroserviceBaseUrl](new MicroserviceBaseUrl(_))
+    with Url
+    with UrlOps[MicroserviceBaseUrl] {
+  implicit val decoder: Decoder[MicroserviceBaseUrl] = stringDecoder(MicroserviceBaseUrl)
 }

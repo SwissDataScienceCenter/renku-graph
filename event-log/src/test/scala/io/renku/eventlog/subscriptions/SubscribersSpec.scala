@@ -57,20 +57,7 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(subscriptionInfo)
         .returning(false.pure[IO])
 
-      (subscriberTracker.add _).expects(subscriberUrl).returning(true.pure[IO])
-
-      subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
-
-      logger.expectNoLogs()
-    }
-
-    "adds the given subscriber to the registry and do not log info message when it was already added" in new TestCase {
-
-      (subscribersRegistry.add _)
-        .expects(subscriptionInfo)
-        .returning(false.pure[IO])
-
-      (subscriberTracker.add _).expects(subscriberUrl).returning(true.pure[IO])
+      (subscriberTracker.add _).expects(subscriberUrl).returning(false.pure[IO])
 
       subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
 
@@ -127,7 +114,9 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(subscriberUrl)
         .returning(true.pure[IO])
 
-      subscribers.delete(subscriberUrl = subscriberUrl).unsafeRunSync()
+      (subscriberTracker.remove _).expects(subscriberUrl).returning(true.pure[IO])
+
+      subscribers.delete(subscriberUrl).unsafeRunSync()
 
       logger.loggedOnly(Info(s"$categoryName: $subscriberUrl gone - deleting"))
     }
@@ -137,7 +126,9 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(subscriberUrl)
         .returning(false.pure[IO])
 
-      subscribers.delete(subscriberUrl = subscriberUrl).unsafeRunSync()
+      (subscriberTracker.remove _).expects(subscriberUrl).returning(false.pure[IO])
+
+      subscribers.delete(subscriberUrl).unsafeRunSync()
 
       logger.expectNoLogs()
     }

@@ -162,16 +162,15 @@ private object SubscribersRegistry {
       executionContext: ExecutionContext
   ): IO[SubscribersRegistry] = for {
     subscriberUrlReferenceQueue <- Ref.of[IO, List[Deferred[IO, SubscriberUrl]]](List.empty)
-    registry <-
-      IO(
-        new SubscribersRegistry(categoryName,
-                                subscriberUrlReferenceQueue,
-                                Instant.now _,
-                                logger,
-                                busySleep,
-                                checkupInterval
-        )
-      )
+    registry <- IO {
+                  new SubscribersRegistry(categoryName,
+                                          subscriberUrlReferenceQueue,
+                                          Instant.now _,
+                                          logger,
+                                          busySleep,
+                                          checkupInterval
+                  )
+                }
     _ <- registry.busySubscriberCheckup().foreverM.start
   } yield registry
 }

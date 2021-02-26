@@ -19,14 +19,15 @@
 package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.subscriptions
 
 import cats.MonadError
-import cats.syntax.all._
 import cats.data.Kleisli
 import cats.effect.IO
-import ch.datascience.events.consumers.subscriptions.SubscriptionPayloadComposer
+import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions.{SubscriberUrl, SubscriptionPayloadComposer}
 import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.microservices.{IOMicroserviceUrlFinder, MicroserviceUrlFinder}
+import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import ch.datascience.triplesgenerator.Microservice
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
+import eu.timepit.refined.auto._
 import io.circe.Json
 
 private[awaitinggeneration] class PayloadComposer[Interpretation[_]: MonadError[*[_], Throwable]](
@@ -38,7 +39,9 @@ private[awaitinggeneration] class PayloadComposer[Interpretation[_]: MonadError[
   import urlFinder._
 
   override def prepareSubscriptionPayload(): Interpretation[Json] =
-    findSubscriberUrl().map(Payload(categoryName, _, capacity).asJson)
+    findBaseUrl() map newSubscriberUrl map (Payload(categoryName, _, capacity).asJson)
+
+  private def newSubscriberUrl(baseUrl: MicroserviceBaseUrl) = SubscriberUrl(baseUrl, "events")
 }
 
 private[awaitinggeneration] object PayloadComposer {
@@ -46,7 +49,7 @@ private[awaitinggeneration] object PayloadComposer {
   lazy val payloadsComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
     Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>
       for {
-        subscriptionUrlFinder <- IOMicroserviceUrlFinder(Microservice.ServicePort)
+        subscriptionUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
         capacity              <- GenerationProcessesNumber[IO]()
       } yield new PayloadComposer[IO](categoryName, capacity, subscriptionUrlFinder)
     }
