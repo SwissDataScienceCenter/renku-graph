@@ -62,11 +62,13 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenThereIs(freeSubscriber = subscriber)
         givenSending(event, to = subscriber, got = Delivered)
         givenDispatchRecoveryExists(subscriber, event)
+        expectSendingRegistered(event, subscriber)
 
         givenEventFinder(returns = Some(otherEvent))
         givenThereIs(freeSubscriber = otherSubscriber)
         givenSending(otherEvent, to = otherSubscriber, got = Delivered)
         givenDispatchRecoveryExists(otherSubscriber, otherEvent)
+        expectSendingRegistered(otherEvent, otherSubscriber)
 
         givenNoMoreEvents()
       }
@@ -98,6 +100,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
           givenThereIs(freeSubscriber = otherSubscriber)
           givenSending(event, to = otherSubscriber, got = Delivered)
           givenDispatchRecoveryExists(otherSubscriber, event)
+          expectSendingRegistered(event, otherSubscriber)
 
           givenNoMoreEvents()
         }
@@ -134,6 +137,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
           givenThereIs(freeSubscriber = yetAnotherSubscriber)
           givenSending(event, to = yetAnotherSubscriber, got = Delivered)
           givenDispatchRecoveryExists(yetAnotherSubscriber, event)
+          expectSendingRegistered(event, yetAnotherSubscriber)
 
           givenNoMoreEvents()
         }
@@ -176,6 +180,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
           givenThereIs(freeSubscriber = subscriber)
           givenSending(event, to = subscriber, got = Delivered)
           givenDispatchRecoveryExists(subscriber, event)
+          expectSendingRegistered(event, subscriber)
 
           givenNoMoreEvents()
         }
@@ -205,6 +210,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenThereIs(freeSubscriber = subscriber)
         givenSending(event, to = subscriber, got = Delivered)
         givenDispatchRecoveryExists(subscriber, event)
+        expectSendingRegistered(event, subscriber)
 
         givenNoMoreEvents()
       }
@@ -239,6 +245,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenThereIs(freeSubscriber = subscriber)
         givenSending(event, to = subscriber, got = Delivered)
         givenDispatchRecoveryExists(subscriber, event)
+        expectSendingRegistered(event, subscriber)
 
         givenNoMoreEvents()
       }
@@ -250,6 +257,42 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
           Error(s"$categoryName: Finding events to dispatch failed", exception),
           Error(s"$categoryName: Finding events to dispatch failed", exception),
           Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
+        )
+      }
+    }
+
+    "log an error and look for a new event if registering event delivery fails" in new TestCase {
+
+      val exception  = exceptions.generateOne
+      val event      = testCategoryEvents.generateOne
+      val otherEvent = testCategoryEvents.generateOne
+      val subscriber = subscriberUrls.generateOne
+
+      inSequence {
+        givenEventFinder(returns = Some(event))
+        givenThereIs(freeSubscriber = subscriber)
+        givenSending(event, to = subscriber, got = Delivered)
+        givenDispatchRecoveryExists(subscriber, event)
+        (eventDelivery.registerSending _)
+          .expects(event, subscriber)
+          .returning(exception.raiseError[IO, Unit])
+
+        givenEventFinder(returns = Some(otherEvent))
+        givenThereIs(freeSubscriber = subscriber)
+        givenSending(otherEvent, to = subscriber, got = Delivered)
+        givenDispatchRecoveryExists(subscriber, otherEvent)
+        expectSendingRegistered(otherEvent, subscriber)
+
+        givenNoMoreEvents()
+      }
+
+      distributor.run().unsafeRunAsyncAndForget()
+
+      eventually {
+        logger.loggedOnly(
+          Info(s"$categoryName: $event, url = $subscriber -> $Delivered"),
+          Error(s"$categoryName: registering sending $event to $subscriber failed", exception),
+          Info(s"$categoryName: $otherEvent, url = $subscriber -> $Delivered")
         )
       }
     }
@@ -274,6 +317,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenThereIs(freeSubscriber = subscriber)
         givenSending(event, to = subscriber, got = Delivered)
         givenDispatchRecoveryExists(subscriber, event)
+        expectSendingRegistered(event, subscriber)
 
         givenNoMoreEvents()
       }
@@ -308,6 +352,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         givenThereIs(freeSubscriber = otherSubscriber)
         givenSending(event, to = otherSubscriber, got = Delivered)
         givenDispatchRecoveryExists(otherSubscriber, event)
+        expectSendingRegistered(event, otherSubscriber)
 
         givenNoMoreEvents()
       }
@@ -331,6 +376,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
     val subscribers              = mock[Subscribers[IO]]
     val eventsFinder             = mock[EventFinder[IO, TestCategoryEvent]]
     val eventsSender             = mock[EventsSender[IO, TestCategoryEvent]]
+    val eventDelivery            = mock[EventDelivery[IO, TestCategoryEvent]]
     private val dispatchRecovery = mock[DispatchRecovery[IO, TestCategoryEvent]]
     val logger                   = TestLogger[IO]()
     val distributor = new EventsDistributorImpl[IO, TestCategoryEvent](
@@ -338,6 +384,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       subscribers,
       eventsFinder,
       eventsSender,
+      eventDelivery,
       dispatchRecovery,
       logger,
       noEventSleep = 250 millis,
@@ -387,5 +434,10 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       (eventsSender.sendEvent _)
         .expects(to, event)
         .returning(got.pure[IO])
+
+    def expectSendingRegistered(event: TestCategoryEvent, to: SubscriberUrl): Any =
+      (eventDelivery.registerSending _)
+        .expects(event, to)
+        .returning(().pure[IO])
   }
 }

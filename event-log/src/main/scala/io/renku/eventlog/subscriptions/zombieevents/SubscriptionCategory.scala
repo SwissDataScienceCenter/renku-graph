@@ -42,10 +42,12 @@ private[subscriptions] object SubscriptionCategory {
     subscribers      <- Subscribers(categoryName, subscriberTracker, logger)
     eventsFinder     <- ZombieEventsFinder(transactor, queriesExecTimes)
     dispatchRecovery <- LoggingDispatchRecovery[IO, ZombieEvent](categoryName, logger)
+    eventDelivery    <- EventDelivery.noOp[IO, ZombieEvent]
     eventsDistributor <- IOEventsDistributor(categoryName,
                                              transactor,
                                              subscribers,
                                              eventsFinder,
+                                             eventDelivery,
                                              ZombieEventEncoder,
                                              dispatchRecovery,
                                              logger
