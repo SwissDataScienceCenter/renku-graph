@@ -18,12 +18,14 @@
 
 package io.renku.eventlog.init
 
+import DbInitializer._
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
+import scala.language.reflectiveCalls
 import scala.util.control.NonFatal
 
 trait DbInitializer[Interpretation[_]] {
@@ -31,42 +33,13 @@ trait DbInitializer[Interpretation[_]] {
 }
 
 class DbInitializerImpl[Interpretation[_]](
-    eventLogTableCreator:                     EventLogTableCreator[Interpretation],
-    eventPayloadTableCreator:                 EventPayloadTableCreator[Interpretation],
-    projectPathAdder:                         ProjectPathAdder[Interpretation],
-    batchDateAdder:                           BatchDateAdder[Interpretation],
-    latestEventDatesViewRemover:              LatestEventDatesViewRemover[Interpretation],
-    projectTableCreator:                      ProjectTableCreator[Interpretation],
-    projectPathRemover:                       ProjectPathRemover[Interpretation],
-    eventLogTableRenamer:                     EventLogTableRenamer[Interpretation],
-    eventStatusRenamer:                       EventStatusRenamer[Interpretation],
-    eventPayloadSchemaVersionAdder:           EventPayloadSchemaVersionAdder[Interpretation],
-    subscriptionCategorySyncTimeTableCreator: SubscriptionCategorySyncTimeTableCreator[Interpretation],
-    statusesProcessingTimeTableCreator:       StatusesProcessingTimeTableCreator[Interpretation],
-    eventDeliveryTableCreator:                EventDeliveryTableCreator[Interpretation],
-    subscriberTableCreator:                   SubscriberTableCreator[Interpretation],
-    logger:                                   Logger[Interpretation]
-)(implicit ME:                                Bracket[Interpretation, Throwable])
+    migrators: List[Runnable[Interpretation, Unit]],
+    logger:    Logger[Interpretation]
+)(implicit ME: Bracket[Interpretation, Throwable])
     extends DbInitializer[Interpretation] {
 
   override def run(): Interpretation[Unit] = {
-    for {
-      _ <- eventLogTableCreator.run()
-      _ <- projectPathAdder.run()
-      _ <- batchDateAdder.run()
-      _ <- latestEventDatesViewRemover.run()
-      _ <- projectTableCreator.run()
-      _ <- projectPathRemover.run()
-      _ <- eventLogTableRenamer.run()
-      _ <- eventStatusRenamer.run()
-      _ <- eventPayloadTableCreator.run()
-      _ <- eventPayloadSchemaVersionAdder.run()
-      _ <- subscriptionCategorySyncTimeTableCreator.run()
-      _ <- statusesProcessingTimeTableCreator.run()
-      _ <- eventDeliveryTableCreator.run()
-      _ <- subscriberTableCreator.run()
-      _ <- logger info "Event Log database initialization success"
-    } yield ()
+    migrators.map(_.run()).sequence >> logger.info("Event Log database initialization success")
   } recoverWith logging
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
@@ -75,27 +48,31 @@ class DbInitializerImpl[Interpretation[_]](
   }
 }
 
-object IODbInitializer {
+object DbInitializer {
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[DbInitializer[IO]] = IO {
     new DbInitializerImpl[IO](
-      EventLogTableCreator(transactor, logger),
-      EventPayloadTableCreator(transactor, logger),
-      ProjectPathAdder(transactor, logger),
-      BatchDateAdder(transactor, logger),
-      LatestEventDatesViewRemover[IO](transactor, logger),
-      ProjectTableCreator(transactor, logger),
-      ProjectPathRemover(transactor, logger),
-      EventLogTableRenamer(transactor, logger),
-      EventStatusRenamer(transactor, logger),
-      EventPayloadSchemaVersionAdder(transactor, logger),
-      SubscriptionCategorySyncTimeTableCreator(transactor, logger),
-      StatusesProcessingTimeTableCreator(transactor, logger),
-      EventDeliveryTableCreator(transactor, logger),
-      SubscriberTableCreator(transactor, logger),
+      migrators = List[Runnable[IO, Unit]](
+        EventLogTableCreator(transactor, logger),
+        EventPayloadTableCreator(transactor, logger),
+        ProjectPathAdder(transactor, logger),
+        BatchDateAdder(transactor, logger),
+        LatestEventDatesViewRemover[IO](transactor, logger),
+        ProjectTableCreator(transactor, logger),
+        ProjectPathRemover(transactor, logger),
+        EventLogTableRenamer(transactor, logger),
+        EventStatusRenamer(transactor, logger),
+        EventPayloadSchemaVersionAdder(transactor, logger),
+        SubscriptionCategorySyncTimeTableCreator(transactor, logger),
+        StatusesProcessingTimeTableCreator(transactor, logger),
+        EventDeliveryTableCreator(transactor, logger),
+        SubscriberTableCreator(transactor, logger)
+      ),
       logger
     )
   }
+
+  private[init] type Runnable[F[_], R] = { def run(): F[R] }
 }

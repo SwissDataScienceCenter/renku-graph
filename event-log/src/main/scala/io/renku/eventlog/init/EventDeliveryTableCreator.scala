@@ -52,8 +52,9 @@ private class EventDeliveryTableCreatorImpl[Interpretation[_]](
 
   private def createTable = for {
     _ <- createTableSql.run transact transactor.get
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON event_delivery(event_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON event_delivery(project_id)")
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id     ON event_delivery(event_id)")
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id   ON event_delivery(project_id)")
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_url ON event_delivery(delivery_url)")
     _ <- logger info "'event_delivery' table created"
     _ <- foreignKeySql.run transact transactor.get
   } yield ()
@@ -63,7 +64,7 @@ private class EventDeliveryTableCreatorImpl[Interpretation[_]](
       event_id          varchar    NOT NULL,
       project_id        int4       NOT NULL,
       delivery_url      varchar    NOT NULL,
-      PRIMARY KEY (event_id, project_id)
+      PRIMARY KEY (event_id, project_id, delivery_url)
     );
     """.update
 

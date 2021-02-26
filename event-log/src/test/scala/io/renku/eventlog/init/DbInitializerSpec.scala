@@ -34,289 +34,35 @@ class DbInitializerSpec extends AnyWordSpec with MockedRunnableCollaborators wit
 
     "succeed if all the migration processes run fine" in new TestCase {
 
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      given(batchDateAdder).succeeds(returning = ())
-      given(viewRemover).succeeds(returning = ())
-      given(projectTableCreator).succeeds(returning = ())
-      given(projectPathRemover).succeeds(returning = ())
-      given(eventLogTableRenamer).succeeds(returning = ())
-      given(eventStatusRenamer).succeeds(returning = ())
-      given(eventPayloadTableCreator).succeeds(returning = ())
-      given(eventPayloadSchemaAdder).succeeds(returning = ())
-      given(subscriptionCategorySyncTimeTableCreator).succeeds(returning = ())
-      given(statusProcessingTimeTableCreator).succeeds(returning = ())
-      given(eventDeliveryTableCreator).succeeds(returning = ())
-      given(subscriberTableCreator).succeeds(returning = ())
+      given(migrator1).succeeds(returning = ())
+      given(migrator2).succeeds(returning = ())
 
       dbInitializer.run().unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info("Event Log database initialization success"))
     }
 
-    "fail if creating event_log table fails" in new TestCase {
+    "fail if of the migrators fails" in new TestCase {
 
+      given(migrator1).succeeds(returning = ())
       val exception = exceptions.generateOne
-      given(eventLogTableCreator).fails(becauseOf = exception)
+      given(migrator2).fails(becauseOf = exception)
 
       intercept[Exception] {
         dbInitializer.run().unsafeRunSync()
       } shouldBe exception
     }
-
-    "fail if adding the project_path column fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(projectPathAdder).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-
-    "fail if adding the batch_date column fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(batchDateAdder).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-
-    "fail if dropping the latest event dates view fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      given(batchDateAdder).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(viewRemover).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-
-    "fail if creating the project table fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      given(batchDateAdder).succeeds(returning = ())
-      given(viewRemover).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(projectTableCreator).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-
-    "fail if dropping the project_path column fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      given(batchDateAdder).succeeds(returning = ())
-      given(viewRemover).succeeds(returning = ())
-      given(projectTableCreator).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(projectPathRemover).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-
-    "fail if renaming the event_log table fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      given(batchDateAdder).succeeds(returning = ())
-      given(viewRemover).succeeds(returning = ())
-      given(projectTableCreator).succeeds(returning = ())
-      given(projectPathRemover).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(eventLogTableRenamer).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-
-    "fail if renaming the processing status fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      given(batchDateAdder).succeeds(returning = ())
-      given(viewRemover).succeeds(returning = ())
-      given(projectTableCreator).succeeds(returning = ())
-      given(projectPathRemover).succeeds(returning = ())
-      given(eventLogTableRenamer).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(eventStatusRenamer).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-
-    "fail if creating the event_payload table fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      given(batchDateAdder).succeeds(returning = ())
-      given(viewRemover).succeeds(returning = ())
-      given(projectTableCreator).succeeds(returning = ())
-      given(projectPathRemover).succeeds(returning = ())
-      given(eventLogTableRenamer).succeeds(returning = ())
-      given(eventStatusRenamer).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(eventPayloadTableCreator).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-
-    "fail if creating the event_payload table alteration fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      given(batchDateAdder).succeeds(returning = ())
-      given(viewRemover).succeeds(returning = ())
-      given(projectTableCreator).succeeds(returning = ())
-      given(projectPathRemover).succeeds(returning = ())
-      given(eventLogTableRenamer).succeeds(returning = ())
-      given(eventStatusRenamer).succeeds(returning = ())
-      given(eventPayloadTableCreator).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(eventPayloadSchemaAdder).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-
-    "fail if creating the subscription_category_sync_time table creation fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      given(batchDateAdder).succeeds(returning = ())
-      given(viewRemover).succeeds(returning = ())
-      given(projectTableCreator).succeeds(returning = ())
-      given(projectPathRemover).succeeds(returning = ())
-      given(eventLogTableRenamer).succeeds(returning = ())
-      given(eventStatusRenamer).succeeds(returning = ())
-      given(eventPayloadTableCreator).succeeds(returning = ())
-      given(eventPayloadSchemaAdder).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(subscriptionCategorySyncTimeTableCreator).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-
-    "fail if creating the status_transition_time table creation fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      given(batchDateAdder).succeeds(returning = ())
-      given(viewRemover).succeeds(returning = ())
-      given(projectTableCreator).succeeds(returning = ())
-      given(projectPathRemover).succeeds(returning = ())
-      given(eventLogTableRenamer).succeeds(returning = ())
-      given(eventStatusRenamer).succeeds(returning = ())
-      given(eventPayloadTableCreator).succeeds(returning = ())
-      given(eventPayloadSchemaAdder).succeeds(returning = ())
-      given(subscriptionCategorySyncTimeTableCreator).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(statusProcessingTimeTableCreator).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-    "fail if creating the event_delivery table creation fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      given(batchDateAdder).succeeds(returning = ())
-      given(viewRemover).succeeds(returning = ())
-      given(projectTableCreator).succeeds(returning = ())
-      given(projectPathRemover).succeeds(returning = ())
-      given(eventLogTableRenamer).succeeds(returning = ())
-      given(eventStatusRenamer).succeeds(returning = ())
-      given(eventPayloadTableCreator).succeeds(returning = ())
-      given(eventPayloadSchemaAdder).succeeds(returning = ())
-      given(subscriptionCategorySyncTimeTableCreator).succeeds(returning = ())
-      given(statusProcessingTimeTableCreator).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(eventDeliveryTableCreator).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-
-    "fail if creating the subscriber table creation fails" in new TestCase {
-
-      given(eventLogTableCreator).succeeds(returning = ())
-      given(projectPathAdder).succeeds(returning = ())
-      given(batchDateAdder).succeeds(returning = ())
-      given(viewRemover).succeeds(returning = ())
-      given(projectTableCreator).succeeds(returning = ())
-      given(projectPathRemover).succeeds(returning = ())
-      given(eventLogTableRenamer).succeeds(returning = ())
-      given(eventStatusRenamer).succeeds(returning = ())
-      given(eventPayloadTableCreator).succeeds(returning = ())
-      given(eventPayloadSchemaAdder).succeeds(returning = ())
-      given(subscriptionCategorySyncTimeTableCreator).succeeds(returning = ())
-      given(statusProcessingTimeTableCreator).succeeds(returning = ())
-      given(eventDeliveryTableCreator).succeeds(returning = ())
-      val exception = exceptions.generateOne
-      given(subscriberTableCreator).fails(becauseOf = exception)
-
-      intercept[Exception] {
-        dbInitializer.run().unsafeRunSync()
-      } shouldBe exception
-    }
-
   }
 
   private trait TestCase {
-    val eventLogTableCreator                     = mock[EventLogTableCreator[IO]]
-    val eventPayloadTableCreator                 = mock[EventPayloadTableCreator[IO]]
-    val projectPathAdder                         = mock[ProjectPathAdder[IO]]
-    val batchDateAdder                           = mock[BatchDateAdder[IO]]
-    val viewRemover                              = mock[LatestEventDatesViewRemover[IO]]
-    val projectTableCreator                      = mock[ProjectTableCreator[IO]]
-    val projectPathRemover                       = mock[ProjectPathRemover[IO]]
-    val eventLogTableRenamer                     = mock[EventLogTableRenamer[IO]]
-    val eventStatusRenamer                       = mock[EventStatusRenamer[IO]]
-    val eventPayloadSchemaAdder                  = mock[EventPayloadSchemaVersionAdder[IO]]
-    val subscriptionCategorySyncTimeTableCreator = mock[SubscriptionCategorySyncTimeTableCreator[IO]]
-    val statusProcessingTimeTableCreator         = mock[StatusesProcessingTimeTableCreator[IO]]
-    val eventDeliveryTableCreator                = mock[EventDeliveryTableCreator[IO]]
-    val subscriberTableCreator                   = mock[SubscriberTableCreator[IO]]
-    val logger                                   = TestLogger[IO]()
+    import DbInitializer.Runnable
+
+    val migrator1 = mock[EventLogTableCreator[IO]]
+    val migrator2 = mock[EventPayloadTableCreator[IO]]
+    val logger    = TestLogger[IO]()
+
     val dbInitializer = new DbInitializerImpl[IO](
-      eventLogTableCreator,
-      eventPayloadTableCreator,
-      projectPathAdder,
-      batchDateAdder,
-      viewRemover,
-      projectTableCreator,
-      projectPathRemover,
-      eventLogTableRenamer,
-      eventStatusRenamer,
-      eventPayloadSchemaAdder,
-      subscriptionCategorySyncTimeTableCreator,
-      statusProcessingTimeTableCreator,
-      eventDeliveryTableCreator,
-      subscriberTableCreator,
+      List[Runnable[IO, Unit]](migrator1, migrator2),
       logger
     )
   }
