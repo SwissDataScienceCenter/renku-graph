@@ -30,6 +30,7 @@ import ch.datascience.metrics.LabeledGauge
 import io.renku.eventlog.statuschange.StatusUpdatesRunner
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands.{ToGenerationNonRecoverableFailure, UpdateResult}
+import io.renku.eventlog.subscriptions.EventDelivery
 import io.renku.eventlog.subscriptions.Generators.subscriberUrls
 import org.scalamock.matchers.ArgCapture.CaptureAll
 import org.scalamock.scalatest.MockFactory
@@ -83,9 +84,11 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
     val underTriplesGenerationGauge = mock[LabeledGauge[IO, projects.Path]]
     val statusUpdateRunner          = mock[StatusUpdatesRunner[IO]]
     val logger                      = TestLogger[IO]()
+    val eventDelivery               = mock[EventDelivery[IO, ToGenerationNonRecoverableFailure[IO]]]
     val dispatchRecovery = new DispatchRecoveryImpl[IO](
       underTriplesGenerationGauge,
       statusUpdateRunner,
+      eventDelivery,
       logger,
       onErrorSleep = 100 millis
     )

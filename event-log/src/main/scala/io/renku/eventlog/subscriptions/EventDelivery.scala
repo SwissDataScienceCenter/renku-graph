@@ -29,8 +29,9 @@ import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
 
-private trait EventDelivery[Interpretation[_], CategoryEvent] {
+private[eventlog] trait EventDelivery[Interpretation[_], CategoryEvent] {
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit]
+  def unregister(event:      CompoundEventId): Interpretation[Unit]
 }
 
 private class EventDeliveryImpl[CategoryEvent](transactor:               DbTransactor[IO, EventLogDB],
@@ -54,13 +55,24 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
     )
   } transact transactor.get flatMap toResult
 
+  def unregister(eventId: CompoundEventId): IO[Unit] = measureExecutionTime {
+    val CompoundEventId(id, projectId) = eventId
+
+    SqlQuery(
+      sql"""|DELETE FROM event_delivery 
+            |WHERE event_id = $id AND project_id = $projectId
+            |""".stripMargin.update.run,
+      name = "event delivery info - remove"
+    )
+  } transact transactor.get flatMap toResult
+
   private lazy val toResult: Int => IO[Unit] = {
     case 0 | 1 => ().pure[IO]
     case _     => new Exception("Inserted more than one record to the event_delivery").raiseError[IO, Unit]
   }
 }
 
-private object EventDelivery {
+private[eventlog] object EventDelivery {
 
   def apply[CategoryEvent](
       transactor:               DbTransactor[IO, EventLogDB],
@@ -81,5 +93,8 @@ private class NoOpEventDelivery[Interpretation[_]: MonadError[*[_], Throwable], 
     extends EventDelivery[Interpretation, CategoryEvent] {
 
   override def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit] =
+    ().pure[Interpretation]
+
+  override def unregister(eventId: CompoundEventId): Interpretation[Unit] =
     ().pure[Interpretation]
 }

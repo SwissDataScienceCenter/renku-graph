@@ -58,10 +58,6 @@ package object commands {
       request.as[Json].map(_.validate(status))
     )
 
-    def getSubscriberUrl: EitherT[Interpretation, CommandFindingResult, SubscriberUrl] = EitherT(
-      request.as[Json].map(_.getSubscriberUrl)
-    )
-
     lazy val getProcessingTime: EitherT[Interpretation, CommandFindingResult, Option[EventProcessingTime]] = EitherT(
       request.as[Json].map(_.getProcessingTime)
     )
@@ -91,10 +87,6 @@ package object commands {
       .as[Option[EventMessage]]
       .leftMap(error => PayloadMalformed(error.getMessage()): CommandFindingResult)
 
-    lazy val getSubscriberUrl: Either[CommandFindingResult, SubscriberUrl] = json.hcursor
-      .downField("subscriberUrl")
-      .as[SubscriberUrl]
-      .leftMap(error => PayloadMalformed(error.getMessage()): CommandFindingResult)
   }
 
 }

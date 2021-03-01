@@ -31,6 +31,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands._
+import io.renku.eventlog.subscriptions.EventDelivery
 import org.http4s.Request
 import org.http4s.dsl.Http4sDsl
 
@@ -109,21 +110,63 @@ object IOStatusChangeEndpoint {
   )(implicit contextShift:                ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {
       statusUpdatesRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
+      eventDeliveryTriplesStore <-
+        EventDelivery[ToTriplesStore[IO]](transactor, (_: ToTriplesStore[IO]).eventId, queriesExecTimes)
+      eventDeliveryGenerationNonRecoverable <- EventDelivery[ToGenerationNonRecoverableFailure[IO]](
+                                                 transactor,
+                                                 (_: ToGenerationNonRecoverableFailure[IO]).eventId,
+                                                 queriesExecTimes
+                                               )
+      eventDeliveryTransformationNonRecoverable <- EventDelivery[ToTransformationNonRecoverableFailure[IO]](
+                                                     transactor,
+                                                     (_: ToTransformationNonRecoverableFailure[IO]).eventId,
+                                                     queriesExecTimes
+                                                   )
+      eventDeliveryTriplesGenerated <- EventDelivery[ToTriplesGenerated[IO]](
+                                         transactor,
+                                         (_: ToTriplesGenerated[IO]).eventId,
+                                         queriesExecTimes
+                                       )
+      eventDeliverySkipped <- EventDelivery[ToSkipped[IO]](
+                                transactor,
+                                (_: ToSkipped[IO]).eventId,
+                                queriesExecTimes
+                              )
+      eventDeliveryGenerationRecoverable <- EventDelivery[ToGenerationRecoverableFailure[IO]](
+                                              transactor,
+                                              (_: ToGenerationRecoverableFailure[IO]).eventId,
+                                              queriesExecTimes
+                                            )
+      eventDeliveryTransformationRecoverable <- EventDelivery[ToTransformationRecoverableFailure[IO]](
+                                                  transactor,
+                                                  (_: ToTransformationRecoverableFailure[IO]).eventId,
+                                                  queriesExecTimes
+                                                )
     } yield new StatusChangeEndpoint(statusUpdatesRunner,
                                      Set(
-                                       ToTriplesStore.factory(underTriplesTransformationGauge),
+                                       ToTriplesStore.factory(underTriplesTransformationGauge,
+                                                              eventDeliveryTriplesStore
+                                       ),
                                        ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
                                        ToTriplesGenerated.factory(underTriplesGenerationGauge,
-                                                                  awaitingTriplesTransformationGauge
+                                                                  awaitingTriplesTransformationGauge,
+                                                                  eventDeliveryTriplesGenerated
                                        ),
-                                       ToSkipped.factory(underTriplesGenerationGauge),
-                                       ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),
+                                       ToSkipped.factory(underTriplesGenerationGauge, eventDeliverySkipped),
+                                       ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge,
+                                                                                 eventDeliveryGenerationNonRecoverable
+                                       ),
                                        ToGenerationRecoverableFailure.factory(awaitingTriplesGenerationGauge,
-                                                                              underTriplesGenerationGauge
+                                                                              underTriplesGenerationGauge,
+                                                                              eventDeliveryGenerationRecoverable
                                        ),
-                                       ToTransformationNonRecoverableFailure.factory(underTriplesTransformationGauge),
+                                       ToTransformationNonRecoverableFailure.factory(
+                                         underTriplesTransformationGauge,
+                                         eventDeliveryTransformationNonRecoverable
+                                       ),
                                        ToTransformationRecoverableFailure.factory(awaitingTriplesTransformationGauge,
-                                                                                  underTriplesTransformationGauge
+                                                                                  underTriplesTransformationGauge,
+                                                                                  eventDeliveryTransformationRecoverable
                                        )
                                      ),
                                      logger

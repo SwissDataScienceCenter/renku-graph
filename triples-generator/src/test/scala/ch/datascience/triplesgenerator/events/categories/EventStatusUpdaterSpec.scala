@@ -95,7 +95,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
           .withRequestBody(
             equalToJson(
-              json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime, "subscriberUrl": ${microserviceBaseUrl.value} }""".spaces2
+              json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2
             )
           )
           .willReturn(aResponse().withStatus(status.code))
@@ -246,7 +246,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withRequestBody(
               equalToJson(
-                json"""{"status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE", "subscriberUrl": ${microserviceBaseUrl.value}}""".spaces2
+                json"""{"status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE"}""".spaces2
               )
             )
             .willReturn(aResponse().withStatus(status.code))
@@ -279,7 +279,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
             .withRequestBody(equalToJson(json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE", "message": ${asString(
               exception
-            )}, "subscriberUrl": ${microserviceBaseUrl.value}}""".spaces2))
+            )}}""".spaces2))
             .willReturn(aResponse().withStatus(status.code))
         }
 

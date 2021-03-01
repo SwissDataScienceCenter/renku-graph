@@ -83,8 +83,7 @@ private class IOEventStatusUpdater(
       eventContent = EventRequestContent(
         event = json"""{
           "status": "TRIPLES_STORE", 
-          "processingTime": $processingTime,
-          "subscriberUrl": ${microserviceUrl.value}
+          "processingTime": $processingTime
         }""",
         maybePayload = None
       ),
@@ -123,7 +122,7 @@ private class IOEventStatusUpdater(
     sendStatusChange(
       eventId,
       eventContent = EventRequestContent(
-        json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE", "subscriberUrl": ${microserviceUrl.value}}""" deepMerge exception.asJson,
+        json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE" }""" deepMerge exception.asJson,
         maybePayload = None
       ),
       responseMapping = okConflictAsSuccess
@@ -143,7 +142,7 @@ private class IOEventStatusUpdater(
     sendStatusChange(
       eventId,
       eventContent = EventRequestContent(
-        json"""{"status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE", "subscriberUrl": ${microserviceUrl.value}}""" deepMerge exception.asJson,
+        json"""{"status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE" }""" deepMerge exception.asJson,
         None
       ),
       responseMapping = okConflictAsSuccess

@@ -80,6 +80,10 @@ class StatusUpdatesRunnerImpl(
         .pure[IO]
   }
 
+  private def logError(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, ConnectionIO[Unit]] = { case _ =>
+    logger.error(s"Event ${command.eventId} could not be updated in eventDelivery").to[ConnectionIO]
+  }
+
   private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {
     case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
     case _       => ME.unit
@@ -92,7 +96,10 @@ class StatusUpdatesRunnerImpl(
           command.mapResult(intResult) match {
             case result if result != Updated =>
               QueryFailedException(lastQuery.name, result).raiseError[ConnectionIO, UpdateResult]
-            case result => result.pure[ConnectionIO]
+            case result =>
+              for {
+                _ <- command.updateDelivery().to[ConnectionIO] recoverWith logError(command)
+              } yield result
           }
         }
       case false => (NotFound: commands.UpdateResult).pure[ConnectionIO]
