@@ -39,7 +39,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Duration
 
-class LongProcessingEventsFinderSpec
+class LongProcessingEventFinderSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with MockFactory
@@ -197,7 +197,7 @@ class LongProcessingEventsFinderSpec
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
 
     val finder =
-      new LongProcessingEventFinderImpl(transactor, maxProcessingTime, maxProcessingTimeRatio, queriesExecTimes)
+      new LongProcessingEventFinder(transactor, maxProcessingTime, maxProcessingTimeRatio, queriesExecTimes)
 
     def addEvent(eventId: CompoundEventId, status: EventStatus, executionDate: ExecutionDate): Unit = storeEvent(
       eventId,

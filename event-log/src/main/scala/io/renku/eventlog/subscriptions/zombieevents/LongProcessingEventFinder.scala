@@ -35,19 +35,17 @@ import io.renku.eventlog.{EventLogDB, TypeSerializers}
 
 import java.time.{Duration, Instant}
 
-private class LongProcessingEventFinderImpl(transactor:             DbTransactor[IO, EventLogDB],
-                                            maxProcessingTime:      EventProcessingTime,
-                                            maxProcessingTimeRatio: Int Refined Positive,
-                                            queriesExecTimes:       LabeledHistogram[IO, SqlQuery.Name],
-                                            now:                    () => Instant = () => Instant.now
-)(implicit ME:                                                      Bracket[IO, Throwable], contextShift: ContextShift[IO])
+private class LongProcessingEventFinder(transactor:             DbTransactor[IO, EventLogDB],
+                                        maxProcessingTime:      EventProcessingTime,
+                                        maxProcessingTimeRatio: Int Refined Positive,
+                                        queriesExecTimes:       LabeledHistogram[IO, SqlQuery.Name],
+                                        now:                    () => Instant = () => Instant.now
+)(implicit ME:                                                  Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, ZombieEvent]
     with TypeSerializers {
 
   import doobie.implicits._
-
-  private val zombieMessage: String = "Zombie Event"
 
   override def popEvent(): IO[Option[ZombieEvent]] = {
     findPotentialZombies >>= lookForZombie >>= markEventTaken
@@ -73,7 +71,7 @@ private class LongProcessingEventFinderImpl(transactor:             DbTransactor
     """.stripMargin
         .query[(projects.Id, EventStatus)]
         .to[List],
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find projects")
+      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - find projects")
     )
   }
 
@@ -88,7 +86,7 @@ private class LongProcessingEventFinderImpl(transactor:             DbTransactor
     """.stripMargin
         .query[EventProcessingTime]
         .to[List],
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find processing times")
+      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - find processing times")
     )
   }
 
@@ -117,7 +115,7 @@ private class LongProcessingEventFinderImpl(transactor:             DbTransactor
           .query[(CompoundEventId, projects.Path, EventStatus)]
           .map(ZombieEvent.tupled.apply _)
           .option,
-        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find")
+        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - find")
       )
     }
 
@@ -132,7 +130,7 @@ private class LongProcessingEventFinderImpl(transactor:             DbTransactor
             |SET message = $zombieMessage
             |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
             |""".stripMargin.update.run,
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update message")
+      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - update message")
     )
   }
 
@@ -151,6 +149,6 @@ private object LongProcessingEventFinder {
       transactor:          DbTransactor[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
-    new LongProcessingEventFinderImpl(transactor, MaxProcessingTime, MaxProcessingTimeRatio, queriesExecTimes)
+    new LongProcessingEventFinder(transactor, MaxProcessingTime, MaxProcessingTimeRatio, queriesExecTimes)
   }
 }

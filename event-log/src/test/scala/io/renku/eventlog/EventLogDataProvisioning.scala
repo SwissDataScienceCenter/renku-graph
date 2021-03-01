@@ -19,12 +19,14 @@
 package io.renku.eventlog
 
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.{TransformationRecoverableFailure, TransformingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.microservices.MicroserviceBaseUrl
 import doobie.implicits._
 
 import java.time.Instant
@@ -108,6 +110,24 @@ trait EventLogDataProvisioning {
           |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $eventStatus, $processingTime)
           |ON CONFLICT (event_id, project_id, status)
           |DO UPDATE SET processing_time = excluded.processing_time
+      """.stripMargin.update.run.void
+  }
+
+  protected def upsertEventDelivery(compoundEventId: CompoundEventId, deliveryUrl: SubscriberUrl): Unit = execute {
+    sql"""|INSERT INTO
+          |event_delivery (event_id, project_id, delivery_url)
+          |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $deliveryUrl)
+          |ON CONFLICT (event_id, project_id, delivery_url)
+          |DO NOTHING
+      """.stripMargin.update.run.void
+  }
+
+  protected def upsertSubscriber(deliveryUrl: SubscriberUrl, sourceUrl: MicroserviceBaseUrl): Unit = execute {
+    sql"""|INSERT INTO
+          |subscriber (delivery_url, source_url)
+          |VALUES ($deliveryUrl, $sourceUrl)
+          |ON CONFLICT (delivery_url, source_url)
+          |DO NOTHING
       """.stripMargin.update.run.void
   }
 }

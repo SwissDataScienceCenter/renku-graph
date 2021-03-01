@@ -19,19 +19,19 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.Monad
+import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
-import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventFinder
 
 private class ZombieEventFinder[Interpretation[_]: Monad](
-    longProcessingEventsFinder: EventFinder[Interpretation, ZombieEvent]
+    longProcessingEventsFinder: EventFinder[Interpretation, ZombieEvent],
+    lostSubscriberEventFinder:  EventFinder[Interpretation, ZombieEvent]
 ) extends EventFinder[Interpretation, ZombieEvent] {
-  override def popEvent(): Interpretation[Option[ZombieEvent]] = for {
-    maybeEvent <- longProcessingEventsFinder.popEvent()
-  } yield maybeEvent
+  override def popEvent(): Interpretation[Option[ZombieEvent]] =
+    OptionT(longProcessingEventsFinder.popEvent()).orElseF(lostSubscriberEventFinder.popEvent()).value
 }
 
 private object ZombieEventFinder {
@@ -41,5 +41,6 @@ private object ZombieEventFinder {
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = for {
     longProcessingEventFinder <- LongProcessingEventFinder(transactor, queriesExecTimes)
-  } yield new ZombieEventFinder[IO](longProcessingEventFinder)
+    lostSubscriberEventFinder <- LostSubscriberEventFinder(transactor, queriesExecTimes)
+  } yield new ZombieEventFinder[IO](longProcessingEventFinder, lostSubscriberEventFinder)
 }

@@ -27,19 +27,37 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 import scala.util.Try
+import ch.datascience.generators.Generators._
 
 class ZombieEventsFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
   "popEvent" should {
-    "returns the event found by the LongProcessingEventFinder" in new TestCase {
-      (longProcessingEventsFinder.popEvent _).expects().returning(maybeZombieEvent.pure[Try])
+    "returns the event if found by the LongProcessingEventFinder" in new TestCase {
+      val zombieEvent = zombieEvents.generateOne
+      (longProcessingEventsFinder.popEvent _).expects().returning(zombieEvent.some.pure[Try])
 
-      zombieEventFinder.popEvent() shouldBe maybeZombieEvent.pure[Try]
+      zombieEventFinder.popEvent() shouldBe zombieEvent.some.pure[Try]
     }
+    "returns the event if found by the LostSubscriberEventFinder" in new TestCase {
+      val zombieEvent = zombieEvents.generateOne
+      (longProcessingEventsFinder.popEvent _).expects().returning(None.pure[Try])
+      (lostSubscriberEventsFinder.popEvent _).expects().returning(zombieEvent.some.pure[Try])
+
+      zombieEventFinder.popEvent() shouldBe zombieEvent.some.pure[Try]
+    }
+
+    "fail if the LongProcessingEventFinder fails" in new TestCase {
+      val exception = exceptions.generateOne
+      (longProcessingEventsFinder.popEvent _).expects().returning(exception.raiseError[Try, Option[ZombieEvent]])
+
+      zombieEventFinder.popEvent() shouldBe exception.raiseError[Try, Option[ZombieEvent]]
+    }
+
   }
   private trait TestCase {
-    val maybeZombieEvent           = zombieEvents.generateOption
+
     val longProcessingEventsFinder = mock[EventFinder[Try, ZombieEvent]]
-    val zombieEventFinder          = new ZombieEventFinder[Try](longProcessingEventsFinder)
+    val lostSubscriberEventsFinder = mock[EventFinder[Try, ZombieEvent]]
+    val zombieEventFinder          = new ZombieEventFinder[Try](longProcessingEventsFinder, lostSubscriberEventsFinder)
   }
 
 }
