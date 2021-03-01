@@ -34,14 +34,6 @@ import scala.concurrent.ExecutionContext.Implicits.global
 trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
   self: Suite =>
 
-  object Tables {
-    val event                        = "event"
-    val project                      = "project"
-    val eventPayload                 = "event_payload"
-    val subscriptionCategorySyncTime = "subscription_category_sync_time"
-    lazy val all                     = Set(event, eventPayload, subscriptionCategorySyncTime, project)
-  }
-
   implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 
   private val dbConfig = new EventLogDbConfigProvider[IO].get().unsafeRunSync()

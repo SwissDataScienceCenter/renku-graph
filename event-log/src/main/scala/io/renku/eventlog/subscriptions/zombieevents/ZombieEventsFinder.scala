@@ -18,29 +18,42 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.Monad
+import cats.{Monad, MonadError}
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
+import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
+import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventFinder
 
-private class ZombieEventFinder[Interpretation[_]: Monad](
+import scala.util.control.NonFatal
+
+private class ZombieEventFinder[Interpretation[_]: MonadError[*[_], Throwable]](
     longProcessingEventsFinder: EventFinder[Interpretation, ZombieEvent],
-    lostSubscriberEventFinder:  EventFinder[Interpretation, ZombieEvent]
+    lostSubscriberEventFinder:  EventFinder[Interpretation, ZombieEvent],
+    zombieEventSourceCleaner:   ZombieEventSourceCleaner[Interpretation],
+    logger:                     Logger[Interpretation]
 ) extends EventFinder[Interpretation, ZombieEvent] {
-  override def popEvent(): Interpretation[Option[ZombieEvent]] =
-    OptionT(longProcessingEventsFinder.popEvent()).orElseF(lostSubscriberEventFinder.popEvent()).value
+  override def popEvent(): Interpretation[Option[ZombieEvent]] = for {
+    _          <- zombieEventSourceCleaner.removeZombieSources() recoverWith logError
+    maybeEvent <- OptionT(longProcessingEventsFinder.popEvent()).orElseF(lostSubscriberEventFinder.popEvent()).value
+  } yield maybeEvent
+
+  private lazy val logError: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(e) =>
+    logger.error(e)("ZombieEventSourceCleaner - failure during clean up")
+  }
 }
 
 private object ZombieEventFinder {
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
+      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
+      logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = for {
     longProcessingEventFinder <- LongProcessingEventFinder(transactor, queriesExecTimes)
     lostSubscriberEventFinder <- LostSubscriberEventFinder(transactor, queriesExecTimes)
-  } yield new ZombieEventFinder[IO](longProcessingEventFinder, lostSubscriberEventFinder)
+  } yield new ZombieEventFinder[IO](longProcessingEventFinder, lostSubscriberEventFinder, ???, logger)
 }

@@ -130,4 +130,5 @@ trait EventLogDataProvisioning {
           |DO NOTHING
       """.stripMargin.update.run.void
   }
+
 }
