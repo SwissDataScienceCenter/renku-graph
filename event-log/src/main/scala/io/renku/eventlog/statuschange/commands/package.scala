@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.effect.Sync
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.{EventProcessingTime, EventStatus}
 import io.circe.Json
 import io.renku.eventlog.EventMessage
@@ -57,6 +58,10 @@ package object commands {
       request.as[Json].map(_.validate(status))
     )
 
+    def getSubscriberUrl: EitherT[Interpretation, CommandFindingResult, SubscriberUrl] = EitherT(
+      request.as[Json].map(_.getSubscriberUrl)
+    )
+
     lazy val getProcessingTime: EitherT[Interpretation, CommandFindingResult, Option[EventProcessingTime]] = EitherT(
       request.as[Json].map(_.getProcessingTime)
     )
@@ -84,6 +89,11 @@ package object commands {
     lazy val getMessage: Either[CommandFindingResult, Option[EventMessage]] = json.hcursor
       .downField("message")
       .as[Option[EventMessage]]
+      .leftMap(error => PayloadMalformed(error.getMessage()): CommandFindingResult)
+
+    lazy val getSubscriberUrl: Either[CommandFindingResult, SubscriberUrl] = json.hcursor
+      .downField("subscriberUrl")
+      .as[SubscriberUrl]
       .leftMap(error => PayloadMalformed(error.getMessage()): CommandFindingResult)
   }
 

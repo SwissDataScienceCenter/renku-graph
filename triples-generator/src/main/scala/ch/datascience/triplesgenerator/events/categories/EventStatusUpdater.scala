@@ -27,7 +27,9 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime}
 import ch.datascience.http.client.IORestClient
+import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.triplesgenerator.Microservice
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonEncoder
 import org.http4s.{Status, Uri}
@@ -50,8 +52,9 @@ private trait EventStatusUpdater[Interpretation[_]] {
 }
 
 private class IOEventStatusUpdater(
-    eventLogUrl: EventLogUrl,
-    logger:      Logger[IO]
+    eventLogUrl:     EventLogUrl,
+    microserviceUrl: MicroserviceBaseUrl,
+    logger:          Logger[IO]
 )(implicit
     ME:               MonadError[IO, Throwable],
     executionContext: ExecutionContext,
@@ -80,7 +83,8 @@ private class IOEventStatusUpdater(
       eventContent = EventRequestContent(
         event = json"""{
           "status": "TRIPLES_STORE", 
-          "processingTime": $processingTime
+          "processingTime": $processingTime,
+          "subscriberUrl": ${microserviceUrl.value}
         }""",
         maybePayload = None
       ),
@@ -118,10 +122,10 @@ private class IOEventStatusUpdater(
   override def markEventFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
     sendStatusChange(
       eventId,
-      eventContent =
-        EventRequestContent(json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
-                            maybePayload = None
-        ),
+      eventContent = EventRequestContent(
+        json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE", "subscriberUrl": ${microserviceUrl.value}}""" deepMerge exception.asJson,
+        maybePayload = None
+      ),
       responseMapping = okConflictAsSuccess
     )
 
@@ -138,10 +142,10 @@ private class IOEventStatusUpdater(
   override def markEventTransformationFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
     sendStatusChange(
       eventId,
-      eventContent =
-        EventRequestContent(json"""{"status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
-                            None
-        ),
+      eventContent = EventRequestContent(
+        json"""{"status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE", "subscriberUrl": ${microserviceUrl.value}}""" deepMerge exception.asJson,
+        None
+      ),
       responseMapping = okConflictAsSuccess
     )
 
@@ -194,6 +198,8 @@ private object IOEventStatusUpdater {
       timer:            Timer[IO]
   ): IO[EventStatusUpdater[IO]] =
     for {
-      eventLogUrl <- EventLogUrl[IO]()
-    } yield new IOEventStatusUpdater(eventLogUrl, logger)
+      microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
+      sourceUrl             <- microserviceUrlFinder.findBaseUrl()
+      eventLogUrl           <- EventLogUrl[IO]()
+    } yield new IOEventStatusUpdater(eventLogUrl, sourceUrl, logger)
 }

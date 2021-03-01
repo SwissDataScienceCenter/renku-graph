@@ -18,7 +18,6 @@
 
 package io.renku.eventlog.statuschange
 
-import cats.data.NonEmptyList
 import cats.effect.{Bracket, IO}
 import cats.free.Free
 import cats.syntax.all._
