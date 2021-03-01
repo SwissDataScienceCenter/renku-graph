@@ -39,9 +39,9 @@ trait InMemoryEventLogDbSpec
     allMigrations.map(_.run()).sequence.void.unsafeRunSync()
 
   private def findAllTables(): List[String] = execute {
-    sql"""SELECT DISTINCT tablename FROM pg_tables
-         |WHERE schemaname != 'pg_catalog' AND 
-         |    schemaname != 'information_schema'""".stripMargin
+    sql"""|SELECT DISTINCT tablename FROM pg_tables
+          |WHERE schemaname != 'pg_catalog'
+          |  AND schemaname != 'information_schema'""".stripMargin
       .query[String]
       .to[List]
   }

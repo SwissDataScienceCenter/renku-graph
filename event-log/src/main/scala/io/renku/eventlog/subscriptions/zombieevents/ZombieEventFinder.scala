@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.{Monad, MonadError}
+import cats.MonadError
 import cats.data.OptionT
-import cats.effect.{ContextShift, IO}
+import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
@@ -28,6 +28,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventFinder
 
+import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private class ZombieEventFinder[Interpretation[_]: MonadError[*[_], Throwable]](
@@ -49,11 +50,20 @@ private class ZombieEventFinder[Interpretation[_]: MonadError[*[_], Throwable]](
 private object ZombieEventFinder {
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = for {
+      transactor:       DbTransactor[IO, EventLogDB],
+      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+      logger:           Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[EventFinder[IO, ZombieEvent]] = for {
     longProcessingEventFinder <- LongProcessingEventFinder(transactor, queriesExecTimes)
     lostSubscriberEventFinder <- LostSubscriberEventFinder(transactor, queriesExecTimes)
-  } yield new ZombieEventFinder[IO](longProcessingEventFinder, lostSubscriberEventFinder, ???, logger)
+    zombieEventSourceCleaner  <- ZombieEventSourceCleaner(transactor, queriesExecTimes, logger)
+  } yield new ZombieEventFinder[IO](longProcessingEventFinder,
+                                    lostSubscriberEventFinder,
+                                    zombieEventSourceCleaner,
+                                    logger
+  )
 }
