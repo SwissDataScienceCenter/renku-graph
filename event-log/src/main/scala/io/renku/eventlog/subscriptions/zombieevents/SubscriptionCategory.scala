@@ -40,7 +40,7 @@ private[subscriptions] object SubscriptionCategory {
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers      <- Subscribers(categoryName, subscriberTracker, logger)
-    eventsFinder     <- ZombieEventsFinder(transactor, queriesExecTimes)
+    eventsFinder     <- ZombieEventFinder(transactor, queriesExecTimes)
     dispatchRecovery <- LoggingDispatchRecovery[IO, ZombieEvent](categoryName, logger)
     eventDelivery    <- EventDelivery.noOp[IO, ZombieEvent]
     eventsDistributor <- IOEventsDistributor(categoryName,
