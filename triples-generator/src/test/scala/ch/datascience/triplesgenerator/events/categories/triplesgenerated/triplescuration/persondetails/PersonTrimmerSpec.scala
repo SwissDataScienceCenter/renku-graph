@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
-import cats.data.NonEmptyList
+import cats.data.{EitherT, NonEmptyList}
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -78,7 +78,9 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
         (commitCommiterFinder.findCommitPeople _)
           .expects(projectId, commitId, maybeAccessToken)
-          .returning(Success(CommitPersonsInfo(commitId, NonEmptyList(commitPerson, otherCommitPersons))))
+          .returning(
+            EitherT.right(Success(CommitPersonsInfo(commitId, NonEmptyList(commitPerson, otherCommitPersons))))
+          )
 
         personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken) shouldBe Success(
           expectedTriples -> Set(
@@ -104,7 +106,9 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
         (commitCommiterFinder.findCommitPeople _)
           .expects(projectId, commitId, maybeAccessToken)
-          .returning(Success(CommitPersonsInfo(commitId, NonEmptyList(commitPerson, otherCommitPersons))))
+          .returning(
+            EitherT.right(Success(CommitPersonsInfo(commitId, NonEmptyList(commitPerson, otherCommitPersons))))
+          )
 
         personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken) shouldBe Success(
           expectedTriples -> Set(
@@ -142,7 +146,8 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
         .expects(triples)
         .returning((expectedTriples, Set(personData)))
 
-      val Failure(exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken)
+      val Failure(exception) =
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken).value
 
       exception.getMessage shouldBe s"Multiple emails for person with '$entityId' id found in generated JSON-LD"
     }
@@ -156,7 +161,8 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
         .expects(triples)
         .returning((expectedTriples, Set(personData)))
 
-      val Failure(exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken)
+      val Failure(exception) =
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken).value
       exception.getMessage shouldBe s"No email for person with id '${personData.id}' and multiple names found in generated JSON-LD"
     }
 
@@ -169,7 +175,8 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
         .expects(triples)
         .returning((expectedTriples, Set(personData)))
 
-      val Failure(exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken)
+      val Failure(exception) =
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken).value
       exception.getMessage shouldBe s"No email and no name for person with id '$id' found in generated JSON-LD"
     }
 
@@ -188,10 +195,10 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
       (commitCommiterFinder.findCommitPeople _)
         .expects(projectId, commitId, maybeAccessToken)
-        .returning(Success(CommitPersonsInfo(commitId, otherCommitPersons)))
+        .returning(EitherT.right(Success(CommitPersonsInfo(commitId, otherCommitPersons))))
 
       val Failure(exception: Exception) =
-        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken)
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken).value
       exception.getMessage shouldBe s"Could not find the email for person with id '$id' in gitlab"
     }
 
@@ -209,10 +216,10 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
       (commitCommiterFinder.findCommitPeople _)
         .expects(projectId, commitId, maybeAccessToken)
-        .returning(Success(CommitPersonsInfo(commitId, otherCommitPersons)))
+        .returning(EitherT.right(Success(CommitPersonsInfo(commitId, otherCommitPersons))))
 
       val Failure(exception: Exception) =
-        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken)
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken).value
       exception.getMessage shouldBe s"Could not find the email for person with id '$id' in gitlab"
     }
 
@@ -228,9 +235,10 @@ private class PersonTrimmerSpec extends AnyWordSpec with should.Matchers with Mo
 
       (commitCommiterFinder.findCommitPeople _)
         .expects(projectId, commitId, maybeAccessToken)
-        .returning(expectedException.raiseError[Try, CommitPersonsInfo])
+        .returning(EitherT.right(expectedException.raiseError[Try, CommitPersonsInfo]))
 
-      val Failure(exception) = personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken)
+      val Failure(exception) =
+        personTrimmer.getTriplesAndTrimmedPersons(triples, projectId, eventId, maybeAccessToken).value
 
       exception.getMessage shouldBe expectedException.getMessage
     }

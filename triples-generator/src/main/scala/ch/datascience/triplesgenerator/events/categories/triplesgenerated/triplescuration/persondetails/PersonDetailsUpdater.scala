@@ -64,7 +64,6 @@ private class PersonDetailsUpdaterImpl[Interpretation[_]: Monad](
       triplesAndPersons <-
         personTrimmer
           .getTriplesAndTrimmedPersons(curatedTriples.triples, project.id, eventId, maybeAccessToken)
-          .toRightT
       (updatedTriples, trimmedPersons) = triplesAndPersons
       projectMembers <- findProjectMembers(project.path)(maybeAccessToken)
       personsWithGitlabIds = merge(trimmedPersons, projectMembers)

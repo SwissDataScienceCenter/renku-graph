@@ -59,6 +59,7 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
 
       commitCommitterFinder
         .findCommitPeople(projectId, expectedCommitPersonInfo.id, accessToken.some)
+        .value
         .unsafeRunSync() shouldBe expectedCommitPersonInfo
     }
 
@@ -70,7 +71,7 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
       }
 
       intercept[Exception] {
-        commitCommitterFinder.findCommitPeople(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
+        commitCommitterFinder.findCommitPeople(projectId, commitId, maybeAccessToken = None).value.unsafeRunSync()
       } shouldBe UnauthorizedException
     }
 
@@ -82,7 +83,7 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
       }
 
       intercept[Exception] {
-        commitCommitterFinder.findCommitPeople(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
+        commitCommitterFinder.findCommitPeople(projectId, commitId, maybeAccessToken = None).value.unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.Ok}; error: Invalid message body: Could not decode JSON: {}"
     }
 
@@ -94,7 +95,7 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
       }
 
       intercept[Exception] {
-        commitCommitterFinder.findCommitPeople(projectId, commitId, maybeAccessToken = None).unsafeRunSync()
+        commitCommitterFinder.findCommitPeople(projectId, commitId, maybeAccessToken = None).value.unsafeRunSync()
       }.getMessage shouldBe s"GET $gitLabUrl/api/v4/projects/$projectId/repository/commits/$commitId returned ${Status.NotFound}; body: some message"
     }
   }

@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
 import cats.MonadError
+import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.GitLab
@@ -29,6 +30,7 @@ import ch.datascience.graph.model.users.{Email, Name, ResourceId}
 import ch.datascience.graph.model.{events, projects}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
+import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
@@ -38,11 +40,11 @@ private trait PersonTrimmer[Interpretation[_]] {
                                   projectId:        projects.Id,
                                   eventId:          EventId,
                                   maybeAccessToken: Option[AccessToken]
-  ): Interpretation[(JsonLDTriples, Set[Person])]
+  ): EitherT[Interpretation, ProcessingRecoverableError, (JsonLDTriples, Set[Person])]
 
 }
 
-private class PersonTrimmerImpl[Interpretation[_]: MonadError[*[_], Throwable]](
+private class PersonTrimmerImpl[Interpretation[_]: MonadError[*[_], Throwable]]( //[Interpretation[_]: MonadError[*[_], Throwable]](
     personExtractor:       PersonExtractor,
     commitCommitterFinder: CommitCommitterFinder[Interpretation]
 ) extends PersonTrimmer[Interpretation] {
@@ -51,10 +53,11 @@ private class PersonTrimmerImpl[Interpretation[_]: MonadError[*[_], Throwable]](
                                            projectId:        projects.Id,
                                            eventId:          EventId,
                                            maybeAccessToken: Option[AccessToken]
-  ): Interpretation[(JsonLDTriples, Set[Person])] = for {
-    updatedAndPersonData <- personExtractor.extractPersons(triples).pure[Interpretation]
+  ): EitherT[Interpretation, ProcessingRecoverableError, (JsonLDTriples, Set[Person])] = for {
+    updatedAndPersonData <-
+      EitherT.right[ProcessingRecoverableError](personExtractor.extractPersons(triples).pure[Interpretation])
     (updatedTriples, personsRawData) = updatedAndPersonData
-    personsWithMaybeEmail <- checkForMultipleEmails(personsRawData)
+    personsWithMaybeEmail <- checkForMultipleEmails(personsRawData).toRightT
     persons               <- trimPersons(personsWithMaybeEmail, projectId, CommitId(eventId.value), maybeAccessToken)
   } yield (updatedTriples, persons)
 
@@ -71,15 +74,17 @@ private class PersonTrimmerImpl[Interpretation[_]: MonadError[*[_], Throwable]](
                           projectId:        projects.Id,
                           commitId:         events.CommitId,
                           maybeAccessToken: Option[AccessToken]
-  ): Interpretation[Set[Person]] = {
+  ): EitherT[Interpretation, ProcessingRecoverableError, Set[Person]] = {
     val (personsDataWithNoEmail, personsDataWithSingleEmail)     = partitionPersonsWithSingleEmail(personsRawData)
     val (personsFromSingleEmail, withSingleEmailToCheckInGitlab) = personsDataWithSingleEmail.toPersonOrToGitlab
-    val personsWithNoEmail                                       = personsDataWithNoEmail.toPersonsOrThrow
+    val personsWithNoEmail                                       = personsDataWithNoEmail.toPersonsOrThrow.toRightT
     if (withSingleEmailToCheckInGitlab.nonEmpty) {
       for {
-        commitPersonInfo              <- commitCommitterFinder.findCommitPeople(projectId, commitId, maybeAccessToken)
-        personsWithDeduplicatedEmails <- mergeRawDataWithGitLabData(withSingleEmailToCheckInGitlab, commitPersonInfo)
-        personsWithoutEmails          <- personsWithNoEmail
+        commitPersonInfo <- commitCommitterFinder.findCommitPeople(projectId, commitId, maybeAccessToken)
+        personsWithDeduplicatedEmails <-
+          mergeRawDataWithGitLabData(withSingleEmailToCheckInGitlab, commitPersonInfo).toRightT
+
+        personsWithoutEmails <- personsWithNoEmail
       } yield personsWithDeduplicatedEmails ++ personsWithoutEmails ++ personsFromSingleEmail
     } else {
       personsWithNoEmail.map(_ ++ personsFromSingleEmail)
@@ -145,6 +150,11 @@ private class PersonTrimmerImpl[Interpretation[_]: MonadError[*[_], Throwable]](
       .toList
       .sequence
       .map(_.toSet)
+  }
+
+  private implicit class ResultOps[T](out: Interpretation[T]) {
+    lazy val toRightT: EitherT[Interpretation, ProcessingRecoverableError, T] =
+      EitherT.right[ProcessingRecoverableError](out)
   }
 
 }

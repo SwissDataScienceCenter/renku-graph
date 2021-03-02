@@ -18,14 +18,19 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
+import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
+import cats.syntax.all._
+
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
-import ch.datascience.http.client.RestClientError.UnauthorizedException
+import ch.datascience.http.client.RestClientError.{ConnectivityException, UnauthorizedException}
 import ch.datascience.http.client.{AccessToken, IORestClient}
+import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Method.GET
 import org.http4s.Status.{Ok, Unauthorized}
@@ -39,7 +44,7 @@ private trait CommitCommitterFinder[Interpretation[_]] {
   def findCommitPeople(projectId:        projects.Id,
                        commitId:         CommitId,
                        maybeAccessToken: Option[AccessToken]
-  ): Interpretation[CommitPersonsInfo]
+  ): EitherT[Interpretation, ProcessingRecoverableError, CommitPersonsInfo]
 }
 
 private class CommitCommitterFinderImpl(
@@ -56,18 +61,32 @@ private class CommitCommitterFinderImpl(
   def findCommitPeople(projectId:        projects.Id,
                        commitId:         CommitId,
                        maybeAccessToken: Option[AccessToken]
-  ): IO[CommitPersonsInfo] = for { // TODO: change this to EitherT. See GitLabProjectMembersFinder for an example
-    uri    <- validateUri(s"$gitLabApiUrl/projects/$projectId/repository/commits/$commitId")
-    result <- send(request(GET, uri, maybeAccessToken))(mapResponse)
-  } yield result
+  ): EitherT[IO, ProcessingRecoverableError, CommitPersonsInfo] =
+    for {
+      uri    <- validateUri(s"$gitLabApiUrl/projects/$projectId/repository/commits/$commitId").toRightT
+      result <- EitherT(send(request(GET, uri, maybeAccessToken))(mapResponse) recoverWith maybeRecoverableError)
+    } yield result
 
-  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[CommitPersonsInfo]] = {
-    case (Ok, _, response)    => response.as[CommitPersonsInfo]
-    case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
+  private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[
+    Either[ProcessingRecoverableError, (CommitPersonsInfo)]
+  ]] = {
+    case (Ok, _, response) => response.as[CommitPersonsInfo].map(info => Right(info))
+    case (Unauthorized, _, _) =>
+      Left(CurationRecoverableError("Access token not valid to fetch project commit info")).pure[IO]
   }
 
   private implicit val commitPersonInfoEntityDecoder: EntityDecoder[IO, CommitPersonsInfo] =
     jsonOf[IO, CommitPersonsInfo]
+
+  private lazy val maybeRecoverableError
+      : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, CommitPersonsInfo]]] = {
+    case ConnectivityException(message, cause) =>
+      IO.pure(Either.left(CurationRecoverableError(message, cause)))
+  }
+  private implicit class ResultOps[T](out: IO[T]) {
+    lazy val toRightT: EitherT[IO, ProcessingRecoverableError, T] =
+      EitherT.right[ProcessingRecoverableError](out)
+  }
 
 }
 

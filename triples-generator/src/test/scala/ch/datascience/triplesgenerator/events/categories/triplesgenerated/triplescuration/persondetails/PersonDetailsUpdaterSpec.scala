@@ -58,7 +58,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
 
       (personTrimmer.getTriplesAndTrimmedPersons _)
         .expects(curatedTriples.triples, project.id, eventId, maybeAccessToken)
-        .returning((triplesWithoutPersonDetails, trimmedPersons).pure[Try])
+        .returning(EitherT.right((triplesWithoutPersonDetails, trimmedPersons).pure[Try]))
 
       val projectMembers = gitLabProjectMembers.generateNonEmptyList().toList.toSet
       (projectMembersFinder
@@ -99,7 +99,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
       val exception = exceptions.generateOne
       (personTrimmer.getTriplesAndTrimmedPersons _)
         .expects(curatedTriples.triples, project.id, eventId, maybeAccessToken)
-        .returning(exception.raiseError[Try, (JsonLDTriples, Set[Person])])
+        .returning(EitherT.right(exception.raiseError[Try, (JsonLDTriples, Set[Person])]))
 
       updater.updatePersonDetails(curatedTriples, project, eventId).value shouldBe exception
         .raiseError[Try, (JsonLDTriples, Set[Person])]
@@ -127,7 +127,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
       val triplesWithoutPersonDetails = jsonLDTriples.generateOne
       (personTrimmer.getTriplesAndTrimmedPersons _)
         .expects(curatedTriples.triples, project.id, eventId, maybeAccessToken)
-        .returning((triplesWithoutPersonDetails, trimmedPersons).pure[Try])
+        .returning(EitherT.right((triplesWithoutPersonDetails, trimmedPersons).pure[Try]))
 
       val exception = exceptions.generateOne
       (projectMembersFinder
@@ -151,7 +151,7 @@ class PersonDetailsUpdaterSpec extends AnyWordSpec with should.Matchers with Moc
       val triplesWithoutPersonDetails = jsonLDTriples.generateOne
       (personTrimmer.getTriplesAndTrimmedPersons _)
         .expects(curatedTriples.triples, project.id, eventId, maybeAccessToken)
-        .returning((triplesWithoutPersonDetails, trimmedPersons).pure[Try])
+        .returning(EitherT.right((triplesWithoutPersonDetails, trimmedPersons).pure[Try]))
 
       val exception = CurationRecoverableError(nonBlankStrings().generateOne.value, exceptions.generateOne)
       (projectMembersFinder
