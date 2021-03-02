@@ -18,9 +18,10 @@
 
 package io.renku.eventlog.subscriptions
 
+import Generators._
 import cats.syntax.all._
 import ch.datascience.db.SqlQuery
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.metrics.TestLabeledHistogram
@@ -28,7 +29,6 @@ import ch.datascience.microservices.MicroserviceBaseUrl
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.subscriptions.Generators.subscriberUrls
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -39,70 +39,106 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
 
     "insert a new row in the subscriber table if the subscriber does not exists" in new TestCase {
 
-      findSubscriber(subscriberUrl, sourceUrl) shouldBe None
+      findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl) shouldBe None
 
-      (tracker add subscriberUrl).unsafeRunSync() shouldBe true
+      (tracker add subscriptionInfo).unsafeRunSync() shouldBe true
 
-      findSubscriber(subscriberUrl, sourceUrl) shouldBe Some(subscriberUrl -> sourceUrl)
+      findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl) shouldBe Some(
+        (subscriptionInfo.subscriberId, subscriptionInfo.subscriberUrl, sourceUrl)
+      )
+    }
+
+    "replace existing row for the subscription info with the same subscriber url but different subscriber id" in new TestCase {
+
+      findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl) shouldBe None
+
+      (tracker add subscriptionInfo).unsafeRunSync() shouldBe true
+
+      findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl) shouldBe Some(
+        (subscriptionInfo.subscriberId, subscriptionInfo.subscriberUrl, sourceUrl)
+      )
+
+      val newSubscriberId = subscriberIds.generateOne
+      (tracker add subscriptionInfo.copy(subscriberId = newSubscriberId)).unsafeRunSync() shouldBe true
+
+      findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl) shouldBe Some(
+        (newSubscriberId, subscriptionInfo.subscriberUrl, sourceUrl)
+      )
     }
 
     "insert a new row in the subscriber table " +
       "if the subscriber exists but the source_url is different" in new TestCase {
         val otherSource  = microserviceBaseUrls.generateOne
         val otherTracker = new SubscriberTrackerImpl(transactor, queriesExecTimes, otherSource)
-        (otherTracker add subscriberUrl).unsafeRunSync() shouldBe true
+        (otherTracker add subscriptionInfo).unsafeRunSync() shouldBe true
 
-        findSubscriber(subscriberUrl, otherSource) shouldBe Some(subscriberUrl -> otherSource)
-        findSubscriber(subscriberUrl, sourceUrl)   shouldBe None
+        findSubscriber(subscriptionInfo.subscriberUrl, otherSource) shouldBe Some(
+          (subscriptionInfo.subscriberId, subscriptionInfo.subscriberUrl, otherSource)
+        )
+        findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl) shouldBe None
 
-        (tracker add subscriberUrl).unsafeRunSync() shouldBe true
+        (tracker add subscriptionInfo).unsafeRunSync() shouldBe true
 
-        findSubscriber(subscriberUrl, otherSource) shouldBe Some(subscriberUrl -> otherSource)
-        findSubscriber(subscriberUrl, sourceUrl)   shouldBe Some(subscriberUrl -> sourceUrl)
+        findSubscriber(subscriptionInfo.subscriberUrl, otherSource) shouldBe Some(
+          (subscriptionInfo.subscriberId, subscriptionInfo.subscriberUrl, otherSource)
+        )
+        findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl) shouldBe Some(
+          (subscriptionInfo.subscriberId, subscriptionInfo.subscriberUrl, sourceUrl)
+        )
       }
 
     "do nothing if the subscriber info is already present in the table" in new TestCase {
-      findSubscriber(subscriberUrl, sourceUrl) shouldBe None
+      findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl) shouldBe None
 
-      (tracker add subscriberUrl).unsafeRunSync() shouldBe true
-      findSubscriber(subscriberUrl, sourceUrl)    shouldBe Some(subscriberUrl -> sourceUrl)
+      (tracker add subscriptionInfo).unsafeRunSync() shouldBe true
+      findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl) shouldBe Some(
+        (subscriptionInfo.subscriberId, subscriptionInfo.subscriberUrl, sourceUrl)
+      )
 
-      (tracker add subscriberUrl).unsafeRunSync() shouldBe true
-      findSubscriber(subscriberUrl, sourceUrl)    shouldBe Some(subscriberUrl -> sourceUrl)
+      (tracker add subscriptionInfo).unsafeRunSync() shouldBe true
+      findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl) shouldBe Some(
+        (subscriptionInfo.subscriberId, subscriptionInfo.subscriberUrl, sourceUrl)
+      )
     }
   }
 
   "remove" should {
 
     "remove a subscriber if the subscriber and the current source url exists" in new TestCase {
-      storeSubscriberUrl(subscriberUrl, sourceUrl)
+      storeSubscriptionInfo(subscriptionInfo, sourceUrl)
 
-      findSubscriber(subscriberUrl, sourceUrl)       shouldBe Some(subscriberUrl -> sourceUrl)
-      (tracker remove subscriberUrl).unsafeRunSync() shouldBe true
-      findSubscriber(subscriberUrl, sourceUrl)       shouldBe None
+      findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl) shouldBe Some(
+        (subscriptionInfo.subscriberId, subscriptionInfo.subscriberUrl, sourceUrl)
+      )
+      (tracker remove subscriptionInfo.subscriberUrl).unsafeRunSync() shouldBe true
+      findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl)       shouldBe None
 
     }
 
     "do nothing if the subscriber does not exists" in new TestCase {
-      (tracker remove subscriberUrl).unsafeRunSync() shouldBe true
-      findSubscriber(subscriberUrl, sourceUrl)       shouldBe None
+      (tracker remove subscriptionInfo.subscriberUrl).unsafeRunSync() shouldBe true
+      findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl)       shouldBe None
     }
 
     "do nothing if the subscriber exists but the source_url is different than the current source url" in new TestCase {
 
       val otherSource = microserviceBaseUrls.generateOne
-      storeSubscriberUrl(subscriberUrl, otherSource)
-      findSubscriber(subscriberUrl, otherSource) shouldBe Some(subscriberUrl -> otherSource)
+      storeSubscriptionInfo(subscriptionInfo, otherSource)
+      findSubscriber(subscriptionInfo.subscriberUrl, otherSource) shouldBe Some(
+        (subscriptionInfo.subscriberId, subscriptionInfo.subscriberUrl, otherSource)
+      )
 
-      (tracker remove subscriberUrl).unsafeRunSync() shouldBe true
-      findSubscriber(subscriberUrl, otherSource)     shouldBe Some(subscriberUrl -> otherSource)
-      findSubscriber(subscriberUrl, sourceUrl)       shouldBe None
+      (tracker remove subscriptionInfo.subscriberUrl).unsafeRunSync() shouldBe true
+      findSubscriber(subscriptionInfo.subscriberUrl, otherSource) shouldBe Some(
+        (subscriptionInfo.subscriberId, subscriptionInfo.subscriberUrl, otherSource)
+      )
+      findSubscriber(subscriptionInfo.subscriberUrl, sourceUrl) shouldBe None
     }
   }
 
   private trait TestCase {
 
-    val subscriberUrl    = subscriberUrls.generateOne
+    val subscriptionInfo = subscriptionInfos.generateOne
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val sourceUrl        = microserviceBaseUrls.generateOne
     val tracker          = new SubscriberTrackerImpl(transactor, queriesExecTimes, sourceUrl)
@@ -110,18 +146,19 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
 
   private def findSubscriber(subscriberUrl: SubscriberUrl,
                              sourceUrl:     MicroserviceBaseUrl
-  ): Option[(SubscriberUrl, MicroserviceBaseUrl)] = execute {
-    sql"""|SELECT delivery_url, source_url
+  ): Option[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute {
+    sql"""|SELECT delivery_id, delivery_url, source_url
           |FROM subscriber
           |WHERE delivery_url = ${subscriberUrl.value} AND source_url = ${sourceUrl.value}""".stripMargin
-      .query[(SubscriberUrl, MicroserviceBaseUrl)]
+      .query[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)]
       .option
   }
 
-  private def storeSubscriberUrl(subscriberUrl: SubscriberUrl, sourceUrl: MicroserviceBaseUrl): Unit = execute {
-    sql"""|INSERT INTO
-          |subscriber (delivery_url, source_url)
-          |VALUES (${subscriberUrl.value}, ${sourceUrl.value})
+  private def storeSubscriptionInfo(subscriptionInfo: SubscriptionInfo, sourceUrl: MicroserviceBaseUrl): Unit =
+    execute {
+      sql"""|INSERT INTO
+            |subscriber (delivery_id, delivery_url, source_url)
+            |VALUES (${subscriptionInfo.subscriberId}, ${subscriptionInfo.subscriberUrl}, $sourceUrl)
       """.stripMargin.update.run.void
-  }
+    }
 }

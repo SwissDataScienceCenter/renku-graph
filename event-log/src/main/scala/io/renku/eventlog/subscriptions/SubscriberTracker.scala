@@ -28,8 +28,8 @@ import eu.timepit.refined.auto._
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
 
 private trait SubscriberTracker[Interpretation[_]] {
-  def add(subscriberUrl:    SubscriberUrl): Interpretation[Boolean]
-  def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean]
+  def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean]
+  def remove(subscriberUrl: SubscriberUrl):    Interpretation[Boolean]
 }
 
 private class SubscriberTrackerImpl(transactor:       DbTransactor[IO, EventLogDB],
@@ -40,12 +40,12 @@ private class SubscriberTrackerImpl(transactor:       DbTransactor[IO, EventLogD
     with SubscriberTracker[IO]
     with TypeSerializers {
 
-  override def add(subscriberUrl: SubscriberUrl): IO[Boolean] = measureExecutionTime(
+  override def add(subscriptionInfo: SubscriptionInfo): IO[Boolean] = measureExecutionTime(
     SqlQuery(
-      sql"""|INSERT INTO subscriber (delivery_url, source_url)
-            |VALUES ($subscriberUrl, $sourceUrl)
+      sql"""|INSERT INTO subscriber (delivery_id, delivery_url, source_url)
+            |VALUES (${subscriptionInfo.subscriberId}, ${subscriptionInfo.subscriberUrl}, $sourceUrl)
             |ON CONFLICT (delivery_url, source_url)
-            |DO NOTHING
+            |DO UPDATE SET delivery_id = ${subscriptionInfo.subscriberId}, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
             |""".stripMargin.update.run,
       name = "subscriber - add"
     )

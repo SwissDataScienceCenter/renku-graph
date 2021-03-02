@@ -534,10 +534,11 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | status          VARCHAR    PK    NOT NULL |
 | processing_time INTERVAL         NOT NULL |
 
-| subscriber                         |
-|------------------------------------|
-| source_url   VARCHAR   PK NOT NULL |
-| delivery_url VARCHAR   PK NOT NULL |
+| subscriber                           |
+|--------------------------------------|
+| source_url   VARCHAR     PK NOT NULL |
+| delivery_url VARCHAR     PK NOT NULL |
+| delivery_id  VARCHAR(19)    NOT NULL |
 
 | event_delivery                        |
 |---------------------------------------|

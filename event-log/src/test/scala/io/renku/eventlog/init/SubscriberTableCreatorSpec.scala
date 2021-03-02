@@ -68,8 +68,9 @@ class SubscriberTableCreatorSpec extends AnyWordSpec with DbInitSpec with should
 
       tableExists("subscriber") shouldBe true
 
-      verifyTrue(sql"DROP INDEX idx_delivery_url;")
-      verifyTrue(sql"DROP INDEX idx_source_url;")
+      verifyTrue(sql"DROP INDEX idx_delivery_id")
+      verifyTrue(sql"DROP INDEX idx_delivery_url")
+      verifyTrue(sql"DROP INDEX idx_source_url")
     }
   }
 

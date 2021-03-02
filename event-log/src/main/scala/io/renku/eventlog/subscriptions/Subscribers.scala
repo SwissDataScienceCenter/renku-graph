@@ -53,7 +53,7 @@ private class SubscribersImpl private[subscriptions] (
 
   override def add(subscriptionInfo: SubscriptionInfo): IO[Unit] = for {
     wasAdded <- subscribersRegistry add subscriptionInfo
-    _        <- subscriberTracker add subscriptionInfo.subscriberUrl
+    _        <- subscriberTracker add subscriptionInfo
     _        <- whenA(wasAdded)(logger.info(s"$categoryName: $subscriptionInfo added"))
   } yield ()
 
