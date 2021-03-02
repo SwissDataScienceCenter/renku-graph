@@ -35,11 +35,15 @@ private class ZombieEventFinder[Interpretation[_]: MonadError[*[_], Throwable]](
     longProcessingEventsFinder: EventFinder[Interpretation, ZombieEvent],
     lostSubscriberEventFinder:  EventFinder[Interpretation, ZombieEvent],
     zombieEventSourceCleaner:   ZombieEventSourceCleaner[Interpretation],
+    lostZombieEventFinder:      EventFinder[Interpretation, ZombieEvent],
     logger:                     Logger[Interpretation]
 ) extends EventFinder[Interpretation, ZombieEvent] {
   override def popEvent(): Interpretation[Option[ZombieEvent]] = for {
-    _          <- zombieEventSourceCleaner.removeZombieSources() recoverWith logError
-    maybeEvent <- OptionT(longProcessingEventsFinder.popEvent()).orElseF(lostSubscriberEventFinder.popEvent()).value
+    _ <- zombieEventSourceCleaner.removeZombieSources() recoverWith logError
+    maybeEvent <- OptionT(longProcessingEventsFinder.popEvent())
+                    .orElseF(lostSubscriberEventFinder.popEvent())
+                    .orElseF(lostZombieEventFinder.popEvent())
+                    .value
   } yield maybeEvent
 
   private lazy val logError: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(e) =>
@@ -61,9 +65,11 @@ private object ZombieEventFinder {
     longProcessingEventFinder <- LongProcessingEventFinder(transactor, queriesExecTimes)
     lostSubscriberEventFinder <- LostSubscriberEventFinder(transactor, queriesExecTimes)
     zombieEventSourceCleaner  <- ZombieEventSourceCleaner(transactor, queriesExecTimes, logger)
+    lostZombieEventFinder     <- LostZombieEventFinder(transactor, queriesExecTimes)
   } yield new ZombieEventFinder[IO](longProcessingEventFinder,
                                     lostSubscriberEventFinder,
                                     zombieEventSourceCleaner,
+                                    lostZombieEventFinder,
                                     logger
   )
 }

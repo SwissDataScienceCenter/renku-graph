@@ -49,6 +49,16 @@ class ZombieEventsFinderSpec extends AnyWordSpec with MockFactory with should.Ma
       zombieEventFinder.popEvent() shouldBe zombieEvent.some.pure[Try]
     }
 
+    "returns the potential event found by the LostZombieEventFinder" in new TestCase {
+      val maybeZombieEvent = zombieEvents.generateOption
+      (zombieEventSourceCleaner.removeZombieSources _).expects().returning(().pure[Try])
+      (longProcessingEventsFinder.popEvent _).expects().returning(None.pure[Try])
+      (lostSubscriberEventsFinder.popEvent _).expects().returning(None.pure[Try])
+      (lostZombieEventsFinder.popEvent _).expects().returning(maybeZombieEvent.pure[Try])
+
+      zombieEventFinder.popEvent() shouldBe maybeZombieEvent.pure[Try]
+    }
+
     "fail if the LongProcessingEventFinder fails" in new TestCase {
       val exception = exceptions.generateOne
       (zombieEventSourceCleaner.removeZombieSources _).expects().returning(().pure[Try])
@@ -74,11 +84,13 @@ class ZombieEventsFinderSpec extends AnyWordSpec with MockFactory with should.Ma
     val longProcessingEventsFinder = mock[EventFinder[Try, ZombieEvent]]
     val lostSubscriberEventsFinder = mock[EventFinder[Try, ZombieEvent]]
     val zombieEventSourceCleaner   = mock[ZombieEventSourceCleaner[Try]]
+    val lostZombieEventsFinder     = mock[EventFinder[Try, ZombieEvent]]
     val logger                     = TestLogger[Try]()
     val zombieEventFinder =
       new ZombieEventFinder[Try](longProcessingEventsFinder,
                                  lostSubscriberEventsFinder,
                                  zombieEventSourceCleaner,
+                                 lostZombieEventsFinder,
                                  logger
       )
   }
