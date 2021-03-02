@@ -18,17 +18,20 @@
 
 package ch.datascience.microservices
 
-import java.util.concurrent.ConcurrentHashMap
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.NonBlank
 
-import cats.effect.{CancelToken, IO, IOApp}
+import java.time.{Instant, LocalDateTime}
+import java.time.format.DateTimeFormatter.ofPattern
+import scala.util.Random
 
-import scala.jdk.CollectionConverters._
+final class MicroserviceIdentifier private (val value: String) extends AnyVal with StringTinyType
+object MicroserviceIdentifier
+    extends TinyTypeFactory[MicroserviceIdentifier](new MicroserviceIdentifier(_))
+    with NonBlank {
 
-trait IOMicroservice extends IOApp {
+  def generate(): MicroserviceIdentifier = generate(LocalDateTime.now _)
 
-  protected val subProcessesCancelTokens = new ConcurrentHashMap[CancelToken[IO], Unit]()
-
-  def stopSubProcesses: List[CancelToken[IO]] = subProcessesCancelTokens.keys().asScala.toList
-
-  lazy val identifier: MicroserviceIdentifier = MicroserviceIdentifier.generate()
+  private[microservices] def generate(now: () => LocalDateTime): MicroserviceIdentifier =
+    MicroserviceIdentifier(s"${now().format(ofPattern("yyyyMMddHHmmss"))}-${Random.between(1000, 9999)}")
 }

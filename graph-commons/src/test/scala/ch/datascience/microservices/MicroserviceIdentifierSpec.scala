@@ -18,17 +18,26 @@
 
 package ch.datascience.microservices
 
-import java.util.concurrent.ConcurrentHashMap
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-import cats.effect.{CancelToken, IO, IOApp}
+import java.time.LocalDateTime
 
-import scala.jdk.CollectionConverters._
+class MicroserviceIdentifierSpec extends AnyWordSpec with should.Matchers {
 
-trait IOMicroservice extends IOApp {
+  "generate" should {
 
-  protected val subProcessesCancelTokens = new ConcurrentHashMap[CancelToken[IO], Unit]()
+    "produce unique identifiers in the format yyyyMMddHHmmss-{random 4 digits int}" in {
+      val now = LocalDateTime.now
 
-  def stopSubProcesses: List[CancelToken[IO]] = subProcessesCancelTokens.keys().asScala.toList
+      val id = MicroserviceIdentifier.generate(() => now)
 
-  lazy val identifier: MicroserviceIdentifier = MicroserviceIdentifier.generate()
+      id     shouldBe a[MicroserviceIdentifier]
+      id.value should fullyMatch regex s"${now.getYear}${addPadding(now.getMonthValue)}${addPadding(
+        now.getDayOfMonth
+      )}${addPadding(now.getHour)}${addPadding(now.getMinute)}${addPadding(now.getSecond)}\\-\\d{4}"
+    }
+  }
+
+  private def addPadding(value: Int) = f"$value%02d"
 }
