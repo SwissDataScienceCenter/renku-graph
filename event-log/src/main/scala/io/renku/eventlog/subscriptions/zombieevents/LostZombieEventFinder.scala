@@ -80,7 +80,7 @@ private class LostZombieEventFinder(transactor:       DbTransactor[IO, EventLogD
     SqlQuery(
       sql"""|UPDATE event
             |SET execution_date = ${now()}
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
+            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND message = $zombieMessage
             |""".stripMargin.update.run,
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - update execution date")
     )

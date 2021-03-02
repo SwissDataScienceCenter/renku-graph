@@ -367,6 +367,8 @@ object Generators {
       ): Gen[Set[T]] =
         setOf(generator, minElements, maxElements)
 
+      def toGeneratorOf[TT <: TinyType { type V = T }](implicit ttFactory: T => TT): Gen[TT] = generator map ttFactory
+
       private def generateExample[O](generator: Gen[O]): O =
         generator.sample getOrElse generateExample(generator)
     }

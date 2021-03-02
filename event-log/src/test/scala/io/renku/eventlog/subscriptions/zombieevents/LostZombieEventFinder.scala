@@ -18,12 +18,14 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
+import cats.syntax.all._
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.relativeTimestamps
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventStatuses}
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators.{eventDates, executionDates}
@@ -31,10 +33,8 @@ import io.renku.eventlog.{EventMessage, ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import cats.syntax.all._
-import ch.datascience.generators.Generators.nonNegativeInts
 
-import java.time.Instant.now
+import java.time.Duration
 
 class LostZombieEventFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
 
@@ -59,23 +59,31 @@ class LostZombieEventFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec 
       val zombieEventId: CompoundEventId = compoundEventIds.generateOne
       val zombieEventStatus = zombieEventStatuses.generateOne
       addZombieEvent(zombieEventId, lostZombieEventExecutionDate.generateOne, zombieEventStatus)
+
       finder.popEvent().unsafeRunSync() shouldBe ZombieEvent(zombieEventId, projectPath, zombieEventStatus).some
       finder.popEvent().unsafeRunSync() shouldBe None
 
     }
+
+    "return None if an event is in the past and the status is GeneratingTriples or TransformingTriples " +
+      "but the message is not a zombie message" in new TestCase {
+        addRandomEvent(lostZombieEventExecutionDate.generateOne, zombieEventStatuses.generateOne)
+        addZombieEvent(compoundEventIds.generateOne, activeZombieEventExecutionDate.generateOne)
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+
+      }
   }
 
   private trait TestCase {
 
     val executionDateThreshold = 5 * 60
 
-    val activeZombieEventExecutionDate = for {
-      secondsToRemove <- nonNegativeInts(executionDateThreshold)
-    } yield ExecutionDate(now().minusSeconds(secondsToRemove - 1))
+    val activeZombieEventExecutionDate =
+      relativeTimestamps(lessThanAgo = Duration.ofSeconds(executionDateThreshold - 2)).toGeneratorOf(ExecutionDate)
 
-    val lostZombieEventExecutionDate = for {
-      secondsToAdd <- nonNegativeInts()
-    } yield ExecutionDate(now().minusSeconds(executionDateThreshold + secondsToAdd))
+    val lostZombieEventExecutionDate =
+      relativeTimestamps(moreThanAgo = Duration.ofSeconds(executionDateThreshold + 2)).toGeneratorOf(ExecutionDate)
 
     val projectPath = projectPaths.generateOne
 
@@ -83,15 +91,17 @@ class LostZombieEventFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec 
 
     val finder = new LostZombieEventFinder(transactor, queriesExecTimes)
 
-    def addRandomEvent(): Unit = storeEvent(
+    val zombieEventStatuses = Gen.oneOf(GeneratingTriples, TransformingTriples)
+
+    def addRandomEvent(executionDate: ExecutionDate = executionDates.generateOne,
+                       status:        EventStatus = eventStatuses.generateOne
+    ): Unit = storeEvent(
       compoundEventIds.generateOne,
-      eventStatuses.generateOne,
-      executionDates.generateOne,
+      status,
+      executionDate,
       eventDates.generateOne,
       eventBodies.generateOne
     )
-
-    val zombieEventStatuses = Gen.oneOf(GeneratingTriples, TransformingTriples)
 
     def addZombieEvent(eventId:       CompoundEventId,
                        executionDate: ExecutionDate,
