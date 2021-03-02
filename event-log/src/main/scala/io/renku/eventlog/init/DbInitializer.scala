@@ -56,7 +56,6 @@ object DbInitializer {
     new DbInitializerImpl[IO](
       migrators = List[Runnable[IO, Unit]](
         EventLogTableCreator(transactor, logger),
-        EventPayloadTableCreator(transactor, logger),
         ProjectPathAdder(transactor, logger),
         BatchDateAdder(transactor, logger),
         LatestEventDatesViewRemover[IO](transactor, logger),
@@ -64,6 +63,7 @@ object DbInitializer {
         ProjectPathRemover(transactor, logger),
         EventLogTableRenamer(transactor, logger),
         EventStatusRenamer(transactor, logger),
+        EventPayloadTableCreator(transactor, logger),
         EventPayloadSchemaVersionAdder(transactor, logger),
         SubscriptionCategorySyncTimeTableCreator(transactor, logger),
         StatusesProcessingTimeTableCreator(transactor, logger),
