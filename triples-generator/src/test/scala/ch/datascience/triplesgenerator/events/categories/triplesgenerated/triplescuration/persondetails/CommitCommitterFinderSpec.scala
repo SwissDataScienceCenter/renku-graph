@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
-import cats.data.NonEmptyList
+import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
@@ -32,6 +32,8 @@ import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
+import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails.PersonDetailsGenerators._
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
@@ -60,7 +62,7 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
       commitCommitterFinder
         .findCommitPeople(projectId, expectedCommitPersonInfo.id, accessToken.some)
         .value
-        .unsafeRunSync() shouldBe expectedCommitPersonInfo
+        .unsafeRunSync() shouldBe Right(expectedCommitPersonInfo)
     }
 
     "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
@@ -70,9 +72,12 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
           .willReturn(unauthorized())
       }
 
-      intercept[Exception] {
-        commitCommitterFinder.findCommitPeople(projectId, commitId, maybeAccessToken = None).value.unsafeRunSync()
-      } shouldBe UnauthorizedException
+      commitCommitterFinder
+        .findCommitPeople(projectId, commitId, maybeAccessToken = None)
+        .value
+        .unsafeRunSync() shouldBe Either.left[ProcessingRecoverableError, CommitPersonsInfo](
+        CurationRecoverableError("Access token not valid to fetch project commit info")
+      )
     }
 
     "return an Error if remote client responds with invalid json" in new TestCase {
