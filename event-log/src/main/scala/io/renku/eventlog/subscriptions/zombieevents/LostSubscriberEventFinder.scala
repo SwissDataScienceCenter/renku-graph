@@ -51,12 +51,16 @@ private class LostSubscriberEventFinder(transactor:       DbTransactor[IO, Event
             |  AND (evt.status = ${GeneratingTriples: EventStatus} OR evt.status = ${TransformingTriples: EventStatus})
             |  AND (evt.message IS NULL OR evt.message <> $zombieMessage)
             |JOIN project proj ON evt.project_id = proj.project_id
-            |WHERE NOT EXISTS ( SELECT sub.delivery_url FROM subscriber sub WHERE sub.delivery_url = delivery.delivery_url)
+            |WHERE NOT EXISTS ( 
+            |  SELECT sub.delivery_id 
+            |  FROM subscriber sub 
+            |  WHERE sub.delivery_id = delivery.delivery_id
+            |)
             |LIMIT 1
     """.stripMargin
         .query[(CompoundEventId, projects.Path, EventStatus)]
         .option
-        .map(_.map(ZombieEvent.tupled.apply _)),
+        .map(_.map(ZombieEvent.tupled.apply)),
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lse - find events")
     )
   }

@@ -67,8 +67,8 @@ object DbInitializer {
         EventPayloadSchemaVersionAdder(transactor, logger),
         SubscriptionCategorySyncTimeTableCreator(transactor, logger),
         StatusesProcessingTimeTableCreator(transactor, logger),
-        EventDeliveryTableCreator(transactor, logger),
-        SubscriberTableCreator(transactor, logger)
+        SubscriberTableCreator(transactor, logger),
+        EventDeliveryTableCreator(transactor, logger)
       ),
       logger
     )

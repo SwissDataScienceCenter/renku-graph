@@ -19,16 +19,17 @@
 package io.renku.eventlog.subscriptions
 
 import ch.datascience.db.SqlQuery
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import ch.datascience.events.consumers.subscriptions.SubscriberId
+import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.TestLabeledHistogram
-import io.renku.eventlog.EventContentGenerators._
 import doobie.implicits._
 import eu.timepit.refined.auto._
+import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
-import ch.datascience.graph.model.EventsGenerators._
-import io.renku.eventlog.subscriptions.Generators.subscriberUrls
+import io.renku.eventlog.subscriptions.Generators.{subscriberIds, subscriberUrls}
 import io.renku.eventlog.subscriptions.TestCompoundIdEvent.testCompoundIdEvent
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -38,16 +39,18 @@ class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
 
   "registerSending" should {
 
-    "add association between the given event and subscriber url " +
+    "add association between the given event and subscriber id " +
       "if it does not exist" in new TestCase {
 
         addEvent(event.compoundEventId)
+        upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
+        upsertSubscriber(subscriberId, subscriberUrl, sourceUrl = microserviceBaseUrls.generateOne)
 
         findAllAssociations shouldBe Nil
 
         delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
 
-        findAllAssociations shouldBe List(event.compoundEventId -> subscriberUrl)
+        findAllAssociations shouldBe List(event.compoundEventId -> subscriberId)
 
         val otherEvent = testCompoundIdEvent.generateOne
 
@@ -56,36 +59,40 @@ class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
         delivery.registerSending(otherEvent, subscriberUrl).unsafeRunSync() shouldBe ()
 
         findAllAssociations.toSet shouldBe Set(
-          event.compoundEventId      -> subscriberUrl,
-          otherEvent.compoundEventId -> subscriberUrl
+          event.compoundEventId      -> subscriberId,
+          otherEvent.compoundEventId -> subscriberId
         )
       }
 
     "do nothing if the association between the given event and subscriber url already exists" in new TestCase {
 
       addEvent(event.compoundEventId)
+      upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
 
       delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
       delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
 
-      findAllAssociations shouldBe List(event.compoundEventId -> subscriberUrl)
+      findAllAssociations shouldBe List(event.compoundEventId -> subscriberId)
     }
   }
 
   private trait TestCase {
 
     val event         = testCompoundIdEvent.generateOne
+    val subscriberId  = subscriberIds.generateOne
     val subscriberUrl = subscriberUrls.generateOne
+    val sourceUrl     = microserviceBaseUrls.generateOne
 
     val compoundIdExtractor: TestCompoundIdEvent => CompoundEventId = _.compoundEventId
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val delivery         = new EventDeliveryImpl[TestCompoundIdEvent](transactor, compoundIdExtractor, queriesExecTimes)
+    val delivery =
+      new EventDeliveryImpl[TestCompoundIdEvent](transactor, compoundIdExtractor, queriesExecTimes, sourceUrl)
   }
 
-  private def findAllAssociations: List[(CompoundEventId, SubscriberUrl)] = execute {
-    sql"""|SELECT event_id, project_id, delivery_url
+  private def findAllAssociations: List[(CompoundEventId, SubscriberId)] = execute {
+    sql"""|SELECT event_id, project_id, delivery_id
           |FROM event_delivery""".stripMargin
-      .query[(CompoundEventId, SubscriberUrl)]
+      .query[(CompoundEventId, SubscriberId)]
       .to[List]
   }
 

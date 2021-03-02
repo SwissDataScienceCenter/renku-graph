@@ -19,7 +19,7 @@
 package io.renku.eventlog
 
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
 import ch.datascience.graph.model.SchemaVersion
@@ -113,19 +113,22 @@ trait EventLogDataProvisioning {
       """.stripMargin.update.run.void
   }
 
-  protected def upsertEventDelivery(compoundEventId: CompoundEventId, deliveryUrl: SubscriberUrl): Unit = execute {
+  protected def upsertEventDelivery(compoundEventId: CompoundEventId, deliveryId: SubscriberId): Unit = execute {
     sql"""|INSERT INTO
-          |event_delivery (event_id, project_id, delivery_url)
-          |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $deliveryUrl)
-          |ON CONFLICT (event_id, project_id, delivery_url)
+          |event_delivery (event_id, project_id, delivery_id)
+          |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $deliveryId)
+          |ON CONFLICT (event_id, project_id, delivery_id)
           |DO NOTHING
       """.stripMargin.update.run.void
   }
 
-  protected def upsertSubscriber(deliveryUrl: SubscriberUrl, sourceUrl: MicroserviceBaseUrl): Unit = execute {
+  protected def upsertSubscriber(deliveryId:  SubscriberId,
+                                 deliveryUrl: SubscriberUrl,
+                                 sourceUrl:   MicroserviceBaseUrl
+  ): Unit = execute {
     sql"""|INSERT INTO
-          |subscriber (delivery_url, source_url)
-          |VALUES ($deliveryUrl, $sourceUrl)
+          |subscriber (delivery_id, delivery_url, source_url)
+          |VALUES ($deliveryId, $deliveryUrl, $sourceUrl)
           |ON CONFLICT (delivery_url, source_url)
           |DO NOTHING
       """.stripMargin.update.run.void

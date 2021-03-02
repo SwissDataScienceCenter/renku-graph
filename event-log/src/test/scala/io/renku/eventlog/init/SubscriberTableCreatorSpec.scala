@@ -39,8 +39,7 @@ class SubscriberTableCreatorSpec extends AnyWordSpec with DbInitSpec with should
     eventPayloadTableCreator,
     eventPayloadSchemaVersionAdder,
     subscriptionCategorySyncTimeTableCreator,
-    statusesProcessingTimeTableCreator,
-    eventDeliveryTableCreator
+    statusesProcessingTimeTableCreator
   )
 
   "run" should {

@@ -30,45 +30,47 @@ import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.subscriptions.Generators.subscriberUrls
+import io.renku.eventlog.subscriptions.Generators.{subscriberIds, subscriberUrls}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
 class LostSubscriberEventFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with should.Matchers {
+
   "popEvent" should {
-    List(GeneratingTriples, TransformingTriples).foreach { status =>
-      s"return event which belongs to a subscriber not listed in the subscriber table with the status $status" in new TestCase {
 
-        addEvent(eventId, status)
-        upsertEventDelivery(eventId, deliveryUrl)
-
-        val notLostEvent        = compoundEventIds.generateOne
-        val activeSubscriberUrl = subscriberUrls.generateOne
-        addEvent(notLostEvent, status)
-        upsertEventDelivery(notLostEvent, activeSubscriberUrl)
-        upsertSubscriber(activeSubscriberUrl, sourceUrl)
-
-        finder.popEvent().unsafeRunSync() shouldBe ZombieEvent(eventId, projectPath, status).some
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
-
-    }
-
-    EventStatus.all.filterNot(status => status == GeneratingTriples || status == TransformingTriples).foreach {
-      status =>
-        s"return None when the event has a the status $status" in new TestCase {
+    List(GeneratingTriples, TransformingTriples) foreach { status =>
+      "return event which belongs to a subscriber not listed in the subscriber table " +
+        s"if event's status is $status" in new TestCase {
 
           addEvent(eventId, status)
-          upsertEventDelivery(eventId, deliveryUrl)
+          upsertEventDelivery(eventId, subscriberId)
+
+          val notLostEvent        = compoundEventIds.generateOne
+          val activeSubscriberId  = subscriberIds.generateOne
+          val activeSubscriberUrl = subscriberUrls.generateOne
+          addEvent(notLostEvent, status)
+          upsertSubscriber(activeSubscriberId, activeSubscriberUrl, sourceUrl)
+          upsertEventDelivery(notLostEvent, activeSubscriberId)
+
+          finder.popEvent().unsafeRunSync() shouldBe ZombieEvent(eventId, projectPath, status).some
           finder.popEvent().unsafeRunSync() shouldBe None
         }
     }
 
+    EventStatus.all.filterNot(status => status == GeneratingTriples || status == TransformingTriples) foreach {
+      status =>
+        s"return None when the event has a the status $status" in new TestCase {
+          addEvent(eventId, status)
+          upsertEventDelivery(eventId, subscriberId)
+
+          finder.popEvent().unsafeRunSync() shouldBe None
+        }
+    }
   }
 
   private trait TestCase {
     val eventId          = compoundEventIds.generateOne
-    val deliveryUrl      = subscriberUrls.generateOne
+    val subscriberId     = subscriberIds.generateOne
     val sourceUrl        = microserviceBaseUrls.generateOne
     val projectPath      = projectPaths.generateOne
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")

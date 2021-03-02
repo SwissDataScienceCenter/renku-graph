@@ -540,11 +540,11 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | delivery_url VARCHAR     PK NOT NULL |
 | delivery_id  VARCHAR(19)    NOT NULL |
 
-| event_delivery                        |
-|---------------------------------------|
-| event_id     VARCHAR   PK FK NOT NULL |
-| project_id   INT4      PK FK NOT NULL |
-| delivery_url VARCHAR   PK NOT NULL    |
+| event_delivery                          |
+|-----------------------------------------|
+| event_id     VARCHAR     PK FK NOT NULL |
+| project_id   INT4        PK FK NOT NULL |
+| delivery_id  VARCHAR(19) PK    NOT NULL |
 
 ## Trying out
 

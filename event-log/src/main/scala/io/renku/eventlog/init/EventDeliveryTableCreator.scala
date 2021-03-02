@@ -52,25 +52,25 @@ private class EventDeliveryTableCreatorImpl[Interpretation[_]](
 
   private def createTable = for {
     _ <- createTableSql.run transact transactor.get
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id     ON event_delivery(event_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id   ON event_delivery(project_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_url ON event_delivery(delivery_url)")
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id    ON event_delivery(event_id)")
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id  ON event_delivery(project_id)")
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON event_delivery(delivery_id)")
     _ <- logger info "'event_delivery' table created"
     _ <- foreignKeySql.run transact transactor.get
   } yield ()
 
   private lazy val createTableSql = sql"""
     CREATE TABLE IF NOT EXISTS event_delivery(
-      event_id          varchar    NOT NULL,
-      project_id        int4       NOT NULL,
-      delivery_url      varchar    NOT NULL,
-      PRIMARY KEY (event_id, project_id, delivery_url)
-    );
+      event_id     VARCHAR     NOT NULL,
+      project_id   INT4        NOT NULL,
+      delivery_id  VARCHAR(19) NOT NULL,
+      PRIMARY KEY (event_id, project_id, delivery_id)
+    )
     """.update
 
   private lazy val foreignKeySql = sql"""
     ALTER TABLE event_delivery
-    ADD CONSTRAINT fk_event FOREIGN KEY (event_id, project_id) REFERENCES event (event_id, project_id);
+    ADD CONSTRAINT fk_event FOREIGN KEY (event_id, project_id) REFERENCES event (event_id, project_id)
   """.update
 }
 

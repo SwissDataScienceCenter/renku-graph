@@ -25,9 +25,10 @@ import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.LabeledHistogram
+import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
 
 private[eventlog] trait EventDelivery[Interpretation[_], CategoryEvent] {
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit]
@@ -36,7 +37,8 @@ private[eventlog] trait EventDelivery[Interpretation[_], CategoryEvent] {
 
 private class EventDeliveryImpl[CategoryEvent](transactor:               DbTransactor[IO, EventLogDB],
                                                compoundEventIdExtractor: CategoryEvent => CompoundEventId,
-                                               queriesExecTimes:         LabeledHistogram[IO, SqlQuery.Name]
+                                               queriesExecTimes:         LabeledHistogram[IO, SqlQuery.Name],
+                                               sourceUrl:                MicroserviceBaseUrl
 )(implicit ME:                                                           Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
     with EventDelivery[IO, CategoryEvent]
@@ -46,9 +48,11 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
     val CompoundEventId(id, projectId) = compoundEventIdExtractor(event)
 
     SqlQuery(
-      sql"""|INSERT INTO event_delivery (event_id, project_id, delivery_url)
-            |VALUES ($id, $projectId, $subscriberUrl)
-            |ON CONFLICT (event_id, project_id, delivery_url)
+      sql"""|INSERT INTO event_delivery (event_id, project_id, delivery_id)
+            |  SELECT $id, $projectId, delivery_id
+            |  FROM subscriber
+            |  WHERE delivery_url = $subscriberUrl AND source_url = $sourceUrl
+            |ON CONFLICT (event_id, project_id, delivery_id)
             |DO NOTHING
             |""".stripMargin.update.run,
       name = "event delivery info - add"
@@ -78,9 +82,10 @@ private[eventlog] object EventDelivery {
       transactor:               DbTransactor[IO, EventLogDB],
       compoundEventIdExtractor: CategoryEvent => CompoundEventId,
       queriesExecTimes:         LabeledHistogram[IO, SqlQuery.Name]
-  ): IO[EventDelivery[IO, CategoryEvent]] = IO {
-    new EventDeliveryImpl[CategoryEvent](transactor, compoundEventIdExtractor, queriesExecTimes)
-  }
+  ): IO[EventDelivery[IO, CategoryEvent]] = for {
+    microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
+    microserviceUrl       <- microserviceUrlFinder.findBaseUrl()
+  } yield new EventDeliveryImpl[CategoryEvent](transactor, compoundEventIdExtractor, queriesExecTimes, microserviceUrl)
 
   def noOp[Interpretation[_]: MonadError[*[_], Throwable], CategoryEvent]
       : Interpretation[EventDelivery[Interpretation, CategoryEvent]] =
