@@ -122,8 +122,8 @@ class IODatasetsFinderSpec
           val sharedSameAs    = datasetSameAs.generateOne
           val dataset1Project = datasetProjects.generateOne
           val datasets1 =
-            nonModifiedDatasets().generateOne.copy(sameAs = sharedSameAs, projects = List(dataset1Project))
-          val datasets2 = datasets1.copy(id = datasetIdentifiers.generateOne, projects = single.generateOne.toList)
+            nonModifiedDatasets().generateOne.copy(sameAs = sharedSameAs, usedIn = List(dataset1Project))
+          val datasets2 = datasets1.copy(id = datasetIdentifiers.generateOne, usedIn = single.generateOne.toList)
 
           loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()())
 
@@ -141,7 +141,7 @@ class IODatasetsFinderSpec
 
           val sharedSameAs = datasetSameAs.generateOne
           val dataset1     = nonModifiedDatasets(projects = single).generateOne.copy(sameAs = sharedSameAs)
-          val dataset2     = dataset1.copy(id = datasetIdentifiers.generateOne, projects = single.generateOne.toList)
+          val dataset2     = dataset1.copy(id = datasetIdentifiers.generateOne, usedIn = single.generateOne.toList)
           val datasets2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
             .copy(title = datasetTitles.generateOne)
 
@@ -164,13 +164,13 @@ class IODatasetsFinderSpec
           val sharedSameAs    = datasetSameAs.generateOne
           val dataset1Project = datasetProjects.generateOne
           val datasets1 =
-            nonModifiedDatasets().generateOne.copy(sameAs = sharedSameAs, projects = List(dataset1Project))
+            nonModifiedDatasets().generateOne.copy(sameAs = sharedSameAs, usedIn = List(dataset1Project))
           val datasets2 = datasets1.copy(
             id = datasetIdentifiers.generateOne,
-            projects = single.generateOne.toList.map(_ shiftDateAfter dataset1Project)
+            usedIn = single.generateOne.toList.map(_ shiftDateAfter dataset1Project)
           )
           val datasets2Fork = datasets2.copy(
-            projects = single.generateOne.toList.map(_ shiftDateAfter dataset1Project)
+            usedIn = single.generateOne.toList.map(_ shiftDateAfter dataset1Project)
           )
 
           loadToStore(datasets1.toJsonLD()(), datasets2.toJsonLD()(), datasets2Fork.toJsonLD()())
@@ -263,7 +263,7 @@ class IODatasetsFinderSpec
 
           val projects @ _ +: project2 +: Nil =
             datasetProjects.generateNonEmptyList(minElements = 2, maxElements = 2).toList
-          val dataset = nonModifiedDatasets().generateOne.copy(projects = projects)
+          val dataset = nonModifiedDatasets().generateOne.copy(usedIn = projects)
           val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
             .copy(title = datasetTitles.generateOne)
 
@@ -289,7 +289,7 @@ class IODatasetsFinderSpec
         "- case with forks on renku created datasets" in new TestCase {
 
           val dataset     = nonModifiedDatasets(projects = single).generateOne
-          val datasetFork = dataset.copy(projects = List(datasetProjects.generateOne))
+          val datasetFork = dataset.copy(usedIn = List(datasetProjects.generateOne))
 
           loadToStore(
             dataset.toJsonLD(noSameAs = true)(),
@@ -311,7 +311,7 @@ class IODatasetsFinderSpec
         "- case with more than one level of modification and forks on the 1st level" in new TestCase {
 
           val dataset     = nonModifiedDatasets(projects = single).generateOne
-          val datasetFork = dataset.copy(projects = List(datasetProjects.generateOne))
+          val datasetFork = dataset.copy(usedIn = List(datasetProjects.generateOne))
           val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
             .copy(title = datasetTitles.generateOne)
 
@@ -340,7 +340,7 @@ class IODatasetsFinderSpec
           val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
             .copy(name = datasetNames.generateOne)
           val forkProject             = datasetProjects.generateOne
-          val datasetModificationFork = datasetModification.copy(projects = List(forkProject))
+          val datasetModificationFork = datasetModification.copy(usedIn = List(forkProject))
           val datasetModificationOnFork = modifiedDatasetsOnFirstProject(datasetModificationFork).generateOne
             .copy(name = datasetNames.generateOne)
 
@@ -370,8 +370,8 @@ class IODatasetsFinderSpec
         "- case with unrelated datasets" in new TestCase {
           val project                = projectEntities.generateOne
           val datasetProject         = project.toDatasetProject
-          val dataset0               = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
-          val datasetToBeInvalidated = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
+          val dataset0               = nonModifiedDatasets().generateOne.copy(usedIn = List(datasetProject))
+          val datasetToBeInvalidated = nonModifiedDatasets().generateOne.copy(usedIn = List(datasetProject))
           val entityWithInvalidation: InvalidationEntity =
             invalidationEntity(datasetToBeInvalidated.id, project).generateOne
 
@@ -393,8 +393,8 @@ class IODatasetsFinderSpec
         "- case with forks on renku created datasets and the fork dataset is deleted" in new TestCase {
           val project        = projectEntities.generateOne
           val datasetProject = project.toDatasetProject
-          val dataset        = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
-          val datasetFork    = dataset.copy(projects = List(datasetProjects.generateOne))
+          val dataset        = nonModifiedDatasets().generateOne.copy(usedIn = List(datasetProject))
+          val datasetFork    = dataset.copy(usedIn = List(datasetProjects.generateOne))
           val entityWithInvalidation: InvalidationEntity = invalidationEntity(datasetFork.id, project).generateOne
 
           loadToStore(
@@ -417,8 +417,8 @@ class IODatasetsFinderSpec
         "- case with forks on renku created datasets and original dataset is deleted" in new TestCase {
           val project        = projectEntities.generateOne
           val datasetProject = project.toDatasetProject
-          val dataset        = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
-          val datasetFork    = dataset.copy(projects = List(datasetProjects.generateOne))
+          val dataset        = nonModifiedDatasets().generateOne.copy(usedIn = List(datasetProject))
+          val datasetFork    = dataset.copy(usedIn = List(datasetProjects.generateOne))
           val entityWithInvalidation: InvalidationEntity = invalidationEntity(dataset.id, project).generateOne
 
           loadToStore(
@@ -441,8 +441,8 @@ class IODatasetsFinderSpec
         "- case with modification on renku created datasets" in new TestCase {
           val project        = projectEntities.generateOne
           val datasetProject = project.toDatasetProject
-          val dataset0       = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
-          val dataset1       = nonModifiedDatasets().generateOne.copy(projects = List(datasetProject))
+          val dataset0       = nonModifiedDatasets().generateOne.copy(usedIn = List(datasetProject))
+          val dataset1       = nonModifiedDatasets().generateOne.copy(usedIn = List(datasetProject))
           val dataset0Modification = modifiedDatasetsOnFirstProject(dataset0).generateOne
             .copy(name = datasetNames.generateOne)
 
@@ -530,7 +530,7 @@ class IODatasetsFinderSpec
 
       val phrase       = phrases.generateOne
       val project      = datasetProjects.generateOne
-      val original     = nonModifiedDatasets().generateOne.copy(projects = List(project)).makeTitleContaining(phrase)
+      val original     = nonModifiedDatasets().generateOne.copy(usedIn = List(project)).makeTitleContaining(phrase)
       val modification = modifiedDatasetsOnFirstProject(original).generateOne.copy(title = datasetTitles.generateOne)
 
       loadToStore(
@@ -621,7 +621,7 @@ class IODatasetsFinderSpec
       val dataset1 = nonModifiedDatasets(projects = single).generateOne
         .copy(sameAs = sharedSameAs)
         .makeTitleContaining(phrase)
-      val dataset2 = dataset1.copy(projects = single.generateOne.toList)
+      val dataset2 = dataset1.copy(usedIn = single.generateOne.toList)
       val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
         .copy(title = datasetTitles.generateOne)
 
@@ -640,7 +640,7 @@ class IODatasetsFinderSpec
 
       val phrase   = phrases.generateOne
       val dataset1 = nonModifiedDatasets(projects = single).generateOne
-      val dataset2 = dataset1.copy(projects = single.generateOne.toList)
+      val dataset2 = dataset1.copy(usedIn = single.generateOne.toList)
       val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
         .makeTitleContaining(phrase)
 
@@ -922,7 +922,7 @@ class IODatasetsFinderSpec
     def dataset(havingOnly: DatasetProject): Dataset = {
       tuples
         .find { case (_, ds) =>
-          ds.projects match {
+          ds.usedIn match {
             case first +: Nil => first.path == havingOnly.path
             case _            => false
           }

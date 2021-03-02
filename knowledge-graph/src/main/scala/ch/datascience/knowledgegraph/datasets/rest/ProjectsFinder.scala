@@ -42,7 +42,7 @@ private class ProjectsFinder(
 
   import ProjectsFinder._
 
-  def findProjects(identifier: Identifier): IO[List[DatasetProject]] =
+  def findUsedIn(identifier: Identifier): IO[List[DatasetProject]] =
     queryExpecting[List[DatasetProject]](using = query(identifier))
 
   private def query(identifier: Identifier) = SparqlQuery(

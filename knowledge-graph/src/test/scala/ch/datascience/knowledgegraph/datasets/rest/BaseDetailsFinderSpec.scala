@@ -23,14 +23,16 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{Dates, SameAs}
+import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
-import ch.datascience.knowledgegraph.datasets.model.{Dataset, ModifiedDataset, NonModifiedDataset}
+import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetProject, ModifiedDataset, NonModifiedDataset}
 import ch.datascience.rdfstore.entities.DataSet
-import io.circe.Json
+import io.circe.{Encoder, Json}
 import io.circe.literal._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import ch.datascience.generators.CommonGraphGenerators.{renkuBaseUrls, renkuResourcesUrls}
 
 class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -50,7 +52,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
               .copy(creators = Set.empty)
               .copy(maybeDescription = None)
               .copy(parts = Nil)
-              .copy(projects = Nil)
+              .copy(usedIn = Nil)
               .copy(keywords = Nil)
               .copy(images = Nil)
           )
@@ -70,7 +72,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
               .copy(creators = Set.empty)
               .copy(maybeDescription = None)
               .copy(parts = Nil)
-              .copy(projects = Nil)
+              .copy(usedIn = Nil)
               .copy(keywords = Nil)
               .copy(images = Nil)
           )
@@ -87,6 +89,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "alternateName": {"value": ${dataset.name.value}},
       "description": {"value": $blank},
       "url": {"value": ${dataset.url.value}},
+      "project": {"value": ${dataset.project.asJson}},
       "topmostSameAs": {"value": ${SameAs(DataSet.entityId(dataset.id)).toString}},
       "initialVersion": {"value": ${dataset.versions.initial.toString}},
       "keywords": {"value": ${dataset.keywords.map(_.value).asJson}}
@@ -103,6 +106,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "alternateName": {"value": ${dataset.name.value}},
       "description": {"value": $blank},
       "url": {"value": ${dataset.url.value}},
+      "project": {"value": ${dataset.project.asJson}},
       "topmostSameAs": {"value": ${DataSet.entityId(dataset.id).toString} },
       "maybeDerivedFrom": {"value": ${dataset.derivedFrom.value}},
       "initialVersion": {"value": ${dataset.versions.initial.toString} },
@@ -127,5 +131,24 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
             .map(date => json"""{"maybeDateCreated": {"value": ${date.value}}}""")
             .getOrElse(Json.obj())
         )
+  }
+
+  // this is correct. I think the decoder is incorrect
+  private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
+    json"""{
+      "path": ${project.path.value},
+      "name": ${project.name.value},
+      "created": {
+        "dateCreated": ${project.created.date.value},
+        "agent": {
+          "email": ${project.created.agent.maybeEmail.map(_.value)},
+          "name": ${project.created.agent.name.value}
+        }
+      }
+    }""" deepMerge _links(
+      Link(
+        Rel("project-details") -> Href(renkuResourcesUrls.generateOne / "projects" / project.path)
+      ) // TODO: check to see if this URL is acceptable
+    )
   }
 }

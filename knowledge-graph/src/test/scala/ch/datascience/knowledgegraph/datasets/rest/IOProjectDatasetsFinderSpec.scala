@@ -51,11 +51,11 @@ class IOProjectDatasetsFinderSpec
         ).generateOne
         val datasetModification1Creation = project.copy(created = addedToProject) shiftDateAfter project
         val datasetModification1 = modifiedDatasetsOnFirstProject(
-          originalDataset.copy(projects = List(datasetModification1Creation))
+          originalDataset.copy(usedIn = List(datasetModification1Creation))
         ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
         val datasetModification2 = modifiedDatasetsOnFirstProject(
           datasetModification1.copy(
-            projects = List(project.copy(created = addedToProject) shiftDateAfter datasetModification1Creation)
+            usedIn = List(project.copy(created = addedToProject) shiftDateAfter datasetModification1Creation)
           )
         ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
 
@@ -85,7 +85,7 @@ class IOProjectDatasetsFinderSpec
           projects = project.copy(created = addedToProject).toGenerator
         ).generateOne
         val dataset2Modification = modifiedDatasetsOnFirstProject(
-          dataset2.copy(projects = List(project.copy(created = addedToProject) shiftDateAfter project))
+          dataset2.copy(usedIn = List(project.copy(created = addedToProject) shiftDateAfter project))
         ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
 
         loadToStore(
@@ -177,7 +177,7 @@ class IOProjectDatasetsFinderSpec
         ).generateOne
 
         val dataset2Modification = modifiedDatasetsOnFirstProject(
-          dataset2.copy(projects = List(datasetProject.copy(created = addedToProject) shiftDateAfter datasetProject))
+          dataset2.copy(usedIn = List(datasetProject.copy(created = addedToProject) shiftDateAfter datasetProject))
         ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
 
         val entityWithInvalidation =

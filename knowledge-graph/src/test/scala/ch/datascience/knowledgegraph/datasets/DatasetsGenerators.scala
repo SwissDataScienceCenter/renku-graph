@@ -25,6 +25,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, InitialVersion, SameAs, Url}
+import ch.datascience.graph.model.projects
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.entities.DataSet
 import eu.timepit.refined.auto._
@@ -50,7 +51,8 @@ object DatasetsGenerators {
       creators         <- nonEmptySet(datasetCreators, maxElements = 4)
       dates            <- datasetDates
       part             <- listOf(datasetParts)
-      projects         <- projects
+      project          <- datasetProjects
+      usedIn           <- datasetProjects.toGeneratorOfNonEmptyList()
     } yield NonModifiedDataset(
       id,
       title,
@@ -62,7 +64,8 @@ object DatasetsGenerators {
       creators,
       dates,
       part,
-      projects.toList,
+      project,
+      usedIn.toList,
       keywords,
       images
     )
@@ -89,7 +92,8 @@ object DatasetsGenerators {
       creators,
       dates,
       dataset.parts,
-      List(dataset.projects.headOption getOrElse (throw new IllegalStateException("No projects on a dataset"))),
+      dataset.project,
+      List(dataset.usedIn.headOption getOrElse (throw new IllegalStateException("No projects on a dataset"))),
       keywords,
       imageUrls
     )

@@ -62,10 +62,10 @@ package object rest {
     lazy val entityId: EntityId = DataSet.entityId(dataSet.id)
 
     def changeCreationOnProject(to: AddedToProject): NonModifiedDataset = {
-      val project +: other = dataSet.projects
+      val project +: other = dataSet.usedIn
       if (other != Nil) throw new IllegalStateException("Don't know on which project creation data should be changed")
 
-      dataSet.copy(projects = List(project.copy(created = to)))
+      dataSet.copy(usedIn = List(project.copy(created = to)))
     }
 
     def toJsonLD(
@@ -75,7 +75,7 @@ package object rest {
         topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs)
     ): JsonLD =
       toJsonLDsAndDatasets(
-        firstDatasetDateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
+        firstDatasetDateCreated = DateCreated(dataSet.usedIn.map(_.created.date.value).min),
         noSameAs = noSameAs,
         commitId = commitId
       )(topmostSameAs) match {
@@ -84,13 +84,13 @@ package object rest {
       }
 
     def toJsonLDsAndDatasets(
-        firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
+        firstDatasetDateCreated: DateCreated = DateCreated(dataSet.usedIn.map(_.created.date.value).min),
         noSameAs:                Boolean,
         commitId:                CommitId = commitIds.generateOne
     )(
         topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs)
     ): List[(JsonLD, Dataset)] =
-      dataSet.projects match {
+      dataSet.usedIn match {
         case firstProject :: otherProjects =>
           val firstTuple = nonModifiedDataSetCommit(
             commitId = commitId,
@@ -141,7 +141,7 @@ package object rest {
             ) -> dataSet.copy(
               id = dataSetId,
               sameAs = sameAs,
-              projects = List(
+              usedIn = List(
                 project.copy(created = project.created.copy(date = DateCreatedInProject(projectDateCreated.value)))
               )
             )
@@ -168,7 +168,7 @@ package object rest {
       }
 
     def addAll(projects: List[DatasetProject]): NonModifiedDataset =
-      dataSet.copy(projects = dataSet.projects ++ projects)
+      dataSet.copy(usedIn = dataSet.usedIn ++ projects)
 
     def makeNameContaining(phrase: Phrase): NonModifiedDataset = {
       val nonEmptyPhrase: Generators.NonBlank = Refined.unsafeApply(phrase.toString)
@@ -214,7 +214,7 @@ package object rest {
 
     lazy val entityId: EntityId = DataSet.entityId(dataSet.id)
 
-    def toJsonLD(firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
+    def toJsonLD(firstDatasetDateCreated: DateCreated = DateCreated(dataSet.usedIn.map(_.created.date.value).min),
                  commitId:                CommitId = commitIds.generateOne,
                  topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(DataSet.entityId(dataSet.versions.initial))
     ): JsonLD =
@@ -226,11 +226,11 @@ package object rest {
           )
       }
 
-    def toJsonLDs(firstDatasetDateCreated: DateCreated = DateCreated(dataSet.projects.map(_.created.date.value).min),
+    def toJsonLDs(firstDatasetDateCreated: DateCreated = DateCreated(dataSet.usedIn.map(_.created.date.value).min),
                   commitId:                CommitId = commitIds.generateOne,
                   topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(dataSet.derivedFrom)
     ): List[JsonLD] =
-      dataSet.projects match {
+      dataSet.usedIn match {
         case firstProject :: otherProjects =>
           val firstJsonLd = modifiedDataSetCommit(
             commitId = commitId,

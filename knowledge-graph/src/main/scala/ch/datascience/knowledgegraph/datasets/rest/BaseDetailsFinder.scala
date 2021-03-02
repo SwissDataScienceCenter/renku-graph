@@ -22,6 +22,9 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{Identifier, ImageUri, Keyword}
+import ch.datascience.graph.model.{projects, users}
+import ch.datascience.graph.model.projects.{Path, ResourceId}
+import ch.datascience.graph.model.users.Email
 import ch.datascience.knowledgegraph.datasets.model.Dataset
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
@@ -30,6 +33,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.circe.{DecodingFailure, HCursor}
 
 import scala.concurrent.ExecutionContext
+import scala.util.Try
 
 private class BaseDetailsFinder(
     rdfStoreConfig: RdfStoreConfig,
@@ -69,7 +73,8 @@ private class BaseDetailsFinder(
         |               schema:alternateName ?alternateName;
         |               prov:atLocation ?location ;
         |               renku:topmostSameAs ?topmostSameAs;
-        |               renku:topmostDerivedFrom/schema:identifier ?initialVersion
+        |               renku:topmostDerivedFrom/schema:identifier ?initialVersion .
+        |    ?projectId renku:topmostDerivedFrom/schema:identifier ?initialVersion
         |               
         |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
         |    FILTER NOT EXISTS {
@@ -151,6 +156,15 @@ private object BaseDetailsFinder {
         dates <- Dates
                    .from(maybeDateCreated, maybePublishedDate)
                    .leftMap(e => DecodingFailure(e.getMessage, Nil))
+        path <-
+          extract[projects.ResourceId]("projectId")
+            .flatMap(toProjectPath)
+        projectName     <- extract[projects.Name]("projectName")
+        dateCreated     <- extract[DateCreatedInProject]("minDateCreated")
+        maybeAgentEmail <- extract[Option[Email]]("maybeAgentEmail")
+        agentName       <- extract[users.Name]("agentName")
+        project =
+          DatasetProject(path, projectName, AddedToProject(dateCreated, DatasetAgent(maybeAgentEmail, agentName)))
       } yield maybeDerivedFrom match {
         case Some(derivedFrom) =>
           ModifiedDataset(
@@ -164,7 +178,8 @@ private object BaseDetailsFinder {
             creators = Set.empty,
             dates = dates,
             parts = List.empty,
-            projects = List.empty,
+            project = project,
+            usedIn = List.empty,
             keywords = List.empty,
             images = List.empty
           )
@@ -180,7 +195,8 @@ private object BaseDetailsFinder {
             creators = Set.empty,
             dates = dates,
             parts = List.empty,
-            projects = List.empty,
+            project = project,
+            usedIn = List.empty,
             keywords = List.empty,
             images = List.empty
           )
@@ -205,6 +221,12 @@ private object BaseDetailsFinder {
 
     _.downField("results").downField("bindings").as(decodeList[ImageUri])
   }
+
+  def toProjectPath(projectPath: ResourceId) =
+    projectPath
+      .as[Try, Path]
+      .toEither
+      .leftMap(ex => DecodingFailure(ex.getMessage, Nil))
 
   private def extract[T](property: String)(implicit cursor: HCursor, decoder: Decoder[T]): Result[T] =
     cursor.downField(property).downField("value").as[T]
