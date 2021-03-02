@@ -54,9 +54,11 @@ private class SubscribersRegistry(
 
   def add(subscriptionInfo: SubscriptionInfo): IO[Boolean] = for {
     _        <- IO(busyPool remove subscriptionInfo)
-    wasAdded <- IO(Option(availablePool.putIfAbsent(subscriptionInfo, ())).isEmpty)
+    exists   <- IO(Option(availablePool.get(subscriptionInfo)).nonEmpty)
+    _        <- whenA(exists)(IO(availablePool.remove(subscriptionInfo)))
+    wasAdded <- IO(Option(availablePool.put(subscriptionInfo, ())).isEmpty)
     _        <- whenA(wasAdded)(notifyCallerAboutAvailability(subscriptionInfo.subscriberUrl))
-  } yield wasAdded
+  } yield !exists && wasAdded
 
   private def notifyCallerAboutAvailability(subscriberUrl: SubscriberUrl): IO[Unit] = for {
     oldQueue <- shrinkCallersQueue

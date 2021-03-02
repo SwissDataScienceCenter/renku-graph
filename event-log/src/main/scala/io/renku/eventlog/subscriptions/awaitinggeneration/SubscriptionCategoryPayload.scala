@@ -18,9 +18,11 @@
 
 package io.renku.eventlog.subscriptions.awaitinggeneration
 
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import io.renku.eventlog.subscriptions
 import io.renku.eventlog.subscriptions.Capacity
 
-private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl, maybeCapacity: Option[Capacity])
-    extends subscriptions.SubscriptionInfo
+private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl,
+                                               subscriberId:  SubscriberId,
+                                               maybeCapacity: Option[Capacity]
+) extends subscriptions.SubscriptionInfo

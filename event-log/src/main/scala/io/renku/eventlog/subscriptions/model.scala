@@ -18,11 +18,11 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.projects
+import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{InstantNotInTheFuture, NonNegativeInt, Url}
 import ch.datascience.tinytypes.json.TinyTypeDecoders.{intDecoder, stringDecoder}
-import ch.datascience.tinytypes._
 import io.circe.Decoder
 
 import java.time.Instant
@@ -39,6 +39,7 @@ object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate
 
 private trait SubscriptionInfo extends Product with Serializable {
   val subscriberUrl: SubscriberUrl
+  val subscriberId:  SubscriberId
   val maybeCapacity: Option[Capacity]
 
   override def equals(obj: Any): Boolean = obj match {
@@ -50,7 +51,7 @@ private trait SubscriptionInfo extends Product with Serializable {
 
   override lazy val toString = {
     val capacityAsString = maybeCapacity.map(capacity => s" with capacity $capacity").getOrElse("")
-    s"$subscriberUrl$capacityAsString"
+    s"$subscriberUrl, id = $subscriberId$capacityAsString"
   }
 }
 

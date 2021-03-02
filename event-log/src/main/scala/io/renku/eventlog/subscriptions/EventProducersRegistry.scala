@@ -51,7 +51,7 @@ private[subscriptions] class EventProducersRegistryImpl[Interpretation[_]: Effec
       (UnsupportedPayload("No category supports this payload"): SubscriptionResult).pure[Interpretation]
     } else {
       categories.toList
-        .traverse(_.register(subscriptionRequest))
+        .traverse(_ register subscriptionRequest)
         .map(registrationRequests => registrationRequests.reduce(_ |+| _))
         .map {
           case AcceptedRegistration => SuccessfulSubscription

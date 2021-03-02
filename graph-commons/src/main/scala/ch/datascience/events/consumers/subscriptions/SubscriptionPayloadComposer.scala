@@ -46,7 +46,7 @@ private class SubscriptionPayloadComposerImpl[Interpretation[_]](
   override def prepareSubscriptionPayload(): Interpretation[Json] =
     findBaseUrl()
       .map(newSubscriberUrl)
-      .map(SubscriberBasicInfo(_, microserviceIdentifier))
+      .map(SubscriberBasicInfo(_, SubscriberId(microserviceIdentifier)))
       .map(CategoryAndUrlPayload(categoryName, _).asJson)
 
   private def newSubscriberUrl(baseUrl: MicroserviceBaseUrl) = SubscriberUrl(baseUrl, "events")

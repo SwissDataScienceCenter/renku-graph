@@ -18,23 +18,28 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings, positiveInts}
 import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.microservices.MicroserviceIdentifier
 import org.scalacheck.Gen
 
 private object Generators {
 
   val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
+  val subscriberIds:  Gen[SubscriberId]  = Gen.uuid map (_ => SubscriberId(MicroserviceIdentifier.generate))
   val capacities:     Gen[Capacity]      = positiveInts() map (v => Capacity(v.value))
   val categoryNames:  Gen[CategoryName]  = nonBlankStrings() map (value => CategoryName(value.value))
 
-  final case class TestSubscriptionInfo(subscriberUrl: SubscriberUrl, maybeCapacity: Option[Capacity])
-      extends SubscriptionInfo
+  final case class TestSubscriptionInfo(subscriberUrl: SubscriberUrl,
+                                        subscriberId:  SubscriberId,
+                                        maybeCapacity: Option[Capacity]
+  ) extends SubscriptionInfo
 
   implicit val subscriptionInfos: Gen[TestSubscriptionInfo] = for {
     url           <- subscriberUrls
+    id            <- subscriberIds
     maybeCapacity <- capacities.toGeneratorOfOptions
-  } yield TestSubscriptionInfo(url, maybeCapacity)
+  } yield TestSubscriptionInfo(url, id, maybeCapacity)
 }

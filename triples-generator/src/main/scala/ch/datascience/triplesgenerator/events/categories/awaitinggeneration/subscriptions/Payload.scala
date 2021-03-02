@@ -19,9 +19,8 @@
 package ch.datascience.triplesgenerator.events
 package categories.awaitinggeneration.subscriptions
 
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.microservices.MicroserviceIdentifier
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
 
 private final case class Payload(categoryName: CategoryName, subscriber: Subscriber)
@@ -45,6 +44,6 @@ private object Payload {
 
 private final case class Subscriber(
     url:      SubscriberUrl,
-    id:       MicroserviceIdentifier,
+    id:       SubscriberId,
     capacity: GenerationProcessesNumber
 ) extends ch.datascience.events.consumers.subscriptions.Subscriber

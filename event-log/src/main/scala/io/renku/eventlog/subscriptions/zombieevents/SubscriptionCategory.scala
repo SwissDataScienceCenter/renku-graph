@@ -20,7 +20,7 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.metrics.LabeledHistogram
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.subscriptions._
@@ -61,5 +61,7 @@ private[subscriptions] object SubscriptionCategory {
   )
 }
 
-private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl, maybeCapacity: Option[Capacity])
-    extends subscriptions.SubscriptionInfo
+private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl,
+                                               subscriberId:  SubscriberId,
+                                               maybeCapacity: Option[Capacity]
+) extends subscriptions.SubscriptionInfo

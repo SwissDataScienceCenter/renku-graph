@@ -20,7 +20,7 @@ package ch.datascience.events.consumers.subscriptions
 
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
-import ch.datascience.tinytypes.constraints.Url
+import ch.datascience.tinytypes.constraints.{NonBlank, Url}
 import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
@@ -51,10 +51,10 @@ object CategoryAndUrlPayload {
 
 trait Subscriber extends Product with Serializable {
   val url: SubscriberUrl
-  val id:  MicroserviceIdentifier
+  val id:  SubscriberId
 }
 
-final case class SubscriberBasicInfo(url: SubscriberUrl, id: MicroserviceIdentifier) extends Subscriber
+final case class SubscriberBasicInfo(url: SubscriberUrl, id: SubscriberId) extends Subscriber
 
 final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
 object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url {
@@ -63,4 +63,12 @@ object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)
     SubscriberUrl((microserviceBaseUrl / part.toString()).toString)
 
   implicit val decoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
+}
+
+final class SubscriberId private (val value: String) extends AnyVal with StringTinyType
+object SubscriberId extends TinyTypeFactory[SubscriberId](new SubscriberId(_)) with NonBlank {
+
+  def apply(microserviceId: MicroserviceIdentifier): SubscriberId = SubscriberId(microserviceId.toString)
+
+  implicit val decoder: Decoder[SubscriberId] = stringDecoder(SubscriberId)
 }

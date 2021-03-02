@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions.{SubscriberUrl, SubscriptionPayloadComposer}
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, SubscriptionPayloadComposer}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, MicroserviceUrlFinder}
 import ch.datascience.triplesgenerator.Microservice
@@ -42,7 +42,7 @@ private[awaitinggeneration] class PayloadComposer[Interpretation[_]: MonadError[
   override def prepareSubscriptionPayload(): Interpretation[Json] =
     findBaseUrl()
       .map(newSubscriberUrl)
-      .map(Subscriber(_, microserviceId, capacity))
+      .map(Subscriber(_, SubscriberId(microserviceId), capacity))
       .map(Payload(categoryName, _).asJson)
 
   private def newSubscriberUrl(baseUrl: MicroserviceBaseUrl) = SubscriberUrl(baseUrl, "events")

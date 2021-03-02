@@ -48,13 +48,32 @@ class SubscribersRegistrySpec extends AnyWordSpec with MockFactory with should.M
 
   "add" should {
 
-    "adds the given subscriber to the registry" in new TestCase {
+    "adds the given subscriber to the registry if it wasn't there yet" in new TestCase {
 
       registry.add(subscriptionInfo).unsafeRunSync()                    shouldBe true
       registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
 
       registry.add(subscriptionInfo).unsafeRunSync() shouldBe false
     }
+
+    "replaces the given subscriber in the registry " +
+      "if there was one with the same URL although different id" in new TestCase {
+
+        val initialCapacity = capacities.generateOne
+        registry.add(subscriptionInfo.copy(maybeCapacity = initialCapacity.some)).unsafeRunSync() shouldBe true
+        registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync()                         shouldBe subscriberUrl
+
+        val infoSameUrlButOtherId = subscriptionInfos.generateOne
+          .copy(
+            subscriberUrl = subscriberUrl,
+            maybeCapacity = capacities.generateDifferentThan(initialCapacity).some
+          )
+        registry.add(infoSameUrlButOtherId).unsafeRunSync()               shouldBe false
+        registry.findAvailableSubscriber().flatMap(_.get).unsafeRunSync() shouldBe subscriberUrl
+
+        // this is to prove there's still one subscriber and the one with the new capacity
+        registry.getTotalCapacity shouldBe infoSameUrlButOtherId.maybeCapacity
+      }
 
     "move the given subscriber from the busy state to available" in new TestCase {
 
