@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions
 import Generators._
 import cats.syntax.all._
 import ch.datascience.db.SqlQuery
-import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.metrics.TestLabeledHistogram

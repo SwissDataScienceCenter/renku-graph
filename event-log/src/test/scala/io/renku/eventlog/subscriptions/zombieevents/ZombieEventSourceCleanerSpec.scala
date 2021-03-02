@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions.zombieevents
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.db.SqlQuery
-import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, _}
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.metrics.TestLabeledHistogram
@@ -29,7 +29,6 @@ import ch.datascience.microservices.MicroserviceBaseUrl
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.subscriptions.Generators.{subscriberIds, subscriberUrls}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

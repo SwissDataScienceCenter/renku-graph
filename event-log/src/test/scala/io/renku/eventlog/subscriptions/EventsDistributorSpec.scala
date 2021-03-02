@@ -20,7 +20,7 @@ package io.renku.eventlog.subscriptions
 
 import cats.effect.{IO, Timer}
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.interpreters.TestLogger

@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import ch.datascience.db.SqlQuery
-import ch.datascience.events.consumers.subscriptions.SubscriberId
+import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
@@ -29,7 +29,6 @@ import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
-import io.renku.eventlog.subscriptions.Generators.{subscriberIds, subscriberUrls}
 import io.renku.eventlog.subscriptions.TestCompoundIdEvent.testCompoundIdEvent
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
