@@ -23,7 +23,7 @@ import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{exceptions, positiveInts}
 import ch.datascience.graph.model.EventsGenerators.categoryNames
-import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
+import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, MicroserviceUrlFinder}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
@@ -44,8 +44,11 @@ class PayloadComposerSpec extends AnyWordSpec with should.Matchers with MockFact
 
       composer.prepareSubscriptionPayload() shouldBe json"""{
         "categoryName" : ${categoryName.value},
-        "subscriberUrl": ${(microserviceUrl / "events").value},
-        "capacity":      ${capacity.value}
+        "subscriber": {
+          "url":      ${(microserviceUrl / "events").value},
+          "id":       ${microserviceId.value},
+          "capacity": ${capacity.value}
+        }
       }""".pure[Try]
     }
 
@@ -60,9 +63,10 @@ class PayloadComposerSpec extends AnyWordSpec with should.Matchers with MockFact
   }
 
   private trait TestCase {
-    val categoryName = categoryNames.generateOne
-    val capacity     = positiveInts().map(v => GenerationProcessesNumber(v.value)).generateOne
-    val urlFinder    = mock[MicroserviceUrlFinder[Try]]
-    val composer     = new PayloadComposer[Try](categoryName, capacity, urlFinder)
+    val categoryName   = categoryNames.generateOne
+    val capacity       = positiveInts().map(v => GenerationProcessesNumber(v.value)).generateOne
+    val urlFinder      = mock[MicroserviceUrlFinder[Try]]
+    val microserviceId = MicroserviceIdentifier.generate
+    val composer       = new PayloadComposer[Try](categoryName, capacity, urlFinder, microserviceId)
   }
 }

@@ -362,8 +362,11 @@ All events are sent as multipart requests
 ```json
 {
   "categoryName": "AWAITING_GENERATION",
-  "subscriberUrl": "http://host/path",
-  "capacity": 4
+  "subscriber": {
+    "url":      "http://host/path",
+    "id":       "20210302140653-8641",
+    "capacity": 4
+  }
 }
 ```
 
@@ -394,7 +397,10 @@ All events are sent as multipart requests
 ```json
 {
   "categoryName": "TRIPLES_GENERATED",
-  "subscriberUrl": "http://host/path"
+  "subscriber": {
+    "url":      "http://host/path",
+    "id":       "20210302140653-8641"
+  }
 }
 ```
 
@@ -429,7 +435,10 @@ All events are sent as multipart requests
 ```json
 {
   "categoryName": "MEMBER_SYNC",
-  "subscriberUrl": "http://host/path"
+  "subscriber": {
+    "url":      "http://host/path",
+    "id":       "20210302140653-8641"
+  }
 }
 ```
 
@@ -453,7 +462,10 @@ All events are sent as multipart requests
 ```json
 {
   "categoryName": "ZOMBIE_CHASING",
-  "subscriberUrl": "http://host/path"
+  "subscriber": {
+    "url":      "http://host/path",
+    "id":       "20210302140653-8641"
+  }
 }
 ```
 

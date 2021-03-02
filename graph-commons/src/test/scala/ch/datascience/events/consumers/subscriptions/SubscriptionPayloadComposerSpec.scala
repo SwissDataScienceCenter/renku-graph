@@ -23,7 +23,7 @@ import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.EventsGenerators.categoryNames
-import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
+import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, MicroserviceUrlFinder}
 import io.circe.literal._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -43,7 +43,10 @@ class SubscriptionPayloadComposerSpec extends AnyWordSpec with should.Matchers w
 
       composer.prepareSubscriptionPayload() shouldBe json"""{
         "categoryName" : ${categoryName.value},
-        "subscriberUrl": ${(microserviceUrl / "events").value}
+        "subscriber": {
+          "url": ${(microserviceUrl / "events").value},
+          "id":  ${microserviceId.value}
+        }
       }""".pure[Try]
     }
 
@@ -58,8 +61,9 @@ class SubscriptionPayloadComposerSpec extends AnyWordSpec with should.Matchers w
   }
 
   private trait TestCase {
-    val categoryName = categoryNames.generateOne
-    val urlFinder    = mock[MicroserviceUrlFinder[Try]]
-    val composer     = new SubscriptionPayloadComposerImpl[Try](categoryName, urlFinder)
+    val categoryName   = categoryNames.generateOne
+    val microserviceId = MicroserviceIdentifier.generate
+    val urlFinder      = mock[MicroserviceUrlFinder[Try]]
+    val composer       = new SubscriptionPayloadComposerImpl[Try](categoryName, urlFinder, microserviceId)
   }
 }

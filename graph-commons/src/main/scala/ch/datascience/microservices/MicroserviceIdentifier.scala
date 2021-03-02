@@ -18,10 +18,10 @@
 
 package ch.datascience.microservices
 
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-import java.time.{Instant, LocalDateTime}
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter.ofPattern
 import scala.util.Random
 
@@ -30,7 +30,7 @@ object MicroserviceIdentifier
     extends TinyTypeFactory[MicroserviceIdentifier](new MicroserviceIdentifier(_))
     with NonBlank {
 
-  def generate(): MicroserviceIdentifier = generate(LocalDateTime.now _)
+  def generate: MicroserviceIdentifier = generate(LocalDateTime.now _)
 
   private[microservices] def generate(now: () => LocalDateTime): MicroserviceIdentifier =
     MicroserviceIdentifier(s"${now().format(ofPattern("yyyyMMddHHmmss"))}-${Random.between(1000, 9999)}")

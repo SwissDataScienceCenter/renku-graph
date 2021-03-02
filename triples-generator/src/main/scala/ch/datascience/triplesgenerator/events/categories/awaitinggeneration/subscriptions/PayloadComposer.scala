@@ -24,22 +24,26 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.events.consumers.subscriptions.{SubscriberUrl, SubscriptionPayloadComposer}
 import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
+import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, MicroserviceUrlFinder}
 import ch.datascience.triplesgenerator.Microservice
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
 import eu.timepit.refined.auto._
 import io.circe.Json
 
 private[awaitinggeneration] class PayloadComposer[Interpretation[_]: MonadError[*[_], Throwable]](
-    categoryName: CategoryName,
-    capacity:     GenerationProcessesNumber,
-    urlFinder:    MicroserviceUrlFinder[Interpretation]
+    categoryName:   CategoryName,
+    capacity:       GenerationProcessesNumber,
+    urlFinder:      MicroserviceUrlFinder[Interpretation],
+    microserviceId: MicroserviceIdentifier
 ) extends SubscriptionPayloadComposer[Interpretation] {
   import io.circe.syntax._
   import urlFinder._
 
   override def prepareSubscriptionPayload(): Interpretation[Json] =
-    findBaseUrl() map newSubscriberUrl map (Payload(categoryName, _, capacity).asJson)
+    findBaseUrl()
+      .map(newSubscriberUrl)
+      .map(Subscriber(_, microserviceId, capacity))
+      .map(Payload(categoryName, _).asJson)
 
   private def newSubscriberUrl(baseUrl: MicroserviceBaseUrl) = SubscriberUrl(baseUrl, "events")
 }
@@ -51,6 +55,6 @@ private[awaitinggeneration] object PayloadComposer {
       for {
         subscriptionUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
         capacity              <- GenerationProcessesNumber[IO]()
-      } yield new PayloadComposer[IO](categoryName, capacity, subscriptionUrlFinder)
+      } yield new PayloadComposer[IO](categoryName, capacity, subscriptionUrlFinder, Microservice.Identifier)
     }
 }
