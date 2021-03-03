@@ -44,7 +44,7 @@ private trait PersonTrimmer[Interpretation[_]] {
 
 }
 
-private class PersonTrimmerImpl[Interpretation[_]: MonadError[*[_], Throwable]]( //[Interpretation[_]: MonadError[*[_], Throwable]](
+private class PersonTrimmerImpl[Interpretation[_]: MonadError[*[_], Throwable]](
     personExtractor:       PersonExtractor,
     commitCommitterFinder: CommitCommitterFinder[Interpretation]
 ) extends PersonTrimmer[Interpretation] {
