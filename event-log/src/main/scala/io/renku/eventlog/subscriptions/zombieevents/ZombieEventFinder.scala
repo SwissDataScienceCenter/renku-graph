@@ -73,3 +73,7 @@ private object ZombieEventFinder {
                                     logger
   )
 }
+
+private trait ZombieEventSubProcess {
+  val processName: ZombieEventProcess
+}

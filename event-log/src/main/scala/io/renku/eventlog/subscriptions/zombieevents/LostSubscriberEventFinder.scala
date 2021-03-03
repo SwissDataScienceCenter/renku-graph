@@ -38,6 +38,7 @@ private class LostSubscriberEventFinder(transactor:       DbTransactor[IO, Event
 )(implicit ME:                                            Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, ZombieEvent]
+    with ZombieEventSubProcess
     with TypeSerializers {
 
   import doobie.implicits._
@@ -62,7 +63,7 @@ private class LostSubscriberEventFinder(transactor:       DbTransactor[IO, Event
     """.stripMargin
         .query[(CompoundEventId, projects.Path, EventStatus)]
         .option
-        .map(_.map(ZombieEvent.tupled.apply)),
+        .map(_.map { case (id, path, status) => ZombieEvent(processName, id, path, status) }),
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lse - find events")
     )
   }
@@ -86,6 +87,8 @@ private class LostSubscriberEventFinder(transactor:       DbTransactor[IO, Event
     case 0 => None
     case 1 => Some(event)
   }
+
+  override val processName: ZombieEventProcess = ZombieEventProcess("lse")
 }
 
 private object LostSubscriberEventFinder {

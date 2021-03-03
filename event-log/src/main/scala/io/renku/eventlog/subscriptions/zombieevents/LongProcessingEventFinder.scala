@@ -43,6 +43,7 @@ private class LongProcessingEventFinder(transactor:             DbTransactor[IO,
 )(implicit ME:                                                  Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, ZombieEvent]
+    with ZombieEventSubProcess
     with TypeSerializers {
 
   import doobie.implicits._
@@ -119,7 +120,7 @@ private class LongProcessingEventFinder(transactor:             DbTransactor[IO,
               |LIMIT 1
               |""".stripMargin
           .query[(CompoundEventId, projects.Path, EventStatus)]
-          .map(ZombieEvent.tupled.apply _)
+          .map { case (id, path, status) => ZombieEvent(processName, id, path, status) }
           .option,
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - find")
       )
@@ -144,6 +145,8 @@ private class LongProcessingEventFinder(transactor:             DbTransactor[IO,
     case 0 => None
     case 1 => Some(event)
   }
+
+  override val processName: ZombieEventProcess = ZombieEventProcess("lpe")
 }
 
 private object LongProcessingEventFinder {

@@ -68,7 +68,9 @@ class LongProcessingEventFinderSpec
           ).generateAs(ExecutionDate)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, GeneratingTriples))
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          ZombieEvent(finder.processName, eventId, projectPath, GeneratingTriples)
+        )
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
@@ -93,7 +95,9 @@ class LongProcessingEventFinderSpec
           ).generateAs(ExecutionDate)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, TransformingTriples))
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          ZombieEvent(finder.processName, eventId, projectPath, TransformingTriples)
+        )
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
@@ -139,7 +143,9 @@ class LongProcessingEventFinderSpec
           ).generateAs(ExecutionDate)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, GeneratingTriples))
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          ZombieEvent(finder.processName, eventId, projectPath, GeneratingTriples)
+        )
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
@@ -179,7 +185,9 @@ class LongProcessingEventFinderSpec
           ).generateAs(ExecutionDate)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, GeneratingTriples))
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          ZombieEvent(finder.processName, eventId, projectPath, GeneratingTriples)
+        )
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
@@ -225,7 +233,9 @@ class LongProcessingEventFinderSpec
           ).generateAs(ExecutionDate)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, TransformingTriples))
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          ZombieEvent(finder.processName, eventId, projectPath, TransformingTriples)
+        )
         finder.popEvent().unsafeRunSync() shouldBe None
       }
 
@@ -265,7 +275,9 @@ class LongProcessingEventFinderSpec
           ).generateAs(ExecutionDate)
         )
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, TransformingTriples))
+        finder.popEvent().unsafeRunSync() shouldBe Some(
+          ZombieEvent(finder.processName, eventId, projectPath, TransformingTriples)
+        )
         finder.popEvent().unsafeRunSync() shouldBe None
       }
   }

@@ -52,7 +52,7 @@ class LostSubscriberEventFinderSpec extends AnyWordSpec with InMemoryEventLogDbS
           upsertSubscriber(activeSubscriberId, activeSubscriberUrl, sourceUrl)
           upsertEventDelivery(notLostEvent, activeSubscriberId)
 
-          finder.popEvent().unsafeRunSync() shouldBe ZombieEvent(eventId, projectPath, status).some
+          finder.popEvent().unsafeRunSync() shouldBe ZombieEvent(finder.processName, eventId, projectPath, status).some
           finder.popEvent().unsafeRunSync() shouldBe None
         }
     }

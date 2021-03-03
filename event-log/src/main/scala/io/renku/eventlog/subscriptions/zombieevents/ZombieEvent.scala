@@ -20,10 +20,20 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.renku.eventlog.subscriptions.EventEncoder
 
-private case class ZombieEvent(eventId: CompoundEventId, projectPath: projects.Path, status: EventStatus) {
-  override lazy val toString: String = s"$ZombieEvent $eventId, projectPath = $projectPath, status = $status"
+private final class ZombieEventProcess private (val value: String) extends AnyVal with StringTinyType
+
+private object ZombieEventProcess extends TinyTypeFactory[ZombieEventProcess](new ZombieEventProcess(_))
+
+private case class ZombieEvent(generatedBy: ZombieEventProcess,
+                               eventId:     CompoundEventId,
+                               projectPath: projects.Path,
+                               status:      EventStatus
+) {
+  override lazy val toString: String =
+    s"$ZombieEvent $generatedBy $eventId, projectPath = $projectPath, status = $status"
 }
 
 private object ZombieEventEncoder extends EventEncoder[ZombieEvent] {

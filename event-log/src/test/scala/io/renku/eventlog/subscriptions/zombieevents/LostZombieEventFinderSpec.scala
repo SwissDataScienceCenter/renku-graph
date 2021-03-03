@@ -60,7 +60,11 @@ class LostZombieEventFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec 
       val zombieEventStatus = zombieEventStatuses.generateOne
       addZombieEvent(zombieEventId, lostZombieEventExecutionDate.generateOne, zombieEventStatus)
 
-      finder.popEvent().unsafeRunSync() shouldBe ZombieEvent(zombieEventId, projectPath, zombieEventStatus).some
+      finder.popEvent().unsafeRunSync() shouldBe ZombieEvent(finder.processName,
+                                                             zombieEventId,
+                                                             projectPath,
+                                                             zombieEventStatus
+      ).some
       finder.popEvent().unsafeRunSync() shouldBe None
 
     }

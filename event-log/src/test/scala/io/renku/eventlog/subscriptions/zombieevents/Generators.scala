@@ -18,6 +18,8 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
+import ch.datascience.generators.Generators.nonEmptyStrings
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventStatuses}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 
@@ -26,5 +28,8 @@ private object Generators {
     eventId     <- compoundEventIds
     projectPath <- projectPaths
     eventStatus <- eventStatuses
-  } yield ZombieEvent(eventId, projectPath, eventStatus)
+    processName <- zombieEventProcessNames
+  } yield ZombieEvent(processName, eventId, projectPath, eventStatus)
+
+  lazy val zombieEventProcessNames = nonEmptyStrings().toGeneratorOf(ZombieEventProcess)
 }

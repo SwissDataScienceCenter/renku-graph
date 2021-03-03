@@ -40,6 +40,7 @@ private class LostZombieEventFinder(transactor:       DbTransactor[IO, EventLogD
 )(implicit ME:                                        Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, ZombieEvent]
+    with ZombieEventSubProcess
     with TypeSerializers {
 
   import doobie.implicits._
@@ -60,7 +61,7 @@ private class LostZombieEventFinder(transactor:       DbTransactor[IO, EventLogD
             |LIMIT 1
     """.stripMargin
         .query[(CompoundEventId, projects.Path, EventStatus)]
-        .map(ZombieEvent.tupled.apply _)
+        .map { case (id, path, status) => ZombieEvent(processName, id, path, status) }
         .option,
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - find event")
     )
@@ -85,6 +86,8 @@ private class LostZombieEventFinder(transactor:       DbTransactor[IO, EventLogD
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - update execution date")
     )
   }
+
+  override val processName: ZombieEventProcess = ZombieEventProcess("lze")
 }
 
 private object LostZombieEventFinder {
