@@ -62,7 +62,7 @@ private class BaseDetailsFinder(
       renku  -> "renku",
       schema -> "schema"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybePublishedDate
+    s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybePublishedDate ?projectId ?projectName ?minDateCreated ?maybeAgentEmail ?agentName
         |WHERE {
         |    ?datasetId schema:identifier "$identifier";
         |               schema:identifier ?identifier;
@@ -74,7 +74,32 @@ private class BaseDetailsFinder(
         |               prov:atLocation ?location ;
         |               renku:topmostSameAs ?topmostSameAs;
         |               renku:topmostDerivedFrom/schema:identifier ?initialVersion .
-        |    ?projectId renku:topmostDerivedFrom/schema:identifier ?initialVersion
+        |    ?projectId renku:topmostDerivedFrom/schema:identifier ?initialVersion .
+        |    {
+        |      SELECT ?allDsId ?projectId(MIN(?dateCreated) AS ?minDateCreated)
+        |      WHERE {
+        |        ?dsId rdf:type <http://schema.org/Dataset>;
+        |              schema:identifier '$identifier';
+        |              renku:topmostSameAs ?topmostSameAs.
+        |        ?allDsId rdf:type <http://schema.org/Dataset>;
+        |                 renku:topmostSameAs ?topmostSameAs;
+        |                 schema:isPartOf ?projectId;
+        |                 prov:qualifiedGeneration/prov:activity ?activityId.
+        |        ?activityId prov:startedAtTime ?dateCreated.
+        |      }
+        |      GROUP BY ?allDsId ?projectId
+        |    }
+        |    ?allDsId rdf:type <http://schema.org/Dataset>;
+        |             schema:isPartOf ?projectId;
+        |             prov:qualifiedGeneration/prov:activity ?activityId.
+        |    ?activityId prov:startedAtTime ?minDateCreated;
+        |                prov:wasAssociatedWith ?associationId.
+        |    ?projectId rdf:type <http://schema.org/Project>;
+        |               schema:name ?projectName.
+        |    ?associationId rdf:type <http://schema.org/Person>;
+        |                 schema:name ?agentName.
+        |    OPTIONAL { ?associationId schema:email ?maybeAgentEmail }
+        |               
         |               
         |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
         |    FILTER NOT EXISTS {
