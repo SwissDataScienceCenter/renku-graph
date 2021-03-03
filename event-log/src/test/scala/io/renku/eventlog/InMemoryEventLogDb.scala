@@ -81,6 +81,6 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
       .unsafeRunSync()
 
   def dropTable(tableName: String): Unit = execute {
-    Fragment.const(s"DROP TABLE IF EXISTS $tableName").update.run.map(_ => ())
+    Fragment.const(s"DROP TABLE IF EXISTS $tableName CASCADE").update.run.map(_ => ())
   }
 }
