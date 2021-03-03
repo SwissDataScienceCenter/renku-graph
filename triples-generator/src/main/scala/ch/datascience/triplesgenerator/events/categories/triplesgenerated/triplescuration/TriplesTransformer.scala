@@ -52,7 +52,8 @@ private[events] class TriplesTransformerImpl[Interpretation[_]](
     for {
       triplesWithPersonDetails <- updatePersonDetails(
                                     CuratedTriples(triplesGeneratedEvent.triples, updatesGroups = Nil),
-                                    triplesGeneratedEvent.project.path
+                                    triplesGeneratedEvent.project,
+                                    triplesGeneratedEvent.eventId
                                   )
       triplesWithForkInfo         <- updateProjectInfo(triplesGeneratedEvent, triplesWithPersonDetails)
       triplesWithEnrichedDatasets <- dataSetInfoEnricher.enrichDataSetInfo(triplesWithForkInfo)

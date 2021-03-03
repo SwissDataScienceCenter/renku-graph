@@ -86,8 +86,11 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
       triplesGeneratedEvent:   TriplesGeneratedEvent
   )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
-      curatedTriples <- transform(triplesGeneratedEvent).leftSemiflatMap(toUploadingError(triplesGeneratedEvent))
-      result         <- right[UploadingResult](upload(curatedTriples).flatMap(toUploadingResult(triplesGeneratedEvent, _)))
+      curatedTriples <-
+        transform(triplesGeneratedEvent).leftSemiflatMap(
+          toUploadingError(triplesGeneratedEvent)
+        )
+      result <- right[UploadingResult](upload(curatedTriples).flatMap(toUploadingResult(triplesGeneratedEvent, _)))
     } yield result
   }.merge recoverWith nonRecoverableFailure(triplesGeneratedEvent)
 

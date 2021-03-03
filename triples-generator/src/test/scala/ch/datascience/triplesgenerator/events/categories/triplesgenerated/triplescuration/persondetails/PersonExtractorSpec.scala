@@ -19,147 +19,113 @@
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration
 package persondetails
 
-import cats.data.NonEmptyList
 import cats.syntax.all._
-import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.users.{Affiliation, Email, Name, ResourceId}
-import ch.datascience.rdfstore.entities.bundles._
-import ch.datascience.rdfstore.{FusekiBaseUrl, JsonLDTriples, entities}
-import ch.datascience.tinytypes.json.TinyTypeDecoders._
+import PersonDetailsGenerators._
+import ch.datascience.graph.model.users.{Email, Name, ResourceId}
+import ch.datascience.rdfstore.JsonLDTriples
+import io.circe.literal.JsonStringContext
+import io.circe.syntax._
+import io.circe.{Encoder, Json}
 import ch.datascience.tinytypes.json.TinyTypeEncoders._
-import eu.timepit.refined.auto._
-import io.circe.Json
-import io.circe.optics.JsonOptics._
-import io.circe.optics.JsonPath.root
-import io.renku.jsonld.JsonLD
-import io.renku.jsonld.syntax._
-import monocle.function.Plated
+import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.AppendedClues
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+import eu.timepit.refined.auto._
 
-import scala.collection.mutable
-import scala.util.{Failure, Success, Try}
-
-class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFactory with AppendedClues {
+class PersonExtractorSpec extends AnyWordSpec with should.Matchers with MockFactory with ScalaCheckPropertyChecks {
 
   "extractPersons" should {
 
-    "remove name and email properties from all the Person entities found in the given Json " in new TestCase {
+    "return PersonData with multiple names and remove the person name, label and email from the triples" in new TestCase {
+      val personRawData = personRawDataWithOneEmail.toGeneratorOfNonEmptyList().generateOne.toList.toSet
       val jsonTriples = JsonLDTriples {
-        nonModifiedDataSetCommit(
-          committer = entities.Person(userNames.generateOne, userEmails.generateOne)
-        )(
-          projectPath = projectPaths.generateOne,
-          maybeProjectCreator = entities.Person(userNames.generateOne, userEmails.generateOne).some
-        )(
-          datasetCreators = nonEmptyList(entities.EntitiesGenerators.persons, minElements = 5, maxElements = 10)
-            .retryUntil(atLeastOneWithoutEmail)
-            .generateOne
-            .toList
-            .toSet
-        ).toJson
+        val Some(value) = personRawData.map(_.toJson.asArray.map(_.toList)).toList.sequence
+        value.flatten
       }
 
-      val Success((updatedTriples, foundPersons)) = personExtractor extractPersons jsonTriples
+      val (updatedTriples, actualPersonRawData) = personExtractor extractPersons jsonTriples
+      actualPersonRawData shouldBe personRawData
 
-      val originalPersons = jsonTriples.collectAllPersons
-
-      val actual   = foundPersons.map(person => (person.id, person.name.some, person.maybeEmail))
-      val expected = originalPersons.map(person => (person.id, person.maybeName, person.maybeEmail))
-      actual shouldBe expected
-
-      val updatedPersons = updatedTriples.collectAllPersons
-
-      updatedPersons.foldLeft(true) {
-        case (acc, Person(_, None, None, _)) => acc
-        case _                               => false
-      } shouldBe true withClue "One person contained a name or an email"
+      updatedTriples.value.as[List[Json]].fold(throw _, identity) should contain theSameElementsAs personRawData
+        .map(_.id.asJson(resourceIdEncoder))
+        .toList
     }
 
-    "do not modify person objects if there are no names and emails" in new TestCase {
-      val triples = JsonLDTriples(
-        removePersonsNames(
-          JsonLD
-            .arr(
-              entities.Person(userNames.generateOne, maybeEmail = None, maybeAffiliation = None).asJsonLD
-            )
-            .toJson
-        )
-      )
+    "not return the person when there is no resourceId" in new TestCase {
 
-      val Success((updatedTriples, foundPersons)) = personExtractor extractPersons triples
+      val personWithoutIdJson = json"""[{
+               "@type" : [
+                 "http://www.w3.org/ns/prov#Person",
+                 "http://schema.org/Person"
+               ],
+               "http://www.w3.org/2000/01/rdf-schema#label" : {
+                 "@value" : "es mqlb"
+               },
+               "http://schema.org/affiliation" : {
+                 "@value" : "tefotcvry"
+               },
+               "http://schema.org/email" : ${userEmails.generateNonEmptyList().toList},
+               "http://schema.org/name" : ${userNames.generateNonEmptyList().toList}
+             }]"""
 
-      updatedTriples       shouldBe triples
-      foundPersons.isEmpty shouldBe true
-    }
+      val jsonTriples = JsonLDTriples {
+        val Some(value) = personWithoutIdJson.asArray.map(_.toList)
+        value
+      }
 
-    "fail if there's a Person entity without a name" in new TestCase {
+      val (_, actualPersonRawData) = personExtractor extractPersons jsonTriples
+      actualPersonRawData shouldBe Set.empty[PersonRawData]
 
-      val noNamesJson = JsonLDTriples(
-        removePersonsNames(
-          JsonLD
-            .arr(
-              entities.Person(userNames.generateOne, userEmails.generateOne).asJsonLD
-            )
-            .toJson
-        )
-      )
-
-      val result = personExtractor extractPersons noNamesJson
-
-      result                       shouldBe a[Failure[_]]
-      result.failed.get.getMessage shouldBe "No names for person in generated JSON-LD"
     }
   }
 
   private trait TestCase {
-    implicit val renkuBaseUrl:  RenkuBaseUrl  = renkuBaseUrls.generateOne
-    implicit val fusekiBaseUrl: FusekiBaseUrl = fusekiBaseUrls.generateOne
+    val personExtractor = new PersonExtractorImpl()
 
-    val personExtractor = new PersonExtractorImpl[Try]()
+    lazy val personRawDataWithOneEmail: Gen[PersonRawData] = for {
+      id     <- userResourceIds
+      names  <- userNames.toGeneratorOfNonEmptyList(2)
+      emails <- userEmails
+    } yield PersonRawData(id, names.toList, List(emails))
   }
 
-  private def removePersonsNames(json: Json): Json = Plated.transform[Json] { json =>
-    root.`@type`.each.string.getAll(json) match {
-      case types if types.contains("http://schema.org/Person") =>
-        root.obj.modify(_.remove("http://schema.org/name"))(json)
-      case _ => json
-    }
-  }(json)
+  implicit class PersonRawDatumOps(data: PersonRawData) {
+    def toJson: Json = {
+      val names:  List[Json] = data.names.map(name => json"""{ "@value": ${name.value} }""")
+      val emails: List[Json] = data.emails.map(email => json"""{ "@value": ${email.value} }""")
 
-  private implicit class TriplesOps(triples: JsonLDTriples) {
-
-    lazy val collectAllPersons: Set[Person] = {
-      val collected = mutable.HashSet.empty[Person]
-      Plated.transform[Json] { json =>
-        root.`@type`.each.string.getAll(json) match {
-          case types if types.contains("http://schema.org/Person") =>
-            collected add Person(
-              root.`@id`.as[ResourceId].getOption(json).getOrElse(fail("Person '@id' not found")),
-              json.getValue[Try, Name](schema / "name").value.fold(throw _, identity),
-              json.getValue[Try, Email](schema / "email").value.fold(throw _, identity),
-              json.getValue[Try, Affiliation](schema / "affiliation").value.fold(throw _, identity)
-            )
-          case _ => ()
-        }
-        json
-      }(triples.value)
-      collected.toSet
+      json"""[{
+               "@id" : ${data.id.value},
+               "@type" : [
+                 "http://www.w3.org/ns/prov#Person",
+                 "http://schema.org/Person"
+               ],
+               "http://www.w3.org/2000/01/rdf-schema#label" : {
+                 "@value" : "es mqlb"
+               },
+               "http://schema.org/affiliation" : {
+                 "@value" : "tefotcvry"
+               },
+               "http://schema.org/email" : $emails,
+               "http://schema.org/name" : $names
+             }]"""
     }
   }
 
-  private case class Person(id:               ResourceId,
-                            maybeName:        Option[Name],
-                            maybeEmail:       Option[Email],
-                            maybeAffiliation: Option[Affiliation]
-  )
-
-  private lazy val atLeastOneWithoutEmail: NonEmptyList[entities.Person] => Boolean = _.exists(_.maybeEmail.isEmpty)
+  private implicit def resourceIdEncoder = Encoder.instance[ResourceId] { case ResourceId(id) =>
+    json"""{ "@id": $id,
+            "@type" : [
+                 "http://www.w3.org/ns/prov#Person",
+                 "http://schema.org/Person"
+               ],
+              "http://schema.org/affiliation" : {
+               "@value" : "tefotcvry"
+             }
+           }"""
+  }
 
 }

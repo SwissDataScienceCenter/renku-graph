@@ -26,3 +26,7 @@ private final case class Person(id: ResourceId, maybeGitLabId: Option[GitLabId],
 private object Person {
   def apply(id: ResourceId, name: Name, maybeEmail: Option[Email]): Person = Person(id, None, name, maybeEmail)
 }
+
+private final case class PersonRawData(id: ResourceId, names: List[Name], emails: List[Email])
+
+private final case class CommitPerson(name: Name, email: Email)
