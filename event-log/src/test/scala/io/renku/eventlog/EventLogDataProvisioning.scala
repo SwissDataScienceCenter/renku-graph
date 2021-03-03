@@ -117,7 +117,7 @@ trait EventLogDataProvisioning {
     sql"""|INSERT INTO
           |event_delivery (event_id, project_id, delivery_id)
           |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $deliveryId)
-          |ON CONFLICT (event_id, project_id, delivery_id)
+          |ON CONFLICT (event_id, project_id)
           |DO NOTHING
       """.stripMargin.update.run.void
   }
