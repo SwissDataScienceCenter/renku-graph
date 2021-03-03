@@ -130,7 +130,7 @@ trait EventLogDataProvisioning {
           |subscriber (delivery_id, delivery_url, source_url)
           |VALUES ($deliveryId, $deliveryUrl, $sourceUrl)
           |ON CONFLICT (delivery_url, source_url)
-          |DO NOTHING
+          |DO UPDATE SET delivery_id = $deliveryId, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
       """.stripMargin.update.run.void
   }
 

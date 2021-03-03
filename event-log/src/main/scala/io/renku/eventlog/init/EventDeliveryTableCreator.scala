@@ -64,7 +64,7 @@ private class EventDeliveryTableCreatorImpl[Interpretation[_]](
       event_id     VARCHAR     NOT NULL,
       project_id   INT4        NOT NULL,
       delivery_id  VARCHAR(19) NOT NULL,
-      PRIMARY KEY (event_id, project_id, delivery_id)
+      PRIMARY KEY (event_id, project_id)
     )
     """.update
 

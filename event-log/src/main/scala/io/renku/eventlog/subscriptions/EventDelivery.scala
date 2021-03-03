@@ -22,8 +22,9 @@ import cats.MonadError
 import cats.effect.{Bracket, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.{events, projects}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import doobie.implicits._
@@ -44,20 +45,40 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
     with EventDelivery[IO, CategoryEvent]
     with TypeSerializers {
 
-  def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): IO[Unit] = measureExecutionTime {
+  def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): IO[Unit] = {
     val CompoundEventId(id, projectId) = compoundEventIdExtractor(event)
-
-    SqlQuery(
-      sql"""|INSERT INTO event_delivery (event_id, project_id, delivery_id)
-            |  SELECT $id, $projectId, delivery_id
-            |  FROM subscriber
-            |  WHERE delivery_url = $subscriberUrl AND source_url = $sourceUrl
-            |ON CONFLICT (event_id, project_id, delivery_id)
-            |DO NOTHING
-            |""".stripMargin.update.run,
-      name = "event delivery info - add"
-    )
+    deliveryExists(id, projectId).flatMap {
+      case true  => update(id, projectId, subscriberUrl)
+      case false => insert(id, projectId, subscriberUrl)
+    }
   } transact transactor.get flatMap toResult
+
+  private def insert(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl) =
+    measureExecutionTime {
+      SqlQuery(
+        sql"""|INSERT INTO event_delivery (event_id, project_id, delivery_id)
+              |  SELECT $eventId, $projectId, delivery_id
+              |  FROM subscriber
+              |  WHERE delivery_url = $subscriberUrl AND source_url = $sourceUrl
+              |ON CONFLICT (event_id, project_id)
+              |DO NOTHING
+              |""".stripMargin.update.run,
+        name = "event delivery info - insert"
+      )
+    }
+
+  private def update(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl) =
+    measureExecutionTime {
+      SqlQuery(
+        sql"""|UPDATE event_delivery 
+              |SET delivery_id = sub.delivery_id
+              |FROM event_delivery ed, subscriber sub
+              |WHERE ed.event_id = $eventId AND ed.project_id = $projectId 
+              |  AND sub.delivery_url = $subscriberUrl AND sub.source_url = $sourceUrl
+              |""".stripMargin.update.run,
+        name = "event delivery info - update"
+      )
+    }
 
   def unregister(eventId: CompoundEventId): IO[Unit] = measureExecutionTime {
     val CompoundEventId(id, projectId) = eventId
@@ -69,6 +90,16 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
       name = "event delivery info - remove"
     )
   } transact transactor.get flatMap toResult
+
+  private def deliveryExists(eventId: events.EventId, projectId: projects.Id) = measureExecutionTime {
+    SqlQuery(
+      sql"""|SELECT delivery_id
+            |FROM event_delivery
+            |WHERE event_id = $eventId AND project_id = $projectId
+            |""".stripMargin.query[SubscriberId].option.map(_.isDefined),
+      name = "event delivery info - exist"
+    )
+  }
 
   private lazy val toResult: Int => IO[Unit] = {
     case 0 | 1 => ().pure[IO]
