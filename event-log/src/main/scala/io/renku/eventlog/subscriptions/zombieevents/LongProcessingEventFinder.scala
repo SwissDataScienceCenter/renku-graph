@@ -59,8 +59,14 @@ private class LongProcessingEventFinder(transactor:             DbTransactor[IO,
                           }.sequence
     } yield projectsAndTimes.map {
       case (id, status, Nil)   => (id, status, maxProcessingTime / maxProcessingTimeRatio)
-      case (id, status, times) => (id, status, times.sorted.reverse.apply(times.size / 2))
+      case (id, status, times) => (id, status, findMedian(times))
     }
+
+  private def findMedian(times: List[EventProcessingTime]): EventProcessingTime = {
+    val median = times.sorted.reverse.apply(times.size / 2)
+    if ((median.value compareTo Duration.ofSeconds(150)) < 0) EventProcessingTime(Duration.ofSeconds(150))
+    else median
+  }
 
   private def queryProjectsToCheck = measureExecutionTime {
     SqlQuery(

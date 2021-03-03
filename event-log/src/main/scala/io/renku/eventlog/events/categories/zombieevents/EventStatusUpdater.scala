@@ -56,7 +56,8 @@ private class EventStatusUpdaterImpl(
   }
 
   private def createQuery(eventId: CompoundEventId, oldStatus: EventStatus, newStatus: EventStatus) = SqlQuery(
-    query = sql"""|UPDATE event SET status = $newStatus, execution_date = ${now()}, message = NULL
+    query = sql"""|UPDATE event 
+                  |SET status = $newStatus, execution_date = ${now()}, message = NULL
                   |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = $oldStatus
                   |""".stripMargin.update.run,
     name = "zombie_chasing - update status"

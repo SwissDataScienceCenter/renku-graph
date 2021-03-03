@@ -100,13 +100,14 @@ class LongProcessingEventFinderSpec
     "return an event if " +
       s"it's in the $GeneratingTriples status " +
       "there's info about the last processing times for the project " +
-      "and it's in the status for more than the (median from last 3 events) * 2" in new TestCase {
+      "and it's in the status for more than the (median from last 3 events) * 2 " +
+      "case when median is more than 2.5 min" in new TestCase {
 
         val projectId = projectIds.generateOne
         val datesAndProcessingTimes = {
           for {
             executionDate  <- executionDates
-            processingTime <- eventProcessingTimes
+            processingTime <- longEventProcessingTimes
           } yield addEvent(projectId,
                            executionDate,
                            currentEventStatus = Gen.oneOf(TriplesGenerated, TriplesStore).generateOne,
@@ -143,15 +144,56 @@ class LongProcessingEventFinderSpec
       }
 
     "return an event if " +
+      s"it's in the $GeneratingTriples status " +
+      "there's info about the last processing times for the project " +
+      "and it's in the status for more than the (median from last 3 events) * 2 " +
+      "case when median is less than 2.5 min" in new TestCase {
+
+        val projectId = projectIds.generateOne
+
+        {
+          for {
+            executionDate  <- executionDates
+            processingTime <- shortEventProcessingTimes
+          } yield addEvent(projectId,
+                           executionDate,
+                           currentEventStatus = Gen.oneOf(TriplesGenerated, TriplesStore).generateOne,
+                           processingTime,
+                           processingTimeStatus = GeneratingTriples
+          )
+        }.generateNonEmptyList().toList
+
+        val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
+        addEvent(
+          eventId,
+          GeneratingTriples,
+          relativeTimestamps(
+            moreThanAgo = (Duration ofSeconds 150) plusMinutes positiveInts().generateOne.value
+          ).generateAs(ExecutionDate)
+        )
+        addEvent(
+          compoundEventIds.generateOne.copy(projectId = projectId),
+          GeneratingTriples,
+          relativeTimestamps(
+            lessThanAgo = Duration ofSeconds 145
+          ).generateAs(ExecutionDate)
+        )
+
+        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, GeneratingTriples))
+        finder.popEvent().unsafeRunSync() shouldBe None
+      }
+
+    "return an event if " +
       s"it's in the $TransformingTriples status " +
       "there's info about the last processing times for the project " +
-      "and it's in the status for more than the (median from last 3 events) * 2" in new TestCase {
+      "and it's in the status for more than the (median from last 3 events) * 2 " +
+      "case when median is more than 2.5 min" in new TestCase {
 
         val projectId = projectIds.generateOne
         val datesAndProcessingTimes = {
           for {
             executionDate  <- executionDates
-            processingTime <- eventProcessingTimes
+            processingTime <- longEventProcessingTimes
           } yield addEvent(projectId,
                            executionDate,
                            currentEventStatus = TriplesStore,
@@ -180,6 +222,46 @@ class LongProcessingEventFinderSpec
           TransformingTriples,
           relativeTimestamps(
             lessThanAgo = (medianProcessingTime * maxProcessingTimeRatio).value minusMinutes 2
+          ).generateAs(ExecutionDate)
+        )
+
+        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, TransformingTriples))
+        finder.popEvent().unsafeRunSync() shouldBe None
+      }
+
+    "return an event if " +
+      s"it's in the $TransformingTriples status " +
+      "there's info about the last processing times for the project " +
+      "and it's in the status for more than the (median from last 3 events) * 2 " +
+      "case when median is less than 2.5 min" in new TestCase {
+
+        val projectId = projectIds.generateOne
+
+        {
+          for {
+            executionDate  <- executionDates
+            processingTime <- shortEventProcessingTimes
+          } yield addEvent(projectId,
+                           executionDate,
+                           currentEventStatus = TriplesStore,
+                           processingTime,
+                           processingTimeStatus = TransformingTriples
+          )
+        }.generateNonEmptyList().toList
+
+        val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
+        addEvent(
+          eventId,
+          TransformingTriples,
+          relativeTimestamps(
+            moreThanAgo = (Duration ofSeconds 150) plusMinutes positiveInts().generateOne.value
+          ).generateAs(ExecutionDate)
+        )
+        addEvent(
+          compoundEventIds.generateOne.copy(projectId = projectId),
+          TransformingTriples,
+          relativeTimestamps(
+            lessThanAgo = Duration ofSeconds 145
           ).generateAs(ExecutionDate)
         )
 
@@ -220,4 +302,10 @@ class LongProcessingEventFinderSpec
       executionDate -> processingTime
     }
   }
+
+  private lazy val longEventProcessingTimes: Gen[EventProcessingTime] =
+    javaDurations(min = Duration ofSeconds 155).map(EventProcessingTime.apply)
+
+  private lazy val shortEventProcessingTimes: Gen[EventProcessingTime] =
+    javaDurations(max = Duration ofSeconds 145).map(EventProcessingTime.apply)
 }

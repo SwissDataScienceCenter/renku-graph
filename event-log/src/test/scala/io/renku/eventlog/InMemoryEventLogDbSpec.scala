@@ -45,6 +45,7 @@ trait InMemoryEventLogDbSpec
       .query[String]
       .to[List]
   }
+
   protected def prepareDbForTest(): Unit = execute {
     Fragment.const(s"TRUNCATE TABLE ${findAllTables().mkString(", ")} CASCADE").update.run.void
   }
