@@ -31,6 +31,8 @@ import eu.timepit.refined.api.Refined
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
 
+import java.time.Instant.now
+
 private class LostSubscriberEventFinder(transactor:       DbTransactor[IO, EventLogDB],
                                         queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
 )(implicit ME:                                            Bracket[IO, Throwable], contextShift: ContextShift[IO])
@@ -73,7 +75,7 @@ private class LostSubscriberEventFinder(transactor:       DbTransactor[IO, Event
   private def updateMessage(eventId: CompoundEventId) = measureExecutionTime {
     SqlQuery(
       sql"""|UPDATE event
-            |SET message = $zombieMessage
+            |SET message = $zombieMessage, execution_date = ${now()}
             |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
             |""".stripMargin.update.run,
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lse - update message")

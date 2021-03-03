@@ -133,7 +133,7 @@ private class LongProcessingEventFinder(transactor:             DbTransactor[IO,
   private def updateMessage(eventId: CompoundEventId) = measureExecutionTime {
     SqlQuery(
       sql"""|UPDATE event
-            |SET message = $zombieMessage
+            |SET message = $zombieMessage, execution_date = ${now()}
             |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
             |""".stripMargin.update.run,
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - update message")
