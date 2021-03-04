@@ -52,7 +52,6 @@ class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
         findAllAssociations shouldBe List(event.compoundEventId -> subscriberId)
 
         val otherEvent = testCompoundIdEvent.generateOne
-
         addEvent(otherEvent.compoundEventId)
 
         delivery.registerSending(otherEvent, subscriberUrl).unsafeRunSync() shouldBe ()
@@ -63,7 +62,7 @@ class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
         )
       }
 
-    "update the delivery_id if the association between the given event and subscriber url already exists" in new TestCase {
+    "replace the delivery_id if the association between the given event and subscriber url already exists" in new TestCase {
 
       addEvent(event.compoundEventId)
       upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
@@ -76,7 +75,8 @@ class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
       upsertSubscriber(newSubscriberId, subscriberUrl, sourceUrl)
 
       delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
-      findAllAssociations                                            shouldBe List(event.compoundEventId -> newSubscriberId)
+
+      findAllAssociations shouldBe List(event.compoundEventId -> newSubscriberId)
 
     }
   }

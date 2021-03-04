@@ -47,11 +47,23 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
 
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): IO[Unit] = {
     val CompoundEventId(id, projectId) = compoundEventIdExtractor(event)
-    deliveryExists(id, projectId).flatMap {
-      case true  => update(id, projectId, subscriberUrl)
-      case false => insert(id, projectId, subscriberUrl)
-    }
+    for {
+      _      <- deleteDelivery(id, projectId)
+      result <- insert(id, projectId, subscriberUrl)
+    } yield result
   } transact transactor.get flatMap toResult
+
+  def unregister(eventId: CompoundEventId): IO[Unit] =
+    deleteDelivery(eventId.id, eventId.projectId) transact transactor.get flatMap toResult
+
+  private def deleteDelivery(eventId: events.EventId, projectId: projects.Id) = measureExecutionTime {
+    SqlQuery(
+      sql"""|DELETE FROM event_delivery 
+            |WHERE event_id = $eventId AND project_id = $projectId
+            |""".stripMargin.update.run,
+      name = "event delivery info - remove"
+    )
+  }
 
   private def insert(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl) =
     measureExecutionTime {
@@ -66,40 +78,6 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
         name = "event delivery info - insert"
       )
     }
-
-  private def update(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl) =
-    measureExecutionTime {
-      SqlQuery(
-        sql"""|UPDATE event_delivery 
-              |SET delivery_id = sub.delivery_id
-              |FROM event_delivery ed, subscriber sub
-              |WHERE ed.event_id = $eventId AND ed.project_id = $projectId 
-              |  AND sub.delivery_url = $subscriberUrl AND sub.source_url = $sourceUrl
-              |""".stripMargin.update.run,
-        name = "event delivery info - update"
-      )
-    }
-
-  def unregister(eventId: CompoundEventId): IO[Unit] = measureExecutionTime {
-    val CompoundEventId(id, projectId) = eventId
-
-    SqlQuery(
-      sql"""|DELETE FROM event_delivery 
-            |WHERE event_id = $id AND project_id = $projectId
-            |""".stripMargin.update.run,
-      name = "event delivery info - remove"
-    )
-  } transact transactor.get flatMap toResult
-
-  private def deliveryExists(eventId: events.EventId, projectId: projects.Id) = measureExecutionTime {
-    SqlQuery(
-      sql"""|SELECT delivery_id
-            |FROM event_delivery
-            |WHERE event_id = $eventId AND project_id = $projectId
-            |""".stripMargin.query[SubscriberId].option.map(_.isDefined),
-      name = "event delivery info - exist"
-    )
-  }
 
   private lazy val toResult: Int => IO[Unit] = {
     case 0 | 1 => ().pure[IO]
