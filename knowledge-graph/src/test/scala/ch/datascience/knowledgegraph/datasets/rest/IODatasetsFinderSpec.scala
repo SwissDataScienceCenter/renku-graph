@@ -66,13 +66,13 @@ class IODatasetsFinderSpec
       s"return all datasets when the given phrase is $maybePhrase " +
         "- case of datasets that has neither sameAs nor are imported to and/or from other projects" in new TestCase {
           val sameAs1DatasetsAndJsons = nonModifiedDatasets(
-            projects = datasetProjects.toGeneratorOfNonEmptyList(minElements = 2)
+            usedInProjects = datasetProjects.toGeneratorOfNonEmptyList(minElements = 2)
           ).generateOne.toJsonLDsAndDatasets(noSameAs = true)()
           val sameAs2DatasetsAndJsons = nonModifiedDatasets(
-            projects = datasetProjects.toGeneratorOfNonEmptyList(maxElements = 1)
+            usedInProjects = datasetProjects.toGeneratorOfNonEmptyList(maxElements = 1)
           ).generateOne.toJsonLDsAndDatasets(noSameAs = true)()
           val sameAs3DatasetsAndJsons = nonModifiedDatasets(
-            projects = datasetProjects.toGeneratorOfNonEmptyList(minElements = 2)
+            usedInProjects = datasetProjects.toGeneratorOfNonEmptyList(minElements = 2)
           ).generateOne.toJsonLDsAndDatasets(noSameAs = false)()
 
           loadToStore(
@@ -140,7 +140,7 @@ class IODatasetsFinderSpec
         "- case of shared sameAs with modification on some projects" in new TestCase {
 
           val sharedSameAs = datasetSameAs.generateOne
-          val dataset1     = nonModifiedDatasets(projects = single).generateOne.copy(sameAs = sharedSameAs)
+          val dataset1     = nonModifiedDatasets(usedInProjects = single).generateOne.copy(sameAs = sharedSameAs)
           val dataset2     = dataset1.copy(id = datasetIdentifiers.generateOne, usedIn = single.generateOne.toList)
           val datasets2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
             .copy(title = datasetTitles.generateOne)
@@ -189,7 +189,7 @@ class IODatasetsFinderSpec
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case of one level of modification" in new TestCase {
 
-          val originalDatasetsList = nonModifiedDatasets(projects = single)
+          val originalDatasetsList = nonModifiedDatasets(usedInProjects = single)
             .generateNonEmptyList(maxElements = Refined.unsafeApply(PagingRequest.default.perPage.value))
             .toList
           val modifiedDatasetsList = originalDatasetsList.map { ds =>
@@ -214,7 +214,7 @@ class IODatasetsFinderSpec
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case more than one level of modification" in new TestCase {
 
-          val original = nonModifiedDatasets(projects = single).generateOne
+          val original = nonModifiedDatasets(usedInProjects = single).generateOne
           val modification1 = modifiedDatasetsOnFirstProject(original).generateOne
             .copy(title = datasetTitles.generateOne)
           val modification2 = modifiedDatasetsOnFirstProject(modification1).generateOne
@@ -237,10 +237,10 @@ class IODatasetsFinderSpec
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case if there are modified and non-modified datasets" in new TestCase {
 
-          val dataset1 = nonModifiedDatasets(projects = single).generateOne
+          val dataset1 = nonModifiedDatasets(usedInProjects = single).generateOne
           val dataset1Modification = modifiedDatasetsOnFirstProject(dataset1).generateOne
             .copy(name = datasetNames.generateOne)
-          val nonModifiedDataset = nonModifiedDatasets(projects = single).generateOne
+          val nonModifiedDataset = nonModifiedDatasets(usedInProjects = single).generateOne
 
           loadToStore(
             dataset1.toJsonLD()(),
@@ -288,7 +288,7 @@ class IODatasetsFinderSpec
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case with forks on renku created datasets" in new TestCase {
 
-          val dataset     = nonModifiedDatasets(projects = single).generateOne
+          val dataset     = nonModifiedDatasets(usedInProjects = single).generateOne
           val datasetFork = dataset.copy(usedIn = List(datasetProjects.generateOne))
 
           loadToStore(
@@ -310,7 +310,7 @@ class IODatasetsFinderSpec
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case with more than one level of modification and forks on the 1st level" in new TestCase {
 
-          val dataset     = nonModifiedDatasets(projects = single).generateOne
+          val dataset     = nonModifiedDatasets(usedInProjects = single).generateOne
           val datasetFork = dataset.copy(usedIn = List(datasetProjects.generateOne))
           val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
             .copy(title = datasetTitles.generateOne)
@@ -336,7 +336,7 @@ class IODatasetsFinderSpec
       s"return latest versions of datasets when the given phrase is $maybePhrase " +
         "- case with more than one level of modification and forks on not the 1st level" in new TestCase {
 
-          val dataset = nonModifiedDatasets(projects = single).generateOne
+          val dataset = nonModifiedDatasets(usedInProjects = single).generateOne
           val datasetModification = modifiedDatasetsOnFirstProject(dataset).generateOne
             .copy(name = datasetNames.generateOne)
           val forkProject             = datasetProjects.generateOne
@@ -477,16 +477,16 @@ class IODatasetsFinderSpec
 
         val phrase = phrases.generateOne
         val sameAs1DatasetsAndJsons = nonModifiedDatasets(
-          projects = nonEmptyList(datasetProjects, minElements = 2)
+          usedInProjects = nonEmptyList(datasetProjects, minElements = 2)
         ).generateOne.makeNameContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
         val sameAs2DatasetsAndJsons = nonModifiedDatasets(
-          projects = nonEmptyList(datasetProjects, maxElements = 1)
+          usedInProjects = nonEmptyList(datasetProjects, maxElements = 1)
         ).generateOne.makeDescContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
         val sameAs3DatasetsAndJsons = nonModifiedDatasets(
-          projects = nonEmptyList(datasetProjects, maxElements = 1)
+          usedInProjects = nonEmptyList(datasetProjects, maxElements = 1)
         ).generateOne.makeCreatorNameContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
         val sameAs4DatasetsAndJsons = nonModifiedDatasets(
-          projects = nonEmptyList(datasetProjects, maxElements = 1)
+          usedInProjects = nonEmptyList(datasetProjects, maxElements = 1)
         ).generateOne.makeTitleContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
 
         loadToStore(
@@ -548,10 +548,10 @@ class IODatasetsFinderSpec
 
       val phrase       = phrases.generateOne
       val sharedSameAs = datasetSameAs.generateOne
-      val dataset1 = nonModifiedDatasets(projects = single).generateOne
+      val dataset1 = nonModifiedDatasets(usedInProjects = single).generateOne
         .copy(sameAs = sharedSameAs)
         .makeTitleContaining(phrase)
-      val dataset2 = nonModifiedDatasets(projects = single).generateOne
+      val dataset2 = nonModifiedDatasets(usedInProjects = single).generateOne
         .copy(sameAs = sharedSameAs)
         .makeTitleContaining(phrase)
       val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
@@ -572,9 +572,9 @@ class IODatasetsFinderSpec
 
       val phrase       = phrases.generateOne
       val sharedSameAs = datasetSameAs.generateOne
-      val dataset1 = nonModifiedDatasets(projects = single).generateOne
+      val dataset1 = nonModifiedDatasets(usedInProjects = single).generateOne
         .copy(sameAs = sharedSameAs)
-      val dataset2 = nonModifiedDatasets(projects = single).generateOne
+      val dataset2 = nonModifiedDatasets(usedInProjects = single).generateOne
         .copy(sameAs = sharedSameAs)
       val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
         .makeTitleContaining(phrase)
@@ -594,7 +594,7 @@ class IODatasetsFinderSpec
 
       val phrase       = phrases.generateOne
       val sharedSameAs = datasetSameAs.generateOne
-      val dataset = nonModifiedDatasets(projects = single).generateOne
+      val dataset = nonModifiedDatasets(usedInProjects = single).generateOne
         .copy(sameAs = sharedSameAs)
       val datasetModification1 = modifiedDatasetsOnFirstProject(dataset).generateOne
         .makeTitleContaining(phrase)
@@ -618,7 +618,7 @@ class IODatasetsFinderSpec
 
       val phrase       = phrases.generateOne
       val sharedSameAs = datasetSameAs.generateOne
-      val dataset1 = nonModifiedDatasets(projects = single).generateOne
+      val dataset1 = nonModifiedDatasets(usedInProjects = single).generateOne
         .copy(sameAs = sharedSameAs)
         .makeTitleContaining(phrase)
       val dataset2 = dataset1.copy(usedIn = single.generateOne.toList)
@@ -639,7 +639,7 @@ class IODatasetsFinderSpec
     "return datasets matching the criteria after modification of the fork" in new TestCase {
 
       val phrase   = phrases.generateOne
-      val dataset1 = nonModifiedDatasets(projects = single).generateOne
+      val dataset1 = nonModifiedDatasets(usedInProjects = single).generateOne
       val dataset2 = dataset1.copy(usedIn = single.generateOne.toList)
       val dataset2Modification = modifiedDatasetsOnFirstProject(dataset2).generateOne
         .makeTitleContaining(phrase)
@@ -661,7 +661,7 @@ class IODatasetsFinderSpec
         val project        = projectEntities.generateOne
         val datasetProject = NonEmptyList(project.toDatasetProject, Nil)
         val datasetToBeInvalidated =
-          nonModifiedDatasets(projects = datasetProject).generateOne.makeTitleContaining(phrase)
+          nonModifiedDatasets(usedInProjects = datasetProject).generateOne.makeTitleContaining(phrase)
         val entityWithInvalidation: Entity with Artifact =
           invalidationEntity(datasetToBeInvalidated.id, project).generateOne
 
@@ -763,9 +763,13 @@ class IODatasetsFinderSpec
       val phrase = phrases.generateOne
       val (dataset1, dataset2, dataset3) = addPhrase(
         phrase,
-        nonModifiedDatasets(projects = nonEmptyList(datasetProjects, minElements = 4, maxElements = 4)).generateOne,
-        nonModifiedDatasets(projects = nonEmptyList(datasetProjects, maxElements = 1)).generateOne,
-        nonModifiedDatasets(projects = nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)).generateOne
+        nonModifiedDatasets(usedInProjects =
+          nonEmptyList(datasetProjects, minElements = 4, maxElements = 4)
+        ).generateOne,
+        nonModifiedDatasets(usedInProjects = nonEmptyList(datasetProjects, maxElements = 1)).generateOne,
+        nonModifiedDatasets(usedInProjects =
+          nonEmptyList(datasetProjects, minElements = 2, maxElements = 2)
+        ).generateOne
       )
 
       val datasetsAndJsons = List(dataset1, dataset2, dataset3, nonModifiedDatasets().generateOne)

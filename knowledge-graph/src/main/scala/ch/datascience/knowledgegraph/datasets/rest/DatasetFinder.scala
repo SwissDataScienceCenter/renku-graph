@@ -46,18 +46,17 @@ private class IODatasetFinder(
 
   def findDataset(identifier: Identifier): IO[Option[Dataset]] =
     for {
-      maybeDetailsFiber <- findBaseDetails(identifier).start
+      usedIn            <- findUsedIn(identifier)
+      maybeDetailsFiber <- findBaseDetails(identifier, usedIn).start
       keywordsFiber     <- findKeywords(identifier).start
       imagesFiber       <- findImages(identifier).start
       creatorsFiber     <- findCreators(identifier).start
       partsFiber        <- findParts(identifier).start
-      usedInFiber       <- findUsedIn(identifier).start
       maybeDetails      <- maybeDetailsFiber.join
       keywords          <- keywordsFiber.join
       imageUrls         <- imagesFiber.join
       creators          <- creatorsFiber.join
       parts             <- partsFiber.join
-      usedIn            <- usedInFiber.join
     } yield maybeDetails map { details =>
       details.copy(
         creators = creators,

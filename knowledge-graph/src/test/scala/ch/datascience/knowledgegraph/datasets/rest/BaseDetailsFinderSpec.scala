@@ -18,21 +18,22 @@
 
 package ch.datascience.knowledgegraph.datasets.rest
 
-import ch.datascience.generators.CommonGraphGenerators.renkuBaseUrls
+import ch.datascience.generators.CommonGraphGenerators.{renkuBaseUrls, renkuResourcesUrls}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.datasets.{Dates, SameAs}
+import ch.datascience.graph.model.projects
 import ch.datascience.http.rest.Links.{Href, Link, Rel, _links}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators._
 import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetProject, ModifiedDataset, NonModifiedDataset}
 import ch.datascience.rdfstore.entities.DataSet
-import io.circe.{Encoder, Json}
+import ch.datascience.tinytypes.json.TinyTypeEncoders._
 import io.circe.literal._
+import io.circe.{Encoder, Json}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import ch.datascience.generators.CommonGraphGenerators.{renkuBaseUrls, renkuResourcesUrls}
 
 class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
@@ -45,7 +46,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
 
     "decode result-set with a blank description, url, sameAs, and images to a Dataset object" in {
       forAll(nonModifiedDatasets(), blankStrings()) { (dataset, description) =>
-        resultSet(dataset, description).as[List[Dataset]] shouldBe Right {
+        resultSet(dataset, description).as[List[Dataset]](datasetsDecoder(List(dataset.project))) shouldBe Right {
           List(
             dataset
               .copy(sameAs = SameAs(DataSet.entityId(dataset.id)))
@@ -66,7 +67,9 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
     "decode result-set with a blank description, url, sameAs, and images to a Dataset object" in {
       forAll(nonModifiedDatasets(), blankStrings()) { (dataset, description) =>
         val modifiedDataset = modifiedDatasetsOnFirstProject(dataset).generateOne
-        resultSet(modifiedDataset, description).as[List[Dataset]] shouldBe Right {
+        resultSet(modifiedDataset, description).as[List[Dataset]](
+          datasetsDecoder(List(dataset.project))
+        ) shouldBe Right {
           List(
             modifiedDataset
               .copy(creators = Set.empty)
@@ -89,10 +92,14 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "alternateName": {"value": ${dataset.name.value}},
       "description": {"value": $blank},
       "url": {"value": ${dataset.url.value}},
-      "project": {"value": ${dataset.project.asJson}},
       "topmostSameAs": {"value": ${SameAs(DataSet.entityId(dataset.id)).toString}},
       "initialVersion": {"value": ${dataset.versions.initial.toString}},
-      "keywords": {"value": ${dataset.keywords.map(_.value).asJson}}
+      "keywords": {"value": ${dataset.keywords.map(_.value).asJson}},
+      "projectId": {"value": ${projects.ResourceId.apply(renkuBaseUrl, dataset.project.path).asJson}},
+      "projectName": {"value": ${dataset.project.name.asJson}},
+      "minDateCreated": {"value": ${dataset.project.created.date.asJson}},
+      "maybeAgentEmail": {"value": ${dataset.project.created.agent.maybeEmail.asJson}},
+      "agentName": {"value": ${dataset.project.created.agent.name.asJson}}
     }""".addDates(dataset.dates)
 
     json"""{"results": {"bindings": [$binding]}}"""
@@ -106,12 +113,16 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "alternateName": {"value": ${dataset.name.value}},
       "description": {"value": $blank},
       "url": {"value": ${dataset.url.value}},
-      "project": {"value": ${dataset.project.asJson}},
       "topmostSameAs": {"value": ${DataSet.entityId(dataset.id).toString} },
       "maybeDerivedFrom": {"value": ${dataset.derivedFrom.value}},
       "initialVersion": {"value": ${dataset.versions.initial.toString} },
       "keywords": {"value": ${dataset.keywords.map(_.value).asJson}},
-      "images": {"value": ${dataset.images.map(_.value).asJson}}
+      "images": {"value": ${dataset.images.map(_.value).asJson}},
+      "projectId": {"value": ${projects.ResourceId.apply(renkuBaseUrl, dataset.project.path).asJson}},
+      "projectName": {"value": ${dataset.project.name.asJson}},
+      "minDateCreated": {"value": ${dataset.project.created.date.asJson}},
+      "maybeAgentEmail": {"value": ${dataset.project.created.agent.maybeEmail.asJson}},
+      "agentName": {"value": ${dataset.project.created.agent.name.asJson}}
     }""".addDates(dataset.dates)
 
     json"""{"results": {"bindings": [$binding]}}"""
@@ -133,7 +144,6 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
         )
   }
 
-  // this is correct. I think the decoder is incorrect
   private implicit lazy val projectEncoder: Encoder[DatasetProject] = Encoder.instance[DatasetProject] { project =>
     json"""{
       "path": ${project.path.value},

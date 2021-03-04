@@ -96,7 +96,7 @@ class ProjectsResourcesSpec
   private val parentProjectCommit = commitIds.generateOne
   private val dataset = nonModifiedDatasets().generateOne.copy(
     maybeDescription = Some(datasetDescriptions.generateOne),
-    projects = List(DatasetProject(project.path, project.name, addedToProjectObjects.generateOne))
+    usedIn = List(DatasetProject(project.path, project.name, addedToProjectObjects.generateOne))
   )
 
   Feature("GET knowledge-graph/projects/<namespace>/<name> to find project's details") {

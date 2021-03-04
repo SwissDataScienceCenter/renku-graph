@@ -89,13 +89,13 @@ class DatasetsResourcesSpec
     val dataset1Committer = Person(dataset1Creation.agent.name, dataset1Creation.agent.maybeEmail)
     val dataset1 = nonModifiedDatasets().generateOne.copy(
       maybeDescription = Some(datasetDescriptions.generateOne),
-      projects = List(DatasetProject(project.path, project.name, dataset1Creation))
+      usedIn = List(DatasetProject(project.path, project.name, dataset1Creation))
     )
     val dataset2Creation = addedToProjectObjects.generateOne
     val dataset2CommitId = commitIds.generateOne
     val dataset2 = nonModifiedDatasets().generateOne.copy(
       maybeDescription = None,
-      projects = List(DatasetProject(project.path, project.name, dataset2Creation))
+      usedIn = List(DatasetProject(project.path, project.name, dataset2Creation))
     )
     val modifiedDataset2 = modifiedDatasetsOnFirstProject(dataset2).generateOne
 
@@ -148,9 +148,9 @@ class DatasetsResourcesSpec
           datasetImages = dataset2.images
         ),
         modifiedDataSetCommit(
-          committedDate = modifiedDataset2.projects.head.created.date.toUnsafe(date => CommittedDate.from(date.value)),
-          committer = Person(modifiedDataset2.projects.head.created.agent.name,
-                             modifiedDataset2.projects.head.created.agent.maybeEmail
+          committedDate = modifiedDataset2.usedIn.head.created.date.toUnsafe(date => CommittedDate.from(date.value)),
+          committer = Person(modifiedDataset2.usedIn.head.created.agent.name,
+                             modifiedDataset2.usedIn.head.created.agent.maybeEmail
           ),
           cliVersion = currentVersionPair.cliVersion
         )(
@@ -248,12 +248,12 @@ class DatasetsResourcesSpec
       val dataset1Projects = nonEmptyList(projects).generateOne.toList
       val dataset1 = nonModifiedDatasets().generateOne.copy(
         title = sentenceContaining(text).map(_.value).map(Title.apply).generateOne,
-        projects = dataset1Projects map toDatasetProject
+        usedIn = (dataset1Projects map toDatasetProject)
       )
       val dataset2Projects = nonEmptyList(projects).generateOne.toList
       val dataset2 = nonModifiedDatasets().generateOne.copy(
         maybeDescription = Some(sentenceContaining(text).map(_.value).map(Description.apply).generateOne),
-        projects = dataset2Projects map toDatasetProject
+        usedIn = (dataset2Projects map toDatasetProject)
       )
       val dataset3Projects = nonEmptyList(projects).generateOne.toList
       val dataset3 = {
@@ -263,19 +263,19 @@ class DatasetsResourcesSpec
             datasetCreators.generateOne
               .copy(name = sentenceContaining(text).map(_.value).map(UserName.apply).generateOne)
           ),
-          projects = dataset3Projects map toDatasetProject
+          usedIn = (dataset3Projects map toDatasetProject)
         )
       }
 
       val dataset4Projects = nonEmptyList(projects).generateOne.toList
       val dataset4 = nonModifiedDatasets().generateOne.copy(
         name = sentenceContaining(text).map(_.value).map(Name.apply).generateOne,
-        projects = dataset4Projects map toDatasetProject
+        usedIn = (dataset4Projects map toDatasetProject)
       )
 
       val dataset5Projects = List(projects.generateOne)
       val dataset5 = nonModifiedDatasets().generateOne.copy(
-        projects = dataset5Projects map toDatasetProject
+        usedIn = (dataset5Projects map toDatasetProject)
       )
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
@@ -481,7 +481,7 @@ object DatasetsResources {
       "name": ${dataset.name.value},
       "published": ${dataset.creators -> dataset.dates.maybeDatePublished},
       "date": ${dataset.dates.date}, 
-      "projectsCount": ${dataset.projects.size},
+      "projectsCount": ${dataset.usedIn.size},
       "images": ${dataset.images.map(_.value)}
     }"""
       .addIfDefined("description" -> dataset.maybeDescription)

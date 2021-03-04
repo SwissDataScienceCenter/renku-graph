@@ -47,7 +47,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
     "return details of the dataset with the given id " +
       "- a case of a single used in-project created dataset" in new TestCase {
         forAll(datasetProjects, addedToProjectObjects) { (project, addedToProject) =>
-          val dataset = nonModifiedDatasets(projects = project.copy(created = addedToProject).toGenerator).generateOne
+          val dataset =
+            nonModifiedDatasets(usedInProjects = project.copy(created = addedToProject).toGenerator).generateOne
 
           loadToStore(
             dataset.toJsonLD(noSameAs = true)(),
@@ -72,12 +73,12 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             val sameAs = datasetSameAs.generateOne
             val dataset1 = nonModifiedDatasets(
               Gen.const(sameAs),
-              projects = project1.copy(created = addedToProject1).toGenerator
+              usedInProjects = project1.copy(created = addedToProject1).toGenerator
             ).generateOne
 
             val dataset2 = nonModifiedDatasets(
               Gen.const(sameAs),
-              projects = project2.copy(created = addedToProject2).toGenerator
+              usedInProjects = project2.copy(created = addedToProject2).toGenerator
             ).generateOne
 
             loadToStore(
@@ -111,8 +112,9 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
     "return details of the dataset with the given id " +
       "- a case when dataset is modified" in new TestCase {
         forAll(datasetProjects, addedToProjectObjects) { (project, addedToProject) =>
-          val dataset = nonModifiedDatasets(projects = project.copy(created = addedToProject).toGenerator).generateOne
-          val modifiedOnProject = addedToProjectObjects.generateOne.copy(
+          val dataset =
+            nonModifiedDatasets(usedInProjects = project.copy(created = addedToProject).toGenerator).generateOne
+          val modifiedOnProject: AddedToProject = addedToProjectObjects.generateOne.copy(
             date = DateCreatedInProject(
               timestampsNotInTheFuture(butOlderThan = addedToProject.date.value).generateOne
             )
@@ -135,10 +137,16 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               keywords = dataset.keywords.sorted
             )
           )
-          datasetFinder.findDataset(modifiedDataset.id).unsafeRunSync() shouldBe Some(
+
+          val modifiedDatasetProject = DatasetProject(project.path, project.name, modifiedOnProject)
+
+          val actualmodifiedDataset = datasetFinder.findDataset(modifiedDataset.id).unsafeRunSync()
+
+          actualmodifiedDataset shouldBe Some(
             modifiedDataset.copy(
               parts = modifiedDataset.parts.sorted,
-              usedIn = List(DatasetProject(project.path, project.name, modifiedOnProject)).sorted,
+              project = modifiedDatasetProject,
+              usedIn = List(modifiedDatasetProject),
               keywords = modifiedDataset.keywords.sorted
             )
           )
@@ -155,21 +163,25 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
                addedToProjectObjects
         ) { (project1, addedToProject1, project2, addedToProject2, project3, addedToProject3) =>
           val sourceDataset = nonModifiedDatasets(
-            projects = project1.copy(created = addedToProject1).toGenerator
+            usedInProjects = project1.copy(created = addedToProject1).toGenerator
           ).generateOne
-          val dataset2Id = datasetIdentifiers.generateOne
+          val dataset2Id      = datasetIdentifiers.generateOne
+          val datasetProject2 = DatasetProject(project2.path, project2.name, addedToProject2)
           val dataset2 = sourceDataset.copy(
             id = dataset2Id,
             sameAs = sourceDataset.entityId.asSameAs,
             versions = DatasetVersions(InitialVersion(dataset2Id)),
-            usedIn = List(DatasetProject(project2.path, project2.name, addedToProject2))
+            project = datasetProject2,
+            usedIn = List(datasetProject2)
           )
-          val dataset3Id = datasetIdentifiers.generateOne
+          val dataset3Id      = datasetIdentifiers.generateOne
+          val datasetProject3 = DatasetProject(project3.path, project3.name, addedToProject3)
           val dataset3 = sourceDataset.copy(
             id = dataset3Id,
             sameAs = sourceDataset.entityId.asSameAs,
             versions = DatasetVersions(InitialVersion(dataset3Id)),
-            usedIn = List(DatasetProject(project3.path, project3.name, addedToProject3))
+            project = datasetProject3,
+            usedIn = List(datasetProject3)
           ) // to simulate adding the first project's original dataset to another project
 
           loadToStore(
@@ -220,13 +232,14 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         forAll(datasetProjects, datasetProjects, addedToProjectObjects, commitIds) {
           (sourceProject, forkProject, addedToProject, commitId) =>
             val dataset = nonModifiedDatasets(
-              projects = sourceProject.copy(created = addedToProject).toGenerator
+              usedInProjects = sourceProject.copy(created = addedToProject).toGenerator
             ).generateOne
 
+            val forkUsedIn = List(DatasetProject(forkProject.path, forkProject.name, addedToProject))
             loadToStore(
               dataset.toJsonLD(noSameAs = true, commitId = commitId)(),
               dataset // to simulate forking the sourceProject
-                .copy(usedIn = List(DatasetProject(forkProject.path, forkProject.name, addedToProject)))
+                .copy(project = forkUsedIn.head, usedIn = forkUsedIn)
                 .toJsonLD(noSameAs = true, commitId = commitId)()
             )
 
@@ -249,7 +262,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         forAll(datasetProjects, addedToProjectObjects, datasetProjects, addedToProjectObjects, datasetProjects) {
           (project1, addedToProject1, project2, addedToProject2, project2Fork) =>
             val dataset = nonModifiedDatasets(
-              projects = project1.copy(created = addedToProject1).toGenerator
+              usedInProjects = project1.copy(created = addedToProject1).toGenerator
             ).generateOne
             val project2DatasetCommit = commitIds.generateOne
 
@@ -302,7 +315,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         forAll(datasetProjects, datasetProjects, datasetProjects, addedToProjectObjects, commitIds) {
           (grandparentProject, parentProject, childProject, addedToProject, commitId) =>
             val datasetOnGrandparent = nonModifiedDatasets(
-              projects = grandparentProject.copy(created = addedToProject).toGenerator
+              usedInProjects = grandparentProject.copy(created = addedToProject).toGenerator
             ).generateOne
 
             loadToStore(
@@ -334,7 +347,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
       "- case when the forking hierarchy is broken by dataset modification" in new TestCase {
         forAll(datasetProjects, addedToProjectObjects, datasetProjects) { (project, addedToProject, forkedProject) =>
           val dataset = nonModifiedDatasets(
-            projects = project.copy(created = addedToProject).toGenerator
+            usedInProjects = project.copy(created = addedToProject).toGenerator
           ).generateOne
           val projectDatasetModificationCommit = commitIds.generateOne
           val modifiedOnProject = addedToProjectObjects.generateOne.copy(
@@ -387,6 +400,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         val dataset1Project = datasetProjects.generateOne
         val sharedSameAs    = datasetSameAs.generateOne
         val dataset1 = nonModifiedDatasets().generateOne.copy(
+          project = dataset1Project,
           usedIn = List(dataset1Project),
           sameAs = sharedSameAs
         )
@@ -395,17 +409,21 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         val dataset2 = dataset1.copy(
           id = datasetIdentifiers.generateOne,
           sameAs = dataset1.entityId.asSameAs,
+          project = dataset2Project,
           usedIn = List(dataset2Project)
         )
 
+        val shiftedDataset2Project = dataset2Project shiftDateAfter dataset2Project
         val dataset2ModifiedOldWay = dataset2.copy(
-          usedIn = List(dataset2Project shiftDateAfter dataset2Project)
+          project = shiftedDataset2Project,
+          usedIn = List(shiftedDataset2Project)
         )
 
         val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project
         val dataset3 = dataset2.copy(
           id = datasetIdentifiers.generateOne,
           sameAs = dataset2.entityId.asSameAs,
+          project = dataset3Project,
           usedIn = List(dataset3Project)
         )
 
@@ -432,12 +450,13 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
     "return details of the dataset with the given id - case when the first dataset is in-project created" in new TestCase {
       val dataset1Project = datasetProjects.generateOne
       val dataset1 = nonModifiedDatasets().generateOne
-        .copy(usedIn = List(dataset1Project))
+        .copy(project = dataset1Project, usedIn = List(dataset1Project))
 
       val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
       val dataset2 = dataset1.copy(
         id = datasetIdentifiers.generateOne,
         sameAs = dataset1.entityId.asSameAs,
+        project = dataset2Project,
         usedIn = List(dataset2Project)
       )
 
@@ -445,6 +464,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
       val dataset3 = dataset2.copy(
         id = datasetIdentifiers.generateOne,
         sameAs = dataset2.entityId.asSameAs,
+        project = dataset3Project,
         usedIn = List(dataset3Project)
       )
 
@@ -472,7 +492,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
       "case when the requested id is anywhere in the hierarchy" in new TestCase {
         val dataset1Project = datasetProjects.generateOne
         val dataset1 = nonModifiedDatasets().generateOne
-          .copy(usedIn = List(dataset1Project))
+          .copy(project = dataset1Project, usedIn = List(dataset1Project))
 
         val dataset2Project = datasetProjects.generateOne shiftDateAfter dataset1Project
         val dataset2Id      = datasetIdentifiers.generateOne
@@ -480,6 +500,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           id = dataset2Id,
           sameAs = dataset1.entityId.asSameAs,
           versions = DatasetVersions(InitialVersion(dataset2Id)),
+          project = dataset2Project,
           usedIn = List(dataset2Project)
         )
 
@@ -489,6 +510,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           id = dataset3Id,
           sameAs = dataset2.entityId.asSameAs,
           versions = DatasetVersions(InitialVersion(dataset3Id.toString)),
+          project = dataset3Project,
           usedIn = List(dataset3Project)
         )
 
@@ -529,6 +551,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
       "- case when the sameAs hierarchy is broken by dataset modification" in new TestCase {
         val dataset1Project = datasetProjects.generateOne
         val dataset1 = nonModifiedDatasets().generateOne.copy(
+          project = dataset1Project,
           usedIn = List(dataset1Project)
         )
 
@@ -538,6 +561,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           id = dataset2Id,
           sameAs = dataset1.entityId.asSameAs,
           versions = DatasetVersions(InitialVersion(dataset2Id)),
+          project = dataset2Project,
           usedIn = List(dataset2Project)
         )
 
@@ -548,7 +572,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
         )
         val dataset2ModifiedProject = dataset2Project.copy(created = modifiedOnProject2)
         val modifiedDataset2 = modifiedDatasetsOnFirstProject(
-          dataset2.copy(usedIn = List(dataset2ModifiedProject))
+          dataset2.copy(project = dataset2ModifiedProject, usedIn = List(dataset2ModifiedProject))
         ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
 
         val dataset3Project = datasetProjects.generateOne shiftDateAfter dataset2Project.copy(
@@ -567,7 +591,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
           dates = modifiedDataset2.dates,
           parts = modifiedDataset2.parts,
           project = modifiedDataset2.project,
-          usedIn = List(dataset3Project), // TODO: not sure if this is correct
+          usedIn = List(dataset3Project),
           keywords = modifiedDataset2.keywords,
           images = modifiedDataset2.images
         )

@@ -22,10 +22,9 @@ import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.datasets.{Identifier, ImageUri, Keyword}
-import ch.datascience.graph.model.{projects, users}
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Path, ResourceId}
-import ch.datascience.graph.model.users.Email
-import ch.datascience.knowledgegraph.datasets.model.Dataset
+import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetProject}
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
@@ -49,9 +48,10 @@ private class BaseDetailsFinder(
   import BaseDetailsFinder._
   import ch.datascience.graph.Schemas._
 
-  def findBaseDetails(identifier: Identifier): IO[Option[Dataset]] =
-    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier)) flatMap { dataset =>
-      toSingleDataset(dataset)
+  def findBaseDetails(identifier: Identifier, usedIn: List[DatasetProject]): IO[Option[Dataset]] =
+    queryExpecting[List[Dataset]](using = queryForDatasetDetails(identifier))(datasetsDecoder(usedIn)) flatMap {
+      dataset =>
+        toSingleDataset(dataset)
     }
 
   private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery.of(
@@ -62,7 +62,7 @@ private class BaseDetailsFinder(
       renku  -> "renku",
       schema -> "schema"
     ),
-    s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybePublishedDate ?projectId ?projectName ?minDateCreated ?maybeAgentEmail ?agentName
+    s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybePublishedDate ?projectId
         |WHERE {
         |    ?datasetId schema:identifier "$identifier";
         |               schema:identifier ?identifier;
@@ -74,32 +74,10 @@ private class BaseDetailsFinder(
         |               prov:atLocation ?location ;
         |               renku:topmostSameAs ?topmostSameAs;
         |               renku:topmostDerivedFrom/schema:identifier ?initialVersion .
-        |    ?projectId renku:topmostDerivedFrom/schema:identifier ?initialVersion .
-        |    {
-        |      SELECT ?allDsId ?projectId(MIN(?dateCreated) AS ?minDateCreated)
-        |      WHERE {
-        |        ?dsId rdf:type <http://schema.org/Dataset>;
-        |              schema:identifier '$identifier';
-        |              renku:topmostSameAs ?topmostSameAs.
-        |        ?allDsId rdf:type <http://schema.org/Dataset>;
-        |                 renku:topmostSameAs ?topmostSameAs;
-        |                 schema:isPartOf ?projectId;
-        |                 prov:qualifiedGeneration/prov:activity ?activityId.
-        |        ?activityId prov:startedAtTime ?dateCreated.
-        |      }
-        |      GROUP BY ?allDsId ?projectId
-        |    }
-        |    ?allDsId rdf:type <http://schema.org/Dataset>;
-        |             schema:isPartOf ?projectId;
-        |             prov:qualifiedGeneration/prov:activity ?activityId.
-        |    ?activityId prov:startedAtTime ?minDateCreated;
-        |                prov:wasAssociatedWith ?associationId.
-        |    ?projectId rdf:type <http://schema.org/Project>;
-        |               schema:name ?projectName.
-        |    ?associationId rdf:type <http://schema.org/Person>;
-        |                 schema:name ?agentName.
-        |    OPTIONAL { ?associationId schema:email ?maybeAgentEmail }
         |               
+        |    {
+        |        ?projectId schema:dateCreated ?projDateCreated .
+        |    }
         |               
         |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
         |    FILTER NOT EXISTS {
@@ -163,7 +141,7 @@ private object BaseDetailsFinder {
   import ch.datascience.knowledgegraph.datasets.model._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
 
-  private[rest] implicit val datasetsDecoder: Decoder[List[Dataset]] = {
+  private[rest] def datasetsDecoder(usedIns: List[DatasetProject]): Decoder[List[Dataset]] = {
     val dataset: Decoder[Dataset] = { implicit cursor =>
       for {
         identifier         <- extract[Identifier]("identifier")
@@ -184,12 +162,9 @@ private object BaseDetailsFinder {
         path <-
           extract[projects.ResourceId]("projectId")
             .flatMap(toProjectPath)
-        projectName     <- extract[projects.Name]("projectName")
-        dateCreated     <- extract[DateCreatedInProject]("minDateCreated")
-        maybeAgentEmail <- extract[Option[Email]]("maybeAgentEmail")
-        agentName       <- extract[users.Name]("agentName")
-        project =
-          DatasetProject(path, projectName, AddedToProject(dateCreated, DatasetAgent(maybeAgentEmail, agentName)))
+        project <- Either.fromOption(usedIns.find(_.path == path),
+                                     ifNone = DecodingFailure("Could not find project in UsedIns", Nil)
+                   )
       } yield maybeDerivedFrom match {
         case Some(derivedFrom) =>
           ModifiedDataset(

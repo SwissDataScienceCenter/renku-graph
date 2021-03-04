@@ -182,7 +182,6 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       maybeDateCreated <- cursor.downField("created").as[Option[DateCreated]]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
       project          <- cursor.downField("project").as[DatasetProject]
-      projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
       usedIn           <- cursor.downField("usedIn").as[List[DatasetProject]]
       keywords         <- cursor.downField("keywords").as[List[Keyword]]
       maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
