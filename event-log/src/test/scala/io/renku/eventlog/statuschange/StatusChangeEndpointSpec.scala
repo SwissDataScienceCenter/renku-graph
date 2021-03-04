@@ -228,6 +228,8 @@ class StatusChangeEndpointSpec
       ): IO[Unit] = ().pure[IO]
 
       def maybeProcessingTime: Option[EventProcessingTime] = eventProcessingTimes.generateOption
+
+      override def updateDelivery(): IO[Unit] = IO.unit
     }
 
     lazy val changeStatusCommands: Gen[ChangeStatusCommand[IO]] = Gen.const(MockChangeStatusCommand())

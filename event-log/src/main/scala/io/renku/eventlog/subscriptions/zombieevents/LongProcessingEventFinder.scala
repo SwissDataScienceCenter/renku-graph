@@ -35,19 +35,18 @@ import io.renku.eventlog.{EventLogDB, TypeSerializers}
 
 import java.time.{Duration, Instant}
 
-private class ZombieEventsFinderImpl(transactor:             DbTransactor[IO, EventLogDB],
-                                     maxProcessingTime:      EventProcessingTime,
-                                     maxProcessingTimeRatio: Int Refined Positive,
-                                     queriesExecTimes:       LabeledHistogram[IO, SqlQuery.Name],
-                                     now:                    () => Instant = () => Instant.now
-)(implicit ME:                                               Bracket[IO, Throwable], contextShift: ContextShift[IO])
+private class LongProcessingEventFinder(transactor:             DbTransactor[IO, EventLogDB],
+                                        maxProcessingTime:      EventProcessingTime,
+                                        maxProcessingTimeRatio: Int Refined Positive,
+                                        queriesExecTimes:       LabeledHistogram[IO, SqlQuery.Name],
+                                        now:                    () => Instant = () => Instant.now
+)(implicit ME:                                                  Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, ZombieEvent]
+    with ZombieEventSubProcess
     with TypeSerializers {
 
   import doobie.implicits._
-
-  private val zombieMessage: String = "Zombie Event"
 
   override def popEvent(): IO[Option[ZombieEvent]] = {
     findPotentialZombies >>= lookForZombie >>= markEventTaken
@@ -61,8 +60,14 @@ private class ZombieEventsFinderImpl(transactor:             DbTransactor[IO, Ev
                           }.sequence
     } yield projectsAndTimes.map {
       case (id, status, Nil)   => (id, status, maxProcessingTime / maxProcessingTimeRatio)
-      case (id, status, times) => (id, status, times.sorted.reverse.apply(times.size / 2))
+      case (id, status, times) => (id, status, findMedian(times))
     }
+
+  private def findMedian(times: List[EventProcessingTime]): EventProcessingTime = {
+    val median = times.sorted.reverse.apply(times.size / 2)
+    if ((median.value compareTo Duration.ofSeconds(150)) < 0) EventProcessingTime(Duration.ofSeconds(150))
+    else median
+  }
 
   private def queryProjectsToCheck = measureExecutionTime {
     SqlQuery(
@@ -73,7 +78,7 @@ private class ZombieEventsFinderImpl(transactor:             DbTransactor[IO, Ev
     """.stripMargin
         .query[(projects.Id, EventStatus)]
         .to[List],
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find projects")
+      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - find projects")
     )
   }
 
@@ -88,7 +93,7 @@ private class ZombieEventsFinderImpl(transactor:             DbTransactor[IO, Ev
     """.stripMargin
         .query[EventProcessingTime]
         .to[List],
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find processing times")
+      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - find processing times")
     )
   }
 
@@ -115,9 +120,9 @@ private class ZombieEventsFinderImpl(transactor:             DbTransactor[IO, Ev
               |LIMIT 1
               |""".stripMargin
           .query[(CompoundEventId, projects.Path, EventStatus)]
-          .map(ZombieEvent.tupled.apply _)
+          .map { case (id, path, status) => ZombieEvent(processName, id, path, status) }
           .option,
-        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find")
+        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - find")
       )
     }
 
@@ -129,10 +134,10 @@ private class ZombieEventsFinderImpl(transactor:             DbTransactor[IO, Ev
   private def updateMessage(eventId: CompoundEventId) = measureExecutionTime {
     SqlQuery(
       sql"""|UPDATE event
-            |SET message = $zombieMessage
+            |SET message = $zombieMessage, execution_date = ${now()}
             |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
             |""".stripMargin.update.run,
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update message")
+      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - update message")
     )
   }
 
@@ -140,17 +145,19 @@ private class ZombieEventsFinderImpl(transactor:             DbTransactor[IO, Ev
     case 0 => None
     case 1 => Some(event)
   }
+
+  override val processName: ZombieEventProcess = ZombieEventProcess("lpe")
 }
 
-private object ZombieEventsFinder {
+private object LongProcessingEventFinder {
 
   private val MaxProcessingTimeRatio: Int Refined Positive = 2
-  private val MaxProcessingTime:      EventProcessingTime  = EventProcessingTime(Duration ofDays 7)
+  private val MaxProcessingTime:      EventProcessingTime  = EventProcessingTime(Duration ofDays 14)
 
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
-    new ZombieEventsFinderImpl(transactor, MaxProcessingTime, MaxProcessingTimeRatio, queriesExecTimes)
+    new LongProcessingEventFinder(transactor, MaxProcessingTime, MaxProcessingTimeRatio, queriesExecTimes)
   }
 }

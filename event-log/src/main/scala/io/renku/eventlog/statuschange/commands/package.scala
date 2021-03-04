@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.effect.Sync
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.{EventProcessingTime, EventStatus}
 import io.circe.Json
 import io.renku.eventlog.EventMessage
@@ -85,6 +86,7 @@ package object commands {
       .downField("message")
       .as[Option[EventMessage]]
       .leftMap(error => PayloadMalformed(error.getMessage()): CommandFindingResult)
+
   }
 
 }

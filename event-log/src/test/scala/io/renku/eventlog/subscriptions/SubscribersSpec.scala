@@ -21,6 +21,7 @@ package io.renku.eventlog.subscriptions
 import cats.effect.concurrent.Deferred
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
@@ -43,6 +44,8 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(subscriptionInfo)
         .returning(true.pure[IO])
 
+      (subscriberTracker.add _).expects(subscriptionInfo).returning(true.pure[IO])
+
       subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(Info(s"$categoryName: $subscriptionInfo added"))
@@ -53,6 +56,8 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (subscribersRegistry.add _)
         .expects(subscriptionInfo)
         .returning(false.pure[IO])
+
+      (subscriberTracker.add _).expects(subscriptionInfo).returning(false.pure[IO])
 
       subscribers.add(subscriptionInfo).unsafeRunSync() shouldBe ((): Unit)
 
@@ -109,7 +114,9 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(subscriberUrl)
         .returning(true.pure[IO])
 
-      subscribers.delete(subscriberUrl = subscriberUrl).unsafeRunSync()
+      (subscriberTracker.remove _).expects(subscriberUrl).returning(true.pure[IO])
+
+      subscribers.delete(subscriberUrl).unsafeRunSync()
 
       logger.loggedOnly(Info(s"$categoryName: $subscriberUrl gone - deleting"))
     }
@@ -119,7 +126,9 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(subscriberUrl)
         .returning(false.pure[IO])
 
-      subscribers.delete(subscriberUrl = subscriberUrl).unsafeRunSync()
+      (subscriberTracker.remove _).expects(subscriberUrl).returning(false.pure[IO])
+
+      subscribers.delete(subscriberUrl).unsafeRunSync()
 
       logger.expectNoLogs()
     }
@@ -158,7 +167,8 @@ class SubscribersSpec extends AnyWordSpec with MockFactory with should.Matchers 
     val subscriberUrl    = subscriptionInfo.subscriberUrl
 
     val subscribersRegistry = mock[SubscribersRegistry]
+    val subscriberTracker   = mock[SubscriberTracker[IO]]
     val logger              = TestLogger[IO]()
-    val subscribers         = new SubscribersImpl(categoryName, subscribersRegistry, logger)
+    val subscribers         = new SubscribersImpl(categoryName, subscribersRegistry, subscriberTracker, logger)
   }
 }

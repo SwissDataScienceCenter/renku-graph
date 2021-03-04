@@ -19,11 +19,12 @@
 package io.renku.eventlog.subscriptions
 
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
-import io.renku.eventlog.subscriptions.Generators.{categoryNames, subscriberUrls}
+import io.renku.eventlog.subscriptions.Generators.categoryNames
 import io.renku.eventlog.subscriptions.TestCategoryEvent.testCategoryEvents
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

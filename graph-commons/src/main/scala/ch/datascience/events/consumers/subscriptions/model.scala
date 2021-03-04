@@ -19,13 +19,20 @@
 package ch.datascience.events.consumers.subscriptions
 
 import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
+import ch.datascience.tinytypes.constraints.{NonBlank, Url}
+import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.collection.NonEmpty
+import io.circe.Decoder
 
 trait SubscriptionPayload extends Product with Serializable {
-  val categoryName:  CategoryName
-  val subscriberUrl: SubscriberUrl
+  val categoryName: CategoryName
+  val subscriber:   Subscriber
 }
 
-case class CategoryAndUrlPayload(categoryName: CategoryName, subscriberUrl: SubscriberUrl) extends SubscriptionPayload
+final case class CategoryAndUrlPayload(categoryName: CategoryName, subscriber: Subscriber) extends SubscriptionPayload
 
 object CategoryAndUrlPayload {
   import io.circe.Encoder
@@ -34,7 +41,34 @@ object CategoryAndUrlPayload {
   implicit val encoder: Encoder[CategoryAndUrlPayload] = Encoder.instance[CategoryAndUrlPayload] { payload =>
     json"""{
         "categoryName":  ${payload.categoryName.value},
-        "subscriberUrl": ${payload.subscriberUrl.value}
+        "subscriber": {
+          "url": ${payload.subscriber.url.value},
+          "id": ${payload.subscriber.id.value}
+        }
       }"""
   }
+}
+
+trait Subscriber extends Product with Serializable {
+  val url: SubscriberUrl
+  val id:  SubscriberId
+}
+
+final case class SubscriberBasicInfo(url: SubscriberUrl, id: SubscriberId) extends Subscriber
+
+final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
+object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url {
+
+  def apply(microserviceBaseUrl: MicroserviceBaseUrl, part: String Refined NonEmpty): SubscriberUrl =
+    SubscriberUrl((microserviceBaseUrl / part.toString()).toString)
+
+  implicit val decoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
+}
+
+final class SubscriberId private (val value: String) extends AnyVal with StringTinyType
+object SubscriberId extends TinyTypeFactory[SubscriberId](new SubscriberId(_)) with NonBlank {
+
+  def apply(microserviceId: MicroserviceIdentifier): SubscriberId = SubscriberId(microserviceId.toString)
+
+  implicit val decoder: Decoder[SubscriberId] = stringDecoder(SubscriberId)
 }

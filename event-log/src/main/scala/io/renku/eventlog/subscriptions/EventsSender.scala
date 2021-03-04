@@ -21,14 +21,12 @@ package io.renku.eventlog.subscriptions
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.IORestClient.SleepAfterConnectionIssue
 import ch.datascience.http.client.RestClientError.ConnectivityException
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
-import org.http4s.MediaType
-import org.http4s.headers.`Content-Type`
-import org.http4s.multipart.{Multipart, Part}
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration

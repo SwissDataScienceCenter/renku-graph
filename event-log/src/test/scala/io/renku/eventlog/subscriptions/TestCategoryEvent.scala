@@ -18,11 +18,25 @@
 
 package io.renku.eventlog.subscriptions
 
+import ch.datascience.graph.model.{events, projects}
 import org.scalacheck.{Arbitrary, Gen}
+import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventIds}
+import ch.datascience.graph.model.events.CompoundEventId
 
 private case class TestCategoryEvent(value: Int)
 
 private object TestCategoryEvent {
   lazy val testCategoryEvents: Gen[TestCategoryEvent] =
     Arbitrary.arbInt.arbitrary map TestCategoryEvent.apply
+}
+
+private case class TestCompoundIdEvent(eventId: events.EventId, projectId: projects.Id) {
+  lazy val compoundEventId: CompoundEventId = CompoundEventId(eventId, projectId)
+}
+
+private object TestCompoundIdEvent {
+  lazy val testCompoundIdEvent: Gen[TestCompoundIdEvent] =
+    compoundEventIds.map { case CompoundEventId(id, projectId) =>
+      TestCompoundIdEvent(id, projectId)
+    }
 }

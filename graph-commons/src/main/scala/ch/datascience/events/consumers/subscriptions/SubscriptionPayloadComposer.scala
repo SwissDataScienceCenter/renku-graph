@@ -23,7 +23,9 @@ import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.microservices._
 import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
 import io.circe.Json
 
@@ -32,26 +34,33 @@ trait SubscriptionPayloadComposer[Interpretation[_]] {
 }
 
 private class SubscriptionPayloadComposerImpl[Interpretation[_]](
-    categoryName:          CategoryName,
-    subscriptionUrlFinder: SubscriptionUrlFinder[Interpretation]
-)(implicit ME:             MonadError[Interpretation, Throwable])
+    categoryName:           CategoryName,
+    microserviceUrlFinder:  MicroserviceUrlFinder[Interpretation],
+    microserviceIdentifier: MicroserviceIdentifier
+)(implicit ME:              MonadError[Interpretation, Throwable])
     extends SubscriptionPayloadComposer[Interpretation] {
 
   import io.circe.syntax._
-  import subscriptionUrlFinder._
+  import microserviceUrlFinder._
 
   override def prepareSubscriptionPayload(): Interpretation[Json] =
-    findSubscriberUrl() map (CategoryAndUrlPayload(categoryName, _).asJson)
+    findBaseUrl()
+      .map(newSubscriberUrl)
+      .map(SubscriberBasicInfo(_, SubscriberId(microserviceIdentifier)))
+      .map(CategoryAndUrlPayload(categoryName, _).asJson)
+
+  private def newSubscriberUrl(baseUrl: MicroserviceBaseUrl) = SubscriberUrl(baseUrl, "events")
 }
 
 object SubscriptionPayloadComposer {
 
   def categoryAndUrlPayloadsComposerFactory(
-      microservicePort: Int Refined Positive
+      microservicePort:       Int Refined Positive,
+      microserviceIdentifier: MicroserviceIdentifier
   ): Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
     Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>
       for {
-        subscriptionUrlFinder <- IOSubscriptionUrlFinder(microservicePort)
-      } yield new SubscriptionPayloadComposerImpl[IO](categoryName, subscriptionUrlFinder)
+        subscriptionUrlFinder <- MicroserviceUrlFinder(microservicePort)
+      } yield new SubscriptionPayloadComposerImpl[IO](categoryName, subscriptionUrlFinder, microserviceIdentifier)
     }
 }

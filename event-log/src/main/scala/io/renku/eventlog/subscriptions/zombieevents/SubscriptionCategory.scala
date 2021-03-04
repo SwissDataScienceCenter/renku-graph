@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.metrics.LabeledHistogram
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.subscriptions._
@@ -29,21 +30,24 @@ import scala.concurrent.ExecutionContext
 
 private[subscriptions] object SubscriptionCategory {
 
-  def apply(transactor:       DbTransactor[IO, EventLogDB],
-            queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-            logger:           Logger[IO]
+  def apply(transactor:        DbTransactor[IO, EventLogDB],
+            queriesExecTimes:  LabeledHistogram[IO, SqlQuery.Name],
+            subscriberTracker: SubscriberTracker[IO],
+            logger:            Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
-    subscribers      <- Subscribers(categoryName, logger)
-    eventsFinder     <- ZombieEventsFinder(transactor, queriesExecTimes)
+    subscribers      <- Subscribers(categoryName, subscriberTracker, logger)
+    eventsFinder     <- ZombieEventFinder(transactor, queriesExecTimes, logger)
     dispatchRecovery <- LoggingDispatchRecovery[IO, ZombieEvent](categoryName, logger)
+    eventDelivery    <- EventDelivery.noOp[IO, ZombieEvent]
     eventsDistributor <- IOEventsDistributor(categoryName,
                                              transactor,
                                              subscribers,
                                              eventsFinder,
+                                             eventDelivery,
                                              ZombieEventEncoder,
                                              dispatchRecovery,
                                              logger
@@ -57,5 +61,7 @@ private[subscriptions] object SubscriptionCategory {
   )
 }
 
-private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl, maybeCapacity: Option[Capacity])
-    extends subscriptions.SubscriptionInfo
+private case class SubscriptionCategoryPayload(subscriberUrl: SubscriberUrl,
+                                               subscriberId:  SubscriberId,
+                                               maybeCapacity: Option[Capacity]
+) extends subscriptions.SubscriptionInfo

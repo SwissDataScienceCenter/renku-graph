@@ -31,6 +31,7 @@ import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+import io.renku.eventlog.subscriptions.EventDelivery
 import io.renku.eventlog.{EventLogDB, EventMessage}
 import org.http4s.{MediaType, Request}
 
@@ -43,6 +44,7 @@ final case class ToTransformationRecoverableFailure[Interpretation[_]](
     awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:                Option[EventProcessingTime],
+    eventDelivery:                      EventDelivery[Interpretation, ToTransformationRecoverableFailure[Interpretation]],
     now:                                () => Instant = () => Instant.now
 )(implicit ME:                          Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
@@ -71,11 +73,15 @@ final case class ToTransformationRecoverableFailure[Interpretation[_]](
       } yield ()
     case _ => ME.unit
   }
+
+  override def updateDelivery(): Interpretation[Unit] = eventDelivery.unregister(eventId)
 }
 
 object ToTransformationRecoverableFailure {
-  def factory[Interpretation[_]: Sync](awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
-                                       underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path]
+  def factory[Interpretation[_]: Sync](
+      awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+      underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
+      eventDelivery:                      EventDelivery[Interpretation, ToTransformationRecoverableFailure[Interpretation]]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
@@ -92,7 +98,8 @@ object ToTransformationRecoverableFailure {
               maybeMessage,
               awaitingTriplesTransformationGauge,
               underTriplesTransformationGauge,
-              maybeProcessingTime
+              maybeProcessingTime,
+              eventDelivery
             )
           )
         }.merge

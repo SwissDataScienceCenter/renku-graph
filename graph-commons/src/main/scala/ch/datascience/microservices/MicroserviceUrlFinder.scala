@@ -16,38 +16,38 @@
  * limitations under the License.
  */
 
-package ch.datascience.events.consumers.subscriptions
+package ch.datascience.microservices
 
 import cats.MonadError
-import ch.datascience.tinytypes.constraints.Url
+import ch.datascience.tinytypes.constraints.{Url, UrlOps}
+import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
+import io.circe.Decoder
 
-final class SubscriberUrl private (val value: String) extends AnyVal with StringTinyType
-object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)) with Url
-
-trait SubscriptionUrlFinder[Interpretation[_]] {
-  def findSubscriberUrl(): Interpretation[SubscriberUrl]
+trait MicroserviceUrlFinder[Interpretation[_]] {
+  def findBaseUrl(): Interpretation[MicroserviceBaseUrl]
 }
 
-private class SubscriptionUrlFinderImpl[Interpretation[_]](microservicePort: Int Refined Positive)(implicit
-    ME:                                                                      MonadError[Interpretation, Throwable]
-) extends SubscriptionUrlFinder[Interpretation] {
+class MicroserviceUrlFinderImpl[Interpretation[_]: MonadError[*[_], Throwable]](
+    microservicePort: Int Refined Positive
+) extends MicroserviceUrlFinder[Interpretation] {
+
+  import cats.syntax.all._
 
   import java.net.NetworkInterface
-  import cats.syntax.all._
   import scala.jdk.CollectionConverters._
 
-  override def findSubscriberUrl(): Interpretation[SubscriberUrl] =
+  override def findBaseUrl(): Interpretation[MicroserviceBaseUrl] =
     findAddress flatMap {
       case Some(address) =>
-        SubscriberUrl(s"http://${address.getHostAddress}:$microservicePort/events").pure[Interpretation]
+        MicroserviceBaseUrl(s"http://${address.getHostAddress}:$microservicePort").pure[Interpretation]
       case None =>
-        new Exception("Cannot find service IP").raiseError[Interpretation, SubscriberUrl]
+        new Exception("Cannot find service IP").raiseError[Interpretation, MicroserviceBaseUrl]
     }
 
-  private def findAddress = ME.catchNonFatal {
+  private def findAddress = MonadError[Interpretation, Throwable].catchNonFatal {
     val ipAddresses = NetworkInterface.getNetworkInterfaces.asScala.toSeq.flatMap(p => p.getInetAddresses.asScala.toSeq)
     ipAddresses
       .find { address =>
@@ -59,10 +59,18 @@ private class SubscriptionUrlFinderImpl[Interpretation[_]](microservicePort: Int
   }
 }
 
-object IOSubscriptionUrlFinder {
+object MicroserviceUrlFinder {
   import cats.effect.IO
 
-  def apply(microservicePort: Int Refined Positive): IO[SubscriptionUrlFinder[IO]] = IO {
-    new SubscriptionUrlFinderImpl[IO](microservicePort)
+  def apply(microservicePort: Int Refined Positive): IO[MicroserviceUrlFinder[IO]] = IO {
+    new MicroserviceUrlFinderImpl[IO](microservicePort)
   }
+}
+
+final class MicroserviceBaseUrl private (val value: String) extends AnyVal with StringTinyType
+object MicroserviceBaseUrl
+    extends TinyTypeFactory[MicroserviceBaseUrl](new MicroserviceBaseUrl(_))
+    with Url
+    with UrlOps[MicroserviceBaseUrl] {
+  implicit val decoder: Decoder[MicroserviceBaseUrl] = stringDecoder(MicroserviceBaseUrl)
 }

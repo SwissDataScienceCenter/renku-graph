@@ -95,10 +95,11 @@ private class SubscriptionMechanismImpl(
   }
 
   private def logInfo(payload: Json) =
-    logger.info(s"$categoryName: Subscribed for events with ${payload.subscriberUrl}")
+    logger.info(s"$categoryName: Subscribed for events with ${payload.subscriberUrl}, id = ${payload.subscriberId}")
 
   private implicit class PayloadOps(json: Json) {
-    lazy val subscriberUrl: String = json.hcursor.downField("subscriberUrl").as[String].getOrElse("")
+    lazy val subscriberId:  String = json.hcursor.downField("subscriber").downField("id").as[String].getOrElse("")
+    lazy val subscriberUrl: String = json.hcursor.downField("subscriber").downField("url").as[String].getOrElse("")
   }
 }
 

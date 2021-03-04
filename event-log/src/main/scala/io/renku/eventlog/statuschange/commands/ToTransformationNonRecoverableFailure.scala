@@ -23,6 +23,7 @@ import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -31,6 +32,7 @@ import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+import io.renku.eventlog.subscriptions.EventDelivery
 import io.renku.eventlog.{EventLogDB, EventMessage}
 import org.http4s.{MediaType, Request}
 
@@ -41,6 +43,7 @@ final case class ToTransformationNonRecoverableFailure[Interpretation[_]](
     maybeMessage:                    Option[EventMessage],
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:             Option[EventProcessingTime],
+    eventDelivery:                   EventDelivery[Interpretation, ToTransformationNonRecoverableFailure[Interpretation]],
     now:                             () => Instant = () => Instant.now
 )(implicit ME:                       Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
@@ -64,11 +67,16 @@ final case class ToTransformationNonRecoverableFailure[Interpretation[_]](
     case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesTransformationGauge.decrement
     case _                    => ME.unit
   }
+
+  override def updateDelivery(): Interpretation[Unit] = eventDelivery.unregister(eventId)
 }
 
 object ToTransformationNonRecoverableFailure {
-  def factory[Interpretation[_]: Sync](underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path])(
-      implicit ME: MonadError[Interpretation, Throwable]
+  def factory[Interpretation[_]: Sync](
+      underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+      eventDelivery:                   EventDelivery[Interpretation, ToTransformationNonRecoverableFailure[Interpretation]]
+  )(implicit
+      ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
     Kleisli { case (eventId, request) =>
       when(request, has = MediaType.application.json) {
@@ -82,7 +90,8 @@ object ToTransformationNonRecoverableFailure {
               eventId,
               maybeMessage,
               underTriplesTransformationGauge,
-              maybeProcessingTime
+              maybeProcessingTime,
+              eventDelivery
             )
           )
         }.merge

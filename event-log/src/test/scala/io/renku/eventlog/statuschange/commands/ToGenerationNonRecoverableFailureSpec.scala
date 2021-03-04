@@ -36,6 +36,7 @@ import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, exec
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
+import io.renku.eventlog.subscriptions.EventDelivery
 import org.http4s.circe.jsonEncoder
 import org.http4s.headers.`Content-Type`
 import org.http4s.{MediaType, Request}
@@ -84,6 +85,7 @@ class ToGenerationNonRecoverableFailureSpec
         findEvent(eventId) shouldBe Some((executionDate, GeneratingTriples, None))
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
+        (eventDelivery.unregister _).expects(eventId).returning(IO.unit)
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
@@ -91,6 +93,7 @@ class ToGenerationNonRecoverableFailureSpec
                                                 maybeMessage,
                                                 underTriplesGenerationGauge,
                                                 processingTime,
+                                                eventDelivery,
                                                 currentTime
           )
 
@@ -124,6 +127,7 @@ class ToGenerationNonRecoverableFailureSpec
                                                   maybeMessage,
                                                   underTriplesGenerationGauge,
                                                   processingTime,
+                                                  eventDelivery,
                                                   currentTime
             )
 
@@ -141,8 +145,12 @@ class ToGenerationNonRecoverableFailureSpec
         val maybeMessage        = eventMessages.generateOption
         val maybeProcessingTime = eventProcessingTimes.generateOption
         val expected =
-          ToGenerationNonRecoverableFailure(eventId, maybeMessage, underTriplesGenerationGauge, maybeProcessingTime)
-
+          ToGenerationNonRecoverableFailure(eventId,
+                                            maybeMessage,
+                                            underTriplesGenerationGauge,
+                                            maybeProcessingTime,
+                                            eventDelivery
+          )
         val body = json"""{
             "status": ${EventStatus.GenerationNonRecoverableFailure.value}
           }""" deepMerge maybeMessage
@@ -153,7 +161,9 @@ class ToGenerationNonRecoverableFailureSpec
 
         val request = Request[IO]().withEntity(body)
 
-        val actual = ToGenerationNonRecoverableFailure.factory[IO](underTriplesGenerationGauge).run((eventId, request))
+        val actual = ToGenerationNonRecoverableFailure
+          .factory[IO](underTriplesGenerationGauge, eventDelivery)
+          .run((eventId, request))
         actual.unsafeRunSync() shouldBe CommandFound(expected)
       }
 
@@ -163,11 +173,12 @@ class ToGenerationNonRecoverableFailureSpec
             json"""{
               "status": ${eventStatus.value}
             }"""
-
           val request = Request[IO]().withEntity(body)
 
           val actual =
-            ToGenerationNonRecoverableFailure.factory[IO](underTriplesGenerationGauge).run((eventId, request))
+            ToGenerationNonRecoverableFailure
+              .factory[IO](underTriplesGenerationGauge, eventDelivery)
+              .run((eventId, request))
           actual.unsafeRunSync() shouldBe NotSupported
         }
       }
@@ -176,8 +187,9 @@ class ToGenerationNonRecoverableFailureSpec
         val body = json"""{ }"""
 
         val request = Request[IO]().withEntity(body)
-
-        val actual = ToGenerationNonRecoverableFailure.factory[IO](underTriplesGenerationGauge).run((eventId, request))
+        val actual = ToGenerationNonRecoverableFailure
+          .factory[IO](underTriplesGenerationGauge, eventDelivery)
+          .run((eventId, request))
 
         actual.unsafeRunSync() shouldBe PayloadMalformed("No status property in status change payload")
       }
@@ -185,9 +197,10 @@ class ToGenerationNonRecoverableFailureSpec
       "return NotSupported if the decoding failed because of unsupported content type " in new TestCase {
         val request =
           Request[IO]().withEntity(jsons.generateOne).withHeaders(`Content-Type`(MediaType.multipart.`form-data`))
-
         val actual =
-          ToGenerationNonRecoverableFailure.factory[IO](underTriplesGenerationGauge).run((eventId, request))
+          ToGenerationNonRecoverableFailure
+            .factory[IO](underTriplesGenerationGauge, eventDelivery)
+            .run((eventId, request))
 
         actual.unsafeRunSync() shouldBe NotSupported
       }
@@ -202,6 +215,7 @@ class ToGenerationNonRecoverableFailureSpec
     val eventBatchDate              = batchDates.generateOne
     val processingTime              = eventProcessingTimes.generateSome
 
+    val eventDelivery = mock[EventDelivery[IO, ToGenerationNonRecoverableFailure[IO]]]
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()

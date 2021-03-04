@@ -35,64 +35,98 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import java.time.Instant
 
-class EventStatusUpdaterSpec
+class ZombieStatusCleanerSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
     with MockFactory
     with TypeSerializers
     with should.Matchers {
 
-  "changeStatus" should {
+  "cleanZombieStatus" should {
 
     s"update event status to $New " +
       s"if event has status $GeneratingTriples and so the event in the DB" in new TestCase {
 
-        addEvent(GeneratingTriples)
+        addZombieEvent(GeneratingTriples)
 
         findEvent(eventId) shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
 
-        updater.changeStatus(GeneratingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
-
-        queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
+        updater.cleanZombieStatus(GeneratingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
 
         findEvent(eventId) shouldBe (ExecutionDate(now), New, None).some
+
+        queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
       }
 
     s"update event status to $TriplesGenerated " +
       s"if event has status $TransformingTriples and so the event in the DB" in new TestCase {
-        addEvent(TransformingTriples)
+        addZombieEvent(TransformingTriples)
 
         findEvent(eventId) shouldBe (executionDate, TransformingTriples, Some(zombieMessage)).some
 
-        updater.changeStatus(TransformingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
-
-        queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
+        updater.cleanZombieStatus(TransformingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
 
         findEvent(eventId) shouldBe (ExecutionDate(now), TriplesGenerated, None).some
+
+        queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
+      }
+
+    s"update event status to $New and remove the existing event delivery info " +
+      s"if event has status $GeneratingTriples and so the event in the DB" in new TestCase {
+
+        addZombieEvent(GeneratingTriples)
+        upsertEventDeliveryInfo(eventId)
+
+        findEvent(eventId)          shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
+        findAllDeliveries.map(_._1) shouldBe List(eventId)
+
+        updater.cleanZombieStatus(GeneratingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
+
+        findEvent(eventId)          shouldBe (ExecutionDate(now), New, None).some
+        findAllDeliveries.map(_._1) shouldBe Nil
+
+        queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
+      }
+
+    s"update event status to $TriplesGenerated and remove the existing event delivery info " +
+      s"if event has status $TransformingTriples and so the event in the DB" in new TestCase {
+
+        addZombieEvent(TransformingTriples)
+        upsertEventDeliveryInfo(eventId)
+
+        findEvent(eventId)          shouldBe (executionDate, TransformingTriples, Some(zombieMessage)).some
+        findAllDeliveries.map(_._1) shouldBe List(eventId)
+
+        updater.cleanZombieStatus(TransformingTriplesZombieEvent(eventId, projectPath)).unsafeRunSync() shouldBe Updated
+
+        findEvent(eventId)          shouldBe (ExecutionDate(now), TriplesGenerated, None).some
+        findAllDeliveries.map(_._1) shouldBe Nil
+
+        queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
       }
 
     "do nothing if the event does not exists" in new TestCase {
 
       val otherEventId = compoundEventIds.generateOne
 
-      addEvent(GeneratingTriples)
+      addZombieEvent(GeneratingTriples)
 
       findEvent(eventId) shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
 
       updater
-        .changeStatus(GeneratingTriplesZombieEvent(otherEventId, projectPath))
+        .cleanZombieStatus(GeneratingTriplesZombieEvent(otherEventId, projectPath))
         .unsafeRunSync() shouldBe NotUpdated
 
-      queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
-
       findEvent(eventId) shouldBe (executionDate, GeneratingTriples, Some(zombieMessage)).some
+
+      queriesExecTimes.verifyExecutionTimeMeasured("zombie_chasing - update status")
     }
   }
 
   private trait TestCase {
     val currentTime      = mockFunction[Instant]
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val updater          = new EventStatusUpdaterImpl(transactor, queriesExecTimes, currentTime)
+    val updater          = new ZombieStatusCleanerImpl(transactor, queriesExecTimes, currentTime)
 
     val eventId       = compoundEventIds.generateOne
     val projectPath   = projectPaths.generateOne
@@ -102,14 +136,13 @@ class EventStatusUpdaterSpec
     val now = Instant.now()
     currentTime.expects().returning(now)
 
-    def addEvent(status: EventStatus): Unit =
-      storeEvent(eventId,
-                 status,
-                 executionDate,
-                 eventDates.generateOne,
-                 eventBodies.generateOne,
-                 projectPath = projectPath,
-                 maybeMessage = Some(zombieMessage)
-      )
+    def addZombieEvent(status: EventStatus): Unit = storeEvent(eventId,
+                                                               status,
+                                                               executionDate,
+                                                               eventDates.generateOne,
+                                                               eventBodies.generateOne,
+                                                               projectPath = projectPath,
+                                                               maybeMessage = Some(zombieMessage)
+    )
   }
 }

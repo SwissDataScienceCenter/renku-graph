@@ -19,6 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import io.circe.Json
@@ -34,26 +35,32 @@ private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockF
 
   "deserialize" should {
 
-    "return the subscriber URL if the categoryName and subscriberUrl are valid " +
+    "return subscription info if the categoryName, subscriber URL and subscriber id are valid " +
       "and there's no capacity" in new TestCase {
-        val subscriptionCategoryPayload = subscriptionInfos.generateOne
-          .copy(maybeCapacity = None)
+        val subscriptionCategoryPayload = subscriptionInfos.generateOne.copy(maybeCapacity = None)
+
         val payload = json"""{
           "categoryName":  ${categoryName.value},
-          "subscriberUrl": ${subscriptionCategoryPayload.subscriberUrl.value}
+          "subscriber": {
+            "url": ${subscriptionCategoryPayload.subscriberUrl.value},
+            "id":  ${subscriptionCategoryPayload.subscriberId.value}
+          }
         }"""
 
         deserializer.deserialize(payload) shouldBe Success(Some(subscriptionCategoryPayload))
       }
 
-    "return the subscriber URL if the categoryName, subscriberUrl, and capacity are given and valid" in new TestCase {
-      val capacity = capacities.generateOne
-      val subscriptionCategoryPayload = subscriptionInfos.generateOne
-        .copy(maybeCapacity = capacity.some)
+    "return subscription info if the categoryName, subscriber URL, subscriber Id, and capacity are given and valid" in new TestCase {
+      val capacity                    = capacities.generateOne
+      val subscriptionCategoryPayload = subscriptionInfos.generateOne.copy(maybeCapacity = capacity.some)
+
       val payload = json"""{
           "categoryName":  ${categoryName.value},
-          "subscriberUrl": ${subscriptionCategoryPayload.subscriberUrl.value},
-          "capacity":      ${capacity.value}
+          "subscriber": {
+            "url":      ${subscriptionCategoryPayload.subscriberUrl.value},
+            "id":       ${subscriptionCategoryPayload.subscriberId.value},
+            "capacity": ${capacity.value}
+          }
         }"""
 
       deserializer.deserialize(payload) shouldBe Success(Some(subscriptionCategoryPayload))
@@ -63,7 +70,10 @@ private class SubscriptionRequestDeserializerSpec extends AnyWordSpec with MockF
 
       val payload = json"""{
         "categoryName":  ${nonBlankStrings().generateOne.value},
-        "subscriberUrl": ${subscriberUrls.generateOne.value}
+          "subscriber": {
+            "url": ${subscriberUrls.generateOne.value},
+            "id":  ${subscriberIds.generateOne.value}
+          }
       }"""
 
       deserializer.deserialize(payload) shouldBe Success(Option.empty[TestSubscriptionInfo])

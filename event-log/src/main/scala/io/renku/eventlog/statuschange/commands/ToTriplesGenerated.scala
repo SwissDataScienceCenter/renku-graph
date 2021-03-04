@@ -33,6 +33,7 @@ import eu.timepit.refined.auto._
 import io.circe._
 import io.renku.eventlog.statuschange.commands.CommandFindingResult._
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+import io.renku.eventlog.subscriptions.EventDelivery
 import io.renku.eventlog.{EventLogDB, EventPayload}
 import org.http4s.multipart.{Multipart, Part}
 import org.http4s.{MediaType, Request}
@@ -40,13 +41,14 @@ import org.http4s.{MediaType, Request}
 import java.time.Instant
 import scala.util.control.NonFatal
 
-private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
+final case class ToTriplesGenerated[Interpretation[_]](
     eventId:                     CompoundEventId,
     payload:                     EventPayload,
     schemaVersion:               SchemaVersion,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:         Option[EventProcessingTime],
+    eventDelivery:               EventDelivery[Interpretation, ToTriplesGenerated[Interpretation]],
     now:                         () => Instant = () => Instant.now
 )(implicit ME:                   Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
@@ -77,6 +79,8 @@ private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
                                               |DO UPDATE SET payload = EXCLUDED.payload;
                                               |""".stripMargin.update.run
 
+  override def updateDelivery(): Interpretation[Unit] = eventDelivery.unregister(eventId)
+
   override def updateGauges(updateResult: UpdateResult)(implicit
       transactor:                         DbTransactor[Interpretation, EventLogDB]
   ): Interpretation[Unit] = updateResult match {
@@ -93,7 +97,8 @@ private[statuschange] final case class ToTriplesGenerated[Interpretation[_]](
 object ToTriplesGenerated {
   import org.http4s.circe.jsonDecoder
   def factory[Interpretation[_]: Sync](underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-                                       awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path]
+                                       awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
+                                       eventDelivery:               EventDelivery[Interpretation, ToTriplesGenerated[Interpretation]]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
@@ -118,7 +123,8 @@ object ToTriplesGenerated {
                                                parsedPayload._1,
                                                underTriplesGenerationGauge,
                                                awaitingTransformationGauge,
-                                               maybeProcessingTime
+                                               maybeProcessingTime,
+                                               eventDelivery
             )
           )
         }.merge

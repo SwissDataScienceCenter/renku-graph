@@ -19,6 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.syntax.all._
+import doobie.implicits._
 import io.renku.eventlog.InMemoryEventLogDb
 import org.scalatest.{BeforeAndAfter, Suite}
 
@@ -27,20 +28,19 @@ import scala.language.reflectiveCalls
 trait DbInitSpec extends InMemoryEventLogDb with EventLogDbMigrations with BeforeAndAfter {
   self: Suite =>
 
-  private val tablesToDropBeforeEachTest = List(
-    "event_payload",
-    "status_processing_time",
-    "event_log",
-    "event",
-    "subscription_category_sync_time",
-    "project"
-  )
-
   protected val migrationsToRun: List[Migration]
 
   before {
-    tablesToDropBeforeEachTest foreach dropTable
+    findAllTables() foreach dropTable
     migrationsToRun.map(_.run()).sequence.unsafeRunSync()
+  }
+
+  private def findAllTables(): List[String] = execute {
+    sql"""|SELECT DISTINCT tablename FROM pg_tables
+          |WHERE schemaname != 'pg_catalog'
+          |  AND schemaname != 'information_schema'""".stripMargin
+      .query[String]
+      .to[List]
   }
 
   protected def createEventTable(): Unit =
