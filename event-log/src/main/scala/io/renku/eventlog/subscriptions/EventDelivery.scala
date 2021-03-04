@@ -56,15 +56,6 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
   def unregister(eventId: CompoundEventId): IO[Unit] =
     deleteDelivery(eventId.id, eventId.projectId) transact transactor.get flatMap toResult
 
-  private def deleteDelivery(eventId: events.EventId, projectId: projects.Id) = measureExecutionTime {
-    SqlQuery(
-      sql"""|DELETE FROM event_delivery 
-            |WHERE event_id = $eventId AND project_id = $projectId
-            |""".stripMargin.update.run,
-      name = "event delivery info - remove"
-    )
-  }
-
   private def insert(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl) =
     measureExecutionTime {
       SqlQuery(
@@ -78,6 +69,15 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
         name = "event delivery info - insert"
       )
     }
+
+  private def deleteDelivery(eventId: events.EventId, projectId: projects.Id) = measureExecutionTime {
+    SqlQuery(
+      sql"""|DELETE FROM event_delivery 
+            |WHERE event_id = $eventId AND project_id = $projectId
+            |""".stripMargin.update.run,
+      name = "event delivery info - remove"
+    )
+  }
 
   private lazy val toResult: Int => IO[Unit] = {
     case 0 | 1 => ().pure[IO]

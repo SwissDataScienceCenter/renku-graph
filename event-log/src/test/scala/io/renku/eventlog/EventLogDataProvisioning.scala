@@ -19,7 +19,8 @@
 package io.renku.eventlog
 
 import cats.syntax.all._
-import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
+import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
 import ch.datascience.graph.model.SchemaVersion
@@ -113,13 +114,14 @@ trait EventLogDataProvisioning {
       """.stripMargin.update.run.void
   }
 
-  protected def upsertEventDelivery(compoundEventId: CompoundEventId, deliveryId: SubscriberId): Unit = execute {
-    sql"""|INSERT INTO
-          |event_delivery (event_id, project_id, delivery_id)
-          |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, $deliveryId)
-          |ON CONFLICT (event_id, project_id)
-          |DO NOTHING
-      """.stripMargin.update.run.void
+  protected def upsertEventDeliveryInfo(
+      eventId:     CompoundEventId,
+      deliveryId:  SubscriberId = subscriberIds.generateOne,
+      deliveryUrl: SubscriberUrl = subscriberUrls.generateOne,
+      sourceUrl:   MicroserviceBaseUrl = microserviceBaseUrls.generateOne
+  ): Unit = {
+    upsertSubscriber(deliveryId, deliveryUrl, sourceUrl)
+    upsertEventDelivery(eventId, deliveryId)
   }
 
   protected def upsertSubscriber(deliveryId:  SubscriberId,
@@ -134,4 +136,19 @@ trait EventLogDataProvisioning {
       """.stripMargin.update.run.void
   }
 
+  protected def upsertEventDelivery(eventId: CompoundEventId, deliveryId: SubscriberId): Unit = execute {
+    sql"""|INSERT INTO
+          |event_delivery (event_id, project_id, delivery_id)
+          |VALUES (${eventId.id}, ${eventId.projectId}, $deliveryId)
+          |ON CONFLICT (event_id, project_id)
+          |DO NOTHING
+      """.stripMargin.update.run.void
+  }
+
+  protected def findAllDeliveries: List[(CompoundEventId, SubscriberId)] = execute {
+    sql"""|SELECT event_id, project_id, delivery_id
+          |FROM event_delivery""".stripMargin
+      .query[(CompoundEventId, SubscriberId)]
+      .to[List]
+  }
 }

@@ -25,7 +25,6 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.TestLabeledHistogram
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.InMemoryEventLogDbSpec
@@ -45,18 +44,18 @@ class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
         upsertSubscriber(subscriberId, subscriberUrl, sourceUrl)
         upsertSubscriber(subscriberId, subscriberUrl, sourceUrl = microserviceBaseUrls.generateOne)
 
-        findAllAssociations shouldBe Nil
+        findAllDeliveries shouldBe Nil
 
         delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
 
-        findAllAssociations shouldBe List(event.compoundEventId -> subscriberId)
+        findAllDeliveries shouldBe List(event.compoundEventId -> subscriberId)
 
         val otherEvent = testCompoundIdEvent.generateOne
         addEvent(otherEvent.compoundEventId)
 
         delivery.registerSending(otherEvent, subscriberUrl).unsafeRunSync() shouldBe ()
 
-        findAllAssociations.toSet shouldBe Set(
+        findAllDeliveries.toSet shouldBe Set(
           event.compoundEventId      -> subscriberId,
           otherEvent.compoundEventId -> subscriberId
         )
@@ -69,14 +68,14 @@ class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
 
       delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
 
-      findAllAssociations shouldBe List(event.compoundEventId -> subscriberId)
+      findAllDeliveries shouldBe List(event.compoundEventId -> subscriberId)
 
       val newSubscriberId = subscriberIds.generateOne
       upsertSubscriber(newSubscriberId, subscriberUrl, sourceUrl)
 
       delivery.registerSending(event, subscriberUrl).unsafeRunSync() shouldBe ()
 
-      findAllAssociations shouldBe List(event.compoundEventId -> newSubscriberId)
+      findAllDeliveries shouldBe List(event.compoundEventId -> newSubscriberId)
 
     }
   }
@@ -92,13 +91,6 @@ class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val delivery =
       new EventDeliveryImpl[TestCompoundIdEvent](transactor, compoundIdExtractor, queriesExecTimes, sourceUrl)
-  }
-
-  private def findAllAssociations: List[(CompoundEventId, SubscriberId)] = execute {
-    sql"""|SELECT event_id, project_id, delivery_id
-          |FROM event_delivery""".stripMargin
-      .query[(CompoundEventId, SubscriberId)]
-      .to[List]
   }
 
   private def addEvent(eventId: CompoundEventId): Unit = storeEvent(eventId,
