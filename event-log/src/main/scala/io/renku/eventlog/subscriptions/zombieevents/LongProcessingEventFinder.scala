@@ -59,7 +59,7 @@ private class LongProcessingEventFinder(transactor:             DbTransactor[IO,
       projectsAndTimes <- projectsAndStatuses.map { case (id, status) =>
                             queryProcessingTimes(id, status).map((id, status, _))
                           }.sequence
-    } yield projectsAndTimes.map {
+    } yield projectsAndTimes map {
       case (id, currentStatus, Nil)   => (id, currentStatus.toEventStatus, maxProcessingTime / maxProcessingTimeRatio)
       case (id, currentStatus, times) => (id, currentStatus.toEventStatus, findMedian(times))
     }
@@ -113,11 +113,18 @@ private class LongProcessingEventFinder(transactor:             DbTransactor[IO,
       SqlQuery(
         sql"""|SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
               |FROM event evt
-              |JOIN project proj ON evt.project_id = proj.project_id
+              |JOIN project proj ON proj.project_id = evt.project_id
+              |LEFT JOIN event_delivery ed ON ed.project_id = evt.project_id AND ed.event_id = evt.event_id
               |WHERE evt.project_id = $projectId 
               |  AND evt.status = $status
               |  AND (evt.message IS NULL OR evt.message <> $zombieMessage)
-              |  AND ((${now()} - evt.execution_date) > ${processingTime * maxProcessingTimeRatio})
+              |  AND (
+              |    (ed.delivery_id IS NOT NULL AND (${now()} - evt.execution_date) > ${processingTime * maxProcessingTimeRatio})
+              |    OR 
+              |    (ed.delivery_id IS NULL AND 
+              |      (${now()} - evt.execution_date) > ${EventProcessingTime(Duration.ofMinutes(5))}
+              |    )
+              |  )
               |LIMIT 1
               |""".stripMargin
           .query[(CompoundEventId, projects.Path, EventStatus)]
