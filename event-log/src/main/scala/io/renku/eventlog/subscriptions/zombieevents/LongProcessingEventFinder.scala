@@ -85,10 +85,13 @@ private class LongProcessingEventFinder(transactor:             DbTransactor[IO,
 
   private def queryProcessingTimes(projectId: projects.Id, currentStatus: TransformationStatus) = measureExecutionTime {
     SqlQuery(
-      sql"""|SELECT spt.processing_time
-            |FROM status_processing_time spt
-            |JOIN event evt on evt.event_id = spt.event_id AND evt.project_id = spt.project_id
-            |WHERE spt.project_id = $projectId AND spt.status = ${currentStatus.processingTimeFindingStatus}
+      sql"""|SELECT (
+            |  SELECT spt.processing_time 
+            |  FROM status_processing_time spt 
+            |  WHERE evt.event_id = spt.event_id AND evt.project_id = spt.project_id AND evt.status = spt.status
+            |)
+            |FROM event evt
+            |WHERE evt.project_id = $projectId AND evt.status = ${currentStatus.processingTimeFindingStatus}
             |ORDER BY evt.execution_date DESC
             |LIMIT 3
     """.stripMargin
