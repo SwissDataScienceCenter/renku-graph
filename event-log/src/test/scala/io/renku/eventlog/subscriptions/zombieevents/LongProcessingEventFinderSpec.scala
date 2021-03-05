@@ -116,7 +116,7 @@ class LongProcessingEventFinderSpec
                            executionDate,
                            currentEventStatus = Gen.oneOf(TriplesGenerated, TriplesStore).generateOne,
                            processingTime,
-                           processingTimeStatus = GeneratingTriples
+                           processingTimeStatus = TriplesGenerated
           )
         }.generateNonEmptyList().toList
 
@@ -163,9 +163,9 @@ class LongProcessingEventFinderSpec
             processingTime <- shortEventProcessingTimes
           } yield addEvent(projectId,
                            executionDate,
-                           currentEventStatus = Gen.oneOf(TriplesGenerated, TriplesStore).generateOne,
+                           currentEventStatus = TriplesStore,
                            processingTime,
-                           processingTimeStatus = GeneratingTriples
+                           processingTimeStatus = TriplesStore
           )
         }.generateNonEmptyList().toList
 
@@ -206,7 +206,7 @@ class LongProcessingEventFinderSpec
                            executionDate,
                            currentEventStatus = TriplesStore,
                            processingTime,
-                           processingTimeStatus = TransformingTriples
+                           processingTimeStatus = TriplesStore
           )
         }.generateNonEmptyList().toList
 
@@ -255,7 +255,7 @@ class LongProcessingEventFinderSpec
                            executionDate,
                            currentEventStatus = TriplesStore,
                            processingTime,
-                           processingTimeStatus = TransformingTriples
+                           processingTimeStatus = TriplesStore
           )
         }.generateNonEmptyList().toList
 
