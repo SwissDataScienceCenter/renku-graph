@@ -140,9 +140,7 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
 
           val modifiedDatasetProject = DatasetProject(project.path, project.name, modifiedOnProject)
 
-          val actualmodifiedDataset = datasetFinder.findDataset(modifiedDataset.id).unsafeRunSync()
-
-          actualmodifiedDataset shouldBe Some(
+          datasetFinder.findDataset(modifiedDataset.id).unsafeRunSync() shouldBe Some(
             modifiedDataset.copy(
               parts = modifiedDataset.parts.sorted,
               project = modifiedDatasetProject,
@@ -406,6 +404,12 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             )
           )
         }
+      }
+
+    "return details of the dataset with the given id " +
+      "- case when a dataset on a fork is deleted" in new TestCase {
+        // TODO
+        ???
       }
   }
 

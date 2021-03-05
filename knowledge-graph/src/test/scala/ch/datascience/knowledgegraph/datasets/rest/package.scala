@@ -233,7 +233,7 @@ package object rest {
                   commitId:                CommitId = commitIds.generateOne,
                   topmostDerivedFrom:      TopmostDerivedFrom = TopmostDerivedFrom(dataSet.derivedFrom)
     ): List[JsonLD] =
-      dataSet.usedIn.toList match {
+      dataSet.usedIn match {
         case firstProject :: otherProjects =>
           val firstJsonLd = modifiedDataSetCommit(
             commitId = commitId,

@@ -72,6 +72,14 @@ private class BaseDetailsFinder(
         |                  schema:isPartOf ?projectId .
         |             ?projectId schema:dateCreated ?dateCreated ;
         |                        schema:name ?projectName .
+        |             BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
+        |             FILTER NOT EXISTS {
+        |             # Removing dataset that have an activity that invalidates them
+        |             ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
+        |                                prov:atLocation ?metaDataLocation ;
+        |                                prov:wasInvalidatedBy ?invalidationActivity ;
+        |                                schema:isPartOf ?projectId .
+        |             }  
         |         }
         |         ORDER BY ?dateCreated ?projectName
         |         LIMIT 1
@@ -81,6 +89,7 @@ private class BaseDetailsFinder(
         |    ?datasetId schema:identifier '$identifier';
         |               schema:identifier ?identifier;
         |               rdf:type <http://schema.org/Dataset>;
+        |               schema:isPartOf ?projectId;   
         |               schema:url ?url;
         |               schema:name ?name;
         |               schema:alternateName ?alternateName;
@@ -88,14 +97,7 @@ private class BaseDetailsFinder(
         |               renku:topmostSameAs ?topmostSameAs;
         |               renku:topmostDerivedFrom/schema:identifier ?initialVersion .
         |               
-        |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
-        |    FILTER NOT EXISTS {
-        |      # Removing dataset that have an activity that invalidates them
-        |      ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
-        |                         prov:atLocation ?metaDataLocation ;
-        |                         prov:wasInvalidatedBy ?invalidationActivity ;
-        |                         schema:isPartOf ?projectId .
-        |    }          
+        
         |               
         |    OPTIONAL { ?datasetId prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }.
         |    OPTIONAL { ?datasetId schema:description ?description }.
