@@ -19,15 +19,27 @@
 package ch.datascience.graph.acceptancetests.stubs
 
 import ch.datascience.graph.acceptancetests.data._
+import ch.datascience.graph.acceptancetests.stubs.GitLab.port
+import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
+import com.github.tomakehurst.wiremock.WireMockServer
+import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
 import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
+import com.github.tomakehurst.wiremock.core.WireMockConfiguration
+import com.github.tomakehurst.wiremock.stubbing.StubMapping
+import eu.timepit.refined.api.Refined
+import eu.timepit.refined.auto._
+import eu.timepit.refined.numeric.Positive
 import io.renku.jsonld.JsonLD
 
 object RemoteTriplesGenerator {
+
+  private val logger = TestLogger()
+  private val port: Int Refined Positive = 8080
 
   def `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(
       project:    Project,
@@ -62,6 +74,25 @@ object RemoteTriplesGenerator {
           ok(triples.toJson.spaces2)
         )
     }
+    ()
+  }
+
+  private val instance = WireMock.create().http().host("localhost").port(port.value).build()
+
+  private def stubFor(mappingBuilder: MappingBuilder): StubMapping = instance.register(mappingBuilder)
+
+  private val server = {
+    val newServer = new WireMockServer(WireMockConfiguration.wireMockConfig().port(port.value))
+    newServer.start()
+    WireMock.configureFor(newServer.port())
+    logger.info(s"Remote Triples Generator stub started")
+    newServer
+  }
+
+  def shutdown(): Unit = {
+    server.stop()
+    server.shutdownServer()
+    logger.info(s"Remote Triples Generator stub stopped")
     ()
   }
 }
