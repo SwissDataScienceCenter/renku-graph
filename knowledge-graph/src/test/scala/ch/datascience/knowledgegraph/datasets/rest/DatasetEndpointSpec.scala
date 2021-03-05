@@ -150,7 +150,6 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
 
       logger.loggedOnly(Error(s"Finding dataset with '$identifier' id failed", exception))
     }
-
   }
 
   private trait TestCase {

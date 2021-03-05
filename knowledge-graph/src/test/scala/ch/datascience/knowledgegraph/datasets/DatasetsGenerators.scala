@@ -25,7 +25,6 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.datasets.{DerivedFrom, InitialVersion, SameAs, Url}
-import ch.datascience.graph.model.projects
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.rdfstore.entities.DataSet
 import eu.timepit.refined.auto._

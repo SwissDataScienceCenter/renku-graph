@@ -95,11 +95,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "topmostSameAs": {"value": ${SameAs(DataSet.entityId(dataset.id)).toString}},
       "initialVersion": {"value": ${dataset.versions.initial.toString}},
       "keywords": {"value": ${dataset.keywords.map(_.value).asJson}},
-      "projectId": {"value": ${projects.ResourceId.apply(renkuBaseUrl, dataset.project.path).asJson}},
-      "projectName": {"value": ${dataset.project.name.asJson}},
-      "minDateCreated": {"value": ${dataset.project.created.date.asJson}},
-      "maybeAgentEmail": {"value": ${dataset.project.created.agent.maybeEmail.asJson}},
-      "agentName": {"value": ${dataset.project.created.agent.name.asJson}}
+      "projectId": {"value": ${projects.ResourceId.apply(renkuBaseUrl, dataset.project.path).asJson}}
     }""".addDates(dataset.dates)
 
     json"""{"results": {"bindings": [$binding]}}"""
@@ -118,11 +114,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
       "initialVersion": {"value": ${dataset.versions.initial.toString} },
       "keywords": {"value": ${dataset.keywords.map(_.value).asJson}},
       "images": {"value": ${dataset.images.map(_.value).asJson}},
-      "projectId": {"value": ${projects.ResourceId.apply(renkuBaseUrl, dataset.project.path).asJson}},
-      "projectName": {"value": ${dataset.project.name.asJson}},
-      "minDateCreated": {"value": ${dataset.project.created.date.asJson}},
-      "maybeAgentEmail": {"value": ${dataset.project.created.agent.maybeEmail.asJson}},
-      "agentName": {"value": ${dataset.project.created.agent.name.asJson}}
+      "projectId": {"value": ${projects.ResourceId.apply(renkuBaseUrl, dataset.project.path).asJson}}
     }""".addDates(dataset.dates)
 
     json"""{"results": {"bindings": [$binding]}}"""
@@ -158,7 +150,7 @@ class BaseDetailsFinderSpec extends AnyWordSpec with ScalaCheckPropertyChecks wi
     }""" deepMerge _links(
       Link(
         Rel("project-details") -> Href(renkuResourcesUrls.generateOne / "projects" / project.path)
-      ) // TODO: check to see if this URL is acceptable
+      )
     )
   }
 }

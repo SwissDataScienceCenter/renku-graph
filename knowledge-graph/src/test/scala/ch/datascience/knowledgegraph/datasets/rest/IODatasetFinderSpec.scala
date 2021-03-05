@@ -235,22 +235,27 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               usedInProjects = sourceProject.copy(created = addedToProject).toGenerator
             ).generateOne
 
-            val forkUsedIn = List(DatasetProject(forkProject.path, forkProject.name, addedToProject))
+            val forkUsedIn      = List(DatasetProject(forkProject.path, forkProject.name, addedToProject))
+            val laterCommitDate = dataset.usedIn.map(_.created.date.value).min.plusSeconds(1)
+
             loadToStore(
               dataset.toJsonLD(noSameAs = true, commitId = commitId)(),
               dataset // to simulate forking the sourceProject
                 .copy(project = forkUsedIn.head, usedIn = forkUsedIn)
-                .toJsonLD(noSameAs = true, commitId = commitId)()
+                .toJsonLD(noSameAs = true, commitId = commitId, maybeCommittedDate = Some(laterCommitDate))()
             )
+
+            val allProjects = List(
+              DatasetProject(sourceProject.path, sourceProject.name, addedToProject),
+              DatasetProject(forkProject.path, forkProject.name, addedToProject)
+            ).sorted
 
             datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
               dataset.copy(
                 sameAs = dataset.entityId.asSameAs,
                 parts = dataset.parts.sorted,
-                usedIn = List(
-                  DatasetProject(sourceProject.path, sourceProject.name, addedToProject),
-                  DatasetProject(forkProject.path, forkProject.name, addedToProject)
-                ).sorted,
+                project = DatasetProject(sourceProject.path, sourceProject.name, addedToProject),
+                usedIn = allProjects,
                 keywords = dataset.keywords.sorted
               )
             )
@@ -267,31 +272,42 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             val project2DatasetCommit = commitIds.generateOne
 
             // to simulate adding the same data-set to another project
-            val importedDatasetId = datasetIdentifiers.generateOne
+
+            val importedDatasetProject = DatasetProject(project2.path, project2.name, addedToProject2)
+            val importedDatasetId      = datasetIdentifiers.generateOne
             val importedDataset = dataset.copy(
               id = importedDatasetId,
               versions = DatasetVersions(InitialVersion(importedDatasetId)),
-              usedIn = List(DatasetProject(project2.path, project2.name, addedToProject2))
+              project = importedDatasetProject,
+              usedIn = List(importedDatasetProject)
             )
 
+            val forkedDatasetProject = DatasetProject(project2Fork.path, project2Fork.name, addedToProject2)
             val forkedDataset = importedDataset.copy(
-              usedIn = List(DatasetProject(project2Fork.path, project2Fork.name, addedToProject2))
+              project = forkedDatasetProject,
+              usedIn = List(forkedDatasetProject)
             )
+
+            val laterDate = importedDataset.usedIn.map(_.created.date.value).min.plusSeconds(1)
 
             loadToStore(
               dataset.toJsonLD()(topmostSameAs = TopmostSameAs(dataset.sameAs)),
               importedDataset.toJsonLD(commitId = project2DatasetCommit)(topmostSameAs = TopmostSameAs(dataset.sameAs)),
-              forkedDataset.toJsonLD(commitId = project2DatasetCommit)(topmostSameAs = TopmostSameAs(dataset.sameAs))
+              forkedDataset
+                .toJsonLD(commitId = project2DatasetCommit, maybeCommittedDate = Some(laterDate))(topmostSameAs =
+                  TopmostSameAs(dataset.sameAs)
+                )
             )
 
+            val dataset2UsedIn = List(
+              DatasetProject(project1.path, project1.name, addedToProject1),
+              importedDatasetProject,
+              forkedDatasetProject
+            ).sorted
             datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
               dataset.copy(
                 parts = dataset.parts.sorted,
-                usedIn = List(
-                  DatasetProject(project1.path, project1.name, addedToProject1),
-                  DatasetProject(project2.path, project2.name, addedToProject2),
-                  DatasetProject(project2Fork.path, project2Fork.name, addedToProject2)
-                ).sorted,
+                usedIn = dataset2UsedIn,
                 keywords = dataset.keywords.sorted
               )
             )
@@ -299,11 +315,8 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
             datasetFinder.findDataset(forkedDataset.id).unsafeRunSync() shouldBe Some(
               forkedDataset.copy(
                 parts = dataset.parts.sorted,
-                usedIn = List(
-                  DatasetProject(project1.path, project1.name, addedToProject1),
-                  DatasetProject(project2.path, project2.name, addedToProject2),
-                  DatasetProject(project2Fork.path, project2Fork.name, addedToProject2)
-                ).sorted,
+                project = importedDatasetProject,
+                usedIn = dataset2UsedIn,
                 keywords = dataset.keywords.sorted
               )
             )
@@ -318,14 +331,17 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
               usedInProjects = grandparentProject.copy(created = addedToProject).toGenerator
             ).generateOne
 
+            val secondLatestDate = datasetOnGrandparent.usedIn.map(_.created.date.value).min.plusSeconds(1)
+            val mostRecentDate   = secondLatestDate.plusSeconds(1)
+
             loadToStore(
               datasetOnGrandparent.toJsonLD(noSameAs = true, commitId = commitId)(),
               datasetOnGrandparent // to simulate forking the grandparentProject - dataset on a parent project
                 .copy(usedIn = List(DatasetProject(parentProject.path, parentProject.name, addedToProject)))
-                .toJsonLD(noSameAs = true, commitId = commitId)(),
+                .toJsonLD(noSameAs = true, commitId = commitId, maybeCommittedDate = Some(secondLatestDate))(),
               datasetOnGrandparent // to simulate forking the parentProject - dataset on a child project
                 .copy(usedIn = List(DatasetProject(childProject.path, childProject.name, addedToProject)))
-                .toJsonLD(noSameAs = true, commitId = commitId)()
+                .toJsonLD(noSameAs = true, commitId = commitId, maybeCommittedDate = Some(mostRecentDate))()
             )
 
             datasetFinder.findDataset(datasetOnGrandparent.id).unsafeRunSync() shouldBe Some(

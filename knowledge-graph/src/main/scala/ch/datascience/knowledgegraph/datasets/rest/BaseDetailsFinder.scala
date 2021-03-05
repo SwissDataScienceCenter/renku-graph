@@ -63,21 +63,30 @@ private class BaseDetailsFinder(
       schema -> "schema"
     ),
     s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybePublishedDate ?projectId
-        |WHERE {
-        |    ?datasetId schema:identifier "$identifier";
+        |WHERE {        
+        |    {
+        |         SELECT  ?projectId  ?dateCreated
+        |         WHERE {
+        |             ?datasetId rdf:type <http://schema.org/Dataset>;
+        |                  schema:identifier '$identifier';
+        |                  schema:isPartOf ?projectId .
+        |             ?projectId schema:dateCreated ?dateCreated ;
+        |                        schema:name ?projectName .
+        |         }
+        |         ORDER BY ?dateCreated ?projectName
+        |         LIMIT 1
+        |    }
+        |  
+        |  
+        |    ?datasetId schema:identifier '$identifier';
         |               schema:identifier ?identifier;
         |               rdf:type <http://schema.org/Dataset>;
-        |               schema:isPartOf ?projectId;   
         |               schema:url ?url;
         |               schema:name ?name;
         |               schema:alternateName ?alternateName;
         |               prov:atLocation ?location ;
         |               renku:topmostSameAs ?topmostSameAs;
         |               renku:topmostDerivedFrom/schema:identifier ?initialVersion .
-        |               
-        |    {
-        |        ?projectId schema:dateCreated ?projDateCreated .
-        |    }
         |               
         |    BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
         |    FILTER NOT EXISTS {

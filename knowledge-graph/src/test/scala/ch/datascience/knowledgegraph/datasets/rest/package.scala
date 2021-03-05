@@ -69,15 +69,17 @@ package object rest {
     }
 
     def toJsonLD(
-        noSameAs: Boolean = false,
-        commitId: CommitId = commitIds.generateOne
+        noSameAs:           Boolean = false,
+        commitId:           CommitId = commitIds.generateOne,
+        maybeCommittedDate: Option[CommittedDate] = None
     )(
         topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs)
     ): JsonLD =
       toJsonLDsAndDatasets(
         firstDatasetDateCreated = DateCreated(dataSet.usedIn.map(_.created.date.value).min),
         noSameAs = noSameAs,
-        commitId = commitId
+        commitId = commitId,
+        maybeCommittedDate
       )(topmostSameAs) match {
         case (json, _) :: Nil => json
         case _                => throw new Exception("Not prepared to work datasets having multiple projects")
@@ -86,7 +88,8 @@ package object rest {
     def toJsonLDsAndDatasets(
         firstDatasetDateCreated: DateCreated = DateCreated(dataSet.usedIn.map(_.created.date.value).min),
         noSameAs:                Boolean,
-        commitId:                CommitId = commitIds.generateOne
+        commitId:                CommitId = commitIds.generateOne,
+        maybeCommittedDate:      Option[CommittedDate] = None
     )(
         topmostSameAs: TopmostSameAs = if (noSameAs) TopmostSameAs(dataSet.entityId) else TopmostSameAs(dataSet.sameAs)
     ): List[(JsonLD, Dataset)] =
@@ -94,7 +97,7 @@ package object rest {
         case firstProject :: otherProjects =>
           val firstTuple = nonModifiedDataSetCommit(
             commitId = commitId,
-            committedDate = CommittedDate(firstDatasetDateCreated.value),
+            committedDate = maybeCommittedDate.getOrElse(CommittedDate(firstDatasetDateCreated.value)),
             committer = Person(firstProject.created.agent.name, firstProject.created.agent.maybeEmail)
           )(
             projectPath = firstProject.path,
