@@ -133,7 +133,7 @@ trait TinyTypeOrdering[TT <: TinyType] {
   }
 
   implicit def ordering(implicit valueOrdering: Ordering[TT#V]): Ordering[TT] =
-    (x: TT, y: TT) => valueOrdering.compare(x.value, y.value)
+    Ordering.by(_.value)
 }
 
 trait Constraints[V] extends TypeName {
