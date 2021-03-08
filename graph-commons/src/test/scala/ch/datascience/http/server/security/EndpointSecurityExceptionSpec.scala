@@ -19,12 +19,12 @@
 package ch.datascience.http.server.security
 
 import cats.effect.IO
-import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.ErrorMessage.ErrorMessage
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
 import org.http4s.MediaType._
-import org.http4s.Status.{Forbidden, Unauthorized}
+import org.http4s.Status.{NotFound, Unauthorized}
 import org.http4s.headers.`Content-Type`
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -44,10 +44,10 @@ class EndpointSecurityExceptionSpec extends AnyWordSpec with should.Matchers {
 
   "AuthorizationFailure.toHttpResponse" should {
 
-    s"return an $Forbidden response with a relavant error message" in {
+    s"return a $NotFound response with a relavant error message" in {
       val response = AuthorizationFailure.toHttpResponse[IO]
 
-      response.status                           shouldBe Forbidden
+      response.status                           shouldBe NotFound
       response.contentType                      shouldBe Some(`Content-Type`(application.json))
       response.as[ErrorMessage].unsafeRunSync() shouldBe ErrorMessage("User not authorized failure")
     }

@@ -23,8 +23,7 @@ import cats.syntax.all._
 import ch.datascience.tinytypes.constraints.PathSegment
 import io.circe.Json
 
-import java.time.{Instant, LocalDate}
-import java.time.Duration
+import java.time.{Duration, Instant, LocalDate}
 
 trait TinyType extends Any {
 
@@ -102,10 +101,9 @@ abstract class TinyTypeFactory[TT <: TinyType](instantiate: TT#V => TT)
 
   implicit class TinyTypeConverters(tinyType: TT) {
 
-    def as[Interpretation[_], OUT](implicit
-        converter: TinyTypeConverter[TT, OUT],
-        ME:        MonadError[Interpretation, Throwable]
-    ): Interpretation[OUT] = ME.fromEither(converter(tinyType))
+    def as[Interpretation[_]: MonadError[*[_], Throwable], OUT](implicit
+        converter: TinyTypeConverter[TT, OUT]
+    ): Interpretation[OUT] = implicitly[MonadError[Interpretation, Throwable]].fromEither(converter(tinyType))
 
     def toUnsafe[OUT](implicit convert: TT => Either[Exception, OUT]): OUT =
       convert(tinyType).fold(throw _, identity)
