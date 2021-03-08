@@ -21,6 +21,7 @@ package io.renku.eventlog.subscriptions.zombieevents
 import cats.effect.{Bracket, ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import eu.timepit.refined.api.Refined
@@ -46,41 +47,51 @@ private class ZombieEventSourceCleanerImpl(transactor:           DbTransactor[IO
   import serviceHealthChecker._
 
   override def removeZombieSources(): IO[Unit] = for {
-    otherSources      <- findPotentialZombieSources
-    nonHealthySources <- (otherSources map isHealthy).parSequence.map(_.collect(nonHealthy))
-    _                 <- (nonHealthySources map delete).sequence
+    maybeZombieRecords <- findPotentialZombieRecords
+    nonHealthySources  <- (maybeZombieRecords map isHealthy).parSequence.map(_.collect(nonHealthy))
+    _                  <- (nonHealthySources map delete).sequence
   } yield ()
 
-  private def findPotentialZombieSources: IO[List[MicroserviceBaseUrl]] = measureExecutionTime {
+  private def findPotentialZombieRecords: IO[List[(MicroserviceBaseUrl, SubscriberUrl)]] = measureExecutionTime {
     SqlQuery(
-      sql"""|SELECT DISTINCT source_url
+      sql"""|SELECT DISTINCT source_url, delivery_url
             |FROM subscriber
             |WHERE source_url <> $microserviceBaseUrl
             |""".stripMargin
-        .query[MicroserviceBaseUrl]
+        .query[(MicroserviceBaseUrl, SubscriberUrl)]
         .to[List],
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find zombie sources")
     )
   } transact transactor.get
 
-  private def isHealthy(serviceUrl: MicroserviceBaseUrl): IO[(MicroserviceBaseUrl, Boolean)] =
-    ping(serviceUrl) map (serviceUrl -> _)
-
-  private lazy val nonHealthy: PartialFunction[(MicroserviceBaseUrl, Boolean), MicroserviceBaseUrl] = {
-    case (serviceUrl, false) => serviceUrl
+  private def isHealthy: ((MicroserviceBaseUrl, SubscriberUrl)) => IO[(MicroserviceBaseUrl, SubscriberUrl, Boolean)] = {
+    case (sourceUrl, subscriberUrl) =>
+      for {
+        subscriberAsBaseUrl <- subscriberUrl.as[IO, MicroserviceBaseUrl]
+        subscriberHealthy   <- ping(subscriberAsBaseUrl)
+        sourceHealthy       <- ping(sourceUrl)
+      } yield sourceHealthy -> subscriberHealthy match {
+        case (true, _)  => (sourceUrl, subscriberUrl, true)
+        case (false, _) => (sourceUrl, subscriberUrl, subscriberHealthy)
+      }
   }
 
-  private def delete(serviceUrl: MicroserviceBaseUrl): IO[Unit] = {
+  private lazy val nonHealthy
+      : PartialFunction[(MicroserviceBaseUrl, SubscriberUrl, Boolean), (MicroserviceBaseUrl, SubscriberUrl)] = {
+    case (serviceUrl, subscriberUrl, false) => serviceUrl -> subscriberUrl
+  }
+
+  private def delete: ((MicroserviceBaseUrl, SubscriberUrl)) => IO[Unit] = { case (sourceUrl, subscriberUrl) =>
     measureExecutionTime {
       SqlQuery(
         sql"""|DELETE
               |FROM subscriber
-              |WHERE source_url = $serviceUrl
+              |WHERE source_url = $sourceUrl AND delivery_url = $subscriberUrl
               |""".stripMargin.update.run,
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete zombie source")
       )
-    } transact transactor.get
-  }.void
+    }.transact(transactor.get).void
+  }
 }
 
 private object ZombieEventSourceCleaner {

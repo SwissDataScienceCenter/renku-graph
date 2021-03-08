@@ -51,7 +51,7 @@ object EndpointSecurityException {
     override lazy val getMessage: String = "User not authorized failure"
 
     override def toHttpResponse[Interpretation[_]: Effect]: Response[Interpretation] =
-      Response[Interpretation](Status.Forbidden).withEntity(ErrorMessage(getMessage))
+      Response[Interpretation](Status.NotFound).withEntity(ErrorMessage(getMessage))
   }
   type AuthorizationFailure = AuthorizationFailure.type
 }
