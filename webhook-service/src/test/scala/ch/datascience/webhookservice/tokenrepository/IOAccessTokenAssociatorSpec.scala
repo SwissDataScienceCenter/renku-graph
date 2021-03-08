@@ -18,14 +18,13 @@
 
 package ch.datascience.webhookservice.tokenrepository
 
-import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.http.ErrorMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
 import ch.datascience.interpreters.TestLogger
@@ -82,8 +81,6 @@ class IOAccessTokenAssociatorSpec
   private implicit val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
-
-    val context = MonadError[IO, Throwable]
 
     val tokenRepositoryUrl = TokenRepositoryUrl(externalServiceBaseUrl)
     val projectId          = projectIds.generateOne

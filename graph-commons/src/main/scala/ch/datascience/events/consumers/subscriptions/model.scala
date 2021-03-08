@@ -18,14 +18,17 @@
 
 package ch.datascience.events.consumers.subscriptions
 
+import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
 import ch.datascience.tinytypes.constraints.{NonBlank, Url}
 import ch.datascience.tinytypes.json.TinyTypeDecoders.stringDecoder
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeConverter, TinyTypeFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.Decoder
+
+import java.net.URL
 
 trait SubscriptionPayload extends Product with Serializable {
   val categoryName: CategoryName
@@ -63,6 +66,12 @@ object SubscriberUrl extends TinyTypeFactory[SubscriberUrl](new SubscriberUrl(_)
     SubscriberUrl((microserviceBaseUrl / part.toString()).toString)
 
   implicit val decoder: Decoder[SubscriberUrl] = stringDecoder(SubscriberUrl)
+
+  implicit val microserviceBaseUrlConverter: TinyTypeConverter[SubscriberUrl, MicroserviceBaseUrl] =
+    (subscriberUrl: SubscriberUrl) => {
+      val url = new URL(subscriberUrl.value)
+      MicroserviceBaseUrl(s"${url.getProtocol}://${url.getHost}:${url.getPort}").asRight[IllegalArgumentException]
+    }
 }
 
 final class SubscriberId private (val value: String) extends AnyVal with StringTinyType

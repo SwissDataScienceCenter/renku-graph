@@ -20,11 +20,14 @@ package ch.datascience.events.consumers.subscriptions
 
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonBlankStrings
+import ch.datascience.generators.Generators.{httpUrls, nonBlankStrings, relativePaths}
+import ch.datascience.microservices.MicroserviceBaseUrl
+import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class SubscriberUrlSpec extends AnyWordSpec with should.Matchers {
+class SubscriberUrlSpec extends AnyWordSpec with should.Matchers with ScalaCheckPropertyChecks {
 
   "from" should {
 
@@ -34,6 +37,16 @@ class SubscriberUrlSpec extends AnyWordSpec with should.Matchers {
       val part    = nonBlankStrings().generateOne
 
       SubscriberUrl(baseUrl, part).value shouldBe (baseUrl / part.value).toString
+    }
+  }
+
+  "to MicroserviceBaseUrl conversion" should {
+
+    "successfully convert MicroserviceBaseUrl if well defined" in {
+      forAll(httpUrls(pathGenerator = Gen.const("")), relativePaths(minSegments = 0, maxSegments = 2)) { (url, path) =>
+        val pathValidated = if (path.isEmpty) "" else s"/$path"
+        SubscriberUrl(s"$url$pathValidated").toUnsafe[MicroserviceBaseUrl] shouldBe MicroserviceBaseUrl(url)
+      }
     }
   }
 }
