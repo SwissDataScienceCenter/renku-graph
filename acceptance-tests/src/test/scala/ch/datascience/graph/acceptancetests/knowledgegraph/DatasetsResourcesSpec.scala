@@ -216,7 +216,23 @@ class DatasetsResourcesSpec
         ._links
         .get(Rel("project-details"))
         .getOrFail("No link with rel 'project-details'")
-      val getProjectResponse = restClient.GET(datasetProjectLink.toString, user.accessToken)
+
+      val datasetUsedInProjectLink = foundDatasetDetails.hcursor
+        .downField("usedIn")
+        .downArray
+        ._links
+        .get(Rel("project-details"))
+        .getOrFail("No link with rel 'project-details'")
+
+      datasetProjectLink shouldBe datasetUsedInProjectLink
+
+      foundDatasetDetails.hcursor
+        .downField("project")
+        ._links
+        .get(Rel("project-details"))
+        .getOrFail("No link with rel 'project-details'") shouldBe datasetUsedInProjectLink
+
+      val getProjectResponse = restClient.GET(datasetUsedInProjectLink.toString, user.accessToken)
 
       Then("he should get OK response with project details")
       getProjectResponse.status     shouldBe Ok
