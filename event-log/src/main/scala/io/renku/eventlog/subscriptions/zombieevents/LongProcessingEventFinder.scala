@@ -18,15 +18,17 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
+import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples, TriplesGenerated, TriplesStore}
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import doobie.free.connection.ConnectionOp
+import doobie.util.fragments.in
 import doobie.util.{Get, Put}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -83,23 +85,33 @@ private class LongProcessingEventFinder(transactor:             DbTransactor[IO,
     )
   }
 
+  // format: off
   private def queryProcessingTimes(projectId: projects.Id, currentStatus: TransformationStatus) = measureExecutionTime {
-    SqlQuery(
-      sql"""|SELECT (
-            |  SELECT spt.processing_time 
-            |  FROM status_processing_time spt 
-            |  WHERE evt.event_id = spt.event_id AND evt.project_id = spt.project_id AND evt.status = spt.status
-            |)
-            |FROM event evt
-            |WHERE evt.project_id = $projectId AND evt.status = ${currentStatus.processingTimeFindingStatus}
-            |ORDER BY evt.execution_date DESC
-            |LIMIT 3
-    """.stripMargin
-        .query[EventProcessingTime]
-        .to[List],
+    SqlQuery({fr"""
+      SELECT (
+        SELECT spt.processing_time 
+        FROM status_processing_time spt 
+        WHERE evt.event_id = spt.event_id 
+          AND evt.project_id = spt.project_id 
+          AND spt.status = ${currentStatus.processingTimeFindingStatus}
+      )
+      FROM event evt
+      WHERE evt.project_id = $projectId
+        AND """ ++ `evt.status IN`(currentStatus.followingFindingStatuses) ++ fr"""
+        AND EXISTS (
+          SELECT spt.processing_time 
+          FROM status_processing_time spt 
+          WHERE evt.event_id = spt.event_id 
+            AND evt.project_id = spt.project_id 
+            AND spt.status = ${currentStatus.processingTimeFindingStatus}
+        )
+      ORDER BY evt.execution_date DESC
+      LIMIT 3
+      """}.query[EventProcessingTime].to[List],
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - find processing times")
     )
   }
+  // format: on
 
   private def lookForZombie
       : List[(projects.Id, EventStatus, EventProcessingTime)] => Free[ConnectionOp, Option[ZombieEvent]] = {
@@ -169,17 +181,28 @@ private class LongProcessingEventFinder(transactor:             DbTransactor[IO,
   private sealed trait TransformationStatus {
     val toEventStatus: EventStatus
     def processingTimeFindingStatus: EventStatus
+    def followingFindingStatuses:    Set[EventStatus]
   }
   private object TransformationStatus {
     final case object Generating extends TransformationStatus {
       override val toEventStatus:               EventStatus = GeneratingTriples
       override val processingTimeFindingStatus: EventStatus = TriplesGenerated
+      override val followingFindingStatuses: Set[EventStatus] = Set(TriplesGenerated,
+                                                                    TransformingTriples,
+                                                                    TransformationRecoverableFailure,
+                                                                    TransformationNonRecoverableFailure,
+                                                                    TriplesStore
+      )
     }
     final case object Transforming extends TransformationStatus {
-      override val toEventStatus:               EventStatus = TransformingTriples
-      override val processingTimeFindingStatus: EventStatus = TriplesStore
+      override val toEventStatus:               EventStatus      = TransformingTriples
+      override val processingTimeFindingStatus: EventStatus      = TriplesStore
+      override val followingFindingStatuses:    Set[EventStatus] = Set(TriplesStore)
     }
   }
+
+  private def `evt.status IN`(statuses: Set[EventStatus]) =
+    in(fr"evt.status", NonEmptyList.fromListUnsafe(statuses.toList))
 }
 
 private object LongProcessingEventFinder {

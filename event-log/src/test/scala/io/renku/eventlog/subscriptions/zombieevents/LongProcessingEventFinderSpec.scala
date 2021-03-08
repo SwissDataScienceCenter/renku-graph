@@ -133,8 +133,7 @@ class LongProcessingEventFinderSpec
 
         val medianProcessingTime = {
           val threeMostEvents = datesAndProcessingTimes.sortBy(_._1).reverse.take(3)
-          val sortedTimes     = threeMostEvents.map(_._2).sorted.reverse
-          sortedTimes(sortedTimes.size / 2)
+          threeMostEvents.map(_._2).sorted.reverse(threeMostEvents.size / 2)
         }
 
         val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
@@ -181,7 +180,7 @@ class LongProcessingEventFinderSpec
                            executionDate,
                            currentEventStatus = TriplesStore,
                            processingTime,
-                           processingTimeStatus = TriplesStore
+                           processingTimeStatus = TriplesGenerated
           )
         }.generateNonEmptyList().toList
 
@@ -350,14 +349,15 @@ class LongProcessingEventFinderSpec
     val finder =
       new LongProcessingEventFinder(transactor, maxProcessingTime, maxProcessingTimeRatio, queriesExecTimes)
 
-    def addEvent(eventId: CompoundEventId, status: EventStatus, executionDate: ExecutionDate): Unit = storeEvent(
-      eventId,
-      status,
-      executionDate,
-      eventDates.generateOne,
-      eventBodies.generateOne,
-      projectPath = projectPath
-    )
+    def addEvent(eventId: CompoundEventId, status: EventStatus, executionDate: ExecutionDate): Unit =
+      storeEvent(
+        eventId,
+        status,
+        executionDate,
+        eventDates.generateOne,
+        eventBodies.generateOne,
+        projectPath = projectPath
+      )
 
     def addEvent(projectId:            projects.Id,
                  executionDate:        ExecutionDate,
