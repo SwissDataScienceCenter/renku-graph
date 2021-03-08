@@ -408,8 +408,72 @@ class IODatasetFinderSpec extends AnyWordSpec with InMemoryRdfStore with ScalaCh
 
     "return details of the dataset with the given id " +
       "- case when a dataset on a fork is deleted" in new TestCase {
-        // TODO
-        ???
+        forAll(datasetProjects, projectEntities, addedToProjectObjects, commitIds) {
+          (sourceProject, forkProject, addedToProject, commitId) =>
+            val dataset = nonModifiedDatasets(
+              usedInProjects = sourceProject.copy(created = addedToProject).toGenerator
+            ).generateOne
+
+            val forkUsedIn      = List(DatasetProject(forkProject.path, forkProject.name, addedToProject))
+            val laterCommitDate = dataset.usedIn.map(_.created.date.value).min.plusSeconds(1)
+            val entityWithInvalidation =
+              invalidationEntity(dataset.id, forkProject).generateOne // invalidate the forked dataset
+            loadToStore(
+              dataset.toJsonLD(noSameAs = true, commitId = commitId)(),
+              dataset // to simulate forking the sourceProject
+                .copy(project = forkUsedIn.head, usedIn = forkUsedIn)
+                .toJsonLD(noSameAs = true, commitId = commitId, maybeCommittedDate = Some(laterCommitDate))(),
+              entityWithInvalidation.asJsonLD,
+              randomDataSetCommit
+            )
+
+            val mainProject = DatasetProject(sourceProject.path, sourceProject.name, addedToProject)
+            val allProjects = List(mainProject).sorted
+
+            datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
+              dataset.copy(
+                sameAs = dataset.entityId.asSameAs,
+                parts = dataset.parts.sorted,
+                project = mainProject,
+                usedIn = allProjects,
+                keywords = dataset.keywords.sorted
+              )
+            )
+        }
+      }
+
+    "return details of a fork dataset with the given id " +
+      "- case when the parent of a fork dataset is deleted" in new TestCase {
+        forAll(projectEntities, projectEntities, addedToProjectObjects, commitIds) {
+          (sourceProject, forkProject, addedToProject, commitId) =>
+            val dataset = nonModifiedDatasets(
+              usedInProjects = sourceProject.toDatasetProject.copy(created = addedToProject).toGenerator
+            ).generateOne
+
+            val forkedProject   = DatasetProject(forkProject.path, forkProject.name, addedToProject)
+            val forkUsedIn      = List(forkedProject)
+            val laterCommitDate = dataset.usedIn.map(_.created.date.value).min.plusSeconds(1)
+            val entityWithInvalidation =
+              invalidationEntity(dataset.id, sourceProject).generateOne // invalidate the parent dataset
+            loadToStore(
+              dataset.toJsonLD(noSameAs = true, commitId = commitId)(),
+              dataset // to simulate forking the sourceProject
+                .copy(project = forkUsedIn.head, usedIn = forkUsedIn)
+                .toJsonLD(noSameAs = true, commitId = commitId, maybeCommittedDate = Some(laterCommitDate))(),
+              entityWithInvalidation.asJsonLD,
+              randomDataSetCommit
+            )
+
+            datasetFinder.findDataset(dataset.id).unsafeRunSync() shouldBe Some(
+              dataset.copy(
+                sameAs = dataset.entityId.asSameAs,
+                parts = dataset.parts.sorted,
+                project = forkedProject,
+                usedIn = forkUsedIn.sorted,
+                keywords = dataset.keywords.sorted
+              )
+            )
+        }
       }
   }
 

@@ -60,12 +60,24 @@ private class ProjectsFinder(
         |    WHERE {
         |      ?dsId rdf:type <http://schema.org/Dataset>;
         |            schema:identifier '$identifier';
+        |            prov:atLocation ?location ;
         |            renku:topmostSameAs ?topmostSameAs.
+        |            
+        |      BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation) .
+        |      FILTER NOT EXISTS {
+        |      # Removing dataset that have an activity that invalidates them
+        |      ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
+        |                         prov:atLocation ?metaDataLocation ;
+        |                         prov:wasInvalidatedBy ?invalidationActivity ;
+        |                         schema:isPartOf ?projectId .
+        |      }  
+        |            
         |      ?allDsId rdf:type <http://schema.org/Dataset>;
         |               renku:topmostSameAs ?topmostSameAs;
         |               schema:isPartOf ?projectId;
         |               prov:qualifiedGeneration/prov:activity ?activityId.
         |      ?activityId prov:startedAtTime ?dateCreated.
+        |      
         |    }
         |    GROUP BY ?allDsId ?projectId
         |  }
