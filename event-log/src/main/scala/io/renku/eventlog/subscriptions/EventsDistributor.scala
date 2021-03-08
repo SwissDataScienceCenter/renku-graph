@@ -22,9 +22,9 @@ import cats.MonadError
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.DbTransactor
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Encoder
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 
@@ -37,16 +37,17 @@ private trait EventsDistributor[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private class EventsDistributorImpl[Interpretation[_]: Effect, CategoryEvent](
+private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], Throwable], CategoryEvent](
     categoryName:     CategoryName,
     subscribers:      Subscribers[Interpretation],
     eventsFinder:     EventFinder[Interpretation, CategoryEvent],
     eventsSender:     EventsSender[Interpretation, CategoryEvent],
+    eventDelivery:    EventDelivery[Interpretation, CategoryEvent],
     dispatchRecovery: DispatchRecovery[Interpretation, CategoryEvent],
     logger:           Logger[Interpretation],
     noEventSleep:     FiniteDuration,
     onErrorSleep:     FiniteDuration
-)(implicit timer:     Timer[Interpretation], ME: MonadError[Interpretation, Throwable])
+)(implicit timer:     Timer[Interpretation])
     extends EventsDistributor[Interpretation] {
 
   import eventsSender._
@@ -55,7 +56,7 @@ private class EventsDistributorImpl[Interpretation[_]: Effect, CategoryEvent](
 
   def run(): Interpretation[Unit] = {
     for {
-      _ <- ME.unit
+      _ <- ().pure[Interpretation]
       _ <- popEvent flatMap { categoryEvent =>
              runOnSubscriber(dispatch(categoryEvent)) recoverWith tryReDispatch(categoryEvent)
            }
@@ -71,19 +72,20 @@ private class EventsDistributorImpl[Interpretation[_]: Effect, CategoryEvent](
         case Some(idAndBody) => idAndBody.pure[Interpretation]
       }
 
-  private def dispatch(categoryEvent: CategoryEvent)(subscriber: SubscriberUrl): Interpretation[Unit] = {
+  private def dispatch(event: CategoryEvent)(subscriber: SubscriberUrl): Interpretation[Unit] = {
     for {
-      result <- sendEvent(subscriber, categoryEvent)
-      _      <- logStatement(result, subscriber, categoryEvent)
+      result <- sendEvent(subscriber, event)
+      _      <- logStatement(result, subscriber, event)
       _ <- result match {
-             case Delivered => ().pure[Interpretation]
+             case Delivered =>
+               eventDelivery.registerSending(event, subscriber) recoverWith anErrorLog(event, subscriber)
              case ServiceBusy =>
-               markBusy(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(categoryEvent)))
+               (markBusy(subscriber) recover withNothing) >> runOnSubscriber(dispatch(event))
              case Misdelivered =>
-               delete(subscriber) recover withNothing flatMap (_ => runOnSubscriber(dispatch(categoryEvent)))
+               (delete(subscriber) recover withNothing) >> runOnSubscriber(dispatch(event))
            }
     } yield ()
-  } recoverWith dispatchRecovery.recover(subscriber, categoryEvent)
+  } recoverWith dispatchRecovery.recover(subscriber, event)
 
   private def tryReDispatch(categoryEvent: CategoryEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>
@@ -102,6 +104,12 @@ private class EventsDistributorImpl[Interpretation[_]: Effect, CategoryEvent](
     }
 
   private lazy val withNothing: PartialFunction[Throwable, Unit] = { case NonFatal(_) => () }
+
+  private def anErrorLog(event:         CategoryEvent,
+                         subscriberUrl: SubscriberUrl
+  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)(s"$categoryName: registering sending $event to $subscriberUrl failed")
+  }
 
   private def loggingErrorAndRetry[O](retry: () => Interpretation[O]): PartialFunction[Throwable, Interpretation[O]] = {
     case NonFatal(exception) =>
@@ -122,6 +130,7 @@ private object IOEventsDistributor {
       transactor:           DbTransactor[IO, EventLogDB],
       subscribers:          Subscribers[IO],
       eventsFinder:         EventFinder[IO, CategoryEvent],
+      eventDelivery:        EventDelivery[IO, CategoryEvent],
       categoryEventEncoder: EventEncoder[CategoryEvent],
       dispatchRecovery:     DispatchRecovery[IO, CategoryEvent],
       logger:               Logger[IO]
@@ -136,6 +145,7 @@ private object IOEventsDistributor {
                                       subscribers,
                                       eventsFinder,
                                       eventsSender,
+                                      eventDelivery,
                                       dispatchRecovery,
                                       logger,
                                       noEventSleep = NoEventSleep,

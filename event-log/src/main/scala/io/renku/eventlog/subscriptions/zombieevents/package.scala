@@ -22,4 +22,6 @@ import ch.datascience.graph.model.events.CategoryName
 
 package object zombieevents {
   val categoryName: CategoryName = CategoryName("ZOMBIE_CHASING")
+
+  private[zombieevents] val zombieMessage: String = "Zombie Event"
 }

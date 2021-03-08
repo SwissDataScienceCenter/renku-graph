@@ -20,20 +20,23 @@ package io.renku.eventlog.statuschange
 
 import cats.data.NonEmptyList
 import cats.effect.IO
+import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Info
+import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators.{eventDates, executionDates}
 import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
-import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
+import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, ToTriplesStore, UpdateResult}
+import io.renku.eventlog.subscriptions.EventDelivery
 import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -44,7 +47,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
   "run" should {
     "return not found if the event is not in the DB" in new TestCase {
 
-      val command = TestCommand(eventId, projectPath, gauge)
+      val command = TestCommand(eventId, projectPath, gauge, eventDelivery = eventDelivery)
 
       (gauge.increment _).expects(projectPath).returning(IO.unit)
 
@@ -53,14 +56,16 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     }
 
     "execute query from the given command, " +
-      "map the result using command's result mapping rules " +
+      "map the result using command's result mapping rules, update the delivery status " +
       "and update metrics gauges" in new TestCase {
 
         store(eventId, projectPath, New)
 
         (gauge.increment _).expects(projectPath).returning(IO.unit)
 
-        val command = TestCommand(eventId, projectPath, gauge)
+        (eventDelivery.unregister _).expects(eventId).returning(IO.unit)
+
+        val command = TestCommand(eventId, projectPath, gauge, eventDelivery = eventDelivery)
 
         runner.run(command).unsafeRunSync() shouldBe Updated
 
@@ -73,13 +78,43 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
       }
 
     "execute query from the given command, " +
+      "map the result using command's result mapping rules, log the error when the even delivery fails" +
+      "and update metrics gauges" in new TestCase {
+
+        store(eventId, projectPath, New)
+        val exception = exceptions.generateOne
+
+        (gauge.increment _).expects(projectPath).returning(IO.unit)
+
+        val command = TestCommand(eventId, projectPath, gauge, eventDelivery = eventDelivery)
+
+        (eventDelivery.unregister _).expects(eventId).returning(exception.raiseError[IO, Unit])
+
+        runner.run(command).unsafeRunSync() shouldBe Updated
+
+        findEvents(status = GeneratingTriples).eventIdsOnly shouldBe List(eventId)
+        findProcessingTime(eventId).eventIdsOnly            shouldBe List(eventId)
+
+        logger.logged(Info(s"Event $eventId got ${command.status}"),
+                      Error(s"Event $eventId could not be updated in eventDelivery")
+        )
+
+        histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
+      }
+
+    "execute query from the given command, " +
       "if the query fails rollback to the initial state" in new TestCase {
 
         store(eventId, projectPath, New)
 
         (gauge.increment _).expects(projectPath).returning(IO.unit)
 
-        val command = TestFailingCommand(eventId, projectPath, gauge, eventProcessingTimes.generateSome)
+        val command = TestFailingCommand(eventId,
+                                         projectPath,
+                                         gauge,
+                                         eventProcessingTimes.generateSome,
+                                         eventDelivery = eventDelivery
+        )
 
         runner.run(command).unsafeRunSync() shouldBe NotFound
 
@@ -100,16 +135,18 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     val eventId     = compoundEventIds.generateOne
     val projectPath = projectPaths.generateOne
 
-    val gauge     = mock[LabeledGauge[IO, projects.Path]]
-    val histogram = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val logger    = TestLogger[IO]()
-    val runner    = new StatusUpdatesRunnerImpl(transactor, histogram, logger)
+    val gauge         = mock[LabeledGauge[IO, projects.Path]]
+    val histogram     = TestLabeledHistogram[SqlQuery.Name]("query_id")
+    val logger        = TestLogger[IO]()
+    val runner        = new StatusUpdatesRunnerImpl(transactor, histogram, logger)
+    val eventDelivery = mock[EventDelivery[IO, ToTriplesStore[IO]]]
   }
 
   private case class TestCommand(eventId:             CompoundEventId,
                                  projectPath:         projects.Path,
                                  gauge:               LabeledGauge[IO, projects.Path],
-                                 maybeProcessingTime: Option[EventProcessingTime] = eventProcessingTimes.generateSome
+                                 maybeProcessingTime: Option[EventProcessingTime] = eventProcessingTimes.generateSome,
+                                 eventDelivery:       EventDelivery[IO, ToTriplesStore[IO]]
   ) extends ChangeStatusCommand[IO] {
     import doobie.implicits._
 
@@ -135,6 +172,8 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     override def updateGauges(
         updateResult:      UpdateResult
     )(implicit transactor: DbTransactor[IO, EventLogDB]) = gauge increment projectPath
+
+    override def updateDelivery(): IO[Unit] = eventDelivery.unregister(eventId)
   }
 
   private def store(eventId: CompoundEventId, projectPath: projects.Path, status: EventStatus): Unit =
@@ -149,7 +188,8 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
   private case class TestFailingCommand(eventId:             CompoundEventId,
                                         projectPath:         projects.Path,
                                         gauge:               LabeledGauge[IO, projects.Path],
-                                        maybeProcessingTime: Option[EventProcessingTime]
+                                        maybeProcessingTime: Option[EventProcessingTime],
+                                        eventDelivery:       EventDelivery[IO, ToTriplesStore[IO]]
   ) extends ChangeStatusCommand[IO] {
     import doobie.implicits._
 
@@ -176,6 +216,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
         updateResult:      UpdateResult
     )(implicit transactor: DbTransactor[IO, EventLogDB]) = gauge increment projectPath
 
+    override def updateDelivery(): IO[Unit] = eventDelivery.unregister(eventId)
   }
 
 }

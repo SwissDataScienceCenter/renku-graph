@@ -26,7 +26,7 @@ import ch.datascience.graph.model.EventsGenerators.categoryNames
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import io.circe.Json
-import io.circe.syntax._
+import io.circe.literal._
 import org.scalatest.concurrent.Eventually
 import org.scalatest.matchers.should
 import org.scalatest.time.{Millis, Seconds, Span}
@@ -85,8 +85,14 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
 
     "send/resend subscription for events" in new TestCase {
 
+      val subscriberId  = subscriberIds.generateOne
       val subscriberUrl = subscriberUrls.generateOne
-      val payload       = jsons.generateOne.deepMerge(Json.obj("subscriberUrl" -> subscriberUrl.value.asJson))
+      val payload       = jsons.generateOne.deepMerge(json"""{
+        "subscriber": {
+          "id": ${subscriberId.value},
+          "url": ${subscriberUrl.value}
+        }
+      }""")
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
       subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
@@ -95,7 +101,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
 
       eventually {
         logger.loggedOnly(
-          Info(s"$categoryName: Subscribed for events with $subscriberUrl")
+          Info(s"$categoryName: Subscribed for events with $subscriberUrl, id = $subscriberId")
         )
       }
     }
@@ -106,8 +112,14 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(
         exception.raiseError[IO, Json]
       )
+      val subscriberId  = subscriberIds.generateOne
       val subscriberUrl = subscriberUrls.generateOne
-      val payload       = jsons.generateOne.deepMerge(Json.obj("subscriberUrl" -> subscriberUrl.value.asJson))
+      val payload       = jsons.generateOne.deepMerge(json"""{
+        "subscriber": {
+          "id": ${subscriberId.value},
+          "url": ${subscriberUrl.value}
+        }
+      }""")
       payloadComposer.`expected prepareSubscriptionPayload responses`.add(payload.pure[IO])
 
       subscriptionSender.`expected postToEventLog responses`.add(payload -> IO.unit)
@@ -117,15 +129,21 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
       eventually {
         logger.loggedOnly(
           Error(s"$categoryName: Composing subscription payload failed", exception),
-          Info(s"$categoryName: Subscribed for events with $subscriberUrl")
+          Info(s"$categoryName: Subscribed for events with $subscriberUrl, id = $subscriberId")
         )
       }
     }
 
     "log an error and retry if sending subscription payload fails" in new TestCase {
 
+      val subscriberId  = subscriberIds.generateOne
       val subscriberUrl = subscriberUrls.generateOne
-      val payload       = jsons.generateOne.deepMerge(Json.obj("subscriberUrl" -> subscriberUrl.value.asJson))
+      val payload       = jsons.generateOne.deepMerge(json"""{
+        "subscriber": {
+          "id": ${subscriberId.value},
+          "url": ${subscriberUrl.value}
+        }
+      }""")
       payloadComposer.`expected prepareSubscriptionPayload default response`.set(payload.pure[IO])
 
       val exception = exceptions.generateOne
@@ -139,7 +157,7 @@ class SubscriptionMechanismSpec extends AnyWordSpec with Eventually with should.
         logger.loggedOnly(
           Error(s"$categoryName: Subscribing for events failed", exception),
           Error(s"$categoryName: Subscribing for events failed", exception),
-          Info(s"$categoryName: Subscribed for events with $subscriberUrl")
+          Info(s"$categoryName: Subscribed for events with $subscriberUrl, id = $subscriberId")
         )
       }
     }

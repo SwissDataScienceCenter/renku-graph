@@ -53,13 +53,13 @@ class EventHandlerSpec
     List(Updated, NotUpdated) foreach { result =>
       s"decode an event with the $GeneratingTriples status from the request, " +
         "schedule event update " +
-        s"and return $Accepted if the update result is $result" in new TestCase {
+        s"and return $Accepted if the event status cleaning returned $result" in new TestCase {
 
           val eventId     = compoundEventIds.generateOne
           val projectPath = projectPaths.generateOne
           val event       = GeneratingTriplesZombieEvent(eventId, projectPath)
 
-          (eventStatusUpdater.changeStatus _)
+          (zombieStatusCleaner.cleanZombieStatus _)
             .expects(event)
             .returning(result.pure[IO])
 
@@ -84,13 +84,13 @@ class EventHandlerSpec
 
       s"decode an event  with the $TransformingTriples status from the request, " +
         "schedule event update " +
-        s"and return $Accepted if the update result is $result" in new TestCase {
+        s"and return $Accepted if the event status cleaning result is $result" in new TestCase {
 
           val eventId     = compoundEventIds.generateOne
           val projectPath = projectPaths.generateOne
           val event       = TransformingTriplesZombieEvent(eventId, projectPath)
 
-          (eventStatusUpdater.changeStatus _)
+          (zombieStatusCleaner.cleanZombieStatus _)
             .expects(event)
             .returning(result.pure[IO])
 
@@ -115,12 +115,12 @@ class EventHandlerSpec
         }
     }
 
-    "log an error if updating status fails" in new TestCase {
+    "log an error if event status cleaning fails" in new TestCase {
 
       val event = events.generateOne
 
       val exception = exceptions.generateOne
-      (eventStatusUpdater.changeStatus _)
+      (zombieStatusCleaner.cleanZombieStatus _)
         .expects(event)
         .returning(exception.raiseError[IO, UpdateResult])
 
@@ -189,14 +189,14 @@ class EventHandlerSpec
 
   private trait TestCase {
 
-    val eventStatusUpdater                 = mock[EventStatusUpdater[IO]]
+    val zombieStatusCleaner                = mock[ZombieStatusCleaner[IO]]
     val logger                             = TestLogger[IO]()
     val awaitingTriplesGenerationGauge     = mock[LabeledGauge[IO, projects.Path]]
     val underTriplesGenerationGauge        = mock[LabeledGauge[IO, projects.Path]]
     val awaitingTriplesTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
     val underTriplesTransformationGauge    = mock[LabeledGauge[IO, projects.Path]]
     val handler = new EventHandler[IO](categoryName,
-                                       eventStatusUpdater,
+                                       zombieStatusCleaner,
                                        awaitingTriplesGenerationGauge,
                                        underTriplesGenerationGauge,
                                        awaitingTriplesTransformationGauge,

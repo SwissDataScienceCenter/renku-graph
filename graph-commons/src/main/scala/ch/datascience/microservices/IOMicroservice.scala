@@ -30,4 +30,5 @@ trait IOMicroservice extends IOApp {
 
   def stopSubProcesses: List[CancelToken[IO]] = subProcessesCancelTokens.keys().asScala.toList
 
+  lazy val Identifier: MicroserviceIdentifier = MicroserviceIdentifier.generate
 }

@@ -20,17 +20,18 @@ package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.effect.{IO, Timer}
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, TransformationNonRecoverableFailure}
+import ch.datascience.graph.model.events.EventStatus.TransformationNonRecoverableFailure
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.metrics.LabeledGauge
 import io.renku.eventlog.statuschange.StatusUpdatesRunner
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
-import io.renku.eventlog.statuschange.commands.{ToGenerationNonRecoverableFailure, ToTransformationNonRecoverableFailure, UpdateResult}
-import io.renku.eventlog.subscriptions.Generators.subscriberUrls
+import io.renku.eventlog.statuschange.commands.{ToTransformationNonRecoverableFailure, UpdateResult}
+import io.renku.eventlog.subscriptions.EventDelivery
 import org.scalamock.matchers.ArgCapture.CaptureAll
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -85,9 +86,11 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
     val underTriplesTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
     val statusUpdateRunner              = mock[StatusUpdatesRunner[IO]]
     val logger                          = TestLogger[IO]()
+    val eventDelivery                   = mock[EventDelivery[IO, ToTransformationNonRecoverableFailure[IO]]]
     val dispatchRecovery = new DispatchRecoveryImpl[IO](
       underTriplesTransformationGauge,
       statusUpdateRunner,
+      eventDelivery,
       logger,
       onErrorSleep = 100 millis
     )

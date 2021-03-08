@@ -36,6 +36,7 @@ import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, exec
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
+import io.renku.eventlog.subscriptions.EventDelivery
 import org.http4s.circe.jsonEncoder
 import org.http4s.headers.`Content-Type`
 import org.http4s.{MediaType, Request}
@@ -84,6 +85,7 @@ class ToGenerationRecoverableFailureSpec
 
         (awaitingTriplesGenerationGauge.increment _).expects(projectPath).returning(IO.unit)
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
+        (eventDelivery.unregister _).expects(eventId).returning(IO.unit)
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
@@ -92,6 +94,7 @@ class ToGenerationRecoverableFailureSpec
                                              awaitingTriplesGenerationGauge,
                                              underTriplesGenerationGauge,
                                              processingTime,
+                                             eventDelivery,
                                              currentTime
           )
 
@@ -127,6 +130,7 @@ class ToGenerationRecoverableFailureSpec
                                                awaitingTriplesGenerationGauge,
                                                underTriplesGenerationGauge,
                                                processingTime,
+                                               eventDelivery,
                                                currentTime
             )
 
@@ -148,7 +152,8 @@ class ToGenerationRecoverableFailureSpec
                                          maybeMessage,
                                          awaitingTriplesGenerationGauge,
                                          underTriplesGenerationGauge,
-                                         maybeProcessingTime
+                                         maybeProcessingTime,
+                                         eventDelivery
           )
 
         val body = json"""{
@@ -162,7 +167,7 @@ class ToGenerationRecoverableFailureSpec
         val request = Request[IO]().withEntity(body)
 
         val actual = ToGenerationRecoverableFailure
-          .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
+          .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge, eventDelivery)
           .run((eventId, request))
         actual.unsafeRunSync() shouldBe CommandFound(expected)
       }
@@ -178,7 +183,7 @@ class ToGenerationRecoverableFailureSpec
 
           val actual =
             ToGenerationRecoverableFailure
-              .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
+              .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge, eventDelivery)
               .run((eventId, request))
           actual.unsafeRunSync() shouldBe NotSupported
         }
@@ -190,7 +195,7 @@ class ToGenerationRecoverableFailureSpec
         val request = Request[IO]().withEntity(body)
 
         val actual = ToGenerationRecoverableFailure
-          .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
+          .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge, eventDelivery)
           .run((eventId, request))
 
         actual.unsafeRunSync() shouldBe PayloadMalformed("No status property in status change payload")
@@ -202,7 +207,7 @@ class ToGenerationRecoverableFailureSpec
 
         val actual =
           ToGenerationRecoverableFailure
-            .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
+            .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge, eventDelivery)
             .run((eventId, request))
 
         actual.unsafeRunSync() shouldBe NotSupported
@@ -219,8 +224,8 @@ class ToGenerationRecoverableFailureSpec
     val eventBatchDate                 = batchDates.generateOne
     val processingTime                 = eventProcessingTimes.generateSome
     val commandRunner                  = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
-
-    val now = Instant.now()
+    val eventDelivery                  = mock[EventDelivery[IO, ToGenerationRecoverableFailure[IO]]]
+    val now                            = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
 

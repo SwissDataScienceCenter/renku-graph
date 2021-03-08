@@ -41,6 +41,8 @@ trait EventLogDbMigrations {
     SubscriptionCategorySyncTimeTableCreator(transactor, logger)
   protected lazy val statusesProcessingTimeTableCreator: Migration =
     StatusesProcessingTimeTableCreator(transactor, logger)
+  protected lazy val subscriberTableCreator:    Migration = SubscriberTableCreator(transactor, logger)
+  protected lazy val eventDeliveryTableCreator: Migration = EventDeliveryTableCreator(transactor, logger)
 
   protected type Migration = { def run(): IO[Unit] }
 
@@ -56,6 +58,8 @@ trait EventLogDbMigrations {
     eventPayloadTableCreator,
     eventPayloadSchemaVersionAdder,
     subscriptionCategorySyncTimeTableCreator,
-    statusesProcessingTimeTableCreator
+    statusesProcessingTimeTableCreator,
+    subscriberTableCreator,
+    eventDeliveryTableCreator
   )
 }

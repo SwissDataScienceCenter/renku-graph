@@ -20,6 +20,7 @@ package io.renku.eventlog.subscriptions
 
 import cats.Applicative
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
 import io.chrisdavenport.log4cats.Logger
 
@@ -41,33 +42,35 @@ private trait Subscribers[Interpretation[_]] {
 private class SubscribersImpl private[subscriptions] (
     categoryName:        CategoryName,
     subscribersRegistry: SubscribersRegistry,
+    subscriberTracker:   SubscriberTracker[IO],
     logger:              Logger[IO]
 )(implicit contextShift: ContextShift[IO])
     extends Subscribers[IO] {
 
   private val applicative = Applicative[IO]
+
   import applicative._
 
   override def add(subscriptionInfo: SubscriptionInfo): IO[Unit] = for {
     wasAdded <- subscribersRegistry add subscriptionInfo
+    _        <- subscriberTracker add subscriptionInfo
     _        <- whenA(wasAdded)(logger.info(s"$categoryName: $subscriptionInfo added"))
   } yield ()
 
-  override def delete(subscriberUrl: SubscriberUrl): IO[Unit] =
-    for {
-      removed <- subscribersRegistry delete subscriberUrl
-      _       <- whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))
-    } yield ()
+  override def delete(subscriberUrl: SubscriberUrl): IO[Unit] = for {
+    removed <- subscribersRegistry delete subscriberUrl
+    _       <- subscriberTracker remove subscriberUrl
+    _       <- whenA(removed)(logger.info(s"$categoryName: $subscriberUrl gone - deleting"))
+  } yield ()
 
   override def markBusy(subscriberUrl: SubscriberUrl): IO[Unit] =
     subscribersRegistry markBusy subscriberUrl
 
-  override def runOnSubscriber(f: SubscriberUrl => IO[Unit]): IO[Unit] =
-    for {
-      subscriberUrlReference <- subscribersRegistry.findAvailableSubscriber()
-      subscriberUrl          <- subscriberUrlReference.get
-      _                      <- f(subscriberUrl)
-    } yield ()
+  override def runOnSubscriber(f: SubscriberUrl => IO[Unit]): IO[Unit] = for {
+    subscriberUrlReference <- subscribersRegistry.findAvailableSubscriber()
+    subscriberUrl          <- subscriberUrlReference.get
+    _                      <- f(subscriberUrl)
+  } yield ()
 
   def getTotalCapacity: Option[Capacity] = subscribersRegistry.getTotalCapacity
 }
@@ -77,14 +80,15 @@ private object Subscribers {
   import cats.effect.IO
 
   def apply(
-      categoryName: CategoryName,
-      logger:       Logger[IO]
+      categoryName:      CategoryName,
+      subscriberTracker: SubscriberTracker[IO],
+      logger:            Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       timer:            Timer[IO],
       executionContext: ExecutionContext
   ): IO[Subscribers[IO]] = for {
     subscribersRegistry <- SubscribersRegistry(categoryName, logger)
-    subscribers         <- IO(new SubscribersImpl(categoryName, subscribersRegistry, logger))
+    subscribers         <- IO(new SubscribersImpl(categoryName, subscribersRegistry, subscriberTracker, logger))
   } yield subscribers
 }

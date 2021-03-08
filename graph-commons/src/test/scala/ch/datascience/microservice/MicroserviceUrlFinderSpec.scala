@@ -16,32 +16,33 @@
  * limitations under the License.
  */
 
-package ch.datascience.events.consumers.subscriptions
+package ch.datascience.microservice
 
 import cats.syntax.all._
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.positiveInts
+import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinderImpl}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.generators.Generators.Implicits._
 
 import java.net.NetworkInterface
 import scala.jdk.CollectionConverters._
 import scala.util.Try
 
-class SubscriberUrlFinderSpec extends AnyWordSpec with should.Matchers {
+class MicroserviceUrlFinderSpec extends AnyWordSpec with should.Matchers {
 
-  "findSubscriberUrl" should {
+  "findBaseUrl" should {
 
-    "return host IP" in new TestCase {
-      finder.findSubscriberUrl() shouldBe SubscriberUrl(
-        s"http:/$findAddress:$microservicePort/events"
+    "return host IP and port" in new TestCase {
+      finder.findBaseUrl() shouldBe MicroserviceBaseUrl(
+        s"http:/$findAddress:$microservicePort"
       ).pure[Try]
     }
   }
 
   private trait TestCase {
     val microservicePort = positiveInts().generateOne
-    val finder           = new SubscriptionUrlFinderImpl[Try](microservicePort)
+    val finder           = new MicroserviceUrlFinderImpl[Try](microservicePort)
   }
 
   private def findAddress = {

@@ -22,6 +22,7 @@ import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventProce
 import ch.datascience.graph.model.projects
 import doobie.implicits._
 import doobie.util.fragment.Fragment
+import io.renku.eventlog.subscriptions.SubscriptionInfo
 
 trait EventDataFetching {
   self: InMemoryEventLogDb =>

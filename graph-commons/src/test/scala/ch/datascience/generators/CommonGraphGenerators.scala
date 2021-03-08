@@ -37,13 +37,14 @@ import ch.datascience.http.rest.paging.{PagingRequest, PagingResponse}
 import ch.datascience.http.rest.{Links, SortBy, paging}
 import ch.datascience.http.server.security.EndpointSecurityException
 import ch.datascience.http.server.security.EndpointSecurityException.{AuthenticationFailure, AuthorizationFailure}
+import ch.datascience.microservices.MicroserviceBaseUrl
 import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.circe.literal._
 import io.renku.jsonld.Schema
-import org.scalacheck.Gen
+import org.scalacheck.{Arbitrary, Gen}
 
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.Base64
@@ -103,6 +104,18 @@ object CommonGraphGenerators {
     .map(CliVersion.apply)
 
   implicit val renkuLogTimeouts: Gen[RenkuLogTimeout] = durations(max = 5 hours) map RenkuLogTimeout.apply
+
+  implicit val microserviceBaseUrls: Gen[MicroserviceBaseUrl] = for {
+    protocol <- Arbitrary.arbBool.arbitrary map {
+                  case true  => "http"
+                  case false => "https"
+                }
+    port <- httpPorts
+    ip1  <- positiveInts(999)
+    ip2  <- positiveInts(999)
+    ip3  <- positiveInts(999)
+    ip4  <- positiveInts(999)
+  } yield MicroserviceBaseUrl(s"$protocol://$ip1$ip2$ip3$ip4:$port")
 
   implicit val renkuBaseUrls: Gen[RenkuBaseUrl] = httpUrls() map RenkuBaseUrl.apply
   implicit val renkuResourcesUrls: Gen[renku.ResourcesUrl] = for {
