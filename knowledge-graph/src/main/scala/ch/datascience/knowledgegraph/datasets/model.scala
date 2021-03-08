@@ -19,8 +19,8 @@
 package ch.datascience.knowledgegraph.datasets
 
 import ch.datascience.graph.model.datasets._
-import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 
 object model {
@@ -34,7 +34,8 @@ object model {
     val creators:         Set[DatasetCreator]
     val dates:            Dates
     val parts:            List[DatasetPart]
-    val projects:         List[DatasetProject]
+    val project:          DatasetProject
+    val usedIn:           List[DatasetProject]
     val keywords:         List[Keyword]
     val versions:         DatasetVersions
     val images:           List[ImageUri]
@@ -50,7 +51,8 @@ object model {
                                       creators:         Set[DatasetCreator],
                                       dates:            Dates,
                                       parts:            List[DatasetPart],
-                                      projects:         List[DatasetProject],
+                                      project:          DatasetProject,
+                                      usedIn:           List[DatasetProject],
                                       keywords:         List[Keyword],
                                       images:           List[ImageUri]
   ) extends Dataset
@@ -65,7 +67,8 @@ object model {
                                    creators:         Set[DatasetCreator],
                                    dates:            Dates,
                                    parts:            List[DatasetPart],
-                                   projects:         List[DatasetProject],
+                                   project:          DatasetProject,
+                                   usedIn:           List[DatasetProject],
                                    keywords:         List[Keyword],
                                    images:           List[ImageUri]
   ) extends Dataset

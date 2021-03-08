@@ -36,7 +36,7 @@ object DatasetsGenerators {
 
   def nonModifiedDatasets(
       sameAs:              Gen[SameAs] = datasetSameAs,
-      projects:            Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
+      usedInProjects:      Gen[NonEmptyList[DatasetProject]] = nonEmptyList(datasetProjects)
   )(implicit renkuBaseUrl: RenkuBaseUrl): Gen[NonModifiedDataset] =
     for {
       id               <- datasetIdentifiers
@@ -50,7 +50,7 @@ object DatasetsGenerators {
       creators         <- nonEmptySet(datasetCreators, maxElements = 4)
       dates            <- datasetDates
       part             <- listOf(datasetParts)
-      projects         <- projects
+      usedIn           <- usedInProjects
     } yield NonModifiedDataset(
       id,
       title,
@@ -62,7 +62,8 @@ object DatasetsGenerators {
       creators,
       dates,
       part,
-      projects.toList,
+      usedIn.head,
+      usedIn.toList,
       keywords,
       images
     )
@@ -89,7 +90,8 @@ object DatasetsGenerators {
       creators,
       dates,
       dataset.parts,
-      List(dataset.projects.headOption getOrElse (throw new IllegalStateException("No projects on a dataset"))),
+      dataset.usedIn.headOption getOrElse (throw new IllegalStateException("No projects on a dataset")),
+      List(dataset.usedIn.headOption getOrElse (throw new IllegalStateException("No projects on a dataset"))),
       keywords,
       imageUrls
     )

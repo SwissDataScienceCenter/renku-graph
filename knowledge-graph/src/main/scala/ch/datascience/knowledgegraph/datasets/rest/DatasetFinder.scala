@@ -46,23 +46,22 @@ private class IODatasetFinder(
 
   def findDataset(identifier: Identifier): IO[Option[Dataset]] =
     for {
-      maybeDetailsFiber <- findBaseDetails(identifier).start
+      usedIn            <- findUsedIn(identifier)
+      maybeDetailsFiber <- findBaseDetails(identifier, usedIn).start
       keywordsFiber     <- findKeywords(identifier).start
       imagesFiber       <- findImages(identifier).start
       creatorsFiber     <- findCreators(identifier).start
       partsFiber        <- findParts(identifier).start
-      projectsFiber     <- findProjects(identifier).start
       maybeDetails      <- maybeDetailsFiber.join
       keywords          <- keywordsFiber.join
       imageUrls         <- imagesFiber.join
       creators          <- creatorsFiber.join
       parts             <- partsFiber.join
-      projects          <- projectsFiber.join
     } yield maybeDetails map { details =>
       details.copy(
         creators = creators,
         parts = parts,
-        projects = projects,
+        usedIn = usedIn,
         keywords = keywords,
         images = imageUrls
       )
@@ -71,15 +70,15 @@ private class IODatasetFinder(
   private implicit class DatasetOps(dataset: Dataset) {
     def copy(creators: Set[DatasetCreator],
              parts:    List[DatasetPart],
-             projects: List[DatasetProject],
+             usedIn:   List[DatasetProject],
              keywords: List[Keyword],
              images:   List[ImageUri]
     ): Dataset =
       dataset match {
         case ds: NonModifiedDataset =>
-          ds.copy(creators = creators, parts = parts, projects = projects, keywords = keywords, images = images)
+          ds.copy(creators = creators, parts = parts, usedIn = usedIn, keywords = keywords, images = images)
         case ds: ModifiedDataset =>
-          ds.copy(creators = creators, parts = parts, projects = projects, keywords = keywords, images = images)
+          ds.copy(creators = creators, parts = parts, usedIn = usedIn, keywords = keywords, images = images)
       }
   }
 }

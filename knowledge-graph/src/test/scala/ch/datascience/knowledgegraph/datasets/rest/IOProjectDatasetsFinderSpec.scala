@@ -47,15 +47,15 @@ class IOProjectDatasetsFinderSpec
     "return the very last modification of a dataset in the given project" in new TestCase {
       forAll(datasetProjects, addedToProjectObjects) { (project, addedToProject) =>
         val originalDataset = nonModifiedDatasets(
-          projects = project.copy(created = addedToProject).toGenerator
+          usedInProjects = project.copy(created = addedToProject).toGenerator
         ).generateOne
         val datasetModification1Creation = project.copy(created = addedToProject) shiftDateAfter project
         val datasetModification1 = modifiedDatasetsOnFirstProject(
-          originalDataset.copy(projects = List(datasetModification1Creation))
+          originalDataset.copy(usedIn = List(datasetModification1Creation))
         ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
         val datasetModification2 = modifiedDatasetsOnFirstProject(
           datasetModification1.copy(
-            projects = List(project.copy(created = addedToProject) shiftDateAfter datasetModification1Creation)
+            usedIn = List(project.copy(created = addedToProject) shiftDateAfter datasetModification1Creation)
           )
         ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
 
@@ -80,12 +80,12 @@ class IOProjectDatasetsFinderSpec
 
     "return non-modified datasets and the very last modifications of project's datasets" in new TestCase {
       forAll(datasetProjects, addedToProjectObjects) { (project, addedToProject) =>
-        val dataset1 = nonModifiedDatasets(projects = project.toGenerator).generateOne
+        val dataset1 = nonModifiedDatasets(usedInProjects = project.toGenerator).generateOne
         val dataset2 = nonModifiedDatasets(
-          projects = project.copy(created = addedToProject).toGenerator
+          usedInProjects = project.copy(created = addedToProject).toGenerator
         ).generateOne
         val dataset2Modification = modifiedDatasetsOnFirstProject(
-          dataset2.copy(projects = List(project.copy(created = addedToProject) shiftDateAfter project))
+          dataset2.copy(usedIn = List(project.copy(created = addedToProject) shiftDateAfter project))
         ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
 
         loadToStore(
@@ -117,10 +117,10 @@ class IOProjectDatasetsFinderSpec
       forAll(datasetProjects) { project =>
         val sharedSameAs = datasetSameAs.generateOne
         val dataset1 = nonModifiedDatasets(
-          projects = project.toGenerator
+          usedInProjects = project.toGenerator
         ).generateOne.copy(sameAs = sharedSameAs)
         val dataset2 = nonModifiedDatasets(
-          projects = project.copy(created = addedToProjectObjects.generateOne).toGenerator
+          usedInProjects = project.copy(created = addedToProjectObjects.generateOne).toGenerator
         ).generateOne.copy(sameAs = sharedSameAs)
 
         loadToStore(
@@ -144,9 +144,9 @@ class IOProjectDatasetsFinderSpec
     "not returned deleted dataset" in new TestCase {
       forAll(projectEntities, addedToProjectObjects) { (project, addedToProject) =>
         val datasetProject = project.toDatasetProject
-        val dataset1       = nonModifiedDatasets(projects = datasetProject.toGenerator).generateOne
+        val dataset1       = nonModifiedDatasets(usedInProjects = datasetProject.toGenerator).generateOne
         val datasetToBeInvalidated = nonModifiedDatasets(
-          projects = datasetProject.copy(created = addedToProject).toGenerator
+          usedInProjects = datasetProject.copy(created = addedToProject).toGenerator
         ).generateOne
 
         val entityWithInvalidation = invalidationEntity(datasetToBeInvalidated.id, project).generateOne
@@ -171,13 +171,13 @@ class IOProjectDatasetsFinderSpec
     "not returned deleted dataset when its latest version was deleted" in new TestCase {
       forAll(projectEntities, addedToProjectObjects) { (project, addedToProject) =>
         val datasetProject = project.toDatasetProject
-        val dataset1       = nonModifiedDatasets(projects = datasetProject.toGenerator).generateOne
+        val dataset1       = nonModifiedDatasets(usedInProjects = datasetProject.toGenerator).generateOne
         val dataset2 = nonModifiedDatasets(
-          projects = datasetProject.copy(created = addedToProject).toGenerator
+          usedInProjects = datasetProject.copy(created = addedToProject).toGenerator
         ).generateOne
 
         val dataset2Modification = modifiedDatasetsOnFirstProject(
-          dataset2.copy(projects = List(datasetProject.copy(created = addedToProject) shiftDateAfter datasetProject))
+          dataset2.copy(usedIn = List(datasetProject.copy(created = addedToProject) shiftDateAfter datasetProject))
         ).generateOne.copy(maybeDescription = datasetDescriptions.generateSome)
 
         val entityWithInvalidation =
