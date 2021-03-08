@@ -193,8 +193,8 @@ class ProjectsResourcesSpec
       val projectDetailsResponseForNonMember =
         knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", nonMemberAccessToken)
 
-      Then("he should get FORBIDDEN response")
-      projectDetailsResponseForNonMember.status shouldBe Forbidden
+      Then("he should get NOT_FOUND response")
+      projectDetailsResponseForNonMember.status shouldBe NotFound
     }
   }
 }
