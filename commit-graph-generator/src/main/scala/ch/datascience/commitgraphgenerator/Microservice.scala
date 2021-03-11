@@ -59,20 +59,15 @@ object Microservice extends IOMicroservice {
   override def run(args: List[String]): IO[ExitCode] = for {
     certificateLoader       <- CertificateLoader[IO](ApplicationLogger)
     gitCertificateInstaller <- GitCertificateInstaller[IO](ApplicationLogger)
-
-    triplesGeneration  <- TriplesGeneration[IO]()
-    sentryInitializer  <- SentryInitializer[IO]()
-    metricsRegistry    <- MetricsRegistry()
-    gitLabRateLimit    <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
-    gitLabThrottler    <- Throttler[IO, GitLab](gitLabRateLimit)
-    sparqlTimeRecorder <- SparqlQueryTimeRecorder(metricsRegistry)
+    sentryInitializer       <- SentryInitializer[IO]()
+    metricsRegistry         <- MetricsRegistry()
+    gitLabRateLimit         <- RateLimit.fromConfig[IO, GitLab]("services.gitlab.rate-limit")
+    gitLabThrottler         <- Throttler[IO, GitLab](gitLabRateLimit)
     awaitingGenerationSubscription <- events.categories.awaitinggeneration.SubscriptionFactory(
                                         metricsRegistry,
                                         gitLabThrottler,
-                                        sparqlTimeRecorder,
                                         ApplicationLogger
                                       )
-
     eventConsumersRegistry  <- consumers.EventConsumersRegistry(ApplicationLogger, awaitingGenerationSubscription)
     eventProcessingEndpoint <- IOEventEndpoint(eventConsumersRegistry)
     microserviceRoutes =

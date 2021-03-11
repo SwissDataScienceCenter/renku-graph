@@ -56,7 +56,7 @@ object bundles extends Schemas {
       projectCreatedDates.generateOne,
       projectCreators.generateOption,
       projectVisibilities.generateOption,
-      version = projectSchemaVersions.generateOne
+      version = schemaVersions.generateOne
     )
 
   def fileCommit(
@@ -109,7 +109,7 @@ object bundles extends Schemas {
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeParent:         Option[Project] = None,
-      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
+      projectVersion:      SchemaVersion = schemaVersions.generateOne
   )(
       datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
       datasetTitle:               Title = datasetTitles.generateOne,
@@ -158,7 +158,7 @@ object bundles extends Schemas {
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeParent:         Option[Project] = None,
-      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
+      projectVersion:      SchemaVersion = schemaVersions.generateOne
   )(
       datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
       datasetTitle:               Title = datasetTitles.generateOne,
@@ -221,7 +221,7 @@ object bundles extends Schemas {
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeVisibility:     Option[Visibility] = None,
       maybeParent:         Option[Project] = None,
-      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
+      projectVersion:      SchemaVersion = schemaVersions.generateOne
   )(
       datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
       datasetTitle:               Title = datasetTitles.generateOne,
@@ -270,7 +270,7 @@ object bundles extends Schemas {
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeVisibility:     Option[Visibility] = None,
       maybeParent:         Option[Project] = None,
-      projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
+      projectVersion:      SchemaVersion = schemaVersions.generateOne
   )(
       datasetIdentifier:          Identifier = datasetIdentifiers.generateOne,
       datasetTitle:               Title = datasetTitles.generateOne,
@@ -349,7 +349,7 @@ object bundles extends Schemas {
         projectCreatedDates.generateOne,
         projectCreators.generateOption,
         projectVisibilities.generateSome,
-        version = projectSchemaVersions.generateOne
+        version = schemaVersions.generateOne
       )
       val agent           = Agent(cliVersion)
       val dataSetId       = datasets.Identifier("d67a1653-0b6e-463b-89a0-afe72a53c8bb")

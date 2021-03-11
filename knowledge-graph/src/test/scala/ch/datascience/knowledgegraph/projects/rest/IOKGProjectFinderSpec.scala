@@ -48,7 +48,7 @@ class IOKGProjectFinderSpec
         val maybeProjectCreator = project.created.maybeCreator
         loadToStore(
           fileCommit(commitId = commitIds.generateOne)(projectPath = projectPaths.generateOne,
-                                                       projectVersion = projectSchemaVersions.generateOne
+                                                       projectVersion = schemaVersions.generateOne
           ),
           fileCommit(
             commitId = commitIds.generateOne,
@@ -85,7 +85,7 @@ class IOKGProjectFinderSpec
                 maybeCreator = parent.created.maybeCreator.toMaybePerson,
                 maybeVisibility = None,
                 maybeParentProject = None,
-                version = projectSchemaVersions.generateOne
+                version = schemaVersions.generateOne
               )
             },
             projectVersion = project.version

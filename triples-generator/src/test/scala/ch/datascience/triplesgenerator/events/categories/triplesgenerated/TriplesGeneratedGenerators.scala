@@ -22,7 +22,7 @@ import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.{exceptions, nonEmptyStrings}
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.projectSchemaVersions
+import ch.datascience.graph.model.GraphModelGenerators.schemaVersions
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import org.scalacheck.Gen
 
@@ -36,6 +36,6 @@ object TriplesGeneratedGenerators {
     eventId       <- eventIds
     project       <- projects
     triples       <- jsonLDTriples
-    schemaVersion <- projectSchemaVersions
+    schemaVersion <- schemaVersions
   } yield TriplesGeneratedEvent(eventId, project, triples, schemaVersion)
 }

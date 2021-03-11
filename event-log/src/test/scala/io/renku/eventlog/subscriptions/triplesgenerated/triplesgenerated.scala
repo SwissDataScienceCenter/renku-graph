@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
+import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, schemaVersions}
 import io.renku.eventlog.EventContentGenerators._
 import org.scalacheck.Gen
 
@@ -29,6 +29,6 @@ package object triplesgenerated {
     eventId       <- compoundEventIds
     projectPath   <- projectPaths
     payload       <- eventPayloads
-    schemaVersion <- projectSchemaVersions
+    schemaVersion <- schemaVersions
   } yield TriplesGeneratedEvent(eventId, projectPath, payload, schemaVersion)
 }

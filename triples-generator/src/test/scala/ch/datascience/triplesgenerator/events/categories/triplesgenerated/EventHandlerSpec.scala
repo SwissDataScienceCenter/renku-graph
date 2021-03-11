@@ -151,7 +151,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     val eventBody     = eventBodies.generateOne
     val projectPath   = projectPaths.generateOne
     val project       = Project(eventId.projectId, projectPath)
-    val schemaVersion = projectSchemaVersions.generateOne
+    val schemaVersion = schemaVersions.generateOne
 
     val bodyContent = json"""{ "schemaVersion": ${schemaVersion.value}, "payload": ${eventBody.value} }""".noSpaces
 

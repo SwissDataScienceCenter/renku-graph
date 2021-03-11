@@ -307,7 +307,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
   private trait TestCase {
     val eventId       = compoundEventIds.generateOne
     val rawTriples    = jsonLDTriples.generateOne
-    val schemaVersion = projectSchemaVersions.generateOne
+    val schemaVersion = schemaVersions.generateOne
 
     val eventLogUrl         = EventLogUrl(externalServiceBaseUrl)
     val microserviceBaseUrl = microserviceBaseUrls.generateOne

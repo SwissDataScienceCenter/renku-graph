@@ -1,11 +1,9 @@
-# triples-generator
+# commit-graph-generator
 
 This is a microservice which:
 
-- listens to notification from the Event Log,
-- clones the Git project, checks out the commit `id` in order to create RDF triples by invoking `renku log --format rdf`
-  ,
-- uploads the generated triples to Jena Fuseki
+- subscribes for events from the Event Log for the AWAITING_GENERATION category,
+- upon event arrival: clones the Git project, checks out the commit `id` in order to build a renku graph by invoking `renku log --format json-ld`
 
 ## API
 
@@ -57,53 +55,6 @@ Accepts an event as multipart requests.
 }
 ```
 
-- **TRIPLES_GENERATED**
-
-**Multipart Request**
-
-`event` part:
-
-```json
-{
-  "categoryName": "TRIPLES_GENERATED",
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
-  "project": {
-    "id": 12,
-    "path": "project/path"
-  }
-}
-```
-
-`payload` part as a string:
-
-```
-"JSON payload as string"
-```
-
-`payload` example:
-
-```json
-{
-  "payload": "json-ld payload as string",
-  "schemaVersion": "8"
-}
-```
-
-- **MEMBER_SYNC**
-
-**Multipart Request**
-
-`event` part:
-
-```json
-{
-  "categoryName": "MEMBER_SYNC",
-  "project": {
-    "path": "namespace/project-name"
-  }
-}
-```
-
 ##### Response
 
 | Status                     | Description                                                                  |
@@ -126,22 +77,22 @@ Verifies service health.
 
 ### Trying out
 
-The triples-generator is a part of multi-module sbt project thus it has to be built from the root level.
+The commit-graph-generator is a part of multi-module sbt project thus it has to be built from the root level.
 
 - build the docker image
 
 ```bash
-docker build -f triples-generator/Dockerfile -t triples-generator .
+docker build -f commit-graph-generator/Dockerfile -t commit-graph-generator .
 ```
 
 - run the service
 
 ```bash
-docker run --rm -e 'JENA_BASE_URL=<jena-url>' -e 'JENA_ADMIN_PASSWORD=<jena-password>' -e 'GITLAB_BASE_URL=<gitlab-url>' -e 'EVENT_LOG_POSTGRES_HOST=<postgres-host>' -e 'EVENT_LOG_POSTGRES_USER=<user>' -e 'EVENT_LOG_POSTGRES_PASSWORD=<password>' -p 9002:9002 triples-generator
+docker run --rm -e 'GITLAB_BASE_URL=<gitlab-url>' -e 'EVENT_LOG_POSTGRES_HOST=<postgres-host>' -e 'EVENT_LOG_POSTGRES_USER=<user>' -e 'EVENT_LOG_POSTGRES_PASSWORD=<password>' -e 'SCHEMA_VERSION=<schemaVersion>' -p 9006:9006 commit-graph-generator
 ```
 
 - check if service is running
 
 ```bash
-curl http://localhost:9002/ping
+curl http://localhost:9006/ping
 

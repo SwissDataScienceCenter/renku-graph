@@ -18,8 +18,10 @@
 
 package ch.datascience.graph.model
 
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import cats.MonadError
+import ch.datascience.config.ConfigLoader
 import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import io.circe.Decoder
 
 final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
@@ -27,6 +29,15 @@ object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   implicit val decoder: Decoder[SchemaVersion] = stringDecoder(SchemaVersion)
 
-// TODO: use RenkuBaseUrl config loader as an example.
+  import ConfigLoader._
+  import com.typesafe.config.{Config, ConfigFactory}
+  import pureconfig.ConfigReader
+
+  private implicit val schemaVersionReader: ConfigReader[SchemaVersion] = stringTinyTypeReader(this)
+
+  def apply[Interpretation[_]](
+      config:    Config = ConfigFactory.load()
+  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[SchemaVersion] =
+    find[Interpretation, SchemaVersion]("schema-version", config)
 
 }

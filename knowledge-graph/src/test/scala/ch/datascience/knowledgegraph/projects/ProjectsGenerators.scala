@@ -83,7 +83,7 @@ object ProjectsGenerators {
       name        <- projectNames
       created     <- projectCreations
       maybeParent <- parentsGen
-      version     <- projectSchemaVersions
+      version     <- schemaVersions
     } yield KGProject(id, name, created, maybeParent, version).copy(
       maybeParent = maybeParent.map { parent =>
         parent.copy(

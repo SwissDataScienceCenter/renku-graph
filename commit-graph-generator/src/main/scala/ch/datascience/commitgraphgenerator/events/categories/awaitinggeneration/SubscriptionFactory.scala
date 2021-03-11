@@ -32,18 +32,16 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 
 object SubscriptionFactory {
-  def apply(currentVersionPair: RenkuVersionPair,
-            metricsRegistry:    MetricsRegistry[IO],
-            gitLabThrottler:    Throttler[IO, GitLab],
-            timeRecorder:       SparqlQueryTimeRecorder[IO],
-            logger:             Logger[IO]
+  def apply(
+      metricsRegistry: MetricsRegistry[IO],
+      gitLabThrottler: Throttler[IO, GitLab],
+      logger:          Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
     subscriptionMechanism <- SubscriptionMechanism(categoryName, payloadsComposerFactory, logger)
-    handler <-
-      EventHandler(currentVersionPair, metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
+    handler               <- EventHandler(metricsRegistry, gitLabThrottler, subscriptionMechanism, logger)
   } yield handler -> subscriptionMechanism
 }

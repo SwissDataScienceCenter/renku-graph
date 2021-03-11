@@ -23,6 +23,7 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.events.consumers.ConsumersModelGenerators._
 import ch.datascience.events.consumers.EventSchedulingResult._
+import ch.datascience.graph.model.GraphModelGenerators.schemaVersions
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -32,7 +33,6 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
 import ch.datascience.commitgraphgenerator.events.categories.awaitinggeneration.EventProcessingGenerators._
-import .renkuVersionPairs
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -54,7 +54,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .returning(commitEvents.pure[IO])
 
         (processingRunner.scheduleForProcessing _)
-          .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
+          .expects(eventId, commitEvents, schemaVersion)
           .returning(EventSchedulingResult.Accepted.pure[IO])
 
         val requestContent: EventRequestContent = requestContent(eventId.asJson(eventEncoder), eventBody.value.some)
@@ -78,7 +78,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
           .returning(commitEvents.pure[IO])
 
         (processingRunner.scheduleForProcessing _)
-          .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
+          .expects(eventId, commitEvents, schemaVersion)
           .returning(EventSchedulingResult.Busy.pure[IO])
 
         val requestContent: EventRequestContent = requestContent(eventId.asJson(eventEncoder), eventBody.value.some)
@@ -129,7 +129,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
       val exception = exceptions.generateOne
       (processingRunner.scheduleForProcessing _)
-        .expects(eventId, commitEvents, renkuVersionPair.schemaVersion)
+        .expects(eventId, commitEvents, schemaVersion)
         .returning(exception.raiseError[IO, EventSchedulingResult])
 
       val requestContent: EventRequestContent = requestContent(eventId.asJson(eventEncoder), eventBody.value.some)
@@ -151,9 +151,9 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
 
     val processingRunner      = mock[EventsProcessingRunner[IO]]
     val eventBodyDeserializer = mock[EventBodyDeserializer[IO]]
-    val renkuVersionPair      = renkuVersionPairs.generateOne
+    val schemaVersion         = schemaVersions.generateOne
     val logger                = TestLogger[IO]()
-    val handler               = new EventHandler[IO](categoryName, processingRunner, eventBodyDeserializer, renkuVersionPair, logger)
+    val handler               = new EventHandler[IO](categoryName, processingRunner, eventBodyDeserializer, schemaVersion, logger)
     def requestContent(event: Json, maybePayload: Option[String]): EventRequestContent =
       EventRequestContent(event, maybePayload)
   }

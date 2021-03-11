@@ -115,7 +115,7 @@ class ProjectsResourcesSpec
           maybeCreator =
             parentProject.created.maybeCreator.map(creator => entities.Person(creator.name, creator.maybeEmail)),
           maybeVisibility = None,
-          version = projectSchemaVersions.generateOne
+          version = schemaVersions.generateOne
         )
 
       val parentProjectCommitter = persons.generateOne

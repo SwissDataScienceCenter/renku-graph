@@ -274,7 +274,7 @@ private class TriplesGeneratedEventFinderSpec
   }
 
   private trait TestCase extends TestCaseCommons {
-    val schemaVersion = projectSchemaVersions.generateOne
+    val schemaVersion = schemaVersions.generateOne
 
     val finder = new TriplesGeneratedEventFinderImpl(
       transactor,
@@ -298,7 +298,7 @@ private class TriplesGeneratedEventFinderSpec
                           batchDate:            BatchDate = batchDates.generateOne,
                           projectId:            Id = projectIds.generateOne,
                           projectPath:          Path = projectPaths.generateOne,
-                          payloadSchemaVersion: SchemaVersion = projectSchemaVersions.generateOne,
+                          payloadSchemaVersion: SchemaVersion = schemaVersions.generateOne,
                           eventPayload:         EventPayload = eventPayloads.generateOne
   ): (CompoundEventId, EventBody, EventDate, Path, EventPayload) = {
     val eventId   = compoundEventIds.generateOne.copy(projectId = projectId)

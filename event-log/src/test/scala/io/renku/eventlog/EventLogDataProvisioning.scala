@@ -22,7 +22,7 @@ import cats.syntax.all._
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
+import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, schemaVersions}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.{TransformationRecoverableFailure, TransformingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventProcessingTime, EventStatus}
@@ -44,7 +44,7 @@ trait EventLogDataProvisioning {
                            batchDate:            BatchDate = BatchDate(Instant.now),
                            projectPath:          Path = projectPaths.generateOne,
                            maybeMessage:         Option[EventMessage] = None,
-                           payloadSchemaVersion: SchemaVersion = projectSchemaVersions.generateOne,
+                           payloadSchemaVersion: SchemaVersion = schemaVersions.generateOne,
                            maybeEventPayload:    Option[EventPayload] = None
   ): Unit = {
     upsertProject(compoundEventId, projectPath, eventDate)
@@ -94,7 +94,7 @@ trait EventLogDataProvisioning {
       execute {
         sql"""|INSERT INTO
               |event_payload (event_id, project_id, payload, schema_version)
-              |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, ${payload.value}, ${schemaVersion.value})
+              |VALUES (${compoundEventId.id}, ${compoundEventId.projectId}, ${payload.value}, $schemaVersion)
               |ON CONFLICT (event_id, project_id, schema_version)
               |DO UPDATE SET payload = excluded.payload
       """.stripMargin.update.run.void

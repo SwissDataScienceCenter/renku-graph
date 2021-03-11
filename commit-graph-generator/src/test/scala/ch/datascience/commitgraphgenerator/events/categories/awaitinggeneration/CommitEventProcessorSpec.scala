@@ -188,7 +188,6 @@ class CommitEventProcessorSpec
       IOCommitEventProcessor(
         metricsRegistry,
         Throttler.noThrottling,
-        new SparqlQueryTimeRecorder(TestExecutionTimeRecorder(logger)),
         logger
       ).unsafeRunSync()
     }
@@ -203,7 +202,7 @@ class CommitEventProcessorSpec
 
     val eventId          = compoundEventIds.generateOne
     val maybeAccessToken = Gen.option(accessTokens).generateOne
-    val schemaVersion    = projectSchemaVersions.generateOne
+    val schemaVersion    = schemaVersions.generateOne
 
     val accessTokenFinder       = mock[AccessTokenFinder[Try]]
     val triplesFinder           = mock[TriplesGenerator[Try]]

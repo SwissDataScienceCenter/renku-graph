@@ -72,7 +72,6 @@ object EventHandler {
   def apply(
       metricsRegistry:       MetricsRegistry[IO],
       gitLabThrottler:       Throttler[IO, GitLab],
-      timeRecorder:          SparqlQueryTimeRecorder[IO],
       subscriptionMechanism: SubscriptionMechanism[IO],
       logger:                Logger[IO]
   )(implicit
@@ -80,8 +79,12 @@ object EventHandler {
       executionContext: ExecutionContext,
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    // TODO: read SchemaVersion from Config here and remove it as a parameter
-    processingRunner <-
-      IOEventsProcessingRunner(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
-  } yield new EventHandler[IO](categoryName, processingRunner, EventBodyDeserializer(), schemaVersion = ???, logger)
+    schemaVersion    <- SchemaVersion[IO]()
+    processingRunner <- IOEventsProcessingRunner(metricsRegistry, gitLabThrottler, subscriptionMechanism, logger)
+  } yield new EventHandler[IO](categoryName,
+                               processingRunner,
+                               EventBodyDeserializer(),
+                               schemaVersion = schemaVersion,
+                               logger
+  )
 }

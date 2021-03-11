@@ -110,7 +110,6 @@ private object IOEventsProcessingRunner {
   def apply(
       metricsRegistry:       MetricsRegistry[IO],
       gitLabThrottler:       Throttler[IO, GitLab],
-      timeRecorder:          SparqlQueryTimeRecorder[IO],
       subscriptionMechanism: SubscriptionMechanism[IO],
       logger:                Logger[IO],
       config:                Config = ConfigFactory.load()
@@ -120,7 +119,7 @@ private object IOEventsProcessingRunner {
       timer:            Timer[IO]
   ): IO[EventsProcessingRunner[IO]] =
     for {
-      eventProcessor      <- IOCommitEventProcessor(metricsRegistry, gitLabThrottler, timeRecorder, logger)
+      eventProcessor      <- IOCommitEventProcessor(metricsRegistry, gitLabThrottler, logger)
       generationProcesses <- GenerationProcessesNumber(config)
       semaphore           <- Semaphore(generationProcesses.value)
     } yield new EventsProcessingRunnerImpl(eventProcessor,

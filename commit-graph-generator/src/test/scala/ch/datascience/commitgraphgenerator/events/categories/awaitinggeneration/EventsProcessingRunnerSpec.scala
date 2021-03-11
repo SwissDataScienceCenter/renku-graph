@@ -110,7 +110,7 @@ class EventsProcessingRunnerSpec
     val eventIdCausingFailure = compoundEventIds.generateOne
     val events                = commitEvents.generateNonEmptyList()
     val exception             = exceptions.generateOne
-    val schemaVersion         = projectSchemaVersions.generateOne
+    val schemaVersion         = schemaVersions.generateOne
 
     val eventProcessingTime = 500 millis
     val eventProcessor: EventProcessor[IO] =

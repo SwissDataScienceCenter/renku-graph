@@ -22,7 +22,7 @@ import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies, eventProcessingTimes}
-import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
+import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, schemaVersions}
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
@@ -315,7 +315,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     val processingTime = eventProcessingTimes.generateSome
 
     val payload       = eventPayloads.generateOne
-    val schemaVersion = projectSchemaVersions.generateOne
+    val schemaVersion = schemaVersions.generateOne
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
     val eventDelivery = mock[EventDelivery[IO, ToTriplesGenerated[IO]]]
     val now           = Instant.now()

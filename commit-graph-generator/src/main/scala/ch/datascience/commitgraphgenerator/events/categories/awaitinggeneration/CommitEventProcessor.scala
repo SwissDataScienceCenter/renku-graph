@@ -215,7 +215,6 @@ private object IOCommitEventProcessor {
   def apply(
       metricsRegistry: MetricsRegistry[IO],
       gitLabThrottler: Throttler[IO, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[IO],
       logger:          Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
