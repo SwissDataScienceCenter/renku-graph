@@ -98,27 +98,24 @@ private class ReProvisioningStatusImpl(
     )
   }
 
-  override def isReProvisioning(): IO[Boolean] =
-    for {
-      isCacheExpired <- isCacheExpired
-      flag <- if (isCacheExpired) fetchStatus flatMap {
-                case Some(Running) => triggerPeriodicStatusCheck() map (_ => true)
-                case _             => updateCacheCheckTime() map (_ => false)
-              }
-              else false.pure[IO]
-    } yield flag
+  override def isReProvisioning(): IO[Boolean] = for {
+    isCacheExpired <- isCacheExpired
+    flag <- if (isCacheExpired) fetchStatus flatMap {
+              case Some(Running) => triggerPeriodicStatusCheck() map (_ => true)
+              case _             => updateCacheCheckTime() map (_ => false)
+            }
+            else false.pure[IO]
+  } yield flag
 
-  private def isCacheExpired: IO[Boolean] =
-    for {
-      lastCheckTime <- lastCacheCheckTimeRef.get
-      currentTime   <- timer.clock.monotonic(TimeUnit.MILLISECONDS)
-    } yield currentTime - lastCheckTime > cacheRefreshInterval.toMillis
+  private def isCacheExpired: IO[Boolean] = for {
+    lastCheckTime <- lastCacheCheckTimeRef.get
+    currentTime   <- timer.clock.monotonic(TimeUnit.MILLISECONDS)
+  } yield currentTime - lastCheckTime > cacheRefreshInterval.toMillis
 
-  private def updateCacheCheckTime() =
-    for {
-      currentTime <- timer.clock.monotonic(TimeUnit.MILLISECONDS)
-      _           <- lastCacheCheckTimeRef set currentTime
-    } yield ()
+  private def updateCacheCheckTime() = for {
+    currentTime <- timer.clock.monotonic(TimeUnit.MILLISECONDS)
+    _           <- lastCacheCheckTimeRef set currentTime
+  } yield ()
 
   private def triggerPeriodicStatusCheck(): IO[Unit] =
     whenA(!runningStatusCheckStarted.get()) {
@@ -126,21 +123,20 @@ private class ReProvisioningStatusImpl(
       periodicStatusCheck.start.void
     }
 
-  private def periodicStatusCheck: IO[Unit] =
-    for {
-      _ <- timer sleep statusRefreshInterval
-      _ <- fetchStatus flatMap {
-             case Some(Running) => periodicStatusCheck
-             case _ =>
-               runningStatusCheckStarted set false
-               renewAllSubscriptions()
-           }
-    } yield ()
+  private def periodicStatusCheck: IO[Unit] = for {
+    _ <- timer sleep statusRefreshInterval
+    _ <- fetchStatus flatMap {
+           case Some(Running) => periodicStatusCheck
+           case _ =>
+             runningStatusCheckStarted set false
+             renewAllSubscriptions()
+         }
+  } yield ()
 
   private def fetchStatus: IO[Option[Status]] = queryExpecting[Option[Status]] {
     SparqlQuery.of(
       name = "re-provisioning - get status",
-      Prefixes.of(rdf -> "rdf"),
+      Prefixes of rdf -> "rdf",
       s"""|SELECT ?status
           |WHERE { 
           |  <${id(renkuBaseUrl)}> rdf:type <$objectType>;

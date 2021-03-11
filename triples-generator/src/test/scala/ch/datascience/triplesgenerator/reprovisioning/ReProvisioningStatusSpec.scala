@@ -111,7 +111,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
 
       clearStatus()
 
-      sleep((statusRefreshInterval + (200 millis)).toMillis)
+      sleep((statusRefreshInterval + (500 millis)).toMillis)
 
       reProvisioningStatus.isReProvisioning().unsafeRunSync() shouldBe false
     }
@@ -156,7 +156,7 @@ class ReProvisioningStatusSpec extends AnyWordSpec with should.Matchers with Moc
   private def clearStatus(): Unit = runUpdate {
     SparqlQuery.of(
       name = "re-provisioning - status remove",
-      Prefixes.of(rdf -> "rdf"),
+      Prefixes of rdf -> "rdf",
       s"""|DELETE { ?s ?p ?o }
           |WHERE {
           | ?s ?p ?o;
