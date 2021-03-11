@@ -16,12 +16,7 @@
  * limitations under the License.
  */
 
-addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.2")
+name := "commit-graph-generator"
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.8.0")
-
-addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.6.0")
-
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.13")
-
-addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.10.0-RC1")
+libraryDependencies += "ch.qos.logback" % "logback-classic" % "1.2.3"
+libraryDependencies += "com.lihaoyi"   %% "ammonite-ops"    % "2.3.8"

@@ -22,6 +22,7 @@ lazy val root = Project(
   tokenRepository,
   webhookService,
   triplesGenerator,
+  commitGraphGenerator,
   knowledgeGraph
 )
 
@@ -87,6 +88,21 @@ lazy val triplesGenerator = Project(
   AutomateHeaderPlugin
 )
 
+lazy val commitGraphGenerator = Project(
+  id = "commit-graph-generator",
+  base = file("commit-graph-generator")
+).settings(
+  commonSettings
+).dependsOn(
+  jsonLd       % "compile->compile",
+  jsonLd       % "test->test",
+  graphCommons % "compile->compile",
+  graphCommons % "test->test"
+).enablePlugins(
+  JavaAppPackaging,
+  AutomateHeaderPlugin
+)
+
 lazy val tokenRepository = Project(
   id = "token-repository",
   base = file("token-repository")
@@ -121,6 +137,7 @@ lazy val acceptanceTests = Project(
 ).dependsOn(
   webhookService,
   triplesGenerator,
+  commitGraphGenerator,
   tokenRepository,
   knowledgeGraph % "test->test",
   graphCommons   % "test->test",

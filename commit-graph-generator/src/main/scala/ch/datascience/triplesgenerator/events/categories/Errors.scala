@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Swiss Data Science Center (SDSC)
+ * Copyright 2021 Swiss Data Science Center (SDSC)
  * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
  * Eidgenössische Technische Hochschule Zürich (ETHZ).
  *
@@ -16,12 +16,8 @@
  * limitations under the License.
  */
 
-addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.2")
+package ch.datascience.triplesgenerator.events.categories
 
-addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.8.0")
-
-addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.6.0")
-
-addSbtPlugin("com.github.gseitz" % "sbt-release" % "1.0.13")
-
-addSbtPlugin("net.virtual-void" % "sbt-dependency-graph" % "0.10.0-RC1")
+object Errors {
+  trait ProcessingRecoverableError extends Exception
+}
