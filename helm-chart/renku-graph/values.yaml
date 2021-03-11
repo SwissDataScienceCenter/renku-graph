@@ -45,17 +45,6 @@ triplesGenerator:
   # set this to a pip-installable renku-python version which will be installed on startup
   renkuPythonDevVersion:
 
-commitGraphGenerator:
-  image:
-    repository: travissdsc/commit-graph-generator
-    tag: '1.33.1'
-    pullPolicy: IfNotPresent
-  renkuLogTimeout: 180 minutes
-  gitlab:
-    rateLimit: 30/sec
-  # set this to a pip-installable renku-python version which will be installed on startup
-  renkuPythonDevVersion:
-
 webhookService:
   image:
     repository: renku/webhook-service
