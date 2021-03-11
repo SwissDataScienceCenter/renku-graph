@@ -45,6 +45,11 @@ triplesGenerator:
   # set this to a pip-installable renku-python version which will be installed on startup
   renkuPythonDevVersion:
 
+commitGraphGenerator:
+  image:
+    repository: renku/commit-graph-generator
+    tag: 'latest'
+
 webhookService:
   image:
     repository: renku/webhook-service
