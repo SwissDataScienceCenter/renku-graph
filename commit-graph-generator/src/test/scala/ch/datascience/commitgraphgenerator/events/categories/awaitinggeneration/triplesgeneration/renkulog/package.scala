@@ -16,17 +16,16 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model
+package ch.datascience.commitgraphgenerator.events.categories.awaitinggeneration.triplesgeneration
 
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import ch.datascience.tinytypes.constraints.NonBlank
-import io.circe.Decoder
+import java.nio.file.Paths
 
-final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
-object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank {
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  implicit val decoder: Decoder[SchemaVersion] = stringDecoder(SchemaVersion)
+import ch.datascience.generators.Generators.relativePaths
+import org.scalacheck.Gen
 
-// TODO: use RenkuBaseUrl config loader as an example.
+package object renkulog {
 
+  val paths: Gen[os.Path] = for {
+    path <- relativePaths()
+  } yield os.Path(Paths.get(s"/$path"))
 }

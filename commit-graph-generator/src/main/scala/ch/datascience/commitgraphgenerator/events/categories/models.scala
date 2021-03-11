@@ -16,17 +16,13 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model
+package ch.datascience.commitgraphgenerator.events.categories
 
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import ch.datascience.tinytypes.constraints.NonBlank
-import io.circe.Decoder
+import ch.datascience.graph.model.events.CompoundEventId
 
-final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
-object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank {
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  implicit val decoder: Decoder[SchemaVersion] = stringDecoder(SchemaVersion)
+object models {
 
-// TODO: use RenkuBaseUrl config loader as an example.
-
+  trait CategoryEvent {
+    def compoundEventId: CompoundEventId
+  }
 }

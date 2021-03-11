@@ -16,17 +16,27 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model
+package ch.datascience.commitgraphgenerator
 
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import ch.datascience.tinytypes.constraints.NonBlank
-import io.circe.Decoder
+import cats.effect.{Clock, ConcurrentEffect, Resource}
+import ch.datascience.metrics.RoutesMetrics
+import ch.datascience.commitgraphgenerator.events.EventEndpoint
+import org.http4s.dsl.Http4sDsl
 
-final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
-object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank {
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  implicit val decoder: Decoder[SchemaVersion] = stringDecoder(SchemaVersion)
+private class MicroserviceRoutes[F[_]: ConcurrentEffect](
+    eventEndpoint: EventEndpoint[F],
+    routesMetrics: RoutesMetrics[F]
+)(implicit clock:  Clock[F])
+    extends Http4sDsl[F] {
 
-// TODO: use RenkuBaseUrl config loader as an example.
+  import eventEndpoint._
+  import org.http4s.HttpRoutes
+  import routesMetrics._
 
+  // format: off
+  lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
+    case request @ POST -> Root / "events" => processEvent(request)
+    case GET            -> Root / "ping"   => Ok("pong")
+  }.withMetrics
+  // format: on
 }

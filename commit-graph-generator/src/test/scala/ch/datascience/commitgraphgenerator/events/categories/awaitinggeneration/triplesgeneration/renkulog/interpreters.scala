@@ -16,17 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.graph.model
+package ch.datascience.commitgraphgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
 
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import ch.datascience.tinytypes.constraints.NonBlank
-import io.circe.Decoder
+import cats.effect.IO
+import ch.datascience.graph.config.GitLabUrl
+import ch.datascience.commitgraphgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.GitLabRepoUrlFinder
 
-final class SchemaVersion private (val value: String) extends AnyVal with StringTinyType
-object SchemaVersion extends TinyTypeFactory[SchemaVersion](new SchemaVersion(_)) with NonBlank {
-  import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  implicit val decoder: Decoder[SchemaVersion] = stringDecoder(SchemaVersion)
-
-// TODO: use RenkuBaseUrl config loader as an example.
-
-}
+private class IOGitLabRepoUrlFinder(
+    gitLabUrl: GitLabUrl
+) extends GitLabRepoUrlFinder[IO](gitLabUrl)
