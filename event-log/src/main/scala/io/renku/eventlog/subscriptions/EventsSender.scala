@@ -23,13 +23,13 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.http.client.IORestClient
-import ch.datascience.http.client.IORestClient.SleepAfterConnectionIssue
 import ch.datascience.http.client.RestClientError.ConnectivityException
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 private trait EventsSender[Interpretation[_], CategoryEvent] {
   def sendEvent(subscriptionUrl: SubscriberUrl, categoryEvent: CategoryEvent): Interpretation[SendingResult]
@@ -47,7 +47,7 @@ private object EventsSender {
 private class EventsSenderImpl[CategoryEvent](
     categoryEventEncoder: EventEncoder[CategoryEvent],
     logger:               Logger[IO],
-    retryInterval:        FiniteDuration = SleepAfterConnectionIssue
+    retryInterval:        FiniteDuration = 1 second
 )(implicit
     ME:               MonadError[IO, Throwable],
     executionContext: ExecutionContext,
