@@ -21,6 +21,7 @@ lazy val root = Project(
   eventLog,
   tokenRepository,
   webhookService,
+  commitEventService,
   triplesGenerator,
   knowledgeGraph
 )
@@ -62,6 +63,19 @@ lazy val eventLog = Project(
 lazy val webhookService = Project(
   id = "webhook-service",
   base = file("webhook-service")
+).settings(
+  commonSettings
+).dependsOn(
+  graphCommons % "compile->compile",
+  graphCommons % "test->test"
+).enablePlugins(
+  JavaAppPackaging,
+  AutomateHeaderPlugin
+)
+
+lazy val commitEventService = Project(
+  id = "commit-event-service",
+  base = file("commit-event-service")
 ).settings(
   commonSettings
 ).dependsOn(
@@ -120,6 +134,7 @@ lazy val acceptanceTests = Project(
   commonSettings
 ).dependsOn(
   webhookService,
+  commitEventService,
   triplesGenerator,
   tokenRepository,
   knowledgeGraph % "test->test",
