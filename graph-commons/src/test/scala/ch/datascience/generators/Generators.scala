@@ -359,8 +359,7 @@ object Generators {
       def toGeneratorOfOptions: Gen[Option[T]] = Gen.option(generator)
       def toGeneratorOfNonEmptyList(minElements: Int Refined Positive = 1,
                                     maxElements: Int Refined Positive = 5
-      ): Gen[NonEmptyList[T]] =
-        nonEmptyList(generator, minElements, maxElements)
+      ): Gen[NonEmptyList[T]] = nonEmptyList(generator, minElements, maxElements)
 
       def toGeneratorOfSet(minElements: Int Refined NonNegative = 1,
                            maxElements: Int Refined Positive = 5
