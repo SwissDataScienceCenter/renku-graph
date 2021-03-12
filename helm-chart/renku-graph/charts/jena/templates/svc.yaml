@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "jena.fullname" . }}-headless
+  name: {{ template "jena.fullname" . }}-master
   labels:
     app: {{ template "jena.name" . }}
     chart: {{ template "jena.chart" . }}
@@ -9,7 +9,6 @@ metadata:
     heritage: {{ .Release.Service }}
 spec:
   type: {{ .Values.service.type }}
-  clusterIP: None
   ports:
     - port: {{ .Values.service.port }}
       targetPort: jena
@@ -18,3 +17,4 @@ spec:
   selector:
     app: {{ template "jena.name" . }}
     release: {{ .Release.Name }}
+    role: master
