@@ -455,6 +455,36 @@ All events are sent as multipart requests
 }
 ```
 
+- **COMMIT_SYNC**
+
+**Request**
+
+```json
+{
+  "categoryName": "COMMIT_SYNC",
+  "subscriber": {
+    "url":      "http://host/path",
+    "id":       "20210302140653-8641"
+  }
+}
+```
+
+**Event example**
+
+`event` part:
+
+```json
+{
+  "categoryName": "COMMIT_SYNC",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12,
+    "path": "project/path"
+  },
+  "lastSynced": "2001-09-04T11:00:00.000Z"
+}
+```
+
 - **ZOMBIE_CHASING**
 
 **Request**
