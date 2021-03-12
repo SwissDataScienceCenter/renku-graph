@@ -36,7 +36,7 @@ class CommitSyncEventEncoderSpec extends AnyWordSpec with should.Matchers {
         "id":           ${event.id.id.value},
         "project": {
           "id":         ${event.id.projectId.value},
-          "path":       ${event.id.projectId.value}
+          "path":       ${event.projectPath.value}
         },
         "lastSynced":   ${event.lastSyncedDate.value}
       }"""
