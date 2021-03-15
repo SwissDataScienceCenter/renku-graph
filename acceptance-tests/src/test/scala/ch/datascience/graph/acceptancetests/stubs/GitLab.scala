@@ -40,6 +40,7 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
+import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -302,6 +303,10 @@ object GitLab {
     }
   }
 
+  private val instance = WireMock.create().http().host("localhost").port(port.value).build()
+
+  private def stubFor(mappingBuilder: MappingBuilder): StubMapping = instance.register(mappingBuilder)
+
   private val server = {
     val newServer = new WireMockServer(WireMockConfiguration.wireMockConfig().port(port.value))
     newServer.start()
@@ -316,6 +321,4 @@ object GitLab {
     logger.info(s"GitLab stub stopped")
     ()
   }
-
-  lazy val externalServiceBaseUrl: String = s"http://localhost:${server.port()}"
 }

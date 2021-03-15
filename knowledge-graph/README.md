@@ -174,7 +174,60 @@ Response body example:
       "atLocation" : "data/dataset-name/file2"
     }
   ],
+  "project":  {
+    "_links" : [
+      {
+        "rel" : "project-details",
+        "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
+      }
+    ],
+    "path" : "namespace1/project1-name",
+    "name" : "project1 name",
+    "created" : {
+      "dateCreated" : "1970-05-12T06:06:41.448Z",
+      "agent" : {
+        "email" : "n@ulQdsXl",                  // optional property
+        "name" : "v imzn"
+      }
+    }
+  },
   "isPartOf" : [
+    {
+      "_links" : [
+        {
+          "rel" : "project-details",
+          "href" : "https://zemdgsw:9540/projects/namespace1/project1-name"
+        }
+      ],
+      "path" : "namespace1/project1-name",
+      "name" : "project1 name",
+      "created" : {
+        "dateCreated" : "1970-05-12T06:06:41.448Z",
+        "agent" : {
+          "email" : "n@ulQdsXl",                  // optional property
+          "name" : "v imzn"
+        }
+      }
+    },
+    {
+      "_links" : [
+        {
+          "rel" : "project-details",
+          "href" : "https://zemdgsw:9540/projects/namespace2/project2-name"
+        }
+      ],
+      "path" : "namespace2/project2-name",
+      "name" : "project2 name",
+      "created" : {
+        "dateCreated" : "1970-06-12T06:06:41.448Z",
+        "agent" : {
+          "email" : "name@ulQdsXl",               // optional property
+          "name" : "v imzn"
+        }
+      }
+    }
+  ],
+  "usedIn" : [
     {
       "_links" : [
         {
@@ -313,13 +366,12 @@ in the request for non-public projects. Supported headers are:
 
 **Response**
 
-| Status                     | Description                                              |
-|----------------------------|----------------------------------------------------------|
-| OK (200)                   | If project with the given `namespace/name` can be found  |
-| UNAUTHORIZED (401)         | If given auth header cannot be authenticated             |
-| FORBIDDEN (403)            | If given auth header doesn't allow accessing the project |
-| NOT_FOUND (404)            | If there is no project with the given `namespace/name`   |
-| INTERNAL SERVER ERROR (500)| Otherwise                                                |
+| Status                     | Description                                                                                            |
+|----------------------------|--------------------------------------------------------------------------------------------------------|
+| OK (200)                   | If project with the given `namespace/name` can be found                                                |
+| UNAUTHORIZED (401)         | If given auth header cannot be authenticated                                                           |
+| NOT_FOUND (404)            | If there is no project with the given `namespace/name` or user is not authorised to access the project |
+| INTERNAL SERVER ERROR (500)| Otherwise                                                                                              |
 
 Response body example:
 

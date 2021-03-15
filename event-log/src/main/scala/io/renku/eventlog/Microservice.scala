@@ -34,7 +34,7 @@ import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
-import io.renku.eventlog.init.{DbInitializer, IODbInitializer}
+import io.renku.eventlog.init.DbInitializer
 import io.renku.eventlog.latestevents.IOLatestEventsEndpoint
 import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
@@ -67,7 +67,7 @@ object Microservice extends IOMicroservice {
       for {
         certificateLoader           <- CertificateLoader[IO](ApplicationLogger)
         sentryInitializer           <- SentryInitializer[IO]()
-        dbInitializer               <- IODbInitializer(transactor, ApplicationLogger)
+        dbInitializer               <- DbInitializer(transactor, ApplicationLogger)
         metricsRegistry             <- MetricsRegistry()
         queriesExecTimes            <- QueriesExecutionTimes(metricsRegistry)
         statsFinder                 <- IOStatsFinder(transactor, queriesExecTimes)
@@ -126,6 +126,7 @@ object Microservice extends IOMicroservice {
                                     awaitingTransformationGauge,
                                     underTransformationGauge,
                                     queriesExecTimes,
+                                    ServicePort,
                                     ApplicationLogger
                                   )
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)

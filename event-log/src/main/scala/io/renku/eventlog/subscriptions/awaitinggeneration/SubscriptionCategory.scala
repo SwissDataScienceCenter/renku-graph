@@ -24,7 +24,7 @@ import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.subscriptions.{IOEventsDistributor, Subscribers, SubscriptionCategoryImpl, SubscriptionRequestDeserializer}
+import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.{EventLogDB, subscriptions}
 
 import scala.concurrent.ExecutionContext
@@ -38,13 +38,14 @@ private[subscriptions] object SubscriptionCategory {
       waitingEventsGauge:          LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
+      subscriberTracker:           SubscriberTracker[IO],
       logger:                      Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
-    subscribers <- Subscribers(name, logger)
+    subscribers <- Subscribers(name, subscriberTracker, logger)
     eventFetcher <- IOAwaitingGenerationEventFinder(transactor,
                                                     subscribers,
                                                     waitingEventsGauge,
@@ -52,10 +53,15 @@ private[subscriptions] object SubscriptionCategory {
                                                     queriesExecTimes
                     )
     dispatchRecovery <- DispatchRecovery(transactor, underTriplesGenerationGauge, queriesExecTimes, logger)
+    eventDelivery <- EventDelivery[AwaitingGenerationEvent](transactor,
+                                                            compoundEventIdExtractor = (_: AwaitingGenerationEvent).id,
+                                                            queriesExecTimes
+                     )
     eventsDistributor <- IOEventsDistributor(name,
                                              transactor,
                                              subscribers,
                                              eventFetcher,
+                                             eventDelivery,
                                              AwaitingGenerationEventEncoder,
                                              dispatchRecovery,
                                              logger

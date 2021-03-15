@@ -175,6 +175,37 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
     }
   }
 
+  "markEventTransformationFailedRecoverably" should {
+
+    Set(Ok, Conflict, NotFound) foreach { status =>
+      s"succeed if remote responds with $status" in new TestCase {
+        val exception = exceptions.generateOne
+        stubFor {
+          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+            .withRequestBody(equalToJson(json"""{"status": "TRANSFORMATION_RECOVERABLE_FAILURE", "message": ${asString(
+              exception
+            )}}""".spaces2))
+            .willReturn(aResponse().withStatus(status.code))
+        }
+
+        updater.markEventTransformationFailedRecoverably(eventId, exception).unsafeRunSync() shouldBe ((): Unit)
+      }
+    }
+
+    s"fail if remote responds with status different than $Ok" in new TestCase {
+      val status = BadRequest
+
+      stubFor {
+        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          .willReturn(aResponse().withStatus(status.code))
+      }
+
+      intercept[Exception] {
+        updater.markEventTransformationFailedRecoverably(eventId, exceptions.generateOne).unsafeRunSync()
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+    }
+  }
+
   "markEventFailedRecoverably" should {
 
     Set(Ok, Conflict, NotFound) foreach { status =>
@@ -202,6 +233,39 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
       intercept[Exception] {
         updater.markEventFailedRecoverably(eventId, exceptions.generateOne).unsafeRunSync()
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+    }
+  }
+
+  "markEventTransformationFailedNonRecoverably" should {
+
+    Set(Ok, Conflict, NotFound) foreach { status =>
+      s"succeed if remote responds with $status" in new TestCase {
+        val exception = exceptions.generateOne
+        stubFor {
+          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+            .withRequestBody(
+              equalToJson(
+                json"""{"status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE"}""".spaces2
+              )
+            )
+            .willReturn(aResponse().withStatus(status.code))
+        }
+
+        updater.markEventTransformationFailedNonRecoverably(eventId, exception).unsafeRunSync() shouldBe ((): Unit)
+      }
+    }
+
+    s"fail if remote responds with status different than $Ok" in new TestCase {
+      val status = BadRequest
+
+      stubFor {
+        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          .willReturn(aResponse().withStatus(status.code))
+      }
+
+      intercept[Exception] {
+        updater.markEventTransformationFailedNonRecoverably(eventId, exceptions.generateOne).unsafeRunSync()
       }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
   }
@@ -245,8 +309,9 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
     val rawTriples    = jsonLDTriples.generateOne
     val schemaVersion = projectSchemaVersions.generateOne
 
-    val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val updater     = new IOEventStatusUpdater(eventLogUrl, TestLogger())
+    val eventLogUrl         = EventLogUrl(externalServiceBaseUrl)
+    val microserviceBaseUrl = microserviceBaseUrls.generateOne
+    val updater             = new IOEventStatusUpdater(eventLogUrl, microserviceBaseUrl, TestLogger())
   }
 
   private def asString(exception: Exception): String = {

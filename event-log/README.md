@@ -362,8 +362,11 @@ All events are sent as multipart requests
 ```json
 {
   "categoryName": "AWAITING_GENERATION",
-  "subscriberUrl": "http://host/path",
-  "capacity": 4
+  "subscriber": {
+    "url":      "http://host/path",
+    "id":       "20210302140653-8641",
+    "capacity": 4
+  }
 }
 ```
 
@@ -394,7 +397,10 @@ All events are sent as multipart requests
 ```json
 {
   "categoryName": "TRIPLES_GENERATED",
-  "subscriberUrl": "http://host/path"
+  "subscriber": {
+    "url":      "http://host/path",
+    "id":       "20210302140653-8641"
+  }
 }
 ```
 
@@ -429,7 +435,10 @@ All events are sent as multipart requests
 ```json
 {
   "categoryName": "MEMBER_SYNC",
-  "subscriberUrl": "http://host/path"
+  "subscriber": {
+    "url":      "http://host/path",
+    "id":       "20210302140653-8641"
+  }
 }
 ```
 
@@ -446,6 +455,36 @@ All events are sent as multipart requests
 }
 ```
 
+- **COMMIT_SYNC**
+
+**Request**
+
+```json
+{
+  "categoryName": "COMMIT_SYNC",
+  "subscriber": {
+    "url":      "http://host/path",
+    "id":       "20210302140653-8641"
+  }
+}
+```
+
+**Event example**
+
+`event` part:
+
+```json
+{
+  "categoryName": "COMMIT_SYNC",
+  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
+  "project": {
+    "id": 12,
+    "path": "project/path"
+  },
+  "lastSynced": "2001-09-04T11:00:00.000Z"
+}
+```
+
 - **ZOMBIE_CHASING**
 
 **Request**
@@ -453,7 +492,10 @@ All events are sent as multipart requests
 ```json
 {
   "categoryName": "ZOMBIE_CHASING",
-  "subscriberUrl": "http://host/path"
+  "subscriber": {
+    "url":      "http://host/path",
+    "id":       "20210302140653-8641"
+  }
 }
 ```
 
@@ -521,6 +563,18 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | project_id      INT4       PK FK NOT NULL |
 | status          VARCHAR    PK    NOT NULL |
 | processing_time INTERVAL         NOT NULL |
+
+| subscriber                           |
+|--------------------------------------|
+| source_url   VARCHAR     PK NOT NULL |
+| delivery_url VARCHAR     PK NOT NULL |
+| delivery_id  VARCHAR(19)    NOT NULL |
+
+| event_delivery                          |
+|-----------------------------------------|
+| event_id     VARCHAR     PK FK NOT NULL |
+| project_id   INT4        PK FK NOT NULL |
+| delivery_id  VARCHAR(19)       NOT NULL |
 
 ## Trying out
 

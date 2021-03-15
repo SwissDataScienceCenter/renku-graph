@@ -19,12 +19,15 @@
 package io.renku.eventlog
 
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, subscriberIds, subscriberUrls}
+import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, projectSchemaVersions}
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.EventStatus.{TransformationRecoverableFailure, TransformingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects.Path
+import ch.datascience.microservices.MicroserviceBaseUrl
 import doobie.implicits._
 
 import java.time.Instant
@@ -109,5 +112,43 @@ trait EventLogDataProvisioning {
           |ON CONFLICT (event_id, project_id, status)
           |DO UPDATE SET processing_time = excluded.processing_time
       """.stripMargin.update.run.void
+  }
+
+  protected def upsertEventDeliveryInfo(
+      eventId:     CompoundEventId,
+      deliveryId:  SubscriberId = subscriberIds.generateOne,
+      deliveryUrl: SubscriberUrl = subscriberUrls.generateOne,
+      sourceUrl:   MicroserviceBaseUrl = microserviceBaseUrls.generateOne
+  ): Unit = {
+    upsertSubscriber(deliveryId, deliveryUrl, sourceUrl)
+    upsertEventDelivery(eventId, deliveryId)
+  }
+
+  protected def upsertSubscriber(deliveryId:  SubscriberId,
+                                 deliveryUrl: SubscriberUrl,
+                                 sourceUrl:   MicroserviceBaseUrl
+  ): Unit = execute {
+    sql"""|INSERT INTO
+          |subscriber (delivery_id, delivery_url, source_url)
+          |VALUES ($deliveryId, $deliveryUrl, $sourceUrl)
+          |ON CONFLICT (delivery_url, source_url)
+          |DO UPDATE SET delivery_id = $deliveryId, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
+      """.stripMargin.update.run.void
+  }
+
+  protected def upsertEventDelivery(eventId: CompoundEventId, deliveryId: SubscriberId): Unit = execute {
+    sql"""|INSERT INTO
+          |event_delivery (event_id, project_id, delivery_id)
+          |VALUES (${eventId.id}, ${eventId.projectId}, $deliveryId)
+          |ON CONFLICT (event_id, project_id)
+          |DO NOTHING
+      """.stripMargin.update.run.void
+  }
+
+  protected def findAllDeliveries: List[(CompoundEventId, SubscriberId)] = execute {
+    sql"""|SELECT event_id, project_id, delivery_id
+          |FROM event_delivery""".stripMargin
+      .query[(CompoundEventId, SubscriberId)]
+      .to[List]
   }
 }

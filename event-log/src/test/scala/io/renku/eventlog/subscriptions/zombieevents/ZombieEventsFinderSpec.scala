@@ -18,201 +18,81 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import ch.datascience.db.SqlQuery
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.TestLabeledHistogram
-import eu.timepit.refined.api.Refined
-import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
-import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
-import org.scalacheck.Gen
+import io.renku.eventlog.subscriptions.EventFinder
+import io.renku.eventlog.subscriptions.zombieevents.Generators.zombieEvents
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.Duration
+import scala.util.Try
+import ch.datascience.generators.Generators._
+import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Error
 
-class ZombieEventsFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
-
+class ZombieEventsFinderSpec extends AnyWordSpec with MockFactory with should.Matchers {
   "popEvent" should {
+    "returns the event if found by the LongProcessingEventFinder" in new TestCase {
+      val zombieEvent = zombieEvents.generateOne
+      (zombieEventSourceCleaner.removeZombieSources _).expects().returning(().pure[Try])
+      (longProcessingEventsFinder.popEvent _).expects().returning(zombieEvent.some.pure[Try])
 
-    "return an event if " +
-      s"it's in the $GeneratingTriples status " +
-      "there's no info about the last processing times for the project " +
-      "and it's in the status for more than the MaxProcessingTime" in new TestCase {
+      zombieEventFinder.popEvent() shouldBe zombieEvent.some.pure[Try]
+    }
+    "returns the event if found by the LostSubscriberEventFinder" in new TestCase {
+      val zombieEvent = zombieEvents.generateOne
+      (zombieEventSourceCleaner.removeZombieSources _).expects().returning(().pure[Try])
+      (longProcessingEventsFinder.popEvent _).expects().returning(None.pure[Try])
+      (lostSubscriberEventsFinder.popEvent _).expects().returning(zombieEvent.some.pure[Try])
 
-        val eventId = compoundEventIds.generateOne
-        addEvent(
-          eventId,
-          GeneratingTriples,
-          relativeTimestamps(
-            moreThanAgo = maxProcessingTime.value plusMinutes positiveInts().generateOne.value
-          ).generateAs(ExecutionDate)
-        )
-        addEvent(
-          compoundEventIds.generateOne,
-          GeneratingTriples,
-          relativeTimestamps(
-            lessThanAgo = maxProcessingTime.value minusMinutes positiveInts(max = 59).generateOne.value
-          ).generateAs(ExecutionDate)
-        )
+      zombieEventFinder.popEvent() shouldBe zombieEvent.some.pure[Try]
+    }
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, GeneratingTriples))
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
+    "returns the potential event found by the LostZombieEventFinder" in new TestCase {
+      val maybeZombieEvent = zombieEvents.generateOption
+      (zombieEventSourceCleaner.removeZombieSources _).expects().returning(().pure[Try])
+      (longProcessingEventsFinder.popEvent _).expects().returning(None.pure[Try])
+      (lostSubscriberEventsFinder.popEvent _).expects().returning(None.pure[Try])
+      (lostZombieEventsFinder.popEvent _).expects().returning(maybeZombieEvent.pure[Try])
 
-    "return an event if " +
-      s"it's in the $TransformingTriples status " +
-      "there's no info about the last processing times for the project " +
-      "and it's in the status for more than the MaxProcessingTime" in new TestCase {
+      zombieEventFinder.popEvent() shouldBe maybeZombieEvent.pure[Try]
+    }
 
-        val eventId = compoundEventIds.generateOne
-        addEvent(
-          eventId,
-          TransformingTriples,
-          relativeTimestamps(
-            moreThanAgo = maxProcessingTime.value plusMinutes positiveInts().generateOne.value
-          ).generateAs(ExecutionDate)
-        )
-        addEvent(
-          compoundEventIds.generateOne,
-          TransformingTriples,
-          relativeTimestamps(
-            lessThanAgo = maxProcessingTime.value minusMinutes positiveInts(max = 59).generateOne.value
-          ).generateAs(ExecutionDate)
-        )
+    "fail if the LongProcessingEventFinder fails" in new TestCase {
+      val exception = exceptions.generateOne
+      (zombieEventSourceCleaner.removeZombieSources _).expects().returning(().pure[Try])
+      (longProcessingEventsFinder.popEvent _).expects().returning(exception.raiseError[Try, Option[ZombieEvent]])
 
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, TransformingTriples))
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
+      zombieEventFinder.popEvent() shouldBe exception.raiseError[Try, Option[ZombieEvent]]
+    }
 
-    "return an event if " +
-      s"it's in the $GeneratingTriples status " +
-      "there's info about the last processing times for the project " +
-      "and it's in the status for more than the (median from last 3 events) * 2" in new TestCase {
+    "continue if the ZombieEventSourceCleaner fails" in new TestCase {
+      val exception   = exceptions.generateOne
+      val zombieEvent = zombieEvents.generateOne
+      (zombieEventSourceCleaner.removeZombieSources _).expects().returning(exception.raiseError[Try, Unit])
+      (longProcessingEventsFinder.popEvent _).expects().returning(zombieEvent.some.pure[Try])
 
-        val projectId = projectIds.generateOne
-        val datesAndProcessingTimes = {
-          for {
-            executionDate  <- executionDates
-            processingTime <- eventProcessingTimes
-          } yield addEvent(projectId,
-                           executionDate,
-                           currentEventStatus = Gen.oneOf(TriplesGenerated, TriplesStore).generateOne,
-                           processingTime,
-                           processingTimeStatus = GeneratingTriples
-          )
-        }.generateNonEmptyList().toList
+      zombieEventFinder.popEvent() shouldBe zombieEvent.some.pure[Try]
 
-        val medianProcessingTime = {
-          val threeMostEvents = datesAndProcessingTimes.sortBy(_._1).reverse.take(3)
-          val sortedTimes     = threeMostEvents.map(_._2).sorted.reverse
-          sortedTimes(sortedTimes.size / 2)
-        }
+      logger.loggedOnly(Error("ZombieEventSourceCleaner - failure during clean up", exception))
+    }
 
-        val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
-        addEvent(
-          eventId,
-          GeneratingTriples,
-          relativeTimestamps(
-            moreThanAgo =
-              (medianProcessingTime * maxProcessingTimeRatio).value plusMinutes positiveInts().generateOne.value
-          ).generateAs(ExecutionDate)
-        )
-        addEvent(
-          compoundEventIds.generateOne.copy(projectId = projectId),
-          GeneratingTriples,
-          relativeTimestamps(
-            lessThanAgo = (medianProcessingTime * maxProcessingTimeRatio).value minusMinutes 2
-          ).generateAs(ExecutionDate)
-        )
-
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, GeneratingTriples))
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
-
-    "return an event if " +
-      s"it's in the $TransformingTriples status " +
-      "there's info about the last processing times for the project " +
-      "and it's in the status for more than the (median from last 3 events) * 2" in new TestCase {
-
-        val projectId = projectIds.generateOne
-        val datesAndProcessingTimes = {
-          for {
-            executionDate  <- executionDates
-            processingTime <- eventProcessingTimes
-          } yield addEvent(projectId,
-                           executionDate,
-                           currentEventStatus = TriplesStore,
-                           processingTime,
-                           processingTimeStatus = TransformingTriples
-          )
-        }.generateNonEmptyList().toList
-
-        val medianProcessingTime = {
-          val threeMostEvents = datesAndProcessingTimes.sortBy(_._1).reverse.take(3)
-          val sortedTimes     = threeMostEvents.map(_._2).sorted.reverse
-          sortedTimes(sortedTimes.size / 2)
-        }
-
-        val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
-        addEvent(
-          eventId,
-          TransformingTriples,
-          relativeTimestamps(
-            moreThanAgo =
-              (medianProcessingTime * maxProcessingTimeRatio).value plusMinutes positiveInts().generateOne.value
-          ).generateAs(ExecutionDate)
-        )
-        addEvent(
-          compoundEventIds.generateOne.copy(projectId = projectId),
-          TransformingTriples,
-          relativeTimestamps(
-            lessThanAgo = (medianProcessingTime * maxProcessingTimeRatio).value minusMinutes 2
-          ).generateAs(ExecutionDate)
-        )
-
-        finder.popEvent().unsafeRunSync() shouldBe Some(ZombieEvent(eventId, projectPath, TransformingTriples))
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
   }
-
   private trait TestCase {
 
-    val projectPath = projectPaths.generateOne
-
-    val maxProcessingTime = javaDurations(min = Duration.ofHours(1)).generateAs(EventProcessingTime)
-    val maxProcessingTimeRatio: Int Refined Positive = 2
-    val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-
-    val finder = new ZombieEventsFinderImpl(transactor, maxProcessingTime, maxProcessingTimeRatio, queriesExecTimes)
-
-    def addEvent(eventId: CompoundEventId, status: EventStatus, executionDate: ExecutionDate): Unit = storeEvent(
-      eventId,
-      status,
-      executionDate,
-      eventDates.generateOne,
-      eventBodies.generateOne,
-      projectPath = projectPath
-    )
-
-    def addEvent(projectId:            projects.Id,
-                 executionDate:        ExecutionDate,
-                 currentEventStatus:   EventStatus,
-                 processingTime:       EventProcessingTime,
-                 processingTimeStatus: EventStatus
-    ): (ExecutionDate, EventProcessingTime) = {
-      val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
-      addEvent(eventId, currentEventStatus, executionDate)
-      upsertProcessingTime(eventId, processingTimeStatus, processingTime)
-      executionDate -> processingTime
-    }
+    val longProcessingEventsFinder = mock[EventFinder[Try, ZombieEvent]]
+    val lostSubscriberEventsFinder = mock[EventFinder[Try, ZombieEvent]]
+    val zombieEventSourceCleaner   = mock[ZombieEventSourceCleaner[Try]]
+    val lostZombieEventsFinder     = mock[EventFinder[Try, ZombieEvent]]
+    val logger                     = TestLogger[Try]()
+    val zombieEventFinder =
+      new ZombieEventFinder[Try](longProcessingEventsFinder,
+                                 lostSubscriberEventsFinder,
+                                 zombieEventSourceCleaner,
+                                 lostZombieEventsFinder,
+                                 logger
+      )
   }
+
 }

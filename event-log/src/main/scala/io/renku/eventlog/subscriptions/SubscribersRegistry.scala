@@ -22,6 +22,7 @@ import cats.Applicative
 import cats.effect.concurrent.{Deferred, Ref}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.tinytypes.{InstantTinyType, TinyTypeFactory}
 import io.chrisdavenport.log4cats.Logger
@@ -53,9 +54,11 @@ private class SubscribersRegistry(
 
   def add(subscriptionInfo: SubscriptionInfo): IO[Boolean] = for {
     _        <- IO(busyPool remove subscriptionInfo)
-    wasAdded <- IO(Option(availablePool.putIfAbsent(subscriptionInfo, ())).isEmpty)
+    exists   <- IO(Option(availablePool.get(subscriptionInfo)).nonEmpty)
+    _        <- whenA(exists)(IO(availablePool.remove(subscriptionInfo)))
+    wasAdded <- IO(Option(availablePool.put(subscriptionInfo, ())).isEmpty)
     _        <- whenA(wasAdded)(notifyCallerAboutAvailability(subscriptionInfo.subscriberUrl))
-  } yield wasAdded
+  } yield !exists && wasAdded
 
   private def notifyCallerAboutAvailability(subscriberUrl: SubscriberUrl): IO[Unit] = for {
     oldQueue <- shrinkCallersQueue
@@ -161,16 +164,15 @@ private object SubscribersRegistry {
       executionContext: ExecutionContext
   ): IO[SubscribersRegistry] = for {
     subscriberUrlReferenceQueue <- Ref.of[IO, List[Deferred[IO, SubscriberUrl]]](List.empty)
-    registry <-
-      IO(
-        new SubscribersRegistry(categoryName,
-                                subscriberUrlReferenceQueue,
-                                Instant.now _,
-                                logger,
-                                busySleep,
-                                checkupInterval
-        )
-      )
+    registry <- IO {
+                  new SubscribersRegistry(categoryName,
+                                          subscriberUrlReferenceQueue,
+                                          Instant.now _,
+                                          logger,
+                                          busySleep,
+                                          checkupInterval
+                  )
+                }
     _ <- registry.busySubscriberCheckup().foreverM.start
   } yield registry
 }

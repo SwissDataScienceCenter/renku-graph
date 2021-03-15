@@ -22,23 +22,30 @@ import cats.MonadError
 import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl, SubscriptionPayloadComposer}
 import ch.datascience.graph.model.events.CategoryName
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
-import ch.datascience.events.consumers.subscriptions.{IOSubscriptionUrlFinder, SubscriptionPayloadComposer, SubscriptionUrlFinder}
+import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier, MicroserviceUrlFinder}
 import ch.datascience.triplesgenerator.Microservice
+import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.GenerationProcessesNumber
+import eu.timepit.refined.auto._
 import io.circe.Json
 
-private[awaitinggeneration] class PayloadComposer[Interpretation[_]](
-    categoryName: CategoryName,
-    capacity:     GenerationProcessesNumber,
-    urlFinder:    SubscriptionUrlFinder[Interpretation]
-)(implicit ME:    MonadError[Interpretation, Throwable])
-    extends SubscriptionPayloadComposer[Interpretation] {
+private[awaitinggeneration] class PayloadComposer[Interpretation[_]: MonadError[*[_], Throwable]](
+    categoryName:   CategoryName,
+    capacity:       GenerationProcessesNumber,
+    urlFinder:      MicroserviceUrlFinder[Interpretation],
+    microserviceId: MicroserviceIdentifier
+) extends SubscriptionPayloadComposer[Interpretation] {
   import io.circe.syntax._
   import urlFinder._
 
   override def prepareSubscriptionPayload(): Interpretation[Json] =
-    findSubscriberUrl() map (Payload(categoryName, _, capacity).asJson)
+    findBaseUrl()
+      .map(newSubscriberUrl)
+      .map(Subscriber(_, SubscriberId(microserviceId), capacity))
+      .map(Payload(categoryName, _).asJson)
+
+  private def newSubscriberUrl(baseUrl: MicroserviceBaseUrl) = SubscriberUrl(baseUrl, "events")
 }
 
 private[awaitinggeneration] object PayloadComposer {
@@ -46,8 +53,8 @@ private[awaitinggeneration] object PayloadComposer {
   lazy val payloadsComposerFactory: Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] =
     Kleisli[IO, CategoryName, SubscriptionPayloadComposer[IO]] { categoryName =>
       for {
-        subscriptionUrlFinder <- IOSubscriptionUrlFinder(Microservice.ServicePort)
+        subscriptionUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
         capacity              <- GenerationProcessesNumber[IO]()
-      } yield new PayloadComposer[IO](categoryName, capacity, subscriptionUrlFinder)
+      } yield new PayloadComposer[IO](categoryName, capacity, subscriptionUrlFinder, Microservice.Identifier)
     }
 }

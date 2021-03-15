@@ -69,6 +69,8 @@ final case class ToNew[Interpretation[_]](
       } yield ()
     case _ => ME.unit
   }
+
+  override def updateDelivery(): Interpretation[Unit] = ().pure[Interpretation]
 }
 
 object ToNew {

@@ -33,6 +33,8 @@ trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable w
       transactor:                DbTransactor[Interpretation, EventLogDB]
   ): Interpretation[Unit]
 
+  def updateDelivery(): Interpretation[Unit]
+
   def maybeProcessingTime: Option[EventProcessingTime]
 
   def mapResult: Int => UpdateResult = {

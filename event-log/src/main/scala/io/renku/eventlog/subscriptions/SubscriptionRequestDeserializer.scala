@@ -19,8 +19,10 @@
 package io.renku.eventlog.subscriptions
 
 import cats.MonadError
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.events.CategoryName
 import io.circe.{Decoder, Json}
+import io.renku.eventlog.subscriptions.SubscriptionRequestDeserializer.PayloadFactory
 
 private trait SubscriptionRequestDeserializer[Interpretation[_], SubscriptionInfoType <: SubscriptionInfo] {
   def deserialize(payload: Json): Interpretation[Option[SubscriptionInfoType]]
@@ -28,9 +30,11 @@ private trait SubscriptionRequestDeserializer[Interpretation[_], SubscriptionInf
 
 private object SubscriptionRequestDeserializer {
 
+  type PayloadFactory[SubscriptionInfoType] = (SubscriberUrl, SubscriberId, Option[Capacity]) => SubscriptionInfoType
+
   def apply[Interpretation[_], SubscriptionInfoType <: SubscriptionInfo](
       categoryName:   CategoryName,
-      payloadFactory: (SubscriberUrl, Option[Capacity]) => SubscriptionInfoType
+      payloadFactory: PayloadFactory[SubscriptionInfoType]
   )(implicit
       monadError: MonadError[Interpretation, Throwable]
   ): Interpretation[SubscriptionRequestDeserializer[Interpretation, SubscriptionInfoType]] = monadError.catchNonFatal {
@@ -40,7 +44,7 @@ private object SubscriptionRequestDeserializer {
 
 private class SubscriptionRequestDeserializerImpl[Interpretation[_], SubscriptionInfoType <: SubscriptionInfo](
     categoryName:      CategoryName,
-    payloadFactory:    (SubscriberUrl, Option[Capacity]) => SubscriptionInfoType
+    payloadFactory:    PayloadFactory[SubscriptionInfoType]
 )(implicit monadError: MonadError[Interpretation, Throwable])
     extends SubscriptionRequestDeserializer[Interpretation, SubscriptionInfoType] {
 
@@ -48,20 +52,24 @@ private class SubscriptionRequestDeserializerImpl[Interpretation[_], Subscriptio
 
   override def deserialize(payload: Json): Interpretation[Option[SubscriptionInfoType]] =
     payload
-      .as[(String, SubscriberUrl, Option[Capacity])]
+      .as[(String, SubscriberUrl, SubscriberId, Option[Capacity])]
       .fold(_ => Option.empty[SubscriptionInfoType], toCategoryPayload)
       .pure[Interpretation]
 
-  private lazy val toCategoryPayload: ((String, SubscriberUrl, Option[Capacity])) => Option[SubscriptionInfoType] = {
-    case (categoryName.value, subscriberUrl, maybeCapacity) => Some(payloadFactory(subscriberUrl, maybeCapacity))
-    case _                                                  => None
+  private lazy val toCategoryPayload
+      : ((String, SubscriberUrl, SubscriberId, Option[Capacity])) => Option[SubscriptionInfoType] = {
+    case (categoryName.value, subscriberUrl, subscriberId, maybeCapacity) =>
+      payloadFactory(subscriberUrl, subscriberId, maybeCapacity).some
+    case _ => None
   }
 
-  private implicit lazy val payloadDecoder: Decoder[(String, SubscriberUrl, Option[Capacity])] = { cursor =>
-    for {
-      categoryName  <- cursor.downField("categoryName").as[String]
-      subscriberUrl <- cursor.downField("subscriberUrl").as[SubscriberUrl]
-      maybeCapacity <- cursor.downField("capacity").as[Option[Capacity]]
-    } yield (categoryName, subscriberUrl, maybeCapacity)
+  private implicit lazy val payloadDecoder: Decoder[(String, SubscriberUrl, SubscriberId, Option[Capacity])] = {
+    cursor =>
+      for {
+        categoryName  <- cursor.downField("categoryName").as[String]
+        subscriberUrl <- cursor.downField("subscriber").downField("url").as[SubscriberUrl]
+        subscriberId  <- cursor.downField("subscriber").downField("id").as[SubscriberId]
+        maybeCapacity <- cursor.downField("subscriber").downField("capacity").as[Option[Capacity]]
+      } yield (categoryName, subscriberUrl, subscriberId, maybeCapacity)
   }
 }

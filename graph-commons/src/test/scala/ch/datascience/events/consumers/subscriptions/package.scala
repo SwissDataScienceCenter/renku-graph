@@ -19,8 +19,10 @@
 package ch.datascience.events.consumers
 
 import ch.datascience.generators.Generators.httpUrls
+import ch.datascience.microservices.MicroserviceIdentifier
 import org.scalacheck.Gen
 
 package object subscriptions {
+  implicit val subscriberIds:  Gen[SubscriberId]  = Gen.uuid map (_ => SubscriberId(MicroserviceIdentifier.generate))
   implicit val subscriberUrls: Gen[SubscriberUrl] = httpUrls() map SubscriberUrl.apply
 }

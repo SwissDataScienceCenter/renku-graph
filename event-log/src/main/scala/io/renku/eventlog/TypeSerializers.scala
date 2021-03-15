@@ -20,8 +20,10 @@ package io.renku.eventlog
 
 import cats.data.NonEmptyList
 import ch.datascience.events.consumers.Project
+import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
+import ch.datascience.microservices.MicroserviceBaseUrl
 import doobie.util.meta.{LegacyInstantMetaInstance, LegacyLocalDateMetaInstance}
 import doobie.util.{Get, Put, Read}
 import org.postgresql.util.PGInterval
@@ -112,4 +114,12 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
     Project(id, path)
   }
 
+  implicit val subscriberUrlGet: Get[SubscriberUrl] = Get[String].tmap(SubscriberUrl.apply)
+  implicit val subscriberUrlPut: Put[SubscriberUrl] = Put[String].contramap(_.value)
+
+  implicit val subscriberIdGet: Get[SubscriberId] = Get[String].tmap(SubscriberId.apply)
+  implicit val subscriberIdPut: Put[SubscriberId] = Put[String].contramap(_.value)
+
+  implicit val microserviceUrlGet: Get[MicroserviceBaseUrl] = Get[String].tmap(MicroserviceBaseUrl.apply)
+  implicit val microserviceUrlPut: Put[MicroserviceBaseUrl] = Put[String].contramap(_.value)
 }

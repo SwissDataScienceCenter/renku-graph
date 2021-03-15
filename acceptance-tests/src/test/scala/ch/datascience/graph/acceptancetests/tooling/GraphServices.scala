@@ -22,7 +22,7 @@ import cats.effect._
 import cats.effect.concurrent.Semaphore
 import ch.datascience.db.DBConfigProvider
 import ch.datascience.graph.acceptancetests.db.{EventLog, TokenRepository}
-import ch.datascience.graph.acceptancetests.stubs.GitLab
+import ch.datascience.graph.acceptancetests.stubs.{GitLab, RemoteTriplesGenerator}
 import ch.datascience.graph.acceptancetests.tooling.KnowledgeGraphClient.KnowledgeGraphClient
 import ch.datascience.graph.acceptancetests.tooling.WebhookServiceClient.WebhookServiceClient
 import io.renku.eventlog
@@ -110,5 +110,6 @@ object GraphServices {
   sys.addShutdownHook {
     servicesRunner.stopAllServices()
     GitLab.shutdown()
+    RemoteTriplesGenerator.shutdown()
   }
 }

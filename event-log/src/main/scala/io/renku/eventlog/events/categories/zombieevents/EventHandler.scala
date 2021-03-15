@@ -39,7 +39,7 @@ import scala.util.control.NonFatal
 
 private class EventHandler[Interpretation[_]](
     override val categoryName:          CategoryName,
-    statusUpdater:                      EventStatusUpdater[Interpretation],
+    zombieStatusCleaner:                ZombieStatusCleaner[Interpretation],
     awaitingTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
     underTriplesGenerationGauge:        LabeledGauge[Interpretation, projects.Path],
     awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
@@ -62,16 +62,16 @@ private class EventHandler[Interpretation[_]](
                )
 
       result <- (contextShift.shift *> concurrent
-                  .start(changeStatus(event))).toRightT
+                  .start(cleanZombieStatus(event))).toRightT
                   .map(_ => Accepted)
                   .semiflatTap(logger.log(event))
                   .leftSemiflatTap(logger.log(event))
     } yield result
   }.merge
 
-  private def changeStatus(event: ZombieEvent): Interpretation[Unit] = {
+  private def cleanZombieStatus(event: ZombieEvent): Interpretation[Unit] = {
     for {
-      result <- statusUpdater.changeStatus(event)
+      result <- zombieStatusCleaner.cleanZombieStatus(event)
       _      <- Applicative[Interpretation].whenA(result == Updated)(updateGauges(event))
       _      <- logger.logInfo(event, result.toString)
     } yield ()
@@ -127,9 +127,9 @@ private object EventHandler {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    statusUpdater <- EventStatusUpdater(transactor, queriesExecTimes)
+    zombieStatusCleaner <- ZombieStatusCleaner(transactor, queriesExecTimes)
   } yield new EventHandler[IO](categoryName,
-                               statusUpdater,
+                               zombieStatusCleaner,
                                awaitingTriplesGenerationGauge,
                                underTriplesGenerationGauge,
                                awaitingTriplesTransformationGauge,

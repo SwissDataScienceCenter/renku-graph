@@ -76,14 +76,35 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
             Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / dataset.versions.initial)
           )
           .asRight
-        val Right(projectsJsons) = response.as[Json].unsafeRunSync().hcursor.downField("isPartOf").as[List[Json]]
-        projectsJsons should have size dataset.projects.size
+
+        val responseCursor = response.as[Json].unsafeRunSync().hcursor
+
+        val Right(mainProject) = responseCursor.downField("project").as[Json]
+        (mainProject.hcursor.downField("path").as[Path], mainProject._links)
+          .mapN { case (path, links) =>
+            links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
+          }
+          .getOrElse(fail("No 'path' or 'project-details' links on the 'project' element"))
+
+        val Right(projectsJsons) = responseCursor.downField("isPartOf").as[List[Json]]
+        projectsJsons should have size dataset.usedIn.size
         projectsJsons.foreach { json =>
           (json.hcursor.downField("path").as[Path], json._links)
             .mapN { case (path, links) =>
               links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
             }
             .getOrElse(fail("No 'path' or 'project-details' links on the 'isPartOf' elements"))
+        }
+
+        val Right(usedInJsons) = responseCursor.downField("usedIn").as[List[Json]]
+        usedInJsons should have size dataset.usedIn.size
+        usedInJsons.foreach { json =>
+          (json.hcursor.downField("path").as[Path], json._links)
+            .mapN { case (path, links) =>
+              links shouldBe Links.of(Rel("project-details") -> Href(renkuResourcesUrl / "projects" / path))
+            }
+            .getOrElse(fail("No 'path' or 'project-details' links on the 'usedIn' elements"))
+
         }
 
         logger.loggedOnly(Warn(s"Finding '${dataset.id}' dataset finished${executionTimeRecorder.executionTimeInfo}"))
@@ -159,7 +180,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
       published        <- cursor.downField("published").as[(Set[DatasetCreator], Option[PublishedDate])]
       maybeDateCreated <- cursor.downField("created").as[Option[DateCreated]]
       parts            <- cursor.downField("hasPart").as[List[DatasetPart]]
-      projects         <- cursor.downField("isPartOf").as[List[DatasetProject]]
+      project          <- cursor.downField("project").as[DatasetProject]
+      usedIn           <- cursor.downField("usedIn").as[List[DatasetProject]]
       keywords         <- cursor.downField("keywords").as[List[Keyword]]
       maybeSameAs      <- cursor.downField("sameAs").as[Option[SameAs]]
       maybeDerivedFrom <- cursor.downField("derivedFrom").as[Option[DerivedFrom]]
@@ -180,7 +202,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                            published._1,
                            dates,
                            parts,
-                           projects,
+                           project,
+                           usedIn,
                            keywords,
                            images
         )
@@ -197,7 +220,8 @@ class DatasetEndpointSpec extends AnyWordSpec with MockFactory with ScalaCheckPr
                           published._1,
                           dates,
                           parts,
-                          projects,
+                          project,
+                          usedIn,
                           keywords,
                           images
           )

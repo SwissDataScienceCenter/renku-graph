@@ -94,7 +94,9 @@ class DatasetEndpoint[Interpretation[_]: Effect](
         ("published" -> (dataset.creators -> dataset.dates.maybeDatePublished).asJson).some,
         dataset.dates.maybeDateCreated.map(date => "created" -> date.asJson),
         ("hasPart" -> dataset.parts.asJson).some,
-        ("isPartOf" -> dataset.projects.asJson).some,
+        ("project" -> dataset.project.asJson).some,
+        ("isPartOf" -> dataset.usedIn.asJson).some,
+        ("usedIn" -> dataset.usedIn.asJson).some,
         ("keywords" -> dataset.keywords.asJson).some,
         ("images" -> dataset.images.asJson).some
       ).flatten: _*

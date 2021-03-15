@@ -1,0 +1,127 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ch.datascience.graph.acceptancetests
+
+import cats.syntax.all._
+import ch.datascience.generators.CommonGraphGenerators.accessTokens
+import ch.datascience.generators.Generators.Implicits._
+import ch.datascience.graph.acceptancetests.db.EventLog
+import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
+import ch.datascience.graph.acceptancetests.stubs.GitLab._
+import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
+import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
+import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
+import ch.datascience.graph.model.EventsGenerators.commitIds
+import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.http.client.AccessToken
+import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
+import ch.datascience.knowledgegraph.projects.model.Project
+import ch.datascience.microservices.MicroserviceIdentifier
+import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
+import doobie.implicits._
+import io.circe.literal._
+import io.renku.eventlog.EventContentGenerators.eventDates
+import io.renku.eventlog.{EventDate, TypeSerializers}
+import org.scalatest.GivenWhenThen
+import org.scalatest.concurrent.Eventually
+import org.scalatest.featurespec.AnyFeatureSpec
+import org.scalatest.matchers.should
+
+import java.time.Instant
+
+class ZombieEventDetectionSpec
+    extends AnyFeatureSpec
+    with GraphServices
+    with Eventually
+    with ModelImplicits
+    with GivenWhenThen
+    with TypeSerializers
+    with AcceptanceTestPatience
+    with should.Matchers {
+
+  Scenario(
+    s"An event which got stuck in either $GeneratingTriples or $TransformingTriples status " +
+      s"should be detected and re-processes"
+  ) {
+
+    implicit val accessToken: AccessToken = accessTokens.generateOne
+    val project   = projects.generateOne
+    val projectId = project.id
+    val commitId  = commitIds.generateOne
+    val committer = persons.generateOne
+    val eventDate = eventDates.generateOne
+
+    Given("Triples generation is successful")
+    `GET <triples-generator>/projects/:id/commits/:id returning OK with some triples`(project, commitId, committer)
+
+    And("project members/users exists in GitLab")
+    `GET <gitlabApi>/projects/:path/members returning OK with the list of members`(
+      project.path,
+      committer.asMembersList()
+    )
+
+    And("project exists in GitLab")
+    `GET <gitlabApi>/projects/:path returning OK with`(project)
+
+    And("access token is present")
+    givenAccessTokenPresentFor(project)
+
+    And("an event that should be classified as zombie is in the EventLog DB")
+    insertProjectToDB(project, eventDate) shouldBe 1
+    EventLog.execute {
+      insertEventToDB(commitId, project, eventDate) >> insertEventDeliveryToDB(commitId, project)
+    }
+
+    Then("the zombie chasing functionality should re-do the event")
+    eventually {
+      EventLog.findEvents(projectId, status = GeneratingTriples).isEmpty shouldBe true
+      EventLog.findEvents(projectId, status = TriplesStore)              shouldBe List(commitId)
+    }
+  }
+
+  private def insertProjectToDB(project: Project, eventDate: EventDate) = EventLog.execute {
+    sql"""|INSERT INTO project (project_id, project_path, latest_event_date)
+          |VALUES (${project.id.value}, ${project.path.value}, $eventDate)
+          |ON CONFLICT (project_id)
+          |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
+          |""".stripMargin.update.run
+  }
+
+  private def insertEventToDB(commitId: CommitId, project: Project, eventDate: EventDate) =
+    sql"""|INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
+          |VALUES (${commitId.value}, ${project.id.value}, ${GeneratingTriples.value}, $eventDate,
+          |${Instant.now.minusSeconds(60 * 6)},
+          |$eventDate,
+          |$eventDate,
+          |${json"""{
+                      "id": ${commitId.value},
+                      "project": {
+                        "id":   ${project.id.value},
+                        "path": ${project.path.value}
+                      },
+                      "parents": []
+                    }""".noSpaces})
+            """.stripMargin.update.run
+
+  private def insertEventDeliveryToDB(commitId: CommitId, project: Project) =
+    sql"""|INSERT INTO event_delivery (event_id, project_id, delivery_id)
+          |VALUES (${commitId.value}, ${project.id.value}, ${MicroserviceIdentifier.generate.value})
+          |""".stripMargin.update.run
+}
