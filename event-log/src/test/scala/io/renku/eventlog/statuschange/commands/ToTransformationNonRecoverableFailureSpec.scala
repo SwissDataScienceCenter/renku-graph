@@ -36,7 +36,6 @@ import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, exec
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
-import io.renku.eventlog.subscriptions.EventDelivery
 import org.http4s.circe.jsonEncoder
 import org.http4s.headers.`Content-Type`
 import org.http4s.{MediaType, Request}
@@ -82,7 +81,6 @@ class ToTransformationNonRecoverableFailureSpec
         findEvent(eventId) shouldBe Some((executionDate, TransformingTriples, None))
 
         (underTriplesTransformationGauge.decrement _).expects(projectPath).returning(IO.unit)
-        (eventDelivery.unregister _).expects(eventId).returning(IO.unit)
 
         val maybeMessage = Gen.option(eventMessages).generateOne
         val command =
@@ -90,7 +88,6 @@ class ToTransformationNonRecoverableFailureSpec
                                                     maybeMessage,
                                                     underTriplesTransformationGauge,
                                                     processingTime,
-                                                    eventDelivery,
                                                     currentTime
           )
 
@@ -123,7 +120,6 @@ class ToTransformationNonRecoverableFailureSpec
                                                       maybeMessage,
                                                       underTriplesTransformationGauge,
                                                       processingTime,
-                                                      eventDelivery,
                                                       currentTime
             )
 
@@ -144,8 +140,7 @@ class ToTransformationNonRecoverableFailureSpec
           ToTransformationNonRecoverableFailure(eventId,
                                                 maybeMessage,
                                                 underTriplesTransformationGauge,
-                                                maybeProcessingTime,
-                                                eventDelivery
+                                                maybeProcessingTime
           )
 
         val body = json"""{
@@ -159,7 +154,7 @@ class ToTransformationNonRecoverableFailureSpec
         val request = Request[IO]().withEntity(body)
 
         val actual = ToTransformationNonRecoverableFailure
-          .factory[IO](underTriplesTransformationGauge, eventDelivery)
+          .factory[IO](underTriplesTransformationGauge)
           .run((eventId, request))
         actual.unsafeRunSync() shouldBe CommandFound(expected)
       }
@@ -171,7 +166,7 @@ class ToTransformationNonRecoverableFailureSpec
           val request = Request[IO]().withEntity(body)
           val actual =
             ToTransformationNonRecoverableFailure
-              .factory[IO](underTriplesTransformationGauge, eventDelivery)
+              .factory[IO](underTriplesTransformationGauge)
               .run((eventId, request))
           actual.unsafeRunSync() shouldBe NotSupported
         }
@@ -180,7 +175,7 @@ class ToTransformationNonRecoverableFailureSpec
       "return PayloadMalformed if the decoding failed because no status is present " in new TestCase {
         val request = Request[IO]().withEntity(json"""{ }""")
         val actual = ToTransformationNonRecoverableFailure
-          .factory[IO](underTriplesTransformationGauge, eventDelivery)
+          .factory[IO](underTriplesTransformationGauge)
           .run((eventId, request))
 
         actual.unsafeRunSync() shouldBe PayloadMalformed("No status property in status change payload")
@@ -192,7 +187,7 @@ class ToTransformationNonRecoverableFailureSpec
 
         val actual =
           ToTransformationNonRecoverableFailure
-            .factory[IO](underTriplesTransformationGauge, eventDelivery)
+            .factory[IO](underTriplesTransformationGauge)
             .run((eventId, request))
 
         actual.unsafeRunSync() shouldBe NotSupported
@@ -208,7 +203,6 @@ class ToTransformationNonRecoverableFailureSpec
     val eventBatchDate                  = batchDates.generateOne
     val processingTime                  = eventProcessingTimes.generateSome
 
-    val eventDelivery = mock[EventDelivery[IO, ToTransformationNonRecoverableFailure[IO]]]
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()

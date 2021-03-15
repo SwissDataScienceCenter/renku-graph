@@ -32,7 +32,6 @@ import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.subscriptions.EventDelivery
 import io.renku.eventlog.{EventLogDB, EventMessage}
 import org.http4s.{MediaType, Request}
 
@@ -43,22 +42,20 @@ final case class ToSkipped[Interpretation[_]](
     message:              EventMessage,
     underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:  Option[EventProcessingTime],
-    eventDelivery:        EventDelivery[Interpretation, ToSkipped[Interpretation]],
     now:                  () => Instant = () => Instant.now
 )(implicit ME:            Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
   override lazy val status: EventStatus = Skipped
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
+  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
     SqlQuery(
       sql"""|UPDATE event 
             |SET status = $status, execution_date = ${now()}, message = $message
             |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
             |""".stripMargin.update.run,
       name = "generating_triples->skipped"
-    ),
-    Nil
+    )
   )
 
   override def updateGauges(
@@ -67,14 +64,11 @@ final case class ToSkipped[Interpretation[_]](
     case UpdateResult.Updated => findProjectPath(eventId) flatMap underProcessingGauge.decrement
     case _                    => ME.unit
   }
-
-  override def updateDelivery(): Interpretation[Unit] = eventDelivery.unregister(eventId)
 }
 
 object ToSkipped {
   def factory[Interpretation[_]: Sync](
-      underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-      eventDelivery:               EventDelivery[Interpretation, ToSkipped[Interpretation]]
+      underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
@@ -93,8 +87,7 @@ object ToSkipped {
               eventId,
               message,
               underTriplesGenerationGauge,
-              maybeProcessingTime,
-              eventDelivery
+              maybeProcessingTime
             )
           )
         }.merge

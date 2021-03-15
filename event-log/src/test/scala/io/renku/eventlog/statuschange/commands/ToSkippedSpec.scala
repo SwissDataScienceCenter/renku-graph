@@ -36,7 +36,6 @@ import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, exec
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
-import io.renku.eventlog.subscriptions.EventDelivery
 import org.http4s.circe.jsonEncoder
 import org.http4s.headers.`Content-Type`
 import org.http4s.{MediaType, Request}
@@ -77,11 +76,10 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
         findEvent(eventId) shouldBe Some((executionDate, GeneratingTriples, None))
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
-        (eventDelivery.unregister _).expects(eventId).returning(IO.unit)
 
         val message = eventMessages.generateOne
         val command =
-          ToSkipped[IO](eventId, message, underTriplesGenerationGauge, processingTime, eventDelivery, currentTime)
+          ToSkipped[IO](eventId, message, underTriplesGenerationGauge, processingTime, currentTime)
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -107,7 +105,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
 
           val message = eventMessages.generateOne
           val command =
-            ToSkipped[IO](eventId, message, underTriplesGenerationGauge, processingTime, eventDelivery, currentTime)
+            ToSkipped[IO](eventId, message, underTriplesGenerationGauge, processingTime, currentTime)
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
@@ -122,7 +120,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
         val message             = eventMessages.generateOne
         val maybeProcessingTime = eventProcessingTimes.generateOption
         val expected =
-          ToSkipped(eventId, message, underTriplesGenerationGauge, maybeProcessingTime, eventDelivery)
+          ToSkipped(eventId, message, underTriplesGenerationGauge, maybeProcessingTime)
 
         val body = json"""{
             "status": ${EventStatus.Skipped.value},
@@ -133,7 +131,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
 
         val request = Request[IO]().withEntity(body)
 
-        val actual = ToSkipped.factory[IO](underTriplesGenerationGauge, eventDelivery).run((eventId, request))
+        val actual = ToSkipped.factory[IO](underTriplesGenerationGauge).run((eventId, request))
         actual.unsafeRunSync() shouldBe CommandFound(expected)
       }
 
@@ -143,7 +141,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
 
           val request = Request[IO]().withEntity(body)
 
-          val actual = ToSkipped.factory[IO](underTriplesGenerationGauge, eventDelivery).run((eventId, request))
+          val actual = ToSkipped.factory[IO](underTriplesGenerationGauge).run((eventId, request))
 
           actual.unsafeRunSync() shouldBe NotSupported
         }
@@ -160,13 +158,13 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
 
         val request = Request[IO]().withEntity(body)
 
-        val actual = ToSkipped.factory[IO](underTriplesGenerationGauge, eventDelivery).run((eventId, request))
+        val actual = ToSkipped.factory[IO](underTriplesGenerationGauge).run((eventId, request))
         actual.unsafeRunSync() shouldBe PayloadMalformed("No message property in status change payload")
       }
       "return PayloadMalformed if the decoding failed because no status is present " in new TestCase {
         val request = Request[IO]().withEntity(json"""{ }""")
 
-        val actual = ToSkipped.factory[IO](underTriplesGenerationGauge, eventDelivery).run((eventId, request))
+        val actual = ToSkipped.factory[IO](underTriplesGenerationGauge).run((eventId, request))
 
         actual.unsafeRunSync() shouldBe PayloadMalformed("No status property in status change payload")
       }
@@ -175,7 +173,7 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
         val request =
           Request[IO]().withEntity(jsons.generateOne).withHeaders(`Content-Type`(MediaType.multipart.`form-data`))
 
-        val actual = ToSkipped.factory[IO](underTriplesGenerationGauge, eventDelivery).run((eventId, request))
+        val actual = ToSkipped.factory[IO](underTriplesGenerationGauge).run((eventId, request))
 
         actual.unsafeRunSync() shouldBe NotSupported
       }
@@ -190,7 +188,6 @@ class ToSkippedSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFac
     val eventId                     = compoundEventIds.generateOne
     val eventBatchDate              = batchDates.generateOne
     val processingTime              = eventProcessingTimes.generateSome
-    val eventDelivery               = mock[EventDelivery[IO, ToSkipped[IO]]]
     val commandRunner               = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()

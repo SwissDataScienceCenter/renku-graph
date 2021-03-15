@@ -38,7 +38,7 @@ import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
 import io.renku.eventlog.statuschange.commands.{ToGenerationNonRecoverableFailure, ToGenerationRecoverableFailure, ToNew, ToSkipped, ToTransformationNonRecoverableFailure, ToTransformationRecoverableFailure, ToTriplesGenerated, ToTriplesStore}
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
-import io.renku.eventlog.subscriptions.{EventDelivery, EventProducersRegistry, SubscriptionsEndpoint}
+import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
 import org.http4s.MediaType.application
 import org.http4s.Method.{GET, PATCH, POST}
 import org.http4s.Status._
@@ -227,42 +227,28 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       logger:                       Logger[IO]
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
   class TestStatusChangeEndpoint(
-      updateCommandsRunner:                   StatusUpdatesRunner[IO],
-      awaitingTriplesGenerationGauge:         LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge:            LabeledGauge[IO, projects.Path],
-      awaitingTransformationGauge:            LabeledGauge[IO, projects.Path],
-      underTriplesTransformationGauge:        LabeledGauge[IO, projects.Path],
-      eventDeliveryTriplesStore:              EventDelivery[IO, ToTriplesStore[IO]],
-      eventDeliveryGenerationFailure:         EventDelivery[IO, ToGenerationNonRecoverableFailure[IO]],
-      eventDeliveryTransformationFailure:     EventDelivery[IO, ToTransformationNonRecoverableFailure[IO]],
-      eventDeliverySkipped:                   EventDelivery[IO, ToSkipped[IO]],
-      eventDeliveryTriplesGenerated:          EventDelivery[IO, ToTriplesGenerated[IO]],
-      eventDeliveryGenerationRecoverable:     EventDelivery[IO, ToGenerationRecoverableFailure[IO]],
-      eventDeliveryTransformationRecoverable: EventDelivery[IO, ToTransformationRecoverableFailure[IO]],
-      logger:                                 Logger[IO]
+      updateCommandsRunner:            StatusUpdatesRunner[IO],
+      awaitingTriplesGenerationGauge:  LabeledGauge[IO, projects.Path],
+      underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
+      awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
+      underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
+      logger:                          Logger[IO]
   ) extends StatusChangeEndpoint[IO](updateCommandsRunner,
                                      Set(
-                                       ToTriplesStore.factory(underTriplesGenerationGauge, eventDeliveryTriplesStore),
+                                       ToTriplesStore.factory(underTriplesGenerationGauge),
                                        ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
                                        ToTriplesGenerated.factory(underTriplesGenerationGauge,
-                                                                  awaitingTransformationGauge,
-                                                                  eventDeliveryTriplesGenerated
+                                                                  awaitingTransformationGauge
                                        ),
-                                       ToSkipped.factory(underTriplesGenerationGauge, eventDeliverySkipped),
-                                       ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge,
-                                                                                 eventDeliveryGenerationFailure
-                                       ),
+                                       ToSkipped.factory(underTriplesGenerationGauge),
+                                       ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),
                                        ToGenerationRecoverableFailure.factory(awaitingTriplesGenerationGauge,
-                                                                              underTriplesGenerationGauge,
-                                                                              eventDeliveryGenerationRecoverable
+                                                                              underTriplesGenerationGauge
                                        ),
-                                       ToTransformationNonRecoverableFailure.factory(underTriplesTransformationGauge,
-                                                                                     eventDeliveryTransformationFailure
-                                       ),
+                                       ToTransformationNonRecoverableFailure.factory(underTriplesTransformationGauge),
                                        ToTransformationRecoverableFailure.factory(
                                          awaitingTransformationGauge,
-                                         underTriplesTransformationGauge,
-                                         eventDeliveryTransformationRecoverable
+                                         underTriplesTransformationGauge
                                        )
                                      ),
                                      logger

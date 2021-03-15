@@ -31,7 +31,6 @@ import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.subscriptions.EventDelivery
 import io.renku.eventlog.{EventLogDB, EventMessage}
 import org.http4s.{MediaType, Request}
 
@@ -42,7 +41,6 @@ final case class ToGenerationNonRecoverableFailure[Interpretation[_]](
     maybeMessage:                Option[EventMessage],
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:         Option[EventProcessingTime],
-    eventDelivery:               EventDelivery[Interpretation, ToGenerationNonRecoverableFailure[Interpretation]],
     now:                         () => Instant = () => Instant.now
 )(implicit ME:                   Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
@@ -66,15 +64,12 @@ final case class ToGenerationNonRecoverableFailure[Interpretation[_]](
     case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesGenerationGauge.decrement
     case _                    => ME.unit
   }
-
-  override def updateDelivery(): Interpretation[Unit] = eventDelivery.unregister(eventId)
 }
 
 object ToGenerationNonRecoverableFailure {
 
   def factory[Interpretation[_]: Sync](
-      underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-      eventDelivery:               EventDelivery[Interpretation, ToGenerationNonRecoverableFailure[Interpretation]]
+      underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
@@ -89,8 +84,7 @@ object ToGenerationNonRecoverableFailure {
             ToGenerationNonRecoverableFailure[Interpretation](eventId,
                                                               maybeMessage,
                                                               underTriplesGenerationGauge,
-                                                              maybeProcessingTime,
-                                                              eventDelivery
+                                                              maybeProcessingTime
             )
           )
         }.merge
