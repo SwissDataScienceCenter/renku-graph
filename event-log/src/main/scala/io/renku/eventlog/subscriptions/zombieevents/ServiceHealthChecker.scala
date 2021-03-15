@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
-import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout, SleepAfterConnectionIssue}
+import ch.datascience.http.client.IORestClient.MaxRetriesAfterConnectionTimeout
 import ch.datascience.microservices.MicroserviceBaseUrl
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
@@ -31,7 +31,8 @@ import org.http4s.Status.Ok
 import org.http4s._
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration._
+import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 private trait ServiceHealthChecker[Interpretation[_]] {
@@ -52,7 +53,7 @@ private object ServiceHealthChecker {
 
 private class ServiceHealthCheckerImpl(
     logger:                  Logger[IO],
-    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
+    retryInterval:           FiniteDuration = 1 second,
     maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
     extends IORestClient(Throttler.noThrottling, logger, retryInterval = retryInterval, maxRetries = maxRetries)
