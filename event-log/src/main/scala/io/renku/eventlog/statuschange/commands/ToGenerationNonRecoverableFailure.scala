@@ -47,15 +47,14 @@ final case class ToGenerationNonRecoverableFailure[Interpretation[_]](
 
   override lazy val status: EventStatus = GenerationNonRecoverableFailure
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
+  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
     SqlQuery(
       sql"""|UPDATE event 
             |SET status = $status, execution_date = ${now()}, message = $maybeMessage
             |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
             |""".stripMargin.update.run,
       name = "generating_triples->generation_non_recoverable_fail"
-    ),
-    Nil
+    )
   )
 
   override def updateGauges(

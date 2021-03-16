@@ -126,7 +126,7 @@ class StatusUpdatesRunnerImpl(
         .query[String]
         .option
         .map(_.isDefined),
-      name = "Event update check existence"
+      name = "event update check existence"
     )
   }
 

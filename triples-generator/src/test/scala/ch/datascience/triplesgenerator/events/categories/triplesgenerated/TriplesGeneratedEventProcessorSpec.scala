@@ -22,7 +22,6 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
 import cats.effect.{ContextShift, IO, Timer}
-import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
@@ -190,7 +189,7 @@ class TriplesGeneratedEventProcessorSpec
 
       val exception = exceptions.generateOne
       (eventStatusUpdater
-        .markEventDone(_: CompoundEventId, _: EventProcessingTime))
+        .markTriplesStore(_: CompoundEventId, _: EventProcessingTime))
         .expects(triplesGeneratedEvent.compoundEventId,
                  EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
         )
@@ -295,20 +294,18 @@ class TriplesGeneratedEventProcessorSpec
     }
 
     def expectEventMarkedAsRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
-      (eventStatusUpdater
-        .markEventTransformationFailedRecoverably(_: CompoundEventId, _: Throwable))
-        .expects(commitEventId, exception)
+      (eventStatusUpdater.markEventFailed _)
+        .expects(commitEventId, EventStatus.TransformationRecoverableFailure, exception)
         .returning(context.unit)
 
     def expectEventMarkedAsNonRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
-      (eventStatusUpdater
-        .markEventTransformationFailedNonRecoverably(_: CompoundEventId, _: Throwable))
-        .expects(commitEventId, exception)
+      (eventStatusUpdater.markEventFailed _)
+        .expects(commitEventId, EventStatus.TransformationNonRecoverableFailure, exception)
         .returning(context.unit)
 
     def expectEventMarkedAsDone(compoundEventId: CompoundEventId) =
       (eventStatusUpdater
-        .markEventDone(_: CompoundEventId, _: EventProcessingTime))
+        .markTriplesStore(_: CompoundEventId, _: EventProcessingTime))
         .expects(compoundEventId, EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value)))
         .returning(context.unit)
 

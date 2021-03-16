@@ -36,7 +36,6 @@ import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.trip
 import java.security.SecureRandom
 import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
-import scala.util.control.NonFatal
 
 private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
     gitRepoUrlFinder:    GitLabRepoUrlFinder[IO],
@@ -136,7 +135,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
 
   private def meaningfulError(
       maybeAccessToken: Option[AccessToken]
-  ): PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, JsonLDTriples]]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, JsonLDTriples]]] = { case exception =>
     IO.raiseError {
       (Option(exception.getMessage) -> maybeAccessToken)
         .mapN { (message, token) =>

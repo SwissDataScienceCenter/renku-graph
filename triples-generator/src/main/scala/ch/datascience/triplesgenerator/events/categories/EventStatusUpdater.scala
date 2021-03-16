@@ -25,36 +25,30 @@ import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime}
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
+import ch.datascience.http.ErrorMessage
 import ch.datascience.http.client.IORestClient
-import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.Microservice
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.circe.jsonEncoder
 import org.http4s.{Status, Uri}
 
-import java.io.{PrintWriter, StringWriter}
 import scala.concurrent.ExecutionContext
 
 private trait EventStatusUpdater[Interpretation[_]] {
   def markEventNew(eventId:                     CompoundEventId): Interpretation[Unit]
-  def markEventDone(eventId:                    CompoundEventId, processingTime: EventProcessingTime): Interpretation[Unit]
+  def markTriplesStore(eventId:                 CompoundEventId, processingTime: EventProcessingTime): Interpretation[Unit]
   def markTriplesGenerated(eventId:             CompoundEventId,
                            payload:             JsonLDTriples,
                            schemaVersion:       SchemaVersion,
                            maybeProcessingTime: Option[EventProcessingTime]
   ): Interpretation[Unit]
-  def markEventFailedRecoverably(eventId:                  CompoundEventId, exception: Throwable): Interpretation[Unit]
-  def markEventFailedNonRecoverably(eventId:               CompoundEventId, exception: Throwable): Interpretation[Unit]
-  def markEventTransformationFailedRecoverably(eventId:    CompoundEventId, exception: Throwable): Interpretation[Unit]
-  def markEventTransformationFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): Interpretation[Unit]
+  def markEventFailed(eventId: CompoundEventId, eventStatus: EventStatus, exception: Throwable): Interpretation[Unit]
 }
 
-private class IOEventStatusUpdater(
-    eventLogUrl:     EventLogUrl,
-    microserviceUrl: MicroserviceBaseUrl,
-    logger:          Logger[IO]
+private class EventStatusUpdaterImpl(
+    eventLogUrl: EventLogUrl,
+    logger:      Logger[IO]
 )(implicit
     ME:               MonadError[IO, Throwable],
     executionContext: ExecutionContext,
@@ -66,26 +60,24 @@ private class IOEventStatusUpdater(
   import cats.effect._
   import io.circe._
   import io.circe.literal._
-  import io.circe.syntax._
   import org.http4s.Method.PATCH
   import org.http4s.Status.{Conflict, NotFound, Ok}
   import org.http4s.{Request, Response}
 
   override def markEventNew(eventId: CompoundEventId): IO[Unit] = sendStatusChange(
     eventId,
-    eventContent = EventRequestContent(json"""{"status": "NEW"}""", maybePayload = None),
+    eventContent = EventRequestContent(json"""{"status": ${EventStatus.New.value}}"""),
     responseMapping = okConflictAsSuccess
   )
 
-  override def markEventDone(eventId: CompoundEventId, processingTime: EventProcessingTime): IO[Unit] =
+  override def markTriplesStore(eventId: CompoundEventId, processingTime: EventProcessingTime): IO[Unit] =
     sendStatusChange(
       eventId,
       eventContent = EventRequestContent(
         event = json"""{
-          "status": "TRIPLES_STORE", 
+          "status":         ${EventStatus.TriplesStore.value}, 
           "processingTime": $processingTime
-        }""",
-        maybePayload = None
+        }"""
       ),
       responseMapping = okConflictAsSuccess
     )
@@ -98,7 +90,7 @@ private class IOEventStatusUpdater(
     eventId,
     eventContent = EventRequestContent(
       event = json"""{
-        "status": "TRIPLES_GENERATED"
+        "status": ${EventStatus.TriplesGenerated.value}
       }""" deepMerge maybeProcessingTime
         .map(time => json"""{"processingTime": $time}""")
         .getOrElse(Json.obj()),
@@ -110,40 +102,14 @@ private class IOEventStatusUpdater(
     responseMapping = okConflictAsSuccess
   )
 
-  override def markEventFailedRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
-    sendStatusChange(
-      eventId,
-      eventContent =
-        EventRequestContent(json"""{"status": "GENERATION_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson, None),
-      responseMapping = okConflictAsSuccess
-    )
-
-  override def markEventFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
+  override def markEventFailed(eventId: CompoundEventId, eventStatus: EventStatus, exception: Throwable): IO[Unit] =
     sendStatusChange(
       eventId,
       eventContent = EventRequestContent(
-        json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE" }""" deepMerge exception.asJson,
-        maybePayload = None
-      ),
-      responseMapping = okConflictAsSuccess
-    )
-
-  override def markEventTransformationFailedRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
-    sendStatusChange(
-      eventId,
-      eventContent =
-        EventRequestContent(json"""{"status": "TRANSFORMATION_RECOVERABLE_FAILURE"}""" deepMerge exception.asJson,
-                            maybePayload = None
-        ),
-      responseMapping = okConflictAsSuccess
-    )
-
-  override def markEventTransformationFailedNonRecoverably(eventId: CompoundEventId, exception: Throwable): IO[Unit] =
-    sendStatusChange(
-      eventId,
-      eventContent = EventRequestContent(
-        json"""{"status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE" }""" deepMerge exception.asJson,
-        None
+        json"""{
+          "status":  ${eventStatus.value},
+          "message": ${ErrorMessage(exception).value}
+        }"""
       ),
       responseMapping = okConflictAsSuccess
     )
@@ -152,12 +118,11 @@ private class IOEventStatusUpdater(
       eventId:         CompoundEventId,
       eventContent:    EventRequestContent,
       responseMapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]]
-  ): IO[Unit] =
-    for {
-      uri <- validateUri(s"$eventLogUrl/events/${eventId.id}/${eventId.projectId}")
-      request = createRequest(uri, eventContent)
-      sendingResult <- send(request)(responseMapping)
-    } yield sendingResult
+  ): IO[Unit] = for {
+    uri <- validateUri(s"$eventLogUrl/events/${eventId.id}/${eventId.projectId}")
+    request = createRequest(uri, eventContent)
+    sendingResult <- send(request)(responseMapping)
+  } yield sendingResult
 
   private def createRequest(uri: Uri, eventRequestContent: EventRequestContent) =
     eventRequestContent.maybePayload match {
@@ -175,17 +140,6 @@ private class IOEventStatusUpdater(
     case (Conflict, _, _) => IO.unit
     case (NotFound, _, _) => IO.unit
   }
-
-  private implicit val exceptionEncoder: Encoder[Throwable] = Encoder.instance[Throwable] { exception =>
-    val exceptionAsString = new StringWriter
-    exception.printStackTrace(new PrintWriter(exceptionAsString))
-    exceptionAsString.flush()
-
-    exceptionAsString.toString.trim match {
-      case ""      => Json.obj()
-      case message => json"""{"message": $message}"""
-    }
-  }
 }
 
 private object IOEventStatusUpdater {
@@ -195,10 +149,7 @@ private object IOEventStatusUpdater {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[EventStatusUpdater[IO]] =
-    for {
-      microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
-      sourceUrl             <- microserviceUrlFinder.findBaseUrl()
-      eventLogUrl           <- EventLogUrl[IO]()
-    } yield new IOEventStatusUpdater(eventLogUrl, sourceUrl, logger)
+  ): IO[EventStatusUpdater[IO]] = for {
+    eventLogUrl <- EventLogUrl[IO]()
+  } yield new EventStatusUpdaterImpl(eventLogUrl, logger)
 }

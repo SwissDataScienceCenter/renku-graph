@@ -239,15 +239,13 @@ class CommitEventProcessorSpec
     }
 
     def expectEventMarkedAsRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
-      (eventStatusUpdater
-        .markEventFailedRecoverably(_: CompoundEventId, _: Throwable))
-        .expects(commitEventId, exception)
+      (eventStatusUpdater.markEventFailed _)
+        .expects(commitEventId, EventStatus.GenerationRecoverableFailure, exception)
         .returning(context.unit)
 
     def expectEventMarkedAsNonRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
-      (eventStatusUpdater
-        .markEventFailedNonRecoverably(_: CompoundEventId, _: Throwable))
-        .expects(commitEventId, exception)
+      (eventStatusUpdater.markEventFailed _)
+        .expects(commitEventId, EventStatus.GenerationNonRecoverableFailure, exception)
         .returning(context.unit)
 
     def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId, triples: JsonLDTriples) =
