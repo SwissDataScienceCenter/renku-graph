@@ -34,7 +34,6 @@ import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
-import io.renku.eventlog.subscriptions.EventDelivery
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.http4s.circe.jsonEncoder
 import org.http4s.headers.`Content-Type`
@@ -88,18 +87,14 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
         (awaitingTransformationGauge.increment _).expects(projectPath).returning(IO.unit)
 
-        (eventDelivery.unregister _).expects(eventId).returning(IO.unit)
-
-        val command =
-          ToTriplesGenerated[IO](eventId,
-                                 payload,
-                                 schemaVersion,
-                                 underTriplesGenerationGauge,
-                                 awaitingTransformationGauge,
-                                 processingTime,
-                                 eventDelivery,
-                                 currentTime
-          )
+        val command = ToTriplesGenerated[IO](eventId,
+                                             payload,
+                                             schemaVersion,
+                                             underTriplesGenerationGauge,
+                                             awaitingTransformationGauge,
+                                             processingTime,
+                                             currentTime
+        )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
@@ -131,7 +126,6 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
                                    awaitingTransformationGauge,
                                    underTriplesGenerationGauge,
                                    processingTime,
-                                   eventDelivery,
                                    currentTime
             )
 
@@ -158,8 +152,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
                              schemaVersion,
                              underTriplesGenerationGauge,
                              awaitingTransformationGauge,
-                             maybeProcessingTime,
-                             eventDelivery
+                             maybeProcessingTime
           )
 
         val payloadStr = json"""{ "schemaVersion": ${schemaVersion.value}, "payload": ${triples.value}  }"""
@@ -182,7 +175,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
         val request = Request[IO]().withEntity(body).withHeaders(body.headers)
 
         val actual = ToTriplesGenerated
-          .factory(underTriplesGenerationGauge, awaitingTransformationGauge, eventDelivery)
+          .factory(underTriplesGenerationGauge, awaitingTransformationGauge)
           .run((eventId, request))
         actual.unsafeRunSync() shouldBe CommandFound(expected)
       }
@@ -208,7 +201,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
           val actual =
             ToTriplesGenerated
-              .factory(underTriplesGenerationGauge, awaitingTransformationGauge, eventDelivery)
+              .factory(underTriplesGenerationGauge, awaitingTransformationGauge)
               .run((eventId, request))
           actual.unsafeRunSync() shouldBe NotSupported
         }
@@ -220,7 +213,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
         val actual =
           ToTriplesGenerated
-            .factory(underTriplesGenerationGauge, awaitingTransformationGauge, eventDelivery)
+            .factory(underTriplesGenerationGauge, awaitingTransformationGauge)
             .run((eventId, request))
         actual.unsafeRunSync() shouldBe NotSupported
       }
@@ -247,7 +240,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
         val actual =
           ToTriplesGenerated
-            .factory(underTriplesGenerationGauge, awaitingTransformationGauge, eventDelivery)
+            .factory(underTriplesGenerationGauge, awaitingTransformationGauge)
             .run((eventId, request))
         actual.unsafeRunSync() shouldBe PayloadMalformed(
           "Attempt to decode value on failed cursor: DownField(schemaVersion)"
@@ -275,7 +268,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
         val actual =
           ToTriplesGenerated
-            .factory(underTriplesGenerationGauge, awaitingTransformationGauge, eventDelivery)
+            .factory(underTriplesGenerationGauge, awaitingTransformationGauge)
             .run((eventId, request))
         actual.unsafeRunSync() shouldBe PayloadMalformed(
           "Attempt to decode value on failed cursor: DownField(payload)"
@@ -295,7 +288,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
         val request = Request[IO]().withEntity(body).withHeaders(body.headers)
 
         val actual = ToTriplesGenerated
-          .factory[IO](underTriplesGenerationGauge, awaitingTransformationGauge, eventDelivery)
+          .factory[IO](underTriplesGenerationGauge, awaitingTransformationGauge)
           .run((eventId, request))
 
         actual.unsafeRunSync() shouldBe PayloadMalformed("No status property in status change payload")
@@ -317,7 +310,6 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     val payload       = eventPayloads.generateOne
     val schemaVersion = projectSchemaVersions.generateOne
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
-    val eventDelivery = mock[EventDelivery[IO, ToTriplesGenerated[IO]]]
     val now           = Instant.now()
     currentTime.expects().returning(now).anyNumberOfTimes()
   }

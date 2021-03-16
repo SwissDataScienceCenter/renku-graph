@@ -80,30 +80,43 @@ class StatusUpdatesRunnerImpl(
         .pure[IO]
   }
 
-  private def logError(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, ConnectionIO[Unit]] = { case _ =>
-    logger.error(s"Event ${command.eventId} could not be updated in eventDelivery").to[ConnectionIO]
-  }
-
   private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {
     case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
     case _       => ME.unit
   }
 
   private def executeCommand(command: ChangeStatusCommand[IO]): Free[connection.ConnectionOp, UpdateResult] =
-    checkIfPersisted(command.eventId).flatMap {
+    checkIfPersisted(command.eventId) >>= {
       case true =>
-        runUpdateQueriesIfSuccessful(command).flatMap { case (intResult, lastQuery) =>
-          command.mapResult(intResult) match {
-            case result if result != Updated =>
-              QueryFailedException(lastQuery.name, result).raiseError[ConnectionIO, UpdateResult]
-            case result =>
-              for {
-                _ <- command.updateDelivery().to[ConnectionIO] recoverWith logError(command)
-              } yield result
-          }
-        }
-      case false => (NotFound: commands.UpdateResult).pure[ConnectionIO]
+        for {
+          _      <- deleteDelivery(command) recoverWith logError(command)
+          result <- runUpdateQueriesIfSuccessful(command) >>= toUpdateResult(command)
+        } yield result
+      case false => NotFound.pure[ConnectionIO].widen[commands.UpdateResult]
     }
+
+  private def deleteDelivery(command: ChangeStatusCommand[IO]) = measureExecutionTime {
+    SqlQuery(
+      sql"""|DELETE FROM event_delivery 
+            |WHERE event_id = ${command.eventId.id} AND project_id = ${command.eventId.projectId}
+            |""".stripMargin.update.run.void,
+      name = "status update - delivery info remove"
+    )
+  }
+
+  private def logError(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, ConnectionIO[Unit]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(s"Event ${command.eventId} could not be updated in eventDelivery").to[ConnectionIO]
+  }
+
+  private def toUpdateResult(command: ChangeStatusCommand[IO]): ((Int, SqlQuery[Int])) => ConnectionIO[UpdateResult] = {
+    case (intResult, lastQuery) =>
+      command.mapResult(intResult) match {
+        case result if result != Updated =>
+          QueryFailedException(lastQuery.name, result).raiseError[ConnectionIO, UpdateResult]
+        case result => result.pure[ConnectionIO]
+      }
+  }
 
   private def checkIfPersisted(eventId: CompoundEventId) = measureExecutionTime {
     SqlQuery(
@@ -113,7 +126,7 @@ class StatusUpdatesRunnerImpl(
         .query[String]
         .option
         .map(_.isDefined),
-      name = "Event update check existence"
+      name = "event update check existence"
     )
   }
 

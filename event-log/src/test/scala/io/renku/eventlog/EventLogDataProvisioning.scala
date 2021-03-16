@@ -136,7 +136,9 @@ trait EventLogDataProvisioning {
       """.stripMargin.update.run.void
   }
 
-  protected def upsertEventDelivery(eventId: CompoundEventId, deliveryId: SubscriberId): Unit = execute {
+  protected def upsertEventDelivery(eventId:    CompoundEventId,
+                                    deliveryId: SubscriberId = subscriberIds.generateOne
+  ): Unit = execute {
     sql"""|INSERT INTO
           |event_delivery (event_id, project_id, delivery_id)
           |VALUES (${eventId.id}, ${eventId.projectId}, $deliveryId)
