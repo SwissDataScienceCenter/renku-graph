@@ -39,7 +39,7 @@ import java.time.temporal.ChronoUnit.MINUTES
 
 final case class ToTransformationRecoverableFailure[Interpretation[_]](
     eventId:                            CompoundEventId,
-    maybeMessage:                       Option[EventMessage],
+    message:                            EventMessage,
     awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:                Option[EventProcessingTime],
@@ -49,15 +49,14 @@ final case class ToTransformationRecoverableFailure[Interpretation[_]](
 
   override lazy val status: EventStatus = TransformationRecoverableFailure
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
+  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
     SqlQuery(
       sql"""|UPDATE event
-            |SET status = $status, execution_date = ${now().plus(10, MINUTES)}, message = $maybeMessage
+            |SET status = $status, execution_date = ${now().plus(10, MINUTES)}, message = $message
             |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
             |""".stripMargin.update.run,
       name = "transforming_triples->transformation_recoverable_fail"
-    ),
-    Nil
+    )
   )
 
   override def updateGauges(
@@ -86,11 +85,11 @@ object ToTransformationRecoverableFailure {
           for {
             _                   <- request.validate(status = TransformationRecoverableFailure)
             maybeProcessingTime <- request.getProcessingTime
-            maybeMessage        <- request.getMessage
+            message             <- request.message
           } yield CommandFound(
             ToTransformationRecoverableFailure[Interpretation](
               eventId,
-              maybeMessage,
+              message,
               awaitingTriplesTransformationGauge,
               underTriplesTransformationGauge,
               maybeProcessingTime

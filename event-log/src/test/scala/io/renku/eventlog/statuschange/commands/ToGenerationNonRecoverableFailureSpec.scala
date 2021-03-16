@@ -85,9 +85,9 @@ class ToGenerationNonRecoverableFailureSpec
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-        val maybeMessage = Gen.option(eventMessages).generateOne
+        val message = eventMessages.generateOne
         val command = ToGenerationNonRecoverableFailure[IO](eventId,
-                                                            maybeMessage,
+                                                            message,
                                                             underTriplesGenerationGauge,
                                                             processingTime,
                                                             currentTime
@@ -95,7 +95,7 @@ class ToGenerationNonRecoverableFailureSpec
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvent(eventId) shouldBe Some((ExecutionDate(now), GenerationNonRecoverableFailure, maybeMessage))
+        findEvent(eventId) shouldBe Some((ExecutionDate(now), GenerationNonRecoverableFailure, message))
 
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
@@ -117,14 +117,13 @@ class ToGenerationNonRecoverableFailureSpec
 
           findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
-          val maybeMessage = Gen.option(eventMessages).generateOne
-          val command =
-            ToGenerationNonRecoverableFailure[IO](eventId,
-                                                  maybeMessage,
-                                                  underTriplesGenerationGauge,
-                                                  processingTime,
-                                                  currentTime
-            )
+          val message = eventMessages.generateOne
+          val command = ToGenerationNonRecoverableFailure[IO](eventId,
+                                                              message,
+                                                              underTriplesGenerationGauge,
+                                                              processingTime,
+                                                              currentTime
+          )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
@@ -137,15 +136,14 @@ class ToGenerationNonRecoverableFailureSpec
 
     "factory" should {
       "return a CommandFound when properly decoding a request" in new TestCase {
-        val maybeMessage        = eventMessages.generateOption
+        val message             = eventMessages.generateOne
         val maybeProcessingTime = eventProcessingTimes.generateOption
         val expected =
-          ToGenerationNonRecoverableFailure(eventId, maybeMessage, underTriplesGenerationGauge, maybeProcessingTime)
+          ToGenerationNonRecoverableFailure(eventId, message, underTriplesGenerationGauge, maybeProcessingTime)
         val body = json"""{
-            "status": ${EventStatus.GenerationNonRecoverableFailure.value}
-          }""" deepMerge maybeMessage
-          .map(m => json"""{"message": ${m.value}}""")
-          .getOrElse(Json.obj()) deepMerge maybeProcessingTime
+            "status": ${EventStatus.GenerationNonRecoverableFailure.value},
+            "message": ${message.value}
+          }""" deepMerge maybeProcessingTime
           .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
           .getOrElse(Json.obj())
 

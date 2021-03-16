@@ -117,7 +117,6 @@ object IOStatusChangeEndpoint {
                                        ToTriplesGenerated.factory(underTriplesGenerationGauge,
                                                                   awaitingTriplesTransformationGauge
                                        ),
-                                       ToSkipped.factory(underTriplesGenerationGauge),
                                        ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),
                                        ToGenerationRecoverableFailure.factory(awaitingTriplesGenerationGauge,
                                                                               underTriplesGenerationGauge

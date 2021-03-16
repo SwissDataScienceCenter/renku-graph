@@ -39,7 +39,7 @@ import java.time.temporal.ChronoUnit.MINUTES
 
 final case class ToGenerationRecoverableFailure[Interpretation[_]](
     eventId:                        CompoundEventId,
-    maybeMessage:                   Option[EventMessage],
+    message:                        EventMessage,
     awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:            Option[EventProcessingTime],
@@ -52,7 +52,7 @@ final case class ToGenerationRecoverableFailure[Interpretation[_]](
   override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
     SqlQuery(
       sql"""|UPDATE event
-            |SET status = $status, execution_date = ${now().plus(10, MINUTES)}, message = $maybeMessage
+            |SET status = $status, execution_date = ${now().plus(10, MINUTES)}, message = $message
             |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
             |""".stripMargin.update.run,
       name = "generating_triples->generation_recoverable_fail"
@@ -85,11 +85,11 @@ object ToGenerationRecoverableFailure {
           for {
             _                   <- request.validate(status = GenerationRecoverableFailure)
             maybeProcessingTime <- request.getProcessingTime
-            maybeMessage        <- request.getMessage
+            message             <- request.message
           } yield CommandFound(
             ToGenerationRecoverableFailure[Interpretation](
               eventId,
-              maybeMessage,
+              message,
               awaitingTriplesGenerationGauge,
               underTriplesGenerationGauge,
               maybeProcessingTime

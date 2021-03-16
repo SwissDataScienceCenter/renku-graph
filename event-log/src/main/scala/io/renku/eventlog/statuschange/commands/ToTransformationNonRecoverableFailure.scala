@@ -38,7 +38,7 @@ import java.time.Instant
 
 final case class ToTransformationNonRecoverableFailure[Interpretation[_]](
     eventId:                         CompoundEventId,
-    maybeMessage:                    Option[EventMessage],
+    message:                         EventMessage,
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:             Option[EventProcessingTime],
     now:                             () => Instant = () => Instant.now
@@ -50,7 +50,7 @@ final case class ToTransformationNonRecoverableFailure[Interpretation[_]](
   override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
     SqlQuery(
       sql"""|UPDATE event
-            |SET status = $status, execution_date = ${now()}, message = $maybeMessage
+            |SET status = $status, execution_date = ${now()}, message = $message
             |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
             |""".stripMargin.update.run,
       name = "transforming_triples->transformation_non_recoverable_fail"
@@ -77,11 +77,11 @@ object ToTransformationNonRecoverableFailure {
           for {
             _                   <- request.validate(status = TransformationNonRecoverableFailure)
             maybeProcessingTime <- request.getProcessingTime
-            maybeMessage        <- request.getMessage
+            message             <- request.message
           } yield CommandFound(
             ToTransformationNonRecoverableFailure[Interpretation](
               eventId,
-              maybeMessage,
+              message,
               underTriplesTransformationGauge,
               maybeProcessingTime
             )

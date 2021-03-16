@@ -38,7 +38,7 @@ import java.time.Instant
 
 final case class ToGenerationNonRecoverableFailure[Interpretation[_]](
     eventId:                     CompoundEventId,
-    maybeMessage:                Option[EventMessage],
+    message:                     EventMessage,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:         Option[EventProcessingTime],
     now:                         () => Instant = () => Instant.now
@@ -50,7 +50,7 @@ final case class ToGenerationNonRecoverableFailure[Interpretation[_]](
   override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
     SqlQuery(
       sql"""|UPDATE event 
-            |SET status = $status, execution_date = ${now()}, message = $maybeMessage
+            |SET status = $status, execution_date = ${now()}, message = $message
             |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
             |""".stripMargin.update.run,
       name = "generating_triples->generation_non_recoverable_fail"
@@ -78,10 +78,10 @@ object ToGenerationNonRecoverableFailure {
           for {
             _                   <- request.validate(status = GenerationNonRecoverableFailure)
             maybeProcessingTime <- request.getProcessingTime
-            maybeMessage        <- request.getMessage
+            message             <- request.message
           } yield CommandFound(
             ToGenerationNonRecoverableFailure[Interpretation](eventId,
-                                                              maybeMessage,
+                                                              message,
                                                               underTriplesGenerationGauge,
                                                               maybeProcessingTime
             )

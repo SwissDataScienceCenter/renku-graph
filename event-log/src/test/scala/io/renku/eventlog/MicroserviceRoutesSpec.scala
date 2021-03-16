@@ -36,7 +36,7 @@ import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
-import io.renku.eventlog.statuschange.commands.{ToGenerationNonRecoverableFailure, ToGenerationRecoverableFailure, ToNew, ToSkipped, ToTransformationNonRecoverableFailure, ToTransformationRecoverableFailure, ToTriplesGenerated, ToTriplesStore}
+import io.renku.eventlog.statuschange.commands.{ToGenerationNonRecoverableFailure, ToGenerationRecoverableFailure, ToNew, ToTransformationNonRecoverableFailure, ToTransformationRecoverableFailure, ToTriplesGenerated, ToTriplesStore}
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
 import org.http4s.MediaType.application
@@ -240,7 +240,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
                                        ToTriplesGenerated.factory(underTriplesGenerationGauge,
                                                                   awaitingTransformationGauge
                                        ),
-                                       ToSkipped.factory(underTriplesGenerationGauge),
                                        ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),
                                        ToGenerationRecoverableFailure.factory(awaitingTriplesGenerationGauge,
                                                                               underTriplesGenerationGauge

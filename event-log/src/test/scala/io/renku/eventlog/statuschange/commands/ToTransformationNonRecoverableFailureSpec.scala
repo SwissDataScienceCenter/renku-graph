@@ -39,7 +39,6 @@ import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFoun
 import org.http4s.circe.jsonEncoder
 import org.http4s.headers.`Content-Type`
 import org.http4s.{MediaType, Request}
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -82,18 +81,17 @@ class ToTransformationNonRecoverableFailureSpec
 
         (underTriplesTransformationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-        val maybeMessage = Gen.option(eventMessages).generateOne
-        val command =
-          ToTransformationNonRecoverableFailure[IO](eventId,
-                                                    maybeMessage,
-                                                    underTriplesTransformationGauge,
-                                                    processingTime,
-                                                    currentTime
-          )
+        val message = eventMessages.generateOne
+        val command = ToTransformationNonRecoverableFailure[IO](eventId,
+                                                                message,
+                                                                underTriplesTransformationGauge,
+                                                                processingTime,
+                                                                currentTime
+        )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvent(eventId)                       shouldBe Some((ExecutionDate(now), TransformationNonRecoverableFailure, maybeMessage))
+        findEvent(eventId)                       shouldBe Some((ExecutionDate(now), TransformationNonRecoverableFailure, message))
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
         histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
@@ -114,14 +112,13 @@ class ToTransformationNonRecoverableFailureSpec
 
           findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
-          val maybeMessage = Gen.option(eventMessages).generateOne
-          val command =
-            ToTransformationNonRecoverableFailure[IO](eventId,
-                                                      maybeMessage,
-                                                      underTriplesTransformationGauge,
-                                                      processingTime,
-                                                      currentTime
-            )
+          val message = eventMessages.generateOne
+          val command = ToTransformationNonRecoverableFailure[IO](eventId,
+                                                                  message,
+                                                                  underTriplesTransformationGauge,
+                                                                  processingTime,
+                                                                  currentTime
+          )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
@@ -134,20 +131,15 @@ class ToTransformationNonRecoverableFailureSpec
 
     "factory" should {
       "return a CommandFound when properly decoding a request" in new TestCase {
-        val maybeMessage        = eventMessages.generateOption
+        val message             = eventMessages.generateOne
         val maybeProcessingTime = eventProcessingTimes.generateOption
         val expected =
-          ToTransformationNonRecoverableFailure(eventId,
-                                                maybeMessage,
-                                                underTriplesTransformationGauge,
-                                                maybeProcessingTime
-          )
+          ToTransformationNonRecoverableFailure(eventId, message, underTriplesTransformationGauge, maybeProcessingTime)
 
         val body = json"""{
-            "status": ${EventStatus.TransformationNonRecoverableFailure.value}
-          }""" deepMerge maybeMessage
-          .map(m => json"""{"message": ${m.value}}""")
-          .getOrElse(Json.obj()) deepMerge maybeProcessingTime
+            "status": ${EventStatus.TransformationNonRecoverableFailure.value},
+            "message": ${message.value}
+          }""" deepMerge maybeProcessingTime
           .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
           .getOrElse(Json.obj())
 

@@ -65,10 +65,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
 
       nonRecoverableStatusUpdate.value.eventId                     shouldBe event.id
       nonRecoverableStatusUpdate.value.underTriplesGenerationGauge shouldBe underTriplesGenerationGauge
-      val eventMessageBody = nonRecoverableStatusUpdate.value.maybeMessage
-        .map(_.value)
-        .getOrElse(fail("Expected some EventMessage"))
-      eventMessageBody should include(exception.getMessage)
+      nonRecoverableStatusUpdate.value.message.value                 should include(exception.getMessage)
 
       logger.loggedOnly(
         Error(s"${SubscriptionCategory.name}: Marking event as $GenerationNonRecoverableFailure failed", exception),

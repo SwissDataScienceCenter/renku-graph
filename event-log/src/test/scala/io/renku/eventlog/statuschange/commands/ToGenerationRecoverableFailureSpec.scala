@@ -39,7 +39,6 @@ import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFoun
 import org.http4s.circe.jsonEncoder
 import org.http4s.headers.`Content-Type`
 import org.http4s.{MediaType, Request}
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -85,20 +84,19 @@ class ToGenerationRecoverableFailureSpec
         (awaitingTriplesGenerationGauge.increment _).expects(projectPath).returning(IO.unit)
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
 
-        val maybeMessage = Gen.option(eventMessages).generateOne
-        val command =
-          ToGenerationRecoverableFailure[IO](eventId,
-                                             maybeMessage,
-                                             awaitingTriplesGenerationGauge,
-                                             underTriplesGenerationGauge,
-                                             processingTime,
-                                             currentTime
-          )
+        val message = eventMessages.generateOne
+        val command = ToGenerationRecoverableFailure[IO](eventId,
+                                                         message,
+                                                         awaitingTriplesGenerationGauge,
+                                                         underTriplesGenerationGauge,
+                                                         processingTime,
+                                                         currentTime
+        )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
         findEvent(eventId) shouldBe Some(
-          (ExecutionDate(now.plus(10, MINUTES)), GenerationRecoverableFailure, maybeMessage)
+          (ExecutionDate(now.plus(10, MINUTES)), GenerationRecoverableFailure, message)
         )
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
@@ -120,15 +118,14 @@ class ToGenerationRecoverableFailureSpec
 
           findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
-          val maybeMessage = Gen.option(eventMessages).generateOne
-          val command =
-            ToGenerationRecoverableFailure[IO](eventId,
-                                               maybeMessage,
-                                               awaitingTriplesGenerationGauge,
-                                               underTriplesGenerationGauge,
-                                               processingTime,
-                                               currentTime
-            )
+          val message = eventMessages.generateOne
+          val command = ToGenerationRecoverableFailure[IO](eventId,
+                                                           message,
+                                                           awaitingTriplesGenerationGauge,
+                                                           underTriplesGenerationGauge,
+                                                           processingTime,
+                                                           currentTime
+          )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
@@ -141,21 +138,20 @@ class ToGenerationRecoverableFailureSpec
 
     "factory" should {
       "return a CommandFound when properly decoding a request" in new TestCase {
-        val maybeMessage        = eventMessages.generateOption
+        val message             = eventMessages.generateOne
         val maybeProcessingTime = eventProcessingTimes.generateOption
         val expected =
           ToGenerationRecoverableFailure(eventId,
-                                         maybeMessage,
+                                         message,
                                          awaitingTriplesGenerationGauge,
                                          underTriplesGenerationGauge,
                                          maybeProcessingTime
           )
 
         val body = json"""{
-            "status": ${EventStatus.GenerationRecoverableFailure.value}
-          }""" deepMerge maybeMessage
-          .map(m => json"""{"message": ${m.value}}""")
-          .getOrElse(Json.obj()) deepMerge maybeProcessingTime
+            "status": ${EventStatus.GenerationRecoverableFailure.value},
+            "message": ${message.value}
+          }""" deepMerge maybeProcessingTime
           .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
           .getOrElse(Json.obj())
 
