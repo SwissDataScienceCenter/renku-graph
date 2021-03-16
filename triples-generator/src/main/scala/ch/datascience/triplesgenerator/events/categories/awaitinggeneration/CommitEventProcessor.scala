@@ -177,9 +177,6 @@ private class CommitEventProcessor[Interpretation[_]](
       )
   }
 
-  private def logMessageCommon(event: CommitEvent): String =
-    s"$categoryName: Commit Event ${event.compoundEventId}, ${event.project.path}"
-
   private def rollback(commit: CommitEvent): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = {
     case NonFatal(exception) =>
       markEventNew(commit.compoundEventId)
