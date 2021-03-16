@@ -57,11 +57,14 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], 
   def run(): Interpretation[Unit] = {
     for {
       _ <- ().pure[Interpretation]
-      _ <- popEvent flatMap { categoryEvent =>
-             runOnSubscriber(dispatch(categoryEvent)) recoverWith tryReDispatch(categoryEvent)
-           }
+      _ <- runOnSubscriber(eventDistribution) recoverWith logAndWait
     } yield ()
   }.foreverM[Unit]
+
+  private def eventDistribution(subscriberUrl: SubscriberUrl): Interpretation[Unit] = for {
+    event <- popEvent
+    _     <- dispatch(event)(subscriberUrl) recoverWith tryReDispatch(event)
+  } yield ()
 
   private def popEvent: Interpretation[CategoryEvent] =
     eventsFinder
@@ -96,6 +99,13 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], 
       } yield ()
   }
 
+  private def logAndWait: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    for {
+      _ <- logger.error(exception)(s"$categoryName: executing event distribution on a subscriber failed")
+      _ <- timer sleep onErrorSleep
+    } yield ()
+  }
+
   private def logStatement(result: SendingResult, url: SubscriberUrl, event: CategoryEvent): Interpretation[Unit] =
     result match {
       case result @ Delivered    => logger.info(s"$categoryName: $event, url = $url -> $result")
@@ -114,7 +124,7 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], 
   private def loggingErrorAndRetry[O](retry: () => Interpretation[O]): PartialFunction[Throwable, Interpretation[O]] = {
     case NonFatal(exception) =>
       for {
-        _      <- logger.error(exception)(s"$categoryName: Finding events to dispatch failed")
+        _      <- logger.error(exception)(s"$categoryName: finding events to dispatch failed")
         _      <- timer sleep onErrorSleep
         result <- retry() recoverWith loggingErrorAndRetry(retry)
       } yield result
