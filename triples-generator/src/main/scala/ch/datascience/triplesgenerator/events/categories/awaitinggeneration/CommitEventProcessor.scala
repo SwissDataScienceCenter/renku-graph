@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime}
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
@@ -123,9 +123,15 @@ private class CommitEventProcessor[Interpretation[_]](
                              processingTime.some
         )
       case RecoverableError(commit, message) =>
-        markEventFailedRecoverably(CompoundEventId(commit.eventId, commit.project.id), message)
+        markEventFailed(CompoundEventId(commit.eventId, commit.project.id),
+                        EventStatus.GenerationRecoverableFailure,
+                        message
+        )
       case NonRecoverableError(commit, cause) =>
-        markEventFailedNonRecoverably(CompoundEventId(commit.eventId, commit.project.id), cause)
+        markEventFailed(CompoundEventId(commit.eventId, commit.project.id),
+                        EventStatus.GenerationNonRecoverableFailure,
+                        cause
+        )
     }
   } recoverWith logEventLogUpdateError(uploadingResults)
 
@@ -134,7 +140,7 @@ private class CommitEventProcessor[Interpretation[_]](
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     logger
       .error(exception)(
-        s"${logMessageCommon(triplesGenerationResult.commit)} failed to mark as TriplesGenerated in the Event Log"
+        s"${logMessageCommon(triplesGenerationResult.commit)} failed to mark as $triplesGenerationResult in the Event Log"
       )
   }
 
@@ -144,7 +150,6 @@ private class CommitEventProcessor[Interpretation[_]](
     logger
       .error(error)(s"${logMessageCommon(commit)} ${error.getMessage}")
       .map(_ => RecoverableError(commit, error): TriplesGenerationResult)
-
   }
 
   private def toNonRecoverableFailure(
@@ -171,9 +176,6 @@ private class CommitEventProcessor[Interpretation[_]](
           s"${failed.size} failed"
       )
   }
-
-  private def logMessageCommon(event: CommitEvent): String =
-    s"$categoryName: Commit Event ${event.compoundEventId}, ${event.project.path}"
 
   private def rollback(commit: CommitEvent): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = {
     case NonFatal(exception) =>

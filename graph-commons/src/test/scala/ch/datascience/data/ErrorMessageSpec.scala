@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.http
+package ch.datascience.data
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._

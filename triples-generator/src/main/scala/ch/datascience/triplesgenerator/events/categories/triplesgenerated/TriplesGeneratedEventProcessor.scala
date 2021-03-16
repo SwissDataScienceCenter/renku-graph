@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.EitherT.right
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.events.EventProcessingTime
+import ch.datascience.graph.model.events.{EventProcessingTime, EventStatus}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
@@ -139,13 +139,13 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
 
   private lazy val updateEventLog: ((ElapsedTime, UploadingResult)) => Interpretation[Unit] = {
     case (elapsedTime, Uploaded(event)) =>
-      markEventDone(event.compoundEventId, EventProcessingTime(Duration ofMillis elapsedTime.value))
+      markTriplesStore(event.compoundEventId, EventProcessingTime(Duration ofMillis elapsedTime.value))
         .recoverWith(logEventLogUpdateError(event, "done"))
     case (_, RecoverableError(event, cause)) =>
-      markEventTransformationFailedRecoverably(event.compoundEventId, cause)
+      markEventFailed(event.compoundEventId, EventStatus.TransformationRecoverableFailure, cause)
         .recoverWith(logEventLogUpdateError(event, "as failed recoverably"))
     case (_, NonRecoverableError(event, cause)) =>
-      markEventTransformationFailedNonRecoverably(event.compoundEventId, cause)
+      markEventFailed(event.compoundEventId, EventStatus.TransformationNonRecoverableFailure, cause)
         .recoverWith(logEventLogUpdateError(event, "as failed nonrecoverably"))
   }
 
