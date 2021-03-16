@@ -39,7 +39,6 @@ import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFoun
 import org.http4s.circe.jsonEncoder
 import org.http4s.headers.`Content-Type`
 import org.http4s.{MediaType, Request}
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -95,7 +94,7 @@ class ToGenerationNonRecoverableFailureSpec
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvent(eventId) shouldBe Some((ExecutionDate(now), GenerationNonRecoverableFailure, message))
+        findEvent(eventId) shouldBe Some((ExecutionDate(now), GenerationNonRecoverableFailure, Some(message)))
 
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 

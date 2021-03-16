@@ -96,7 +96,7 @@ class ToTransformationRecoverableFailureSpec
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
         findEvent(eventId) shouldBe Some(
-          (ExecutionDate(now.plus(10, MINUTES)), TransformationRecoverableFailure, message)
+          (ExecutionDate(now.plus(10, MINUTES)), TransformationRecoverableFailure, Some(message))
         )
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 

@@ -96,7 +96,7 @@ class ToGenerationRecoverableFailureSpec
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
         findEvent(eventId) shouldBe Some(
-          (ExecutionDate(now.plus(10, MINUTES)), GenerationRecoverableFailure, message)
+          (ExecutionDate(now.plus(10, MINUTES)), GenerationRecoverableFailure, Some(message))
         )
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 

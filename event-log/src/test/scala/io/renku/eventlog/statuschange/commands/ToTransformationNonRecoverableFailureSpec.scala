@@ -91,7 +91,7 @@ class ToTransformationNonRecoverableFailureSpec
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
-        findEvent(eventId)                       shouldBe Some((ExecutionDate(now), TransformationNonRecoverableFailure, message))
+        findEvent(eventId)                       shouldBe Some((ExecutionDate(now), TransformationNonRecoverableFailure, Some(message)))
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
         histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
