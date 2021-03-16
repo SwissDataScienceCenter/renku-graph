@@ -242,18 +242,6 @@ Currently, only status changing payloads are allowed:
 
 **Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
 
-- for transitioning event from status `GENERATING_TRIPLES` to `SKIPPED`
-
-```json
-{
-  "status": "SKIPPED",
-  "message": "MigrationEvent",
-  "processing_time (optional)": "P2DT3H4M"
-}
-```
-
-**Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
-
 - for transitioning event from status `GENERATING_TRIPLES` to `GENERATION_NON_RECOVERABLE_FAILURE`
 
 ```json

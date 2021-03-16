@@ -33,8 +33,6 @@ trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable w
       transactor:                DbTransactor[Interpretation, EventLogDB]
   ): Interpretation[Unit]
 
-  def updateDelivery(): Interpretation[Unit]
-
   def maybeProcessingTime: Option[EventProcessingTime]
 
   def mapResult: Int => UpdateResult = {
@@ -42,7 +40,6 @@ trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable w
     case 1 => UpdateResult.Updated
     case _ => UpdateResult.Conflict
   }
-
 }
 
 sealed trait UpdateResult extends Product with Serializable
@@ -52,5 +49,4 @@ object UpdateResult {
   case object Updated  extends UpdateResult
   case object NotFound extends UpdateResult
   case class Failure(message: String Refined NonEmpty) extends UpdateResult
-
 }

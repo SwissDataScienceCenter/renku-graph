@@ -28,7 +28,7 @@ import io.circe.Json
 import io.renku.eventlog.EventMessage
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{NotSupported, PayloadMalformed}
 import org.http4s.circe.jsonOf
-import org.http4s.{MediaType, Request}
+import org.http4s.{EntityDecoder, MediaType, Request}
 
 package object commands {
   private[statuschange] sealed trait CommandFindingResult extends Product with Serializable
@@ -52,7 +52,7 @@ package object commands {
     else (NotSupported: CommandFindingResult).pure[Interpretation]
 
   implicit class RequestOps[Interpretation[_]: Sync](request: Request[Interpretation]) {
-    private implicit val jsonEntityDecoder = jsonOf[Interpretation, Json]
+    private implicit val jsonEntityDecoder: EntityDecoder[Interpretation, Json] = jsonOf[Interpretation, Json]
 
     def validate(status: EventStatus): EitherT[Interpretation, CommandFindingResult, Unit] = EitherT(
       request.as[Json].map(_.validate(status))
@@ -62,12 +62,13 @@ package object commands {
       request.as[Json].map(_.getProcessingTime)
     )
 
-    lazy val getMessage: EitherT[Interpretation, CommandFindingResult, Option[EventMessage]] = EitherT(
-      request.as[Json].map(_.getMessage)
+    lazy val message: EitherT[Interpretation, CommandFindingResult, EventMessage] = EitherT(
+      request.as[Json].map(_.message)
     )
   }
 
   implicit class JsonOps(json: Json) {
+
     def validate(status: EventStatus): Either[CommandFindingResult, Unit] = json.hcursor
       .downField("status")
       .as[EventStatus]
@@ -82,11 +83,9 @@ package object commands {
       .as[Option[EventProcessingTime]]
       .leftMap(error => PayloadMalformed(error.getMessage()): CommandFindingResult)
 
-    lazy val getMessage: Either[CommandFindingResult, Option[EventMessage]] = json.hcursor
+    lazy val message: Either[CommandFindingResult, EventMessage] = json.hcursor
       .downField("message")
-      .as[Option[EventMessage]]
+      .as[EventMessage]
       .leftMap(error => PayloadMalformed(error.getMessage()): CommandFindingResult)
-
   }
-
 }

@@ -27,7 +27,7 @@ import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, ToTransformationNonRecoverableFailure, UpdateResult}
 import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
-import io.renku.eventlog.subscriptions.{DispatchRecovery, EventDelivery}
+import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.{EventLogDB, EventMessage, subscriptions}
 
 import scala.concurrent.duration._
@@ -37,7 +37,6 @@ import scala.util.control.NonFatal
 private class DispatchRecoveryImpl[Interpretation[_]](
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     statusUpdatesRunner:             StatusUpdatesRunner[Interpretation],
-    eventDelivery:                   EventDelivery[Interpretation, ToTransformationNonRecoverableFailure[Interpretation]],
     logger:                          Logger[Interpretation],
     onErrorSleep:                    FiniteDuration
 )(implicit ME:                       Bracket[Interpretation, Throwable], timer: Timer[Interpretation])
@@ -51,8 +50,7 @@ private class DispatchRecoveryImpl[Interpretation[_]](
       event.id,
       EventMessage(exception),
       underTriplesTransformationGauge,
-      None,
-      eventDelivery
+      None
     )
     for {
       _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
@@ -83,15 +81,5 @@ private object DispatchRecovery {
             logger:                          Logger[IO]
   )(implicit timer:                          Timer[IO]): IO[DispatchRecovery[IO, TriplesGeneratedEvent]] = for {
     updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
-    eventDelivery <- EventDelivery[ToTransformationNonRecoverableFailure[IO]](
-                       transactor,
-                       (_: ToTransformationNonRecoverableFailure[IO]).eventId,
-                       queriesExecTimes
-                     )
-  } yield new DispatchRecoveryImpl[IO](underTriplesTransformationGauge,
-                                       updateCommandRunner,
-                                       eventDelivery,
-                                       logger,
-                                       OnErrorSleep
-  )
+  } yield new DispatchRecoveryImpl[IO](underTriplesTransformationGauge, updateCommandRunner, logger, OnErrorSleep)
 }

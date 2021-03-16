@@ -36,11 +36,9 @@ import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, exec
 import io.renku.eventlog._
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
-import io.renku.eventlog.subscriptions.EventDelivery
 import org.http4s.circe.jsonEncoder
 import org.http4s.headers.`Content-Type`
 import org.http4s.{MediaType, Request}
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -85,23 +83,20 @@ class ToTransformationRecoverableFailureSpec
 
         (awaitingTriplesTransformationGauge.increment _).expects(projectPath).returning(IO.unit)
         (underTriplesTransformationGauge.decrement _).expects(projectPath).returning(IO.unit)
-        (eventDelivery.unregister _).expects(eventId).returning(IO.unit)
-        val maybeMessage = Gen.option(eventMessages).generateOne
-        val command =
-          ToTransformationRecoverableFailure[IO](
-            eventId,
-            maybeMessage,
-            awaitingTriplesTransformationGauge,
-            underTriplesTransformationGauge,
-            processingTime,
-            eventDelivery,
-            currentTime
-          )
+        val message = eventMessages.generateOne
+        val command = ToTransformationRecoverableFailure[IO](
+          eventId,
+          message,
+          awaitingTriplesTransformationGauge,
+          underTriplesTransformationGauge,
+          processingTime,
+          currentTime
+        )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
         findEvent(eventId) shouldBe Some(
-          (ExecutionDate(now.plus(10, MINUTES)), TransformationRecoverableFailure, maybeMessage)
+          (ExecutionDate(now.plus(10, MINUTES)), TransformationRecoverableFailure, Some(message))
         )
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
@@ -123,17 +118,15 @@ class ToTransformationRecoverableFailureSpec
 
           findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
-          val maybeMessage = Gen.option(eventMessages).generateOne
-          val command =
-            ToTransformationRecoverableFailure[IO](
-              eventId,
-              maybeMessage,
-              awaitingTriplesTransformationGauge,
-              underTriplesTransformationGauge,
-              processingTime,
-              eventDelivery,
-              currentTime
-            )
+          val message = eventMessages.generateOne
+          val command = ToTransformationRecoverableFailure[IO](
+            eventId,
+            message,
+            awaitingTriplesTransformationGauge,
+            underTriplesTransformationGauge,
+            processingTime,
+            currentTime
+          )
 
           (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
@@ -146,29 +139,27 @@ class ToTransformationRecoverableFailureSpec
 
     "factory" should {
       "return a CommandFound when properly decoding a request" in new TestCase {
-        val maybeMessage        = eventMessages.generateOption
+        val message             = eventMessages.generateOne
         val maybeProcessingTime = eventProcessingTimes.generateOption
         val expected =
           ToTransformationRecoverableFailure(eventId,
-                                             maybeMessage,
+                                             message,
                                              awaitingTriplesTransformationGauge,
                                              underTriplesTransformationGauge,
-                                             maybeProcessingTime,
-                                             eventDelivery
+                                             maybeProcessingTime
           )
 
         val body = json"""{
-            "status": ${EventStatus.TransformationRecoverableFailure.value}
-          }""" deepMerge maybeMessage
-          .map(m => json"""{"message": ${m.value}}""")
-          .getOrElse(Json.obj()) deepMerge maybeProcessingTime
+            "status": ${EventStatus.TransformationRecoverableFailure.value},
+            "message": ${message.value}
+          }""" deepMerge maybeProcessingTime
           .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
           .getOrElse(Json.obj())
 
         val request = Request[IO]().withEntity(body)
 
         val actual = ToTransformationRecoverableFailure
-          .factory[IO](awaitingTriplesTransformationGauge, underTriplesTransformationGauge, eventDelivery)
+          .factory[IO](awaitingTriplesTransformationGauge, underTriplesTransformationGauge)
           .run((eventId, request))
         actual.unsafeRunSync() shouldBe CommandFound(expected)
       }
@@ -184,7 +175,7 @@ class ToTransformationRecoverableFailureSpec
 
           val actual =
             ToTransformationRecoverableFailure
-              .factory[IO](awaitingTriplesTransformationGauge, underTriplesTransformationGauge, eventDelivery)
+              .factory[IO](awaitingTriplesTransformationGauge, underTriplesTransformationGauge)
               .run((eventId, request))
           actual.unsafeRunSync() shouldBe NotSupported
         }
@@ -194,7 +185,7 @@ class ToTransformationRecoverableFailureSpec
         val request = Request[IO]().withEntity(json"""{ }""")
 
         val actual = ToTransformationRecoverableFailure
-          .factory[IO](awaitingTriplesTransformationGauge, underTriplesTransformationGauge, eventDelivery)
+          .factory[IO](awaitingTriplesTransformationGauge, underTriplesTransformationGauge)
           .run((eventId, request))
 
         actual.unsafeRunSync() shouldBe PayloadMalformed("No status property in status change payload")
@@ -205,7 +196,7 @@ class ToTransformationRecoverableFailureSpec
           Request[IO]().withEntity(jsons.generateOne).withHeaders(`Content-Type`(MediaType.multipart.`form-data`))
 
         val actual = ToTransformationRecoverableFailure
-          .factory[IO](awaitingTriplesTransformationGauge, underTriplesTransformationGauge, eventDelivery)
+          .factory[IO](awaitingTriplesTransformationGauge, underTriplesTransformationGauge)
           .run((eventId, request))
 
         actual.unsafeRunSync() shouldBe NotSupported
@@ -221,7 +212,6 @@ class ToTransformationRecoverableFailureSpec
     val eventId                            = compoundEventIds.generateOne
     val eventBatchDate                     = batchDates.generateOne
     val processingTime                     = eventProcessingTimes.generateSome
-    val eventDelivery                      = mock[EventDelivery[IO, ToTransformationRecoverableFailure[IO]]]
     val commandRunner                      = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()
