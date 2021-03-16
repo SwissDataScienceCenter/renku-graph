@@ -23,6 +23,7 @@ tokenRepository:
     secret:
 
 triplesGenerator:
+  replicas: 1
   image:
     repository: renku/triples-generator
     tag: 'latest'
