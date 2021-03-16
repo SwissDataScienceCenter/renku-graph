@@ -264,12 +264,12 @@ class DatasetsResourcesSpec
       val dataset1Projects = nonEmptyList(projects).generateOne.toList
       val dataset1 = nonModifiedDatasets().generateOne.copy(
         title = sentenceContaining(text).map(_.value).map(Title.apply).generateOne,
-        usedIn = (dataset1Projects map toDatasetProject)
+        usedIn = dataset1Projects map toDatasetProject
       )
       val dataset2Projects = nonEmptyList(projects).generateOne.toList
       val dataset2 = nonModifiedDatasets().generateOne.copy(
         maybeDescription = Some(sentenceContaining(text).map(_.value).map(Description.apply).generateOne),
-        usedIn = (dataset2Projects map toDatasetProject)
+        usedIn = dataset2Projects map toDatasetProject
       )
       val dataset3Projects = nonEmptyList(projects).generateOne.toList
       val dataset3 = {
@@ -279,19 +279,19 @@ class DatasetsResourcesSpec
             datasetCreators.generateOne
               .copy(name = sentenceContaining(text).map(_.value).map(UserName.apply).generateOne)
           ),
-          usedIn = (dataset3Projects map toDatasetProject)
+          usedIn = dataset3Projects map toDatasetProject
         )
       }
 
       val dataset4Projects = nonEmptyList(projects).generateOne.toList
       val dataset4 = nonModifiedDatasets().generateOne.copy(
         name = sentenceContaining(text).map(_.value).map(Name.apply).generateOne,
-        usedIn = (dataset4Projects map toDatasetProject)
+        usedIn = dataset4Projects map toDatasetProject
       )
 
       val dataset5Projects = List(projects.generateOne)
       val dataset5 = nonModifiedDatasets().generateOne.copy(
-        usedIn = (dataset5Projects map toDatasetProject)
+        usedIn = dataset5Projects map toDatasetProject
       )
 
       Given("some datasets with title, description, name and author containing some arbitrary chosen text")
