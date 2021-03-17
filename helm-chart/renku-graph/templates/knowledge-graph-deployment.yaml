@@ -42,7 +42,7 @@ spec:
               value: {{ .Release.Namespace }}
               {{- end }}
             - name: JENA_BASE_URL
-              value: "http://{{ template "jena.fullname" . }}:{{ .Values.jena.service.port }}"
+              value: "http://{{ template "jena.fullname" . }}-master:{{ .Values.jena.service.port }}"
             - name: JENA_RENKU_PASSWORD
               valueFrom:
                 secretKeyRef:
