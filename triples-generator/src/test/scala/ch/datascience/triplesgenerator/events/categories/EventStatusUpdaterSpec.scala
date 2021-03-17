@@ -42,7 +42,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
   "markNew" should {
 
-    Set(Ok, Conflict, NotFound) foreach { status =>
+    Set(Ok, NotFound) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
@@ -70,7 +70,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
   "markTriplesStore" should {
 
-    Set(Ok, Conflict, NotFound) foreach { status =>
+    Set(Ok, NotFound) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
         val processingTime = eventProcessingTimes.generateOne
 
@@ -110,7 +110,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
   "markTriplesGenerated" should {
 
-    Set(Ok, Conflict, NotFound) foreach { status =>
+    Set(Ok, NotFound) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
         val maybeProcessingTime = eventProcessingTimes.generateOption
 
@@ -180,7 +180,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
     GenerationRecoverableFailure +: GenerationNonRecoverableFailure +: TransformationRecoverableFailure +: TransformationNonRecoverableFailure +: Nil foreach {
       eventStatus =>
-        Set(Ok, Conflict, NotFound) foreach { status =>
+        Set(Ok, NotFound) foreach { status =>
           s"succeed if remote responds with $status for $eventStatus" in new TestCase {
             val exception = exceptions.generateOne
             stubFor {

@@ -77,7 +77,6 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
     lazy val asHttpResponse: Interpretation[Response[Interpretation]] = result match {
       case UpdateResult.Updated  => Ok(InfoMessage("Event status updated"))
       case UpdateResult.NotFound => NotFound(InfoMessage("Event not found"))
-      case UpdateResult.Conflict => Conflict(InfoMessage("Event status cannot be updated"))
       case UpdateResult.Failure(message) =>
         logger.error(message.value)
         InternalServerError(ErrorMessage(message.value))

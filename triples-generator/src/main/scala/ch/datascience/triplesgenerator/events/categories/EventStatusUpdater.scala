@@ -61,13 +61,13 @@ private class EventStatusUpdaterImpl(
   import io.circe._
   import io.circe.literal._
   import org.http4s.Method.PATCH
-  import org.http4s.Status.{Conflict, NotFound, Ok}
+  import org.http4s.Status.{NotFound, Ok}
   import org.http4s.{Request, Response}
 
   override def markEventNew(eventId: CompoundEventId): IO[Unit] = sendStatusChange(
     eventId,
     eventContent = EventRequestContent(json"""{"status": ${EventStatus.New.value}}"""),
-    responseMapping = okConflictAsSuccess
+    responseMapping
   )
 
   override def markTriplesStore(eventId: CompoundEventId, processingTime: EventProcessingTime): IO[Unit] =
@@ -79,7 +79,7 @@ private class EventStatusUpdaterImpl(
           "processingTime": $processingTime
         }"""
       ),
-      responseMapping = okConflictAsSuccess
+      responseMapping
     )
 
   override def markTriplesGenerated(eventId:             CompoundEventId,
@@ -99,7 +99,7 @@ private class EventStatusUpdaterImpl(
         "schemaVersion": ${schemaVersion.value}
       }""".noSpaces.some
     ),
-    responseMapping = okConflictAsSuccess
+    responseMapping
   )
 
   override def markEventFailed(eventId: CompoundEventId, eventStatus: EventStatus, exception: Throwable): IO[Unit] =
@@ -111,7 +111,7 @@ private class EventStatusUpdaterImpl(
           "message": ${ErrorMessage(exception).value}
         }"""
       ),
-      responseMapping = okConflictAsSuccess
+      responseMapping
     )
 
   private def sendStatusChange(
@@ -135,9 +135,8 @@ private class EventStatusUpdaterImpl(
         request(PATCH, uri).withEntity(eventRequestContent.event)
     }
 
-  private lazy val okConflictAsSuccess: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
+  private lazy val responseMapping: PartialFunction[(Status, Request[IO], Response[IO]), IO[Unit]] = {
     case (Ok, _, _)       => IO.unit
-    case (Conflict, _, _) => IO.unit
     case (NotFound, _, _) => IO.unit
   }
 }

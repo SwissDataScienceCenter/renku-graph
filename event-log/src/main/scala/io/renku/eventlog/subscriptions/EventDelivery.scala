@@ -33,7 +33,6 @@ import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
 
 private[subscriptions] trait EventDelivery[Interpretation[_], CategoryEvent] {
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit]
-  def unregister(event:      CompoundEventId): Interpretation[Unit]
 }
 
 private class EventDeliveryImpl[CategoryEvent](transactor:               DbTransactor[IO, EventLogDB],
@@ -52,9 +51,6 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
       result <- insert(id, projectId, subscriberUrl)
     } yield result
   } transact transactor.get flatMap toResult
-
-  def unregister(eventId: CompoundEventId): IO[Unit] =
-    deleteDelivery(eventId.id, eventId.projectId) transact transactor.get flatMap toResult
 
   private def insert(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl) =
     measureExecutionTime {
@@ -107,8 +103,5 @@ private class NoOpEventDelivery[Interpretation[_]: MonadError[*[_], Throwable], 
     extends EventDelivery[Interpretation, CategoryEvent] {
 
   override def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit] =
-    ().pure[Interpretation]
-
-  override def unregister(eventId: CompoundEventId): Interpretation[Unit] =
     ().pure[Interpretation]
 }

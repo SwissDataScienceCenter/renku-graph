@@ -195,8 +195,6 @@ Currently, only status changing payloads are allowed:
 }
 ```
 
-**Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
-
 - for transitioning event from status `TRIPLES_GENERATED` to `TRIPLES_STORE`
 
 ```json
@@ -205,8 +203,6 @@ Currently, only status changing payloads are allowed:
   "processing_time (optional)": "PT2.023S"
 }
 ```
-
-**Notice** `CONFLICT (409)` returned when current event status is different from `TRIPLES_GENERATED`.
 
 - for transitioning event from status `GENERATING_TRIPLES` to `TRIPLES_GENERATED`
 - a multipart request is required with the `event` part as follow
@@ -228,8 +224,6 @@ Currently, only status changing payloads are allowed:
 }
 ```
 
-**Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
-
 - for transitioning event from status `GENERATING_TRIPLES` to `GENERATION_RECOVERABLE_FAILURE`
 
 ```json
@@ -239,8 +233,6 @@ Currently, only status changing payloads are allowed:
   "processing_time (optional)": "PT2.023S"
 }
 ```
-
-**Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
 
 - for transitioning event from status `GENERATING_TRIPLES` to `GENERATION_NON_RECOVERABLE_FAILURE`
 
@@ -252,8 +244,6 @@ Currently, only status changing payloads are allowed:
 }
 ```
 
-**Notice** `CONFLICT (409)` returned when current event status is different from `GENERATING_TRIPLES`.
-
 - for transitioning event from status `TRANSFORMING_TRIPLES` to `TRANFORMATION_RECOVERABLE_FAILURE`
 
 ```json
@@ -263,8 +253,6 @@ Currently, only status changing payloads are allowed:
   "processing_time (optional)": "PT15M"
 }
 ```
-
-**Notice** `CONFLICT (409)` returned when current event status is different from `TRANSFORMING_TRIPLES`.
 
 - for transitioning event from status `TRANSFORMING_TRIPLES` to `TRANSFORMATION_NON_RECOVERABLE_FAILURE`
 
@@ -276,8 +264,6 @@ Currently, only status changing payloads are allowed:
 }
 ```
 
-**Notice** `CONFLICT (409)` returned when current event status is different from `TRANSFORMING_TRIPLES`.
-
 **Response**
 
 | Status                     | Description                                                                 |
@@ -285,7 +271,6 @@ Currently, only status changing payloads are allowed:
 | OK (200)                   | If status update is successful                                              |
 | BAD_REQUEST (400)          | When invalid payload is given                                               |
 | NOT_FOUND (404)            | When the event does not exists                                              |
-| CONFLICT (409)             | When current status of the event does not allow to become the requested one |
 | INTERNAL SERVER ERROR (500)| When some problems occurs                                                   |
 
 #### GET /ping

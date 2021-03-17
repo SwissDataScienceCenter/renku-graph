@@ -109,16 +109,16 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
         val command = TestFailingCommand(eventId, projectPath, gauge, eventProcessingTimes.generateSome)
 
-        runner.run(command).unsafeRunSync() shouldBe NotFound
+        val UpdateResult.Failure(message) = runner.run(command).unsafeRunSync()
 
+        message.value shouldBe s"${command.queries.head.name} failed for event $eventId " +
+          s"to status ${command.status} with result ${command.queryResult}. " +
+          s"Rolling back queries: ${List(command.queries.head.name.value, "status update - delivery info remove", "upsert_processing_time")
+            .mkString(", ")}"
+
+        findEvents(status = New).eventIdsOnly               shouldBe List(eventId)
         findEvents(status = GeneratingTriples).eventIdsOnly shouldBe List()
         findProcessingTime(eventId).eventIdsOnly            shouldBe List()
-
-        logger.loggedOnly(
-          Info(
-            s"${command.queries.head.name} failed for event ${command.eventId} to status ${command.status} with result $NotFound. Rolling back queries: ${command.queries.map(_.name.toString).toList.mkString(", ")}"
-          )
-        )
 
         histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
 
@@ -156,12 +156,6 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
       Nil
     )
 
-    override def mapResult: Int => UpdateResult = {
-      case 0 => UpdateResult.NotFound
-      case 1 => UpdateResult.Updated
-      case _ => UpdateResult.Conflict
-    }
-
     override def updateGauges(
         updateResult:      UpdateResult
     )(implicit transactor: DbTransactor[IO, EventLogDB]) = gauge increment projectPath
@@ -185,21 +179,17 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
     override def status: EventStatus = GeneratingTriples
 
+    val queryResult: Int = 0
+
     override def queries = NonEmptyList.of(
       SqlQuery(
         sql"""|UPDATE event
               |SET status = $status
               |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${New: EventStatus}
-              |""".stripMargin.update.run.map(_ => 0),
+              |""".stripMargin.update.run.map(_ => queryResult),
         name = "test_failure_status_update"
       )
     )
-
-    override def mapResult: Int => UpdateResult = {
-      case 0 => UpdateResult.NotFound
-      case 1 => UpdateResult.Updated
-      case _ => UpdateResult.Conflict
-    }
 
     override def updateGauges(
         updateResult:      UpdateResult
