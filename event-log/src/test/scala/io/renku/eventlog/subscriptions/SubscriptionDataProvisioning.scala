@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.syntax.all._
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import doobie.implicits._
@@ -32,7 +33,7 @@ trait SubscriptionDataProvisioning extends EventLogDataProvisioning with Subscri
             |subscription_category_sync_time (project_id, category_name, last_synced)
             |VALUES ($projectId, $categoryName, $lastSynced)
             |ON CONFLICT (project_id, category_name)
-            |DO UPDATE SET  last_synced = excluded.last_synced 
-      """.stripMargin.update.run.map(_ => ())
+            |DO UPDATE SET last_synced = excluded.last_synced 
+      """.stripMargin.update.run.void
     }
 }
