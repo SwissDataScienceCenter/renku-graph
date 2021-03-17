@@ -53,7 +53,13 @@ private class CommitSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
   private def findEvent() = measureExecutionTime {
     SqlQuery(
       sql"""|SELECT
-            |  (SELECT evt.event_id FROM event evt WHERE evt.project_id = proj.project_id AND evt.event_date = proj.latest_event_date),
+            |  (SELECT evt.event_id 
+            |    FROM event evt 
+            |    WHERE evt.project_id = proj.project_id 
+            |      AND evt.event_date = proj.latest_event_date
+            |    ORDER BY created_date DESC
+            |    LIMIT 1
+            |  ),
             |  proj.project_id, 
             |  proj.project_path,
             |  sync_time.last_synced,

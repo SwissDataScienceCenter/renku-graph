@@ -19,6 +19,7 @@
 package io.renku.eventlog.subscriptions
 package commitsync
 
+import cats.Eval
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -29,7 +30,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec}
+import io.renku.eventlog.{CreatedDate, EventDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -120,18 +121,49 @@ class CommitSyncEventFinderSpec
         finder.popEvent().unsafeRunSync() shouldBe Some(CommitSyncEvent(event0Id, event0ProjectPath, event0LastSynced))
         finder.popEvent().unsafeRunSync() shouldBe None
       }
+
+    "return events for " +
+      "which falls into the categories above " +
+      "and have more than one event with the latest event date" in new TestCase {
+        val commonEventDate = relativeTimestamps(moreThanAgo = Duration.ofHours(7 * 24 + 1)).generateAs(EventDate)
+        val lastSynced      = relativeTimestamps(moreThanAgo = Duration.ofHours(25)).generateAs(LastSyncedDate)
+        val projectId       = projectIds.generateOne
+        val projectPath     = projectPaths.generateOne
+
+        val event0Id          = compoundEventIds.generateOne.copy(projectId = projectId)
+        val event0CreatedDate = createdDates.generateOne
+        addEvent(event0Id, commonEventDate, projectPath, event0CreatedDate)
+        upsertLastSynced(projectId, categoryName, lastSynced)
+
+        val event1Id          = compoundEventIds.generateOne.copy(projectId = projectId)
+        val event1CreatedDate = createdDates.generateOne
+        addEvent(event1Id, commonEventDate, projectPath, event1CreatedDate)
+        upsertLastSynced(projectId, categoryName, lastSynced)
+
+        finder.popEvent().unsafeRunSync().map(_.id) shouldBe List(
+          event0Id -> event0CreatedDate,
+          event1Id -> event1CreatedDate
+        ).sortBy(_._2).reverse.headOption.map(_._1)
+
+        finder.popEvent().unsafeRunSync() shouldBe None
+      }
   }
 
   private trait TestCase {
     val finder = new CommitSyncEventFinderImpl(transactor, TestLabeledHistogram[SqlQuery.Name]("query_id"))
   }
 
-  private def addEvent(eventId: CompoundEventId, eventDate: EventDate, projectPath: projects.Path): Unit =
+  private def addEvent(eventId:     CompoundEventId,
+                       eventDate:   EventDate,
+                       projectPath: projects.Path,
+                       createdDate: CreatedDate = createdDates.generateOne
+  ): Unit =
     storeEvent(eventId,
                eventStatuses.generateOne,
                executionDates.generateOne,
                eventDate,
                eventBodies.generateOne,
+               createdDate,
                projectPath = projectPath
     )
 }

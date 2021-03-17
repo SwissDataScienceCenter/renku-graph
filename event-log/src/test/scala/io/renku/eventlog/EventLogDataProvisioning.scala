@@ -81,7 +81,9 @@ trait EventLogDataProvisioning {
             |project (project_id, project_path, latest_event_date)
             |VALUES (${compoundEventId.projectId}, $projectPath, $eventDate)
             |ON CONFLICT (project_id)
-            |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
+            |DO UPDATE 
+            |  SET latest_event_date = excluded.latest_event_date 
+            |  WHERE excluded.latest_event_date > project.latest_event_date
       """.stripMargin.update.run.void
     }
 
