@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "jena.fullname" . }}
+  name: {{ template "jena.fullname" . }}-master
   labels:
     app: {{ template "jena.name" . }}
     chart: {{ template "jena.chart" . }}
@@ -11,9 +11,10 @@ spec:
   type: {{ .Values.service.type }}
   ports:
     - port: {{ .Values.service.port }}
-      targetPort: http
+      targetPort: jena
       protocol: TCP
-      name: http
+      name: jena
   selector:
     app: {{ template "jena.name" . }}
     release: {{ .Release.Name }}
+    role: master
