@@ -227,7 +227,7 @@ private object IOCommitEventProcessor {
     for {
       triplesGenerator        <- TriplesGenerator()
       accessTokenFinder       <- IOAccessTokenFinder(logger)
-      eventStatusUpdater      <- IOEventStatusUpdater(logger)
+      eventStatusUpdater      <- IOEventStatusUpdater(categoryName, logger)
       eventsProcessingTimes   <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
       allEventsTimeRecorder   <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
       singleEventTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = None)

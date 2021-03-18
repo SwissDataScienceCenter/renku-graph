@@ -21,6 +21,8 @@ package ch.datascience.data
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.collection.NonEmpty
 
+import java.io.{PrintWriter, StringWriter}
+
 object ErrorMessage {
 
   type ErrorMessage = String Refined NonEmpty
@@ -31,8 +33,17 @@ object ErrorMessage {
       .getOrElse(throw new IllegalArgumentException("ErrorMessage cannot be instantiated with a blank String"))
   }
 
-  def apply(exception: Throwable): ErrorMessage = toErrorMessage {
+  def withExceptionMessage(exception: Throwable): ErrorMessage = toErrorMessage {
     blankToNone(exception.getMessage)
+      .fold(ifEmpty = exception.getClass.getName)(toSingleLine)
+  }
+
+  def withStackTrace(exception: Throwable): ErrorMessage = toErrorMessage {
+    blankToNone {
+      val sw = new StringWriter
+      exception.printStackTrace(new PrintWriter(sw))
+      sw.toString
+    }
       .fold(ifEmpty = exception.getClass.getName)(toSingleLine)
   }
 

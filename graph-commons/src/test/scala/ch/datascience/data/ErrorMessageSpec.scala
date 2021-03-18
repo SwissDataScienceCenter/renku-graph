@@ -24,21 +24,24 @@ import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.io.{PrintWriter, StringWriter}
+
 class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
-
   "ErrorMessage" should {
-
     "be instantiatable from a non blank String" in {
       val line1                 = nonEmptyStrings().generateOne
       val (line2Message, line2) = tabbedLines.generateOne
 
       ErrorMessage(s"$line1\n$line2").value shouldBe s"$line1 $line2Message"
     }
+  }
+
+  "ErrorMessage.withExceptionMessage" should {
 
     "be instantiable from an Exception with a non-null, non-blank, single line message" in {
       val exception = exceptions.generateOne
 
-      val message = ErrorMessage(exception)
+      val message = ErrorMessage.withExceptionMessage(exception)
 
       message.value shouldBe exception.getMessage
     }
@@ -48,7 +51,7 @@ class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
       val (line2Message, line2) = tabbedLines.generateOne
       val exception             = new Exception(s"$line1\n$line2")
 
-      val message = ErrorMessage(exception)
+      val message = ErrorMessage.withExceptionMessage(exception)
 
       message.value shouldBe s"$line1 $line2Message"
     }
@@ -57,7 +60,7 @@ class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
       val exception = new Exception()
       assume(exception.getMessage == null)
 
-      val message = ErrorMessage(exception)
+      val message = ErrorMessage.withExceptionMessage(exception)
 
       message.value shouldBe s"${exception.getClass.getName}"
     }
@@ -65,9 +68,22 @@ class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
     "be instantiable from an Exception with a blank message" in {
       val exception = new Exception(blankStrings().generateOne)
 
-      val message = ErrorMessage(exception)
+      val message = ErrorMessage.withExceptionMessage(exception)
 
       message.value shouldBe s"${exception.getClass.getName}"
+    }
+  }
+
+  "ErrorMessage.withStackTrace" should {
+
+    "be instantiable from an Exception with a non-null, non-blank, single line message" in {
+      val exception = exceptions.generateOne
+
+      val message = ErrorMessage.withStackTrace(exception)
+
+      val sw = new StringWriter
+      exception.printStackTrace(new PrintWriter(sw))
+      message.value.replaceAll("\\s", "") shouldBe sw.toString.replace("\n", "").replaceAll("\\s", "")
     }
   }
 

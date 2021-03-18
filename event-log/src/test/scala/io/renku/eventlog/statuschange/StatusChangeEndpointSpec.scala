@@ -83,27 +83,6 @@ class StatusChangeEndpointSpec
 
     "decode payload from the body, " +
       "perform status update " +
-      s"and return $Conflict if no event gets updated - status case" in new TestCase {
-
-        val eventId = command.eventId
-
-        (commandsRunner.run _)
-          .expects(command)
-          .returning(UpdateResult.Conflict.pure[IO])
-
-        val request = Request[IO]()
-
-        val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
-
-        response.status                          shouldBe Conflict
-        response.contentType                     shouldBe Some(`Content-Type`(application.json))
-        response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event status cannot be updated")
-
-        logger.expectNoLogs()
-      }
-
-    "decode payload from the body, " +
-      "perform status update " +
       s"and return $InternalServerError if there was an error during update - status case" in new TestCase {
 
         val eventId = command.eventId
@@ -120,8 +99,6 @@ class StatusChangeEndpointSpec
         response.status                          shouldBe InternalServerError
         response.contentType                     shouldBe Some(`Content-Type`(application.json))
         response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage.value)
-
-        logger.loggedOnly(Error(errorMessage.value))
       }
 
     s"return $BadRequest if all the commands return NotSupported" in new TestCase {

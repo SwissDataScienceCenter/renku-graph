@@ -107,7 +107,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
     EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.NotFound}" in new TestCase {
+        s"and return ${UpdateResult.Failure}" in new TestCase {
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
                      eventStatus,
@@ -129,7 +129,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
                                    currentTime
             )
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
+          (commandRunner run command).unsafeRunSync() shouldBe a[UpdateResult.Failure]
 
           val expectedEvents =
             if (eventStatus != TriplesGenerated) List.empty
@@ -139,6 +139,27 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           findProcessingTime(eventId).eventIdsOnly shouldBe List()
 
           histogram.verifyExecutionTimeMeasured(command.queries.head.name)
+        }
+      s"do nothing when updating event with $eventStatus status " +
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
+
+          findEvents(status = eventStatus) shouldBe List()
+          findPayload(eventId)             shouldBe None
+          val command =
+            ToTriplesGenerated[IO](eventId,
+                                   payload,
+                                   schemaVersion,
+                                   awaitingTransformationGauge,
+                                   underTriplesGenerationGauge,
+                                   processingTime,
+                                   currentTime
+            )
+
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
+
+          findEvents(status = TriplesGenerated)    shouldBe List()
+          findPayload(eventId)                     shouldBe None
+          findProcessingTime(eventId).eventIdsOnly shouldBe List()
         }
     }
 

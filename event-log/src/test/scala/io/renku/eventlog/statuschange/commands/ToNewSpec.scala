@@ -98,7 +98,7 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
 
     EventStatus.all.filterNot(_ == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.NotFound}" in new TestCase {
+        s"and return ${UpdateResult.Failure}" in new TestCase {
 
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
@@ -114,7 +114,7 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
           val command =
             ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, processingTime, currentTime)
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
+          (commandRunner run command).unsafeRunSync() shouldBe a[UpdateResult.Failure]
 
           val expectedEvents =
             if (eventStatus != New) List.empty
@@ -123,6 +123,19 @@ class ToNewSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory
           findProcessingTime(eventId) shouldBe List()
 
           histogram.verifyExecutionTimeMeasured(command.queries.head.name)
+        }
+      s"do nothing when updating event with $eventStatus status " +
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
+
+          findEvents(status = eventStatus) shouldBe List()
+
+          val command =
+            ToNew[IO](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, processingTime, currentTime)
+
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
+
+          findEvents(status = New)    shouldBe List()
+          findProcessingTime(eventId) shouldBe List()
         }
     }
 

@@ -149,7 +149,7 @@ abstract class IORestClient[ThrottlingTarget](
       response
         .as[String]
         .flatMap { bodyAsString =>
-          IO.raiseError(UnexpectedResponseException(LogMessage(request, response, bodyAsString)))
+          IO.raiseError(UnexpectedResponseException(response.status, LogMessage(request, response, bodyAsString)))
         }
   }
 

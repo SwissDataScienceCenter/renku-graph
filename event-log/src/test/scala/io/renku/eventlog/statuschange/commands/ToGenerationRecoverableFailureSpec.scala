@@ -105,7 +105,7 @@ class ToGenerationRecoverableFailureSpec
 
     EventStatus.all.filterNot(status => status == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.NotFound}" in new TestCase {
+        s"and return ${UpdateResult.Failure}" in new TestCase {
 
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
@@ -127,12 +127,30 @@ class ToGenerationRecoverableFailureSpec
                                                            currentTime
           )
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
+          (commandRunner run command).unsafeRunSync() shouldBe a[UpdateResult.Failure]
 
           findEvent(eventId)          shouldBe Some((executionDate, eventStatus, None))
           findProcessingTime(eventId) shouldBe List()
 
           histogram.verifyExecutionTimeMeasured(command.queries.head.name)
+        }
+      s"do nothing when updating event with $eventStatus status " +
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
+
+          findEvent(eventId) shouldBe None
+
+          val command = ToGenerationRecoverableFailure[IO](eventId,
+                                                           eventMessages.generateOne,
+                                                           awaitingTriplesGenerationGauge,
+                                                           underTriplesGenerationGauge,
+                                                           processingTime,
+                                                           currentTime
+          )
+
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
+
+          findEvent(eventId)          shouldBe None
+          findProcessingTime(eventId) shouldBe List()
         }
     }
 

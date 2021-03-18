@@ -23,7 +23,7 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.exceptions
+import ch.datascience.generators.Generators.{exceptions, serverErrorHttpStatuses}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
@@ -113,7 +113,7 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
         .expects(curatedTriples.triples)
         .returning(datasetInfoList.toList.toSet.pure[Try])
 
-      val exception = UnexpectedResponseException("Unexpected response exception")
+      val exception = UnexpectedResponseException(serverErrorHttpStatuses.generateOne, "Unexpected response exception")
       datasetInfoList.toList.foreach { datasetInfo =>
         (topmostDataFinder.findTopmostData _).expects(datasetInfo).returning(exception.raiseError[Try, TopmostData])
       }
@@ -179,16 +179,16 @@ class DataSetInfoEnricherSpec extends AnyWordSpec with MockFactory with should.M
   private trait TestCase {
     val curatedTriples = curatedTriplesObjects[Try].generateOne
 
-    val infoFinder = mock[DataSetInfoFinder[Try]]
-    val triplesUpdater = mock[TriplesUpdater]
-    val topmostDataFinder = mock[TopmostDataFinder[Try]]
+    val infoFinder         = mock[DataSetInfoFinder[Try]]
+    val triplesUpdater     = mock[TriplesUpdater]
+    val topmostDataFinder  = mock[TopmostDataFinder[Try]]
     val descendantsUpdater = mock[DescendantsUpdater]
-    val enricher = new DataSetInfoEnricherImpl[Try](infoFinder, triplesUpdater, topmostDataFinder, descendantsUpdater)
+    val enricher           = new DataSetInfoEnricherImpl[Try](infoFinder, triplesUpdater, topmostDataFinder, descendantsUpdater)
   }
 
   private lazy val datasetInfos = for {
-    datasetId <- entityIds
-    maybeSameAs <- datasetSameAs.toGeneratorOfOptions
+    datasetId        <- entityIds
+    maybeSameAs      <- datasetSameAs.toGeneratorOfOptions
     maybeDerivedFrom <- datasetDerivedFroms.toGeneratorOfOptions
   } yield (datasetId, maybeSameAs, maybeDerivedFrom)
 }
