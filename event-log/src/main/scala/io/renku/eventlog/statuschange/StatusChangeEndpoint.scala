@@ -31,7 +31,6 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands._
-import io.renku.eventlog.subscriptions.EventDelivery
 import org.http4s.Request
 import org.http4s.dsl.Http4sDsl
 
@@ -64,11 +63,11 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
       ]
   ): Interpretation[Response[Interpretation]] = commandFactories match {
     case Nil => BadRequest(ErrorMessage("No event command found"))
-    case head :: tail =>
-      head(eventId -> request).flatMap {
+    case headFactory :: otherFactories =>
+      headFactory.run(eventId -> request).flatMap {
         case command: CommandFound[Interpretation] =>
           run(command.command).flatMap(_.asHttpResponse) recoverWith httpResponse
-        case NotSupported              => tryCommandFactory(eventId, request, tail)
+        case NotSupported              => tryCommandFactory(eventId, request, otherFactories)
         case PayloadMalformed(message) => BadRequest(ErrorMessage(message))
       }
   }
@@ -111,7 +110,9 @@ object IOStatusChangeEndpoint {
                                      Set(
                                        ToTriplesStore.factory(underTriplesTransformationGauge),
                                        ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
-                                       ToTriplesGenerated.factory(underTriplesGenerationGauge,
+                                       ToTriplesGenerated.factory(transactor,
+                                                                  underTriplesTransformationGauge,
+                                                                  underTriplesGenerationGauge,
                                                                   awaitingTriplesTransformationGauge
                                        ),
                                        ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),

@@ -52,8 +52,8 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
       runner.run(command).unsafeRunSync() shouldBe NotFound
     }
 
-    "execute query from the given command, " +
-      "update the delivery status, " +
+    "remove the delivery info " +
+      "execute query from the given command, " +
       "map the result using command's result mapping rules, " +
       "and update metrics gauges" in new TestCase {
 
@@ -100,7 +100,8 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
       }
 
     "execute query from the given command, " +
-      "if the query fails rollback to the initial state" in new TestCase {
+      "if the query fails rollback to the initial state " +
+      "except from the event delivery info" in new TestCase {
 
         store(eventId, projectPath, New)
         upsertEventDelivery(eventId)
@@ -113,7 +114,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
         message.value shouldBe s"${command.queries.head.name} failed for event $eventId " +
           s"to status ${command.status} with result ${command.queryResult}. " +
-          s"Rolling back queries: ${List(command.queries.head.name.value, "status update - delivery info remove", "upsert_processing_time")
+          s"Rolling back queries: ${List(command.queries.head.name.value, "upsert_processing_time")
             .mkString(", ")}"
 
         findEvents(status = New).eventIdsOnly               shouldBe List(eventId)
@@ -122,7 +123,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
         histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
 
-        findAllDeliveries.map(_._1) shouldBe List(eventId)
+        findAllDeliveries.map(_._1) shouldBe Nil
       }
   }
 
