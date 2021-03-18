@@ -35,7 +35,7 @@ import org.scalacheck.{Arbitrary, Gen}
 
 import java.time.Instant.now
 import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
-import java.time.{Duration => _, _}
+import java.time.{Duration => JavaDuration, _}
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
 
@@ -233,8 +233,8 @@ object Generators {
       .map(Instant.ofEpochMilli)
 
   def relativeTimestamps(
-      lessThanAgo: Duration = Duration.ofDays(365 * 5),
-      moreThanAgo: Duration = Duration.ZERO
+      lessThanAgo: JavaDuration = JavaDuration.ofDays(365 * 5),
+      moreThanAgo: JavaDuration = JavaDuration.ZERO
   ): Gen[Instant] = {
     if ((lessThanAgo compareTo moreThanAgo) < 0)
       throw new IllegalArgumentException(
@@ -273,17 +273,17 @@ object Generators {
       .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
       .map(_.toLocalDate)
 
-  val notNegativeJavaDurations: Gen[Duration] = javaDurations(min = 0, max = 20000)
+  val notNegativeJavaDurations: Gen[JavaDuration] = javaDurations(min = 0, max = 20000)
 
   def javaDurations(
-      min: Duration = Duration.ZERO,
-      max: Duration = Duration.ofDays(20)
-  ): Gen[Duration] = javaDurations(min.toMillis, max.toMillis)
+      min: JavaDuration = JavaDuration.ZERO,
+      max: JavaDuration = JavaDuration.ofDays(20)
+  ): Gen[JavaDuration] = javaDurations(min.toMillis, max.toMillis)
 
-  def javaDurations(min: Long, max: Long): Gen[Duration] =
+  def javaDurations(min: Long, max: Long): Gen[JavaDuration] =
     Gen
       .choose(min, max)
-      .map(Duration.ofMillis)
+      .map(JavaDuration.ofMillis)
 
   implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls() map ServiceUrl.apply
   implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply

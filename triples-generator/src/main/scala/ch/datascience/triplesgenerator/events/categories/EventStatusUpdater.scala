@@ -22,11 +22,11 @@ import cats.{Eval, MonadError}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
+import ch.datascience.data.ErrorMessage
 import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus}
-import ch.datascience.http.ErrorMessage
 import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.JsonLDTriples
@@ -114,7 +114,7 @@ private class EventStatusUpdaterImpl(
       eventContent = EventRequestContent(
         json"""{
           "status":  ${eventStatus.value},
-          "message": ${ErrorMessage(exception).value}
+          "message": ${ErrorMessage.withStackTrace(exception).value}
         }"""
       ),
       responseMapping

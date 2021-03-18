@@ -19,6 +19,7 @@
 package ch.datascience.triplesgenerator.events.categories
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.data.ErrorMessage
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -26,7 +27,6 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.EventsGenerators.{categoryNames, compoundEventIds, eventProcessingTimes, failureEventStatuses}
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.http.ErrorMessage
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.json.JsonOps._
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -193,7 +193,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
                   equalToJson(
                     json"""{
                       "status":  ${eventStatus.value},
-                      "message": ${ErrorMessage(exception).value}
+                      "message": ${ErrorMessage.withStackTrace(exception).value}
                     }""".spaces2
                   )
                 )

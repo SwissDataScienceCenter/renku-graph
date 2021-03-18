@@ -99,8 +99,6 @@ class StatusChangeEndpointSpec
         response.status                          shouldBe InternalServerError
         response.contentType                     shouldBe Some(`Content-Type`(application.json))
         response.as[InfoMessage].unsafeRunSync() shouldBe ErrorMessage(errorMessage.value)
-
-        logger.loggedOnly(Error(errorMessage.value))
       }
 
     s"return $BadRequest if all the commands return NotSupported" in new TestCase {

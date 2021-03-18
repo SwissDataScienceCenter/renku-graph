@@ -55,13 +55,15 @@ class StatusUpdatesRunnerImpl(
 
   override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] =
     for {
-      updateResult <- executeCommand(command) transact transactor.get recoverWith errorToUpdateResult
+      updateResult <- executeCommand(command) transact transactor.get recoverWith errorToUpdateResult(command)
       _            <- logInfo(command, updateResult)
       _            <- command updateGauges updateResult
     } yield updateResult
 
-  private lazy val errorToUpdateResult: PartialFunction[Throwable, IO[UpdateResult]] = { case NonFatal(exception) =>
-    UpdateResult.Failure(ErrorMessage(exception)).pure[IO]
+  private def errorToUpdateResult(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(s"Event ${command.eventId} got ${command.status}")
+      UpdateResult.Failure(ErrorMessage.withExceptionMessage(exception)).pure[IO]
   }
 
   private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {

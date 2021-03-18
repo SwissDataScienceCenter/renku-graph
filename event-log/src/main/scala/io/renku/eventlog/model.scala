@@ -95,7 +95,7 @@ object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) w
 
   implicit val decoder: Decoder[EventMessage] = stringDecoder(EventMessage)
 
-  def apply(exception: Throwable): EventMessage = EventMessage(ErrorMessage(exception).value)
+  def apply(exception: Throwable): EventMessage = EventMessage(ErrorMessage.withStackTrace(exception).value)
 }
 
 final class EventPayload private (val value: String) extends AnyVal with StringTinyType

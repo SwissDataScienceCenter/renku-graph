@@ -95,7 +95,7 @@ class EventMessageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
 
     "be instantiatable from an exception and contain the stack trace" in {
       forAll(nestedExceptions) { exception =>
-        EventMessage(exception).value shouldBe ErrorMessage(exception).value
+        EventMessage(exception).value shouldBe ErrorMessage.withStackTrace(exception).value
       }
     }
   }
