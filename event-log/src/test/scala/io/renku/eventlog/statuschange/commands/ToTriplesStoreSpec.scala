@@ -113,7 +113,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
     EventStatus.all.filterNot(status => status == TransformingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.NotFound}" in new TestCase {
+        s"and return ${UpdateResult.Failure}" in new TestCase {
 
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
@@ -129,7 +129,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
           val command =
             ToTriplesStore[IO](eventId, underTriplesGenerationGauge, processingTime, currentTime)
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
+          (commandRunner run command).unsafeRunSync() shouldBe a[UpdateResult.Failure]
 
           val expectedEvents =
             if (eventStatus != TriplesStore) List.empty
@@ -139,7 +139,21 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
           histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
+      s"do nothing when updating event with $eventStatus status " +
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
+
+          findEvents(status = eventStatus) shouldBe List()
+
+          val command =
+            ToTriplesStore[IO](eventId, underTriplesGenerationGauge, processingTime, currentTime)
+
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
+
+          findEvents(status = TriplesStore)        shouldBe List()
+          findProcessingTime(eventId).eventIdsOnly shouldBe List()
+        }
     }
+
     "factory" should {
       "return a CommandFound when properly decoding a request" in new TestCase {
         val maybeProcessingTime = eventProcessingTimes.generateOption
