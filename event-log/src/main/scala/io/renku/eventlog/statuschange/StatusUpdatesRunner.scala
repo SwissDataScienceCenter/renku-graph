@@ -53,16 +53,20 @@ class StatusUpdatesRunnerImpl(
 
   import doobie.implicits._
 
-  override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] =
-    for {
-      updateResult <- executeCommand(command) transact transactor.get recoverWith errorToUpdateResult(command)
-      _            <- logInfo(command, updateResult)
-      _            <- command updateGauges updateResult
-    } yield updateResult
+  override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] = for {
+    _ <- deleteDelivery(command) transact transactor.get recoverWith errorToUpdateResult(
+           s"Event ${command.eventId} - cannot remove event delivery"
+         )
+    updateResult <- executeCommand(command) transact transactor.get recoverWith errorToUpdateResult(
+                      s"Event ${command.eventId} got ${command.status}"
+                    )
+    _ <- logInfo(command, updateResult)
+    _ <- command updateGauges updateResult
+  } yield updateResult
 
-  private def errorToUpdateResult(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
+  private def errorToUpdateResult(message: String): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) =>
-      logger.error(exception)(s"Event ${command.eventId} got ${command.status}")
+      logger.error(exception)(message)
       UpdateResult.Failure(ErrorMessage.withExceptionMessage(exception)).pure[IO]
   }
 
@@ -75,19 +79,20 @@ class StatusUpdatesRunnerImpl(
     checkIfPersisted(command.eventId) >>= {
       case true =>
         runUpdateQueriesIfSuccessful(
-          command.queries.toList :+ deleteDelivery(command) :++ maybeUpdateProcessingTimeQuery(command),
+          command.queries.toList :++ maybeUpdateProcessingTimeQuery(command),
           command
         ) >>= toUpdateResult
       case false => NotFound.pure[ConnectionIO].widen[commands.UpdateResult]
     }
 
-  private def deleteDelivery(command: ChangeStatusCommand[IO]) =
+  private def deleteDelivery(command: ChangeStatusCommand[IO]) = measureExecutionTime {
     SqlQuery(
       sql"""|DELETE FROM event_delivery 
             |WHERE event_id = ${command.eventId.id} AND project_id = ${command.eventId.projectId}
-            |""".stripMargin.update.run.map(_ => 1),
+            |""".stripMargin.update.run.map(_ => UpdateResult.Updated: UpdateResult),
       name = "status update - delivery info remove"
     )
+  }
 
   private def toUpdateResult: UpdateResult => ConnectionIO[UpdateResult] = {
     case UpdateResult.Failure(message) => new Exception(message).raiseError[ConnectionIO, UpdateResult]

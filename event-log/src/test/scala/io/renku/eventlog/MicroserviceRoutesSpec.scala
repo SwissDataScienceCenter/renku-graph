@@ -20,6 +20,7 @@ package io.renku.eventlog
 
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
+import ch.datascience.db.DbTransactor
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
@@ -227,6 +228,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       logger:                       Logger[IO]
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
   class TestStatusChangeEndpoint(
+      transactor:                      DbTransactor[IO, EventLogDB],
       updateCommandsRunner:            StatusUpdatesRunner[IO],
       awaitingTriplesGenerationGauge:  LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
@@ -237,7 +239,9 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
                                      Set(
                                        ToTriplesStore.factory(underTriplesGenerationGauge),
                                        ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
-                                       ToTriplesGenerated.factory(underTriplesGenerationGauge,
+                                       ToTriplesGenerated.factory(transactor,
+                                                                  underTriplesTransformationGauge,
+                                                                  underTriplesGenerationGauge,
                                                                   awaitingTransformationGauge
                                        ),
                                        ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),
