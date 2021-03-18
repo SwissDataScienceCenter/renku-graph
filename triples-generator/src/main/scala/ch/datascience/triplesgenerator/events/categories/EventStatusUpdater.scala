@@ -18,22 +18,26 @@
 
 package ch.datascience.triplesgenerator.events.categories
 
-import cats.MonadError
+import cats.{Eval, MonadError}
 import cats.effect.{ContextShift, IO, Timer}
-import cats.implicits.catsSyntaxOptionId
+import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.SchemaVersion
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.http.ErrorMessage
 import ch.datascience.http.client.IORestClient
+import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.JsonLDTriples
 import io.chrisdavenport.log4cats.Logger
+import org.http4s.Status.{BadGateway, GatewayTimeout, ServiceUnavailable}
 import org.http4s.circe.jsonEncoder
 import org.http4s.{Status, Uri}
 
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 private trait EventStatusUpdater[Interpretation[_]] {
   def markEventNew(eventId:                     CompoundEventId): Interpretation[Unit]
@@ -47,8 +51,10 @@ private trait EventStatusUpdater[Interpretation[_]] {
 }
 
 private class EventStatusUpdaterImpl(
-    eventLogUrl: EventLogUrl,
-    logger:      Logger[IO]
+    eventLogUrl:  EventLogUrl,
+    categoryName: CategoryName,
+    retryDelay:   FiniteDuration,
+    logger:       Logger[IO]
 )(implicit
     ME:               MonadError[IO, Throwable],
     executionContext: ExecutionContext,
@@ -121,8 +127,22 @@ private class EventStatusUpdaterImpl(
   ): IO[Unit] = for {
     uri <- validateUri(s"$eventLogUrl/events/${eventId.id}/${eventId.projectId}")
     request = createRequest(uri, eventContent)
-    sendingResult <- send(request)(responseMapping)
+    sendingResult <- send(request)(responseMapping) recoverWith retryOnServerError(
+                       Eval.always(sendStatusChange(eventId, eventContent, responseMapping))
+                     )
   } yield sendingResult
+
+  def retryOnServerError(retry: Eval[IO[Unit]]): PartialFunction[Throwable, IO[Unit]] = {
+    case UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, message) =>
+      waitAndRetry(retry, message)
+    case ConnectivityException(message, _) => waitAndRetry(retry, message)
+  }
+
+  private def waitAndRetry(retry: Eval[IO[Unit]], errorMessage: String) = for {
+    _      <- logger.error(s"$categoryName: sending status change failed - retrying in $retryDelay - $errorMessage")
+    _      <- timer sleep retryDelay
+    result <- retry.value
+  } yield result
 
   private def createRequest(uri: Uri, eventRequestContent: EventRequestContent) =
     eventRequestContent.maybePayload match {
@@ -139,16 +159,18 @@ private class EventStatusUpdaterImpl(
     case (Ok, _, _)       => IO.unit
     case (NotFound, _, _) => IO.unit
   }
+
 }
 
 private object IOEventStatusUpdater {
   def apply(
-      logger: Logger[IO]
+      categoryName: CategoryName,
+      logger:       Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventStatusUpdater[IO]] = for {
     eventLogUrl <- EventLogUrl[IO]()
-  } yield new EventStatusUpdaterImpl(eventLogUrl, logger)
+  } yield new EventStatusUpdaterImpl(eventLogUrl, categoryName, retryDelay = 30 seconds, logger)
 }

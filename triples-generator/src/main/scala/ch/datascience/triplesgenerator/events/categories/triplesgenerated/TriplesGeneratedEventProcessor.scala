@@ -218,7 +218,7 @@ private object IOTriplesGeneratedEventProcessor {
       uploader              <- IOUploader(logger, timeRecorder)
       accessTokenFinder     <- IOAccessTokenFinder(logger)
       triplesCurator        <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)
-      eventStatusUpdater    <- IOEventStatusUpdater(logger)
+      eventStatusUpdater    <- IOEventStatusUpdater(categoryName, logger)
       eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
       executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
     } yield new TriplesGeneratedEventProcessor(

@@ -18,8 +18,6 @@
 
 package ch.datascience.generators
 
-import java.time.{Duration, Instant, LocalDate, LocalDateTime, ZoneId, ZoneOffset, ZonedDateTime}
-import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
 import cats.data.NonEmptyList
 import ch.datascience.config.ServiceUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
@@ -30,10 +28,14 @@ import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.{NonNegative, NonPositive, Positive}
 import eu.timepit.refined.string.Url
 import io.circe.{Encoder, Json}
+import org.http4s.Status
+import org.http4s.Status._
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 
 import java.time.Instant.now
+import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
+import java.time.{Duration => _, _}
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
 
@@ -193,6 +195,25 @@ object Generators {
                 }
     port <- httpPorts
   } yield s"$protocol://localhost:$port"
+
+  lazy val httpStatuses: Gen[Status] = Gen.oneOf(successHttpStatuses, clientErrorHttpStatuses, serverErrorHttpStatuses)
+
+  lazy val successHttpStatuses: Gen[Status] = Gen.oneOf(Ok, Created, Accepted)
+
+  lazy val clientErrorHttpStatuses: Gen[Status] = Gen.oneOf(
+    Unauthorized,
+    PaymentRequired,
+    Forbidden,
+    NotFound,
+    Conflict
+  )
+  lazy val serverErrorHttpStatuses: Gen[Status] = Gen.oneOf(
+    InternalServerError,
+    NotImplemented,
+    BadGateway,
+    ServiceUnavailable,
+    GatewayTimeout
+  )
 
   val validatedUrls: Gen[String Refined Url] = httpUrls() map Refined.unsafeApply
 
