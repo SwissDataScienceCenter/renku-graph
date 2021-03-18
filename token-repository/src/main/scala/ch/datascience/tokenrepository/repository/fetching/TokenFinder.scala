@@ -21,7 +21,7 @@ package ch.datascience.tokenrepository.repository.fetching
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.metrics.LabeledHistogram
@@ -49,7 +49,7 @@ private class TokenFinder[Interpretation[_]](
 
 private object IOTokenFinder {
   def apply(
-      transactor:          DbTransactor[IO, ProjectsTokensDB],
+      transactor:          SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[TokenFinder[IO]] =
     for {

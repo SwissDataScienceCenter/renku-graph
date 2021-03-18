@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.membersync
 
 import cats.effect.{Bracket, ContextShift, IO}
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import doobie.free.connection.ConnectionOp
@@ -29,7 +29,7 @@ import io.renku.eventlog.subscriptions.{EventFinder, LastSyncedDate, Subscriptio
 
 import java.time.Instant
 
-private class MemberSyncEventFinderImpl(transactor:       DbTransactor[IO, EventLogDB],
+private class MemberSyncEventFinderImpl(transactor:       SessionResource[IO, EventLogDB],
                                         queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
                                         now:              () => Instant = () => Instant.now
 )(implicit ME:                                            Bracket[IO, Throwable], contextShift: ContextShift[IO])
@@ -40,7 +40,7 @@ private class MemberSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
   import cats.free.Free
   import doobie.implicits._
 
-  override def popEvent(): IO[Option[MemberSyncEvent]] = findEventAndMarkTaken() transact transactor.get
+  override def popEvent(): IO[Option[MemberSyncEvent]] = findEventAndMarkTaken() transact transactor.resource
 
   private def findEventAndMarkTaken() =
     findEvent() flatMap {
@@ -105,7 +105,7 @@ private class MemberSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
 
 private object MemberSyncEventFinder {
   def apply(
-      transactor:       DbTransactor[IO, EventLogDB],
+      transactor:       SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
   )(implicit ME:        Bracket[IO, Throwable], contextShift: ContextShift[IO]): IO[EventFinder[IO, MemberSyncEvent]] = IO {
     new MemberSyncEventFinderImpl(transactor, queriesExecTimes)

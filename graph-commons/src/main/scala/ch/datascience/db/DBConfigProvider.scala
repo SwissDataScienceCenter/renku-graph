@@ -55,7 +55,7 @@ class DBConfigProvider[Interpretation[_], TargetDB](
       maxLifetime    <- find[DBConfig.MaxLifetime](s"$namespace.max-connection-lifetime", config)
       urlTemplate    <- find[DBConfig.UrlTemplate](s"$namespace.db-url-template", config)
       url            <- OptionT.fromOption(jdbcUrlOverride) getOrElseF findUrl(urlTemplate, host)
-    } yield DBConfig(driver, url, user, pass, connectionPool, maxLifetime)
+    } yield DBConfig(driver, url, host, dbName, user, pass, connectionPool, maxLifetime)
 
   private def findUrl(urlTeplate: DBConfig.UrlTemplate, host: DBConfig.Host): Interpretation[DBConfig.Url] =
     ME.fromEither {
@@ -70,6 +70,8 @@ object DBConfigProvider {
 
   case class DBConfig[TargetDB](driver:         Driver,
                                 url:            Url,
+                                host:           Host,
+                                name:           DbName,
                                 user:           User,
                                 pass:           Pass,
                                 connectionPool: ConnectionPool,

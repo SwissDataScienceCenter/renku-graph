@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
@@ -29,14 +29,14 @@ private trait EventPayloadTableCreator[Interpretation[_]] {
 
 private object EventPayloadTableCreator {
   def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): EventPayloadTableCreator[Interpretation] =
     new EventPayloadTableCreatorImpl(transactor, logger)
 }
 
 private class EventPayloadTableCreatorImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
+    transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends EventPayloadTableCreator[Interpretation]
@@ -45,7 +45,7 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]](
   import cats.syntax.all._
   import doobie.implicits._
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
     whenEventTableExists(
@@ -60,15 +60,15 @@ private class EventPayloadTableCreatorImpl[Interpretation[_]](
     sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
       .query[Boolean]
       .unique
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .recover { case _ => false }
 
   private def createTable = for {
-    _ <- createTableSql.update.run transact transactor.get
+    _ <- createTableSql.update.run transact transactor.resource
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)")
     _ <- logger info "'event_payload' table created"
-    _ <- foreignKeySql.run transact transactor.get
+    _ <- foreignKeySql.run transact transactor.resource
   } yield ()
 
   private lazy val createTableSql = sql"""

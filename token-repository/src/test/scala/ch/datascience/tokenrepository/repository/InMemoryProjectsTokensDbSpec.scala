@@ -51,13 +51,13 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
     sql"select token from projects_tokens where project_path = ${projectPath.value}"
       .query[String]
       .option
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .unsafeRunSync()
 
   protected def findToken(projectId: Id): Option[String] =
     sql"select token from projects_tokens where project_id = ${projectId.value}"
       .query[String]
       .option
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .unsafeRunSync()
 }

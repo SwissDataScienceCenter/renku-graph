@@ -61,7 +61,7 @@ private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO, Name]]) e
 
   private val dbConfig: DBConfigProvider.DBConfig[TestDB] = newDbConfig[TestDB]
 
-  private val transactor: DbTransactor[IO, TestDB] = DbTransactor[IO, TestDB](
+  private val transactor: SessionResource[IO, TestDB] = DbTransactor[IO, TestDB](
     Transactor.fromDriverManager[IO](
       dbConfig.driver.value,
       dbConfig.url.value,
@@ -80,5 +80,5 @@ private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO, Name]]) e
   def executeQuery(expected: Int) =
     measureExecutionTime[Int] {
       query(expected)
-    } transact transactor.get
+    } transact transactor.resource
 }

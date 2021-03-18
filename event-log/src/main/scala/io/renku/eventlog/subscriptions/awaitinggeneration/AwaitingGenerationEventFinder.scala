@@ -22,7 +22,7 @@ import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
@@ -43,7 +43,7 @@ import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
 private class AwaitingGenerationEventFinderImpl(
-    transactor:            DbTransactor[IO, EventLogDB],
+    transactor:            SessionResource[IO, EventLogDB],
     waitingEventsGauge:    LabeledGauge[IO, projects.Path],
     underProcessingGauge:  LabeledGauge[IO, projects.Path],
     queriesExecTimes:      LabeledHistogram[IO, SqlQuery.Name],
@@ -58,7 +58,7 @@ private class AwaitingGenerationEventFinderImpl(
 
   override def popEvent(): IO[Option[AwaitingGenerationEvent]] =
     for {
-      maybeProjectAwaitingGenerationEvent <- findEventAndUpdateForProcessing() transact transactor.get
+      maybeProjectAwaitingGenerationEvent <- findEventAndUpdateForProcessing() transact transactor.resource
       (maybeProject, maybeAwaitingGenerationEvent) = maybeProjectAwaitingGenerationEvent
       _ <- maybeUpdateMetrics(maybeProject, maybeAwaitingGenerationEvent)
     } yield maybeAwaitingGenerationEvent
@@ -172,7 +172,7 @@ private object IOAwaitingGenerationEventFinder {
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
   def apply(
-      transactor:           DbTransactor[IO, EventLogDB],
+      transactor:           SessionResource[IO, EventLogDB],
       subscribers:          Subscribers[IO],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],

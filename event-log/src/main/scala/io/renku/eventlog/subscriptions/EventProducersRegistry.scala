@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions
 import cats._
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import eu.timepit.refined.api.Refined
@@ -67,7 +67,7 @@ object EventProducersRegistry {
   final case class UnsupportedPayload(message: String) extends SubscriptionResult
 
   def apply(
-      transactor:                  DbTransactor[IO, EventLogDB],
+      transactor:                  SessionResource[IO, EventLogDB],
       waitingEventsGauge:          LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
       awaitingTransformationGauge: LabeledGauge[IO, projects.Path],

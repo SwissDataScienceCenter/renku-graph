@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions
 import cats.MonadError
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
 import io.chrisdavenport.log4cats.Logger
@@ -127,7 +127,7 @@ private object IOEventsDistributor {
 
   def apply[CategoryEvent](
       categoryName:         CategoryName,
-      transactor:           DbTransactor[IO, EventLogDB],
+      transactor:           SessionResource[IO, EventLogDB],
       subscribers:          Subscribers[IO],
       eventsFinder:         EventFinder[IO, CategoryEvent],
       eventDelivery:        EventDelivery[IO, CategoryEvent],

@@ -20,7 +20,7 @@ package io.renku.eventlog.init
 
 import cats.effect.Bracket
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import doobie.implicits._
@@ -37,20 +37,20 @@ private trait ProjectPathAdder[Interpretation[_]] {
 
 private object ProjectPathAdder {
   def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): ProjectPathAdder[Interpretation] =
     new ProjectPathAdderImpl(transactor, logger)
 }
 
 private class ProjectPathAdderImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
+    transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends ProjectPathAdder[Interpretation]
     with EventTableCheck[Interpretation] {
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
     whenEventTableExists(
@@ -65,7 +65,7 @@ private class ProjectPathAdderImpl[Interpretation[_]](
     sql"select project_path from event_log limit 1"
       .query[String]
       .option
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_ => true)
       .recover { case _ => false }
 
@@ -84,7 +84,7 @@ private class ProjectPathAdderImpl[Interpretation[_]](
     sql"select min(event_body) from event_log group by project_id;"
       .query[String]
       .to[List]
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .flatMap(toListOfProjectIdAndPath)
 
   private def toListOfProjectIdAndPath(bodies: List[String]): Interpretation[List[(Id, Path)]] =
@@ -111,7 +111,7 @@ private class ProjectPathAdderImpl[Interpretation[_]](
 
   private def toSqlUpdate: ((Id, Path)) => Interpretation[Unit] = { case (projectId, projectPath) =>
     sql"update event_log set project_path = ${projectPath.value} where project_id = ${projectId.value}".update.run
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_ => ())
   }
 

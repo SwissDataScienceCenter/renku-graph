@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects.Id
@@ -40,7 +40,7 @@ trait ProcessingStatusFinder[Interpretation[_]] {
 }
 
 class ProcessingStatusFinderImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
+    transactor:       SessionResource[IO, EventLogDB],
     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
@@ -50,7 +50,7 @@ class ProcessingStatusFinderImpl(
   import io.renku.eventlog.TypeSerializers._
 
   override def fetchStatus(projectId: Id): OptionT[IO, ProcessingStatus] = OptionT {
-    measureExecutionTime(latestBatchStatues(projectId)) transact transactor.get flatMap toProcessingStatus
+    measureExecutionTime(latestBatchStatues(projectId)) transact transactor.resource flatMap toProcessingStatus
   }
 
   private def latestBatchStatues(projectId: Id) = SqlQuery(
@@ -81,7 +81,7 @@ class ProcessingStatusFinderImpl(
 
 object IOProcessingStatusFinder {
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
+      transactor:          SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusFinder[IO]] = IO {
     new ProcessingStatusFinderImpl(transactor, queriesExecTimes)

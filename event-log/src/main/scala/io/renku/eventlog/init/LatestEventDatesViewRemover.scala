@@ -20,7 +20,7 @@ package io.renku.eventlog.init
 
 import cats.effect.Bracket
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor}
+import ch.datascience.db.{DbClient, SessionResource}
 import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -31,23 +31,23 @@ private[eventlog] trait LatestEventDatesViewRemover[Interpretation[_]] {
 
 private[eventlog] object LatestEventDatesViewRemover {
   def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): LatestEventDatesViewRemover[Interpretation] =
     new LatestEventDatesViewRemoverImpl(transactor, logger)
 }
 
 private[eventlog] class LatestEventDatesViewRemoverImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
+    transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends DbClient(maybeHistogram = None)
     with LatestEventDatesViewRemover[Interpretation] {
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] = for {
-    _ <- dropView.run transact transactor.get
+    _ <- dropView.run transact transactor.resource
     _ <- logger.info("'project_latest_event_date' view dropped")
   } yield ()
 

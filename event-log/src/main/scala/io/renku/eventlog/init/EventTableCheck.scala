@@ -20,7 +20,7 @@ package io.renku.eventlog.init
 
 import cats.effect.Bracket
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import doobie.implicits._
 import io.renku.eventlog.EventLogDB
 
@@ -30,7 +30,7 @@ private trait EventTableCheck[Interpretation[_]] {
       eventTableExistsMessage: => Interpretation[Unit],
       otherwise:               => Interpretation[Unit]
   )(implicit
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       ME:         Bracket[Interpretation, Throwable]
   ): Interpretation[Unit] = checkTableExists flatMap {
     case true  => eventTableExistsMessage
@@ -38,12 +38,12 @@ private trait EventTableCheck[Interpretation[_]] {
   }
 
   private def checkTableExists(implicit
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       ME:         Bracket[Interpretation, Throwable]
   ): Interpretation[Boolean] =
     sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event')"
       .query[Boolean]
       .unique
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .recover { case _ => false }
 }

@@ -21,7 +21,7 @@ package io.renku.eventlog.statuschange
 import cats.effect.{Bracket, IO}
 import cats.free.Free
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.LabeledHistogram
 import doobie.free.connection
@@ -41,7 +41,7 @@ trait StatusUpdatesRunner[Interpretation[_]] {
 }
 
 class StatusUpdatesRunnerImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
+    transactor:       SessionResource[IO, EventLogDB],
     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
     logger:           Logger[IO]
 )(implicit ME:        Bracket[IO, Throwable])
@@ -49,13 +49,13 @@ class StatusUpdatesRunnerImpl(
     with StatusUpdatesRunner[IO]
     with StatusProcessingTime {
 
-  private implicit val transact: DbTransactor[IO, EventLogDB] = transactor
+  private implicit val transact: SessionResource[IO, EventLogDB] = transactor
 
   import doobie.implicits._
 
   override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] =
     for {
-      updateResult <- executeCommand(command) transact transactor.get recoverWith errorToUpdateResult(command)
+      updateResult <- executeCommand(command) transact transactor.resource recoverWith errorToUpdateResult(command)
       _            <- logInfo(command, updateResult)
       _            <- command updateGauges updateResult
     } yield updateResult
@@ -152,7 +152,7 @@ object IOUpdateCommandsRunner {
 
   import cats.effect.IO
 
-  def apply(transactor:       DbTransactor[IO, EventLogDB],
+  def apply(transactor:       SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
             logger:           Logger[IO]
   ): IO[StatusUpdatesRunner[IO]] = IO {

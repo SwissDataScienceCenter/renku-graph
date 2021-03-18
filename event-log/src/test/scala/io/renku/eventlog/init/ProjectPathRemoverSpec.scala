@@ -80,7 +80,7 @@ class ProjectPathRemoverSpec
     sql"select project_path from event_log limit 1"
       .query[String]
       .option
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_ => true)
       .recover { case _ => false }
       .unsafeRunSync()

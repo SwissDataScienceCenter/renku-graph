@@ -20,7 +20,7 @@ package io.renku.eventlog.init
 
 import cats.effect.Bracket
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -32,7 +32,7 @@ trait EventStatusRenamer[Interpretation[_]] {
 }
 
 private case class EventStatusRenamerImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
+    transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends EventStatusRenamer[Interpretation] {
@@ -49,7 +49,7 @@ private case class EventStatusRenamerImpl[Interpretation[_]](
 
   private def renameAllStatuses(from: String, to: String) =
     sql"""UPDATE event SET status = $to WHERE status = $from""".update.run
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .void
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
@@ -60,7 +60,7 @@ private case class EventStatusRenamerImpl[Interpretation[_]](
 
 private object EventStatusRenamer {
   def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): EventStatusRenamer[Interpretation] =
     EventStatusRenamerImpl(transactor, logger)

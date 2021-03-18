@@ -21,7 +21,7 @@ package io.renku.eventlog
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.config.sentry.SentryInitializer
-import ch.datascience.db.DbTransactorResource
+import ch.datascience.db.{SessionPoolResource, SessionResource}
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventConsumersRegistry
 import ch.datascience.http.server.HttpServer
@@ -40,6 +40,7 @@ import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
 import io.renku.eventlog.subscriptions._
+import natchez.Trace.Implicits.noop
 import pureconfig.ConfigSource
 
 import java.util.concurrent.ConcurrentHashMap
@@ -58,11 +59,11 @@ object Microservice extends IOMicroservice {
   protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
 
   override def run(args: List[String]): IO[ExitCode] = for {
-    transactorResource <- new EventLogDbConfigProvider[IO](args) map DbTransactorResource[IO, EventLogDB]
+    transactorResource <- new EventLogDbConfigProvider[IO](args) map SessionPoolResource[IO, EventLogDB]
     exitCode           <- runMicroservice(transactorResource)
   } yield exitCode
 
-  private def runMicroservice(transactorResource: DbTransactorResource[IO, EventLogDB]) =
+  private def runMicroservice(transactorResource: Resource[IO, SessionResource[IO, EventLogDB]]) =
     transactorResource.use { transactor =>
       for {
         certificateLoader           <- CertificateLoader[IO](ApplicationLogger)

@@ -22,7 +22,7 @@ import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
@@ -43,7 +43,7 @@ import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
 private class TriplesGeneratedEventFinderImpl(
-    transactor:                  DbTransactor[IO, EventLogDB],
+    transactor:                  SessionResource[IO, EventLogDB],
     awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
     underTransformationGauge:    LabeledGauge[IO, projects.Path],
     queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
@@ -58,7 +58,7 @@ private class TriplesGeneratedEventFinderImpl(
 
   override def popEvent(): IO[Option[TriplesGeneratedEvent]] =
     for {
-      maybeProjectAndEvent <- findEventAndUpdateForProcessing() transact transactor.get
+      maybeProjectAndEvent <- findEventAndUpdateForProcessing() transact transactor.resource
       (maybeProject, maybeTriplesGeneratedEvent) = maybeProjectAndEvent
       _ <- maybeUpdateMetrics(maybeProject, maybeTriplesGeneratedEvent)
     } yield maybeTriplesGeneratedEvent
@@ -167,7 +167,7 @@ private object IOTriplesGeneratedEventFinder {
 
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
-  def apply(transactor:                  DbTransactor[IO, EventLogDB],
+  def apply(transactor:                  SessionResource[IO, EventLogDB],
             awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
             underTransformationGauge:    LabeledGauge[IO, projects.Path],
             queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name]

@@ -139,7 +139,7 @@ class EventStatusRenamerImplSpec
     sql"SELECT event_id FROM event"
       .query[EventId]
       .to[List]
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .unsafeRunSync()
       .toSet
 }

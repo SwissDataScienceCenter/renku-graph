@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
@@ -29,14 +29,14 @@ private trait ProjectTableCreator[Interpretation[_]] {
 
 private object ProjectTableCreator {
   def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): ProjectTableCreator[Interpretation] =
     new ProjectTableCreatorImpl(transactor, logger)
 }
 
 private class ProjectTableCreatorImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
+    transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends ProjectTableCreator[Interpretation]
@@ -44,7 +44,7 @@ private class ProjectTableCreatorImpl[Interpretation[_]](
 
   import cats.syntax.all._
   import doobie.implicits._
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
     whenEventTableExists(
@@ -59,18 +59,18 @@ private class ProjectTableCreatorImpl[Interpretation[_]](
     sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'project')"
       .query[Boolean]
       .unique
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .recover { case _ => false }
 
   private def createTable = for {
-    _ <- createTableSql.run transact transactor.get
+    _ <- createTableSql.run transact transactor.resource
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id        ON project(project_id)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path      ON project(project_path)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_latest_event_date ON project(latest_event_date)")
     _ <- logger info "'project' table created"
-    _ <- fillInTableSql.run transact transactor.get
+    _ <- fillInTableSql.run transact transactor.resource
     _ <- logger info "'project' table filled in"
-    _ <- foreignKeySql.run transact transactor.get
+    _ <- foreignKeySql.run transact transactor.resource
   } yield ()
 
   private lazy val createTableSql = sql"""

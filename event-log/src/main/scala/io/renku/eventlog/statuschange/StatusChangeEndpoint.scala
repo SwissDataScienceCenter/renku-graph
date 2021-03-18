@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.Kleisli
 import cats.effect.{ContextShift, Effect}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
@@ -100,7 +100,7 @@ object IOStatusChangeEndpoint {
   import cats.effect.IO
 
   def apply(
-      transactor:                         DbTransactor[IO, EventLogDB],
+      transactor:                         SessionResource[IO, EventLogDB],
       awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
       awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],

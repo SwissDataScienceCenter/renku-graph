@@ -20,7 +20,7 @@ package io.renku.eventlog.subscriptions.awaitinggeneration
 
 import cats.effect.{Bracket, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -75,7 +75,7 @@ private object DispatchRecovery {
 
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
-  def apply(transactor:                  DbTransactor[IO, EventLogDB],
+  def apply(transactor:                  SessionResource[IO, EventLogDB],
             underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
             queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
             logger:                      Logger[IO]

@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
@@ -28,14 +28,14 @@ private trait SubscriberTableCreator[Interpretation[_]] {
 }
 
 private class SubscriberTableCreatorImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
+    transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends SubscriberTableCreator[Interpretation] {
 
   import cats.syntax.all._
   import doobie.implicits._
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
     checkTableExists flatMap {
@@ -47,11 +47,11 @@ private class SubscriberTableCreatorImpl[Interpretation[_]](
     sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'subscriber')"
       .query[Boolean]
       .unique
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .recover { case _ => false }
 
   private def createTable = for {
-    _ <- createTableSql.run transact transactor.get
+    _ <- createTableSql.run transact transactor.resource
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_id ON subscriber(delivery_id)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_delivery_url ON subscriber(delivery_url)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_source_url ON subscriber(source_url)")
@@ -71,7 +71,7 @@ private class SubscriberTableCreatorImpl[Interpretation[_]](
 
 private object SubscriberTableCreator {
   def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): SubscriberTableCreator[Interpretation] =
     new SubscriberTableCreatorImpl(transactor, logger)

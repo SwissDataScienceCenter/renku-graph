@@ -20,7 +20,7 @@ package io.renku.eventlog.events.categories.zombieevents
 
 import cats.effect.{Bracket, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.metrics.LabeledHistogram
@@ -36,7 +36,7 @@ private trait ZombieStatusCleaner[Interpretation[_]] {
 }
 
 private class ZombieStatusCleanerImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
+    transactor:       SessionResource[IO, EventLogDB],
     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
     now:              () => Instant = () => Instant.now
 )(implicit ME:        Bracket[IO, Throwable])
@@ -49,7 +49,7 @@ private class ZombieStatusCleanerImpl(
       _      <- cleanEventualDeliveries(event.eventId)
       result <- updateEventStatus(event)
     } yield result
-  } transact transactor.get flatMap toResult
+  } transact transactor.resource flatMap toResult
 
   private lazy val updateEventStatus: ZombieEvent => ConnectionIO[Int] = {
     case GeneratingTriplesZombieEvent(eventId, _)   => updateStatusQuery(eventId, GeneratingTriples, New)
@@ -89,7 +89,7 @@ private class ZombieStatusCleanerImpl(
 private object ZombieStatusCleaner {
   import cats.effect.IO
 
-  def apply(transactor:       DbTransactor[IO, EventLogDB],
+  def apply(transactor:       SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
   ): IO[ZombieStatusCleaner[IO]] = IO {
     new ZombieStatusCleanerImpl(transactor, queriesExecTimes)

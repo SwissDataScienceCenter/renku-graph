@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import doobie.implicits._
@@ -31,12 +31,12 @@ private object ProjectPathFinder {
 
   def findProjectPath[Interpretation[_]](
       eventId:           CompoundEventId
-  )(implicit transactor: DbTransactor[Interpretation, EventLogDB], ME: Bracket[Interpretation, Throwable]) =
+  )(implicit transactor: SessionResource[Interpretation, EventLogDB], ME: Bracket[Interpretation, Throwable]) =
     sql"""|SELECT project_path
           |FROM project 
           |WHERE project_id = ${eventId.projectId}
           |""".stripMargin
       .query[projects.Path]
       .unique
-      .transact(transactor.get)
+      .transact(transactor.resource)
 }

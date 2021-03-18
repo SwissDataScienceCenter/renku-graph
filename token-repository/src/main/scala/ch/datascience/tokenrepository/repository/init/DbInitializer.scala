@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository.repository.init
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
@@ -30,7 +30,7 @@ import scala.util.control.NonFatal
 class DbInitializer[Interpretation[_]](
     projectPathAdder:         ProjectPathAdder[Interpretation],
     duplicateProjectsRemover: DuplicateProjectsRemover[Interpretation],
-    transactor:               DbTransactor[Interpretation, ProjectsTokensDB],
+    transactor:               SessionResource[Interpretation, ProjectsTokensDB],
     logger:                   Logger[Interpretation]
 )(implicit ME:                Bracket[Interpretation, Throwable]) {
 
@@ -51,7 +51,7 @@ class DbInitializer[Interpretation[_]](
           | token VARCHAR NOT NULL
           |);
        """.stripMargin.update.run
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_ => ())
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
@@ -64,7 +64,7 @@ object IODbInitializer {
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor:       DbTransactor[IO, ProjectsTokensDB],
+      transactor:       SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   )(implicit

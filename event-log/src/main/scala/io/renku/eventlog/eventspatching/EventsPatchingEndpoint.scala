@@ -89,11 +89,11 @@ class EventsPatchingEndpointImpl(
 }
 
 object IOEventsPatchingEndpoint {
-  import ch.datascience.db.DbTransactor
+  import ch.datascience.db.SessionResource
   import io.renku.eventlog.EventLogDB
 
   def apply(
-      transactor:           DbTransactor[IO, EventLogDB],
+      transactor:           SessionResource[IO, EventLogDB],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],

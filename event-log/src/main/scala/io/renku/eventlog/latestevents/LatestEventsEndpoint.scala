@@ -73,11 +73,11 @@ class LatestEventsEndpoint[Interpretation[_]: Effect](
 
 object IOLatestEventsEndpoint {
   import cats.effect.{ContextShift, IO}
-  import ch.datascience.db.DbTransactor
+  import ch.datascience.db.SessionResource
   import io.renku.eventlog.EventLogDB
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
+      transactor:          SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[LatestEventsEndpoint[IO]] =

@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions
 import cats.MonadError
 import cats.effect.{Bracket, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.{events, projects}
@@ -36,7 +36,7 @@ private[subscriptions] trait EventDelivery[Interpretation[_], CategoryEvent] {
   def unregister(event:      CompoundEventId): Interpretation[Unit]
 }
 
-private class EventDeliveryImpl[CategoryEvent](transactor:               DbTransactor[IO, EventLogDB],
+private class EventDeliveryImpl[CategoryEvent](transactor:               SessionResource[IO, EventLogDB],
                                                compoundEventIdExtractor: CategoryEvent => CompoundEventId,
                                                queriesExecTimes:         LabeledHistogram[IO, SqlQuery.Name],
                                                sourceUrl:                MicroserviceBaseUrl
@@ -51,10 +51,10 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
       _      <- deleteDelivery(id, projectId)
       result <- insert(id, projectId, subscriberUrl)
     } yield result
-  } transact transactor.get flatMap toResult
+  } transact transactor.resource flatMap toResult
 
   def unregister(eventId: CompoundEventId): IO[Unit] =
-    deleteDelivery(eventId.id, eventId.projectId) transact transactor.get flatMap toResult
+    deleteDelivery(eventId.id, eventId.projectId) transact transactor.resource flatMap toResult
 
   private def insert(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl) =
     measureExecutionTime {
@@ -88,7 +88,7 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
 private[subscriptions] object EventDelivery {
 
   def apply[CategoryEvent](
-      transactor:               DbTransactor[IO, EventLogDB],
+      transactor:               SessionResource[IO, EventLogDB],
       compoundEventIdExtractor: CategoryEvent => CompoundEventId,
       queriesExecTimes:         LabeledHistogram[IO, SqlQuery.Name]
   ): IO[EventDelivery[IO, CategoryEvent]] = for {

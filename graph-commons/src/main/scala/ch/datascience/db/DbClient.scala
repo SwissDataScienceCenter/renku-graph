@@ -17,23 +17,28 @@
  */
 
 package ch.datascience.db
-
-import cats.effect.{Async, IO}
+import cats.Monad
+import cats.effect.Async
+import cats.syntax.all._
 import ch.datascience.db.SqlQuery.Name
 import ch.datascience.metrics.LabeledHistogram
-import doobie.free.connection.ConnectionIO
-import doobie.implicits._
+import skunk.Session
 
-abstract class DbClient(maybeHistogram: Option[LabeledHistogram[IO, Name]]) {
+abstract class DbClient[Interpretation[_]: Async](
+    maybeHistogram: Option[LabeledHistogram[Interpretation, Name]]
+) {
 
-  protected def measureExecutionTime[ResultType](query: SqlQuery[ResultType]): ConnectionIO[ResultType] =
+  protected def measureExecutionTime[ResultType](
+      query:   SqlQuery[Interpretation, ResultType],
+      session: Session[Interpretation]
+  ): Interpretation[ResultType] =
     maybeHistogram match {
-      case None => query.query
+      case None => query.query.run(session)
       case Some(histogram) =>
         for {
-          timer  <- Async[ConnectionIO].liftIO(histogram startTimer query.name)
-          result <- query.query
-          _      <- Async[ConnectionIO].liftIO(timer.observeDuration)
+          timer  <- histogram.startTimer(query.name)
+          result <- query.query.run(session)
+          _      <- timer.observeDuration // TODO verify if Async is needed
         } yield result
     }
 

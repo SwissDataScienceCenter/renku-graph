@@ -171,7 +171,7 @@ class ProjectPathAdderSpec
     sql"select project_path from projects_tokens limit 1"
       .query[String]
       .option
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_ => true)
       .recover { case _ => false }
       .unsafeRunSync()

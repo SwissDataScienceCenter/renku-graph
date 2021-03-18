@@ -19,7 +19,7 @@
 package io.renku.eventlog.eventdetails
 
 import cats.effect.{Bracket, IO}
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
@@ -30,7 +30,7 @@ private trait EventDetailsFinder[Interpretation[_]] {
 }
 
 private class EventDetailsFinderImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
+    transactor:       SessionResource[IO, EventLogDB],
     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
@@ -40,7 +40,7 @@ private class EventDetailsFinderImpl(
   import eu.timepit.refined.auto._
 
   override def findDetails(eventId: CompoundEventId): IO[Option[CompoundEventId]] =
-    measureExecutionTime(find(eventId)) transact transactor.get
+    measureExecutionTime(find(eventId)) transact transactor.resource
 
   private def find(eventId: CompoundEventId) = SqlQuery(
     sql"""|SELECT evt.event_id, evt.project_id
@@ -54,7 +54,7 @@ private class EventDetailsFinderImpl(
 
 private object EventDetailsFinder {
   def apply(
-      transactor:       DbTransactor[IO, EventLogDB],
+      transactor:       SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
   ): IO[EventDetailsFinder[IO]] = IO {
     new EventDetailsFinderImpl(transactor, queriesExecTimes)

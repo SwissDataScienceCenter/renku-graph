@@ -141,6 +141,7 @@ lazy val commonSettings = Seq(
   scalacOptions += "-unchecked",
   scalacOptions += "-deprecation",
   scalacOptions += "-Ywarn-value-discard",
+  scalacOptions += "-Ymacro-annotations",
   scalacOptions += "-Xfatal-warnings",
   organizationName := "Swiss Data Science Center (SDSC)",
   startYear := Some(java.time.LocalDate.now().getYear),

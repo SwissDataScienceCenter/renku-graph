@@ -22,7 +22,7 @@ import cats.data.Nested
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.free.Free
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -35,7 +35,7 @@ import io.renku.eventlog.{EventLogDB, TypeSerializers}
 
 import java.time.{Duration, Instant}
 
-private class LongProcessingEventFinder(transactor:       DbTransactor[IO, EventLogDB],
+private class LongProcessingEventFinder(transactor:       SessionResource[IO, EventLogDB],
                                         queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
                                         now:              () => Instant = () => Instant.now
 )(implicit ME:                                            Bracket[IO, Throwable], contextShift: ContextShift[IO])
@@ -48,7 +48,7 @@ private class LongProcessingEventFinder(transactor:       DbTransactor[IO, Event
 
   override def popEvent(): IO[Option[ZombieEvent]] = {
     findPotentialZombies >>= lookForZombie >>= markEventTaken
-  } transact transactor.get
+  } transact transactor.resource
 
   private def findPotentialZombies: Free[ConnectionOp, List[(projects.Id, EventStatus)]] =
     Nested(queryProjectsToCheck).map { case (id, currentStatus) => id -> currentStatus.toEventStatus }.value
@@ -153,7 +153,7 @@ private class LongProcessingEventFinder(transactor:       DbTransactor[IO, Event
 private object LongProcessingEventFinder {
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
+      transactor:          SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
     new LongProcessingEventFinder(transactor, queriesExecTimes)

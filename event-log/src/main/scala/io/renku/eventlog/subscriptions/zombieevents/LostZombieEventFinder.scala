@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions.zombieevents
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.syntax.all._
 import cats.free.Free
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
 import ch.datascience.graph.model.projects
@@ -35,7 +35,7 @@ import java.time.Duration
 import java.time.Instant.now
 import scala.language.postfixOps
 
-private class LostZombieEventFinder(transactor:       DbTransactor[IO, EventLogDB],
+private class LostZombieEventFinder(transactor:       SessionResource[IO, EventLogDB],
                                     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
 )(implicit ME:                                        Bracket[IO, Throwable], contextShift: ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
@@ -45,7 +45,7 @@ private class LostZombieEventFinder(transactor:       DbTransactor[IO, EventLogD
 
   import doobie.implicits._
 
-  override def popEvent(): IO[Option[ZombieEvent]] = (findEvent >>= markEventTaken) transact transactor.get
+  override def popEvent(): IO[Option[ZombieEvent]] = (findEvent >>= markEventTaken) transact transactor.resource
 
   private val maxDurationForEvent = EventProcessingTime(Duration.ofMinutes(5))
 
@@ -92,7 +92,7 @@ private class LostZombieEventFinder(transactor:       DbTransactor[IO, EventLogD
 
 private object LostZombieEventFinder {
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
+      transactor:          SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
     new LostZombieEventFinder(transactor, queriesExecTimes)

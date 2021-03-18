@@ -19,7 +19,7 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.data.NonEmptyList
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
@@ -30,7 +30,7 @@ trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable w
   def status:  EventStatus
   def queries: NonEmptyList[SqlQuery[Int]]
   def updateGauges(updateResult: UpdateResult)(implicit
-      transactor:                DbTransactor[Interpretation, EventLogDB]
+      transactor:                SessionResource[Interpretation, EventLogDB]
   ): Interpretation[Unit]
 
   def maybeProcessingTime: Option[EventProcessingTime]

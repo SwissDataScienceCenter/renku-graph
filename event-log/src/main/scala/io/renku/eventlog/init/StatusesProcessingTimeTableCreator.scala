@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
@@ -29,21 +29,21 @@ private trait StatusesProcessingTimeTableCreator[Interpretation[_]] {
 
 private object StatusesProcessingTimeTableCreator {
   def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): StatusesProcessingTimeTableCreator[Interpretation] =
     new StatusesProcessingTimeTableCreatorImpl[Interpretation](transactor, logger)
 }
 
 private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
+    transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends StatusesProcessingTimeTableCreator[Interpretation] {
 
   import cats.syntax.all._
   import doobie.implicits._
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
     checkTableExists flatMap {
@@ -55,16 +55,16 @@ private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]](
     sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'status_processing_time')"
       .query[Boolean]
       .unique
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .recover { case _ => false }
 
   private def createTable = for {
-    _ <- createTableSql.run transact transactor.get
+    _ <- createTableSql.run transact transactor.resource
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_processing_time(event_id)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_processing_time(project_id)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status         ON status_processing_time(status)")
     _ <- logger info "'status_processing_time' table created"
-    _ <- foreignKeySql.run transact transactor.get
+    _ <- foreignKeySql.run transact transactor.resource
   } yield ()
 
   private lazy val createTableSql = sql"""

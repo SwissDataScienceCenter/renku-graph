@@ -20,7 +20,7 @@ package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.effect.{Bracket, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
@@ -34,7 +34,7 @@ private trait ZombieEventSourceCleaner[Interpretation[_]] {
   def removeZombieSources(): Interpretation[Unit]
 }
 
-private class ZombieEventSourceCleanerImpl(transactor:           DbTransactor[IO, EventLogDB],
+private class ZombieEventSourceCleanerImpl(transactor:           SessionResource[IO, EventLogDB],
                                            queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
                                            microserviceBaseUrl:  MicroserviceBaseUrl,
                                            serviceHealthChecker: ServiceHealthChecker[IO]
@@ -62,7 +62,7 @@ private class ZombieEventSourceCleanerImpl(transactor:           DbTransactor[IO
         .to[List],
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find zombie sources")
     )
-  } transact transactor.get
+  } transact transactor.resource
 
   private def isHealthy: ((MicroserviceBaseUrl, SubscriberUrl)) => IO[(MicroserviceBaseUrl, SubscriberUrl, Boolean)] = {
     case (sourceUrl, subscriberUrl) =>
@@ -90,13 +90,13 @@ private class ZombieEventSourceCleanerImpl(transactor:           DbTransactor[IO
               |""".stripMargin.update.run,
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete zombie source")
       )
-    }.transact(transactor.get).void
+    }.transact(transactor.resource).void
   }
 }
 
 private object ZombieEventSourceCleaner {
   def apply(
-      transactor:       DbTransactor[IO, EventLogDB],
+      transactor:       SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   )(implicit

@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect.{ContextShift, Effect, IO}
 import cats.syntax.all._
 import ch.datascience.http.ErrorMessage._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.LabeledHistogram
@@ -55,7 +55,7 @@ class DeleteTokenEndpoint[Interpretation[_]: Effect](
 
 object IODeleteTokenEndpoint {
   def apply(
-      transactor:          DbTransactor[IO, ProjectsTokensDB],
+      transactor:          SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[DeleteTokenEndpoint[IO]] = IO {

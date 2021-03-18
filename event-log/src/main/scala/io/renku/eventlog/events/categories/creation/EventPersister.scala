@@ -24,7 +24,7 @@ import cats.Applicative
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, IO}
 import cats.free.Free
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects
@@ -43,7 +43,7 @@ trait EventPersister[Interpretation[_]] {
 }
 
 class EventPersisterImpl(
-    transactor:         DbTransactor[IO, EventLogDB],
+    transactor:         SessionResource[IO, EventLogDB],
     waitingEventsGauge: LabeledGauge[IO, projects.Path],
     queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name],
     now:                () => Instant = () => Instant.now
@@ -56,7 +56,7 @@ class EventPersisterImpl(
 
   override def storeNewEvent(event: Event): IO[Result] =
     for {
-      result <- insertIfNotDuplicate(event) transact transactor.get
+      result <- insertIfNotDuplicate(event) transact transactor.resource
       _ <- Applicative[IO].whenA(result == Created && event.status == New)(
              waitingEventsGauge.increment(event.project.path)
            )
@@ -160,7 +160,7 @@ object EventPersister {
 
 object IOEventPersister {
   def apply(
-      transactor:         DbTransactor[IO, EventLogDB],
+      transactor:         SessionResource[IO, EventLogDB],
       waitingEventsGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name]
   ): IO[EventPersisterImpl] = IO {

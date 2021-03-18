@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository.repository.init
 
 import cats.effect._
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
@@ -38,7 +38,7 @@ private trait ProjectPathAdder[Interpretation[_]] {
 }
 
 private class IOProjectPathAdder(
-    transactor:        DbTransactor[IO, ProjectsTokensDB],
+    transactor:        SessionResource[IO, ProjectsTokensDB],
     accessTokenCrypto: AccessTokenCrypto[IO],
     pathFinder:        ProjectPathFinder[IO],
     tokenRemover:      TokenRemover[IO],
@@ -59,7 +59,7 @@ private class IOProjectPathAdder(
     sql"select project_path from projects_tokens limit 1"
       .query[String]
       .option
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_ => true)
       .recover { case _ => false }
 
@@ -88,7 +88,7 @@ private class IOProjectPathAdder(
     sql"select project_id, token from projects_tokens where project_path IS NULL limit 1;"
       .query[(Int, String)]
       .option
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .flatMap {
         case None =>
           Option.empty[(Id, EncryptedAccessToken)].pure[IO]
@@ -118,12 +118,12 @@ private class IOProjectPathAdder(
 
   private def addPath(id: Id, path: Path): IO[Unit] =
     sql"update projects_tokens set project_path = ${path.value} where project_id = ${id.value}".update.run
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_ => ())
 
-  private def execute(sql: Fragment, transactor: DbTransactor[IO, ProjectsTokensDB]): IO[Unit] =
+  private def execute(sql: Fragment, transactor: SessionResource[IO, ProjectsTokensDB]): IO[Unit] =
     sql.update.run
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_ => ())
 
   private lazy val logging: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
@@ -139,7 +139,7 @@ private object IOProjectPathAdder {
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor:       DbTransactor[IO, ProjectsTokensDB],
+      transactor:       SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   )(implicit

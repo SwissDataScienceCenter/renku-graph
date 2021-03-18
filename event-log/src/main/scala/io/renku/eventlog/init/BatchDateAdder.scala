@@ -20,7 +20,7 @@ package io.renku.eventlog.init
 
 import cats.effect.Bracket
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -33,20 +33,20 @@ private trait BatchDateAdder[Interpretation[_]] {
 
 private object BatchDateAdder {
   def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): BatchDateAdder[Interpretation] =
     new BatchDateAdderImpl(transactor, logger)
 }
 
 private class BatchDateAdderImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
+    transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends BatchDateAdder[Interpretation]
     with EventTableCheck[Interpretation] {
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
     whenEventTableExists(
@@ -61,7 +61,7 @@ private class BatchDateAdderImpl[Interpretation[_]](
     sql"SELECT batch_date FROM event_log limit 1"
       .query[String]
       .option
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_ => true)
       .recover { case _ => false }
 

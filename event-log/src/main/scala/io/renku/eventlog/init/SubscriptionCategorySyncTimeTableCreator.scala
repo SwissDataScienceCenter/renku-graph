@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
@@ -29,21 +29,21 @@ private trait SubscriptionCategorySyncTimeTableCreator[Interpretation[_]] {
 
 private object SubscriptionCategorySyncTimeTableCreator {
   def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): SubscriptionCategorySyncTimeTableCreator[Interpretation] =
     new SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation](transactor, logger)
 }
 
 private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
+    transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends SubscriptionCategorySyncTimeTableCreator[Interpretation] {
 
   import cats.syntax.all._
   import doobie.implicits._
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
     checkTableExists flatMap {
@@ -55,16 +55,16 @@ private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]](
     sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'subscription_category_sync_time')"
       .query[Boolean]
       .unique
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .recover { case _ => false }
 
   private def createTable = for {
-    _ <- createTableSql.run transact transactor.get
+    _ <- createTableSql.run transact transactor.resource
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id       ON subscription_category_sync_time(project_id)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_category_name    ON subscription_category_sync_time(category_name)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_last_synced      ON subscription_category_sync_time(last_synced)")
     _ <- logger info "'subscription_category_sync_time' table created"
-    _ <- foreignKeySql.run transact transactor.get
+    _ <- foreignKeySql.run transact transactor.resource
   } yield ()
 
   private lazy val createTableSql = sql"""

@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository.repository.init
 
 import cats.effect.Bracket
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
@@ -31,14 +31,14 @@ private trait DuplicateProjectsRemover[Interpretation[_]] {
 
 private object DuplicateProjectsRemover {
   def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, ProjectsTokensDB],
+      transactor: SessionResource[Interpretation, ProjectsTokensDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): DuplicateProjectsRemover[Interpretation] =
     new DuplicateProjectsRemoverImpl(transactor, logger)
 }
 
 private class DuplicateProjectsRemoverImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, ProjectsTokensDB],
+    transactor: SessionResource[Interpretation, ProjectsTokensDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends DuplicateProjectsRemover[Interpretation] {
@@ -58,5 +58,5 @@ private class DuplicateProjectsRemoverImpl[Interpretation[_]](
           |    GROUP BY project_path
           |    HAVING COUNT(distinct project_id) > 1
           |  ) pr_to_stay ON pr_to_stay.project_path = pt.project_path AND pr_to_stay.id_to_stay <> pt.project_id
-          |)""".stripMargin.update.run.transact(transactor.get).void
+          |)""".stripMargin.update.run.transact(transactor.resource).void
 }

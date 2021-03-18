@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository.repository
 
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import com.dimafeng.testcontainers._
 import doobie.free.connection.ConnectionIO
 import doobie.implicits._
@@ -45,7 +45,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
     password = dbConfig.pass
   )
 
-  lazy val transactor: DbTransactor[IO, ProjectsTokensDB] = DbTransactor[IO, ProjectsTokensDB] {
+  lazy val transactor: SessionResource[IO, ProjectsTokensDB] = DbTransactor[IO, ProjectsTokensDB] {
     Transactor.fromDriverManager[IO](
       dbConfig.driver.value,
       container.jdbcUrl,
@@ -56,12 +56,12 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
 
   def execute[O](query: ConnectionIO[O]): O =
     query
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .unsafeRunSync()
 
   protected def tableExists(): Boolean =
     sql"""select exists (select * from projects_tokens);""".query.option
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .recover { case _ => None }
       .unsafeRunSync()
       .isDefined

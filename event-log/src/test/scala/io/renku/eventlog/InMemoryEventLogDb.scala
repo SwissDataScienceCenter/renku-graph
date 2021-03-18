@@ -20,7 +20,7 @@ package io.renku.eventlog
 
 import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import com.dimafeng.testcontainers._
 import doobie.Transactor
 import doobie.free.connection.ConnectionIO
@@ -45,7 +45,7 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
     password = dbConfig.pass
   )
 
-  lazy val transactor: DbTransactor[IO, EventLogDB] = DbTransactor[IO, EventLogDB] {
+  lazy val transactor: SessionResource[IO, EventLogDB] = DbTransactor[IO, EventLogDB] {
     Transactor.fromDriverManager[IO](
       dbConfig.driver.value,
       container.jdbcUrl,
@@ -56,7 +56,7 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
 
   def execute[O](query: ConnectionIO[O]): O =
     query
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .unsafeRunSync()
 
   def verifyTrue(sql: Fragment): Unit = execute {
@@ -67,7 +67,7 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
     sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = $tableName)"
       .query[Boolean]
       .unique
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .recover { case _ => false }
       .unsafeRunSync()
 
@@ -76,7 +76,7 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
       .const(s"select exists (select * from $viewName)")
       .query[Boolean]
       .unique
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .recover { case _ => false }
       .unsafeRunSync()
 

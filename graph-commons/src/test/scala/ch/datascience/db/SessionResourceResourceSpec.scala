@@ -27,7 +27,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class DbTransactorResourceSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class SessionResourceResourceSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "use" should {
 
@@ -44,9 +44,9 @@ class DbTransactorResourceSpec extends AnyWordSpec with MockFactory with should.
   private implicit val cs: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
-    val transactedBlock    = mockFunction[DbTransactor[IO, TestDB], IO[Unit]]
+    val transactedBlock    = mockFunction[SessionResource[IO, TestDB], IO[Unit]]
     val dataSourceUpdater  = mockFunction[HikariDataSource, Unit]
     val dbConfig           = TestDbConfig.newDbConfig[TestDB]
-    val transactorResource = new DbTransactorResource[IO, TestDB](dbConfig, dataSourceUpdater)
+    val transactorResource = new DbSessionPoolResource[IO, TestDB](dbConfig, dataSourceUpdater)
   }
 }

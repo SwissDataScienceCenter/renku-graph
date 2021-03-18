@@ -102,7 +102,7 @@ class ProjectPathAdderSpec
     sql"select project_path from event_log limit 1"
       .query[String]
       .option
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_ => true)
       .recover { case _ => false }
       .unsafeRunSync()
@@ -132,7 +132,7 @@ class ProjectPathAdderSpec
     sql"select project_path from event_log"
       .query[Path]
       .to[List]
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .unsafeRunSync()
       .toSet
 }

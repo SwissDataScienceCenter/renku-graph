@@ -23,7 +23,7 @@ import cats.data.EitherT.{fromEither, fromOption, right}
 import cats.data.{EitherT, Kleisli, NonEmptyList}
 import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, events, projects}
@@ -78,7 +78,7 @@ final case class ToTriplesGenerated[Interpretation[_]](
                                               |""".stripMargin.update.run
 
   override def updateGauges(updateResult: UpdateResult)(implicit
-      transactor:                         DbTransactor[Interpretation, EventLogDB]
+      transactor:                         SessionResource[Interpretation, EventLogDB]
   ): Interpretation[Unit] = updateResult match {
     case UpdateResult.Updated =>
       for {

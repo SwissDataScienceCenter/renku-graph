@@ -21,7 +21,7 @@ package io.renku.eventlog.metrics
 import cats.data.NonEmptyList
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.{CategoryName, EventStatus}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.metrics.LabeledHistogram
@@ -44,7 +44,7 @@ trait StatsFinder[Interpretation[_]] {
 }
 
 class StatsFinderImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
+    transactor:       SessionResource[IO, EventLogDB],
     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
     categoryNames:    Set[CategoryName] Refined NonEmpty,
     now:              () => Instant = () => Instant.now
@@ -55,7 +55,7 @@ class StatsFinderImpl(
 
   override def countEventsByCategoryName(): IO[Map[CategoryName, Long]] =
     measureExecutionTime(countEventsPerCategoryName)
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_.toMap)
 
   // format: off
@@ -95,7 +95,7 @@ class StatsFinderImpl(
 
   override def statuses(): IO[Map[EventStatus, Long]] =
     measureExecutionTime(findStatuses)
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_.toMap)
       .map(addMissingStatues)
 
@@ -116,7 +116,7 @@ class StatsFinderImpl(
       case None => Map.empty[Path, Long].pure[IO]
       case Some(statusesList) =>
         measureExecutionTime(countProjectsEvents(statusesList, maybeLimit))
-          .transact(transactor.get)
+          .transact(transactor.resource)
           .map(_.toMap)
     }
 
@@ -178,7 +178,7 @@ object IOStatsFinder {
   import io.renku.eventlog.subscriptions.membersync
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
+      transactor:          SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[StatsFinder[IO]] = IO {
     new StatsFinderImpl(

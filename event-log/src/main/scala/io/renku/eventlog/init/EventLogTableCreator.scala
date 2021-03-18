@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.events.EventStatus.GenerationRecoverableFailure
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -30,14 +30,14 @@ private trait EventLogTableCreator[Interpretation[_]] {
 
 private object EventLogTableCreator {
   def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): EventLogTableCreator[Interpretation] =
     new EventLogTableCreatorImpl(transactor, logger)
 }
 
 private class EventLogTableCreatorImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
+    transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends EventLogTableCreator[Interpretation]
@@ -46,7 +46,7 @@ private class EventLogTableCreatorImpl[Interpretation[_]](
   import cats.syntax.all._
   import doobie.implicits._
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
     whenEventTableExists(
@@ -61,11 +61,11 @@ private class EventLogTableCreatorImpl[Interpretation[_]](
     sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
       .query[Boolean]
       .unique
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .recover { case _ => false }
 
   private def createTable = for {
-    _ <- createTableSql.update.run transact transactor.get
+    _ <- createTableSql.update.run transact transactor.resource
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_log(event_id)")
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)")

@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.triplesgenerated
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
@@ -33,7 +33,7 @@ private[subscriptions] object SubscriptionCategory {
   val name: CategoryName = CategoryName("TRIPLES_GENERATED")
 
   def apply(
-      transactor:                  DbTransactor[IO, EventLogDB],
+      transactor:                  SessionResource[IO, EventLogDB],
       awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
       underTransformationGauge:    LabeledGauge[IO, projects.Path],
       queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],

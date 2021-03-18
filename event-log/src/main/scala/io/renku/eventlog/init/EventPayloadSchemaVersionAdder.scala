@@ -19,7 +19,7 @@
 package io.renku.eventlog.init
 
 import cats.effect.Bracket
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
@@ -29,14 +29,14 @@ private trait EventPayloadSchemaVersionAdder[Interpretation[_]] {
 
 private object EventPayloadSchemaVersionAdder {
   def apply[Interpretation[_]](
-      transactor: DbTransactor[Interpretation, EventLogDB],
+      transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): EventPayloadSchemaVersionAdder[Interpretation] =
     new EventPayloadSchemaVersionAdderImpl(transactor, logger)
 }
 
 private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]](
-    transactor: DbTransactor[Interpretation, EventLogDB],
+    transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends EventPayloadSchemaVersionAdder[Interpretation]
@@ -45,7 +45,7 @@ private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]](
   import cats.syntax.all._
   import doobie.implicits._
 
-  private implicit val transact: DbTransactor[Interpretation, EventLogDB] = transactor
+  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
     checkTableExists flatMap {
@@ -57,11 +57,11 @@ private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]](
     sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
       .query[Boolean]
       .unique
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .recover { case _ => false }
 
   private def alterTable = for {
-    _ <- alterTableSql.update.run transact transactor.get
+    _ <- alterTableSql.update.run transact transactor.resource
     _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_schema_version ON event_payload(schema_version)")
     _ <- logger info "'event_payload' table altered"
   } yield ()

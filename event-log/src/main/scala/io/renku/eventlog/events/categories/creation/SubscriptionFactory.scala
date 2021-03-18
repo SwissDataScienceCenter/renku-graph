@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.creation
 
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.events.consumers.EventHandler
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
@@ -32,7 +32,7 @@ import scala.concurrent.ExecutionContext
 
 object SubscriptionFactory {
 
-  def apply(transactor:         DbTransactor[IO, EventLogDB],
+  def apply(transactor:         SessionResource[IO, EventLogDB],
             waitingEventsGauge: LabeledGauge[IO, projects.Path],
             queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name],
             logger:             Logger[IO]

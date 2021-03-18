@@ -20,7 +20,7 @@ package io.renku.eventlog.eventspatching
 
 import cats.effect.{Bracket, IO}
 import cats.syntax.all._
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
 import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
@@ -33,7 +33,7 @@ private trait EventsPatcher[Interpretation[_]] {
 }
 
 private class EventsPatcherImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
+    transactor:       SessionResource[IO, EventLogDB],
     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
     logger:           Logger[IO]
 )(implicit ME:        Bracket[IO, Throwable])
@@ -42,7 +42,7 @@ private class EventsPatcherImpl(
 
   def applyToAllEvents(eventsPatch: EventsPatch[IO]): IO[Unit] = {
     for {
-      _ <- measureExecutionTime(eventsPatch.query) transact transactor.get
+      _ <- measureExecutionTime(eventsPatch.query) transact transactor.resource
       _ <- eventsPatch.updateGauges()
       _ <- logger.info(s"All events patched with ${eventsPatch.name}")
     } yield ()
@@ -59,7 +59,7 @@ private class EventsPatcherImpl(
 
 private object IOEventsPatcher {
   def apply(
-      transactor:       DbTransactor[IO, EventLogDB],
+      transactor:       SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   ): IO[EventsPatcher[IO]] = IO {

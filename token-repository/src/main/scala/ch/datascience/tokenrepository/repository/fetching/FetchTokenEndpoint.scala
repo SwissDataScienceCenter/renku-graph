@@ -23,7 +23,7 @@ import cats.effect.{ContextShift, Effect, IO}
 import cats.syntax.all._
 import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.InfoMessage
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.client.AccessToken
@@ -72,7 +72,7 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
 
 object IOFetchTokenEndpoint {
   def apply(
-      transactor:          DbTransactor[IO, ProjectsTokensDB],
+      transactor:          SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[FetchTokenEndpoint[IO]] =

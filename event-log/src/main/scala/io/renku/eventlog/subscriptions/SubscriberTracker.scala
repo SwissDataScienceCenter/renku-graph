@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats.effect.{Bracket, IO}
-import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
@@ -32,7 +32,7 @@ private trait SubscriberTracker[Interpretation[_]] {
   def remove(subscriberUrl: SubscriberUrl):    Interpretation[Boolean]
 }
 
-private class SubscriberTrackerImpl(transactor:       DbTransactor[IO, EventLogDB],
+private class SubscriberTrackerImpl(transactor:       SessionResource[IO, EventLogDB],
                                     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
                                     sourceUrl:        MicroserviceBaseUrl
 )(implicit ME:                                        Bracket[IO, Throwable])
@@ -49,7 +49,7 @@ private class SubscriberTrackerImpl(transactor:       DbTransactor[IO, EventLogD
             |""".stripMargin.update.run,
       name = "subscriber - add"
     )
-  ) transact transactor.get map mapToTableResult
+  ) transact transactor.resource map mapToTableResult
 
   override def remove(subscriberUrl: SubscriberUrl): IO[Boolean] = measureExecutionTime(
     SqlQuery(
@@ -58,7 +58,7 @@ private class SubscriberTrackerImpl(transactor:       DbTransactor[IO, EventLogD
             |""".stripMargin.update.run,
       name = "subscriber - delete"
     )
-  ) transact transactor.get map mapToTableResult
+  ) transact transactor.resource map mapToTableResult
 
   private lazy val mapToTableResult: Int => Boolean = {
     case 0 | 1 => true
@@ -67,7 +67,7 @@ private class SubscriberTrackerImpl(transactor:       DbTransactor[IO, EventLogD
 }
 
 private object SubscriberTracker {
-  def apply(transactor:       DbTransactor[IO, EventLogDB],
+  def apply(transactor:       SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
   ): IO[SubscriberTracker[IO]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)

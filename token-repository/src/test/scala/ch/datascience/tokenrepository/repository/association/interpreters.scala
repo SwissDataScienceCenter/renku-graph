@@ -19,7 +19,7 @@
 package ch.datascience.tokenrepository.repository.association
 
 import cats.effect.{Bracket, IO}
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
@@ -28,7 +28,7 @@ import io.chrisdavenport.log4cats.Logger
 import scala.util.Try
 
 private class TryAssociationPersister(
-    transactor:       DbTransactor[Try, ProjectsTokensDB],
+    transactor:       SessionResource[Try, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
 )(implicit ME:        Bracket[Try, Throwable])
     extends AssociationPersister[Try](transactor, queriesExecTimes)

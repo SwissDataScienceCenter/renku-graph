@@ -21,7 +21,7 @@ package io.renku.eventlog.init
 import DbInitializer._
 import cats.effect.{Bracket, ContextShift, IO}
 import cats.syntax.all._
-import ch.datascience.db.DbTransactor
+import ch.datascience.db.SessionResource
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
@@ -50,7 +50,7 @@ class DbInitializerImpl[Interpretation[_]](
 
 object DbInitializer {
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
+      transactor:          SessionResource[IO, EventLogDB],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[DbInitializer[IO]] = IO {
     new DbInitializerImpl[IO](

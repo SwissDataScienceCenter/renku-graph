@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -64,7 +64,7 @@ final case class ToTriplesStore[Interpretation[_]](
 
   override def updateGauges(
       updateResult:      UpdateResult
-  )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
+  )(implicit transactor: SessionResource[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
     case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesTransformationGauge.decrement
     case _                    => ME.unit
   }

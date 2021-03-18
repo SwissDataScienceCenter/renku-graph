@@ -99,7 +99,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
     sql"select batch_date from event_log limit 1"
       .query[Instant]
       .option
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .map(_ => true)
       .recover { case _ => false }
       .unsafeRunSync()
@@ -130,7 +130,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
     sql"select batch_date from event_log"
       .query[BatchDate]
       .to[List]
-      .transact(transactor.get)
+      .transact(transactor.resource)
       .unsafeRunSync()
       .toSet
 }

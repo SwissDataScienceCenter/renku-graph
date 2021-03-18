@@ -20,7 +20,7 @@ package io.renku.eventlog.statuschange
 
 import cats.data.NonEmptyList
 import cats.effect.IO
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
@@ -164,7 +164,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
     override def updateGauges(
         updateResult:      UpdateResult
-    )(implicit transactor: DbTransactor[IO, EventLogDB]) = gauge increment projectPath
+    )(implicit transactor: SessionResource[IO, EventLogDB]) = gauge increment projectPath
   }
 
   private def store(eventId: CompoundEventId, projectPath: projects.Path, status: EventStatus): Unit =
@@ -203,6 +203,6 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
     override def updateGauges(
         updateResult:      UpdateResult
-    )(implicit transactor: DbTransactor[IO, EventLogDB]) = gauge increment projectPath
+    )(implicit transactor: SessionResource[IO, EventLogDB]) = gauge increment projectPath
   }
 }

@@ -21,7 +21,7 @@ package io.renku.eventlog.statuschange
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes, eventStatuses}
@@ -224,7 +224,7 @@ class StatusChangeEndpointSpec
       val queries: NonEmptyList[SqlQuery[Int]] =
         nonEmptyStrings().generateNonEmptyList().map(s => SqlQuery[Int](1.pure[ConnectionIO], Refined.unsafeApply(s)))
       def updateGauges(updateResult: UpdateResult)(implicit
-          transactor:                DbTransactor[IO, EventLogDB]
+          transactor:                SessionResource[IO, EventLogDB]
       ): IO[Unit] = ().pure[IO]
 
       def maybeProcessingTime: Option[EventProcessingTime] = eventProcessingTimes.generateOption

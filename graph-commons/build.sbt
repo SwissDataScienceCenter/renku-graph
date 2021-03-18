@@ -36,6 +36,9 @@ libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
 
 libraryDependencies += "io.sentry" % "sentry-logback" % "3.2.0"
 
+val skunkVersion = "0.0.24"
+libraryDependencies += "org.tpolecat" %% "skunk-core" % skunkVersion
+
 val doobieVersion = "0.10.0"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
