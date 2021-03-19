@@ -50,7 +50,7 @@ private class DispatchRecoveryImpl[Interpretation[_]](
       event.id,
       EventMessage(exception),
       underTriplesGenerationGauge,
-      None
+      maybeProcessingTime = None
     )
     for {
       _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)

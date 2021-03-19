@@ -235,25 +235,5 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
       underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
       logger:                          Logger[IO]
-  ) extends StatusChangeEndpoint[IO](updateCommandsRunner,
-                                     Set(
-                                       ToTriplesStore.factory(underTriplesGenerationGauge),
-                                       ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
-                                       ToTriplesGenerated.factory(transactor,
-                                                                  underTriplesTransformationGauge,
-                                                                  underTriplesGenerationGauge,
-                                                                  awaitingTransformationGauge
-                                       ),
-                                       ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),
-                                       ToGenerationRecoverableFailure.factory(awaitingTriplesGenerationGauge,
-                                                                              underTriplesGenerationGauge
-                                       ),
-                                       ToTransformationNonRecoverableFailure.factory(underTriplesTransformationGauge),
-                                       ToTransformationRecoverableFailure.factory(
-                                         awaitingTransformationGauge,
-                                         underTriplesTransformationGauge
-                                       )
-                                     ),
-                                     logger
-      )
+  ) extends StatusChangeEndpoint[IO](updateCommandsRunner, Set.empty, logger)
 }

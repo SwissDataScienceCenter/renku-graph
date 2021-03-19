@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.statuschange
 
+import CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.IO
 import cats.syntax.all._
@@ -36,16 +37,17 @@ import ch.datascience.metrics.LabeledGauge
 import doobie.free.connection.ConnectionIO
 import eu.timepit.refined.api.Refined
 import io.circe.Json
+import io.circe.literal.JsonStringContext
 import io.circe.syntax._
 import io.prometheus.client.Gauge
 import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
 import org.http4s.MediaType._
 import org.http4s.Status._
 import org.http4s._
 import org.http4s.headers.`Content-Type`
+import org.http4s.multipart.{Multipart, Part}
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -70,7 +72,7 @@ class StatusChangeEndpointSpec
           .expects(command)
           .returning(Updated.pure[IO])
 
-        val request = Request[IO]()
+        val request = createValidRequest()
 
         val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
 
@@ -92,7 +94,7 @@ class StatusChangeEndpointSpec
           .expects(command)
           .returning(UpdateResult.Failure(errorMessage).pure[IO])
 
-        val request = Request[IO]()
+        val request = createValidRequest()
 
         val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
 
@@ -105,7 +107,7 @@ class StatusChangeEndpointSpec
 
       val eventId = compoundEventIds.generateOne
 
-      val request = Request[IO]()
+      val request = createValidRequest()
 
       val response = changeStatusWithFailingDecode()(eventId, request).unsafeRunSync()
 
@@ -124,20 +126,19 @@ class StatusChangeEndpointSpec
         .expects(command)
         .returning(UpdateResult.NotFound.pure[IO])
 
-      val request = Request[IO]()
+      val request = createValidRequest()
 
       val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
 
       response.status                          shouldBe NotFound
       response.contentType                     shouldBe Some(`Content-Type`(application.json))
       response.as[InfoMessage].unsafeRunSync() shouldBe InfoMessage("Event not found")
-
     }
 
-    s"return $BadRequest when parsing the payload fails" in new TestCase {
+    s"return $BadRequest when one of the command returns PayloadMalformed" in new TestCase {
 
       val eventId = command.eventId
-      val request = Request[IO]()
+      val request = createValidRequest()
       val message = nonEmptyStrings().generateOne
 
       val response = changeStatusWithPayloadMalformed(message)(eventId, request).unsafeRunSync()
@@ -145,7 +146,31 @@ class StatusChangeEndpointSpec
       response.status                   shouldBe BadRequest
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync() shouldBe ErrorMessage(message).asJson
+    }
 
+    s"return $BadRequest when requst is not a multipart request" in new TestCase {
+
+      val eventId = command.eventId
+      val request = Request[IO]()
+
+      val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
+
+      response.status                   shouldBe BadRequest
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Malformed event or payload").asJson
+    }
+
+    s"return $BadRequest when there's no event part" in new TestCase {
+
+      val eventId   = command.eventId
+      val multipart = Multipart[IO](Vector())
+      val request   = Request[IO]().withEntity(multipart).withHeaders(multipart.headers)
+
+      val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
+
+      response.status                   shouldBe BadRequest
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Malformed event or payload").asJson
     }
 
     s"return $InternalServerError when updating event status fails" in new TestCase {
@@ -157,7 +182,7 @@ class StatusChangeEndpointSpec
         .expects(command)
         .returning(exception.raiseError[IO, UpdateResult])
 
-      val request = Request[IO]()
+      val request = createValidRequest()
 
       val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
 
@@ -208,6 +233,21 @@ class StatusChangeEndpointSpec
     }
 
     lazy val changeStatusCommands: Gen[ChangeStatusCommand[IO]] = Gen.const(MockChangeStatusCommand())
+
+    def createValidRequest(): Request[IO] = {
+      val multipart = Multipart[IO](
+        Vector(
+          Part.formData[IO](
+            "event",
+            (json"""{"status": ${eventStatuses.generateOne.value}}""" deepMerge eventProcessingTimes.generateOption
+              .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}}""")
+              .getOrElse(Json.obj())).noSpaces,
+            `Content-Type`(MediaType.application.json)
+          )
+        )
+      )
+      Request[IO]().withEntity(multipart).withHeaders(multipart.headers)
+    }
   }
 
   private class GaugeStub extends LabeledGauge[IO, projects.Path] {

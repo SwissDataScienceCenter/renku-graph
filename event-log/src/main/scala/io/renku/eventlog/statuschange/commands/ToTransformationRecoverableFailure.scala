@@ -29,10 +29,11 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
+import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
+import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
 import io.renku.eventlog.{EventLogDB, EventMessage}
-import org.http4s.{MediaType, Request}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.MINUTES
@@ -72,31 +73,25 @@ final case class ToTransformationRecoverableFailure[Interpretation[_]](
   }
 }
 
-object ToTransformationRecoverableFailure {
+private[statuschange] object ToTransformationRecoverableFailure {
   def factory[Interpretation[_]: Sync](
       awaitingTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
       underTriplesTransformationGauge:    LabeledGauge[Interpretation, projects.Path]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
-  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
-    Kleisli { case (eventId, request) =>
-      when(request, has = MediaType.application.json) {
-        {
-          for {
-            _                   <- request.validate(status = TransformationRecoverableFailure)
-            maybeProcessingTime <- request.getProcessingTime
-            message             <- request.message
-          } yield CommandFound(
-            ToTransformationRecoverableFailure[Interpretation](
-              eventId,
-              message,
-              awaitingTriplesTransformationGauge,
-              underTriplesTransformationGauge,
-              maybeProcessingTime
-            )
-          )
-        }.merge
-      }
-    }
+  ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
+    case EventOnlyRequest(eventId, TransformationRecoverableFailure, maybeProcessingTime, Some(message)) =>
+      CommandFound(
+        ToTransformationRecoverableFailure[Interpretation](
+          eventId,
+          message,
+          awaitingTriplesTransformationGauge,
+          underTriplesTransformationGauge,
+          maybeProcessingTime
+        )
+      )
+    case EventOnlyRequest(_, TransformationRecoverableFailure, _, None) => PayloadMalformed("No message provided")
+    case _                                                              => NotSupported
+  }
 
 }

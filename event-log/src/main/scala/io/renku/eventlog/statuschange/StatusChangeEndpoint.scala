@@ -18,56 +18,104 @@
 
 package io.renku.eventlog.statuschange
 
+import ChangeStatusRequest.EventOnlyRequest
+import CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import cats.MonadError
-import cats.data.Kleisli
+import cats.data.EitherT.right
+import cats.data.{EitherT, Kleisli}
 import cats.effect.{ContextShift, Effect}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
+import io.circe.Json
 import io.renku.eventlog.statuschange.commands._
-import org.http4s.Request
+import io.renku.eventlog.{EventLogDB, EventMessage}
 import org.http4s.dsl.Http4sDsl
+import org.http4s.multipart.{Multipart, Part}
 
 import scala.util.control.NonFatal
 
-class StatusChangeEndpoint[Interpretation[_]: Effect](
+class StatusChangeEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable]](
     statusUpdatesRunner: StatusUpdatesRunner[Interpretation],
-    commandFactories: Set[
-      Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult]
-    ],
-    logger:    Logger[Interpretation]
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+    commandFactories:    Set[Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult]],
+    logger:              Logger[Interpretation]
+) extends Http4sDsl[Interpretation] {
 
   import ch.datascience.http.InfoMessage
   import ch.datascience.http.InfoMessage._
+  import org.http4s.circe.jsonDecoder
   import org.http4s.{Request, Response}
   import statusUpdatesRunner.run
 
   def changeStatus(eventId: CompoundEventId,
                    request: Request[Interpretation]
-  ): Interpretation[Response[Interpretation]] =
-    tryCommandFactory(eventId, request, commandFactories.toList)
+  ): Interpretation[Response[Interpretation]] = {
+    for {
+      changeStatusRequest <- decodeRequest(eventId, request)
+      response            <- right[Response[Interpretation]](tryCommandFactory(commandFactories.toList, changeStatusRequest))
+    } yield response
+  }.merge
+
+  private def decodeRequest(eventId: CompoundEventId,
+                            request: Request[Interpretation]
+  ): EitherT[Interpretation, Response[Interpretation], ChangeStatusRequest] = EitherT {
+    {
+      for {
+        multipart <- request.as[Multipart[Interpretation]]
+        eventPart <-
+          multipart.parts
+            .find(_.name.contains("event"))
+            .map(_.pure[Interpretation])
+            .getOrElse(
+              new Exception("No event part in change status payload").raiseError[Interpretation, Part[Interpretation]]
+            )
+        eventJson <- eventPart.as[Json]
+        status <- eventJson.hcursor
+                    .downField("status")
+                    .as[EventStatus]
+                    .fold(_.raiseError[Interpretation, EventStatus], _.pure[Interpretation])
+        maybeProcessingTime <-
+          eventJson.hcursor
+            .downField("processingTime")
+            .as[Option[EventProcessingTime]]
+            .fold(_.raiseError[Interpretation, Option[EventProcessingTime]], _.pure[Interpretation])
+        maybeMessage <- eventJson.hcursor
+                          .downField("message")
+                          .as[Option[EventMessage]]
+                          .fold(_.raiseError[Interpretation, Option[EventMessage]], _.pure[Interpretation])
+        eventOnlyRequest    <- EventOnlyRequest(eventId, status, maybeProcessingTime, maybeMessage).pure[Interpretation]
+        changeStatusRequest <- createRequest(eventOnlyRequest)(multipart.parts.find(_.name.contains("payload")))
+      } yield changeStatusRequest
+    }.map(_.asRight[Response[Interpretation]]).recoverWith(badRequest)
+  }
+
+  private def createRequest(
+      eventOnlyRequest: EventOnlyRequest
+  ): Kleisli[Interpretation, Option[Part[Interpretation]], ChangeStatusRequest] = Kleisli {
+    case Some(payloadPart) => payloadPart.as[String].map(payload => eventOnlyRequest.addPayload(payload))
+    case None              => (eventOnlyRequest: ChangeStatusRequest).pure[Interpretation]
+  }
+
+  def badRequest: PartialFunction[Throwable, Interpretation[Either[Response[Interpretation], ChangeStatusRequest]]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)("Decoding status change request body failed")
+      BadRequest(ErrorMessage("Malformed event or payload")).map(_.asLeft[ChangeStatusRequest])
+  }
 
   private def tryCommandFactory(
-      eventId: CompoundEventId,
-      request: Request[Interpretation],
-      commandFactories: List[
-        Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult]
-      ]
+      commandFactories:    List[Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult]],
+      changeStatusRequest: ChangeStatusRequest
   ): Interpretation[Response[Interpretation]] = commandFactories match {
     case Nil => BadRequest(ErrorMessage("No event command found"))
     case headFactory :: otherFactories =>
-      headFactory.run(eventId -> request).flatMap {
+      headFactory.run(changeStatusRequest).flatMap {
         case command: CommandFound[Interpretation] =>
           run(command.command).flatMap(_.asHttpResponse) recoverWith httpResponse
-        case NotSupported              => tryCommandFactory(eventId, request, otherFactories)
+        case NotSupported              => tryCommandFactory(otherFactories, changeStatusRequest)
         case PayloadMalformed(message) => BadRequest(ErrorMessage(message))
       }
   }
