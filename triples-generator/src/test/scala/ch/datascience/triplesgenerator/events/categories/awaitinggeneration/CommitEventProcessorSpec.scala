@@ -250,11 +250,11 @@ class CommitEventProcessorSpec
 
     def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId, triples: JsonLDTriples) =
       (eventStatusUpdater
-        .markTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion, _: Option[EventProcessingTime]))
+        .markTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion, _: EventProcessingTime))
         .expects(compoundEventId,
                  triples,
                  schemaVersion,
-                 EventProcessingTime(Duration.ofMillis(singleEventTimeRecorder.elapsedTime.value)).some
+                 EventProcessingTime(Duration.ofMillis(singleEventTimeRecorder.elapsedTime.value))
         )
         .returning(context.unit)
 

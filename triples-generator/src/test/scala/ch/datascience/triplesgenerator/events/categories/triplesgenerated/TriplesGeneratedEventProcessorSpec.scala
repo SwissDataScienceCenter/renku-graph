@@ -207,7 +207,7 @@ class TriplesGeneratedEventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.raiseError(exception))
 
-      expectEventMarkedAsTriplesGenerated(triplesGeneratedEvent)
+      expectEventRolledBackToTriplesGenerated(triplesGeneratedEvent)
 
       eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
@@ -311,8 +311,18 @@ class TriplesGeneratedEventProcessorSpec
 
     def expectEventMarkedAsTriplesGenerated(event: TriplesGeneratedEvent) =
       (eventStatusUpdater
-        .markTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion, _: Option[EventProcessingTime]))
-        .expects(event.compoundEventId, event.triples, event.schemaVersion, None)
+        .markTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion, _: EventProcessingTime))
+        .expects(event.compoundEventId,
+                 event.triples,
+                 event.schemaVersion,
+                 EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
+        )
+        .returning(context.unit)
+
+    def expectEventRolledBackToTriplesGenerated(event: TriplesGeneratedEvent) =
+      (eventStatusUpdater
+        .markTriplesGenerated(_: CompoundEventId))
+        .expects(event.compoundEventId)
         .returning(context.unit)
 
     def logSummary(triplesGeneratedEvent: TriplesGeneratedEvent, isSuccessful: Boolean): Assertion =

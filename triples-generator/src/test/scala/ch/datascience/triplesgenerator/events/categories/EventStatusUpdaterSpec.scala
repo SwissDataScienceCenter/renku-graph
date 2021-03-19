@@ -24,11 +24,10 @@ import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.EventsGenerators.{categoryNames, compoundEventIds, eventProcessingTimes, failureEventStatuses}
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.json.JsonOps._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.http.Fault
@@ -50,7 +49,10 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       s"succeed if remote responds with $status" in new TestCase {
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withRequestBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
+            .withMultipartRequestBody(
+              aMultipart("event")
+                .withBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
+            )
             .willReturn(aResponse().withStatus(status.code))
         }
 
@@ -62,7 +64,10 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       val status = BadRequest
       stubFor {
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-          .withRequestBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
+          .withMultipartRequestBody(
+            aMultipart("event")
+              .withBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
+          )
           .willReturn(aResponse().withStatus(status.code))
       }
 
@@ -80,10 +85,11 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withRequestBody(
-              equalToJson(
-                json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2
-              )
+            .withMultipartRequestBody(
+              aMultipart("event")
+                .withBody(
+                  equalToJson(json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2)
+                )
             )
             .willReturn(aResponse().withStatus(status.code))
         }
@@ -98,10 +104,11 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
       stubFor {
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-          .withRequestBody(
-            equalToJson(
-              json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2
-            )
+          .withMultipartRequestBody(
+            aMultipart("event")
+              .withBody(
+                equalToJson(json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2)
+              )
           )
           .willReturn(aResponse().withStatus(status.code))
       }
@@ -115,8 +122,8 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
   "markTriplesGenerated" should {
 
     Set(Ok, NotFound) foreach { status =>
-      s"succeed if remote responds with $status" in new TestCase {
-        val maybeProcessingTime = eventProcessingTimes.generateOption
+      s"succeed if remote responds with $status - case with payload" in new TestCase {
+        val processingTime = eventProcessingTimes.generateOne
 
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
@@ -124,9 +131,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
               aMultipart("event")
                 .withBody(
                   equalToJson(
-                    json"""{"status": "TRIPLES_GENERATED"}"""
-                      .addIfDefined("processingTime" -> maybeProcessingTime)
-                      .spaces2
+                    json"""{"status": "TRIPLES_GENERATED", "processingTime": ${processingTime.value}}""".spaces2
                   )
                 )
             )
@@ -134,7 +139,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
               aMultipart("payload")
                 .withBody(
                   equalToJson(
-                    json"""{"schemaVersion": ${schemaVersion.value} , "payload": ${rawTriples.value.noSpaces} }""".noSpaces
+                    json"""{"schemaVersion": ${schemaVersion.value} , "payload": ${rawTriples.value.noSpaces}}""".noSpaces
                   )
                 )
             )
@@ -142,14 +147,32 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
         }
 
         updater
-          .markTriplesGenerated(eventId, rawTriples, schemaVersion, maybeProcessingTime)
+          .markTriplesGenerated(eventId, rawTriples, schemaVersion, processingTime)
+          .unsafeRunSync() shouldBe ((): Unit)
+      }
+
+      s"succeed if remote responds with $status - case without payload" in new TestCase {
+
+        stubFor {
+          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+            .withMultipartRequestBody(
+              aMultipart("event")
+                .withBody(
+                  equalToJson(json"""{"status": "TRIPLES_GENERATED"}""".spaces2)
+                )
+            )
+            .willReturn(aResponse().withStatus(status.code))
+        }
+
+        updater
+          .markTriplesGenerated(eventId)
           .unsafeRunSync() shouldBe ((): Unit)
       }
     }
 
-    s"fail if remote responds with status different than $Ok" in new TestCase {
-      val maybeProcessingTime = eventProcessingTimes.generateOption
-      val status              = BadRequest
+    s"fail if remote responds with status different than $Ok - case with payload" in new TestCase {
+      val processingTime = eventProcessingTimes.generateOne
+      val status         = BadRequest
 
       stubFor {
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
@@ -157,9 +180,7 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
             aMultipart("event")
               .withBody(
                 equalToJson(
-                  json"""{"status": "TRIPLES_GENERATED"}"""
-                    .addIfDefined("processingTime" -> maybeProcessingTime)
-                    .spaces2
+                  json"""{"status": "TRIPLES_GENERATED", "processingTime": ${processingTime.value}}""".spaces2
                 )
               )
           )
@@ -175,7 +196,26 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       }
 
       intercept[Exception] {
-        updater.markTriplesGenerated(eventId, rawTriples, schemaVersion, maybeProcessingTime).unsafeRunSync()
+        updater.markTriplesGenerated(eventId, rawTriples, schemaVersion, processingTime).unsafeRunSync()
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+    }
+
+    s"fail if remote responds with status different than $Ok - case without payload" in new TestCase {
+      val status = BadRequest
+
+      stubFor {
+        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          .withMultipartRequestBody(
+            aMultipart("event")
+              .withBody(
+                equalToJson(json"""{"status": "TRIPLES_GENERATED"}""".spaces2)
+              )
+          )
+          .willReturn(aResponse().withStatus(status.code))
+      }
+
+      intercept[Exception] {
+        updater.markTriplesGenerated(eventId).unsafeRunSync()
       }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
   }
@@ -189,13 +229,16 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
             val exception = exceptions.generateOne
             stubFor {
               patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-                .withRequestBody(
-                  equalToJson(
-                    json"""{
-                      "status":  ${eventStatus.value},
-                      "message": ${ErrorMessage.withStackTrace(exception).value}
-                    }""".spaces2
-                  )
+                .withMultipartRequestBody(
+                  aMultipart("event")
+                    .withBody(
+                      equalToJson(
+                        json"""{
+                          "status":  ${eventStatus.value},
+                          "message": ${ErrorMessage.withStackTrace(exception).value}
+                        }""".spaces2
+                      )
+                    )
                 )
                 .willReturn(aResponse().withStatus(status.code))
             }
@@ -220,10 +263,12 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
   }
 
   "eventStatusUpdater" should {
+
     Set(BadGateway, ServiceUnavailable, GatewayTimeout) foreach { errorStatus =>
       s"retry if remote responds with status such as $errorStatus" in new TestCase {
         Set(
-          updater.markTriplesGenerated(eventId, rawTriples, schemaVersion, eventProcessingTimes.generateOption),
+          updater.markTriplesGenerated(eventId, rawTriples, schemaVersion, eventProcessingTimes.generateOne),
+          updater.markTriplesGenerated(eventId),
           updater.markEventNew(eventId),
           updater.markTriplesStore(eventId, eventProcessingTimes.generateOne),
           updater.markEventFailed(eventId, failureEventStatuses.generateOne, exceptions.generateOne)
@@ -259,7 +304,8 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
     }
     s"retry if remote is not reachable" in new TestCase {
       Set(
-        updater.markTriplesGenerated(eventId, rawTriples, schemaVersion, eventProcessingTimes.generateOption),
+        updater.markTriplesGenerated(eventId, rawTriples, schemaVersion, eventProcessingTimes.generateOne),
+        updater.markTriplesGenerated(eventId),
         updater.markEventNew(eventId),
         updater.markTriplesStore(eventId, eventProcessingTimes.generateOne),
         updater.markEventFailed(eventId, failureEventStatuses.generateOne, exceptions.generateOne)

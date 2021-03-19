@@ -171,12 +171,10 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   private def rollback(
       triplesGeneratedEvent: TriplesGeneratedEvent
   ): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = { case NonFatal(exception) =>
-    markTriplesGenerated(triplesGeneratedEvent.compoundEventId,
-                         triplesGeneratedEvent.triples,
-                         triplesGeneratedEvent.schemaVersion,
-                         maybeProcessingTime = None
-    ) >> new Exception("transformation failure -> Event rolled back", exception)
-      .raiseError[Interpretation, Option[AccessToken]]
+    markTriplesGenerated(triplesGeneratedEvent.compoundEventId) >> new Exception(
+      "transformation failure -> Event rolled back",
+      exception
+    ).raiseError[Interpretation, Option[AccessToken]]
   }
 
   private sealed trait UploadingResult extends Product with Serializable {

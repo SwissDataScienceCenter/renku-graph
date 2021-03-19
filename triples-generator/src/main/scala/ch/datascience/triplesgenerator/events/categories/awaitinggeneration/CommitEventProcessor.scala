@@ -117,11 +117,7 @@ private class CommitEventProcessor[Interpretation[_]](
   private def updateEventLog(uploadingResults: TriplesGenerationResult): Interpretation[Unit] = {
     uploadingResults match {
       case TriplesGenerated(commit, triples, schemaVersion, processingTime) =>
-        markTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id),
-                             triples,
-                             schemaVersion,
-                             processingTime.some
-        )
+        markTriplesGenerated(CompoundEventId(commit.eventId, commit.project.id), triples, schemaVersion, processingTime)
       case RecoverableError(commit, message) =>
         markEventFailed(CompoundEventId(commit.eventId, commit.project.id),
                         EventStatus.GenerationRecoverableFailure,
