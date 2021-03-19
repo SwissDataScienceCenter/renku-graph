@@ -18,36 +18,45 @@
 
 package io.renku.eventlog.eventdetails
 
-import cats.effect.{Bracket, IO}
+import cats.data.Kleisli
+import cats.effect.{Async, IO}
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.LabeledHistogram
-import doobie.implicits._
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import skunk.implicits._
+import skunk.codec.all._
 
 private trait EventDetailsFinder[Interpretation[_]] {
   def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]]
 }
 
-private class EventDetailsFinderImpl(
-    transactor:       SessionResource[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:        Bracket[IO, Throwable])
-    extends DbClient(Some(queriesExecTimes))
-    with EventDetailsFinder[IO]
+private class EventDetailsFinderImpl[Interpretation[_]: Async](
+    transactor:       SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
+) extends DbClient[Interpretation](Some(queriesExecTimes))
+    with EventDetailsFinder[Interpretation]
     with TypeSerializers {
 
   import eu.timepit.refined.auto._
 
-  override def findDetails(eventId: CompoundEventId): IO[Option[CompoundEventId]] =
-    measureExecutionTime(find(eventId)) transact transactor.resource
+  override def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]] =
+    transactor.use { session =>
+      session.transaction.use { xa =>
+        for {
+          sp <- xa.savepoint
+          result <- measureExecutionTime(find(eventId), session).recoverWith { case e =>
+                      xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Option[CompoundEventId]])
+                    }
+        } yield result
+      }
+    }
 
-  private def find(eventId: CompoundEventId) = SqlQuery(
-    sql"""|SELECT evt.event_id, evt.project_id
-          |FROM event evt WHERE evt.event_id = ${eventId.id} and evt.project_id = ${eventId.projectId} 
-          |""".stripMargin
-      .query[CompoundEventId]
-      .option,
+  private def find(eventId: CompoundEventId) = SqlQuery[Interpretation, Option[CompoundEventId]](
+    Kleisli(_.option(sql"""SELECT evt.event_id, evt.project_id
+                           FROM event evt WHERE evt.event_id = #${eventId.id} and evt.project_id = #${eventId.projectId.toString}
+                           """.query(varchar ~ int4).gmap[CompoundEventId])),
     name = "find event details"
   )
 }

@@ -45,8 +45,8 @@ private class AssociationPersister[Interpretation[_]: Async: Monad](
       session.transaction.use { xa =>
         for {
           sp <- xa.savepoint
-          _ <- upsert(projectId, projectPath, encryptedToken)(session).recoverWith { case _ =>
-                 xa.rollback(sp).void
+          _ <- upsert(projectId, projectPath, encryptedToken)(session).recoverWith { case e =>
+                 xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
                }
         } yield ()
 

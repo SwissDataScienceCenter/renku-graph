@@ -48,7 +48,7 @@ private class PersistedTokensFinder[Interpretation[_]: Async: Bracket[*[_], Thro
 
   def findToken(projectPath: Path): OptionT[Interpretation, EncryptedAccessToken] = run {
     val query: Query[Void, String] =
-      sql"select token from projects_tokens where project_path = ${projectPath.value}".query(varchar)
+      sql"select token from projects_tokens where project_path = #${projectPath.value}".query(varchar)
     SqlQuery[Interpretation, Option[String]](
       Kleisli(session => session.option(query)),
       name = "find token - path"

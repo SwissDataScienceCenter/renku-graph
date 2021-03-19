@@ -34,7 +34,8 @@ class DbInitializer[Interpretation[_]](
     logger:                   Logger[Interpretation]
 )(implicit ME:                Bracket[Interpretation, Throwable]) {
 
-  import doobie.implicits._
+  import skunk._
+  import skunk.implicits._
 
   def run(): Interpretation[Unit] = {
     for {
@@ -46,13 +47,21 @@ class DbInitializer[Interpretation[_]](
   } recoverWith logging
 
   private def createTable: Interpretation[Unit] =
-    sql"""|CREATE TABLE IF NOT EXISTS projects_tokens(
-          | project_id int4 PRIMARY KEY,
-          | token VARCHAR NOT NULL
-          |);
-       """.stripMargin.update.run
-      .transact(transactor.resource)
-      .map(_ => ())
+    transactor
+      .use { session =>
+        session.transaction.use { xa =>
+          val query: Command[Void] = sql"""CREATE TABLE IF NOT EXISTS projects_tokens(
+                            project_id int4 PRIMARY KEY,
+                            token VARCHAR NOT NULL
+                            );""".command
+          for {
+            sp <- xa.savepoint
+            _ <- session.execute(query).recoverWith { case e =>
+                   xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
+                 }
+          } yield ()
+        }
+      }
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     logger.error(exception)("Projects Tokens database initialization failure")

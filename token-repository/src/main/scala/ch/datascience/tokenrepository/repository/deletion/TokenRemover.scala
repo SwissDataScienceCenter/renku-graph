@@ -18,34 +18,53 @@
 
 package ch.datascience.tokenrepository.repository.deletion
 
-import cats.effect.{Bracket, IO}
+import cats.Monad
+import cats.data.Kleisli
+import cats.syntax.all._
+import cats.effect.Async
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import eu.timepit.refined.auto._
+import skunk.data.Completion
+import skunk.implicits._
 
-class TokenRemover[Interpretation[_]](
+class TokenRemover[Interpretation[_]: Async: Monad](
     transactor:       SessionResource[Interpretation, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:        Bracket[Interpretation, Throwable])
-    extends DbClient(Some(queriesExecTimes)) {
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
+) extends DbClient[Interpretation](Some(queriesExecTimes)) {
 
-  def delete(projectId: Id): Interpretation[Unit] = measureExecutionTime {
-    SqlQuery(
-      sql"""
-          delete 
-          from projects_tokens 
-          where project_id = ${projectId.value}
-          """.update.run
-        .map(failIfMultiUpdate(projectId)),
-      name = "remove token"
-    )
-  }.transact(transactor.resource)
+  def delete(projectId: Id): Interpretation[Unit] = transactor.use { session =>
+    session.transaction.use { xa =>
+      val deletion = measureExecutionTime(
+        {
+          val command = sql"""
+          delete
+          from projects_tokens
+          where project_id = #${projectId.value.toString}
+          """.command
+          SqlQuery[Interpretation, Unit](
+            Kleisli(_.execute(command).map(failIfMultiUpdate(projectId))),
+            name = "remove token"
+          )
+        },
+        session
+      )
 
-  private def failIfMultiUpdate(projectId: Id): Int => Unit = {
-    case 0 => ()
-    case 1 => ()
-    case n => throw new RuntimeException(s"Deleting token for a projectId: $projectId removed $n records")
+      for {
+        sp <- xa.savepoint
+        _ <- deletion.recoverWith { case e =>
+               xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
+             }
+      } yield ()
+
+    }
+  }
+
+  private def failIfMultiUpdate(projectId: Id): Completion => Unit = {
+    case Completion.Delete(0 | 1) => ()
+    case Completion.Delete(n) =>
+      throw new RuntimeException(s"Deleting token for a projectId: $projectId removed $n records")
   }
 }

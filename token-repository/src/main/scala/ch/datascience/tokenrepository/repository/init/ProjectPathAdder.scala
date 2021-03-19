@@ -21,15 +21,17 @@ package ch.datascience.tokenrepository.repository.init
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.association.{IOProjectPathFinder, ProjectPathFinder}
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
-import doobie.implicits._
-import doobie.util.fragment.Fragment
 import io.chrisdavenport.log4cats.Logger
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 import scala.util.control.NonFatal
 
@@ -55,13 +57,19 @@ private class IOProjectPathAdder(
       case false => addColumn()
     }
 
-  private def checkColumnExists: IO[Boolean] =
-    sql"select project_path from projects_tokens limit 1"
-      .query[String]
-      .option
-      .transact(transactor.resource)
-      .map(_ => true)
-      .recover { case _ => false }
+  private def checkColumnExists: IO[Boolean] = {
+
+    val query: Query[skunk.Void, projects.Path] = sql"select project_path from projects_tokens limit 1"
+      .query(varchar)
+      .gmap[projects.Path]
+
+    transactor.use { session =>
+      session
+        .option(query)
+        .map(_ => true)
+        .recover { case _ => false } // TODO verify this was using a transaction
+    }
+  }
 
   private def addColumn() = {
     for {
@@ -121,10 +129,17 @@ private class IOProjectPathAdder(
       .transact(transactor.resource)
       .map(_ => ())
 
-  private def execute(sql: Fragment, transactor: SessionResource[IO, ProjectsTokensDB]): IO[Unit] =
-    sql.update.run
-      .transact(transactor.resource)
-      .map(_ => ())
+  private def execute(sql: Command[Void], transactor: SessionResource[IO, ProjectsTokensDB]): IO[Unit] =
+    transactor.use { session =>
+      session.transaction.use { xa =>
+        for {
+          sp <- xa.savepoint
+          _ <- session.execute(sql).recoverWith { case exception =>
+                 xa.rollback(sp).flatMap(logging)
+               }
+        } yield ()
+      }
+    }
 
   private lazy val logging: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
     logger.error(exception)("'project_path' column adding failure")
