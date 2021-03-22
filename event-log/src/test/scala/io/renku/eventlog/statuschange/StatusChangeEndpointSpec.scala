@@ -148,7 +148,7 @@ class StatusChangeEndpointSpec
       response.as[Json].unsafeRunSync() shouldBe ErrorMessage(message).asJson
     }
 
-    s"return $BadRequest when requst is not a multipart request" in new TestCase {
+    s"return $BadRequest when request is not a multipart request" in new TestCase {
 
       val eventId = command.eventId
       val request = Request[IO]()
@@ -165,6 +165,104 @@ class StatusChangeEndpointSpec
       val eventId   = command.eventId
       val multipart = Multipart[IO](Vector())
       val request   = Request[IO]().withEntity(multipart).withHeaders(multipart.headers)
+
+      val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
+
+      response.status                   shouldBe BadRequest
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Malformed event or payload").asJson
+    }
+
+    s"return $BadRequest when the request event part is not json" in new TestCase {
+
+      val eventId = command.eventId
+      val multipart = Multipart[IO](
+        Vector(
+          Part.formData[IO]("event", nonEmptyStrings().generateOne, `Content-Type`(MediaType.application.json))
+        )
+      )
+      val request = Request[IO]().withEntity(multipart).withHeaders(multipart.headers)
+
+      val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
+
+      response.status                   shouldBe BadRequest
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Malformed event or payload").asJson
+    }
+
+    s"return $BadRequest when the request does not contain a status" in new TestCase {
+
+      val eventId = command.eventId
+      val multipart = Multipart[IO](
+        Vector(
+          Part.formData[IO]("event", jsons.generateOne.noSpaces, `Content-Type`(MediaType.application.json))
+        )
+      )
+      val request = Request[IO]().withEntity(multipart).withHeaders(multipart.headers)
+
+      val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
+
+      response.status                   shouldBe BadRequest
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Malformed event or payload").asJson
+    }
+
+    s"return $BadRequest when the request contains an unknown status" in new TestCase {
+
+      val eventId = command.eventId
+      val multipart = Multipart[IO](
+        Vector(
+          Part.formData[IO]("event",
+                            (json"""{"event": ${Gen.oneOf(Gen.const(""), nonEmptyStrings()).generateOne} }""").noSpaces,
+                            `Content-Type`(MediaType.application.json)
+          )
+        )
+      )
+      val request = Request[IO]().withEntity(multipart).withHeaders(multipart.headers)
+
+      val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
+
+      response.status                   shouldBe BadRequest
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Malformed event or payload").asJson
+    }
+
+    s"return $BadRequest when the request contains an wrongly formatted processingTime" in new TestCase {
+
+      val eventId = command.eventId
+      val multipart = Multipart[IO](
+        Vector(
+          Part.formData[IO](
+            "event",
+            (json"""{"event": ${eventStatuses.generateOne.value}, "processingTime": ${Gen
+              .oneOf(Gen.const(""), nonEmptyStrings())
+              .generateOne} }""").noSpaces,
+            `Content-Type`(MediaType.application.json)
+          )
+        )
+      )
+      val request = Request[IO]().withEntity(multipart).withHeaders(multipart.headers)
+
+      val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
+
+      response.status                   shouldBe BadRequest
+      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
+      response.as[Json].unsafeRunSync() shouldBe ErrorMessage("Malformed event or payload").asJson
+    }
+
+    s"return $BadRequest when the request contains an empty message" in new TestCase {
+
+      val eventId = command.eventId
+      val multipart = Multipart[IO](
+        Vector(
+          Part.formData[IO](
+            "event",
+            (json"""{"event": ${eventStatuses.generateOne.value}, "processingTime": ${eventProcessingTimes.generateOne}, "message": "" }""").noSpaces,
+            `Content-Type`(MediaType.application.json)
+          )
+        )
+      )
+      val request = Request[IO]().withEntity(multipart).withHeaders(multipart.headers)
 
       val response = changeStatusWithSuccessfulDecode(command)(eventId, request).unsafeRunSync()
 
