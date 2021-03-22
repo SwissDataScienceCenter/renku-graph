@@ -32,6 +32,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
@@ -163,6 +164,24 @@ class CommitEventProcessorSpec
       logError(commitEvents.head, exception, exception.getMessage)
       logSummary(commitEvents, failed = 1)
     }
+
+    s"put event into status $New if finding access token fails" in new TestCase {
+
+      val commitEvents  = commitsLists(size = Gen.const(1)).generateOne
+      val commit +: Nil = commitEvents.toList
+
+      val exception = exceptions.generateOne
+      givenFetchingAccessToken(forProjectPath = commitEvents.head.project.path)
+        .returning(exception.raiseError[Try, Option[AccessToken]])
+
+      expectEventRolledBackToNew(commit.compoundEventId)
+
+      eventProcessor.process(eventId, commitEvents, schemaVersion) shouldBe context.unit
+
+      logger.getMessages(Error).map(_.message) shouldBe List(
+        s"${logMessageCommon(commit)}: commit Event processing failure"
+      )
+    }
   }
 
   "eventsProcessingTimes histogram" should {
@@ -239,23 +258,29 @@ class CommitEventProcessorSpec
     }
 
     def expectEventMarkedAsRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
-      (eventStatusUpdater.markEventFailed _)
+      (eventStatusUpdater.toFailure _)
         .expects(commitEventId, EventStatus.GenerationRecoverableFailure, exception)
         .returning(context.unit)
 
     def expectEventMarkedAsNonRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
-      (eventStatusUpdater.markEventFailed _)
+      (eventStatusUpdater.toFailure _)
         .expects(commitEventId, EventStatus.GenerationNonRecoverableFailure, exception)
         .returning(context.unit)
 
     def expectEventMarkedAsTriplesGenerated(compoundEventId: CompoundEventId, triples: JsonLDTriples) =
       (eventStatusUpdater
-        .markTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion, _: EventProcessingTime))
+        .toTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion, _: EventProcessingTime))
         .expects(compoundEventId,
                  triples,
                  schemaVersion,
                  EventProcessingTime(Duration.ofMillis(singleEventTimeRecorder.elapsedTime.value))
         )
+        .returning(context.unit)
+
+    def expectEventRolledBackToNew(commitEventId: CompoundEventId) =
+      (eventStatusUpdater
+        .rollback[New](_: CompoundEventId)(_: () => New))
+        .expects(commitEventId, *)
         .returning(context.unit)
 
     def logSummary(commits: NonEmptyList[CommitEvent], triplesGenerated: Int = 0, failed: Int = 0) =
