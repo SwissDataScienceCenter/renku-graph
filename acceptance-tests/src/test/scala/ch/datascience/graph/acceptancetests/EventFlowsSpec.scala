@@ -17,11 +17,11 @@
  */
 
 package ch.datascience.graph.acceptancetests
-import cats.data.NonEmptyList
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
+import ch.datascience.graph.acceptancetests.flows.RdfStoreProvisioning.`wait for events to be processed`
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
@@ -38,7 +38,7 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 
-class EventLogEventsHandlingSpec
+class EventFlowsSpec
     extends AnyFeatureSpec
     with ModelImplicits
     with GivenWhenThen
@@ -47,9 +47,9 @@ class EventLogEventsHandlingSpec
     with AcceptanceTestPatience
     with should.Matchers {
 
-  Feature("Commit Events from the Event Log get translated to triples in the RDF Store") {
+  Feature("Push events from GitLab should be translated into triples in the RDF Store") {
 
-    Scenario("New Commit Events in the Event Log should be picked-up for processing") {
+    Scenario("Valid events get through to the RDF store") {
 
       implicit val accessToken: AccessToken = accessTokens.generateOne
       val project   = projects.generateOne
@@ -80,22 +80,14 @@ class EventLogEventsHandlingSpec
         .POST("webhooks/events", HookToken(projectId), data.GitLab.pushEvent(project, commitId))
         .status shouldBe Accepted
 
-      Then("there should be an Commit Event added to the Event Log")
-      eventually {
-        EventLog.findEvents(projectId, status = New, TriplesGenerated) shouldBe List(commitId)
-      }
+      And("relevant commit events are processed")
+      `wait for events to be processed`(project.id)
 
-      When("the Event is picked up by the Triples Generator")
-      Then("RDF triples got generated and pushed to the RDF Store")
-      eventually {
-        RDFStore.allTriplesCount should be > 0
-      }
+      Then(s"all the events should get the $TriplesStore status in the Event Log")
+      EventLog.findEvents(projectId).map(_._2).toSet shouldBe Set(TriplesStore)
 
-      And(s"the relevant Event got marked as $TriplesStore in the Log")
-      eventually {
-        EventLog.findEvents(projectId, status = New, TriplesGenerated, TransformingTriples) shouldBe List.empty
-        EventLog.findEvents(projectId, status = TriplesStore)                                 should contain(commitId)
-      }
+      And("triples in the RDF Store")
+      RDFStore.allTriplesCount should be > 0
     }
   }
 }
