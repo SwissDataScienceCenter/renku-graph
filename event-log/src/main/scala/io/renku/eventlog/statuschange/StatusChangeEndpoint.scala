@@ -31,12 +31,13 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
-import io.circe.Json
+import io.circe.{Decoder, Json}
 import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.{EventLogDB, EventMessage}
 import org.http4s.dsl.Http4sDsl
 import org.http4s.multipart.{Multipart, Part}
 
+import scala.language.implicitConversions
 import scala.util.control.NonFatal
 
 class StatusChangeEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable]](
@@ -74,23 +75,20 @@ class StatusChangeEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable
               new Exception("No event part in change status payload").raiseError[Interpretation, Part[Interpretation]]
             )
         eventJson <- eventPart.as[Json]
-        status <- eventJson.hcursor
-                    .downField("status")
-                    .as[EventStatus]
-                    .fold(_.raiseError[Interpretation, EventStatus], _.pure[Interpretation])
-        maybeProcessingTime <-
-          eventJson.hcursor
-            .downField("processingTime")
-            .as[Option[EventProcessingTime]]
-            .fold(_.raiseError[Interpretation, Option[EventProcessingTime]], _.pure[Interpretation])
-        maybeMessage <- eventJson.hcursor
-                          .downField("message")
-                          .as[Option[EventMessage]]
-                          .fold(_.raiseError[Interpretation, Option[EventMessage]], _.pure[Interpretation])
-        eventOnlyRequest    <- EventOnlyRequest(eventId, status, maybeProcessingTime, maybeMessage).pure[Interpretation]
+        eventOnlyRequest <- eventJson
+                              .as[EventOnlyRequest](requestDecoder(eventId))
+                              .fold(_.raiseError[Interpretation, EventOnlyRequest], _.pure[Interpretation])
         changeStatusRequest <- createRequest(eventOnlyRequest)(multipart.parts.find(_.name.contains("payload")))
       } yield changeStatusRequest
-    }.map(_.asRight[Response[Interpretation]]).recoverWith(badRequest)
+    }.map(_.asRight[Response[Interpretation]]) recoverWith badRequest
+  }
+
+  private implicit def requestDecoder(eventId: CompoundEventId): Decoder[EventOnlyRequest] = { cursor =>
+    for {
+      status              <- cursor.downField("status").as[EventStatus]
+      maybeProcessingTime <- cursor.downField("processingTime").as[Option[EventProcessingTime]]
+      maybeMessage        <- cursor.downField("message").as[Option[EventMessage]]
+    } yield EventOnlyRequest(eventId, status, maybeProcessingTime, maybeMessage)
   }
 
   private def createRequest(
