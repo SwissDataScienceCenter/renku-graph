@@ -29,10 +29,11 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
+import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
+import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
+import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
 import io.renku.eventlog.{EventLogDB, EventMessage}
-import org.http4s.{MediaType, Request}
 
 import java.time.Instant
 
@@ -70,23 +71,17 @@ object ToTransformationNonRecoverableFailure {
       underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
-  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
-    Kleisli { case (eventId, request) =>
-      when(request, has = MediaType.application.json) {
-        {
-          for {
-            _                   <- request.validate(status = TransformationNonRecoverableFailure)
-            maybeProcessingTime <- request.getProcessingTime
-            message             <- request.message
-          } yield CommandFound(
-            ToTransformationNonRecoverableFailure[Interpretation](
-              eventId,
-              message,
-              underTriplesTransformationGauge,
-              maybeProcessingTime
-            )
-          )
-        }.merge
-      }
-    }
+  ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
+    case EventOnlyRequest(eventId, TransformationNonRecoverableFailure, maybeProcessingTime, Some(message)) =>
+      CommandFound(
+        ToTransformationNonRecoverableFailure[Interpretation](
+          eventId,
+          message,
+          underTriplesTransformationGauge,
+          maybeProcessingTime
+        )
+      )
+    case EventOnlyRequest(_, TransformationNonRecoverableFailure, _, None) => PayloadMalformed("No message provided")
+    case _                                                                 => NotSupported
+  }
 }

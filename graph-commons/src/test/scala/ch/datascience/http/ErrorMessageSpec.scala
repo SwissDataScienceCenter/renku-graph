@@ -32,7 +32,7 @@ class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
       val line1                 = nonEmptyStrings().generateOne
       val (line2Message, line2) = tabbedLines.generateOne
 
-      ErrorMessage(s"$line1\n$line2").value shouldBe s"$line1 $line2Message"
+      ErrorMessage(s"$line1\n$line2").value shouldBe s"$line1; $line2Message"
     }
 
     "be instantiable from an Exception with a non-null, non-blank, single line message" in {
@@ -50,7 +50,7 @@ class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
 
       val message = ErrorMessage(exception)
 
-      message.value shouldBe s"$line1 $line2Message"
+      message.value shouldBe s"$line1; $line2Message"
     }
 
     "be instantiable from an Exception with a null message" in {

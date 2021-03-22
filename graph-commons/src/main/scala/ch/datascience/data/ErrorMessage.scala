@@ -55,7 +55,8 @@ object ErrorMessage {
         case nonBlank => Some(nonBlank)
       }
 
-  private lazy val toSingleLine: String => String = _.split('\n').map(_.trim.filter(_ >= ' ')).mkString("", " ", "")
+  private lazy val toSingleLine: String => String =
+    _.split('\n').map(_.trim).mkString("", "; ", "")
 
   private val toErrorMessage: String => ErrorMessage = RefType
     .applyRef[ErrorMessage](_)

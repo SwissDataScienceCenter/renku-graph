@@ -27,12 +27,14 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.io.{PrintWriter, StringWriter}
 
 class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
+
   "ErrorMessage" should {
+
     "be instantiatable from a non blank String" in {
       val line1                 = nonEmptyStrings().generateOne
       val (line2Message, line2) = tabbedLines.generateOne
 
-      ErrorMessage(s"$line1\n$line2").value shouldBe s"$line1 $line2Message"
+      ErrorMessage(s"$line1\n$line2").value shouldBe s"$line1; $line2Message"
     }
   }
 
@@ -53,7 +55,7 @@ class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
 
       val message = ErrorMessage.withExceptionMessage(exception)
 
-      message.value shouldBe s"$line1 $line2Message"
+      message.value shouldBe s"$line1; $line2Message"
     }
 
     "be instantiable from an Exception with a null message" in {
@@ -83,7 +85,7 @@ class ErrorMessageSpec extends AnyWordSpec with should.Matchers {
 
       val sw = new StringWriter
       exception.printStackTrace(new PrintWriter(sw))
-      message.value.replaceAll("\\s", "") shouldBe sw.toString.replace("\n", "").replaceAll("\\s", "")
+      message.value shouldBe sw.toString.split("\n").map(_.trim).mkString("; ")
     }
   }
 

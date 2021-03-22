@@ -30,9 +30,10 @@ import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
+import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
+import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import org.http4s.{MediaType, Request}
+import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
 
 import java.time.Instant
 
@@ -71,27 +72,16 @@ final case class ToNew[Interpretation[_]](
   }
 }
 
-object ToNew {
+private[statuschange] object ToNew {
   def factory[Interpretation[_]: Sync](awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
                                        underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
-  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
-    Kleisli { case (eventId, request) =>
-      when(request, has = MediaType.application.json) {
-        {
-          for {
-            _                   <- request.validate(status = New)
-            maybeProcessingTime <- request.getProcessingTime
-          } yield CommandFound(
-            ToNew[Interpretation](
-              eventId,
-              awaitingTriplesGenerationGauge,
-              underTriplesGenerationGauge,
-              maybeProcessingTime
-            )
-          )
-        }.merge
-      }
-    }
+  ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
+    case EventOnlyRequest(eventId, New, maybeProcessingTime, _) =>
+      CommandFound(
+        ToNew[Interpretation](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, maybeProcessingTime)
+      )
+    case _ => NotSupported
+  }
 }

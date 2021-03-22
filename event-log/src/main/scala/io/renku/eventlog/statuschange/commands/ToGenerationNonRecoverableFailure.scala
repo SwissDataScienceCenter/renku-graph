@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.statuschange.commands
+package io.renku.eventlog.statuschange
+package commands
 
 import cats.MonadError
 import cats.data.{Kleisli, NonEmptyList}
@@ -29,21 +30,19 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
-import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
 import io.renku.eventlog.{EventLogDB, EventMessage}
-import org.http4s.{MediaType, Request}
 
 import java.time.Instant
 
-final case class ToGenerationNonRecoverableFailure[Interpretation[_]](
+final case class ToGenerationNonRecoverableFailure[Interpretation[_]: Bracket[*[_], Throwable]](
     eventId:                     CompoundEventId,
     message:                     EventMessage,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:         Option[EventProcessingTime],
     now:                         () => Instant = () => Instant.now
-)(implicit ME:                   Bracket[Interpretation, Throwable])
-    extends ChangeStatusCommand[Interpretation] {
+) extends ChangeStatusCommand[Interpretation] {
+
+  import ProjectPathFinder.findProjectPath
 
   override lazy val status: EventStatus = GenerationNonRecoverableFailure
 
@@ -61,33 +60,29 @@ final case class ToGenerationNonRecoverableFailure[Interpretation[_]](
       updateResult:      UpdateResult
   )(implicit transactor: DbTransactor[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
     case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesGenerationGauge.decrement
-    case _                    => ME.unit
+    case _                    => ().pure[Interpretation]
   }
 }
 
 object ToGenerationNonRecoverableFailure {
 
+  import ChangeStatusRequest.EventOnlyRequest
+  import CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
+
   def factory[Interpretation[_]: Sync](
       underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
-  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
-    Kleisli { case (eventId, request) =>
-      when(request, has = MediaType.application.json) {
-        {
-          for {
-            _                   <- request.validate(status = GenerationNonRecoverableFailure)
-            maybeProcessingTime <- request.getProcessingTime
-            message             <- request.message
-          } yield CommandFound(
-            ToGenerationNonRecoverableFailure[Interpretation](eventId,
-                                                              message,
-                                                              underTriplesGenerationGauge,
-                                                              maybeProcessingTime
-            )
-          )
-        }.merge
-      }
-
-    }
+  ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
+    case EventOnlyRequest(eventId, GenerationNonRecoverableFailure, maybeProcessingTime, Some(message)) =>
+      CommandFound(
+        ToGenerationNonRecoverableFailure[Interpretation](eventId,
+                                                          message,
+                                                          underTriplesGenerationGauge,
+                                                          maybeProcessingTime
+        )
+      )
+    case EventOnlyRequest(_, GenerationNonRecoverableFailure, _, None) => PayloadMalformed("No message provided")
+    case _                                                             => NotSupported
+  }
 }
