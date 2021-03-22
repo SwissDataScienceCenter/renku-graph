@@ -39,13 +39,13 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 private trait EventStatusUpdater[Interpretation[_]] {
-  def markEventNew(eventId:                CompoundEventId): Interpretation[Unit]
-  def markTriplesStore(eventId:            CompoundEventId, processingTime: EventProcessingTime): Interpretation[Unit]
   def markTriplesGenerated(eventId:        CompoundEventId,
                            payload:        JsonLDTriples,
                            schemaVersion:  SchemaVersion,
                            processingTime: EventProcessingTime
   ): Interpretation[Unit]
+  def markTriplesStore(eventId:     CompoundEventId, processingTime: EventProcessingTime): Interpretation[Unit]
+  def markEventNew(eventId:         CompoundEventId): Interpretation[Unit]
   def markTriplesGenerated(eventId: CompoundEventId): Interpretation[Unit]
   def markEventFailed(eventId:      CompoundEventId, eventStatus: EventStatus, exception: Throwable): Interpretation[Unit]
 }

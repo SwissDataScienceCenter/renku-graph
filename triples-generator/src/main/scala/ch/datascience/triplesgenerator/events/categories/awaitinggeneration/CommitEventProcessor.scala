@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.data.{EitherT, NonEmptyList}
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.graph.model.events.EventStatus.{GenerationNonRecoverableFailure, GenerationRecoverableFailure}
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
@@ -192,9 +193,15 @@ private class CommitEventProcessor[Interpretation[_]](
                                 triples:        JsonLDTriples,
                                 schemaVersion:  SchemaVersion,
                                 processingTime: EventProcessingTime
-    ) extends TriplesGenerationResult
-    case class RecoverableError(commit: CommitEvent, cause: Throwable) extends GenerationError
-    case class NonRecoverableError(commit: CommitEvent, cause: Throwable) extends GenerationError
+    ) extends TriplesGenerationResult {
+      override lazy val toString: String = TriplesGenerated.toString()
+    }
+    case class RecoverableError(commit: CommitEvent, cause: Throwable) extends GenerationError {
+      override lazy val toString: String = GenerationRecoverableFailure.toString
+    }
+    case class NonRecoverableError(commit: CommitEvent, cause: Throwable) extends GenerationError {
+      override lazy val toString: String = GenerationNonRecoverableFailure.toString()
+    }
   }
 }
 
