@@ -26,7 +26,7 @@ import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import com.github.tomakehurst.wiremock.WireMockServer
-import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, get, ok}
+import com.github.tomakehurst.wiremock.client.WireMock.{aResponse, badRequest, get, ok, unauthorized}
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import com.github.tomakehurst.wiremock.http.Fault.CONNECTION_RESET_BY_PEER
@@ -77,16 +77,24 @@ object RemoteTriplesGenerator {
     ()
   }
 
-  def `GET <triples-generator>/projects/:id/commits/:id having connectivity problems`(
+  def `GET <triples-generator>/projects/:id/commits/:id fails non recoverably`(
       project:  Project,
-      commitId: CommitId,
-      triples:  JsonLD
+      commitId: CommitId
   ): Unit = {
     stubFor {
       get(s"/projects/${project.id}/commits/$commitId")
-        .willReturn(
-          aResponse().withFault(CONNECTION_RESET_BY_PEER)
-        )
+        .willReturn(badRequest())
+    }
+    ()
+  }
+
+  def `GET <triples-generator>/projects/:id/commits/:id fails recoverably`(
+      project:  Project,
+      commitId: CommitId
+  ): Unit = {
+    stubFor {
+      get(s"/projects/${project.id}/commits/$commitId")
+        .willReturn(unauthorized())
     }
     ()
   }

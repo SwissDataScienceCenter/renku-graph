@@ -40,6 +40,7 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
+import com.github.tomakehurst.wiremock.http.Fault
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
@@ -203,6 +204,18 @@ object GitLab {
     }
     ()
   }
+
+  def `GET <gitlabApi>/projects/:path returning BadRequest`(project: Project)(implicit accessToken: AccessToken) =
+    stubFor {
+      get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
+        .willReturn(badRequest())
+    }
+
+  def `GET <gitlabApi>/projects/:path having connectivity issues`(project: Project)(implicit accessToken: AccessToken) =
+    stubFor {
+      get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
+        .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
+    }
 
   def `GET <gitlabApi>/projects/:path returning OK with`(
       project:            Project,
