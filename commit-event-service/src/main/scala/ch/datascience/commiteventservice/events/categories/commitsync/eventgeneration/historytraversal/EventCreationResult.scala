@@ -16,19 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync
+package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
 
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.CategoryName
-import org.scalacheck.Gen
-
-private object Generators {
-
-  implicit lazy val commitSyncEvents: Gen[CommitSyncEvent] = for {
-    commitId       <- commitIds
-    projectId      <- projectIds
-    projectPath    <- projectPaths
-    lastSyncedDate <- lastSyncedDates
-  } yield CommitSyncEvent(CategoryName("COMMIT_SYNC"), commitId, CommitProject(projectId, projectPath), lastSyncedDate)
+private sealed trait EventCreationResult extends Product with Serializable
+private object EventCreationResult {
+  final case object Created extends EventCreationResult
+  final case object Existed extends EventCreationResult
+  final case object Failed  extends EventCreationResult
 }

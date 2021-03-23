@@ -16,11 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.eventprocessing.startcommit
+package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
 
-private sealed trait EventCreationResult extends Product with Serializable
-private object EventCreationResult {
-  final case object Created extends EventCreationResult
-  final case object Existed extends EventCreationResult
-  final case object Failed  extends EventCreationResult
-}
+import scala.util.Try
+
+private class TryCommitEventsSourceBuilder(
+    commitInfoFinder: CommitInfoFinder[Try]
+) extends CommitEventsSourceBuilder[Try](commitInfoFinder)

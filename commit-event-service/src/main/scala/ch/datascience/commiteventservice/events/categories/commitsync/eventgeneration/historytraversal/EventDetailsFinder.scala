@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.eventprocessing.startcommit
+package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}

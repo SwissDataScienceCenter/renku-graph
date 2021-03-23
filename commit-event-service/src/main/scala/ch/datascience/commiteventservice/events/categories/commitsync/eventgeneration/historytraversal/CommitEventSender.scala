@@ -16,27 +16,27 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.eventprocessing.commitevent
+package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.EventBody
 import ch.datascience.http.client.IORestClient
-import ch.datascience.commiteventservice.eventprocessing.CommitEvent
-import ch.datascience.commiteventservice.eventprocessing.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.Status
 import org.http4s.Status.Accepted
 
 import scala.concurrent.ExecutionContext
 
-trait CommitEventSender[Interpretation[_]] {
+private trait CommitEventSender[Interpretation[_]] {
   def send(commitEvent: CommitEvent): Interpretation[Unit]
 }
 
-class IOCommitEventSender(
+private class CommitEventSenderImpl(
     eventLogUrl:           EventLogUrl,
     commitEventSerializer: CommitEventSerializer[IO],
     logger:                Logger[IO]
@@ -103,7 +103,7 @@ class IOCommitEventSender(
   }
 }
 
-object IOCommitEventSender {
+private object CommitEventSender {
 
   def apply(
       logger: Logger[IO]
@@ -114,5 +114,5 @@ object IOCommitEventSender {
   ): IO[CommitEventSender[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
-    } yield new IOCommitEventSender(eventLogUrl, new CommitEventSerializer[IO], logger)
+    } yield new CommitEventSenderImpl(eventLogUrl, new CommitEventSerializer[IO], logger)
 }

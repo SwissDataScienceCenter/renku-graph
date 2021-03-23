@@ -16,19 +16,19 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.eventprocessing
+package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
 import ch.datascience.graph.model.events.EventStatus.{New, Skipped}
 import ch.datascience.graph.model.events.{BatchDate, CommitId, CommitMessage, CommittedDate, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.users.Email
 import ch.datascience.graph.model.{projects, users}
 
-final case class StartCommit(
+private final case class StartCommit(
     id:      CommitId,
     project: Project
 )
 
-sealed trait CommitEvent extends Product with Serializable {
+private sealed trait CommitEvent extends Product with Serializable {
   def id:            CommitId
   def project:       Project
   def message:       CommitMessage
@@ -40,7 +40,7 @@ sealed trait CommitEvent extends Product with Serializable {
   def status:        EventStatus
 }
 
-object CommitEvent {
+private object CommitEvent {
   implicit class CommitEventOps(commitEvent: CommitEvent) {
     lazy val compoundEventId: CompoundEventId = CompoundEventId(EventId(commitEvent.id.value), commitEvent.project.id)
   }
@@ -72,13 +72,13 @@ object CommitEvent {
   }
 }
 
-final case class Project(id: projects.Id, path: projects.Path)
+private final case class Project(id: projects.Id, path: projects.Path)
 
-sealed trait Person extends Product with Serializable {
+private sealed trait Person extends Product with Serializable {
   def name: users.Name
 }
 
-object Person {
+private object Person {
   sealed trait WithEmail { self: Person =>
     def email: Email
   }
@@ -86,8 +86,8 @@ object Person {
 
 import Person._
 
-sealed trait Author extends Person
-object Author {
+private sealed trait Author extends Person
+private object Author {
   final case class FullAuthor(name: users.Name, email: Email) extends Author with WithEmail
   final case class AuthorWithName(name: users.Name) extends Author
 
@@ -96,8 +96,8 @@ object Author {
   def withEmail(email:   Email): Author = FullAuthor(email.extractName, email)
 }
 
-sealed trait Committer extends Person
-object Committer {
+private sealed trait Committer extends Person
+private object Committer {
   final case class FullCommitter(name: users.Name, email: Email) extends Committer with WithEmail
   final case class CommitterWithName(name: users.Name) extends Committer
 

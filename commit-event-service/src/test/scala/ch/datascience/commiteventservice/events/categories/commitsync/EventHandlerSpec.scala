@@ -21,6 +21,7 @@ package ch.datascience.commiteventservice.events.categories.commitsync
 import Generators.commitSyncEvents
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.MissedEventsGenerator
 import ch.datascience.events.consumers.EventRequestContent
 import ch.datascience.events.consumers.EventSchedulingResult._
 import ch.datascience.generators.Generators.Implicits._

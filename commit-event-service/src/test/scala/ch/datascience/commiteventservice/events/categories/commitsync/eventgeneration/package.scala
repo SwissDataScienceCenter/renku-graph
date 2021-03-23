@@ -18,17 +18,16 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync
 
-import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.CategoryName
-import org.scalacheck.Gen
+import io.circe.Json
+import io.circe.syntax._
 
-private object Generators {
+package object eventgeneration {
 
-  implicit lazy val commitSyncEvents: Gen[CommitSyncEvent] = for {
-    commitId       <- commitIds
-    projectId      <- projectIds
-    projectPath    <- projectPaths
-    lastSyncedDate <- lastSyncedDates
-  } yield CommitSyncEvent(CategoryName("COMMIT_SYNC"), commitId, CommitProject(projectId, projectPath), lastSyncedDate)
+  implicit class PersonOps(person: Person) {
+
+    lazy val emailToJson: Json = person match {
+      case person: Person.WithEmail => person.email.value.asJson
+      case _ => Json.Null
+    }
+  }
 }

@@ -16,10 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync
+package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.commitsync._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.CommitToEventLog
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
@@ -27,15 +29,12 @@ import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFin
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
-import ch.datascience.commiteventservice.commits.{CommitInfo, IOLatestCommitFinder, LatestCommitFinder}
-import ch.datascience.commiteventservice.eventprocessing.{Project, StartCommit}
-import ch.datascience.commiteventservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private abstract class MissedEventsGenerator[Interpretation[_]] {
+private[commitsync] trait MissedEventsGenerator[Interpretation[_]] {
   def generateMissedEvents(commitSyncRequest: CommitSyncEvent): Interpretation[Unit]
 }
 
@@ -80,17 +79,16 @@ private class MissedEventsGeneratorImpl(
   private def addEventsIfMissing(latestProjectCommit: CommitSyncEvent,
                                  maybeLatestCommit:   Option[CommitInfo],
                                  maybeAccessToken:    Option[AccessToken]
-  ) =
-    maybeLatestCommit match {
-      case None                                                        => IO.pure(Skipped)
-      case Some(commitInfo) if commitInfo.id == latestProjectCommit.id => IO.pure(Skipped)
-      case Some(commitInfo) =>
-        for {
-          projectInfo <- findProjectInfo(latestProjectCommit.project.id, maybeAccessToken)
-          startCommit <- startCommitFrom(commitInfo, projectInfo)
-          _           <- storeCommitsInEventLog(startCommit)
-        } yield Updated
-    }
+  ) = maybeLatestCommit match {
+    case None                                                        => IO.pure(Skipped)
+    case Some(commitInfo) if commitInfo.id == latestProjectCommit.id => IO.pure(Skipped)
+    case Some(commitInfo) =>
+      for {
+        projectInfo <- findProjectInfo(latestProjectCommit.project.id, maybeAccessToken)
+        startCommit <- startCommitFrom(commitInfo, projectInfo)
+        _           <- storeCommitsInEventLog(startCommit)
+      } yield Updated
+  }
 
   private def startCommitFrom(commitInfo: CommitInfo, projectInfo: ProjectInfo) = IO.pure {
     StartCommit(
@@ -118,7 +116,7 @@ private class MissedEventsGeneratorImpl(
   }
 }
 
-private object MissedEventsGenerator {
+private[commitsync] object MissedEventsGenerator {
   def apply(
       gitLabThrottler:       Throttler[IO, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[IO],
@@ -131,11 +129,12 @@ private object MissedEventsGenerator {
     for {
       tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
       gitLabUrl          <- GitLabUrl[IO]()
-      commitToEventLog   <- IOCommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
+      commitToEventLog   <- CommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
+      latestCommitFinder <- LatestCommitFinder(gitLabThrottler, logger)
     } yield new MissedEventsGeneratorImpl(
       new IOAccessTokenFinder(tokenRepositoryUrl, logger),
-      new IOLatestCommitFinder(gitLabUrl, gitLabThrottler, logger),
-      new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, logger),
+      latestCommitFinder,
+      new ProjectInfoFinderImpl(gitLabUrl, gitLabThrottler, logger),
       commitToEventLog,
       logger,
       executionTimeRecorder

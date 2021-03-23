@@ -16,9 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync
+package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.commiteventservice.events.categories.commitsync.ProjectInfo
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
@@ -37,7 +38,7 @@ private trait ProjectInfoFinder[Interpretation[_]] {
   ): Interpretation[ProjectInfo]
 }
 
-private class IOProjectInfoFinder(
+private class ProjectInfoFinderImpl(
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
@@ -81,7 +82,7 @@ private class IOProjectInfoFinder(
     maybeVisibility getOrElse Public
 }
 
-private object IOProjectInfoFinder {
+private object ProjectInfoFinder {
   def apply(
       gitLabThrottler: Throttler[IO, GitLab],
       logger:          Logger[IO]
@@ -89,8 +90,7 @@ private object IOProjectInfoFinder {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[ProjectInfoFinder[IO]] =
-    for {
-      gitLabUrl <- GitLabUrl[IO]()
-    } yield new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, logger)
+  ): IO[ProjectInfoFinder[IO]] = for {
+    gitLabUrl <- GitLabUrl[IO]()
+  } yield new ProjectInfoFinderImpl(gitLabUrl, gitLabThrottler, logger)
 }

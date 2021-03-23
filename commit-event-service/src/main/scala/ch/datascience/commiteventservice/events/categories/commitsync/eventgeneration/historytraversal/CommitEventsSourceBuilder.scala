@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.eventprocessing.startcommit
+package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
@@ -27,11 +27,10 @@ import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.{BatchDate, CommitId}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ApplicationLogger
-import ch.datascience.commiteventservice.commits.{CommitInfo, CommitInfoFinder, IOCommitInfoFinder}
-import ch.datascience.commiteventservice.eventprocessing.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
-import ch.datascience.commiteventservice.eventprocessing.startcommit.CommitEventsSourceBuilder.EventsFlowBuilder
-import ch.datascience.commiteventservice.eventprocessing.startcommit.EventCreationResult.Existed
-import ch.datascience.commiteventservice.eventprocessing.{CommitEvent, StartCommit}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.CommitEvent.{NewCommitEvent, SkippedCommitEvent}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.CommitEventsSourceBuilder.EventsFlowBuilder
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.EventCreationResult.Existed
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.{CommitEvent, CommitInfo, StartCommit}
 
 import java.time.Clock
 import scala.concurrent.ExecutionContext
@@ -122,9 +121,7 @@ private object CommitEventsSourceBuilder {
         transform: CommitEvent => Interpretation[EventCreationResult]
     ): Interpretation[List[EventCreationResult]]
   }
-}
 
-private object IOCommitEventsSourceBuilder {
   def apply(
       gitLabThrottler: Throttler[IO, GitLab]
   )(implicit
@@ -134,5 +131,5 @@ private object IOCommitEventsSourceBuilder {
   ): IO[CommitEventsSourceBuilder[IO]] =
     for {
       gitLabUrl <- GitLabUrl[IO]()
-    } yield new CommitEventsSourceBuilder[IO](new IOCommitInfoFinder(gitLabUrl, gitLabThrottler, ApplicationLogger))
+    } yield new CommitEventsSourceBuilder[IO](new CommitInfoFinderImpl(gitLabUrl, gitLabThrottler, ApplicationLogger))
 }

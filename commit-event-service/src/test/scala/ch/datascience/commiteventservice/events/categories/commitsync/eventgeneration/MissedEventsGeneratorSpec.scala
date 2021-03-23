@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync
+package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
+import Generators.{commitInfos, projectInfos}
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
-import ch.datascience.commiteventservice.commits.{CommitInfo, LatestCommitFinder}
-import ch.datascience.commiteventservice.eventprocessing.startcommit.CommitToEventLog
-import ch.datascience.commiteventservice.eventprocessing.{Project, StartCommit}
-import Generators.{commitInfos, projectInfos}
+import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.CommitToEventLog
+import ch.datascience.commiteventservice.events.categories.commitsync.CommitSyncEvent
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -39,7 +39,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
+
 import scala.concurrent.ExecutionContext.global
 
 class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should.Matchers {

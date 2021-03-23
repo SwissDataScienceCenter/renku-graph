@@ -22,6 +22,7 @@ import cats.MonadError
 import cats.data.EitherT.fromEither
 import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.MissedEventsGenerator
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.events.consumers

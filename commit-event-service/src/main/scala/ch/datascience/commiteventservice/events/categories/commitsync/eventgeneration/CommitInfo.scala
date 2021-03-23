@@ -16,13 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.commits
+package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
 
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.users.{Email, Name}
-import ch.datascience.commiteventservice.eventprocessing.{Author, Committer}
 
-case class CommitInfo(
+private case class CommitInfo(
     id:            CommitId,
     message:       CommitMessage,
     committedDate: CommittedDate,
@@ -31,13 +30,13 @@ case class CommitInfo(
     parents:       List[CommitId]
 )
 
-object CommitInfo {
+private object CommitInfo {
 
   import cats.syntax.all._
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import io.circe._
 
-  private[commits] implicit val commitInfoDecoder: Decoder[CommitInfo] = (cursor: HCursor) => {
+  implicit val commitInfoDecoder: Decoder[CommitInfo] = (cursor: HCursor) => {
 
     implicit class CursorOps(cursor: ACursor) {
       lazy val toMaybeName: Decoder.Result[Option[Name]] =

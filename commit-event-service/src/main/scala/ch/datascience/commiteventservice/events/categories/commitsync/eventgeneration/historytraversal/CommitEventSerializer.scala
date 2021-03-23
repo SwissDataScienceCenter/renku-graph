@@ -16,10 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.eventprocessing.commitevent
+package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
 
 import cats.MonadError
-import ch.datascience.commiteventservice.eventprocessing.{CommitEvent, Person}
+import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.{CommitEvent, Person}
 import io.circe.literal._
 import io.circe.{Encoder, Json}
 
@@ -37,7 +37,7 @@ private class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[I
     "committedDate": ${commitEvent.committedDate.toString},
     "author":        ${commitEvent.author},
     "committer":     ${commitEvent.committer}, 
-    "parents":       ${commitEvent.parents.map(_.value).toArray},
+    "parents":       ${commitEvent.parents.map(_.value)},
     "project": {
       "id":          ${commitEvent.project.id.value},
       "path":        ${commitEvent.project.path.value}
