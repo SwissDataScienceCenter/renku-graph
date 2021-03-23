@@ -35,7 +35,7 @@ import io.circe.Decoder
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
+private[events] class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
     override val categoryName: CategoryName,
     missedEventGenerator:      MissedEventsGenerator[Interpretation],
     logger:                    Logger[Interpretation]
@@ -87,7 +87,7 @@ private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
     } yield CommitProject(id, path)
 }
 
-private object EventHandler {
+private[events] object EventHandler {
   def apply(
       gitLabThrottler:       Throttler[IO, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[IO],

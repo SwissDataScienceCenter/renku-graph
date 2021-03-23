@@ -42,13 +42,11 @@ private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect](
   import routesMetrics._
 
   // format: off
-  lazy val nonAuthorizedRoutes: HttpRoutes[Interpretation] = HttpRoutes.of[Interpretation] {
-    case           GET  -> Root / "ping"                                                        => Ok("pong")
-    case request @ POST -> Root / "events"       => processEvent(request)
-  }
+  lazy val routes: Resource[Interpretation, HttpRoutes[Interpretation]] = HttpRoutes.of[Interpretation] {
+    case           GET  -> Root / "ping"   => Ok("pong")
+    case request @ POST -> Root / "events" => processEvent(request)
+  }.withMetrics
   // format: on
-
-  lazy val routes: Resource[Interpretation, HttpRoutes[Interpretation]] = nonAuthorizedRoutes.withMetrics
 }
 
 private object MicroserviceRoutes {
