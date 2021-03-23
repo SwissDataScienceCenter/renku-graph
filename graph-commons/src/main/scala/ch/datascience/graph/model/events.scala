@@ -172,4 +172,8 @@ object events {
         EventProcessingTime(Duration.ofMillis(processingTime.value.toMillis / multiplier.value))
     }
   }
+
+  final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
+  object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_)) with InstantNotInTheFuture
+
 }
