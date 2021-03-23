@@ -18,7 +18,7 @@
 
 package ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.persondetails
 
-import cats.data.{EitherT, NonEmptyList}
+import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
@@ -28,7 +28,6 @@ import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
@@ -65,7 +64,7 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
         .unsafeRunSync() shouldBe Right(expectedCommitPersonInfo)
     }
 
-    "return an UnauthorizedException if remote client responds with UNAUTHORIZED" in new TestCase {
+    "return an CurationRecoverableError if remote client responds with UNAUTHORIZED" in new TestCase {
 
       stubFor {
         get(s"/api/v4/projects/${urlEncode(projectId.toString)}/repository/commits/$commitId")
@@ -77,6 +76,21 @@ class CommitCommitterFinderSpec extends AnyWordSpec with ExternalServiceStubbing
         .value
         .unsafeRunSync() shouldBe Either.left[ProcessingRecoverableError, CommitPersonsInfo](
         CurationRecoverableError("Access token not valid to fetch project commit info")
+      )
+    }
+
+    "return an CurationRecoverableError if remote client responds with SERVICE_UNAVAILABLE" in new TestCase {
+
+      stubFor {
+        get(s"/api/v4/projects/${urlEncode(projectId.toString)}/repository/commits/$commitId")
+          .willReturn(serviceUnavailable())
+      }
+
+      commitCommitterFinder
+        .findCommitPeople(projectId, commitId, maybeAccessToken = None)
+        .value
+        .unsafeRunSync() shouldBe Either.left[ProcessingRecoverableError, CommitPersonsInfo](
+        CurationRecoverableError("Service unavailable")
       )
     }
 

@@ -19,25 +19,21 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.MonadError
-import cats.data.{EitherT, Kleisli, NonEmptyList}
+import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.circe.Decoder.decodeOption
-import io.circe.{Decoder, HCursor}
 import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
+import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
+import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.subscriptions.EventDelivery
-import org.http4s.circe.jsonOf
-import org.http4s.{EntityDecoder, MediaType, Request}
+import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
 
 import java.time.Instant
 
@@ -45,19 +41,17 @@ final case class ToTriplesStore[Interpretation[_]](
     eventId:                         CompoundEventId,
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:             Option[EventProcessingTime],
-    eventDelivery:                   EventDelivery[Interpretation, ToTriplesStore[Interpretation]],
     now:                             () => Instant = () => Instant.now
 )(implicit ME:                       Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
   override lazy val status: EventStatus = TriplesStore
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
+  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
     SqlQuery(
       query = upsertEventStatus,
       name = "transforming_triples->triples_store"
-    ),
-    Nil
+    )
   )
 
   private lazy val upsertEventStatus =
@@ -72,40 +66,17 @@ final case class ToTriplesStore[Interpretation[_]](
     case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesTransformationGauge.decrement
     case _                    => ME.unit
   }
-
-  override def updateDelivery(): Interpretation[Unit] = eventDelivery.unregister(eventId)
 }
 
-object ToTriplesStore {
+private[statuschange] object ToTriplesStore {
   def factory[Interpretation[_]: Sync](
-      underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
-      eventDelivery:                   EventDelivery[Interpretation, ToTriplesStore[Interpretation]]
+      underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
-  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
-    Kleisli { case (eventId, request) =>
-      when(request, has = MediaType.application.json) {
-        {
-          for {
-            _                   <- request.validate(status = TriplesStore)
-            maybeProcessingTime <- request.getProcessingTime
-          } yield CommandFound(
-            ToTriplesStore[Interpretation](eventId, underTriplesTransformationGauge, maybeProcessingTime, eventDelivery)
-          )
-        }.merge
-      }
-
-    }
-
-  private implicit def entityDecoder[Interpretation[_]: Sync]()
-      : EntityDecoder[Interpretation, (EventStatus, Option[EventProcessingTime])] = {
-    implicit val decoder: Decoder[(EventStatus, Option[EventProcessingTime])] = { (cursor: HCursor) =>
-      for {
-        status <- cursor.downField("status").as[EventStatus]
-        maybeProcessingTime <-
-          cursor.downField("processingTime").as[Option[EventProcessingTime]](decodeOption(EventProcessingTime.decoder))
-      } yield status -> maybeProcessingTime
-    }
-    jsonOf[Interpretation, (EventStatus, Option[EventProcessingTime])]
+  ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
+    case EventOnlyRequest(eventId, TriplesStore, someTime @ Some(_), _) =>
+      CommandFound(ToTriplesStore[Interpretation](eventId, underTriplesTransformationGauge, someTime))
+    case EventOnlyRequest(_, TriplesStore, None, _) => PayloadMalformed("No processing time provided")
+    case _                                          => NotSupported
   }
 }

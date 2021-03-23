@@ -34,3 +34,7 @@ object EventSchedulingResult {
 }
 
 case class EventRequestContent(event: Json, maybePayload: Option[String])
+
+object EventRequestContent {
+  def apply(event: Json): EventRequestContent = EventRequestContent(event, None)
+}

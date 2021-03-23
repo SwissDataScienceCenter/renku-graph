@@ -92,6 +92,7 @@ object events {
         TransformationNonRecoverableFailure
       )
 
+    type New = New.type
     final case object New extends EventStatus {
       override val value: String = "NEW"
     }
@@ -101,6 +102,7 @@ object events {
       override val value: String = "GENERATING_TRIPLES"
     }
 
+    type TriplesGenerated = TriplesGenerated.type
     final case object TriplesGenerated extends EventStatus {
       override val value: String = "TRIPLES_GENERATED"
     }

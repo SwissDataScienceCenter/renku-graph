@@ -89,6 +89,7 @@ object EventProducersRegistry {
                                                                           logger
                                   )
     memberSyncCategory <- membersync.SubscriptionCategory(transactor, queriesExecTimes, subscriberTracker, logger)
+    commitSyncCategory <- commitsync.SubscriptionCategory(transactor, queriesExecTimes, subscriberTracker, logger)
     triplesGeneratedCategory <- triplesgenerated.SubscriptionCategory(transactor,
                                                                       awaitingTransformationGauge,
                                                                       underTransformationGauge,
@@ -101,6 +102,7 @@ object EventProducersRegistry {
     Set[SubscriptionCategory[IO]](
       awaitingGenerationCategory,
       memberSyncCategory,
+      commitSyncCategory,
       triplesGeneratedCategory,
       zombieEventsCategory
     )

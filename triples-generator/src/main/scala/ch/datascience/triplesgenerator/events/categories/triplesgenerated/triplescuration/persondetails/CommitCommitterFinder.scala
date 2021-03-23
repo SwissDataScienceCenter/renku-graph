@@ -21,7 +21,6 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 import cats.data.EitherT
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabApiUrl
@@ -35,6 +34,7 @@ import io.chrisdavenport.log4cats.Logger
 import org.http4s.Method.GET
 import org.http4s.Status.{Ok, Unauthorized}
 import org.http4s.circe.jsonOf
+import org.http4s.dsl.io.ServiceUnavailable
 import org.http4s.{EntityDecoder, Request, Response, Status}
 
 import scala.concurrent.ExecutionContext
@@ -71,6 +71,8 @@ private class CommitCommitterFinderImpl(
     Either[ProcessingRecoverableError, (CommitPersonsInfo)]
   ]] = {
     case (Ok, _, response) => response.as[CommitPersonsInfo].map(info => Right(info))
+    case (ServiceUnavailable, _, _) =>
+      Left(CurationRecoverableError("Service unavailable")).pure[IO]
     case (Unauthorized, _, _) =>
       Left(CurationRecoverableError("Access token not valid to fetch project commit info")).pure[IO]
   }

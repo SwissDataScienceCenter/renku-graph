@@ -21,6 +21,7 @@ package io.renku.eventlog.statuschange
 import cats.effect.{Bracket, IO}
 import cats.free.Free
 import cats.syntax.all._
+import ch.datascience.data.ErrorMessage
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.metrics.LabeledHistogram
@@ -30,7 +31,6 @@ import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.statuschange.IOUpdateCommandsRunner.QueryFailedException
 import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
 
@@ -53,35 +53,21 @@ class StatusUpdatesRunnerImpl(
 
   import doobie.implicits._
 
-  override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] =
-    for {
-      updateResult <- executeCommand(command) transact transactor.get recoverWith errorToUpdateResult(command)
-      _            <- logInfo(command, updateResult)
-      _            <- command updateGauges updateResult
-    } yield updateResult
+  override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] = for {
+    _ <- deleteDelivery(command) transact transactor.get recoverWith errorToUpdateResult(
+           s"Event ${command.eventId} - cannot remove event delivery"
+         )
+    updateResult <- executeCommand(command) transact transactor.get recoverWith errorToUpdateResult(
+                      s"Event ${command.eventId} got ${command.status}"
+                    )
+    _ <- logInfo(command, updateResult)
+    _ <- command updateGauges updateResult
+  } yield updateResult
 
-  private def errorToUpdateResult(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
-    case QueryFailedException(failedQueryName: SqlQuery.Name, updateResult: UpdateResult) =>
-      logger
-        .info(
-          s"$failedQueryName failed for event ${command.eventId} to status ${command.status} with result $updateResult. " +
-            s"Rolling back queries: ${command.queries.map(_.name.toString).toList.mkString(", ")}"
-        )
-        .map(_ => updateResult)
-
+  private def errorToUpdateResult(message: String): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) =>
-      UpdateResult
-        .Failure(
-          Refined.unsafeApply(
-            s"${command.queries.map(_.name.toString).toList.mkString(", ")} failed for event ${command.eventId} to status ${command.status} with ${exception.getMessage}. " +
-              s"Rolling back queries: ${command.queries.map(_.name.toString).toList.mkString(", ")}"
-          )
-        )
-        .pure[IO]
-  }
-
-  private def logError(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, ConnectionIO[Unit]] = { case _ =>
-    logger.error(s"Event ${command.eventId} could not be updated in eventDelivery").to[ConnectionIO]
+      logger.error(exception)(message)
+      UpdateResult.Failure(ErrorMessage.withExceptionMessage(exception)).pure[IO]
   }
 
   private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {
@@ -90,20 +76,28 @@ class StatusUpdatesRunnerImpl(
   }
 
   private def executeCommand(command: ChangeStatusCommand[IO]): Free[connection.ConnectionOp, UpdateResult] =
-    checkIfPersisted(command.eventId).flatMap {
+    checkIfPersisted(command.eventId) >>= {
       case true =>
-        runUpdateQueriesIfSuccessful(command).flatMap { case (intResult, lastQuery) =>
-          command.mapResult(intResult) match {
-            case result if result != Updated =>
-              QueryFailedException(lastQuery.name, result).raiseError[ConnectionIO, UpdateResult]
-            case result =>
-              for {
-                _ <- command.updateDelivery().to[ConnectionIO] recoverWith logError(command)
-              } yield result
-          }
-        }
-      case false => (NotFound: commands.UpdateResult).pure[ConnectionIO]
+        runUpdateQueriesIfSuccessful(
+          command.queries.toList :++ maybeUpdateProcessingTimeQuery(command),
+          command
+        ) >>= toUpdateResult
+      case false => NotFound.pure[ConnectionIO].widen[commands.UpdateResult]
     }
+
+  private def deleteDelivery(command: ChangeStatusCommand[IO]) = measureExecutionTime {
+    SqlQuery(
+      sql"""|DELETE FROM event_delivery 
+            |WHERE event_id = ${command.eventId.id} AND project_id = ${command.eventId.projectId}
+            |""".stripMargin.update.run.map(_ => UpdateResult.Updated: UpdateResult),
+      name = "status update - delivery info remove"
+    )
+  }
+
+  private def toUpdateResult: UpdateResult => ConnectionIO[UpdateResult] = {
+    case UpdateResult.Failure(message) => new Exception(message).raiseError[ConnectionIO, UpdateResult]
+    case result                        => result.pure[ConnectionIO]
+  }
 
   private def checkIfPersisted(eventId: CompoundEventId) = measureExecutionTime {
     SqlQuery(
@@ -113,26 +107,30 @@ class StatusUpdatesRunnerImpl(
         .query[String]
         .option
         .map(_.isDefined),
-      name = "Event update check existence"
+      name = "event update check existence"
     )
   }
 
-  private def runUpdateQueriesIfSuccessful(command: ChangeStatusCommand[IO]): ConnectionIO[(Int, SqlQuery[Int])] =
-    measureExecutionTime(command.queries.head).flatMap { result =>
-      val queries =
-        upsertStatusProcessingTime(command.eventId, command.status, command.maybeProcessingTime)
-          .map(processingTimeQuery => command.queries.tail :+ processingTimeQuery)
-          .getOrElse(command.queries.tail)
-      (result, command.queries.head, queries)
-        .iterateWhileM {
-          case (_, _, query :: remainingQueries) =>
-            measureExecutionTime(query).map(result => (result, query, remainingQueries))
-          case (previousResult, previousQuery, Nil) =>
-            (previousResult, previousQuery, List.empty[SqlQuery[Int]]).pure[ConnectionIO]
-        } { case (previsousResult, _, queries) => previsousResult == 1 && queries.nonEmpty }
-        .map { case (lastResult, lastQuery, _) => (lastResult, lastQuery) }
-    }
+  private def maybeUpdateProcessingTimeQuery(command: ChangeStatusCommand[IO]) =
+    upsertStatusProcessingTime(command.eventId, command.status, command.maybeProcessingTime)
 
+  private def runUpdateQueriesIfSuccessful(queries: List[SqlQuery[Int]],
+                                           command: ChangeStatusCommand[IO]
+  ): ConnectionIO[UpdateResult] =
+    queries
+      .map(query => measureExecutionTime(query).map(query -> _))
+      .sequence
+      .map(_.foldLeft(Updated: UpdateResult) {
+        case (Updated, (_, 1)) => Updated
+        case (Updated, (query, result)) =>
+          UpdateResult.Failure(
+            Refined.unsafeApply(
+              s"${query.name} failed for event ${command.eventId} to status ${command.status} with result $result. " +
+                s"Rolling back queries: ${queries.map(_.name.toString).mkString(", ")}"
+            )
+          )
+        case (other, (_, _)) => other
+      })
 }
 
 object IOUpdateCommandsRunner {
@@ -145,6 +143,4 @@ object IOUpdateCommandsRunner {
   ): IO[StatusUpdatesRunner[IO]] = IO {
     new StatusUpdatesRunnerImpl(transactor, queriesExecTimes, logger)
   }
-
-  case class QueryFailedException(failingQueryName: SqlQuery.Name, updateResult: UpdateResult) extends Throwable()
 }

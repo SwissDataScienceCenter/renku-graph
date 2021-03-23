@@ -35,7 +35,7 @@ import eu.timepit.refined.auto._
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._
-import org.http4s.Status.{Forbidden, Unauthorized}
+import org.http4s.Status.{Forbidden, ServiceUnavailable, Unauthorized}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -45,7 +45,7 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 
 class GitLabProjectMembersFinderSpec
-  extends AnyWordSpec
+    extends AnyWordSpec
     with ExternalServiceStubbing
     with ScalaCheckPropertyChecks
     with should.Matchers {
@@ -72,7 +72,7 @@ class GitLabProjectMembersFinderSpec
     }
 
     "collect users from paged results" in new TestCase {
-      val projectUsers = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList
+      val projectUsers   = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList
       val projectMembers = gitLabProjectMembers.generateNonEmptyList(minElements = 2).toList
 
       stubFor {
@@ -112,7 +112,7 @@ class GitLabProjectMembersFinderSpec
       finder.findProjectMembers(path).value.unsafeRunSync() shouldBe Right(Set.empty)
     }
 
-    Forbidden +: Unauthorized +: Nil foreach { status =>
+    Forbidden +: Unauthorized +: ServiceUnavailable +: Nil foreach { status =>
       s"return a CurationRecoverableError when service responds with $status" in new TestCase {
         stubFor {
           get(s"/api/v4/projects/${urlEncode(path.toString)}/members")
@@ -128,9 +128,9 @@ class GitLabProjectMembersFinderSpec
     "return a CurationRecoverableError when service is not available" in new TestCase {
 
       override val finder = new IOGitLabProjectMembersFinder(gitLabUrls.generateOne.apiV4,
-        Throttler.noThrottling,
-        TestLogger(),
-        retryInterval = 1 millis
+                                                             Throttler.noThrottling,
+                                                             TestLogger(),
+                                                             retryInterval = 1 millis
       )
 
       val Left(error) = finder.findProjectMembers(path).value.unsafeRunSync()
@@ -139,8 +139,8 @@ class GitLabProjectMembersFinderSpec
     }
   }
 
-  private implicit lazy val cs: ContextShift[IO] = IO.contextShift(global)
-  private implicit lazy val timer: Timer[IO] = IO.timer(global)
+  private implicit lazy val cs:    ContextShift[IO] = IO.contextShift(global)
+  private implicit lazy val timer: Timer[IO]        = IO.timer(global)
 
   private trait TestCase {
 
@@ -148,7 +148,7 @@ class GitLabProjectMembersFinderSpec
     implicit val maybeAccessToken: Option[AccessToken] = accessTokens.generateOption
 
     private val gitLabUrl = GitLabUrl(externalServiceBaseUrl)
-    val finder = new IOGitLabProjectMembersFinder(gitLabUrl.apiV4, Throttler.noThrottling, TestLogger())
+    val finder            = new IOGitLabProjectMembersFinder(gitLabUrl.apiV4, Throttler.noThrottling, TestLogger())
   }
 
   private implicit val projectMemberEncoder: Encoder[GitLabProjectMember] = Encoder.instance[GitLabProjectMember] {

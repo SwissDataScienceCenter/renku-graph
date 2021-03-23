@@ -58,14 +58,14 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       inSequence {
 
-        givenEventFinder(returns = Some(event))
         givenThereIs(freeSubscriber = subscriber)
+        givenEventFinder(returns = Some(event))
         givenSending(event, to = subscriber, got = Delivered)
         givenDispatchRecoveryExists(subscriber, event)
         expectSendingRegistered(event, subscriber)
 
-        givenEventFinder(returns = Some(otherEvent))
         givenThereIs(freeSubscriber = otherSubscriber)
+        givenEventFinder(returns = Some(otherEvent))
         givenSending(otherEvent, to = otherSubscriber, got = Delivered)
         givenDispatchRecoveryExists(otherSubscriber, otherEvent)
         expectSendingRegistered(otherEvent, otherSubscriber)
@@ -91,8 +91,8 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         val otherSubscriber = subscriberUrls.generateOne
 
         inSequence {
-          givenEventFinder(returns = Some(event))
           givenThereIs(freeSubscriber = subscriber)
+          givenEventFinder(returns = Some(event))
           givenSending(event, to = subscriber, got = ServiceBusy)
           givenDispatchRecoveryExists(subscriber, event)
           expectMarkedBusy(subscriber)
@@ -123,8 +123,8 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         val yetAnotherSubscriber = subscriberUrls.generateOne
 
         inSequence {
-          givenEventFinder(returns = Some(event))
           givenThereIs(freeSubscriber = subscriber)
+          givenEventFinder(returns = Some(event))
           givenSending(event, to = subscriber, got = Misdelivered)
           givenDispatchRecoveryExists(subscriber, event)
           expectRemoval(subscriber)
@@ -164,8 +164,8 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         val event        = testCategoryEvents.generateOne
 
         inSequence {
-          givenEventFinder(returns = Some(failingEvent))
           givenThereIs(freeSubscriber = subscriber)
+          givenEventFinder(returns = Some(failingEvent))
 
           (eventsSender.sendEvent _)
             .expects(subscriber, failingEvent)
@@ -176,8 +176,8 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
             .expects(exception)
             .returning(IO.unit)
 
-          givenEventFinder(returns = Some(event))
           givenThereIs(freeSubscriber = subscriber)
+          givenEventFinder(returns = Some(event))
           givenSending(event, to = subscriber, got = Delivered)
           givenDispatchRecoveryExists(subscriber, event)
           expectSendingRegistered(event, subscriber)
@@ -201,13 +201,12 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       val subscriber = subscriberUrls.generateOne
 
       inSequence {
-        givenEventFinder(returns = Some(event))
-
         (subscribers.runOnSubscriber _)
           .expects(*)
           .returning(exception.raiseError[IO, Unit])
 
         givenThereIs(freeSubscriber = subscriber)
+        givenEventFinder(returns = Some(event))
         givenSending(event, to = subscriber, got = Delivered)
         givenDispatchRecoveryExists(subscriber, event)
         expectSendingRegistered(event, subscriber)
@@ -219,7 +218,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Error(s"$categoryName: Dispatching an event failed", exception),
+          Error(s"$categoryName: executing event distribution on a subscriber failed", exception),
           Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
         )
       }
@@ -232,17 +231,18 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       val subscriber = subscriberUrls.generateOne
 
       inSequence {
-        (eventsFinder.popEvent _)
-          .expects()
-          .returning(exception.raiseError[IO, Option[TestCategoryEvent]])
-
-        (eventsFinder.popEvent _)
-          .expects()
-          .returning(exception.raiseError[IO, Option[TestCategoryEvent]])
-
-        // retry fetching some new event
-        givenEventFinder(returns = Some(event))
         givenThereIs(freeSubscriber = subscriber)
+
+        (eventsFinder.popEvent _)
+          .expects()
+          .returning(exception.raiseError[IO, Option[TestCategoryEvent]])
+
+        (eventsFinder.popEvent _)
+          .expects()
+          .returning(exception.raiseError[IO, Option[TestCategoryEvent]])
+
+        givenEventFinder(returns = Some(event))
+
         givenSending(event, to = subscriber, got = Delivered)
         givenDispatchRecoveryExists(subscriber, event)
         expectSendingRegistered(event, subscriber)
@@ -254,8 +254,8 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
 
       eventually {
         logger.loggedOnly(
-          Error(s"$categoryName: Finding events to dispatch failed", exception),
-          Error(s"$categoryName: Finding events to dispatch failed", exception),
+          Error(s"$categoryName: finding events to dispatch failed", exception),
+          Error(s"$categoryName: finding events to dispatch failed", exception),
           Info(s"$categoryName: $event, url = $subscriber -> $Delivered")
         )
       }
@@ -269,16 +269,16 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       val subscriber = subscriberUrls.generateOne
 
       inSequence {
-        givenEventFinder(returns = Some(event))
         givenThereIs(freeSubscriber = subscriber)
+        givenEventFinder(returns = Some(event))
         givenSending(event, to = subscriber, got = Delivered)
         givenDispatchRecoveryExists(subscriber, event)
         (eventDelivery.registerSending _)
           .expects(event, subscriber)
           .returning(exception.raiseError[IO, Unit])
 
-        givenEventFinder(returns = Some(otherEvent))
         givenThereIs(freeSubscriber = subscriber)
+        givenEventFinder(returns = Some(otherEvent))
         givenSending(otherEvent, to = subscriber, got = Delivered)
         givenDispatchRecoveryExists(subscriber, otherEvent)
         expectSendingRegistered(otherEvent, subscriber)
@@ -304,9 +304,8 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       val subscriber = subscriberUrls.generateOne
 
       inSequence {
-        givenEventFinder(returns = Some(event))
-
         givenThereIs(freeSubscriber = subscriber)
+        givenEventFinder(returns = Some(event))
         givenSending(event, to = subscriber, got = ServiceBusy)
         givenDispatchRecoveryExists(subscriber, event)
 
@@ -339,9 +338,8 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       val otherSubscriber = subscriberUrls.generateOne
 
       inSequence {
-        givenEventFinder(returns = Some(event))
-
         givenThereIs(freeSubscriber = subscriber)
+        givenEventFinder(returns = Some(event))
         givenSending(event, to = subscriber, got = Misdelivered)
         givenDispatchRecoveryExists(subscriber, event)
 

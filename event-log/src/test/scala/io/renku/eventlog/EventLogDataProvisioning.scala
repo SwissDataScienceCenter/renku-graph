@@ -81,7 +81,9 @@ trait EventLogDataProvisioning {
             |project (project_id, project_path, latest_event_date)
             |VALUES (${compoundEventId.projectId}, $projectPath, $eventDate)
             |ON CONFLICT (project_id)
-            |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
+            |DO UPDATE 
+            |  SET latest_event_date = excluded.latest_event_date 
+            |  WHERE excluded.latest_event_date > project.latest_event_date
       """.stripMargin.update.run.void
     }
 
@@ -136,7 +138,9 @@ trait EventLogDataProvisioning {
       """.stripMargin.update.run.void
   }
 
-  protected def upsertEventDelivery(eventId: CompoundEventId, deliveryId: SubscriberId): Unit = execute {
+  protected def upsertEventDelivery(eventId:    CompoundEventId,
+                                    deliveryId: SubscriberId = subscriberIds.generateOne
+  ): Unit = execute {
     sql"""|INSERT INTO
           |event_delivery (event_id, project_id, delivery_id)
           |VALUES (${eventId.id}, ${eventId.projectId}, $deliveryId)

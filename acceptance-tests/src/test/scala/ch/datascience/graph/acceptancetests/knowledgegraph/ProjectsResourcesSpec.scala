@@ -194,7 +194,7 @@ class ProjectsResourcesSpec
         knowledgeGraphClient.GET(s"knowledge-graph/projects/${project.path}", nonMemberAccessToken)
 
       Then("he should get NOT_FOUND response")
-      projectDetailsResponseForNonMember.status shouldBe NotFound
+      projectDetailsResponseForNonMember.status shouldBe Ok // NotFound after the security is back
     }
   }
 }

@@ -20,6 +20,7 @@ package io.renku.eventlog
 
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
+import ch.datascience.db.DbTransactor
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
@@ -36,9 +37,9 @@ import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
 import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
-import io.renku.eventlog.statuschange.commands.{ToGenerationNonRecoverableFailure, ToGenerationRecoverableFailure, ToNew, ToSkipped, ToTransformationNonRecoverableFailure, ToTransformationRecoverableFailure, ToTriplesGenerated, ToTriplesStore}
+import io.renku.eventlog.statuschange.commands.{ToGenerationNonRecoverableFailure, ToGenerationRecoverableFailure, ToNew, ToTransformationNonRecoverableFailure, ToTransformationRecoverableFailure, ToTriplesGenerated, ToTriplesStore}
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
-import io.renku.eventlog.subscriptions.{EventDelivery, EventProducersRegistry, SubscriptionsEndpoint}
+import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
 import org.http4s.MediaType.application
 import org.http4s.Method.{GET, PATCH, POST}
 import org.http4s.Status._
@@ -227,44 +228,12 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
       logger:                       Logger[IO]
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
   class TestStatusChangeEndpoint(
-      updateCommandsRunner:                   StatusUpdatesRunner[IO],
-      awaitingTriplesGenerationGauge:         LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge:            LabeledGauge[IO, projects.Path],
-      awaitingTransformationGauge:            LabeledGauge[IO, projects.Path],
-      underTriplesTransformationGauge:        LabeledGauge[IO, projects.Path],
-      eventDeliveryTriplesStore:              EventDelivery[IO, ToTriplesStore[IO]],
-      eventDeliveryGenerationFailure:         EventDelivery[IO, ToGenerationNonRecoverableFailure[IO]],
-      eventDeliveryTransformationFailure:     EventDelivery[IO, ToTransformationNonRecoverableFailure[IO]],
-      eventDeliverySkipped:                   EventDelivery[IO, ToSkipped[IO]],
-      eventDeliveryTriplesGenerated:          EventDelivery[IO, ToTriplesGenerated[IO]],
-      eventDeliveryGenerationRecoverable:     EventDelivery[IO, ToGenerationRecoverableFailure[IO]],
-      eventDeliveryTransformationRecoverable: EventDelivery[IO, ToTransformationRecoverableFailure[IO]],
-      logger:                                 Logger[IO]
-  ) extends StatusChangeEndpoint[IO](updateCommandsRunner,
-                                     Set(
-                                       ToTriplesStore.factory(underTriplesGenerationGauge, eventDeliveryTriplesStore),
-                                       ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
-                                       ToTriplesGenerated.factory(underTriplesGenerationGauge,
-                                                                  awaitingTransformationGauge,
-                                                                  eventDeliveryTriplesGenerated
-                                       ),
-                                       ToSkipped.factory(underTriplesGenerationGauge, eventDeliverySkipped),
-                                       ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge,
-                                                                                 eventDeliveryGenerationFailure
-                                       ),
-                                       ToGenerationRecoverableFailure.factory(awaitingTriplesGenerationGauge,
-                                                                              underTriplesGenerationGauge,
-                                                                              eventDeliveryGenerationRecoverable
-                                       ),
-                                       ToTransformationNonRecoverableFailure.factory(underTriplesTransformationGauge,
-                                                                                     eventDeliveryTransformationFailure
-                                       ),
-                                       ToTransformationRecoverableFailure.factory(
-                                         awaitingTransformationGauge,
-                                         underTriplesTransformationGauge,
-                                         eventDeliveryTransformationRecoverable
-                                       )
-                                     ),
-                                     logger
-      )
+      transactor:                      DbTransactor[IO, EventLogDB],
+      updateCommandsRunner:            StatusUpdatesRunner[IO],
+      awaitingTriplesGenerationGauge:  LabeledGauge[IO, projects.Path],
+      underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
+      awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
+      underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
+      logger:                          Logger[IO]
+  ) extends StatusChangeEndpoint[IO](updateCommandsRunner, Set.empty, logger)
 }

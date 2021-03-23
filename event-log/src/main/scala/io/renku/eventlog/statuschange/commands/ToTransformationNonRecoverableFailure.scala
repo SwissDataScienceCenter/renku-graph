@@ -23,42 +23,39 @@ import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import doobie.implicits._
 import eu.timepit.refined.auto._
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
+import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
+import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.subscriptions.EventDelivery
+import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
 import io.renku.eventlog.{EventLogDB, EventMessage}
-import org.http4s.{MediaType, Request}
 
 import java.time.Instant
 
 final case class ToTransformationNonRecoverableFailure[Interpretation[_]](
     eventId:                         CompoundEventId,
-    maybeMessage:                    Option[EventMessage],
+    message:                         EventMessage,
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:             Option[EventProcessingTime],
-    eventDelivery:                   EventDelivery[Interpretation, ToTransformationNonRecoverableFailure[Interpretation]],
     now:                             () => Instant = () => Instant.now
 )(implicit ME:                       Bracket[Interpretation, Throwable])
     extends ChangeStatusCommand[Interpretation] {
 
   override lazy val status: EventStatus = TransformationNonRecoverableFailure
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
+  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
     SqlQuery(
       sql"""|UPDATE event
-            |SET status = $status, execution_date = ${now()}, message = $maybeMessage
+            |SET status = $status, execution_date = ${now()}, message = $message
             |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${TransformingTriples: EventStatus}
             |""".stripMargin.update.run,
       name = "transforming_triples->transformation_non_recoverable_fail"
-    ),
-    Nil
+    )
   )
 
   override def updateGauges(
@@ -67,34 +64,24 @@ final case class ToTransformationNonRecoverableFailure[Interpretation[_]](
     case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesTransformationGauge.decrement
     case _                    => ME.unit
   }
-
-  override def updateDelivery(): Interpretation[Unit] = eventDelivery.unregister(eventId)
 }
 
 object ToTransformationNonRecoverableFailure {
   def factory[Interpretation[_]: Sync](
-      underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
-      eventDelivery:                   EventDelivery[Interpretation, ToTransformationNonRecoverableFailure[Interpretation]]
+      underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path]
   )(implicit
       ME: MonadError[Interpretation, Throwable]
-  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
-    Kleisli { case (eventId, request) =>
-      when(request, has = MediaType.application.json) {
-        {
-          for {
-            _                   <- request.validate(status = TransformationNonRecoverableFailure)
-            maybeProcessingTime <- request.getProcessingTime
-            maybeMessage        <- request.getMessage
-          } yield CommandFound(
-            ToTransformationNonRecoverableFailure[Interpretation](
-              eventId,
-              maybeMessage,
-              underTriplesTransformationGauge,
-              maybeProcessingTime,
-              eventDelivery
-            )
-          )
-        }.merge
-      }
-    }
+  ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
+    case EventOnlyRequest(eventId, TransformationNonRecoverableFailure, maybeProcessingTime, Some(message)) =>
+      CommandFound(
+        ToTransformationNonRecoverableFailure[Interpretation](
+          eventId,
+          message,
+          underTriplesTransformationGauge,
+          maybeProcessingTime
+        )
+      )
+    case EventOnlyRequest(_, TransformationNonRecoverableFailure, _, None) => PayloadMalformed("No message provided")
+    case _                                                                 => NotSupported
+  }
 }

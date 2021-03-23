@@ -18,8 +18,6 @@
 
 package ch.datascience.generators
 
-import java.time.{Duration, Instant, LocalDate, LocalDateTime, ZoneId, ZoneOffset, ZonedDateTime}
-import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
 import cats.data.NonEmptyList
 import ch.datascience.config.ServiceUrl
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
@@ -30,10 +28,14 @@ import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.{NonNegative, NonPositive, Positive}
 import eu.timepit.refined.string.Url
 import io.circe.{Encoder, Json}
+import org.http4s.Status
+import org.http4s.Status._
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary, Gen}
 
 import java.time.Instant.now
+import java.time.temporal.ChronoUnit.{DAYS => JAVA_DAYS, MINUTES => JAVA_MINS}
+import java.time.{Duration => JavaDuration, _}
 import scala.concurrent.duration._
 import scala.language.{implicitConversions, postfixOps}
 
@@ -194,6 +196,25 @@ object Generators {
     port <- httpPorts
   } yield s"$protocol://localhost:$port"
 
+  lazy val httpStatuses: Gen[Status] = Gen.oneOf(successHttpStatuses, clientErrorHttpStatuses, serverErrorHttpStatuses)
+
+  lazy val successHttpStatuses: Gen[Status] = Gen.oneOf(Ok, Created, Accepted)
+
+  lazy val clientErrorHttpStatuses: Gen[Status] = Gen.oneOf(
+    Unauthorized,
+    PaymentRequired,
+    Forbidden,
+    NotFound,
+    Conflict
+  )
+  lazy val serverErrorHttpStatuses: Gen[Status] = Gen.oneOf(
+    InternalServerError,
+    NotImplemented,
+    BadGateway,
+    ServiceUnavailable,
+    GatewayTimeout
+  )
+
   val validatedUrls: Gen[String Refined Url] = httpUrls() map Refined.unsafeApply
 
   val shas: Gen[String] = for {
@@ -212,8 +233,8 @@ object Generators {
       .map(Instant.ofEpochMilli)
 
   def relativeTimestamps(
-      lessThanAgo: Duration = Duration.ofDays(365 * 5),
-      moreThanAgo: Duration = Duration.ZERO
+      lessThanAgo: JavaDuration = JavaDuration.ofDays(365 * 5),
+      moreThanAgo: JavaDuration = JavaDuration.ZERO
   ): Gen[Instant] = {
     if ((lessThanAgo compareTo moreThanAgo) < 0)
       throw new IllegalArgumentException(
@@ -252,17 +273,17 @@ object Generators {
       .map(LocalDateTime.ofInstant(_, ZoneOffset.UTC))
       .map(_.toLocalDate)
 
-  val notNegativeJavaDurations: Gen[Duration] = javaDurations(min = 0, max = 20000)
+  val notNegativeJavaDurations: Gen[JavaDuration] = javaDurations(min = 0, max = 20000)
 
   def javaDurations(
-      min: Duration = Duration.ZERO,
-      max: Duration = Duration.ofDays(20)
-  ): Gen[Duration] = javaDurations(min.toMillis, max.toMillis)
+      min: JavaDuration = JavaDuration.ZERO,
+      max: JavaDuration = JavaDuration.ofDays(20)
+  ): Gen[JavaDuration] = javaDurations(min.toMillis, max.toMillis)
 
-  def javaDurations(min: Long, max: Long): Gen[Duration] =
+  def javaDurations(min: Long, max: Long): Gen[JavaDuration] =
     Gen
       .choose(min, max)
-      .map(Duration.ofMillis)
+      .map(JavaDuration.ofMillis)
 
   implicit val serviceUrls:  Gen[ServiceUrl]  = httpUrls() map ServiceUrl.apply
   implicit val elapsedTimes: Gen[ElapsedTime] = Gen.choose(0L, 10000L) map ElapsedTime.apply
@@ -359,8 +380,7 @@ object Generators {
       def toGeneratorOfOptions: Gen[Option[T]] = Gen.option(generator)
       def toGeneratorOfNonEmptyList(minElements: Int Refined Positive = 1,
                                     maxElements: Int Refined Positive = 5
-      ): Gen[NonEmptyList[T]] =
-        nonEmptyList(generator, minElements, maxElements)
+      ): Gen[NonEmptyList[T]] = nonEmptyList(generator, minElements, maxElements)
 
       def toGeneratorOfSet(minElements: Int Refined NonNegative = 1,
                            maxElements: Int Refined Positive = 5

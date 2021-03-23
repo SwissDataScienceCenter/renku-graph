@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect.{Bracket, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
-import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
+import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.{events, projects}
 import ch.datascience.metrics.LabeledHistogram
@@ -31,9 +31,8 @@ import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
 
-private[eventlog] trait EventDelivery[Interpretation[_], CategoryEvent] {
+private[subscriptions] trait EventDelivery[Interpretation[_], CategoryEvent] {
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit]
-  def unregister(event:      CompoundEventId): Interpretation[Unit]
 }
 
 private class EventDeliveryImpl[CategoryEvent](transactor:               DbTransactor[IO, EventLogDB],
@@ -52,9 +51,6 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
       result <- insert(id, projectId, subscriberUrl)
     } yield result
   } transact transactor.get flatMap toResult
-
-  def unregister(eventId: CompoundEventId): IO[Unit] =
-    deleteDelivery(eventId.id, eventId.projectId) transact transactor.get flatMap toResult
 
   private def insert(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl) =
     measureExecutionTime {
@@ -85,7 +81,7 @@ private class EventDeliveryImpl[CategoryEvent](transactor:               DbTrans
   }
 }
 
-private[eventlog] object EventDelivery {
+private[subscriptions] object EventDelivery {
 
   def apply[CategoryEvent](
       transactor:               DbTransactor[IO, EventLogDB],
@@ -107,8 +103,5 @@ private class NoOpEventDelivery[Interpretation[_]: MonadError[*[_], Throwable], 
     extends EventDelivery[Interpretation, CategoryEvent] {
 
   override def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit] =
-    ().pure[Interpretation]
-
-  override def unregister(eventId: CompoundEventId): Interpretation[Unit] =
     ().pure[Interpretation]
 }

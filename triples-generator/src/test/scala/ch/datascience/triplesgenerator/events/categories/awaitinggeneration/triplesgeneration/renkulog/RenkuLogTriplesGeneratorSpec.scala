@@ -35,7 +35,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
+import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.{CommitEvent, categoryName}
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.Commands.RepositoryPath
@@ -354,7 +354,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       val actual = intercept[Exception] {
         triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe "Triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
@@ -380,7 +380,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       val actual = intercept[Exception] {
         triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe "Triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
@@ -414,7 +414,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
         triplesGenerator.generateTriples(commitWithoutParent).value.unsafeRunSync()
       }
 
-      actual.getMessage should startWith("Triples generation failed: ")
+      actual.getMessage should startWith(s"${commonLogMessage(commitWithoutParent)} triples generation failed: ")
       actual.getMessage should not include accessToken.value
       actual.getMessage should include(accessToken.toString)
       actual.getCause shouldBe null
@@ -452,7 +452,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       val actual = intercept[Exception] {
         triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe "Triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
@@ -493,7 +493,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       val actual = intercept[Exception] {
         triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe "Triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
@@ -541,7 +541,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       val actual = intercept[Exception] {
         triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe "Triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
@@ -591,7 +591,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       val actual = intercept[Exception] {
         triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe "Triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
@@ -634,7 +634,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       val actual = intercept[Exception] {
         triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe "Triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
@@ -682,7 +682,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       val actual = intercept[Exception] {
         triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe "Triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
 
@@ -730,7 +730,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
       val actual = intercept[Exception] {
         triplesGenerator.generateTriples(commitWithoutParent)(maybeAccessToken).value.unsafeRunSync()
       }
-      actual.getMessage shouldBe "Triples generation failed"
+      actual.getMessage shouldBe s"${commonLogMessage(commitWithoutParent)} triples generation failed"
       actual.getCause   shouldBe exception
     }
   }
@@ -776,4 +776,7 @@ class RenkuLogTriplesGeneratorSpec extends AnyWordSpec with MockFactory with sho
 
     val triplesGenerator = new RenkuLogTriplesGenerator(gitLabRepoUrlFinder, renku, file, git, randomLong)
   }
+
+  private def commonLogMessage(event: CommitEvent): String =
+    s"$categoryName: Commit Event ${event.compoundEventId}, ${event.project.path}"
 }

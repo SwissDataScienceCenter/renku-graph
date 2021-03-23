@@ -18,9 +18,9 @@
 
 package io.renku.eventlog
 
+import ch.datascience.data.ErrorMessage
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventStatus}
-import ch.datascience.graph.model.projects
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints.{BoundedInstant, InstantNotInTheFuture, NonBlank}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
@@ -95,19 +95,9 @@ object EventMessage extends TinyTypeFactory[EventMessage](new EventMessage(_)) w
 
   implicit val decoder: Decoder[EventMessage] = stringDecoder(EventMessage)
 
-  import java.io.{PrintWriter, StringWriter}
-
-  def apply(exception: Throwable): Option[EventMessage] = {
-    val exceptionAsString = new StringWriter
-    exception.printStackTrace(new PrintWriter(exceptionAsString))
-    exceptionAsString.flush()
-
-    from(exceptionAsString.toString).fold(
-      _ => None,
-      Option.apply
-    )
-  }
+  def apply(exception: Throwable): EventMessage = EventMessage(ErrorMessage.withStackTrace(exception).value)
 }
+
 final class EventPayload private (val value: String) extends AnyVal with StringTinyType
 object EventPayload extends TinyTypeFactory[EventPayload](new EventPayload(_)) with NonBlank {
   implicit val decoder: Decoder[EventPayload] = stringDecoder(EventPayload)

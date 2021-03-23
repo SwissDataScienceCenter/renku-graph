@@ -19,6 +19,7 @@
 package ch.datascience.http
 
 import cats.Applicative
+import ch.datascience.data.{ErrorMessage => DataErrorMessage}
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.collection.NonEmpty
 import io.circe._
@@ -27,35 +28,11 @@ import org.http4s.circe.jsonEncoderOf
 
 object ErrorMessage {
 
-  type ErrorMessage = String Refined NonEmpty
+  type ErrorMessage = DataErrorMessage.ErrorMessage
 
-  def apply(errorMessage: String): ErrorMessage = toErrorMessage {
-    blankToNone(errorMessage)
-      .map(toSingleLine)
-      .getOrElse(throw new IllegalArgumentException("ErrorMessage cannot be instantiated with a blank String"))
-  }
+  def apply(errorMessage: String): ErrorMessage = DataErrorMessage(errorMessage)
 
-  def apply(exception: Throwable): ErrorMessage = toErrorMessage {
-    blankToNone(exception.getMessage)
-      .fold(ifEmpty = exception.getClass.getName)(toSingleLine)
-  }
-
-  private def blankToNone(message: String): Option[String] =
-    Option(message)
-      .map(_.trim)
-      .flatMap {
-        case ""       => None
-        case nonBlank => Some(nonBlank)
-      }
-
-  private lazy val toSingleLine: String => String = _.split('\n').map(_.trim.filter(_ >= ' ')).mkString("", " ", "")
-
-  private val toErrorMessage: String => ErrorMessage = RefType
-    .applyRef[ErrorMessage](_)
-    .fold(
-      error => throw new IllegalArgumentException(error),
-      identity
-    )
+  def apply(exception: Throwable): ErrorMessage = DataErrorMessage.withExceptionMessage(exception)
 
   implicit val errorMessageEncoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
     Json.obj("message" -> Json.fromString(message.value))
