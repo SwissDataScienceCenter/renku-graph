@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.commitsync
+package ch.datascience.commiteventservice.events.categories.commitsync
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
@@ -28,21 +28,18 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import ch.datascience.commiteventservice.commits.{CommitInfo, IOLatestCommitFinder, LatestCommitFinder}
-import ch.datascience.commiteventservice.commitsync.LatestEventsFetcher.LatestProjectCommit
 import ch.datascience.commiteventservice.eventprocessing.{Project, StartCommit}
 import ch.datascience.commiteventservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
-import ch.datascience.commiteventservice.project.{IOProjectInfoFinder, ProjectInfo, ProjectInfoFinder}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
 private abstract class MissedEventsLoader[Interpretation[_]] {
-  def loadMissedEvents: Interpretation[Unit]
+  def loadMissedEvents(commitSyncRequest: CommitSyncEvent): Interpretation[Unit]
 }
 
 private class IOMissedEventsLoader(
-    latestEventsFinder:    LatestEventsFetcher[IO],
     accessTokenFinder:     AccessTokenFinder[IO],
     latestCommitFinder:    LatestCommitFinder[IO],
     projectInfoFinder:     ProjectInfoFinder[IO],
@@ -58,28 +55,21 @@ private class IOMissedEventsLoader(
   import commitToEventLog._
   import executionTimeRecorder._
   import latestCommitFinder._
-  import latestEventsFinder._
   import projectInfoFinder._
 
-  def loadMissedEvents: IO[Unit] =
+  def loadMissedEvents(commitSyncRequest: CommitSyncEvent): IO[Unit] =
     measureExecutionTime {
-      for {
-        latestLogEvents <- fetchLatestEvents()
-        updateSummary <- if (latestLogEvents.isEmpty) IO.pure(UpdateSummary())
-                         else (latestLogEvents map loadEvents).sequence map toUpdateSummary
-      } yield updateSummary
-    } flatMap logSummary recoverWith loggingError
 
-  private lazy val logSummary: ((ElapsedTime, UpdateSummary)) => IO[Unit] = { case (elapsedTime, updateSummary) =>
+      loadEvents(commitSyncRequest)
+    } flatMap logResult recoverWith loggingError
+
+  private lazy val logResult: ((ElapsedTime, UpdateResult)) => IO[Unit] = { case (elapsedTime, result) =>
     logger.info(
-      s"Synchronized Commits with GitLab in ${elapsedTime}ms: " +
-        s"${updateSummary(Updated)} updates, " +
-        s"${updateSummary(Skipped)} skipped, " +
-        s"${updateSummary(Failed)} failed"
+      s"Syncing Commits with GitLab $result in ${elapsedTime}ms: "
     )
   }
 
-  private def loadEvents(latestProjectCommit: LatestProjectCommit): IO[UpdateResult] = {
+  private def loadEvents(latestProjectCommit: CommitSyncEvent): IO[UpdateResult] = {
     for {
       maybeAccessToken  <- findAccessToken(latestProjectCommit.project.path)
       maybeLatestCommit <- findLatestCommit(latestProjectCommit.project.id, maybeAccessToken).value
@@ -87,13 +77,13 @@ private class IOMissedEventsLoader(
     } yield updateResult
   } recoverWith loggingWarning(latestProjectCommit)
 
-  private def addEventsIfMissing(latestProjectCommit: LatestProjectCommit,
+  private def addEventsIfMissing(latestProjectCommit: CommitSyncEvent,
                                  maybeLatestCommit:   Option[CommitInfo],
                                  maybeAccessToken:    Option[AccessToken]
   ) =
     maybeLatestCommit match {
-      case None                                                              => IO.pure(Skipped)
-      case Some(commitInfo) if commitInfo.id == latestProjectCommit.commitId => IO.pure(Skipped)
+      case None                                                        => IO.pure(Skipped)
+      case Some(commitInfo) if commitInfo.id == latestProjectCommit.id => IO.pure(Skipped)
       case Some(commitInfo) =>
         for {
           projectInfo <- findProjectInfo(latestProjectCommit.project.id, maybeAccessToken)
@@ -109,9 +99,9 @@ private class IOMissedEventsLoader(
     )
   }
 
-  private def loggingWarning(latestProjectCommit: LatestProjectCommit): PartialFunction[Throwable, IO[UpdateResult]] = {
+  private def loggingWarning(latestProjectCommit: CommitSyncEvent): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) =>
-      logger.warn(exception)(s"Synchronizing Commits for project ${latestProjectCommit.project.path} failed")
+      logger.error(exception)(s"Synchronizing Commits for project ${latestProjectCommit.project.path} failed")
       IO.pure(Failed)
   }
 
@@ -126,14 +116,6 @@ private class IOMissedEventsLoader(
     final case object Updated extends UpdateResult
     final case object Failed  extends UpdateResult
   }
-
-  private case class UpdateSummary(state: Map[UpdateResult, Int] = Map.empty) {
-    def apply(updateResult: UpdateResult): Int = state.getOrElse(updateResult, 0)
-  }
-
-  private def toUpdateSummary(updateResults: List[UpdateResult]) = UpdateSummary(
-    updateResults.groupBy(identity).view.mapValues(_.size).toMap
-  )
 }
 
 private object IOMissedEventsLoader {
@@ -150,9 +132,7 @@ private object IOMissedEventsLoader {
       tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
       gitLabUrl          <- GitLabUrl[IO]()
       commitToEventLog   <- IOCommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
-      latestEventsFinder <- IOLatestEventsFetcher(logger)
     } yield new IOMissedEventsLoader(
-      latestEventsFinder,
       new IOAccessTokenFinder(tokenRepositoryUrl, logger),
       new IOLatestCommitFinder(gitLabUrl, gitLabThrottler, logger),
       new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, logger),

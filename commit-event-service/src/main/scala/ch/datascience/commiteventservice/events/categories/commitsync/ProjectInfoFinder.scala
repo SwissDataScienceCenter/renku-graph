@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.project
+package ch.datascience.commiteventservice.events.categories.commitsync
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
@@ -30,14 +30,14 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait ProjectInfoFinder[Interpretation[_]] {
+private trait ProjectInfoFinder[Interpretation[_]] {
   def findProjectInfo(
       projectId:        projects.Id,
       maybeAccessToken: Option[AccessToken]
   ): Interpretation[ProjectInfo]
 }
 
-class IOProjectInfoFinder(
+private class IOProjectInfoFinder(
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
@@ -81,7 +81,7 @@ class IOProjectInfoFinder(
     maybeVisibility getOrElse Public
 }
 
-object IOProjectInfoFinder {
+private object IOProjectInfoFinder {
   def apply(
       gitLabThrottler: Throttler[IO, GitLab],
       logger:          Logger[IO]

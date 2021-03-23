@@ -16,11 +16,21 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.project
+package ch.datascience.commiteventservice.events.categories.commitsync
 
+import ch.datascience.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path, Visibility}
 
-final case class ProjectInfo(
+private final case class CommitProject(id: projects.Id, path: projects.Path)
+
+private final case class CommitSyncEvent(categoryName: CategoryName,
+                                         id:           CommitId,
+                                         project:      CommitProject,
+                                         lastSynced:   LastSyncedDate
+)
+
+private final case class ProjectInfo(
     id:         Id,
     visibility: Visibility,
     path:       Path

@@ -19,9 +19,10 @@
 package ch.datascience.commiteventservice
 
 import cats.effect.{Clock, ConcurrentEffect, ContextShift, IO, Resource, Timer}
-import ch.datascience.commiteventservice.commitsync.CommitSyncEndpoint
+import ch.datascience.commiteventservice.events.EventEndpoint
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
+import ch.datascience.events.consumers.EventConsumersRegistry
 import ch.datascience.graph.http.server.security.GitLabAuthenticator
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
@@ -31,19 +32,19 @@ import org.http4s.dsl.Http4sDsl
 import scala.concurrent.ExecutionContext
 
 private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect](
-    commitSyncEndpoint: CommitSyncEndpoint[Interpretation],
-    routesMetrics:      RoutesMetrics[Interpretation]
-)(implicit clock:       Clock[Interpretation])
+    eventEndpoint: EventEndpoint[Interpretation],
+    routesMetrics: RoutesMetrics[Interpretation]
+)(implicit clock:  Clock[Interpretation])
     extends Http4sDsl[Interpretation] {
 
-  import commitSyncEndpoint._
+  import eventEndpoint._
   import org.http4s.HttpRoutes
   import routesMetrics._
 
   // format: off
   lazy val nonAuthorizedRoutes: HttpRoutes[Interpretation] = HttpRoutes.of[Interpretation] {
     case           GET  -> Root / "ping"                                                        => Ok("pong")
-    case request @ POST -> Root / "events"       => syncCommits(request)
+    case request @ POST -> Root / "events"       => processEvent(request)
   }
   // format: on
 
@@ -52,6 +53,7 @@ private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect](
 
 private object MicroserviceRoutes {
   def apply(
+      consumersRegistry:     EventConsumersRegistry[IO],
       metricsRegistry:       MetricsRegistry[IO],
       gitLabThrottler:       Throttler[IO, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[IO],
@@ -62,10 +64,9 @@ private object MicroserviceRoutes {
       timer:            Timer[IO]
   ): IO[MicroserviceRoutes[IO]] =
     for {
-      commitSyncEndpoint <- CommitSyncEndpoint(executionTimeRecorder, logger)
-      authenticator      <- GitLabAuthenticator(gitLabThrottler, logger)
+      eventEndpoint <- EventEndpoint(consumersRegistry, logger)
     } yield new MicroserviceRoutes(
-      commitSyncEndpoint,
+      eventEndpoint,
       new RoutesMetrics[IO](metricsRegistry)
     )
 }
