@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
-import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
 import ch.datascience.graph.model.projects
 import doobie.implicits._
 import io.renku.eventlog.{EventLogDataProvisioning, InMemoryEventLogDb}

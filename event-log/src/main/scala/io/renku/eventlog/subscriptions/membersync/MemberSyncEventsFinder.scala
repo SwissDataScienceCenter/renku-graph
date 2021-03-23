@@ -20,12 +20,13 @@ package io.renku.eventlog.subscriptions.membersync
 
 import cats.effect.{Bracket, ContextShift, IO}
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
+import ch.datascience.graph.model.events.LastSyncedDate
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import doobie.free.connection.ConnectionOp
 import eu.timepit.refined.api.Refined
 import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.subscriptions.{EventFinder, LastSyncedDate, SubscriptionTypeSerializers}
+import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
 
 import java.time.Instant
 
