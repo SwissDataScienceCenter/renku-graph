@@ -105,6 +105,22 @@ eventLog:
   threadsNumber: 6
   connectionPool: 10
 
+commitEventService:
+  image:
+    repository: jachro/commit-event-service
+    tag: '1.34.6-n012.h88c33daf'
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 9006
+  resources:
+    limits:
+      memory: 2000Mi
+  jvmXmx: 200M
+  gitlab:
+    rateLimit: 100/sec
+  threadsNumber: 3
+
 sentry:
   enabled: false
   url: '' # Sentry url
