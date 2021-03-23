@@ -35,11 +35,11 @@ import io.chrisdavenport.log4cats.Logger
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private abstract class MissedEventsLoader[Interpretation[_]] {
-  def loadMissedEvents(commitSyncRequest: CommitSyncEvent): Interpretation[Unit]
+private abstract class MissedEventsGenerator[Interpretation[_]] {
+  def generateMissedEvents(commitSyncRequest: CommitSyncEvent): Interpretation[Unit]
 }
 
-private class IOMissedEventsLoader(
+private class MissedEventsGeneratorImpl(
     accessTokenFinder:     AccessTokenFinder[IO],
     latestCommitFinder:    LatestCommitFinder[IO],
     projectInfoFinder:     ProjectInfoFinder[IO],
@@ -47,7 +47,7 @@ private class IOMissedEventsLoader(
     logger:                Logger[IO],
     executionTimeRecorder: ExecutionTimeRecorder[IO]
 )(implicit contextShift:   ContextShift[IO])
-    extends MissedEventsLoader[IO] {
+    extends MissedEventsGenerator[IO] {
 
   import IOAccessTokenFinder._
   import UpdateResult._
@@ -57,7 +57,7 @@ private class IOMissedEventsLoader(
   import latestCommitFinder._
   import projectInfoFinder._
 
-  def loadMissedEvents(commitSyncRequest: CommitSyncEvent): IO[Unit] =
+  def generateMissedEvents(commitSyncRequest: CommitSyncEvent): IO[Unit] =
     measureExecutionTime {
 
       loadEvents(commitSyncRequest)
@@ -118,7 +118,7 @@ private class IOMissedEventsLoader(
   }
 }
 
-private object IOMissedEventsLoader {
+private object MissedEventsGenerator {
   def apply(
       gitLabThrottler:       Throttler[IO, GitLab],
       executionTimeRecorder: ExecutionTimeRecorder[IO],
@@ -127,12 +127,12 @@ private object IOMissedEventsLoader {
       timer:            Timer[IO],
       contextShift:     ContextShift[IO],
       executionContext: ExecutionContext
-  ): IO[MissedEventsLoader[IO]] =
+  ): IO[MissedEventsGenerator[IO]] =
     for {
       tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
       gitLabUrl          <- GitLabUrl[IO]()
       commitToEventLog   <- IOCommitToEventLog(gitLabThrottler, executionTimeRecorder, logger)
-    } yield new IOMissedEventsLoader(
+    } yield new MissedEventsGeneratorImpl(
       new IOAccessTokenFinder(tokenRepositoryUrl, logger),
       new IOLatestCommitFinder(gitLabUrl, gitLabThrottler, logger),
       new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, logger),

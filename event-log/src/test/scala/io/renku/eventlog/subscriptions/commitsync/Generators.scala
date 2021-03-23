@@ -22,7 +22,7 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestampsNotInTheFuture
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
-import io.renku.eventlog.subscriptions.LastSyncedDate
+import ch.datascience.graph.model.events.LastSyncedDate
 
 private object Generators {
 

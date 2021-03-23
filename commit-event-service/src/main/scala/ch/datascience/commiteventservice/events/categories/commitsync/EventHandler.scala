@@ -1,32 +1,52 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ch.datascience.commiteventservice.events.categories.commitsync
 
 import cats.MonadError
 import cats.data.EitherT.fromEither
-import cats.effect.{ContextShift, IO, Timer}
+import cats.effect.{Concurrent, ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.db.{DbTransactor, SqlQuery}
+import ch.datascience.config.GitLab
+import ch.datascience.control.Throttler
 import ch.datascience.events.consumers
 import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadRequest}
-import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult, Project}
-import ch.datascience.graph.model.events.{BatchDate, CategoryName, CommitId, EventBody, EventId, EventStatus, LastSyncedDate}
-import ch.datascience.graph.model.projects
-import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
+import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
+import ch.datascience.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
+import ch.datascience.logging.ExecutionTimeRecorder
 import io.chrisdavenport.log4cats.Logger
-import io.circe.{Decoder, DecodingFailure, HCursor}
+import io.circe.Decoder
 
 import scala.concurrent.ExecutionContext
+import scala.util.control.NonFatal
 
-private class EventHandler[Interpretation[_]](
+private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
     override val categoryName: CategoryName,
-    missedEventLoader:         MissedEventsLoader[Interpretation],
+    missedEventGenerator:      MissedEventsGenerator[Interpretation],
     logger:                    Logger[Interpretation]
 )(implicit
-    ME: MonadError[Interpretation, Throwable]
+    contextShift: ContextShift[Interpretation],
+    concurrent:   Concurrent[Interpretation]
 ) extends consumers.EventHandler[Interpretation] {
 
   import ch.datascience.graph.model.projects
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
-  import missedEventLoader._
+  import missedEventGenerator._
 
   override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
     for {
@@ -35,57 +55,48 @@ private class EventHandler[Interpretation[_]](
         fromEither[Interpretation](
           request.event.as[CommitSyncEvent].leftMap(_ => BadRequest).leftWiden[EventSchedulingResult]
         )
-      result <- loadMissedEvents(event).toRightT
+      result <- (contextShift.shift *> concurrent
+                  .start(generateMissedEvents(event) recoverWith logError(event))).toRightT
                   .map(_ => Accepted)
-                  .semiflatTap(logger.log(event))
-                  .leftSemiflatTap(logger.log(event))
+                  .semiflatTap(logger log event)
+                  .leftSemiflatTap(logger log event)
     } yield result
   }.merge
 
   private implicit lazy val eventInfoToString: CommitSyncEvent => String = { event =>
-    s"${event.id}, projectPath = ${event.project.path}, lastSynced = ${event.lastSynced}"
+    s"id = ${event.id}, projectId = ${event.project.id}, projectPath = ${event.project.path}, lastSynced = ${event.lastSynced}"
   }
 
-  private implicit val eventDecoder: Decoder[CommitSyncEvent] = (cursor: HCursor) =>
-    cursor.downField("status").as[Option[String]] flatMap {
-      case "COMMIT_SYNC" =>
-        for {
-          id          <- cursor.downField("id").as[CommitId]
-          projectId   <- cursor.downField("project").as[projects.Id]
-          projectPath <- cursor.downField("project").as[projects.Path]
-          lastSynced  <- cursor.downField("id").as[LastSyncedDate]
+  private def logError(event: CommitSyncEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      logger.logError(event, exception)
+      exception.raiseError[Interpretation, Unit]
+  }
 
-        } yield CommitSyncEvent(categoryName, id, CommitProject(projectId, projectPath), lastSynced)
+  private implicit val eventDecoder: Decoder[CommitSyncEvent] = cursor =>
+    for {
+      id         <- cursor.downField("id").as[CommitId]
+      project    <- cursor.downField("project").as[CommitProject]
+      lastSynced <- cursor.downField("lastSynced").as[LastSyncedDate]
+    } yield CommitSyncEvent(categoryName, id, project, lastSynced)
 
-      case Some(invalidStatus) =>
-        Left(DecodingFailure(s"Status $invalidStatus is not valid. Only NEW or SKIPPED are accepted", Nil))
-    }
-
-//  private def verifyMessage(result: Decoder.Result[Option[String]]) =
-//    result
-//      .map(blankToNone)
-//      .flatMap {
-//        case None          => Left(DecodingFailure(s"Skipped Status requires message", Nil))
-//        case Some(message) => EventMessage.from(message.value)
-//      }
-//      .leftMap(_ => DecodingFailure("Invalid Skipped Event message", Nil))
-
-  implicit val projectDecoder: Decoder[Project] = (cursor: HCursor) =>
+  private implicit lazy val projectDecoder: Decoder[CommitProject] = cursor =>
     for {
       id   <- cursor.downField("id").as[projects.Id]
       path <- cursor.downField("path").as[projects.Path]
-    } yield Project(id, path)
+    } yield CommitProject(id, path)
 }
 
 private object EventHandler {
-  def apply(waitingEventsGauge: LabeledGauge[IO, projects.Path],
-            queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name],
-            logger:             Logger[IO]
+  def apply(
+      gitLabThrottler:       Throttler[IO, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[IO],
+      logger:                Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    missedEventsLoader <- IOMissedEventsLoader(gitLabThrottler = ???, executionTimeRecorder = ???, logger = logger)
-  } yield new EventHandler[IO](CategoryName("COMMIT_SYNC"), missedEventsLoader, logger)
+    missedEventsGenerator <- MissedEventsGenerator(gitLabThrottler, executionTimeRecorder, logger)
+  } yield new EventHandler[IO](categoryName, missedEventsGenerator, logger)
 }

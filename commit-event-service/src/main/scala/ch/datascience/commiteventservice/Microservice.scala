@@ -55,13 +55,12 @@ object Microservice extends IOMicroservice {
     metricsRegistry       <- MetricsRegistry()
     eventConsumersRegistry <-
       consumers.EventConsumersRegistry(ApplicationLogger) // TODO: add event log's COMMIT_SYNC subscription
-    microserviceRoutes <-
-      MicroserviceRoutes(eventConsumersRegistry,
-                         metricsRegistry,
-                         gitLabThrottler,
-                         executionTimeRecorder,
-                         ApplicationLogger
-      )
+    microserviceRoutes <- MicroserviceRoutes(eventConsumersRegistry,
+                                             metricsRegistry,
+                                             gitLabThrottler,
+                                             executionTimeRecorder,
+                                             ApplicationLogger
+                          )
     exitcode <- microserviceRoutes.routes.use { routes =>
                   val httpServer = new HttpServer[IO](serverPort = 9001, routes)
 

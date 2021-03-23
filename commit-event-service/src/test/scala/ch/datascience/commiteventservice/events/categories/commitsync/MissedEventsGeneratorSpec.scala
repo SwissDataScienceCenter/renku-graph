@@ -42,7 +42,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
 import scala.concurrent.ExecutionContext.global
 
-class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.Matchers {
+class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should.Matchers {
   import IOAccessTokenFinder._
 
   "loadMissedEvents" should {
@@ -54,7 +54,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
 
         givenLatestCommitAndLogEventMatch(commitSyncEvent)
 
-        eventsLoader.loadMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
+        eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
 
         logger.logged(
           Info(
@@ -82,7 +82,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
           StartCommit(id = commitInfo.id, project = Project(projectInfo.id, projectInfo.path))
         ).returning(IO.unit)
 
-        eventsLoader.loadMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
+        eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
 
         logger.logged(
           Info(
@@ -99,7 +99,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
       givenFetchLatestCommit(commitSyncEvent.project.id, maybeAccessToken1)
         .returning(OptionT.none[IO, CommitInfo])
 
-      eventsLoader.loadMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
+      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
 
       logger.logged(
         Info(
@@ -118,7 +118,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
         .expects(commitSyncEvent.project.path, projectPathToPath)
         .returning(context.raiseError(exception))
 
-      eventsLoader.loadMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
+      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
 
       logger.logged(Error(s"Synchronizing Commits for project ${commitSyncEvent.project.path} failed", exception))
       logger.logged(
@@ -140,7 +140,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
       givenFindingProjectInfo(commitSyncEvent, maybeAccessToken1)
         .returning(context.raiseError(exception))
 
-      eventsLoader.loadMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
+      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Error(s"Synchronizing Commits for project ${commitSyncEvent.project.path} failed", exception),
@@ -166,7 +166,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
         StartCommit(id = commitInfo1.id, project = Project(projectInfo1.id, projectInfo1.path))
       ).returning(IO.raiseError(exception))
 
-      eventsLoader.loadMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
+      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
 
       logger.loggedOnly(
         Error(s"Synchronizing Commits for project ${commitSyncEvent.project.path} failed", exception),
@@ -188,7 +188,7 @@ class IOMissedEventsLoaderSpec extends AnyWordSpec with MockFactory with should.
     val commitToEventLog      = mock[CommitToEventLog[IO]]
     val logger                = TestLogger[IO]()
     val executionTimeRecorder = TestExecutionTimeRecorder[IO](logger)
-    val eventsLoader = new IOMissedEventsLoader(
+    val eventsGenerator = new MissedEventsGeneratorImpl(
       accessTokenFinder,
       latestCommitFinder,
       projectInfoFinder,

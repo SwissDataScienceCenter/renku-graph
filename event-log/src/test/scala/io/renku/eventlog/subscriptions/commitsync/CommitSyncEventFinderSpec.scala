@@ -19,13 +19,12 @@
 package io.renku.eventlog.subscriptions
 package commitsync
 
-import cats.Eval
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.events.{CompoundEventId, LastSyncedDate}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._

@@ -18,9 +18,9 @@
 
 package io.renku.eventlog.subscriptions.commitsync
 
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.events.{CompoundEventId, LastSyncedDate}
 import ch.datascience.graph.model.projects
-import io.renku.eventlog.subscriptions.{EventEncoder, LastSyncedDate}
+import io.renku.eventlog.subscriptions.EventEncoder
 
 private final case class CommitSyncEvent(id:             CompoundEventId,
                                          projectPath:    projects.Path,

@@ -16,18 +16,10 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice
+package ch.datascience.commiteventservice.events.categories
 
-import ch.datascience.generators.Generators.Implicits.GenOps
-import ch.datascience.generators.Generators.timestamps
-import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
-import ch.datascience.graph.model.events.{CategoryName, CommitId, LastSyncedDate}
-import ch.datascience.graph.model.projects
-import org.scalacheck.Gen
-import cats.syntax.all._
+import ch.datascience.graph.model.events.CategoryName
 
-import java.time.{Duration, Instant}
-import java.time.Instant.now
-
-package object commitsync {}
+package object commitsync {
+  val categoryName: CategoryName = CategoryName("COMMIT_SYNC")
+}
