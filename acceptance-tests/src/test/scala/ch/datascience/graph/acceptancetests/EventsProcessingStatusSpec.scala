@@ -111,7 +111,7 @@ class EventsProcessingStatusSpec
       projectId:          Id,
       projectPath:        Path
   )(implicit accessToken: AccessToken): Unit = {
-    `GET <gitlabApi>/projects/:id returning OK with Project Path`(projectId, projectPath)
+    `GET <gitlabApi>/projects/:id returning OK`(projectId, projectPath)
     tokenRepositoryClient
       .PUT(s"projects/$projectId/tokens", accessToken.toJson, maybeAccessToken = None)
       .status shouldBe NoContent
@@ -129,6 +129,9 @@ class EventsProcessingStatusSpec
                                                                                         allCommitIds.head,
                                                                                         allCommitIds.tail.toSet
     )
+
+    `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(project.id, allCommitIds.head)
+
     // assuring there's project info in GitLab for the triples curation process
     `GET <gitlabApi>/projects/:path returning OK with`(project)
 

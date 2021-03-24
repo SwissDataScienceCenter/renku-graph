@@ -27,7 +27,7 @@ import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.CommitId
-import ch.datascience.graph.model.projects.{Id, Name, Path, Visibility}
+import ch.datascience.graph.model.projects.{DateCreated, Id, Name, Path, Visibility}
 import ch.datascience.graph.model.users
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.AccessToken.{OAuthAccessToken, PersonalAccessToken}
@@ -69,23 +69,6 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:id returning OK`(
-      projectId:          Id,
-      projectName:        Name = projectNames.generateOne,
-      projectVisibility:  Visibility
-  )(implicit accessToken: AccessToken): Unit = {
-    stubFor {
-      get(s"/api/v4/projects/$projectId").withAccessTokenInHeader
-        .willReturn(okJson(json"""{
-          "id":                  ${projectId.value}, 
-          "visibility":          ${projectVisibility.value},
-          "name":                ${projectName.value},
-          "path_with_namespace": ${projectPaths.generateOne.value}
-        }""".noSpaces))
-    }
-    ()
-  }
-
   def `GET <gitlabApi>/projects/:id/hooks returning OK with the hook`(
       projectId:          Id
   )(implicit accessToken: AccessToken): Unit = {
@@ -120,17 +103,35 @@ object GitLab {
   def `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(
       projectId:          Id,
       commitIds:          CommitId*
-  )(implicit accessToken: AccessToken): Unit = {
+  )(implicit accessToken: AccessToken): Any = {
 
     val getLatestCommit = get(s"/api/v4/projects/$projectId/repository/commits?per_page=1").withAccessTokenInHeader
-      .inScenario(s"fetch latest commit for $projectId")
 
-    commitIds.zipWithIndex foreach { case (commitId, idx) =>
+    if (commitIds.size == 1)
       stubFor {
         getLatestCommit
-          .whenScenarioStateIs(if (idx == 0) Scenario.STARTED else s"call $idx")
-          .willSetStateTo(s"call ${idx + 1}")
           .willReturn(okJson(json"""[
+          {
+            "id":              ${commitIds.head.value},
+            "author_name":     ${nonEmptyStrings().generateOne},
+            "author_email":    ${userEmails.generateOne.value},
+            "committer_name":  ${nonEmptyStrings().generateOne},
+            "committer_email": ${userEmails.generateOne.value},
+            "message":         ${nonEmptyStrings().generateOne},
+            "committed_date":  ${committedDates.generateOne.value.toString},
+            "parent_ids":      []
+          }                         
+        ]""".noSpaces))
+      }
+    else {
+      val getLatestCommitWithScenario = getLatestCommit.inScenario(s"fetch latest commit for $projectId")
+
+      commitIds.zipWithIndex foreach { case (commitId, idx) =>
+        stubFor {
+          getLatestCommitWithScenario
+            .whenScenarioStateIs(if (idx == 0) Scenario.STARTED else s"call $idx")
+            .willSetStateTo(s"call ${idx + 1}")
+            .willReturn(okJson(json"""[
           {
             "id":              ${commitId.value},
             "author_name":     ${nonEmptyStrings().generateOne},
@@ -142,6 +143,7 @@ object GitLab {
             "parent_ids":      []
           }                         
         ]""".noSpaces))
+        }
       }
     }
   }
@@ -162,27 +164,6 @@ object GitLab {
           "message":         ${nonEmptyStrings().generateOne},
           "committed_date":  ${committedDates.generateOne.value.toString},
           "parent_ids":      ${parentIds.map(_.value).toList}
-        }""".noSpaces))
-    }
-    ()
-  }
-
-  def `GET <gitlabApi>/projects/:id returning OK with Project Path`(
-      project:            Project
-  )(implicit accessToken: AccessToken): Unit =
-    `GET <gitlabApi>/projects/:id returning OK with Project Path`(project.id, project.path, project.name)
-
-  def `GET <gitlabApi>/projects/:id returning OK with Project Path`(
-      projectId:          Id,
-      projectPath:        Path,
-      projectName:        Name = projectNames.generateOne
-  )(implicit accessToken: AccessToken): Unit = {
-    stubFor {
-      get(s"/api/v4/projects/$projectId").withAccessTokenInHeader
-        .willReturn(okJson(json"""{
-          "id":                  ${projectId.value},
-          "name":                ${projectName.value},
-          "path_with_namespace": ${projectPath.value}
         }""".noSpaces))
     }
     ()
@@ -212,21 +193,35 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:path returning BadRequest`(
+  def `GET <gitlabApi>/projects/:id returning OK`(
       project:            Project
-  )(implicit accessToken: AccessToken): StubMapping =
-    stubFor {
-      get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
-        .willReturn(badRequest())
-    }
+  )(implicit accessToken: AccessToken): Unit =
+    `GET <gitlabApi>/projects/:id returning OK`(project.id,
+                                                project.path,
+                                                project.name,
+                                                project.visibility,
+                                                project.created.date
+    )
 
-  def `GET <gitlabApi>/projects/:path having connectivity issues`(
-      project:            Project
-  )(implicit accessToken: AccessToken): StubMapping =
+  def `GET <gitlabApi>/projects/:id returning OK`(
+      projectId:          Id,
+      projectPath:        Path = projectPaths.generateOne,
+      projectName:        Name = projectNames.generateOne,
+      projectVisibility:  Visibility = projectVisibilities.generateOne,
+      dateCreated:        DateCreated = projectCreatedDates.generateOne
+  )(implicit accessToken: AccessToken): Unit = {
     stubFor {
-      get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
-        .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
+      get(s"/api/v4/projects/$projectId").withAccessTokenInHeader
+        .willReturn(okJson(json"""{
+          "id":                  ${projectId.value}, 
+          "visibility":          ${projectVisibility.value},
+          "name":                ${projectName.value},
+          "path_with_namespace": ${projectPath.value},
+          "created_at":          ${dateCreated.value}
+        }""".noSpaces))
     }
+    ()
+  }
 
   def `GET <gitlabApi>/projects/:path returning OK with`(
       project:            Project,
@@ -319,6 +314,22 @@ object GitLab {
     }
     ()
   }
+
+  def `GET <gitlabApi>/projects/:path returning BadRequest`(
+      project:            Project
+  )(implicit accessToken: AccessToken): StubMapping =
+    stubFor {
+      get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
+        .willReturn(badRequest())
+    }
+
+  def `GET <gitlabApi>/projects/:path having connectivity issues`(
+      project:            Project
+  )(implicit accessToken: AccessToken): StubMapping =
+    stubFor {
+      get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
+        .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
+    }
 
   private implicit class MappingBuilderOps(builder: MappingBuilder) {
     def withAccessTokenInHeader(implicit accessToken: AccessToken): MappingBuilder = accessToken match {
