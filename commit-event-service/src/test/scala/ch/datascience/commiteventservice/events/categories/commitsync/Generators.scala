@@ -20,15 +20,21 @@ package ch.datascience.commiteventservice.events.categories.commitsync
 
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.events.CategoryName
 import org.scalacheck.Gen
 
 private object Generators {
 
-  implicit lazy val commitSyncEvents: Gen[CommitSyncEvent] = for {
+  lazy val fullCommitSyncEvents: Gen[FullCommitSyncEvent] = for {
     commitId       <- commitIds
     projectId      <- projectIds
     projectPath    <- projectPaths
     lastSyncedDate <- lastSyncedDates
-  } yield CommitSyncEvent(CategoryName("COMMIT_SYNC"), commitId, CommitProject(projectId, projectPath), lastSyncedDate)
+  } yield FullCommitSyncEvent(commitId, CommitProject(projectId, projectPath), lastSyncedDate)
+
+  lazy val minimalCommitSyncEvents: Gen[MinimalCommitSyncEvent] = for {
+    projectId   <- projectIds
+    projectPath <- projectPaths
+  } yield MinimalCommitSyncEvent(CommitProject(projectId, projectPath))
+
+  lazy val commitSyncEvents: Gen[CommitSyncEvent] = Gen.oneOf(fullCommitSyncEvents, minimalCommitSyncEvents)
 }

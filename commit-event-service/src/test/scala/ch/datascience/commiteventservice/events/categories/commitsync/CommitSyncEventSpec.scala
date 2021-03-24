@@ -25,14 +25,22 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class CommitSyncEventSpec extends AnyWordSpec with should.Matchers {
 
-  "toString" should {
+  "FullCommitSyncEvent.toString" should {
 
     "print out the event id, project id and path along with the last sync date" in {
-      val event = commitSyncEvents.generateOne
+      val event = fullCommitSyncEvents.generateOne
       event.toString shouldBe s"id = ${event.id}, " +
         s"projectId = ${event.project.id}, " +
         s"projectPath = ${event.project.path}, " +
         s"lastSynced = ${event.lastSynced}"
+    }
+  }
+
+  "MinimalCommitSyncEvent.toString" should {
+
+    "print out the event id, project id and path along with the last sync date" in {
+      val event = minimalCommitSyncEvents.generateOne
+      event.toString shouldBe s"projectId = ${event.project.id}, projectPath = ${event.project.path}"
     }
   }
 }

@@ -18,7 +18,7 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync
 
-import Generators.commitSyncEvents
+import Generators._
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.MissedEventsGenerator
@@ -49,9 +49,24 @@ class EventHandlerSpec
 
     "decode an event from the request, " +
       "schedule commit synchronization " +
-      s"and return $Accepted" in new TestCase {
+      s"and return $Accepted - full commit sync event case" in new TestCase {
 
-        val event = commitSyncEvents.generateOne
+        val event = fullCommitSyncEvents.generateOne
+
+        (missedEventsGenerator.generateMissedEvents _)
+          .expects(event)
+          .returning(().pure[IO])
+
+        handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
+
+        logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
+      }
+
+    "decode an event from the request, " +
+      "schedule commit synchronization " +
+      s"and return $Accepted - minimal commit sync event case" in new TestCase {
+
+        val event = minimalCommitSyncEvents.generateOne
 
         (missedEventsGenerator.generateMissedEvents _)
           .expects(event)
@@ -112,15 +127,22 @@ class EventHandlerSpec
     def requestContent(event: Json): EventRequestContent = EventRequestContent(event, None)
   }
 
-  private implicit lazy val eventEncoder: Encoder[CommitSyncEvent] = Encoder.instance[CommitSyncEvent] { event =>
-    json"""{
-      "categoryName": "COMMIT_SYNC",
-      "id":           ${event.id.value},
-      "project": {
-        "id":   ${event.project.id.value},
-        "path": ${event.project.path.value}
-      },
-      "lastSynced": ${event.lastSynced.value}
-    }"""
+  private implicit def eventEncoder[E <: CommitSyncEvent]: Encoder[E] = Encoder.instance[E] {
+    case FullCommitSyncEvent(id, project, lastSynced) => json"""{
+        "categoryName": "COMMIT_SYNC",
+        "id":           ${id.value},
+        "project": {
+          "id":         ${project.id.value},
+          "path":       ${project.path.value}
+        },
+        "lastSynced":   ${lastSynced.value}
+      }"""
+    case MinimalCommitSyncEvent(project)              => json"""{
+        "categoryName": "COMMIT_SYNC",
+        "project": {
+          "id":         ${project.id.value},
+          "path":       ${project.path.value}
+        }
+      }"""
   }
 }

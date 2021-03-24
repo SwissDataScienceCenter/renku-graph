@@ -50,7 +50,7 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
     "do nothing if the latest eventIds in the Event Log " +
       "matches the latest commits in GitLab for relevant projects" in new TestCase {
 
-        val commitSyncEvent = commitSyncEvents.generateOne
+        val commitSyncEvent = fullCommitSyncEvents.generateOne
 
         givenLatestCommitAndLogEventMatch(commitSyncEvent)
 
@@ -63,7 +63,7 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
 
     "add missing events to the Event Log " +
       "when the latest eventId differs from the latest commit in GitLab" in new TestCase {
-        val commitSyncEvent  = commitSyncEvents.generateOne
+        val commitSyncEvent  = fullCommitSyncEvents.generateOne
         val maybeAccessToken = Gen.option(accessTokens).generateOne
 
         givenAccessToken(commitSyncEvent.project.path, maybeAccessToken)
@@ -86,6 +86,31 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
           Info(s"${logMessageCommon(commitSyncEvent)} -> new events found in ${executionTimeRecorder.elapsedTime}ms")
         )
       }
+
+    "add all events to the Event Log in the case of the minimal commit sync event" in new TestCase {
+      val commitSyncEvent  = minimalCommitSyncEvents.generateOne
+      val maybeAccessToken = Gen.option(accessTokens).generateOne
+
+      givenAccessToken(commitSyncEvent.project.path, maybeAccessToken)
+      val projectInfo = projectInfos.generateOne.copy(id = commitSyncEvent.project.id)
+
+      val commitInfo = commitInfos.generateOne
+      givenFetchLatestCommit(commitSyncEvent.project.id, maybeAccessToken)
+        .returning(OptionT.some[IO](commitInfo))
+
+      givenFindingProjectInfo(commitSyncEvent, maybeAccessToken)
+        .returning(projectInfo.pure[IO])
+
+      givenStoring(
+        StartCommit(id = commitInfo.id, project = Project(projectInfo.id, projectInfo.path))
+      ).returning(IO.unit)
+
+      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ()
+
+      logger.logged(
+        Info(s"${logMessageCommon(commitSyncEvent)} -> new events found in ${executionTimeRecorder.elapsedTime}ms")
+      )
+    }
 
     "do nothing if there are no commits in GitLab (e.g. project removed)" in new TestCase {
       val commitSyncEvent = commitSyncEvents.generateOne
@@ -190,7 +215,7 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
       executionTimeRecorder
     )
 
-    def givenLatestCommitAndLogEventMatch(latestCommit: CommitSyncEvent): Unit = {
+    def givenLatestCommitAndLogEventMatch(latestCommit: FullCommitSyncEvent): Unit = {
       val maybeAccessToken = Gen.option(accessTokens).generateOne
       givenAccessToken(latestCommit.project.path, maybeAccessToken)
 

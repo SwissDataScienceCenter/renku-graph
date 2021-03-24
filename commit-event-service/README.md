@@ -35,6 +35,18 @@ Accepts an event as multipart requests.
 }
 ```
 
+or
+
+```json
+{
+  "categoryName": "COMMIT_SYNC",
+  "project": {
+    "id": 12,
+    "path": "project/path"
+  }
+}
+```
+
 ##### Response
 
 | Status                     | Description                                                                  |

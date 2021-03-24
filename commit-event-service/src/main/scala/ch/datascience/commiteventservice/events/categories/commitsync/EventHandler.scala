@@ -73,11 +73,17 @@ private[events] class EventHandler[Interpretation[_]: MonadError[*[_], Throwable
   }
 
   private implicit val eventDecoder: Decoder[CommitSyncEvent] = cursor =>
-    for {
-      id         <- cursor.downField("id").as[CommitId]
-      project    <- cursor.downField("project").as[CommitProject]
-      lastSynced <- cursor.downField("lastSynced").as[LastSyncedDate]
-    } yield CommitSyncEvent(categoryName, id, project, lastSynced)
+    cursor.downField("id").as[Option[CommitId]] flatMap {
+      case Some(id) =>
+        for {
+          project    <- cursor.downField("project").as[CommitProject]
+          lastSynced <- cursor.downField("lastSynced").as[LastSyncedDate]
+        } yield FullCommitSyncEvent(id, project, lastSynced)
+      case None =>
+        for {
+          project <- cursor.downField("project").as[CommitProject]
+        } yield MinimalCommitSyncEvent(project)
+    }
 
   private implicit lazy val projectDecoder: Decoder[CommitProject] = cursor =>
     for {

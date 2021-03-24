@@ -80,12 +80,12 @@ private class MissedEventsGeneratorImpl(
   private def addEventsIfMissing(event:             CommitSyncEvent,
                                  maybeLatestCommit: Option[CommitInfo],
                                  maybeAccessToken:  Option[AccessToken]
-  ) = maybeLatestCommit match {
-    case None                                          => Skipped.pure[IO]
-    case Some(commitInfo) if commitInfo.id == event.id => Skipped.pure[IO]
-    case Some(commitInfo) =>
+  ) = maybeLatestCommit -> event match {
+    case (None, _)                                                                => Skipped.pure[IO]
+    case (Some(commitInfo), FullCommitSyncEvent(id, _, _)) if commitInfo.id == id => Skipped.pure[IO]
+    case (Some(commitInfo), syncEvent) =>
       for {
-        projectInfo <- findProjectInfo(event.project.id, maybeAccessToken)
+        projectInfo <- findProjectInfo(syncEvent.project.id, maybeAccessToken)
         startCommit <- startCommitFrom(commitInfo, projectInfo)
         _           <- storeCommitsInEventLog(startCommit)
       } yield Updated
