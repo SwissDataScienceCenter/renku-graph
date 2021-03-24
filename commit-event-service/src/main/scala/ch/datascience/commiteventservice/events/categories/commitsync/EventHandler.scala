@@ -64,9 +64,7 @@ private[events] class EventHandler[Interpretation[_]: MonadError[*[_], Throwable
     } yield result
   }.merge
 
-  private implicit lazy val eventInfoToString: CommitSyncEvent => String = { event =>
-    s"id = ${event.id}, projectId = ${event.project.id}, projectPath = ${event.project.path}, lastSynced = ${event.lastSynced}"
-  }
+  private implicit lazy val eventInfoToString: CommitSyncEvent => String = _.toString
 
   private def logError(event: CommitSyncEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
     case NonFatal(exception) =>

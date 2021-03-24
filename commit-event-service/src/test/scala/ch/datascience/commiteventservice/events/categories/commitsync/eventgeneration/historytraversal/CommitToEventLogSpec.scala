@@ -16,14 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
+package ch.datascience.commiteventservice.events.categories.commitsync
+package eventgeneration
 package historytraversal
 
+import CommitEvent._
+import EventCreationResult._
 import Generators._
 import cats.MonadError
 import cats.syntax.all._
-import CommitEvent._
-import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.EventCreationResult._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -306,23 +307,23 @@ class CommitToEventLogSpec extends AnyWordSpec with MockFactory with should.Matc
                           existed:      Int,
                           failed:       Int
     ): String =
-      s"Start Commit id: ${startCommit.id}, project: ${startCommit.project.id}: " +
-        s"$commitEvents Commit Events generated: $created created, $existed existed, $failed failed in ${executionTimeRecorder.elapsedTime}ms"
+      s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
+        s"events generation result: $created created, $existed existed, $failed failed in ${executionTimeRecorder.elapsedTime}ms"
 
     def failedFinding(startCommit: StartCommit): String =
-      s"Start Commit id: ${startCommit.id}, project: ${startCommit.project.id}: " +
+      s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
         "finding commit events failed"
 
     def generalFailure(startCommit: StartCommit): String =
-      s"Start Commit id: ${startCommit.id}, project: ${startCommit.project.id}: " +
+      s"$categoryName: id = ${startCommit.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
         "converting to commit events failed"
 
     def failedStoring(startCommit: StartCommit, commitEvent: CommitEvent): String =
-      s"Start Commit id: ${startCommit.id}, project: ${startCommit.project.id}, CommitEvent id: ${commitEvent.id}: " +
+      s"$categoryName: id = ${startCommit.id}, addedId = ${commitEvent.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
         "storing in the event log failed"
 
     def failedEventFinding(startCommit: StartCommit, commitEvent: CommitEvent): String =
-      s"Start Commit id: ${startCommit.id}, project: ${startCommit.project.id}, CommitEvent id: ${commitEvent.id}: " +
+      s"$categoryName: id = ${startCommit.id}, addedId = ${commitEvent.id}, projectId = ${startCommit.project.id}, projectPath = ${startCommit.project.path} -> " +
         "finding event in the event log failed"
 
     def commitEventsFrom(startCommit: StartCommit, minParents: Int Refined NonNegative = 0): Gen[List[CommitEvent]] =

@@ -28,7 +28,10 @@ private final case class CommitSyncEvent(categoryName: CategoryName,
                                          id:           CommitId,
                                          project:      CommitProject,
                                          lastSynced:   LastSyncedDate
-)
+) {
+  override lazy val toString: String =
+    s"id = $id, projectId = ${project.id}, projectPath = ${project.path}, lastSynced = $lastSynced"
+}
 
 private final case class ProjectInfo(
     id:         Id,

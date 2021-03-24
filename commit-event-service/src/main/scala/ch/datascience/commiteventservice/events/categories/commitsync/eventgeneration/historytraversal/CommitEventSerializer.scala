@@ -46,11 +46,11 @@ private class CommitEventSerializer[Interpretation[_]](implicit ME: MonadError[I
 
   private implicit def personEncoder[E <: Person]: Encoder[E] = Encoder.instance[E] {
     case person: Person.WithEmail => json"""{
-      "username": ${person.name.value},
-      "email"   : ${person.email.value}
-    }"""
+        "username": ${person.name.value},
+        "email"   : ${person.email.value}
+      }"""
     case person: Person           => json"""{
-      "username": ${person.name.value}
-    }"""
+        "username": ${person.name.value}
+      }"""
   }
 }

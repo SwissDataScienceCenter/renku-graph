@@ -18,7 +18,6 @@
 
 package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal
 
-import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.control.Throttler
@@ -36,12 +35,11 @@ private trait EventDetailsFinder[Interpretation[_]] {
   def checkIfExists(commitId: CommitId, projectId: projects.Id): Interpretation[Boolean]
 }
 
-private class EventDetailsFinderImpl(eventLogUrl: EventLogUrl, logger: Logger[IO])(implicit
-    ME:                                           MonadError[IO, Throwable],
-    executionContext:                             ExecutionContext,
-    contextShift:                                 ContextShift[IO],
-    timer:                                        Timer[IO]
-) extends IORestClient(Throttler.noThrottling, logger)
+private class EventDetailsFinderImpl(
+    eventLogUrl:             EventLogUrl,
+    logger:                  Logger[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORestClient(Throttler.noThrottling, logger)
     with EventDetailsFinder[IO] {
 
   import org.http4s.Method.GET

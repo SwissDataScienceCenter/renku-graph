@@ -59,11 +59,7 @@ class EventHandlerSpec
 
         handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
 
-        logger.loggedOnly(
-          Info(
-            s"${handler.categoryName}: id = ${event.id}, projectId = ${event.project.id}, projectPath = ${event.project.path}, lastSynced = ${event.lastSynced} -> $Accepted"
-          )
-        )
+        logger.loggedOnly(Info(s"${logMessageCommon(event)} -> $Accepted"))
       }
 
     s"return $Accepted and log an error if scheduling missed events generation fails" in new TestCase {
@@ -76,14 +72,10 @@ class EventHandlerSpec
 
       handler.handle(requestContent(event.asJson)).unsafeRunSync() shouldBe Accepted
 
-      logger.getMessages(Info).map(_.message) should contain(
-        s"${handler.categoryName}: id = ${event.id}, projectId = ${event.project.id}, projectPath = ${event.project.path}, lastSynced = ${event.lastSynced} -> $Accepted"
-      )
+      logger.getMessages(Info).map(_.message) should contain only s"${logMessageCommon(event)} -> $Accepted"
 
       eventually {
-        logger.getMessages(Error).map(_.message) should contain(
-          s"${handler.categoryName}: id = ${event.id}, projectId = ${event.project.id}, projectPath = ${event.project.path}, lastSynced = ${event.lastSynced} -> Failure"
-        )
+        logger.getMessages(Error).map(_.message) should contain only s"${logMessageCommon(event)} -> Failure"
       }
     }
 

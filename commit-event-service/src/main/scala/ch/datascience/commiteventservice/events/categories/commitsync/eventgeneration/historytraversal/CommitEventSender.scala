@@ -56,16 +56,15 @@ private class CommitEventSenderImpl(
   import org.http4s.Method.POST
   import org.http4s.{Request, Response}
 
-  def send(commitEvent: CommitEvent): IO[Unit] =
-    for {
-      serialisedEvent <- serialiseToJsonString(commitEvent)
-      eventBody       <- ME.fromEither(EventBody.from(serialisedEvent))
-      uri             <- validateUri(s"$eventLogUrl/events")
-      sendingResult <-
-        send(request(POST, uri).withMultipartBuilder.addPart("event", (commitEvent -> eventBody).asJson).build())(
-          mapResponse
-        )
-    } yield sendingResult
+  def send(commitEvent: CommitEvent): IO[Unit] = for {
+    serialisedEvent <- serialiseToJsonString(commitEvent)
+    eventBody       <- ME.fromEither(EventBody.from(serialisedEvent))
+    uri             <- validateUri(s"$eventLogUrl/events")
+    sendingResult <-
+      send(request(POST, uri).withMultipartBuilder.addPart("event", (commitEvent -> eventBody).asJson).build())(
+        mapResponse
+      )
+  } yield sendingResult
 
   private implicit lazy val entityEncoder: Encoder[(CommitEvent, EventBody)] =
     Encoder.instance[(CommitEvent, EventBody)] {

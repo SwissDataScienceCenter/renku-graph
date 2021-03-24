@@ -16,13 +16,23 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories
+package ch.datascience.commiteventservice.events.categories.commitsync
 
-import ch.datascience.graph.model.events.CategoryName
+import Generators._
+import ch.datascience.generators.Generators.Implicits._
+import org.scalatest.matchers.should
+import org.scalatest.wordspec.AnyWordSpec
 
-package object commitsync {
-  val categoryName: CategoryName = CategoryName("COMMIT_SYNC")
+class CommitSyncEventSpec extends AnyWordSpec with should.Matchers {
 
-  private[commitsync] def logMessageCommon(event: CommitSyncEvent): String =
-    s"$categoryName: id = ${event.id}, projectId = ${event.project.id}, projectPath = ${event.project.path}, lastSynced = ${event.lastSynced}"
+  "toString" should {
+
+    "print out the event id, project id and path along with the last sync date" in {
+      val event = commitSyncEvents.generateOne
+      event.toString shouldBe s"id = ${event.id}, " +
+        s"projectId = ${event.project.id}, " +
+        s"projectPath = ${event.project.path}, " +
+        s"lastSynced = ${event.lastSynced}"
+    }
+  }
 }

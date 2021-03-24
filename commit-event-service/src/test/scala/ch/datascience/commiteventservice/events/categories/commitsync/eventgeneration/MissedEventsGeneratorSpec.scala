@@ -16,15 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
+package ch.datascience.commiteventservice.events.categories.commitsync
+package eventgeneration
 
 import Generators.{commitInfos, projectInfos}
-import cats.MonadError
 import cats.data.OptionT
 import cats.effect.{ContextShift, IO}
+import cats.syntax.all._
 import ch.datascience.commiteventservice.events.categories.commitsync.Generators._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.CommitToEventLog
-import ch.datascience.commiteventservice.events.categories.commitsync.CommitSyncEvent
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -54,12 +54,10 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
 
         givenLatestCommitAndLogEventMatch(commitSyncEvent)
 
-        eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
+        eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ()
 
         logger.logged(
-          Info(
-            s"Syncing Commits with GitLab Skipped in ${executionTimeRecorder.elapsedTime}ms: "
-          )
+          Info(s"${logMessageCommon(commitSyncEvent)} -> no new events found in ${executionTimeRecorder.elapsedTime}ms")
         )
       }
 
@@ -76,18 +74,16 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
           .returning(OptionT.some[IO](commitInfo))
 
         givenFindingProjectInfo(commitSyncEvent, maybeAccessToken)
-          .returning(context.pure(projectInfo))
+          .returning(projectInfo.pure[IO])
 
         givenStoring(
           StartCommit(id = commitInfo.id, project = Project(projectInfo.id, projectInfo.path))
         ).returning(IO.unit)
 
-        eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
+        eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ()
 
         logger.logged(
-          Info(
-            s"Syncing Commits with GitLab Updated in ${executionTimeRecorder.elapsedTime}ms: "
-          )
+          Info(s"${logMessageCommon(commitSyncEvent)} -> new events found in ${executionTimeRecorder.elapsedTime}ms")
         )
       }
 
@@ -99,12 +95,10 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
       givenFetchLatestCommit(commitSyncEvent.project.id, maybeAccessToken1)
         .returning(OptionT.none[IO, CommitInfo])
 
-      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
+      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ()
 
       logger.logged(
-        Info(
-          s"Syncing Commits with GitLab Skipped in ${executionTimeRecorder.elapsedTime}ms: "
-        )
+        Info(s"${logMessageCommon(commitSyncEvent)} -> no new events found in ${executionTimeRecorder.elapsedTime}ms")
       )
     }
 
@@ -116,14 +110,14 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
       (accessTokenFinder
         .findAccessToken(_: Path)(_: Path => String))
         .expects(commitSyncEvent.project.path, projectPathToPath)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, Option[AccessToken]])
 
-      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
+      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ()
 
-      logger.logged(Error(s"Synchronizing Commits for project ${commitSyncEvent.project.path} failed", exception))
       logger.logged(
-        Info(
-          s"Syncing Commits with GitLab Failed in ${executionTimeRecorder.elapsedTime}ms: "
+        Error(
+          s"${logMessageCommon(commitSyncEvent)} -> synchronization failed in ${executionTimeRecorder.elapsedTime}ms",
+          exception
         )
       )
     }
@@ -138,14 +132,14 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
         .returning(OptionT.some[IO](commitInfo1))
       val exception = exceptions.generateOne
       givenFindingProjectInfo(commitSyncEvent, maybeAccessToken1)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, ProjectInfo])
 
-      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
+      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Error(s"Synchronizing Commits for project ${commitSyncEvent.project.path} failed", exception),
-        Info(
-          s"Syncing Commits with GitLab Failed in ${executionTimeRecorder.elapsedTime}ms: "
+        Error(
+          s"${logMessageCommon(commitSyncEvent)} -> synchronization failed in ${executionTimeRecorder.elapsedTime}ms",
+          exception
         )
       )
     }
@@ -160,18 +154,18 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
         .returning(OptionT.some[IO](commitInfo1))
       val projectInfo1 = projectInfos.generateOne.copy(id = commitSyncEvent.project.id)
       givenFindingProjectInfo(commitSyncEvent, maybeAccessToken1)
-        .returning(context.pure(projectInfo1))
+        .returning(projectInfo1.pure[IO])
       val exception = exceptions.generateOne
       givenStoring(
         StartCommit(id = commitInfo1.id, project = Project(projectInfo1.id, projectInfo1.path))
       ).returning(IO.raiseError(exception))
 
-      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ((): Unit)
+      eventsGenerator.generateMissedEvents(commitSyncEvent).unsafeRunSync() shouldBe ()
 
       logger.loggedOnly(
-        Error(s"Synchronizing Commits for project ${commitSyncEvent.project.path} failed", exception),
-        Info(
-          s"Syncing Commits with GitLab Failed in ${executionTimeRecorder.elapsedTime}ms: "
+        Error(
+          s"${logMessageCommon(commitSyncEvent)} -> synchronization failed in ${executionTimeRecorder.elapsedTime}ms",
+          exception
         )
       )
     }
@@ -180,7 +174,6 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
 
     val accessTokenFinder     = mock[AccessTokenFinder[IO]]
     val latestCommitFinder    = mock[LatestCommitFinder[IO]]
@@ -216,7 +209,7 @@ class MissedEventsGeneratorSpec extends AnyWordSpec with MockFactory with should
       (accessTokenFinder
         .findAccessToken(_: Path)(_: Path => String))
         .expects(projectPath, projectPathToPath)
-        .returning(context.pure(maybeAccessToken))
+        .returning(maybeAccessToken.pure[IO])
 
     def givenFindingProjectInfo(latestProjectCommit: CommitSyncEvent, maybeAccessToken: Option[AccessToken]) =
       (projectInfoFinder

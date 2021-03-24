@@ -16,11 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration
+package ch.datascience.commiteventservice.events.categories.commitsync
+package eventgeneration
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.commiteventservice.events.categories.commitsync._
 import ch.datascience.commiteventservice.events.categories.commitsync.eventgeneration.historytraversal.CommitToEventLog
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
@@ -56,63 +56,60 @@ private class MissedEventsGeneratorImpl(
   import latestCommitFinder._
   import projectInfoFinder._
 
-  def generateMissedEvents(commitSyncRequest: CommitSyncEvent): IO[Unit] =
-    measureExecutionTime {
+  def generateMissedEvents(event: CommitSyncEvent): IO[Unit] = measureExecutionTime {
+    loadEvents(event)
+  } flatMap logResult(event) recoverWith loggingError(event)
 
-      loadEvents(commitSyncRequest)
-    } flatMap logResult recoverWith loggingError
-
-  private lazy val logResult: ((ElapsedTime, UpdateResult)) => IO[Unit] = { case (elapsedTime, result) =>
-    logger.info(
-      s"Syncing Commits with GitLab $result in ${elapsedTime}ms: "
-    )
+  private def logResult(event: CommitSyncEvent): ((ElapsedTime, UpdateResult)) => IO[Unit] = {
+    case (elapsedTime, Skipped) =>
+      logger.info(s"${logMessageCommon(event)} -> no new events found in ${elapsedTime}ms")
+    case (elapsedTime, Updated) =>
+      logger.info(s"${logMessageCommon(event)} -> new events found in ${elapsedTime}ms")
+    case (elapsedTime, Failed(message, exception)) =>
+      logger.error(exception)(s"${logMessageCommon(event)} -> $message in ${elapsedTime}ms")
   }
 
-  private def loadEvents(latestProjectCommit: CommitSyncEvent): IO[UpdateResult] = {
+  private def loadEvents(event: CommitSyncEvent): IO[UpdateResult] = {
     for {
-      maybeAccessToken  <- findAccessToken(latestProjectCommit.project.path)
-      maybeLatestCommit <- findLatestCommit(latestProjectCommit.project.id, maybeAccessToken).value
-      updateResult      <- addEventsIfMissing(latestProjectCommit, maybeLatestCommit, maybeAccessToken)
+      maybeAccessToken  <- findAccessToken(event.project.path)
+      maybeLatestCommit <- findLatestCommit(event.project.id, maybeAccessToken).value
+      updateResult      <- addEventsIfMissing(event, maybeLatestCommit, maybeAccessToken)
     } yield updateResult
-  } recoverWith loggingWarning(latestProjectCommit)
+  } recoverWith toUpdateResult
 
-  private def addEventsIfMissing(latestProjectCommit: CommitSyncEvent,
-                                 maybeLatestCommit:   Option[CommitInfo],
-                                 maybeAccessToken:    Option[AccessToken]
+  private def addEventsIfMissing(event:             CommitSyncEvent,
+                                 maybeLatestCommit: Option[CommitInfo],
+                                 maybeAccessToken:  Option[AccessToken]
   ) = maybeLatestCommit match {
-    case None                                                        => IO.pure(Skipped)
-    case Some(commitInfo) if commitInfo.id == latestProjectCommit.id => IO.pure(Skipped)
+    case None                                          => Skipped.pure[IO]
+    case Some(commitInfo) if commitInfo.id == event.id => Skipped.pure[IO]
     case Some(commitInfo) =>
       for {
-        projectInfo <- findProjectInfo(latestProjectCommit.project.id, maybeAccessToken)
+        projectInfo <- findProjectInfo(event.project.id, maybeAccessToken)
         startCommit <- startCommitFrom(commitInfo, projectInfo)
         _           <- storeCommitsInEventLog(startCommit)
       } yield Updated
   }
 
-  private def startCommitFrom(commitInfo: CommitInfo, projectInfo: ProjectInfo) = IO.pure {
-    StartCommit(
-      id = commitInfo.id,
-      project = Project(projectInfo.id, projectInfo.path)
-    )
+  private def startCommitFrom(commitInfo: CommitInfo, projectInfo: ProjectInfo) = StartCommit(
+    id = commitInfo.id,
+    project = Project(projectInfo.id, projectInfo.path)
+  ).pure[IO]
+
+  private lazy val toUpdateResult: PartialFunction[Throwable, IO[UpdateResult]] = { case NonFatal(exception) =>
+    Failed("synchronization failed", exception).pure[IO]
   }
 
-  private def loggingWarning(latestProjectCommit: CommitSyncEvent): PartialFunction[Throwable, IO[UpdateResult]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"Synchronizing Commits for project ${latestProjectCommit.project.path} failed")
-      IO.pure(Failed)
-  }
-
-  private lazy val loggingError: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)("Synchronizing Commits with GitLab failed")
-    IO.raiseError(exception)
+  private def loggingError(event: CommitSyncEvent): PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)(s"${logMessageCommon(event)} -> synchronization failed")
+    exception.raiseError[IO, Unit]
   }
 
   private sealed trait UpdateResult extends Product with Serializable
   private object UpdateResult {
     final case object Skipped extends UpdateResult
     final case object Updated extends UpdateResult
-    final case object Failed  extends UpdateResult
+    case class Failed(message: String, exception: Throwable) extends UpdateResult
   }
 }
 
