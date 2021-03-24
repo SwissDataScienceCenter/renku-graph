@@ -41,7 +41,7 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import com.github.tomakehurst.wiremock.http.Fault
-import com.github.tomakehurst.wiremock.stubbing.StubMapping
+import com.github.tomakehurst.wiremock.stubbing.{Scenario, StubMapping}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.numeric.Positive
@@ -119,11 +119,18 @@ object GitLab {
 
   def `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(
       projectId:          Id,
-      commitId:           CommitId
+      commitIds:          CommitId*
   )(implicit accessToken: AccessToken): Unit = {
-    stubFor {
-      get(s"/api/v4/projects/$projectId/repository/commits?per_page=1").withAccessTokenInHeader
-        .willReturn(okJson(json"""[
+
+    val getLatestCommit = get(s"/api/v4/projects/$projectId/repository/commits?per_page=1").withAccessTokenInHeader
+      .inScenario(s"fetch latest commit for $projectId")
+
+    commitIds.zipWithIndex foreach { case (commitId, idx) =>
+      stubFor {
+        getLatestCommit
+          .whenScenarioStateIs(if (idx == 0) Scenario.STARTED else s"call $idx")
+          .willSetStateTo(s"call ${idx + 1}")
+          .willReturn(okJson(json"""[
           {
             "id":              ${commitId.value},
             "author_name":     ${nonEmptyStrings().generateOne},
@@ -135,8 +142,8 @@ object GitLab {
             "parent_ids":      []
           }                         
         ]""".noSpaces))
+      }
     }
-    ()
   }
 
   def `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(
@@ -205,13 +212,17 @@ object GitLab {
     ()
   }
 
-  def `GET <gitlabApi>/projects/:path returning BadRequest`(project: Project)(implicit accessToken: AccessToken) =
+  def `GET <gitlabApi>/projects/:path returning BadRequest`(
+      project:            Project
+  )(implicit accessToken: AccessToken): StubMapping =
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
         .willReturn(badRequest())
     }
 
-  def `GET <gitlabApi>/projects/:path having connectivity issues`(project: Project)(implicit accessToken: AccessToken) =
+  def `GET <gitlabApi>/projects/:path having connectivity issues`(
+      project:            Project
+  )(implicit accessToken: AccessToken): StubMapping =
     stubFor {
       get(s"/api/v4/projects/${urlEncode(project.path.value)}").withAccessTokenInHeader
         .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
