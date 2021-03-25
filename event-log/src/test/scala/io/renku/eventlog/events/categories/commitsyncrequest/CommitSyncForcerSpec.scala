@@ -31,8 +31,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.time.Instant
-
 class CommitSyncForcerSpec
     extends AnyWordSpec
     with InMemoryEventLogDbSpec
@@ -106,8 +104,7 @@ class CommitSyncForcerSpec
   }
 
   private trait TestCase {
-    val currentTime      = mockFunction[Instant]
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val forcer           = new CommitSyncForcerImpl(transactor, queriesExecTimes, currentTime)
+    val forcer           = new CommitSyncForcerImpl(transactor, queriesExecTimes)
   }
 }

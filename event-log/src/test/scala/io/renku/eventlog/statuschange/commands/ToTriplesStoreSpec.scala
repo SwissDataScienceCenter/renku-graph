@@ -32,7 +32,7 @@ import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators.{eventDates, executionDates, _}
 import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
-import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported}
+import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
@@ -149,29 +149,36 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
           findProcessingTime(eventId).eventIdsOnly shouldBe List()
         }
     }
+  }
 
-    "factory" should {
+  "factory" should {
 
-      "return a CommandFound when properly decoding a request" in new TestCase {
-        val maybeProcessingTime = eventProcessingTimes.generateOption
+    "return a CommandFound when properly decoding a request" in new TestCase {
+      val maybeProcessingTime = eventProcessingTimes.generateSome
 
-        val actual = ToTriplesStore
+      val actual = ToTriplesStore
+        .factory[IO](underTriplesGenerationGauge)
+        .run(EventOnlyRequest(eventId, TriplesStore, maybeProcessingTime, eventMessages.generateOption))
+        .unsafeRunSync()
+
+      actual shouldBe CommandFound(
+        ToTriplesStore(eventId, underTriplesGenerationGauge, maybeProcessingTime)
+      )
+    }
+
+    "return PayloadMalformed if there's no processing time in the request" in new TestCase {
+      ToTriplesStore
+        .factory[IO](underTriplesGenerationGauge)
+        .run(EventOnlyRequest(eventId, TriplesStore, maybeProcessingTime = None, eventMessages.generateOption))
+        .unsafeRunSync() shouldBe PayloadMalformed("No processing time provided")
+    }
+
+    EventStatus.all.filterNot(status => status == TriplesStore) foreach { eventStatus =>
+      s"return NotSupported if the decoding failed with status: $eventStatus " in new TestCase {
+        ToTriplesStore
           .factory[IO](underTriplesGenerationGauge)
-          .run(EventOnlyRequest(eventId, TriplesStore, maybeProcessingTime, eventMessages.generateOption))
-          .unsafeRunSync()
-
-        actual shouldBe CommandFound(
-          ToTriplesStore(eventId, underTriplesGenerationGauge, maybeProcessingTime)
-        )
-      }
-
-      EventStatus.all.filterNot(status => status == TriplesStore) foreach { eventStatus =>
-        s"return NotSupported if the decoding failed with status: $eventStatus " in new TestCase {
-          ToTriplesStore
-            .factory[IO](underTriplesGenerationGauge)
-            .run(changeStatusRequestsWith(eventStatus).generateOne)
-            .unsafeRunSync() shouldBe NotSupported
-        }
+          .run(changeStatusRequestsWith(eventStatus).generateOne)
+          .unsafeRunSync() shouldBe NotSupported
       }
     }
   }
