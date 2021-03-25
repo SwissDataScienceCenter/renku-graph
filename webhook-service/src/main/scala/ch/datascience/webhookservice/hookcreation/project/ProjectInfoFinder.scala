@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.project
+package ch.datascience.webhookservice.hookcreation.project
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.config.GitLab
@@ -30,14 +30,14 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
-trait ProjectInfoFinder[Interpretation[_]] {
+private[hookcreation] trait ProjectInfoFinder[Interpretation[_]] {
   def findProjectInfo(
       projectId:        projects.Id,
       maybeAccessToken: Option[AccessToken]
   ): Interpretation[ProjectInfo]
 }
 
-class IOProjectInfoFinder(
+private[hookcreation] class ProjectInfoFinderImpl(
     gitLabUrl:               GitLabUrl,
     gitLabThrottler:         Throttler[IO, GitLab],
     logger:                  Logger[IO]
@@ -81,7 +81,7 @@ class IOProjectInfoFinder(
     maybeVisibility getOrElse Public
 }
 
-object IOProjectInfoFinder {
+private[hookcreation] object ProjectInfoFinder {
   def apply(
       gitLabThrottler: Throttler[IO, GitLab],
       logger:          Logger[IO]
@@ -89,8 +89,7 @@ object IOProjectInfoFinder {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[ProjectInfoFinder[IO]] =
-    for {
-      gitLabUrl <- GitLabUrl[IO]()
-    } yield new IOProjectInfoFinder(gitLabUrl, gitLabThrottler, logger)
+  ): IO[ProjectInfoFinder[IO]] = for {
+    gitLabUrl <- GitLabUrl[IO]()
+  } yield new ProjectInfoFinderImpl(gitLabUrl, gitLabThrottler, logger)
 }

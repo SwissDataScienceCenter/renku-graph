@@ -16,10 +16,11 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.project
+package ch.datascience.webhookservice
 
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
+import ch.datascience.webhookservice.WebhookServiceGenerators._
+import ch.datascience.webhookservice.model.ProjectHookUrl
 import com.typesafe.config.ConfigFactory
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should

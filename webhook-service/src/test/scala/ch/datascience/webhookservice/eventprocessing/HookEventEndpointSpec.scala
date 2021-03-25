@@ -18,23 +18,21 @@
 
 package ch.datascience.webhookservice.eventprocessing
 
-import cats.MonadError
 import cats.effect.IO
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.InfoMessage
+import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.webhookservice.CommitSyncRequestSender
+import ch.datascience.webhookservice.WebhookServiceGenerators._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.crypto.IOHookTokenCrypto
-import ch.datascience.webhookservice.eventprocessing.startcommit.{CommitToEventLog, IOCommitToEventLog}
-import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
-import ch.datascience.webhookservice.model.HookToken
+import ch.datascience.webhookservice.model.{CommitSyncRequest, HookToken}
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
@@ -52,16 +50,16 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
     "return ACCEPTED for valid push event payload which are accepted" in new TestCase {
 
-      (commitToEventLog
-        .storeCommitsInEventLog(_: StartCommit))
-        .expects(startCommit)
-        .returning(context.pure(()))
+      (commitSyncRequestSender
+        .sendCommitSyncRequest(_: CommitSyncRequest))
+        .expects(pushEvent)
+        .returning(().pure[IO])
 
-      expectDecryptionOf(serializedHookToken, returning = HookToken(startCommit.project.id))
+      expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
 
       val request = Request(Method.POST, uri"webhooks" / "events")
         .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
-        .withEntity(pushEventPayloadFrom(startCommit))
+        .withEntity(pushEventPayloadFrom(pushEvent))
 
       val response = processPushEvent(request).unsafeRunSync()
 
@@ -70,29 +68,25 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
       response.as[Json].unsafeRunSync() shouldBe InfoMessage("Event accepted").asJson
     }
 
-    "return INTERNAL_SERVER_ERROR when storing push event in the event log fails and log the error" in new TestCase {
+    "return ACCEPTED when sending a commit sync request fails and log the error" in new TestCase {
 
       val exception = exceptions.generateOne
-      (commitToEventLog
-        .storeCommitsInEventLog(_: StartCommit))
-        .expects(startCommit)
-        .returning(context.raiseError(exception))
+      (commitSyncRequestSender
+        .sendCommitSyncRequest(_: CommitSyncRequest))
+        .expects(pushEvent)
+        .returning(exception.raiseError[IO, Unit])
 
-      expectDecryptionOf(serializedHookToken, returning = HookToken(startCommit.project.id))
+      expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
 
       val request = Request(Method.POST, uri"webhooks" / "events")
         .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
-        .withEntity(pushEventPayloadFrom(startCommit))
+        .withEntity(pushEventPayloadFrom(pushEvent))
 
       val response = processPushEvent(request).unsafeRunSync()
 
-      response.status                   shouldBe InternalServerError
+      response.status                   shouldBe Accepted
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe ErrorMessage(exception).asJson
-
-      logger.loggedOnly(
-        Error(exception.getMessage, exception)
-      )
+      response.as[Json].unsafeRunSync() shouldBe InfoMessage("Event accepted").asJson
     }
 
     "return BAD_REQUEST for invalid push event payload" in new TestCase {
@@ -113,7 +107,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
     "return UNAUTHORIZED if X-Gitlab-Token token is not present in the header" in new TestCase {
 
       val request = Request(Method.POST, uri"webhooks" / "events")
-        .withEntity(pushEventPayloadFrom(startCommit))
+        .withEntity(pushEventPayloadFrom(pushEvent))
 
       val response = processPushEvent(request).unsafeRunSync()
 
@@ -127,11 +121,11 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
       (hookTokenCrypto
         .decrypt(_: SerializedHookToken))
         .expects(serializedHookToken)
-        .returning(context.pure(HookToken(projectIds.generateOne)))
+        .returning(HookToken(projectIds.generateOne).pure[IO])
 
       val request = Request(Method.POST, uri"webhooks" / "events")
         .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
-        .withEntity(pushEventPayloadFrom(startCommit))
+        .withEntity(pushEventPayloadFrom(pushEvent))
 
       val response = processPushEvent(request).unsafeRunSync()
 
@@ -146,11 +140,11 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
       (hookTokenCrypto
         .decrypt(_: SerializedHookToken))
         .expects(serializedHookToken)
-        .returning(context.raiseError(exception))
+        .returning(exception.raiseError[IO, HookToken])
 
       val request = Request(Method.POST, uri"webhooks" / "events")
         .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
-        .withEntity(pushEventPayloadFrom(startCommit))
+        .withEntity(pushEventPayloadFrom(pushEvent))
 
       val response = processPushEvent(request).unsafeRunSync()
 
@@ -160,21 +154,11 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
     }
   }
 
-  "PushEvent deserialization" should {
-
-    "work if 'before' is null" in new TestCase {
-      import HookEventEndpoint.pushEventDecoder
-
-      pushEventPayloadFrom(startCommit).as[StartCommit] shouldBe Right(startCommit)
-    }
-  }
-
   private trait TestCase {
-    val context = MonadError[IO, Throwable]
 
     val logger = TestLogger[IO]()
 
-    val startCommit = startCommits.generateOne
+    val pushEvent = commitSyncRequests.generateOne
     val serializedHookToken = nonEmptyStrings().map {
       SerializedHookToken
         .from(_)
@@ -184,23 +168,21 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
         )
     }.generateOne
 
-    val commitToEventLog = mock[CommitToEventLog[IO]]
-    val hookTokenCrypto  = mock[IOHookTokenCrypto]
+    val commitSyncRequestSender = mock[CommitSyncRequestSender[IO]]
+    val hookTokenCrypto         = mock[IOHookTokenCrypto]
     val processPushEvent = new HookEventEndpointImpl[IO](
       hookTokenCrypto,
-      commitToEventLog,
+      commitSyncRequestSender,
       logger
     ).processPushEvent _
 
-    def pushEventPayloadFrom(commit: StartCommit) = json"""
-      {                                                      
-        "after": ${commit.id.value},
+    def pushEventPayloadFrom(syncRequest: CommitSyncRequest) =
+      json"""{                                                      
         "project": {
-          "id":                  ${commit.project.id.value},
-          "path_with_namespace": ${commit.project.path.value}
+          "id":                  ${syncRequest.project.id.value},
+          "path_with_namespace": ${syncRequest.project.path.value}
         }
-      }
-    """
+      }"""
 
     def expectDecryptionOf(hookAuthToken: SerializedHookToken, returning: HookToken) =
       (hookTokenCrypto

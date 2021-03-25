@@ -27,43 +27,48 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
+import ch.datascience.webhookservice.CommitSyncRequestSender
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.hookcreation.HookCreator.{CreationResult, HookAlreadyCreated}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
+import ch.datascience.webhookservice.hookcreation.project._
+import ch.datascience.webhookservice.hookvalidation.HookValidator
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.HookMissing
-import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValidator}
-import ch.datascience.webhookservice.model.HookToken
-import ch.datascience.webhookservice.project._
+import ch.datascience.webhookservice.model.{CommitSyncRequest, HookToken, ProjectHookUrl}
 import ch.datascience.webhookservice.tokenrepository.{AccessTokenAssociator, IOAccessTokenAssociator}
 import io.chrisdavenport.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private class HookCreator[Interpretation[_]](
-    projectHookUrl:        ProjectHookUrl,
-    projectHookValidator:  HookValidator[Interpretation],
-    projectInfoFinder:     ProjectInfoFinder[Interpretation],
-    hookTokenCrypto:       HookTokenCrypto[Interpretation],
-    projectHookCreator:    ProjectHookCreator[Interpretation],
-    accessTokenAssociator: AccessTokenAssociator[Interpretation],
-    eventsHistoryLoader:   EventsHistoryLoader[Interpretation],
-    logger:                Logger[Interpretation]
+private trait HookCreator[Interpretation[_]] {
+  def createHook(projectId: Id, accessToken: AccessToken): Interpretation[CreationResult]
+}
+
+private class HookCreatorImpl[Interpretation[_]: MonadError[*[_], Throwable]](
+    projectHookUrl:          ProjectHookUrl,
+    projectHookValidator:    HookValidator[Interpretation],
+    projectInfoFinder:       ProjectInfoFinder[Interpretation],
+    hookTokenCrypto:         HookTokenCrypto[Interpretation],
+    projectHookCreator:      ProjectHookCreator[Interpretation],
+    accessTokenAssociator:   AccessTokenAssociator[Interpretation],
+    commitSyncRequestSender: CommitSyncRequestSender[Interpretation],
+    logger:                  Logger[Interpretation]
 )(implicit
-    ME:           MonadError[Interpretation, Throwable],
     contextShift: ContextShift[Interpretation],
     concurrent:   Concurrent[Interpretation]
-) {
+) extends HookCreator[Interpretation] {
 
   import HookCreator.CreationResult._
   import accessTokenAssociator._
+  import commitSyncRequestSender._
   import hookTokenCrypto._
   import projectHookCreator.create
   import projectHookValidator._
   import projectInfoFinder._
 
-  def createHook(projectId: Id, accessToken: AccessToken): Interpretation[CreationResult] = {
+  override def createHook(projectId: Id, accessToken: AccessToken): Interpretation[CreationResult] = {
     for {
       hookValidation      <- right(validateHook(projectId, Some(accessToken)))
       _                   <- leftIfProjectHookExists(hookValidation, projectId, projectHookUrl)
@@ -71,7 +76,9 @@ private class HookCreator[Interpretation[_]](
       serializedHookToken <- right(encrypt(HookToken(projectInfo.id)))
       _                   <- right(create(ProjectHook(projectId, projectHookUrl, serializedHookToken), accessToken))
       _                   <- right(associate(projectId, accessToken))
-      _                   <- right(contextShift.shift *> concurrent.start(eventsHistoryLoader.loadAllEvents(projectInfo, accessToken)))
+      _ <- right(
+             contextShift.shift *> concurrent.start(sendCommitSyncRequest(CommitSyncRequest(projectInfo.toProject)))
+           )
     } yield ()
   }.fold[CreationResult](_ => HookExisted, _ => HookCreated) recoverWith loggingError(projectId)
 
@@ -88,7 +95,7 @@ private class HookCreator[Interpretation[_]](
   private def loggingError(projectId: Id): PartialFunction[Throwable, Interpretation[CreationResult]] = {
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook creation failed for project with id $projectId")
-      ME.raiseError(exception)
+      exception.raiseError[Interpretation, CreationResult]
   }
 
   private def right[T](value: Interpretation[T]): EitherT[Interpretation, HookAlreadyCreated, T] =
@@ -103,13 +110,8 @@ private object HookCreator {
     final case object HookExisted extends CreationResult
   }
 
-  private case class HookAlreadyCreated(
-      projectId:      Id,
-      projectHookUrl: ProjectHookUrl
-  )
-}
+  case class HookAlreadyCreated(projectId: Id, projectHookUrl: ProjectHookUrl)
 
-private object IOHookCreator {
   def apply(
       projectHookUrl:        ProjectHookUrl,
       gitLabThrottler:       Throttler[IO, GitLab],
@@ -123,19 +125,19 @@ private object IOHookCreator {
       timer:            Timer[IO]
   ): IO[HookCreator[IO]] =
     for {
-      eventsHistoryLoader <- IOEventsHistoryLoader(gitLabThrottler, executionTimeRecorder, logger)
-      hookValidator       <- IOHookValidator(projectHookUrl, gitLabThrottler)
-      projectInfoFinder   <- IOProjectInfoFinder(gitLabThrottler, logger)
-      hookCreator         <- IOProjectHookCreator(gitLabThrottler, logger)
-      tokenAssociator     <- IOAccessTokenAssociator(logger)
-    } yield new HookCreator[IO](
+      commitSyncRequestSender <- CommitSyncRequestSender(logger)
+      hookValidator           <- HookValidator(projectHookUrl, gitLabThrottler)
+      projectInfoFinder       <- ProjectInfoFinder(gitLabThrottler, logger)
+      hookCreator             <- IOProjectHookCreator(gitLabThrottler, logger)
+      tokenAssociator         <- IOAccessTokenAssociator(logger)
+    } yield new HookCreatorImpl[IO](
       projectHookUrl,
       hookValidator,
       projectInfoFinder,
       hookTokenCrypto,
       hookCreator,
       tokenAssociator,
-      eventsHistoryLoader,
+      commitSyncRequestSender,
       logger
     )
 }

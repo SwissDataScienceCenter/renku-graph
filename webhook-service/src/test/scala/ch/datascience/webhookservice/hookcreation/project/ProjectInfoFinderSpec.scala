@@ -16,7 +16,7 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.project
+package ch.datascience.webhookservice.hookcreation.project
 
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
@@ -38,7 +38,7 @@ import org.scalatest.wordspec.AnyWordSpec
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class IOProjectInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
+class ProjectInfoFinderSpec extends AnyWordSpec with MockFactory with ExternalServiceStubbing with should.Matchers {
 
   "findProjectInfo" should {
 
@@ -138,7 +138,7 @@ class IOProjectInfoFinderSpec extends AnyWordSpec with MockFactory with External
     val projectVisibility = projectVisibilities.generateOne
     val projectPath       = projectPaths.generateOne
 
-    val projectInfoFinder = new IOProjectInfoFinder(gitLabUrl, Throttler.noThrottling, TestLogger())
+    val projectInfoFinder = new ProjectInfoFinderImpl(gitLabUrl, Throttler.noThrottling, TestLogger())
 
     def projectJson(maybeAccessToken: Option[AccessToken]): String = maybeAccessToken match {
       case Some(_) =>

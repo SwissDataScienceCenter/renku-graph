@@ -28,7 +28,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.http.client.IORestClient
 import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import eu.timepit.refined.api.Refined
-import eu.timepit.refined.numeric.{NonNegative, Positive}
+import eu.timepit.refined.numeric.NonNegative
 import io.chrisdavenport.log4cats.Logger
 import io.circe.Decoder
 

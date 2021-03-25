@@ -131,7 +131,7 @@ private class EventStatusUpdaterImpl(
                      )
   } yield sendingResult
 
-  def retryOnServerError(retry: Eval[IO[Unit]]): PartialFunction[Throwable, IO[Unit]] = {
+  private def retryOnServerError(retry: Eval[IO[Unit]]): PartialFunction[Throwable, IO[Unit]] = {
     case UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, message) =>
       waitAndRetry(retry, message)
     case ConnectivityException(message, _) => waitAndRetry(retry, message)

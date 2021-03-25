@@ -20,12 +20,12 @@ package ch.datascience.webhookservice.tokenrepository
 
 import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
-import ch.datascience.http.ErrorMessage._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.tokenrepository.TokenRepositoryUrl
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._

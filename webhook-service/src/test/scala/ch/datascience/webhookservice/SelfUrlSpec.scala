@@ -16,11 +16,12 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.project
+package ch.datascience.webhookservice
 
 import ch.datascience.config.ConfigLoader.ConfigLoadingException
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
+import ch.datascience.webhookservice.WebhookServiceGenerators._
+import ch.datascience.webhookservice.model.SelfUrl
 import com.typesafe.config.ConfigFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec

@@ -16,12 +16,15 @@
  * limitations under the License.
  */
 
-package ch.datascience.webhookservice.eventprocessing.startcommit
+package ch.datascience.webhookservice.hookcreation.project
 
-import ch.datascience.webhookservice.commits.CommitInfoFinder
+import ch.datascience.graph.model.projects.{Id, Path, Visibility}
+import ch.datascience.webhookservice.model.Project
 
-import scala.util.Try
-
-private class TryCommitEventsSourceBuilder(
-    commitInfoFinder: CommitInfoFinder[Try]
-) extends CommitEventsSourceBuilder[Try](commitInfoFinder)
+final case class ProjectInfo(
+    id:         Id,
+    visibility: Visibility,
+    path:       Path
+) {
+  lazy val toProject: Project = Project(id, path)
+}

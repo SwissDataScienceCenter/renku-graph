@@ -29,9 +29,9 @@ import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
+import ch.datascience.webhookservice.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
-import ch.datascience.webhookservice.project.ProjectHookUrl
+import ch.datascience.webhookservice.model.ProjectHookUrl
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json
 import org.http4s.Status
@@ -140,7 +140,6 @@ class IOProjectHookVerifierSpec extends AnyWordSpec with MockFactory with Extern
 
   private trait TestCase {
     val gitLabUrl     = GitLabUrl(externalServiceBaseUrl)
-    val selfUrl       = validatedUrls.generateOne
     val projectHookId = projectHookIds.generateOne
     val projectId     = projectHookId.projectId
 
@@ -171,7 +170,7 @@ class IOProjectHookVerifierSpec extends AnyWordSpec with MockFactory with Extern
     "project_id" -> Json.fromInt(projectId.value)
   )
 
-  private val projectHookIds: Gen[HookIdentifier] = for {
+  private lazy val projectHookIds: Gen[HookIdentifier] = for {
     projectId <- projectIds
     hookUrl   <- projectHookUrls
   } yield HookIdentifier(projectId, hookUrl)
