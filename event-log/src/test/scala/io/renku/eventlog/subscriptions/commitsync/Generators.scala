@@ -21,14 +21,22 @@ package io.renku.eventlog.subscriptions.commitsync
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.timestampsNotInTheFuture
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
-import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
 import ch.datascience.graph.model.events.LastSyncedDate
+import org.scalacheck.Gen
 
 private object Generators {
 
-  val commitSyncEvents = for {
+  val fullCommitSyncEvents: Gen[FullCommitSyncEvent] = for {
     id         <- compoundEventIds
     path       <- projectPaths
     lastSynced <- timestampsNotInTheFuture toGeneratorOf LastSyncedDate
-  } yield CommitSyncEvent(id, path, lastSynced)
+  } yield FullCommitSyncEvent(id, path, lastSynced)
+
+  val minimalCommitSyncEvents: Gen[MinimalCommitSyncEvent] = for {
+    projectId   <- projectIds
+    projectPath <- projectPaths
+  } yield MinimalCommitSyncEvent(projectId, projectPath)
+
+  val commitSyncEvents: Gen[CommitSyncEvent] = Gen.oneOf(fullCommitSyncEvents, minimalCommitSyncEvents)
 }

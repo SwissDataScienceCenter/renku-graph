@@ -431,6 +431,18 @@ All events are sent as multipart requests
 }
 ```
 
+or
+
+```json
+{
+  "categoryName": "COMMIT_SYNC",
+  "project": {
+    "id": 12,
+    "path": "project/path"
+  }
+}
+```
+
 - **ZOMBIE_CHASING**
 
 **Request**
