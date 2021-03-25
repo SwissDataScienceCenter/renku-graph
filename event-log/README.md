@@ -130,6 +130,24 @@ Changes the status of a zombie event
 }
 ```
 
+- **COMMIT_SYNC_REQUEST**
+
+Forces issuing a commit sync event for the given project
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "COMMIT_SYNC_REQUEST",
+  "project": {
+    "id":   12,
+    "path": "namespace/project-name"
+  }
+}
+```
+
 **Response**
 
 | Status                     | Description                                                                          |

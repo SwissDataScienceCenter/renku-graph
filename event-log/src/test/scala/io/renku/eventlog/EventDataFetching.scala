@@ -49,7 +49,7 @@ trait EventDataFetching {
         .option
     }
 
-  protected def findProjects(): List[(projects.Id, projects.Path, EventDate)] = execute {
+  protected def findProjects: List[(projects.Id, projects.Path, EventDate)] = execute {
     sql"""SELECT * FROM project"""
       .query[(projects.Id, projects.Path, EventDate)]
       .to[List]

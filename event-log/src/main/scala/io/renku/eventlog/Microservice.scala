@@ -98,8 +98,16 @@ object Microservice extends IOMicroservice {
                                       queriesExecTimes,
                                       ApplicationLogger
                                     )
-        eventConsumersRegistry <-
-          consumers.EventConsumersRegistry(ApplicationLogger, creationSubscription, zombieEventsSubscription)
+        commitSyncRequestSubscription <- events.categories.commitsyncrequest.SubscriptionFactory(
+                                           transactor,
+                                           queriesExecTimes,
+                                           ApplicationLogger
+                                         )
+        eventConsumersRegistry <- consumers.EventConsumersRegistry(ApplicationLogger,
+                                                                   creationSubscription,
+                                                                   zombieEventsSubscription,
+                                                                   commitSyncRequestSubscription
+                                  )
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
