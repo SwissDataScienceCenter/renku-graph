@@ -23,6 +23,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.stubbing.ExternalServiceStubbing
 import ch.datascience.webhookservice.model.CommitSyncRequest
 import com.github.tomakehurst.wiremock.client.WireMock.{post, _}
@@ -59,6 +60,12 @@ class CommitSyncRequestSenderSpec
       }
 
       eventSender.sendCommitSyncRequest(syncRequest).unsafeRunSync() shouldBe ()
+
+      logger.loggedOnly(
+        Info(
+          s"CommitSyncRequest sent for projectId = ${syncRequest.project.id}, projectPath = ${syncRequest.project.path}"
+        )
+      )
     }
 
     s"fail when delivering the event to the Event Log got $BadRequest" in new TestCase {
@@ -142,7 +149,8 @@ class CommitSyncRequestSenderSpec
     val syncRequest = commitSyncRequests.generateOne
 
     val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
-    val eventSender = new CommitSyncRequestSenderImpl(eventLogUrl, TestLogger(), 500 millis)
+    val logger      = TestLogger[IO]()
+    val eventSender = new CommitSyncRequestSenderImpl(eventLogUrl, logger, 500 millis)
   }
 
   private implicit lazy val eventEncoder: Encoder[CommitSyncRequest] = Encoder.instance[CommitSyncRequest] { event =>

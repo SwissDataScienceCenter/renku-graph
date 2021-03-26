@@ -33,7 +33,6 @@ import org.http4s.{Status, Uri}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
 import scala.language.postfixOps
-import scala.util.control.NonFatal
 
 private trait CommitSyncRequestSender[Interpretation[_]] {
   def sendCommitSyncRequest(commitSyncRequest: CommitSyncRequest): Interpretation[Unit]
@@ -57,11 +56,10 @@ private class CommitSyncRequestSenderImpl(
   import org.http4s.Method.POST
   import org.http4s.{Request, Response}
 
-  def sendCommitSyncRequest(commitSyncRequest: CommitSyncRequest): IO[Unit] = for {
-    uri <- validateUri(s"$eventLogUrl/events")
-    sendingResult <- send(prepareRequest(uri, commitSyncRequest))(mapResponse) recoverWith retryOnServerError(
-                       Eval.always(sendCommitSyncRequest(commitSyncRequest))
-                     )
+  def sendCommitSyncRequest(syncRequest: CommitSyncRequest): IO[Unit] = for {
+    uri           <- validateUri(s"$eventLogUrl/events")
+    sendingResult <- send(prepareRequest(uri, syncRequest))(mapResponse) recoverWith retryDelivery(syncRequest)
+    _             <- logInfo(syncRequest)
   } yield sendingResult
 
   private def prepareRequest(uri: Uri, commitSyncRequest: CommitSyncRequest) =
@@ -69,11 +67,11 @@ private class CommitSyncRequestSenderImpl(
       .addPart("event", commitSyncRequest.asJson)
       .build()
 
-  private def retryOnServerError(retry: Eval[IO[Unit]]): PartialFunction[Throwable, IO[Unit]] = {
+  private def retryDelivery(commitSyncRequest: CommitSyncRequest): PartialFunction[Throwable, IO[Unit]] = {
     case UnexpectedResponseException(ServiceUnavailable | GatewayTimeout | BadGateway, message) =>
-      waitAndRetry(retry, message)
+      waitAndRetry(Eval.always(sendCommitSyncRequest(commitSyncRequest)), message)
     case ConnectivityException(message, _) =>
-      waitAndRetry(retry, message)
+      waitAndRetry(Eval.always(sendCommitSyncRequest(commitSyncRequest)), message)
   }
 
   private def waitAndRetry(retry: Eval[IO[Unit]], errorMessage: String) = for {
@@ -96,10 +94,8 @@ private class CommitSyncRequestSenderImpl(
     case (Accepted, _, _) => IO.unit
   }
 
-  private def logError(syncRequest: CommitSyncRequest): PartialFunction[Throwable, IO[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"Problems with sending $syncRequest event")
-      exception.raiseError[IO, Unit]
+  private lazy val logInfo: CommitSyncRequest => IO[Unit] = { case CommitSyncRequest(project) =>
+    logger.info(s"CommitSyncRequest sent for projectId = ${project.id}, projectPath = ${project.path}")
   }
 }
 

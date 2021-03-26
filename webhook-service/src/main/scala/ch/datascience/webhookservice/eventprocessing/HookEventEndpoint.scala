@@ -23,6 +23,7 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
@@ -33,7 +34,7 @@ import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.model.{CommitSyncRequest, HookToken, Project}
 import io.chrisdavenport.log4cats.Logger
-import io.circe.{Decoder, HCursor}
+import io.circe.Decoder
 import org.http4s._
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
@@ -62,20 +63,21 @@ class HookEventEndpointImpl[Interpretation[_]: MonadError[*[_], Throwable]](
 
   def processPushEvent(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
-      pushEvent <- request.as[CommitSyncRequest] recoverWith badRequest
+      pushEvent <- request.as[(CommitId, CommitSyncRequest)] recoverWith badRequest
       authToken <- findHookToken(request)
       hookToken <- decrypt(authToken) recoverWith unauthorizedException
-      _         <- validate(hookToken, pushEvent)
-      _         <- contextShift.shift *> concurrent.start(sendCommitSyncRequest(pushEvent))
+      _         <- validate(hookToken, pushEvent._2)
+      _         <- contextShift.shift *> concurrent.start(sendCommitSyncRequest(pushEvent._2))
+      _         <- logInfo(pushEvent)
       response  <- Accepted(InfoMessage("Event accepted"))
     } yield response
   } recoverWith httpResponse
 
-  private implicit lazy val startCommitEntityDecoder: EntityDecoder[Interpretation, CommitSyncRequest] =
-    jsonOf[Interpretation, CommitSyncRequest]
+  private implicit lazy val startCommitEntityDecoder: EntityDecoder[Interpretation, (CommitId, CommitSyncRequest)] =
+    jsonOf[Interpretation, (CommitId, CommitSyncRequest)]
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[CommitSyncRequest]] = {
-    case NonFatal(exception) => BadRequestError(exception).raiseError[Interpretation, CommitSyncRequest]
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[(CommitId, CommitSyncRequest)]] = {
+    case NonFatal(exception) => BadRequestError(exception).raiseError[Interpretation, (CommitId, CommitSyncRequest)]
   }
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
@@ -110,11 +112,18 @@ class HookEventEndpointImpl[Interpretation[_]: MonadError[*[_], Throwable]](
       logger.error(exception)(exception.getMessage)
       InternalServerError(ErrorMessage(exception))
   }
+
+  private lazy val logInfo: ((CommitId, CommitSyncRequest)) => Interpretation[Unit] = {
+    case (commitId, CommitSyncRequest(project)) =>
+      logger.info(
+        s"Push event for eventId = $commitId, projectId = ${project.id}, projectPath = ${project.path} -> accepted"
+      )
+  }
 }
 
 private object HookEventEndpoint {
 
-  private implicit val projectDecoder: Decoder[Project] = (cursor: HCursor) => {
+  private implicit val projectDecoder: Decoder[Project] = cursor => {
     import ch.datascience.tinytypes.json.TinyTypeDecoders._
     for {
       id   <- cursor.downField("id").as[Id]
@@ -122,10 +131,13 @@ private object HookEventEndpoint {
     } yield Project(id, path)
   }
 
-  implicit val pushEventDecoder: Decoder[CommitSyncRequest] = cursor =>
+  implicit val pushEventDecoder: Decoder[(CommitId, CommitSyncRequest)] = cursor => {
+    import ch.datascience.tinytypes.json.TinyTypeDecoders._
     for {
-      project <- cursor.downField("project").as[Project]
-    } yield CommitSyncRequest(project)
+      commitId <- cursor.downField("after").as[CommitId]
+      project  <- cursor.downField("project").as[Project]
+    } yield commitId -> CommitSyncRequest(project)
+  }
 }
 
 object IOHookEventEndpoint {

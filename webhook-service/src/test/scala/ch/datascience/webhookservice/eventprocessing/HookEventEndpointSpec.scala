@@ -22,12 +22,15 @@ import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
+import ch.datascience.graph.model.events.CommitId
 import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
+import ch.datascience.interpreters.TestLogger.Level.Info
 import ch.datascience.webhookservice.CommitSyncRequestSender
 import ch.datascience.webhookservice.WebhookServiceGenerators._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
@@ -52,41 +55,26 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
       (commitSyncRequestSender
         .sendCommitSyncRequest(_: CommitSyncRequest))
-        .expects(pushEvent)
+        .expects(syncRequest)
         .returning(().pure[IO])
 
-      expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
+      expectDecryptionOf(serializedHookToken, returning = HookToken(syncRequest.project.id))
 
       val request = Request(Method.POST, uri"webhooks" / "events")
         .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
-        .withEntity(pushEventPayloadFrom(pushEvent))
+        .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
       val response = processPushEvent(request).unsafeRunSync()
 
       response.status                   shouldBe Accepted
       response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
       response.as[Json].unsafeRunSync() shouldBe InfoMessage("Event accepted").asJson
-    }
 
-    "return ACCEPTED when sending a commit sync request fails and log the error" in new TestCase {
-
-      val exception = exceptions.generateOne
-      (commitSyncRequestSender
-        .sendCommitSyncRequest(_: CommitSyncRequest))
-        .expects(pushEvent)
-        .returning(exception.raiseError[IO, Unit])
-
-      expectDecryptionOf(serializedHookToken, returning = HookToken(pushEvent.project.id))
-
-      val request = Request(Method.POST, uri"webhooks" / "events")
-        .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
-        .withEntity(pushEventPayloadFrom(pushEvent))
-
-      val response = processPushEvent(request).unsafeRunSync()
-
-      response.status                   shouldBe Accepted
-      response.contentType              shouldBe Some(`Content-Type`(MediaType.application.json))
-      response.as[Json].unsafeRunSync() shouldBe InfoMessage("Event accepted").asJson
+      logger.loggedOnly(
+        Info(
+          s"Push event for eventId = $commitId, projectId = ${syncRequest.project.id}, projectPath = ${syncRequest.project.path} -> accepted"
+        )
+      )
     }
 
     "return BAD_REQUEST for invalid push event payload" in new TestCase {
@@ -107,7 +95,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
     "return UNAUTHORIZED if X-Gitlab-Token token is not present in the header" in new TestCase {
 
       val request = Request(Method.POST, uri"webhooks" / "events")
-        .withEntity(pushEventPayloadFrom(pushEvent))
+        .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
       val response = processPushEvent(request).unsafeRunSync()
 
@@ -125,7 +113,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
       val request = Request(Method.POST, uri"webhooks" / "events")
         .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
-        .withEntity(pushEventPayloadFrom(pushEvent))
+        .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
       val response = processPushEvent(request).unsafeRunSync()
 
@@ -144,7 +132,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
       val request = Request(Method.POST, uri"webhooks" / "events")
         .withHeaders(Headers.of(Header("X-Gitlab-Token", serializedHookToken.toString)))
-        .withEntity(pushEventPayloadFrom(pushEvent))
+        .withEntity(pushEventPayloadFrom(commitId, syncRequest))
 
       val response = processPushEvent(request).unsafeRunSync()
 
@@ -156,9 +144,8 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
 
   private trait TestCase {
 
-    val logger = TestLogger[IO]()
-
-    val pushEvent = commitSyncRequests.generateOne
+    val commitId    = commitIds.generateOne
+    val syncRequest = commitSyncRequests.generateOne
     val serializedHookToken = nonEmptyStrings().map {
       SerializedHookToken
         .from(_)
@@ -168,6 +155,7 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
         )
     }.generateOne
 
+    val logger                  = TestLogger[IO]()
     val commitSyncRequestSender = mock[CommitSyncRequestSender[IO]]
     val hookTokenCrypto         = mock[IOHookTokenCrypto]
     val processPushEvent = new HookEventEndpointImpl[IO](
@@ -176,18 +164,19 @@ class HookEventEndpointSpec extends AnyWordSpec with MockFactory with should.Mat
       logger
     ).processPushEvent _
 
-    def pushEventPayloadFrom(syncRequest: CommitSyncRequest) =
-      json"""{                                                      
-        "project": {
-          "id":                  ${syncRequest.project.id.value},
-          "path_with_namespace": ${syncRequest.project.path.value}
-        }
-      }"""
-
     def expectDecryptionOf(hookAuthToken: SerializedHookToken, returning: HookToken) =
       (hookTokenCrypto
         .decrypt(_: SerializedHookToken))
         .expects(hookAuthToken)
         .returning(IO.pure(returning))
   }
+
+  private def pushEventPayloadFrom(commitId: CommitId, syncRequest: CommitSyncRequest) =
+    json"""{                                                      
+      "after":                 ${commitId.value},
+      "project": {
+        "id":                  ${syncRequest.project.id.value},
+        "path_with_namespace": ${syncRequest.project.path.value}
+      }
+    }"""
 }
