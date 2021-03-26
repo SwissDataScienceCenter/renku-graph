@@ -488,12 +488,16 @@ class IODatasetsFinderSpec
         val sameAs4DatasetsAndJsons = nonModifiedDatasets(
           usedInProjects = nonEmptyList(datasetProjects, maxElements = 1)
         ).generateOne.makeTitleContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
+        val sameAs5DatasetsAndJsons = nonModifiedDatasets(
+          usedInProjects = nonEmptyList(datasetProjects, maxElements = 1)
+        ).generateOne.makeKeywordsContaining(phrase).toJsonLDsAndDatasets(noSameAs = true)()
 
         loadToStore(
           (sameAs1DatasetsAndJsons ++
             sameAs2DatasetsAndJsons ++
             sameAs3DatasetsAndJsons ++
             sameAs4DatasetsAndJsons ++
+            sameAs5DatasetsAndJsons ++
             nonModifiedDatasets().generateOne.toJsonLDsAndDatasets(noSameAs = true)()).jsonLDs: _*
         )
 
@@ -504,12 +508,13 @@ class IODatasetsFinderSpec
         result.results shouldBe List(sameAs1DatasetsAndJsons,
                                      sameAs2DatasetsAndJsons,
                                      sameAs3DatasetsAndJsons,
-                                     sameAs4DatasetsAndJsons
+                                     sameAs4DatasetsAndJsons,
+                                     sameAs5DatasetsAndJsons
         )
           .flatMap(_.toDatasetSearchResult(result.results))
           .sortBy(_.title)
 
-        result.pagingInfo.total shouldBe Total(4)
+        result.pagingInfo.total shouldBe Total(5)
       }
 
     "return no results if there is no matching dataset" in new TestCase {

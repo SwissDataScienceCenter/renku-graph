@@ -111,7 +111,7 @@ private class IODatasetsFinder(
         |        WHERE {
         |          {
         |            SELECT DISTINCT ?id
-        |            WHERE { ?id text:query (schema:name schema:description schema:alternateName '$phrase') }
+        |            WHERE { ?id text:query (schema:name schema:description schema:alternateName schema:keywords '$phrase') }
         |          } {
         |            ?id rdf:type <http://schema.org/Dataset>;
         |            	renku:topmostSameAs ?sameAs.
