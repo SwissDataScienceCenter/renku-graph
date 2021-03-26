@@ -261,117 +261,121 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           findProcessingTime(eventId).eventIdsOnly shouldBe List()
         }
     }
+  }
 
-    "factory" should {
+  "factory" should {
 
-      s"return a CommandFound for the $TriplesGenerated status " +
-        s"when event is currently in the $GeneratingTriples status" in new TestCase {
+    s"return a CommandFound for the $TriplesGenerated status " +
+      s"when event is currently in the $GeneratingTriples status" in new TestCase {
 
-          createEvent(GeneratingTriples)
+        createEvent(GeneratingTriples)
 
-          val maybeProcessingTime = eventProcessingTimes.generateOption
-          val eventPayload        = eventPayloads.generateOne
-          val payloadPartBody     = json"""{
+        val maybeProcessingTime = eventProcessingTimes.generateSome
+        val eventPayload        = eventPayloads.generateOne
+        val payloadPartBody     = json"""{
             "schemaVersion": ${schemaVersion.value},
             "payload":       ${eventPayload.value}
           }""".spaces2
 
-          val actual = ToTriplesGenerated
-            .factory(transactor,
-                     underTriplesTransformationGauge,
-                     underTriplesGenerationGauge,
-                     awaitingTransformationGauge
-            )
-            .run(EventAndPayloadRequest(eventId, TriplesGenerated, maybeProcessingTime, payloadPartBody))
-            .unsafeRunSync()
-
-          actual shouldBe CommandFound(
-            GeneratingToTriplesGenerated(eventId,
-                                         eventPayload,
-                                         schemaVersion,
-                                         underTriplesGenerationGauge,
-                                         awaitingTransformationGauge,
-                                         maybeProcessingTime
-            )
-          )
-        }
-
-      s"return a CommandFound for the $TriplesGenerated status " +
-        s"when event is currently in the $TransformingTriples status" in new TestCase {
-
-          createEvent(TransformingTriples)
-
-          val actual = ToTriplesGenerated
-            .factory(transactor,
-                     underTriplesTransformationGauge,
-                     underTriplesGenerationGauge,
-                     awaitingTransformationGauge
-            )
-            .run(
-              EventOnlyRequest(eventId,
-                               TriplesGenerated,
-                               eventProcessingTimes.generateOption,
-                               eventMessages.generateOption
-              )
-            )
-            .unsafeRunSync()
-
-          actual shouldBe CommandFound(
-            TransformingToTriplesGenerated(eventId, underTriplesTransformationGauge, awaitingTransformationGauge)
-          )
-        }
-
-      EventStatus.all.filterNot(status => status == TriplesGenerated) foreach { eventStatus =>
-        s"return NotSupported if status is $eventStatus" in new TestCase {
-          ToTriplesGenerated
-            .factory(transactor,
-                     underTriplesTransformationGauge,
-                     underTriplesGenerationGauge,
-                     awaitingTransformationGauge
-            )
-            .run(changeStatusRequestsWith(eventStatus).generateOne)
-            .unsafeRunSync() shouldBe NotSupported
-        }
-      }
-
-      s"return PayloadMalformed if the decoding failed because of missing schemaVersion property" in new TestCase {
-
-        createEvent(GeneratingTriples)
-
-        val maybeProcessingTime = eventProcessingTimes.generateOption
-        val eventPayload        = eventPayloads.generateOne
-        val payloadPartBody     = json"""{"payload": ${eventPayload.value}}""".spaces2
-
-        ToTriplesGenerated
+        val actual = ToTriplesGenerated
           .factory(transactor,
                    underTriplesTransformationGauge,
                    underTriplesGenerationGauge,
                    awaitingTransformationGauge
           )
           .run(EventAndPayloadRequest(eventId, TriplesGenerated, maybeProcessingTime, payloadPartBody))
-          .unsafeRunSync() shouldBe PayloadMalformed(
-          "Attempt to decode value on failed cursor: DownField(schemaVersion)"
+          .unsafeRunSync()
+
+        actual shouldBe CommandFound(
+          GeneratingToTriplesGenerated(eventId,
+                                       eventPayload,
+                                       schemaVersion,
+                                       underTriplesGenerationGauge,
+                                       awaitingTransformationGauge,
+                                       maybeProcessingTime
+          )
         )
       }
 
-      s"return PayloadMalformed if the decoding failed because of missing payload property" in new TestCase {
+    s"return a CommandFound for the $TriplesGenerated status " +
+      s"when event is currently in the $TransformingTriples status" in new TestCase {
 
-        createEvent(GeneratingTriples)
+        createEvent(TransformingTriples)
 
-        val maybeProcessingTime = eventProcessingTimes.generateOption
-        val payloadPartBody     = json"""{"schemaVersion": ${schemaVersion.value}}""".spaces2
+        val actual = ToTriplesGenerated
+          .factory(transactor,
+                   underTriplesTransformationGauge,
+                   underTriplesGenerationGauge,
+                   awaitingTransformationGauge
+          )
+          .run(
+            EventOnlyRequest(eventId,
+                             TriplesGenerated,
+                             eventProcessingTimes.generateOption,
+                             eventMessages.generateOption
+            )
+          )
+          .unsafeRunSync()
 
+        actual shouldBe CommandFound(
+          TransformingToTriplesGenerated(eventId, underTriplesTransformationGauge, awaitingTransformationGauge)
+        )
+      }
+
+    EventStatus.all.filterNot(status => status == TriplesGenerated) foreach { eventStatus =>
+      s"return NotSupported if status is $eventStatus" in new TestCase {
         ToTriplesGenerated
           .factory(transactor,
                    underTriplesTransformationGauge,
                    underTriplesGenerationGauge,
                    awaitingTransformationGauge
           )
-          .run(EventAndPayloadRequest(eventId, TriplesGenerated, maybeProcessingTime, payloadPartBody))
-          .unsafeRunSync() shouldBe PayloadMalformed(
-          "Attempt to decode value on failed cursor: DownField(payload)"
-        )
+          .run(changeStatusRequestsWith(eventStatus).generateOne)
+          .unsafeRunSync() shouldBe NotSupported
       }
+    }
+
+    "return PayloadMalformed if there's payload but no processing time in the request" in new TestCase {
+      val payloadPartBody = json"""{
+            "schemaVersion": ${schemaVersion.value},
+            "payload":       ${eventPayloads.generateOne.value}
+          }""".spaces2
+
+      ToTriplesGenerated
+        .factory(transactor, underTriplesTransformationGauge, underTriplesGenerationGauge, awaitingTransformationGauge)
+        .run(EventAndPayloadRequest(eventId, TriplesGenerated, None, payloadPartBody))
+        .unsafeRunSync() shouldBe PayloadMalformed("No processing time provided")
+    }
+
+    s"return PayloadMalformed if the decoding failed because of missing schemaVersion property" in new TestCase {
+
+      createEvent(GeneratingTriples)
+
+      val maybeProcessingTime = eventProcessingTimes.generateOption
+      val eventPayload        = eventPayloads.generateOne
+      val payloadPartBody     = json"""{"payload": ${eventPayload.value}}""".spaces2
+
+      ToTriplesGenerated
+        .factory(transactor, underTriplesTransformationGauge, underTriplesGenerationGauge, awaitingTransformationGauge)
+        .run(EventAndPayloadRequest(eventId, TriplesGenerated, maybeProcessingTime, payloadPartBody))
+        .unsafeRunSync() shouldBe PayloadMalformed(
+        "Attempt to decode value on failed cursor: DownField(schemaVersion)"
+      )
+    }
+
+    s"return PayloadMalformed if the decoding failed because of missing payload property" in new TestCase {
+
+      createEvent(GeneratingTriples)
+
+      val maybeProcessingTime = eventProcessingTimes.generateOption
+      val payloadPartBody     = json"""{"schemaVersion": ${schemaVersion.value}}""".spaces2
+
+      ToTriplesGenerated
+        .factory(transactor, underTriplesTransformationGauge, underTriplesGenerationGauge, awaitingTransformationGauge)
+        .run(EventAndPayloadRequest(eventId, TriplesGenerated, maybeProcessingTime, payloadPartBody))
+        .unsafeRunSync() shouldBe PayloadMalformed(
+        "Attempt to decode value on failed cursor: DownField(payload)"
+      )
     }
   }
 

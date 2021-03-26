@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 
 import cats.syntax.all._
-import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
 import ch.datascience.graph.model.projects
 import doobie.implicits._
 import io.renku.eventlog.{EventLogDataProvisioning, InMemoryEventLogDb}
@@ -35,5 +35,13 @@ trait SubscriptionDataProvisioning extends EventLogDataProvisioning with Subscri
             |ON CONFLICT (project_id, category_name)
             |DO UPDATE SET last_synced = excluded.last_synced 
       """.stripMargin.update.run.void
+    }
+
+  protected def findSyncTime(projectId: projects.Id, categoryName: CategoryName): Option[LastSyncedDate] =
+    execute {
+      sql"""|SELECT last_synced
+            |FROM subscription_category_sync_time
+            |WHERE project_id = $projectId AND category_name = $categoryName
+      """.stripMargin.query[LastSyncedDate].option
     }
 }

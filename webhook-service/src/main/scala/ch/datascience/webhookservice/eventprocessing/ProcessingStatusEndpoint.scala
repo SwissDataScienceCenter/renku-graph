@@ -24,16 +24,15 @@ import cats.effect._
 import cats.syntax.all._
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.InfoMessage
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
+import ch.datascience.webhookservice.hookvalidation.HookValidator
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
-import ch.datascience.webhookservice.hookvalidation.{HookValidator, IOHookValidator}
-import ch.datascience.webhookservice.project.ProjectHookUrl
+import ch.datascience.webhookservice.model.ProjectHookUrl
 import io.chrisdavenport.log4cats.Logger
 import io.circe.literal._
 import io.circe.syntax._
@@ -129,9 +128,8 @@ object IOProcessingStatusEndpoint {
       contextShift:     ContextShift[IO],
       clock:            Clock[IO],
       timer:            Timer[IO]
-  ): IO[ProcessingStatusEndpoint[IO]] =
-    for {
-      fetcher       <- IOProcessingStatusFetcher(logger)
-      hookValidator <- IOHookValidator(projectHookUrl, gitLabThrottler)
-    } yield new ProcessingStatusEndpointImpl[IO](hookValidator, fetcher, executionTimeRecorder, logger)
+  ): IO[ProcessingStatusEndpoint[IO]] = for {
+    fetcher       <- IOProcessingStatusFetcher(logger)
+    hookValidator <- HookValidator(projectHookUrl, gitLabThrottler)
+  } yield new ProcessingStatusEndpointImpl[IO](hookValidator, fetcher, executionTimeRecorder, logger)
 }

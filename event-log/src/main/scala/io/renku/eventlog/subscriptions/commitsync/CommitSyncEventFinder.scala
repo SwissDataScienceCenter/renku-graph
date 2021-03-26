@@ -19,13 +19,14 @@
 package io.renku.eventlog.subscriptions.commitsync
 
 import cats.effect.{Bracket, ContextShift, IO}
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.CompoundEventId
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.events.{CompoundEventId, LastSyncedDate}
+import ch.datascience.graph.model.{events, projects}
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
+import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
 import io.renku.eventlog.{EventDate, EventLogDB}
-import io.renku.eventlog.subscriptions.{EventFinder, LastSyncedDate, SubscriptionTypeSerializers}
 
 import java.time.Instant
 
@@ -43,14 +44,14 @@ private class CommitSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
 
   override def popEvent(): IO[Option[CommitSyncEvent]] = findEventAndMarkTaken() transact transactor.get
 
-  private def findEventAndMarkTaken() =
-    findEvent() flatMap {
-      case Some((event, maybeSyncDate)) =>
-        setSyncDate(event, maybeSyncDate) map toNoneIfEventAlreadyTaken(event)
-      case None => Free.pure[ConnectionOp, Option[CommitSyncEvent]](None)
-    }
+  private def findEventAndMarkTaken() = findEvent >>= {
+    case Some((event, maybeSyncDate)) =>
+      setSyncDate(event, maybeSyncDate) map toNoneIfEventAlreadyTaken(event)
+    case None =>
+      Free.pure[ConnectionOp, Option[CommitSyncEvent]](None)
+  }
 
-  private def findEvent() = measureExecutionTime {
+  private def findEvent = measureExecutionTime {
     SqlQuery(
       sql"""|SELECT
             |  (SELECT evt.event_id 
@@ -76,15 +77,18 @@ private class CommitSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
             |ORDER BY proj.latest_event_date DESC 
             |LIMIT 1
       """.stripMargin
-        .query[(CompoundEventId, projects.Path, Option[LastSyncedDate], EventDate)]
-        .map { case (id, projectPath, maybeLastSyncDate, latestEventDate) =>
-          CommitSyncEvent(id,
-                          projectPath,
-                          maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
-          ) -> maybeLastSyncDate
+        .query[(Option[events.EventId], projects.Id, projects.Path, Option[LastSyncedDate], EventDate)]
+        .map {
+          case (Some(eventId), projectId, projectPath, maybeLastSyncDate, latestEventDate) =>
+            FullCommitSyncEvent(CompoundEventId(eventId, projectId),
+                                projectPath,
+                                maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
+            ) -> maybeLastSyncDate
+          case (None, projectId, projectPath, maybeLastSyncDate, _) =>
+            MinimalCommitSyncEvent(projectId, projectPath) -> maybeLastSyncDate
         }
         .option,
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event")
+      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find full event")
     )
   }
 
@@ -94,9 +98,9 @@ private class CommitSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
 
   private def updateLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
     SqlQuery(
-      sql"""|UPDATE subscription_category_sync_time 
+      sql"""|UPDATE subscription_category_sync_time
             |SET last_synced = ${now()}
-            |WHERE project_id = ${event.id.projectId} AND category_name = $categoryName
+            |WHERE project_id = ${event.projectId} AND category_name = $categoryName
             |""".stripMargin.update.run,
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced")
     )
@@ -105,13 +109,20 @@ private class CommitSyncEventFinderImpl(transactor:       DbTransactor[IO, Event
   private def insertLastSyncedDate(event: CommitSyncEvent) = measureExecutionTime {
     SqlQuery(
       sql"""|INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
-            |VALUES (${event.id.projectId}, $categoryName, ${now()})
+            |VALUES (${event.projectId}, $categoryName, ${now()})
             |ON CONFLICT (project_id, category_name)
-            |DO UPDATE 
+            |DO UPDATE
             |  SET last_synced = EXCLUDED.last_synced
             |""".stripMargin.update.run,
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced")
     )
+  }
+
+  private implicit class SyncEventOps(commitSyncEvent: CommitSyncEvent) {
+    lazy val projectId: projects.Id = commitSyncEvent match {
+      case FullCommitSyncEvent(eventId, _, _)   => eventId.projectId
+      case MinimalCommitSyncEvent(projectId, _) => projectId
+    }
   }
 
   private def toNoneIfEventAlreadyTaken(event: CommitSyncEvent): Int => Option[CommitSyncEvent] = {

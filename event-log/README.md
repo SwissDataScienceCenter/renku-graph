@@ -6,7 +6,6 @@ This is a microservice which provides CRUD operations for Event Log DB.
 
 | Method | Path                                    | Description                                                    |
 |--------|-----------------------------------------|----------------------------------------------------------------|
-|  GET   | ```/events?latest_per_project=true```   | Finds events for all the projects with the latest `event_date` |
 |  GET   | ```/events/:event-id/:project-id```     | Retrieve chosen event's data                                   |
 |  PATCH | ```/events```                           | Changes events' data by applying the given patch               |
 |  POST  | ```/events```                           | Send an event for processing                                   |
@@ -15,32 +14,6 @@ This is a microservice which provides CRUD operations for Event Log DB.
 |  GET   | ```/ping```                             | Verifies service health                                        |
 |  GET   | ```/processing-status?project-id=:id``` | Finds processing status of events belonging to a project       |
 |  POST  | ```/subscriptions```                    | Adds a subscription for events                                 |
-
-#### GET /events?latest_per_project=true
-
-Finds events for all the projects with the latest `event_date`.
-
-**Response**
-
-| Status                     | Description                                                   |
-|----------------------------|---------------------------------------------------------------|
-| OK (200)                   | If there are events found for the projects or `[]` otherwise  |
-| BAD_REQUEST (400)          | If value different that `true` given for `latest_per_project` |
-| NOT_FOUND (404)            | If no `latest_per_project` given                              |
-| INTERNAL SERVER ERROR (500)| When there are problems                                       |
-
-Response body example:
-
-```json
-{
-  "id": "df654c3b1bd105a29d658f78f6380a842feac879",
-  "project": {
-    "id": 123,
-    "path": "namespace/project-name"
-  },
-  "body": "JSON payload"
-}
-```
 
 #### GET /events/:event-id/:project-id`
 
@@ -154,6 +127,24 @@ Changes the status of a zombie event
     "path": "namespace/project-name"
   },
   "status": "GENERATING_TRIPLES|TRANSFORMING_TRIPLES"
+}
+```
+
+- **COMMIT_SYNC_REQUEST**
+
+Forces issuing a commit sync event for the given project
+
+**Multipart Request**
+
+`event` part:
+
+```json
+{
+  "categoryName": "COMMIT_SYNC_REQUEST",
+  "project": {
+    "id":   12,
+    "path": "namespace/project-name"
+  }
 }
 ```
 
@@ -455,6 +446,18 @@ All events are sent as multipart requests
     "path": "project/path"
   },
   "lastSynced": "2001-09-04T11:00:00.000Z"
+}
+```
+
+or
+
+```json
+{
+  "categoryName": "COMMIT_SYNC",
+  "project": {
+    "id": 12,
+    "path": "project/path"
+  }
 }
 ```
 

@@ -18,8 +18,6 @@
 
 package ch.datascience.webhookservice
 
-import java.util.concurrent.ConcurrentHashMap
-
 import cats.effect._
 import ch.datascience.config.certificates.CertificateLoader
 import ch.datascience.generators.Generators
@@ -28,7 +26,6 @@ import ch.datascience.generators.Generators.exceptions
 import ch.datascience.http.server.IOHttpServer
 import ch.datascience.interpreters.IOSentryInitializer
 import ch.datascience.testtools.MockedRunnableCollaborators
-import ch.datascience.webhookservice.missedevents._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -45,11 +42,10 @@ class MicroserviceRunnerSpec
 
     "return Success Exit Code if " +
       "Sentry initialisation is fine and " +
-      "Events Synchronization Scheduler and Http Server start up" in new TestCase {
+      "Http Server start up" in new TestCase {
 
         given(certificateLoader).succeeds(returning = ())
         given(sentryInitializer).succeeds(returning = ())
-        given(eventsSynchronizationScheduler).succeeds(returning = ())
         given(httpServer).succeeds(returning = ExitCode.Success)
 
         runner.run().unsafeRunSync() shouldBe ExitCode.Success
@@ -76,22 +72,10 @@ class MicroserviceRunnerSpec
       } shouldBe exception
     }
 
-    "return Success Exit Code even if starting the Events Synchronization Scheduler fails" in new TestCase {
-
-      given(certificateLoader).succeeds(returning = ())
-      given(sentryInitializer).succeeds(returning = ())
-      val exception = Generators.exceptions.generateOne
-      given(eventsSynchronizationScheduler).fails(becauseOf = exception)
-      given(httpServer).succeeds(returning = ExitCode.Success)
-
-      runner.run().unsafeRunSync() shouldBe ExitCode.Success
-    }
-
     "fail if starting Http Server fails" in new TestCase {
 
       given(certificateLoader).succeeds(returning = ())
       given(sentryInitializer).succeeds(returning = ())
-      given(eventsSynchronizationScheduler).succeeds(returning = ())
       val exception = Generators.exceptions.generateOne
       given(httpServer).fails(becauseOf = exception)
 
@@ -104,16 +88,9 @@ class MicroserviceRunnerSpec
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
-    val certificateLoader              = mock[CertificateLoader[IO]]
-    val sentryInitializer              = mock[IOSentryInitializer]
-    val eventsSynchronizationScheduler = mock[TestIOEventsSynchronizationScheduler]
-    val httpServer                     = mock[IOHttpServer]
-    val runner = new MicroserviceRunner(
-      certificateLoader,
-      sentryInitializer,
-      eventsSynchronizationScheduler,
-      httpServer,
-      new ConcurrentHashMap[CancelToken[IO], Unit]()
-    )
+    val certificateLoader = mock[CertificateLoader[IO]]
+    val sentryInitializer = mock[IOSentryInitializer]
+    val httpServer        = mock[IOHttpServer]
+    val runner            = new MicroserviceRunner(certificateLoader, sentryInitializer, httpServer)
   }
 }

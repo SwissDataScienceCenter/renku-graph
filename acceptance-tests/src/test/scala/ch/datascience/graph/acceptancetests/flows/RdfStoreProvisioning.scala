@@ -57,6 +57,8 @@ object RdfStoreProvisioning extends ModelImplicits with Eventually with Acceptan
 
     `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(projectId, commitId)
 
+    `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(projectId, commitId)
+
     `GET <gitlabApi>/projects/:path returning OK with`(project, maybeCreator = Some(committer))
 
     `GET <triples-generator>/projects/:id/commits/:id returning OK`(project, commitId, triples)

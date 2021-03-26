@@ -27,10 +27,8 @@ import ch.datascience.http.server.HttpServer
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.microservices.IOMicroservice
-import ch.datascience.webhookservice.missedevents.{EventsSynchronizationScheduler, IOEventsSynchronizationScheduler}
 import pureconfig.ConfigSource
 
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors.newFixedThreadPool
 import scala.concurrent.ExecutionContext
 
@@ -52,8 +50,6 @@ object Microservice extends IOMicroservice {
     gitLabThrottler       <- Throttler[IO, GitLab](gitLabRateLimit)
     executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     metricsRegistry       <- MetricsRegistry()
-    eventsSynchronizationScheduler <-
-      IOEventsSynchronizationScheduler(gitLabThrottler, executionTimeRecorder, ApplicationLogger)
     microserviceRoutes <-
       MicroserviceRoutes(metricsRegistry, gitLabThrottler, executionTimeRecorder, ApplicationLogger)
     exitcode <- microserviceRoutes.routes.use { routes =>
@@ -62,30 +58,20 @@ object Microservice extends IOMicroservice {
                   new MicroserviceRunner(
                     certificateLoader,
                     sentryInitializer,
-                    eventsSynchronizationScheduler,
-                    httpServer,
-                    subProcessesCancelTokens
+                    httpServer
                   ).run()
                 }
   } yield exitcode
 }
 
-class MicroserviceRunner(certificateLoader:              CertificateLoader[IO],
-                         sentryInitializer:              SentryInitializer[IO],
-                         eventsSynchronizationScheduler: EventsSynchronizationScheduler[IO],
-                         httpServer:                     HttpServer[IO],
-                         subProcessesCancelTokens:       ConcurrentHashMap[CancelToken[IO], Unit]
-)(implicit contextShift:                                 ContextShift[IO]) {
+class MicroserviceRunner(certificateLoader: CertificateLoader[IO],
+                         sentryInitializer: SentryInitializer[IO],
+                         httpServer:        HttpServer[IO]
+)(implicit contextShift:                    ContextShift[IO]) {
 
   def run(): IO[ExitCode] = for {
     _      <- certificateLoader.run()
     _      <- sentryInitializer.run()
-    _      <- eventsSynchronizationScheduler.run().start.map(gatherCancelToken)
     result <- httpServer.run()
   } yield result
-
-  private def gatherCancelToken(fiber: Fiber[IO, Unit]): Fiber[IO, Unit] = {
-    subProcessesCancelTokens.put(fiber.cancel, ())
-    fiber
-  }
 }

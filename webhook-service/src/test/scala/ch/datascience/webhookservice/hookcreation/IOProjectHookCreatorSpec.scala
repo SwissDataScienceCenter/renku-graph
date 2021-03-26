@@ -27,7 +27,7 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
-import ch.datascience.webhookservice.generators.WebhookServiceGenerators.{projectHookUrls, serializedHookTokens}
+import ch.datascience.webhookservice.WebhookServiceGenerators.{projectHookUrls, serializedHookTokens}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
 import com.github.tomakehurst.wiremock.client.WireMock._
 import io.circe.Json

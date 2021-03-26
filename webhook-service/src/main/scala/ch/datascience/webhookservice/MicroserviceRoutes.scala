@@ -32,7 +32,7 @@ import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.eventprocessing._
 import ch.datascience.webhookservice.hookcreation.{HookCreationEndpoint, IOHookCreationEndpoint}
 import ch.datascience.webhookservice.hookvalidation.{HookValidationEndpoint, IOHookValidationEndpoint}
-import ch.datascience.webhookservice.project.ProjectHookUrl
+import ch.datascience.webhookservice.model.ProjectHookUrl
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.AuthedRoutes
 import org.http4s.dsl.Http4sDsl
@@ -85,25 +85,24 @@ private object MicroserviceRoutes {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[MicroserviceRoutes[IO]] =
-    for {
-      projectHookUrl  <- ProjectHookUrl.fromConfig[IO]()
-      hookTokenCrypto <- HookTokenCrypto[IO]()
-      hookEventEndpoint <-
-        IOHookEventEndpoint(gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
-      hookCreatorEndpoint <-
-        IOHookCreationEndpoint(projectHookUrl, gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
-      processingStatusEndpoint <-
-        IOProcessingStatusEndpoint(projectHookUrl, gitLabThrottler, executionTimeRecorder, logger)
-      hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler, logger)
-      authenticator          <- GitLabAuthenticator(gitLabThrottler, logger)
-      authMiddleware         <- Authentication.middleware(authenticator)
-    } yield new MicroserviceRoutes(
-      hookEventEndpoint,
-      hookCreatorEndpoint,
-      hookValidationEndpoint,
-      processingStatusEndpoint,
-      authMiddleware,
-      new RoutesMetrics[IO](metricsRegistry)
-    )
+  ): IO[MicroserviceRoutes[IO]] = for {
+    projectHookUrl  <- ProjectHookUrl.fromConfig[IO]()
+    hookTokenCrypto <- HookTokenCrypto[IO]()
+    hookEventEndpoint <-
+      IOHookEventEndpoint(gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
+    hookCreatorEndpoint <-
+      IOHookCreationEndpoint(projectHookUrl, gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
+    processingStatusEndpoint <-
+      IOProcessingStatusEndpoint(projectHookUrl, gitLabThrottler, executionTimeRecorder, logger)
+    hookValidationEndpoint <- IOHookValidationEndpoint(projectHookUrl, gitLabThrottler, logger)
+    authenticator          <- GitLabAuthenticator(gitLabThrottler, logger)
+    authMiddleware         <- Authentication.middleware(authenticator)
+  } yield new MicroserviceRoutes(
+    hookEventEndpoint,
+    hookCreatorEndpoint,
+    hookValidationEndpoint,
+    processingStatusEndpoint,
+    authMiddleware,
+    new RoutesMetrics[IO](metricsRegistry)
+  )
 }
