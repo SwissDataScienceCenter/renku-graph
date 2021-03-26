@@ -18,15 +18,22 @@
 
 package io.renku.eventlog.subscriptions.commitsync
 
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.events.{CompoundEventId, LastSyncedDate}
 import ch.datascience.graph.model.projects
-import io.renku.eventlog.subscriptions.{EventEncoder, LastSyncedDate}
+import io.renku.eventlog.subscriptions.EventEncoder
 
-private final case class CommitSyncEvent(id:             CompoundEventId,
-                                         projectPath:    projects.Path,
-                                         lastSyncedDate: LastSyncedDate
-) {
-  override lazy val toString: String = s"$CommitSyncEvent $id, projectPath = $projectPath, lastSynced = $lastSyncedDate"
+private sealed trait CommitSyncEvent
+
+private final case class FullCommitSyncEvent(id:             CompoundEventId,
+                                             projectPath:    projects.Path,
+                                             lastSyncedDate: LastSyncedDate
+) extends CommitSyncEvent {
+  override lazy val toString: String = s"CommitSyncEvent $id, projectPath = $projectPath, lastSynced = $lastSyncedDate"
+}
+
+private final case class MinimalCommitSyncEvent(projectId: projects.Id, projectPath: projects.Path)
+    extends CommitSyncEvent {
+  override lazy val toString: String = s"CommitSyncEvent projectId = $projectId, projectPath = $projectPath"
 }
 
 private object CommitSyncEventEncoder extends EventEncoder[CommitSyncEvent] {
@@ -34,15 +41,24 @@ private object CommitSyncEventEncoder extends EventEncoder[CommitSyncEvent] {
   import io.circe.Json
   import io.circe.literal._
 
-  override def encodeEvent(event: CommitSyncEvent): Json = json"""{
-    "categoryName": ${categoryName.value},
-    "id":           ${event.id.id.value},
-    "project": {
-      "id":         ${event.id.projectId.value},
-      "path":       ${event.projectPath.value}
-    },
-    "lastSynced":   ${event.lastSyncedDate.value}
-  }"""
+  override def encodeEvent(event: CommitSyncEvent): Json = event match {
+    case FullCommitSyncEvent(eventId, projectPath, lastSyncedDate) => json"""{
+        "categoryName": ${categoryName.value},
+        "id":           ${eventId.id.value},
+        "project": {
+          "id":         ${eventId.projectId.value},
+          "path":       ${projectPath.value}
+        },
+        "lastSynced":   ${lastSyncedDate.value}
+      }"""
+    case MinimalCommitSyncEvent(projectId, projectPath)            => json"""{
+        "categoryName": ${categoryName.value},
+        "project": {
+          "id":         ${projectId.value},
+          "path":       ${projectPath.value}
+        }
+      }"""
+  }
 
   override def encodePayload(event: CommitSyncEvent): Option[String] = None
 }

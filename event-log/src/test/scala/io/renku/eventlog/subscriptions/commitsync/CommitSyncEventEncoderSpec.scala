@@ -20,7 +20,7 @@ package io.renku.eventlog.subscriptions.commitsync
 
 import ch.datascience.generators.Generators.Implicits._
 import io.circe.literal._
-import io.renku.eventlog.subscriptions.commitsync.Generators.commitSyncEvents
+import io.renku.eventlog.subscriptions.commitsync.Generators._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -28,8 +28,8 @@ class CommitSyncEventEncoderSpec extends AnyWordSpec with should.Matchers {
 
   "encodeEvent" should {
 
-    "serialize AwaitingGenerationEvent to Json" in {
-      val event = commitSyncEvents.generateOne
+    "serialize FullCommitSyncEvent to Json" in {
+      val event = fullCommitSyncEvents.generateOne
 
       CommitSyncEventEncoder.encodeEvent(event) shouldBe json"""{
         "categoryName": "COMMIT_SYNC",
@@ -39,6 +39,18 @@ class CommitSyncEventEncoderSpec extends AnyWordSpec with should.Matchers {
           "path":       ${event.projectPath.value}
         },
         "lastSynced":   ${event.lastSyncedDate.value}
+      }"""
+    }
+
+    "serialize MinimalCommitSyncEvent to Json" in {
+      val event = minimalCommitSyncEvents.generateOne
+
+      CommitSyncEventEncoder.encodeEvent(event) shouldBe json"""{
+        "categoryName": "COMMIT_SYNC",
+        "project": {
+          "id":         ${event.projectId.value},
+          "path":       ${event.projectPath.value}
+        }
       }"""
     }
   }

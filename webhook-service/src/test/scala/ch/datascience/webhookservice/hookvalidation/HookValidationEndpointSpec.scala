@@ -114,7 +114,7 @@ class HookValidationEndpointSpec extends AnyWordSpec with MockFactory with shoul
     val authUser  = authUsers.generateOne
 
     val logger        = TestLogger[IO]()
-    val hookValidator = mock[IOHookValidator]
+    val hookValidator = mock[HookValidator[IO]]
     val validateHook  = new HookValidationEndpointImpl[IO](hookValidator, logger).validateHook _
   }
 }

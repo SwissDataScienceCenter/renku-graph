@@ -140,7 +140,9 @@ private[statuschange] object ToTriplesGenerated extends TypeSerializers {
       underTriplesGenerationGauge:     LabeledGauge[Interpretation, projects.Path],
       awaitingTransformationGauge:     LabeledGauge[Interpretation, projects.Path]
   ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli {
-    case EventAndPayloadRequest(eventId, TriplesGenerated, maybeProcessingTime, payload) =>
+    case EventAndPayloadRequest(_, TriplesGenerated, None, _) =>
+      (PayloadMalformed("No processing time provided"): CommandFindingResult).pure[Interpretation]
+    case EventAndPayloadRequest(eventId, TriplesGenerated, Some(processingTime), payload) =>
       findEventStatus[Interpretation](eventId, transactor).flatMap {
         case GeneratingTriples =>
           {
@@ -154,7 +156,7 @@ private[statuschange] object ToTriplesGenerated extends TypeSerializers {
                                                            parsedPayload._1,
                                                            underTriplesGenerationGauge,
                                                            awaitingTransformationGauge,
-                                                           maybeProcessingTime
+                                                           Some(processingTime)
               )
             )
           }.merge.widen[CommandFindingResult]

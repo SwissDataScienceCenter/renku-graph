@@ -18,16 +18,12 @@
 
 package ch.datascience.webhookservice.crypto
 
-import java.nio.charset.StandardCharsets.UTF_8
-import java.security.InvalidKeyException
-import java.util.Base64
-
 import ch.datascience.crypto.AesCrypto.Secret
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
+import ch.datascience.webhookservice.WebhookServiceGenerators._
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
-import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.model.HookToken
 import com.typesafe.config.ConfigFactory
 import eu.timepit.refined.api.RefType
@@ -35,6 +31,9 @@ import eu.timepit.refined.auto._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
+import java.nio.charset.StandardCharsets.UTF_8
+import java.security.InvalidKeyException
+import java.util.Base64
 import scala.jdk.CollectionConverters._
 import scala.util.{Failure, Success, Try}
 

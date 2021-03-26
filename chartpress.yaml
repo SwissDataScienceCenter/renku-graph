@@ -28,3 +28,7 @@ charts:
         contextPath: .
         dockerfilePath: event-log/Dockerfile
         valuesPath: eventLog.image
+      commit-event-service:
+        contextPath: .
+        dockerfilePath: commit-event-service/Dockerfile
+        valuesPath: commitEventService.image

@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "commitEventService.fullname" . }}
+  labels:
+    app: {{ template "commitEventService.name" . }}
+    chart: {{ template "graph.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ include "commitEventService.name" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "commitEventService.name" . }}
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: commit-event-service
+          image: "{{ .Values.commitEventService.image.repository }}:{{ .Values.commitEventService.image.tag }}"
+          imagePullPolicy: {{ .Values.commitEventService.image.pullPolicy }}
+          env:
+            - name: RENKU_CLIENT_CERTIFICATE
+              valueFrom:
+                secretKeyRef:
+                  name: client-certificate-secret
+                  key: client-certificate
+            - name: EVENT_LOG_BASE_URL
+              value: "http://{{ template "eventLog.fullname" . }}:{{ .Values.eventLog.service.port }}"
+            - name: TOKEN_REPOSITORY_BASE_URL
+              value: "http://{{ template "tokenRepository.fullname" . }}:{{ .Values.tokenRepository.service.port }}"
+            - name: GITLAB_BASE_URL
+              value: {{ .Values.gitlab.url }}
+            - name: GITLAB_RATE_LIMIT
+              value: {{ .Values.commitEventService.gitlab.rateLimit }}
+            - name: SENTRY_ENABLED
+              value: "{{ .Values.sentry.enabled }}"
+              {{- if .Values.sentry.enabled }}
+            - name: SENTRY_BASE_URL
+              value: {{ .Values.sentry.url }}
+            - name: SENTRY_ENVIRONMENT_NAME
+              value: {{ .Values.sentry.environmentName }}
+              {{- end }}
+            - name: THREADS_NUMBER
+              value: "{{ .Values.commitEventService.threadsNumber }}"
+            - name: JAVA_OPTS
+              value: -Xmx{{ .Values.commitEventService.jvmXmx }} -XX:+UseG1GC
+          ports:
+            - name: http-commit-sv
+              containerPort: 9006
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /ping
+              port: http-commit-sv
+          readinessProbe:
+            httpGet:
+              path: /ping
+              port: http-commit-sv
+          resources:
+  {{- toYaml .Values.commitEventService.resources | nindent 12 }}
+  {{- with .Values.nodeSelector }}
+nodeSelector:
+  {{ toYaml . | indent 8 }}
+  {{- end }}
+  {{- with .Values.affinity }}
+affinity:
+  {{ toYaml . | indent 8 }}
+  {{- end }}
+  {{- with .Values.tolerations }}
+tolerations:
+  {{ toYaml . | indent 8 }}
+  {{- end }}

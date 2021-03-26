@@ -20,6 +20,7 @@ package ch.datascience.webhookservice.hookcreation
 
 import cats._
 import cats.effect.{ConcurrentEffect, ContextShift, IO}
+import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -27,14 +28,15 @@ import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.AccessToken
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
+import ch.datascience.webhookservice.CommitSyncRequestSender
+import ch.datascience.webhookservice.WebhookServiceGenerators._
 import ch.datascience.webhookservice.crypto.IOHookTokenCrypto
-import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.hookcreation.ProjectHookCreator.ProjectHook
+import ch.datascience.webhookservice.hookcreation.project._
+import ch.datascience.webhookservice.hookvalidation.HookValidator
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
-import ch.datascience.webhookservice.hookvalidation.IOHookValidator
-import ch.datascience.webhookservice.model.HookToken
-import ch.datascience.webhookservice.project._
+import ch.datascience.webhookservice.model.{CommitSyncRequest, HookToken, Project}
 import ch.datascience.webhookservice.tokenrepository.AccessTokenAssociator
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -73,7 +75,9 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(projectId, accessToken)
         .returning(context.unit)
 
-      expectEventsHistoryLoader(returning = context.unit)
+      (commitSyncRequestSender.sendCommitSyncRequest _)
+        .expects(CommitSyncRequest(Project(projectInfo.id, projectInfo.path)))
+        .returning(().pure[IO])
 
       hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookCreated
 
@@ -217,7 +221,7 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
       logger.loggedOnly(Error(s"Hook creation failed for project with id $projectId", exception))
     }
 
-    "return either HookExisted/HookCreated if loading all events fails" in new TestCase {
+    "fail return either HookExisted/HookCreated if loading all events fails" in new TestCase {
 
       (projectHookValidator
         .validateHook(_: Id, _: Option[AccessToken]))
@@ -244,7 +248,9 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(projectId, accessToken)
         .returning(context.unit)
 
-      expectEventsHistoryLoader(returning = context.raiseError(exceptions.generateOne))
+      (commitSyncRequestSender.sendCommitSyncRequest _)
+        .expects(CommitSyncRequest(Project(projectInfo.id, projectInfo.path)))
+        .returning(exceptions.generateOne.raiseError[IO, Unit])
 
       hookCreation.createHook(projectId, accessToken).unsafeRunSync() shouldBe HookCreated
 
@@ -264,29 +270,23 @@ class HookCreatorSpec extends AnyWordSpec with MockFactory with should.Matchers 
 
     val context: MonadError[IO, Throwable] = MonadError[IO, Throwable]
 
-    val logger                = TestLogger[IO]()
-    val projectInfoFinder     = mock[ProjectInfoFinder[IO]]
-    val projectHookValidator  = mock[IOHookValidator]
-    val projectHookCreator    = mock[ProjectHookCreator[IO]]
-    val hookTokenCrypto       = mock[IOHookTokenCrypto]
-    val accessTokenAssociator = mock[AccessTokenAssociator[IO]]
-    val eventsHistoryLoader   = mock[IOEventsHistoryLoader]
+    val logger                  = TestLogger[IO]()
+    val projectInfoFinder       = mock[ProjectInfoFinder[IO]]
+    val projectHookValidator    = mock[HookValidator[IO]]
+    val projectHookCreator      = mock[ProjectHookCreator[IO]]
+    val hookTokenCrypto         = mock[IOHookTokenCrypto]
+    val accessTokenAssociator   = mock[AccessTokenAssociator[IO]]
+    val commitSyncRequestSender = mock[CommitSyncRequestSender[IO]]
 
-    val hookCreation = new HookCreator[IO](
+    val hookCreation = new HookCreatorImpl[IO](
       projectHookUrl,
       projectHookValidator,
       projectInfoFinder,
       hookTokenCrypto,
       projectHookCreator,
       accessTokenAssociator,
-      eventsHistoryLoader,
+      commitSyncRequestSender,
       logger
     )
-
-    def expectEventsHistoryLoader(returning: IO[Unit]) =
-      (eventsHistoryLoader
-        .loadAllEvents(_: ProjectInfo, _: AccessToken))
-        .expects(projectInfo, accessToken)
-        .returning(returning)
   }
 }

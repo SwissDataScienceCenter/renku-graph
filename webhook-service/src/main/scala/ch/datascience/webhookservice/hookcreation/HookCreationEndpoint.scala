@@ -31,7 +31,7 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
-import ch.datascience.webhookservice.project.ProjectHookUrl
+import ch.datascience.webhookservice.model.ProjectHookUrl
 import io.chrisdavenport.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Response, Status}
@@ -84,8 +84,7 @@ object IOHookCreationEndpoint {
       contextShift:     ContextShift[IO],
       clock:            Clock[IO],
       timer:            Timer[IO]
-  ): IO[HookCreationEndpoint[IO]] =
-    for {
-      hookCreator <- IOHookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
-    } yield new HookCreationEndpointImpl[IO](hookCreator, logger)
+  ): IO[HookCreationEndpoint[IO]] = for {
+    hookCreator <- HookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
+  } yield new HookCreationEndpointImpl[IO](hookCreator, logger)
 }

@@ -35,9 +35,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
-import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
-import io.renku.eventlog.statuschange.commands.{ToGenerationNonRecoverableFailure, ToGenerationRecoverableFailure, ToNew, ToTransformationNonRecoverableFailure, ToTransformationRecoverableFailure, ToTriplesGenerated, ToTriplesStore}
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
 import org.http4s.MediaType.application
@@ -57,33 +55,6 @@ import scala.language.reflectiveCalls
 class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "routes" should {
-
-    "define a GET /events?latest-per-project=true" in new TestCase {
-      val request = Request[IO](GET, uri"events".withQueryParam("latest-per-project", "true"))
-      (latestEventsEndpoint.findLatestEvents _).expects().returning(Response[IO](Ok).pure[IO])
-
-      val response = routes.call(request)
-
-      response.status shouldBe Ok
-    }
-
-    "define a GET /events?latest-per-project=true " +
-      s"returning $NotFound if no latest-per-project parameter given" in new TestCase {
-        val response = routes call Request[IO](GET, uri"events")
-
-        response.status            shouldBe NotFound
-        response.contentType       shouldBe Some(`Content-Type`(application.json))
-        response.body[InfoMessage] shouldBe InfoMessage("No 'latest-per-project' parameter")
-      }
-
-    "define a GET /events?latest-per-project=true " +
-      s"returning $BadRequest if latest-per-project parameter has invalid value" in new TestCase {
-        val response = routes call Request[IO](GET, uri"events".withQueryParam("latest-per-project", "xxx"))
-
-        response.status             shouldBe BadRequest
-        response.contentType        shouldBe Some(`Content-Type`(application.json))
-        response.body[ErrorMessage] shouldBe ErrorMessage("'latest-per-project' parameter with invalid value")
-      }
 
     "define a GET /events/:event-id/:project-:id endpoint" in new TestCase {
       val eventId = compoundEventIds.generateOne
@@ -199,7 +170,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
   private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
 
   private trait TestCase {
-    val latestEventsEndpoint     = mock[TestLatestEventsEndpoint]
     val eventEndpoint            = mock[EventEndpoint[IO]]
     val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]
     val eventsPatchingEndpoint   = mock[EventsPatchingEndpoint[IO]]
@@ -209,7 +179,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
     val routes = new MicroserviceRoutes[IO](
       eventEndpoint,
-      latestEventsEndpoint,
       processingStatusEndpoint,
       eventsPatchingEndpoint,
       statusChangeEndpoint,
@@ -219,8 +188,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     ).routes.map(_.or(notAvailableResponse))
   }
 
-  class TestLatestEventsEndpoint(latestEventsFinder: LatestEventsFinder[IO], logger: Logger[IO])
-      extends LatestEventsEndpoint[IO](latestEventsFinder, logger)
   class TestProcessingStatusEndpoint(processingStatusFinder: ProcessingStatusFinder[IO], logger: Logger[IO])
       extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
   class TestSubscriptionEndpoint(

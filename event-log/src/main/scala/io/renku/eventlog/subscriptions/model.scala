@@ -33,10 +33,6 @@ private final class Capacity private (val value: Int) extends AnyVal with IntTin
 private object Capacity extends TinyTypeFactory[Capacity](new Capacity(_)) with NonNegativeInt {
   implicit val decoder: Decoder[Capacity] = intDecoder(Capacity)
 }
-
-final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
-object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_)) with InstantNotInTheFuture
-
 private trait SubscriptionInfo extends Product with Serializable {
   val subscriberUrl: SubscriberUrl
   val subscriberId:  SubscriberId

@@ -17,7 +17,7 @@
  */
 
 package io.renku.eventlog.subscriptions
-import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
 import doobie.util.{Get, Put}
 import io.renku.eventlog.TypeSerializers
 
