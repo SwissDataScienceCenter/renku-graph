@@ -123,6 +123,7 @@ class DatasetsResourcesSpec
           dates = dataset1.dates,
           datasetCreators = dataset1.creators map toPerson,
           datasetParts = dataset1.parts.map(part => (part.name, part.atLocation)),
+          datasetKeywords = dataset1.keywords,
           datasetImages = dataset1.images
         ),
         nonModifiedDataSetCommit(
@@ -145,6 +146,7 @@ class DatasetsResourcesSpec
           dates = dataset2.dates,
           datasetCreators = dataset2.creators map toPerson,
           datasetParts = dataset2.parts.map(part => (part.name, part.atLocation)),
+          datasetKeywords = dataset2.keywords,
           datasetImages = dataset2.images
         ),
         modifiedDataSetCommit(
@@ -168,6 +170,7 @@ class DatasetsResourcesSpec
           dates = modifiedDataset2.dates,
           datasetCreators = modifiedDataset2.creators map toPerson,
           datasetParts = modifiedDataset2.parts.map(part => (part.name, part.atLocation)),
+          datasetKeywords = modifiedDataset2.keywords,
           datasetImages = modifiedDataset2.images
         )
       )
@@ -264,7 +267,8 @@ class DatasetsResourcesSpec
       val dataset1Projects = nonEmptyList(projects).generateOne.toList
       val dataset1 = nonModifiedDatasets().generateOne.copy(
         title = sentenceContaining(text).map(_.value).map(Title.apply).generateOne,
-        usedIn = dataset1Projects map toDatasetProject
+        usedIn = dataset1Projects map toDatasetProject,
+        keywords = datasetKeywords.generateNonEmptyList().toList
       )
       val dataset2Projects = nonEmptyList(projects).generateOne.toList
       val dataset2 = nonModifiedDatasets().generateOne.copy(
@@ -439,6 +443,7 @@ class DatasetsResourcesSpec
         maybeDatasetDescription = dataset.maybeDescription,
         dates = dataset.dates,
         datasetCreators = dataset.creators map toPerson,
+        datasetKeywords = dataset.keywords,
         datasetImages = dataset.images
       )
 
@@ -498,7 +503,8 @@ object DatasetsResources {
       "published": ${dataset.creators -> dataset.dates.maybeDatePublished},
       "date": ${dataset.dates.date}, 
       "projectsCount": ${dataset.usedIn.size},
-      "images": ${dataset.images.map(_.value)}
+      "images": ${dataset.images.map(_.value)},
+      "keywords": ${dataset.keywords.map(_.value)}
     }"""
       .addIfDefined("description" -> dataset.maybeDescription)
       .deepMerge {
