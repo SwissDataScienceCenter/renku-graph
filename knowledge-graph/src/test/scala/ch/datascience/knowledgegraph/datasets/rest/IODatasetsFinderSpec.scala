@@ -899,6 +899,7 @@ class IODatasetsFinderSpec
       dataset.creators,
       dataset.dates,
       ProjectsCount(projectsCount),
+      dataset.keywords.sorted,
       dataset.images
     )
   }

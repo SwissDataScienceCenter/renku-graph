@@ -16,8 +16,8 @@ This is a microservice which provides API for the Graph DB.
 
 #### GET /knowledge-graph/datasets?query=\<phrase\>&sort=\<property\>:asc|desc&page=\<page\>&per_page=\<per_page\>
 
-Finds datasets which `title`, `description` or creator `name` matches the given `phrase` or returns all the datasets if
-no `query` parameter is given.
+Finds datasets which `title`, `description`, `keywords`, or creator `name` matches the given `phrase` or returns all the
+datasets if no `query` parameter is given.
 
 NOTES:
 
@@ -83,6 +83,7 @@ Response body example:
       },
       "date": "2012-10-14T03:02:25.639Z",            // either datePublished or dateCreated
       "projectsCount": 2,
+      "keywords": ["grüezi", "안녕", "잘 지내?"],
       "images": ["image.png"],
       "_links":[  
          {  
@@ -103,6 +104,7 @@ Response body example:
       },
       "date": "2012-11-15T10:00:00.000Z",            // either datePublished or dateCreated
       "projectsCount": 1,
+      "keywords": [],
       "images": ["https://blah.com/image.png"],
       "_links":[  
          {  

@@ -20,7 +20,7 @@ package ch.datascience.knowledgegraph.datasets.rest
 
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.datasets.{DateCreated, Dates, Description, Identifier, ImageUri, Name, PublishedDate, Title}
+import ch.datascience.graph.model.datasets.{DateCreated, Dates, Description, Identifier, ImageUri, Keyword, Name, PublishedDate, Title}
 import ch.datascience.http.rest.paging.Paging.PagedResultsFinder
 import ch.datascience.http.rest.paging.{Paging, PagingRequest, PagingResponse}
 import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
@@ -53,6 +53,7 @@ private object DatasetsFinder {
       creators:         Set[DatasetCreator],
       dates:            Dates,
       projectsCount:    ProjectsCount,
+      keywords:         List[Keyword],
       images:           List[ImageUri]
   )
 
@@ -101,77 +102,79 @@ private class IODatasetsFinder(
       "PREFIX schema: <http://schema.org/>",
       "PREFIX text: <http://jena.apache.org/text#>"
     ),
-    s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
-        |WHERE {
-        |  {
-        |    SELECT (MIN(?dsId) AS ?dsIdExample) ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
-        |    WHERE {
-        |      {
-        |        SELECT DISTINCT ?sameAs
-        |        WHERE {
-        |          {
-        |            SELECT DISTINCT ?id
-        |            WHERE { ?id text:query (schema:name schema:description schema:alternateName schema:keywords '$phrase') }
-        |          } {
-        |            ?id rdf:type <http://schema.org/Dataset>;
-        |            	renku:topmostSameAs ?sameAs.
-        |          } UNION {
-        |            ?id rdf:type <http://schema.org/Person>.
-        |            ?luceneDsId schema:creator ?id;
-        |                        rdf:type <http://schema.org/Dataset>;
-        |                        renku:topmostSameAs ?sameAs.
-        |                        
+    s"""|SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount (GROUP_CONCAT(?keyword; separator='|') AS ?keywords) ?images
+        |WHERE {        
+        |  SELECT ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount ?keyword (GROUP_CONCAT(?encodedImageUrl; separator=',') AS ?images)
+        |  WHERE {
+        |    {
+        |      SELECT (MIN(?dsId) AS ?dsIdExample) ?sameAs (COUNT(DISTINCT ?projectId) AS ?projectsCount)
+        |      WHERE {
+        |        {
+        |          SELECT DISTINCT ?sameAs
+        |          WHERE {
+        |            {
+        |              SELECT DISTINCT ?id
+        |              WHERE { ?id text:query (schema:name schema:description schema:alternateName schema:keywords '$phrase') }
+        |            } {
+        |              ?id rdf:type <http://schema.org/Dataset>;
+        |              	renku:topmostSameAs ?sameAs.
+        |            } UNION {
+        |              ?id rdf:type <http://schema.org/Person>.
+        |              ?luceneDsId schema:creator ?id;
+        |                          rdf:type <http://schema.org/Dataset>;
+        |                          renku:topmostSameAs ?sameAs.
+        |            }
+        |          }
+        |        } {
+        |          ?dsId rdf:type <http://schema.org/Dataset>;
+        |                renku:topmostSameAs ?sameAs;
+        |                schema:isPartOf ?projectId ;
+        |                prov:atLocation ?location .
+        |          BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
+        |          FILTER NOT EXISTS {
+        |              # Removing dataset that have an activity that invalidates them
+        |              ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
+        |                                 prov:atLocation ?metaDataLocation ;
+        |                                 prov:wasInvalidatedBy ?invalidationActivity ;
+        |                                 schema:isPartOf ?projectId .
+        |          }
+        |          FILTER NOT EXISTS {
+        |              ?someId prov:wasDerivedFrom/schema:url ?dsId.
+        |              ?someId schema:isPartOf ?projectId.
         |          }
         |        }
-        |      } {
-        |        ?dsId rdf:type <http://schema.org/Dataset>;
-        |              renku:topmostSameAs ?sameAs;
-        |              schema:isPartOf ?projectId ;
-        |              prov:atLocation ?location .
-        |              
-        |        BIND(CONCAT(?location, "/metadata.yml") AS ?metaDataLocation).
-        |        FILTER NOT EXISTS {
-        |            # Removing dataset that have an activity that invalidates them
-        |            ?deprecationEntity rdf:type <http://www.w3.org/ns/prov#Entity>;
-        |                               prov:atLocation ?metaDataLocation ;
-        |                               prov:wasInvalidatedBy ?invalidationActivity ;
-        |                               schema:isPartOf ?projectId .
-        |        }
-        |        
-        |        FILTER NOT EXISTS {
-        |            ?someId prov:wasDerivedFrom/schema:url ?dsId.
-        |            ?someId schema:isPartOf ?projectId.
-        |        }
+        |      }
+        |      GROUP BY ?sameAs
+        |      HAVING (COUNT(*) > 0)
+        |    } {
+        |      ?dsIdExample rdf:type <http://schema.org/Dataset>;
+        |            renku:topmostSameAs ?sameAs;
+        |            schema:identifier ?identifier;
+        |            schema:name ?name ;
+        |            schema:alternateName ?alternateName;
+        |            schema:isPartOf ?projectId .
+        |      OPTIONAL {
+        |        ?dsIdExample schema:image ?imageId .
+        |        ?imageId     schema:position ?imagePosition ;
+        |                     schema:contentUrl ?imageUrl .
+        |        BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
+        |      }
+        |      OPTIONAL { ?dsIdExample schema:keywords ?keyword }
+        |      OPTIONAL { ?dsIdExample schema:description ?maybeDescription }
+        |      OPTIONAL { ?dsIdExample schema:datePublished ?maybePublishedDate }
+        |      OPTIONAL { ?dsIdExample schema:dateCreated ?maybeDateCreated }
+        |      OPTIONAL { ?dsIdExample prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
+        |      OPTIONAL { ?dsIdExample schema:url ?maybeUrl }
+        |      BIND (IF(BOUND(?maybePublishedDate), ?maybePublishedDate, ?maybeDateCreated) AS ?date)
+        |      FILTER NOT EXISTS {
+        |        ?someId prov:wasDerivedFrom/schema:url ?dsIdExample.
+        |        ?someId schema:isPartOf ?projectId.
         |      }
         |    }
-        |    GROUP BY ?sameAs
-        |    HAVING (COUNT(*) > 0)
-        |  } {
-        |    ?dsIdExample rdf:type <http://schema.org/Dataset>;
-        |          renku:topmostSameAs ?sameAs;
-        |          schema:identifier ?identifier;
-        |          schema:name ?name ;
-        |          schema:alternateName ?alternateName;
-        |          schema:isPartOf ?projectId .
-        |    OPTIONAL { 
-        |      ?dsIdExample schema:image ?imageId .
-        |      ?imageId     schema:position ?imagePosition ;
-        |                   schema:contentUrl ?imageUrl .
-        |      BIND(CONCAT(STR(?imagePosition), STR(':'), STR(?imageUrl)) AS ?encodedImageUrl)
-        |    }
-        |    OPTIONAL { ?dsIdExample schema:description ?maybeDescription }
-        |    OPTIONAL { ?dsIdExample schema:datePublished ?maybePublishedDate }
-        |    OPTIONAL { ?dsIdExample schema:dateCreated ?maybeDateCreated }
-        |    OPTIONAL { ?dsIdExample prov:wasDerivedFrom/schema:url ?maybeDerivedFrom }
-        |    OPTIONAL { ?dsIdExample schema:url ?maybeUrl }
-        |    BIND (IF(BOUND(?maybePublishedDate), ?maybePublishedDate, ?maybeDateCreated) AS ?date)
-        |    FILTER NOT EXISTS {
-        |      ?someId prov:wasDerivedFrom/schema:url ?dsIdExample.
-        |      ?someId schema:isPartOf ?projectId.
-        |    }
         |  }
+        |  GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount ?keyword
         |}
-        |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount
+        |GROUP BY ?identifier ?name ?alternateName ?maybeDescription ?maybePublishedDate ?maybeDateCreated ?date ?maybeDerivedFrom ?sameAs ?projectsCount ?images
         |${`ORDER BY`(sort)}
         |""".stripMargin
   )
@@ -209,6 +212,18 @@ private object IODatasetsFinder {
         )
         .getOrElse(Nil)
 
+    def toListOfKeywords(keywordsString: Option[String]): List[Keyword] =
+      keywordsString
+        .map(
+          _.split("\\|")
+            .map(_.trim)
+            .toSet
+            .toList
+            .map(Keyword.apply)
+            .sorted
+        )
+        .getOrElse(Nil)
+
     for {
       id                 <- cursor.downField("identifier").downField("value").as[Identifier]
       title              <- cursor.downField("name").downField("value").as[Title]
@@ -216,6 +231,7 @@ private object IODatasetsFinder {
       maybeDateCreated   <- cursor.downField("maybeDateCreated").downField("value").as[Option[DateCreated]]
       maybePublishedDate <- cursor.downField("maybePublishedDate").downField("value").as[Option[PublishedDate]]
       projectsCount      <- cursor.downField("projectsCount").downField("value").as[ProjectsCount]
+      keywords           <- cursor.downField("keywords").downField("value").as[Option[String]].map(toListOfKeywords)
       images             <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
       maybeDescription <- cursor
                             .downField("maybeDescription")
@@ -234,6 +250,7 @@ private object IODatasetsFinder {
       Set.empty,
       dates,
       projectsCount,
+      keywords,
       images
     )
   }

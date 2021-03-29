@@ -504,7 +504,7 @@ object DatasetsResources {
       "date": ${dataset.dates.date}, 
       "projectsCount": ${dataset.usedIn.size},
       "images": ${dataset.images.map(_.value)},
-      "keywords": ${dataset.keywords.map(_.value)}
+      "keywords": ${dataset.keywords.sorted.map(_.value)}
     }"""
       .addIfDefined("description" -> dataset.maybeDescription)
       .deepMerge {
