@@ -106,6 +106,7 @@ jobs:
         uses: SwissDataScienceCenter/renku/actions/publish-chart@master
         env:
           CHART_PATH: helm-chart/renku-graph
+          CHART_NAME: renku-graph
           GITHUB_TOKEN: ${{ secrets.RENKU_CI_TOKEN }}
           DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
