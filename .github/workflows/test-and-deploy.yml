@@ -78,33 +78,34 @@ jobs:
       - name: Formatter
         run: sbt scalafmtCheck
   deploy-to-graph:
-    name: Deploy to graph
-    runs-on: ubuntu-latest
+    name: Deploy to renku-graph
+    runs-on: ubuntu-20.04
     needs: [unit-tests, acceptance-tests, formatter]
     if: "github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/hotfix-')"
     environment:
       name: renku-graph
     steps:
-      - name: deploy-master
-        uses: SwissDataScienceCenter/renku/actions/deploy-renku@master
-        env:
-          DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
-          DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
-          GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
-          KUBECONFIG: "${{ github.workspace }}/renkubot-kube.config"
-          RANCHER_PROJECT_ID: ${{ secrets.CI_RANCHER_PROJECT }}
-          RENKU_RELEASE: renku-graph
-          RENKU_VALUES_FILE: "${{ github.workspace }}/values.yaml"
-          RENKU_VALUES: ${{ secrets.CI_RENKU_VALUES }}
-          RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
-          RENKUBOT_RANCHER_BEARER_TOKEN: ${{ secrets.RENKUBOT_RANCHER_BEARER_TOKEN }}
-          RENKU_BOT_DEV_PASSWORD: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
-          RENKU_ANONYMOUS_SESSIONS: true
-          RENKU_TESTS_ENABLED: true
-          TEST_ARTIFACTS_PATH: "tests-artifacts-${{ github.sha }}"
-          renku_graph: "@${{ github.head_ref }}"
-          renku: "@master"
+    - name: deploy-master
+      uses: SwissDataScienceCenter/renku/actions/deploy-renku@master
+      env:
+        DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
+        DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
+        GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
+        KUBECONFIG: "${{ github.workspace }}/renkubot-kube.config"
+        RANCHER_PROJECT_ID: ${{ secrets.CI_RANCHER_PROJECT }}
+        RENKU_RELEASE: renku-graph
+        RENKU_VALUES_FILE: "${{ github.workspace }}/values.yaml"
+        RENKU_VALUES: ${{ secrets.CI_RENKU_VALUES }}
+        RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
+        RENKUBOT_RANCHER_BEARER_TOKEN: ${{ secrets.RENKUBOT_RANCHER_BEARER_TOKEN }}
+        RENKU_BOT_DEV_PASSWORD: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
+        RENKU_ANONYMOUS_SESSIONS: true
+        RENKU_TESTS_ENABLED: true
+        TEST_ARTIFACTS_PATH: "tests-artifacts-${{ github.sha }}"
+        renku_graph: "@master"
+        renku: "@master"
   renku-acceptance-tests:
+    name: Renku Acceptance Tests
     runs-on: ubuntu-20.04
     needs: deploy-to-graph
     steps:
