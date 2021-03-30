@@ -181,73 +181,12 @@ lazy val commonSettings = Seq(
   )
 )
 
-import ReleaseTransformations._
-import sbtrelease.ReleasePlugin.autoImport.ReleaseKeys._
-import sbtrelease.ReleasePlugin.autoImport._
-import sbtrelease.{Vcs, Versions}
-
-releaseTagComment :=
-  Vcs
-    .detect(root.base)
-    .map { implicit vcs =>
-      s"Release Notes for ${(version in ThisBuild).value}\n* $lastCommitMessage"
-    }
-    .getOrElse {
-      sys.error("Release Tag comment cannot be calculated")
-    }
-
-def lastCommitMessage()(implicit vcs: Vcs): String =
-  vcs.cmd("log", "--format=%s", "-1", "HEAD").!!.trim
-
-releaseProcess := Seq[ReleaseStep](
-  log("Checking snapshot dependencies"),
-  checkSnapshotDependencies,
-  log("Inquiring version"),
-  inquireVersions,
-  log("Cleaning"),
-  runClean,
-  log("Checking Tag"),
-  verifyTagDoesNotExist,
-  log("Tagging Release"),
-  tagRelease,
-  log("Pushing Tag"),
-  pushChanges
-)
-
-def log(message: String): ReleaseStep = { state: State =>
-  println(message)
-  state
-}
-
-lazy val verifyTagDoesNotExist: ReleaseStep = { state: State =>
-  val version = findVersion(_._1, state)
-
-  Vcs
-    .detect(root.base)
-    .map { implicit vcs =>
-      if (vcs.cmd("tag", "-l").!!.trim contains version)
-        sys.error(s"Tag $version already exists")
-      else Unit
-    }
-    .getOrElse {
-      sys.error("Release Tag comment cannot be calculated")
-    }
-
-  state
-}
-
-def findVersion(selectVersion: Versions => String, state: State): String = {
-  val allVersions = state.get(versions).getOrElse {
-    sys.error("No versions are set! Was this release part executed before inquireVersions?")
-  }
-
-  selectVersion(allVersions)
-}
+import sbtrelease.Vcs
 
 lazy val writeVersionToChart = taskKey[Unit]("Write release version to Chart.yaml")
 
 writeVersionToChart := {
-  val version = readVersionFromVersionSbt
+  val version = readTag
 
   val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
 
@@ -259,25 +198,12 @@ writeVersionToChart := {
   IO.writeLines(chartFile, updatedLines)
 }
 
-def readVersionFromVersionSbt: String =
-  IO
-    .readLines(root.base / "version.sbt")
-    .mkString("")
-    .trim
-    .replace("version in ThisBuild := ", "")
-    .replace("\"", "")
-
-lazy val checkTagExists = taskKey[Unit]("Checks if tag already exists")
-
-checkTagExists := {
-
-  val version = readVersionFromVersionSbt
-
-  val tagExists = Vcs
+def readTag: String = {
+  val tag = Vcs
     .detect(root.base)
-    .map(_.cmd("tag", "-n", version).!!.trim.nonEmpty)
+    .map(_.cmd("describe").!!.trim)
     .getOrElse(sys.error("Release Tag cannot be checked"))
 
-  if (tagExists) sys.error(s"Tag '$version' already exists")
-  else ()
+  if (tag.matches("\\d+\\.\\d+\\.\\d+")) tag
+  else sys.error("Current commit is not tagged")
 }
