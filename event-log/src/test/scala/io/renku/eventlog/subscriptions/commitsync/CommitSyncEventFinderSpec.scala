@@ -91,16 +91,12 @@ class CommitSyncEventFinderSpec
         val project2Path      = projectPaths.generateOne
         val project2EventDate = eventDates.generateOne
         upsertProject(project2Id, project2Path, project2EventDate)
-        println("" + project1Id + " " + project1Path + " " + project1EventDate)
-        println("" + project2Id + " " + project2Path + " " + project2EventDate)
 
         List(
           (project1Id, project1Path, project1EventDate),
           (project2Id, project2Path, project2EventDate)
         ).sortBy(_._3).reverse foreach { case (projectId, path, _) =>
-          val d = finder.popEvent().unsafeRunSync()
-          println(d)
-          d shouldBe Some(MinimalCommitSyncEvent(projectId, path))
+          finder.popEvent().unsafeRunSync() shouldBe Some(MinimalCommitSyncEvent(projectId, path))
         }
         finder.popEvent().unsafeRunSync() shouldBe None
       }
