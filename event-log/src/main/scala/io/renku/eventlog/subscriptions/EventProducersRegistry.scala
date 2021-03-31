@@ -67,14 +67,14 @@ object EventProducersRegistry {
   final case class UnsupportedPayload(message: String) extends SubscriptionResult
 
   def apply(
-      transactor:                  DbTransactor[IO, EventLogDB],
-      waitingEventsGauge:          LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
-      awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
-      underTransformationGauge:    LabeledGauge[IO, projects.Path],
-      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
-      microservicePort:            Int Refined Positive,
-      logger:                      Logger[IO]
+      transactor:                     DbTransactor[IO, EventLogDB],
+      awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+      underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
+      awaitingTransformationGauge:    LabeledGauge[IO, projects.Path],
+      underTransformationGauge:       LabeledGauge[IO, projects.Path],
+      queriesExecTimes:               LabeledHistogram[IO, SqlQuery.Name],
+      microservicePort:               Int Refined Positive,
+      logger:                         Logger[IO]
   )(implicit
       contextShift:     ContextShift[IO],
       timer:            Timer[IO],
@@ -82,7 +82,7 @@ object EventProducersRegistry {
   ): IO[EventProducersRegistry[IO]] = for {
     subscriberTracker <- SubscriberTracker(transactor, queriesExecTimes)
     awaitingGenerationCategory <- awaitinggeneration.SubscriptionCategory(transactor,
-                                                                          waitingEventsGauge,
+                                                                          awaitingTriplesGenerationGauge,
                                                                           underTriplesGenerationGauge,
                                                                           queriesExecTimes,
                                                                           subscriberTracker,

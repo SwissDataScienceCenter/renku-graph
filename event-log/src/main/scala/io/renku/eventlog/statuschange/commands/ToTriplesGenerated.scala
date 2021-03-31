@@ -40,7 +40,7 @@ import java.time.Instant
 
 trait ToTriplesGenerated[Interpretation[_]] extends ChangeStatusCommand[Interpretation]
 
-final case class GeneratingToTriplesGenerated[Interpretation[_]](
+final case class GeneratingToTriplesGenerated[Interpretation[_]: Bracket[*[_], Throwable]](
     eventId:                     CompoundEventId,
     payload:                     EventPayload,
     schemaVersion:               SchemaVersion,
@@ -48,8 +48,7 @@ final case class GeneratingToTriplesGenerated[Interpretation[_]](
     awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:         Option[EventProcessingTime],
     now:                         () => Instant = () => Instant.now
-)(implicit ME:                   Bracket[Interpretation, Throwable])
-    extends ToTriplesGenerated[Interpretation] {
+) extends ToTriplesGenerated[Interpretation] {
 
   override lazy val status: events.EventStatus = TriplesGenerated
 
@@ -89,17 +88,16 @@ final case class GeneratingToTriplesGenerated[Interpretation[_]](
         _    <- awaitingTransformationGauge increment path
         _    <- underTriplesGenerationGauge decrement path
       } yield ()
-    case _ => ME.unit
+    case _ => ().pure[Interpretation]
   }
 }
 
-final case class TransformingToTriplesGenerated[Interpretation[_]](
+final case class TransformingToTriplesGenerated[Interpretation[_]: Bracket[*[_], Throwable]](
     eventId:                         CompoundEventId,
-    underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     awaitingTransformationGauge:     LabeledGauge[Interpretation, projects.Path],
+    underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     now:                             () => Instant = () => Instant.now
-)(implicit ME:                       Bracket[Interpretation, Throwable])
-    extends ToTriplesGenerated[Interpretation] {
+) extends ToTriplesGenerated[Interpretation] {
 
   override lazy val status: events.EventStatus = TriplesGenerated
 
@@ -126,7 +124,7 @@ final case class TransformingToTriplesGenerated[Interpretation[_]](
         _    <- awaitingTransformationGauge increment path
         _    <- underTriplesTransformationGauge decrement path
       } yield ()
-    case _ => ME.unit
+    case _ => ().pure[Interpretation]
   }
 
   override val maybeProcessingTime: Option[EventProcessingTime] = None
@@ -167,8 +165,8 @@ private[statuschange] object ToTriplesGenerated extends TypeSerializers {
         case TransformingTriples =>
           CommandFound(
             TransformingToTriplesGenerated[Interpretation](eventId,
-                                                           underTriplesTransformationGauge,
-                                                           awaitingTransformationGauge
+                                                           awaitingTransformationGauge,
+                                                           underTriplesTransformationGauge
             )
           )
         case _ => NotSupported

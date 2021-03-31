@@ -91,6 +91,25 @@ private class ProjectPrioritisationSpec extends AnyWordSpec with should.Matchers
         projectPrioritisation.prioritise(projects).noPriority shouldBe List(projects.last.toIdsAndPath)
       }
 
+    "discard all project events with " +
+      "current occupancy > 0, " +
+      "total occupancy >= max free spots, " +
+      "total capacity = 40 (mutli-projects)" in new TestCase {
+
+        `given totalCapacity`(40)
+
+        val project0 = projectInfos.generateOne.copy(currentOccupancy = 22)
+        val project1 = projectInfos.generateOne.copy(currentOccupancy = 1, latestEventDate = EventDate(now()))
+        val project2 = projectInfos.generateOne.copy(currentOccupancy = 1, latestEventDate = EventDate(now()))
+        val project3 = projectInfos.generateOne.copy(currentOccupancy = 12)
+
+        val projectsAwaitingGeneration = projectInfos.generateList(4).map(_.copy(currentOccupancy = 0))
+
+        val projects = List(project0, project1, project2, project3) ++ projectsAwaitingGeneration
+
+        projectPrioritisation.prioritise(projects).noPriority shouldBe projectsAwaitingGeneration.map(_.toIdsAndPath)
+      }
+
     "return an empty list if there are no projects" in new TestCase {
       `given no totalCapacity`
 

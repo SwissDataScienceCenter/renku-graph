@@ -142,8 +142,8 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
         (awaitingTransformationGauge.increment _).expects(projectPath).returning(IO.unit)
 
         val command = TransformingToTriplesGenerated[IO](eventId,
-                                                         underTriplesTransformationGauge,
                                                          awaitingTransformationGauge,
+                                                         underTriplesTransformationGauge,
                                                          now = currentTime
         )
 
@@ -227,8 +227,8 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
           val command = TransformingToTriplesGenerated[IO](eventId,
-                                                           underTriplesTransformationGauge,
                                                            awaitingTransformationGauge,
+                                                           underTriplesTransformationGauge,
                                                            currentTime
           )
 
@@ -249,8 +249,8 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           findEvents(status = eventStatus) shouldBe List()
           findPayload(eventId)             shouldBe None
           val command = TransformingToTriplesGenerated[IO](eventId,
-                                                           underTriplesTransformationGauge,
                                                            awaitingTransformationGauge,
+                                                           underTriplesTransformationGauge,
                                                            currentTime
           )
 
@@ -318,7 +318,7 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           .unsafeRunSync()
 
         actual shouldBe CommandFound(
-          TransformingToTriplesGenerated(eventId, underTriplesTransformationGauge, awaitingTransformationGauge)
+          TransformingToTriplesGenerated(eventId, awaitingTransformationGauge, underTriplesTransformationGauge)
         )
       }
 
