@@ -67,7 +67,7 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], 
     subscriber => (popEvent semiflatMap dispatch(subscriber)).value.void
 
   private def popEvent: OptionT[Interpretation, CategoryEvent] = OptionT {
-    eventsFinder.popEvent() recoverWith loggingError
+    eventsFinder.popEvent() recoverWith logError
   }.flatTapNone(timer sleep noEventSleep)
 
   private def dispatch(subscriber: SubscriberUrl)(event: CategoryEvent): Interpretation[Unit] = {
@@ -105,7 +105,7 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], 
       logger.error(exception)(s"$categoryName: $event -> returning an event to the queue failed")
   }
 
-  private lazy val loggingError: PartialFunction[Throwable, Interpretation[Option[CategoryEvent]]] = {
+  private lazy val logError: PartialFunction[Throwable, Interpretation[Option[CategoryEvent]]] = {
     case NonFatal(exception) =>
       for {
         _ <- logger.error(exception)(s"$categoryName: finding events to dispatch failed")
