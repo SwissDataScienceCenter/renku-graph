@@ -351,13 +351,12 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
       createEvent(GeneratingTriples)
 
-      val maybeProcessingTime = eventProcessingTimes.generateOption
-      val eventPayload        = eventPayloads.generateOne
-      val payloadPartBody     = json"""{"payload": ${eventPayload.value}}""".spaces2
+      val eventPayload    = eventPayloads.generateOne
+      val payloadPartBody = json"""{"payload": ${eventPayload.value}}""".spaces2
 
       ToTriplesGenerated
         .factory(transactor, underTriplesTransformationGauge, underTriplesGenerationGauge, awaitingTransformationGauge)
-        .run(EventAndPayloadRequest(eventId, TriplesGenerated, maybeProcessingTime, payloadPartBody))
+        .run(EventAndPayloadRequest(eventId, TriplesGenerated, processingTime, payloadPartBody))
         .unsafeRunSync() shouldBe PayloadMalformed(
         "Attempt to decode value on failed cursor: DownField(schemaVersion)"
       )
@@ -367,12 +366,11 @@ class ToTriplesGeneratedSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
 
       createEvent(GeneratingTriples)
 
-      val maybeProcessingTime = eventProcessingTimes.generateOption
-      val payloadPartBody     = json"""{"schemaVersion": ${schemaVersion.value}}""".spaces2
+      val payloadPartBody = json"""{"schemaVersion": ${schemaVersion.value}}""".spaces2
 
       ToTriplesGenerated
         .factory(transactor, underTriplesTransformationGauge, underTriplesGenerationGauge, awaitingTransformationGauge)
-        .run(EventAndPayloadRequest(eventId, TriplesGenerated, maybeProcessingTime, payloadPartBody))
+        .run(EventAndPayloadRequest(eventId, TriplesGenerated, processingTime, payloadPartBody))
         .unsafeRunSync() shouldBe PayloadMalformed(
         "Attempt to decode value on failed cursor: DownField(payload)"
       )
