@@ -25,7 +25,7 @@ import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, ToGenerationNonRecoverableFailure, UpdateResult}
+import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.{EventLogDB, EventMessage, subscriptions}
@@ -34,13 +34,23 @@ import scala.concurrent.duration._
 import scala.language.postfixOps
 import scala.util.control.NonFatal
 
-private class DispatchRecoveryImpl[Interpretation[_]](
-    underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-    statusUpdatesRunner:         StatusUpdatesRunner[Interpretation],
-    logger:                      Logger[Interpretation],
-    onErrorSleep:                FiniteDuration
-)(implicit ME:                   Bracket[Interpretation, Throwable], timer: Timer[Interpretation])
+private class DispatchRecoveryImpl[Interpretation[_]: Bracket[*[_], Throwable]](
+    awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
+    underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path],
+    statusUpdatesRunner:            StatusUpdatesRunner[Interpretation],
+    logger:                         Logger[Interpretation],
+    onErrorSleep:                   FiniteDuration
+)(implicit timer:                   Timer[Interpretation])
     extends subscriptions.DispatchRecovery[Interpretation, AwaitingGenerationEvent] {
+
+  override def returnToQueue(event: AwaitingGenerationEvent): Interpretation[Unit] = {
+    val toNewCommand = ToNew[Interpretation](event.id,
+                                             awaitingTriplesGenerationGauge,
+                                             underTriplesGenerationGauge,
+                                             maybeProcessingTime = None
+    )
+    statusUpdatesRunner run toNewCommand void
+  }
 
   override def recover(
       url:   SubscriberUrl,
@@ -75,11 +85,17 @@ private object DispatchRecovery {
 
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
-  def apply(transactor:                  DbTransactor[IO, EventLogDB],
-            underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
-            queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
-            logger:                      Logger[IO]
-  )(implicit timer:                      Timer[IO]): IO[DispatchRecovery[IO, AwaitingGenerationEvent]] = for {
+  def apply(transactor:                     DbTransactor[IO, EventLogDB],
+            awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+            underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
+            queriesExecTimes:               LabeledHistogram[IO, SqlQuery.Name],
+            logger:                         Logger[IO]
+  )(implicit timer:                         Timer[IO]): IO[DispatchRecovery[IO, AwaitingGenerationEvent]] = for {
     updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
-  } yield new DispatchRecoveryImpl[IO](underTriplesGenerationGauge, updateCommandRunner, logger, OnErrorSleep)
+  } yield new DispatchRecoveryImpl[IO](awaitingTriplesGenerationGauge,
+                                       underTriplesGenerationGauge,
+                                       updateCommandRunner,
+                                       logger,
+                                       OnErrorSleep
+  )
 }

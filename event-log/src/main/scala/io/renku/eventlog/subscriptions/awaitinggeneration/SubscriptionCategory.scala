@@ -34,12 +34,12 @@ private[subscriptions] object SubscriptionCategory {
   val name: CategoryName = CategoryName("AWAITING_GENERATION")
 
   def apply(
-      transactor:                  DbTransactor[IO, EventLogDB],
-      waitingEventsGauge:          LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
-      queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
-      subscriberTracker:           SubscriberTracker[IO],
-      logger:                      Logger[IO]
+      transactor:                     DbTransactor[IO, EventLogDB],
+      awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+      underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
+      queriesExecTimes:               LabeledHistogram[IO, SqlQuery.Name],
+      subscriberTracker:              SubscriberTracker[IO],
+      logger:                         Logger[IO]
   )(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
@@ -48,11 +48,16 @@ private[subscriptions] object SubscriptionCategory {
     subscribers <- Subscribers(name, subscriberTracker, logger)
     eventFetcher <- IOAwaitingGenerationEventFinder(transactor,
                                                     subscribers,
-                                                    waitingEventsGauge,
+                                                    awaitingTriplesGenerationGauge,
                                                     underTriplesGenerationGauge,
                                                     queriesExecTimes
                     )
-    dispatchRecovery <- DispatchRecovery(transactor, underTriplesGenerationGauge, queriesExecTimes, logger)
+    dispatchRecovery <- DispatchRecovery(transactor,
+                                         awaitingTriplesGenerationGauge,
+                                         underTriplesGenerationGauge,
+                                         queriesExecTimes,
+                                         logger
+                        )
     eventDelivery <- EventDelivery[AwaitingGenerationEvent](transactor,
                                                             compoundEventIdExtractor = (_: AwaitingGenerationEvent).id,
                                                             queriesExecTimes

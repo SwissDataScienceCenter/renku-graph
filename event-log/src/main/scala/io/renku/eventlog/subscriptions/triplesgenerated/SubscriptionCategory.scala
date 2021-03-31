@@ -47,7 +47,8 @@ private[subscriptions] object SubscriptionCategory {
     subscribers <- Subscribers(name, subscriberTracker, logger)
     eventFetcher <-
       IOTriplesGeneratedEventFinder(transactor, awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
-    dispatchRecovery <- DispatchRecovery(transactor, underTransformationGauge, queriesExecTimes, logger)
+    dispatchRecovery <-
+      DispatchRecovery(transactor, awaitingTransformationGauge, underTransformationGauge, queriesExecTimes, logger)
     eventDelivery <- EventDelivery[TriplesGeneratedEvent](transactor,
                                                           compoundEventIdExtractor = (_: TriplesGeneratedEvent).id,
                                                           queriesExecTimes
