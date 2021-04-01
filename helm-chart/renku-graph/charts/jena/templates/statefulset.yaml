@@ -38,10 +38,17 @@ spec:
             httpGet:
               path: /$/ping
               port: jena
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 10
+            timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /$/ping
               port: jena
+            periodSeconds: 60
+            successThreshold: 1
+            failureThreshold: 3
           volumeMounts:
             - name: lucene-config
               mountPath: /fuseki/configuration/{{ .Values.global.graph.jena.dataset }}.ttl

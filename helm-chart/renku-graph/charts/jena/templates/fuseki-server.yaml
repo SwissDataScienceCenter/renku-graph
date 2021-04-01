@@ -15,6 +15,10 @@ data:
     JAVA=$JAVA_HOME/bin/java
     JAR=$FUSEKI_HOME/fuseki-server.jar
 
+    echo Waiting for mount points...
+    sleep 10s
+
+    echo Preparing for Lucene indices rebuilding...
     # killing Jena if already started as Lucene indexing cannot happen on started Jena
     killall -9 java
     rm $FUSEKI_BASE/databases/{{ .Values.global.graph.jena.dataset }}/tdb.lock
