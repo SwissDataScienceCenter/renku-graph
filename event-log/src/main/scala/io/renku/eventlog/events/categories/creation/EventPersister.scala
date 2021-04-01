@@ -21,131 +21,170 @@ package io.renku.eventlog.events.categories.creation
 import EventPersister.Result
 import Result._
 import cats.Applicative
-import cats.data.NonEmptyList
-import cats.effect.{Bracket, IO}
+import cats.data.{Kleisli, NonEmptyList}
+import cats.effect.{Async, Bracket, IO}
+import cats.syntax.all._
 import cats.free.Free
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import doobie.free.connection.ConnectionOp
-import doobie.implicits._
-import doobie.util.fragments.in
 import eu.timepit.refined.auto._
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
-import io.renku.eventlog.{Event, EventLogDB}
+import io.renku.eventlog.{CreatedDate, Event, EventDate, EventLogDB, EventMessage, ExecutionDate}
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
-import java.time.Instant
+import java.time.{Instant, LocalDateTime, OffsetDateTime, ZoneId}
 
 trait EventPersister[Interpretation[_]] {
   def storeNewEvent(event: Event): Interpretation[Result]
 }
 
-class EventPersisterImpl(
-    transactor:         SessionResource[IO, EventLogDB],
-    waitingEventsGauge: LabeledGauge[IO, projects.Path],
-    queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name],
+class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    transactor:         SessionResource[Interpretation, EventLogDB],
+    waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
+    queriesExecTimes:   LabeledHistogram[Interpretation, SqlQuery.Name],
     now:                () => Instant = () => Instant.now
-)(implicit ME:          Bracket[IO, Throwable])
-    extends DbClient(Some(queriesExecTimes))
-    with EventPersister[IO] {
+) extends DbClient(Some(queriesExecTimes))
+    with EventPersister[Interpretation] {
 
-  import doobie.ConnectionIO
   import io.renku.eventlog.TypeSerializers._
 
-  override def storeNewEvent(event: Event): IO[Result] =
-    for {
-      result <- insertIfNotDuplicate(event) transact transactor.resource
-      _ <- Applicative[IO].whenA(result == Created && event.status == New)(
-             waitingEventsGauge.increment(event.project.path)
-           )
-    } yield result
-
-  private def insertIfNotDuplicate(event: Event) =
-    checkIfPersisted(event) flatMap {
-      case true  => Free.pure[ConnectionOp, Result](Existed)
-      case false => persist(event)
+  override def storeNewEvent(event: Event): Interpretation[Result] = transactor.use { session =>
+    session.transaction.use { xa =>
+      for {
+        sp <- xa.savepoint
+        result <- insertIfNotDuplicate(event)(session).recoverWith { case error =>
+                    xa.rollback(sp).flatMap(_ => error.raiseError[Interpretation, Result])
+                  }
+        _ <- Applicative[Interpretation].whenA(result == Created && event.status == New)(
+               waitingEventsGauge.increment(event.project.path)
+             )
+      } yield result
     }
 
-  private def persist(event: Event): Free[ConnectionOp, Result] =
+  }
+
+  private def insertIfNotDuplicate(event: Event)(session: Session[Interpretation]) =
+    checkIfPersisted(event)(session) flatMap {
+      case true  => (Existed: Result).pure[Interpretation]
+      case false => persist(event)(session)
+    }
+
+  private def persist(event: Event)(session: Session[Interpretation]): Interpretation[Result] =
     for {
-      updatedCommitEvent <- eventuallyAddToExistingBatch(event)
-      _                  <- upsertProject(updatedCommitEvent)
-      _                  <- insert(updatedCommitEvent)
+      updatedCommitEvent <- eventuallyAddToExistingBatch(event)(session)
+      _                  <- upsertProject(updatedCommitEvent)(session)
+      _                  <- insert(session)(updatedCommitEvent)
     } yield Created
 
-  private def eventuallyAddToExistingBatch(event: Event) =
-    findBatchInQueue(event)
+  private def eventuallyAddToExistingBatch(event: Event)(session: Session[Interpretation]) =
+    findBatchInQueue(event)(session)
       .map(_.map(event.withBatchDate).getOrElse(event))
 
-  private def checkIfPersisted(event: Event) = measureExecutionTime {
+  private def checkIfPersisted(event: Event)(implicit session: Session[Interpretation]) = measureExecutionTime(
     SqlQuery(
-      sql"""|SELECT event_id
-            |FROM event
-            |WHERE event_id = ${event.id} AND project_id = ${event.project.id}""".stripMargin
-        .query[String]
-        .option
-        .map(_.isDefined),
+      Kleisli { session =>
+        val query: Query[skunk.Void, String] = sql"""SELECT event_id
+                                                     FROM event
+                                                     WHERE event_id = #${event.id.value} AND project_id = #${event.project.id.toString}"""
+          .query(varchar)
+        session
+          .option(query)
+          .map(_.isDefined)
+      },
       name = "new - check existence"
     )
-  }
+  )
 
   // format: off
-  private def findBatchInQueue(event: Event) = measureExecutionTime {
-    SqlQuery({ fr"""
+  private def findBatchInQueue(event: Event)(implicit session: Session[Interpretation]) = measureExecutionTime (
+    SqlQuery(
+      Kleisli{ session =>
+        val query = sql"""
         SELECT batch_date
         FROM event
-        WHERE project_id = ${event.project.id} AND """ ++ `status IN`(New, GenerationRecoverableFailure, GeneratingTriples) ++ fr"""
+        WHERE project_id = #${event.project.id.toString} AND #${`status IN`(New, GenerationRecoverableFailure, GeneratingTriples)}
         ORDER BY batch_date DESC
         LIMIT 1"""
-      }.query[BatchDate].option,
+      .query(timestamptz)
+        session.option[OffsetDateTime](query).map {
+          case Some(dateTime) => Some(BatchDate(dateTime.toInstant))
+          case None => None
+        }
+  },
       name = "new - find batch"
-    )
-  }
+    ))
   // format: on
 
-  private lazy val insert: Event => ConnectionIO[Unit] = {
+  private def insert(implicit session: Session[Interpretation]): Event => Interpretation[Unit] = {
     case NewEvent(id, project, date, batchDate, body) =>
-      val currentTime = now()
       measureExecutionTime(
         SqlQuery(
-          sql"""|INSERT INTO
-                |event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
-                |VALUES ($id, ${project.id}, ${New: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body)
-                |""".stripMargin.update.run.map(_ => ()),
+          Kleisli { session =>
+            val query: Command[
+              EventId ~ projects.Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
+            ] = sql"""INSERT INTO
+                event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
+                VALUES ($eventIdPut, $projectIdPut, $eventStatusPut, $createdDatePut, $executionDatePut, $eventDatePut, $batchDatePut, $eventBodyPut)
+                """.command
+            session.prepare(query).use {
+              _.execute(
+                id ~ project.id ~ New ~ CreatedDate(now()) ~ ExecutionDate(now()) ~ date ~ batchDate ~ body
+              ).void
+            }
+          },
           name = "new - create (NEW)"
         )
       )
     case SkippedEvent(id, project, date, batchDate, body, message) =>
-      val currentTime = now()
       measureExecutionTime(
         SqlQuery(
-          sql"""|INSERT INTO
-                |event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
-                |VALUES ($id, ${project.id}, ${Skipped: EventStatus}, $currentTime, $currentTime, $date, $batchDate, $body, $message)
-                |""".stripMargin.update.run.map(_ => ()),
+          Kleisli { session =>
+            val query: Command[
+              EventId ~ projects.Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody ~ EventMessage
+            ] = sql"""INSERT INTO
+                  event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
+                  VALUES ($eventIdPut, $projectIdPut, $eventStatusPut, $createdDatePut, $executionDatePut, $eventDatePut, $batchDatePut, $eventBodyPut, $eventMessagePut)
+                  """.command
+            session
+              .prepare(query)
+              .use(
+                _.execute(
+                  id ~ project.id ~ Skipped ~ CreatedDate(now()) ~ ExecutionDate(
+                    now()
+                  ) ~ date ~ batchDate ~ body ~ message
+                )
+              )
+              .void
+          },
           name = "new - create (SKIPPED)"
         )
       )
   }
 
-  private def upsertProject(event: Event) = measureExecutionTime {
+  private def upsertProject(event: Event)(implicit session: Session[Interpretation]) = measureExecutionTime(
     SqlQuery(
-      sql"""|INSERT INTO
-            |project (project_id, project_path, latest_event_date)
-            |VALUES (${event.project.id}, ${event.project.path}, ${event.date})
-            |ON CONFLICT (project_id)
-            |DO 
-            |  UPDATE SET latest_event_date = EXCLUDED.latest_event_date, project_path = EXCLUDED.project_path 
-            |  WHERE EXCLUDED.latest_event_date > project.latest_event_date
-      """.stripMargin.update.run.map(_ => ()),
+      Kleisli { session =>
+        val query: Command[projects.Id ~ projects.Path ~ EventDate] = sql"""INSERT INTO
+            project (project_id, project_path, latest_event_date)
+            VALUES ($projectIdPut, $projectPathPut, $eventDatePut)
+            ON CONFLICT (project_id)
+            DO 
+              UPDATE SET latest_event_date = EXCLUDED.latest_event_date, project_path = EXCLUDED.project_path 
+              WHERE EXCLUDED.latest_event_date > project.latest_event_date
+      """.command
+        session.prepare(query).use(pq => pq.execute(event.project.id ~ event.project.path ~ event.date)).void
+      },
       name = "new - upsert project"
     )
-  }
+  )
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
-    in(fr"status", NonEmptyList.of(status, otherStatuses: _*))
+    s"status IN #${NonEmptyList.of(status, otherStatuses: _*).toList.mkString(",")}"
 }
 
 object EventPersister {
@@ -163,7 +202,7 @@ object IOEventPersister {
       transactor:         SessionResource[IO, EventLogDB],
       waitingEventsGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name]
-  ): IO[EventPersisterImpl] = IO {
-    new EventPersisterImpl(transactor, waitingEventsGauge, queriesExecTimes)
+  ): IO[EventPersisterImpl[IO]] = IO {
+    new EventPersisterImpl[IO](transactor, waitingEventsGauge, queriesExecTimes)
   }
 }

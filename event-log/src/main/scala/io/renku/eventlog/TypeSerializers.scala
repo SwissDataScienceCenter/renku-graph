@@ -22,47 +22,65 @@ import cats.data.NonEmptyList
 import ch.datascience.events.consumers.Project
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.microservices.MicroserviceBaseUrl
 import doobie.util.meta.{LegacyInstantMetaInstance, LegacyLocalDateMetaInstance}
-import doobie.util.{Get, Put, Read}
+import doobie.util.{Get, Put}
 import org.postgresql.util.PGInterval
+import skunk.codec.all._
+import skunk.{Decoder, Encoder}
 
-import java.time.{Duration, Instant}
+import java.time.{Duration, OffsetDateTime, ZoneId}
 
 object TypeSerializers extends TypeSerializers
 
 trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMetaInstance {
 
-  implicit val eventIdGet: Get[EventId] = Get[String].tmap(EventId.apply)
-  implicit val eventIdPut: Put[EventId] = Put[String].contramap(_.value)
+  val eventIdGet: Decoder[EventId] = varchar.map(EventId.apply)
+  val eventIdPut: Encoder[EventId] = varchar.values.contramap(_.value)
 
-  implicit val projectIdGet: Get[projects.Id] = Get[Int].tmap(projects.Id.apply)
-  implicit val projectIdPut: Put[projects.Id] = Put[Int].contramap(_.value)
+  val projectIdGet: Decoder[projects.Id] = int4.map(projects.Id.apply)
+  val projectIdPut: Encoder[projects.Id] = int4.values.contramap(_.value)
 
-  implicit val projectPathGet: Get[projects.Path] = Get[String].tmap(projects.Path.apply)
-  implicit val projectPathPut: Put[projects.Path] = Put[String].contramap(_.value)
+  val projectPathGet: Decoder[projects.Path] = varchar.map(projects.Path.apply)
+  val projectPathPut: Encoder[projects.Path] =
+    varchar.values.contramap((b: projects.Path) => b.value)
 
-  implicit val eventBodyGet: Get[EventBody] = Get[String].tmap(EventBody.apply)
-  implicit val eventBodyPut: Put[EventBody] = Put[String].contramap(_.value)
+  val eventBodyGet: Decoder[EventBody] = varchar.map(EventBody.apply)
+  val eventBodyPut: Encoder[EventBody] = varchar.values.contramap(_.value)
 
-  implicit val createdDateGet: Get[CreatedDate] = Get[Instant].tmap(CreatedDate.apply)
-  implicit val createdDatePut: Put[CreatedDate] = Put[Instant].contramap(_.value)
+  val createdDateGet: Decoder[CreatedDate] = timestamptz.map(timestamp => CreatedDate(timestamp.toInstant))
+  val createdDatePut: Encoder[CreatedDate] =
+    timestamptz.values.contramap((b: CreatedDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
 
-  implicit val executionDateGet: Get[ExecutionDate] = Get[Instant].tmap(ExecutionDate.apply)
-  implicit val executionDatePut: Put[ExecutionDate] = Put[Instant].contramap(_.value)
+  val executionDateGet: Decoder[ExecutionDate] =
+    timestamptz.map(timestamp => ExecutionDate(timestamp.toInstant))
+  val executionDatePut: Encoder[ExecutionDate] =
+    timestamptz.values.contramap((b: ExecutionDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
 
-  implicit val eventDateGet: Get[EventDate] = Get[Instant].tmap(EventDate.apply)
-  implicit val eventDatePut: Put[EventDate] = Put[Instant].contramap(_.value)
+  // TODO revamp all the codecs
+  val eventDateGet: Decoder[EventDate] = timestamptz.map(timestamp => EventDate(timestamp.toInstant))
+  val eventDatePut: Encoder[EventDate] =
+    timestamptz.values.contramap((b: EventDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
 
-  implicit val batchDateGet: Get[BatchDate] = Get[Instant].tmap(BatchDate.apply)
-  implicit val batchDatePut: Put[BatchDate] = Put[Instant].contramap(_.value)
+  val batchDateGet: Decoder[BatchDate] = timestamptz.map(timestamp => BatchDate(timestamp.toInstant))
+  val batchDatePut: Encoder[BatchDate] =
+    timestamptz.values.contramap((b: BatchDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
 
-  implicit val eventMessageGet: Get[EventMessage] = Get[String].tmap(EventMessage.apply)
-  implicit val eventMessagePut: Put[EventMessage] = Put[String].contramap(_.value)
+  val eventMessageGet: Decoder[EventMessage] = varchar.map(EventMessage.apply)
+  val eventMessagePut: Encoder[EventMessage] = varchar.values.contramap(_.value)
 
-  implicit val eventStatusGet: Get[EventStatus] = Get[String].tmap(EventStatus.apply)
-  implicit val eventStatusPut: Put[EventStatus] = Put[String].contramap(_.value)
+  val eventProcessingTimeGet: Decoder[EventProcessingTime] = interval.map(EventProcessingTime.apply)
+  val eventProcessingTimePut: Encoder[EventProcessingTime] = interval.values.contramap(_.value)
+
+  val eventPayloadGet: Decoder[EventPayload] = text.map(EventPayload.apply)
+  val eventPayloadPut: Encoder[EventPayload] = text.values.contramap(_.value)
+
+  val eventStatusGet: Decoder[EventStatus] = varchar.map(EventStatus.apply)
+  val eventStatusPut: Encoder[EventStatus] = varchar.values.contramap(_.value)
+
+  val schemaVersionGet: Decoder[SchemaVersion] = text.map(SchemaVersion.apply)
+  val schemaVersionPut: Encoder[SchemaVersion] = text.values.contramap(_.value)
 
   private val nanosPerSecond = 1000000000L
   private val secsPerMinute  = 60
@@ -106,20 +124,19 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
       )
     }
 
-  implicit val compoundEventIdRead: Read[CompoundEventId] = Read[(EventId, projects.Id)].map {
-    case (eventId, projectId) => CompoundEventId(eventId, projectId)
-  }
+  val compoundEventIdGet: Decoder[CompoundEventId] = (eventIdGet ~ projectIdGet).gmap[CompoundEventId]
+  val projectGet:         Decoder[Project]         = (projectIdGet ~ projectPathGet).gmap[Project]
 
-  implicit val projectRead: Read[Project] = Read[(projects.Id, projects.Path)].map { case (id, path) =>
-    Project(id, path)
-  }
+  val subscriberUrlGet: Decoder[SubscriberUrl] = varchar.map(SubscriberUrl.apply)
+  val subscriberUrlPut: Encoder[SubscriberUrl] = varchar.values.contramap(_.value)
 
-  implicit val subscriberUrlGet: Get[SubscriberUrl] = Get[String].tmap(SubscriberUrl.apply)
-  implicit val subscriberUrlPut: Put[SubscriberUrl] = Put[String].contramap(_.value)
+  val microserviceBaseUrlGet: Decoder[MicroserviceBaseUrl] = varchar.map(MicroserviceBaseUrl.apply)
+  val microserviceBaseUrlPut: Encoder[MicroserviceBaseUrl] = varchar.values.contramap(_.value)
 
-  implicit val subscriberIdGet: Get[SubscriberId] = Get[String].tmap(SubscriberId.apply)
-  implicit val subscriberIdPut: Put[SubscriberId] = Put[String].contramap(_.value)
+  val subscriberIdGet: Decoder[SubscriberId] = varchar.map(SubscriberId.apply)
+  val subscriberIdPut: Encoder[SubscriberId] = varchar.values.contramap(_.value)
 
-  implicit val microserviceUrlGet: Get[MicroserviceBaseUrl] = Get[String].tmap(MicroserviceBaseUrl.apply)
-  implicit val microserviceUrlPut: Put[MicroserviceBaseUrl] = Put[String].contramap(_.value)
+  val microserviceUrlGet: Decoder[MicroserviceBaseUrl] = varchar.map(MicroserviceBaseUrl.apply)
+  val microserviceUrlPut: Encoder[MicroserviceBaseUrl] = varchar.values.contramap(_.value)
+
 }

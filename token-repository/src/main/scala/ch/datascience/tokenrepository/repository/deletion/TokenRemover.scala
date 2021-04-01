@@ -27,38 +27,27 @@ import ch.datascience.graph.model.projects.Id
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import eu.timepit.refined.auto._
-import skunk.data.Completion
+import skunk._
 import skunk.implicits._
+import skunk.codec.all._
+import skunk.data.Completion
 
 class TokenRemover[Interpretation[_]: Async: Monad](
     transactor:       SessionResource[Interpretation, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes)) {
 
-  def delete(projectId: Id): Interpretation[Unit] = transactor.use { session =>
-    session.transaction.use { xa =>
-      val deletion = measureExecutionTime(
-        {
-          val command = sql"""
+  def delete(projectId: Id): Interpretation[Unit] = transactor.use { implicit session =>
+    measureExecutionTime {
+      val command: Command[Void] = sql"""
           delete
           from projects_tokens
           where project_id = #${projectId.value.toString}
           """.command
-          SqlQuery[Interpretation, Unit](
-            Kleisli(_.execute(command).map(failIfMultiUpdate(projectId))),
-            name = "remove token"
-          )
-        },
-        session
+      SqlQuery[Interpretation, Unit](
+        Kleisli(_.execute(command).map(failIfMultiUpdate(projectId))),
+        name = "remove token"
       )
-
-      for {
-        sp <- xa.savepoint
-        _ <- deletion.recoverWith { case e =>
-               xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
-             }
-      } yield ()
-
     }
   }
 
@@ -66,5 +55,7 @@ class TokenRemover[Interpretation[_]: Async: Monad](
     case Completion.Delete(0 | 1) => ()
     case Completion.Delete(n) =>
       throw new RuntimeException(s"Deleting token for a projectId: $projectId removed $n records")
+    case completion =>
+      throw new RuntimeException(s"Deleting token for a projectId: $projectId failed with completion code $completion")
   }
 }

@@ -18,70 +18,82 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.MonadError
+import cats.effect.{Async, Bracket}
 import ch.datascience.db.SessionResource
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import skunk.codec.all._
+import skunk._
+import skunk.implicits._
 
 private trait EventPayloadTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object EventPayloadTableCreator {
-  def apply[Interpretation[_]](
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): EventPayloadTableCreator[Interpretation] =
+  ): EventPayloadTableCreator[Interpretation] =
     new EventPayloadTableCreatorImpl(transactor, logger)
 }
 
-private class EventPayloadTableCreatorImpl[Interpretation[_]](
+private class EventPayloadTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventPayloadTableCreator[Interpretation]
-    with EventTableCheck[Interpretation] {
+) extends EventPayloadTableCreator[Interpretation]
+    with EventTableCheck {
 
   import cats.syntax.all._
-  import doobie.implicits._
 
-  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
-
-  override def run(): Interpretation[Unit] =
+  override def run(): Interpretation[Unit] = transactor.use { implicit session =>
     whenEventTableExists(
       checkTableExists flatMap {
-        case true  => logger info "'event_payload' table exists"
-        case false => createTable
+        case true => logger info "'event_payload' table exists"
+        case false =>
+          session.transaction.use { xa =>
+            for {
+              sp <- xa.savepoint
+              result <- createTable recoverWith { e =>
+                          xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
+                        }
+            } yield result
+          }
       },
-      otherwise = ME.raiseError(new Exception("Event table missing; creation of event_payload is not possible"))
+      otherwise = MonadError[Interpretation, Throwable].raiseError(
+        new Exception("Event table missing; creation of event_payload is not possible")
+      )
     )
+  }
 
   private def checkTableExists: Interpretation[Boolean] =
-    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
-      .query[Boolean]
-      .unique
-      .transact(transactor.resource)
-      .recover { case _ => false }
+    transactor.use { session =>
+      val query: Query[Void, Boolean] =
+        sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
+          .query(bool)
+      session.unique(query).recover { case _ => false }
+    }
 
-  private def createTable = for {
-    _ <- createTableSql.update.run transact transactor.resource
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)")
+  private def createTable(implicit session: Session[Interpretation]) = for {
+    _ <- session.execute(createTableSql)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_payload(event_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_payload(project_id)".command)
     _ <- logger info "'event_payload' table created"
-    _ <- foreignKeySql.run transact transactor.resource
+    _ <- session.execute(foreignKeySql)
   } yield ()
 
-  private lazy val createTableSql = sql"""
+  private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS event_payload(
       event_id       varchar   NOT NULL,
       project_id     int4      NOT NULL,
       payload        text,
       PRIMARY KEY (event_id, project_id)
     );
-    """
+    """.command
 
-  private lazy val foreignKeySql = sql"""
+  private lazy val foreignKeySql: Command[Void] = sql"""
     ALTER TABLE event_payload
     ADD CONSTRAINT fk_event FOREIGN KEY (event_id, project_id) REFERENCES event (event_id, project_id);
-  """.update
+  """.command
 }

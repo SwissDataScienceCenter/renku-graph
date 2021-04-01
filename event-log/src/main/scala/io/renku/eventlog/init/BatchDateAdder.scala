@@ -18,12 +18,14 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
-import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import skunk._
+import skunk.codec.all.bool
+import skunk.implicits._
 
 import scala.util.control.NonFatal
 
@@ -32,51 +34,51 @@ private trait BatchDateAdder[Interpretation[_]] {
 }
 
 private object BatchDateAdder {
-  def apply[Interpretation[_]](
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): BatchDateAdder[Interpretation] =
+  ): BatchDateAdder[Interpretation] =
     new BatchDateAdderImpl(transactor, logger)
 }
 
-private class BatchDateAdderImpl[Interpretation[_]](
+private class BatchDateAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends BatchDateAdder[Interpretation]
-    with EventTableCheck[Interpretation] {
+) extends BatchDateAdder[Interpretation]
+    with EventTableCheck {
 
   private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
-  override def run(): Interpretation[Unit] =
+  override def run(): Interpretation[Unit] = transactor.use { implicit session =>
     whenEventTableExists(
       logger info "'batch_date' column adding skipped",
       otherwise = checkColumnExists flatMap {
         case true  => logger info "'batch_date' column exists"
-        case false => addColumn()
+        case false => addColumn
       }
     )
-
-  private def checkColumnExists: Interpretation[Boolean] =
-    sql"SELECT batch_date FROM event_log limit 1"
-      .query[String]
-      .option
-      .transact(transactor.resource)
+  }
+  private def checkColumnExists: Interpretation[Boolean] = transactor.use { session =>
+    val query: Query[skunk.Void, Boolean] = sql"SELECT batch_date FROM event_log limit 1"
+      .query(bool)
+    session
+      .option(query)
       .map(_ => true)
       .recover { case _ => false }
+  }
 
-  private def addColumn() = {
+  private def addColumn(implicit session: Session[Interpretation]) = {
     for {
-      _ <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS batch_date timestamp")
-      _ <- execute(sql"update event_log set batch_date = created_date")
-      _ <- execute(sql"ALTER TABLE event_log ALTER COLUMN batch_date SET NOT NULL")
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_batch_date ON event_log(batch_date)")
+      _ <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS batch_date timestamp".command)
+      _ <- execute(sql"update event_log set batch_date = created_date".command)
+      _ <- execute(sql"ALTER TABLE event_log ALTER COLUMN batch_date SET NOT NULL".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_batch_date ON event_log(batch_date)".command)
       _ <- logger.info("'batch_date' column added")
     } yield ()
   } recoverWith logging
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     logger.error(exception)("'batch_date' column adding failure")
-    ME.raiseError(exception)
+    exception.raiseError[Interpretation, Unit]
   }
 }

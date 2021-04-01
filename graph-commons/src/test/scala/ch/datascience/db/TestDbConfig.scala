@@ -35,6 +35,8 @@ object TestDbConfig {
     DBConfig[TargetDb](
       driver = "org.h2.Driver",
       url = toUrl(s"jdbc:h2:mem:$dbName;DB_CLOSE_DELAY=-1;MODE=PostgreSQL"),
+      name = dbName,
+      host = "",
       user = "user",
       pass = "",
       connectionPool = 20,

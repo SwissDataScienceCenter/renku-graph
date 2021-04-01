@@ -18,8 +18,10 @@
 
 package ch.datascience.interpreters
 
-import cats.effect.IO
+import cats.effect.{IO, Resource}
 import ch.datascience.db.SessionResource
 import doobie.util.transactor.Transactor
+import skunk.Session
 
-class TestSessionResource[TargetDB](transactor: Transactor.Aux[IO, _]) extends SessionResource[IO, TargetDB](transactor)
+class TestSessionResource[TargetDB](transactor: Resource[IO, Session[IO]])
+    extends SessionResource[IO, TargetDB](transactor)

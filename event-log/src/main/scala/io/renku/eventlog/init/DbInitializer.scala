@@ -68,7 +68,8 @@ object DbInitializer {
         SubscriptionCategorySyncTimeTableCreator(transactor, logger),
         StatusesProcessingTimeTableCreator(transactor, logger),
         SubscriberTableCreator(transactor, logger),
-        EventDeliveryTableCreator(transactor, logger)
+        EventDeliveryTableCreator(transactor, logger),
+        TimestampZoneAdder(transactor, logger)
       ),
       logger
     )

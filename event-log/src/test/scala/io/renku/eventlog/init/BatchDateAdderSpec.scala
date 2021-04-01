@@ -27,7 +27,6 @@ import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.events.BatchDate
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import doobie.implicits._
 import io.circe.literal._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.{CreatedDate, Event}

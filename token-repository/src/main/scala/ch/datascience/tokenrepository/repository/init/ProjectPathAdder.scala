@@ -73,7 +73,7 @@ private class IOProjectPathAdder(
 
   private def addColumn() = {
     for {
-      _ <- execute(sql"ALTER TABLE projects_tokens ADD COLUMN IF NOT EXISTS project_path VARCHAR", transactor)
+      _ <- execute(sql"ALTER TABLE projects_tokens ADD COLUMN IF NOT EXISTS project_path VARCHAR".command, transactor)
       _ <- addMissingPaths().start
     } yield ()
   } recoverWith logging
@@ -81,8 +81,9 @@ private class IOProjectPathAdder(
   private def addMissingPaths(): IO[Unit] =
     for {
       _ <- addPathIfMissing()
-      _ <- execute(sql"ALTER TABLE projects_tokens ALTER COLUMN project_path SET NOT NULL", transactor)
-      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON projects_tokens(project_path)", transactor)
+      _ <- execute(sql"ALTER TABLE projects_tokens ALTER COLUMN project_path SET NOT NULL".command, transactor)
+      _ <-
+        execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON projects_tokens(project_path)".command, transactor)
       _ <- logger.info("'project_path' column added")
     } yield ()
 
@@ -92,19 +93,36 @@ private class IOProjectPathAdder(
       case Some((projectId, encryptedToken)) => addPathOrRemoveRow(projectId, encryptedToken)
     }
 
-  private def findEntryWithoutPath =
-    sql"select project_id, token from projects_tokens where project_path IS NULL limit 1;"
-      .query[(Int, String)]
-      .option
-      .transact(transactor.resource)
-      .flatMap {
-        case None =>
-          Option.empty[(Id, EncryptedAccessToken)].pure[IO]
-        case Some((id, token)) =>
-          ME.fromEither((Id from id, EncryptedAccessToken from token).mapN { case (projectId, encryptedToken) =>
-            Option(projectId -> encryptedToken)
-          })
+  private def findEntryWithoutPath: IO[Option[(Id, EncryptedAccessToken)]] = {
+    val query: Query[Void, (Int, String)] =
+      sql"select project_id, token from projects_tokens where project_path IS NULL limit 1;"
+        .query(int4 ~ varchar)
+    transactor
+      .use { session =>
+        session.transaction.use { xa =>
+          for {
+            sp <- xa.savepoint
+            maybeIdAndToken <-
+              session.option[(Int, String)](query).recoverWith { case NonFatal(exception) =>
+                xa.rollback(sp).flatMap(_ => logAndThrow(exception))
+              }
+            maybeProjectAndToken <- maybeIdAndToken match {
+                                      case None =>
+                                        Option.empty[(Id, EncryptedAccessToken)].pure[IO]
+                                      case Some((id, token)) =>
+                                        ME.fromEither(
+                                          (Id from id, EncryptedAccessToken from token)
+                                            .mapN { // TODO Verify if the deserializer is can be called by skunk
+                                              case (projectId, encryptedToken) =>
+                                                Option(projectId -> encryptedToken)
+                                            }
+                                        )
+                                    }
+
+          } yield maybeProjectAndToken
+        }
       }
+  }
 
   private def addPathOrRemoveRow(id: Id, encryptedToken: EncryptedAccessToken) = {
     for {
@@ -125,17 +143,26 @@ private class IOProjectPathAdder(
     }
 
   private def addPath(id: Id, path: Path): IO[Unit] =
-    sql"update projects_tokens set project_path = ${path.value} where project_id = ${id.value}".update.run
-      .transact(transactor.resource)
-      .map(_ => ())
+    transactor.use { session =>
+      session.transaction.use { xa =>
+        val query: Command[Void] =
+          sql"update projects_tokens set project_path = #${path.value} where project_id = #${id.value.toString}".command
+        for {
+          sp <- xa.savepoint
+          _ <- session.execute(query).recoverWith { case NonFatal(exception) =>
+                 xa.rollback(sp).flatMap(_ => logAndThrow(exception))
+               }
+        } yield ()
+      }
+    }
 
   private def execute(sql: Command[Void], transactor: SessionResource[IO, ProjectsTokensDB]): IO[Unit] =
     transactor.use { session =>
       session.transaction.use { xa =>
         for {
           sp <- xa.savepoint
-          _ <- session.execute(sql).recoverWith { case exception =>
-                 xa.rollback(sp).flatMap(logging)
+          _ <- session.execute(sql).recoverWith { case NonFatal(exception) =>
+                 xa.rollback(sp).flatMap(_ => logAndThrow(exception))
                }
         } yield ()
       }
@@ -144,6 +171,11 @@ private class IOProjectPathAdder(
   private lazy val logging: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
     logger.error(exception)("'project_path' column adding failure")
     ME.raiseError(exception)
+  }
+
+  private def logAndThrow[A](exception: Throwable) = {
+    logger.error(exception)("'project_path' column adding failure")
+    ME.raiseError[A](exception)
   }
 }
 

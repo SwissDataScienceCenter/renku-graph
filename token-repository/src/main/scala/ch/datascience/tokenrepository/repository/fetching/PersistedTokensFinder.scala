@@ -39,7 +39,8 @@ private class PersistedTokensFinder[Interpretation[_]: Async: Bracket[*[_], Thro
 ) extends DbClient[Interpretation](Some(queriesExecTimes)) {
 
   def findToken(projectId: Id): OptionT[Interpretation, EncryptedAccessToken] = run {
-    val query: Query[Void, String] = sql"""select token from projects_tokens where project_id =""".query(varchar)
+    val query: Query[Void, String] =
+      sql"""select token from projects_tokens where project_id =#${projectId.value.toString}""".query(varchar)
     SqlQuery[Interpretation, Option[String]](
       query = Kleisli(session => session.option(query)),
       name = "find token - id"
@@ -57,8 +58,8 @@ private class PersistedTokensFinder[Interpretation[_]: Async: Bracket[*[_], Thro
 
   private def run(query: SqlQuery[Interpretation, Option[String]]) =
     OptionT {
-      sessionResource.use { session =>
-        measureExecutionTime(query, session).flatMap(toSerializedAccessToken)
+      sessionResource.use { implicit session =>
+        measureExecutionTime(query).flatMap(toSerializedAccessToken)
       }
     }
 

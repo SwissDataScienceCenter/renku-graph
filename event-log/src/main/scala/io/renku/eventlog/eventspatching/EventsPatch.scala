@@ -19,41 +19,45 @@
 package io.renku.eventlog.eventspatching
 
 import java.time.Instant
-
 import cats.MonadError
+import cats.data.Kleisli
+import cats.effect.Async
 import cats.syntax.all._
 import ch.datascience.db.SqlQuery
-import ch.datascience.graph.model.events.EventStatus
+import ch.datascience.graph.model.events.{BatchDate, EventStatus}
 import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
-import doobie.free.connection.ConnectionIO
-import doobie.implicits._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.eventlog.TypeSerializers
+import skunk._
+import skunk.codec.all._
+import skunk.data.Completion
+import skunk.implicits._
 
 private trait EventsPatch[Interpretation[_]] extends Product with Serializable with TypeSerializers {
   def name:               String Refined NonEmpty
   def updateGauges():     Interpretation[Unit]
-  protected def sqlQuery: ConnectionIO[Int]
-  lazy val query: SqlQuery[Int] = SqlQuery(sqlQuery, name)
+  protected def sqlQuery: Kleisli[Interpretation, Session[Interpretation], Completion]
+  lazy val query: SqlQuery[Interpretation, Completion] = SqlQuery(sqlQuery, name)
 }
 
-private case class StatusNewPatch[Interpretation[_]](
+private case class StatusNewPatch[Interpretation[_]: Async: MonadError[*[_], Throwable]](
     waitingEventsGauge:   LabeledGauge[Interpretation, projects.Path],
     underProcessingGauge: LabeledGauge[Interpretation, projects.Path],
     now:                  () => Instant = () => Instant.now
-)(implicit ME:            MonadError[Interpretation, Throwable])
-    extends EventsPatch[Interpretation] {
+) extends EventsPatch[Interpretation] {
 
   val status: EventStatus             = New
   val name:   String Refined NonEmpty = Refined.unsafeApply(s"status $status patch")
 
-  protected override def sqlQuery: ConnectionIO[Int] =
-    sql"""|UPDATE event
-          |SET status = $status, execution_date = event_date, batch_date = ${now()}, message = NULL
-          |""".stripMargin.update.run
+  protected override def sqlQuery: Kleisli[Interpretation, Session[Interpretation], Completion] = Kleisli { session =>
+    val query: Command[EventStatus ~ BatchDate] = sql"""UPDATE event
+                                     SET status = $eventStatusPut, execution_date = event_date, batch_date = $batchDatePut, message = NULL
+                                     """.command
+    session.prepare(query).use(_.execute(status ~ BatchDate(now())))
+  }
 
   override def updateGauges(): Interpretation[Unit] =
     for {

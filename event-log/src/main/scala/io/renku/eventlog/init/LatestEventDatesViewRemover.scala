@@ -18,39 +18,41 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource}
-import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import skunk.Command
+import skunk.implicits.toStringOps
 
 private[eventlog] trait LatestEventDatesViewRemover[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private[eventlog] object LatestEventDatesViewRemover {
-  def apply[Interpretation[_]](
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): LatestEventDatesViewRemover[Interpretation] =
     new LatestEventDatesViewRemoverImpl(transactor, logger)
 }
 
-private[eventlog] class LatestEventDatesViewRemoverImpl[Interpretation[_]](
+private[eventlog] class LatestEventDatesViewRemoverImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends DbClient(maybeHistogram = None)
+) extends DbClient[Interpretation](maybeHistogram = None)
     with LatestEventDatesViewRemover[Interpretation] {
 
   private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
-  override def run(): Interpretation[Unit] = for {
-    _ <- dropView.run transact transactor.resource
-    _ <- logger.info("'project_latest_event_date' view dropped")
-  } yield ()
+  override def run(): Interpretation[Unit] = transactor.use { session =>
+    for {
+      _ <- session.execute(dropView)
+      _ <- logger.info("'project_latest_event_date' view dropped")
+    } yield ()
+  }
 
-  private lazy val dropView =
-    sql"""DROP MATERIALIZED VIEW IF EXISTS project_latest_event_date""".update
+  private lazy val dropView: Command[skunk.Void] =
+    sql"""DROP MATERIALIZED VIEW IF EXISTS project_latest_event_date""".command
 }

@@ -18,40 +18,46 @@
 
 package io.renku.eventlog.latestevents
 
-import cats.effect.{Bracket, IO}
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket, IO}
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.events.consumers.Project
 import ch.datascience.graph.model.events.{EventBody, EventId}
 import ch.datascience.metrics.LabeledHistogram
-import doobie.implicits._
 import io.renku.eventlog.latestevents.LatestEventsFinder.IdProjectBody
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import skunk._
+import skunk.implicits._
 
 trait LatestEventsFinder[Interpretation[_]] {
   def findAllLatestEvents(): Interpretation[List[IdProjectBody]]
 }
 
-class LatestEventsFinderImpl(
-    transactor:       SessionResource[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:        Bracket[IO, Throwable])
+class LatestEventsFinderImpl[Interpretation[_]: Async](
+    transactor:       SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
+)(implicit ME:        Bracket[Interpretation, Throwable])
     extends DbClient(Some(queriesExecTimes))
-    with LatestEventsFinder[IO]
+    with LatestEventsFinder[Interpretation]
     with TypeSerializers {
 
   import LatestEventsFinder._
   import eu.timepit.refined.auto._
 
-  override def findAllLatestEvents(): IO[List[IdProjectBody]] =
-    measureExecutionTime(findEvents) transact transactor.resource
+  override def findAllLatestEvents(): Interpretation[List[IdProjectBody]] =
+    transactor.use(implicit session => measureExecutionTime(findEvents))
 
   private def findEvents = SqlQuery(
-    sql"""|SELECT evt.event_id, evt.project_id, prj.project_path, evt.event_body
-          |FROM event evt
-          |JOIN project prj ON evt.project_id = prj.project_id AND evt.event_date = prj.latest_event_date
-          |""".stripMargin
-      .query[(EventId, Project, EventBody)]
-      .to[List],
+    Kleisli[Interpretation, Session[Interpretation], List[IdProjectBody]] { session =>
+      val query: Query[skunk.Void, IdProjectBody] =
+        sql"""SELECT evt.event_id, evt.project_id, prj.project_path, evt.event_body
+          FROM event evt
+          JOIN project prj ON evt.project_id = prj.project_id AND evt.event_date = prj.latest_event_date
+          """
+          .query(eventIdGet ~ projectGet ~ eventBodyGet)
+          .map { case id ~ project ~ body => (id, project, body) }
+      session.execute(query)
+    },
     name = "latest projects events"
   )
 }

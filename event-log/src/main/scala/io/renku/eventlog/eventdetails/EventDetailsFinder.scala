@@ -19,14 +19,16 @@
 package io.renku.eventlog.eventdetails
 
 import cats.data.Kleisli
-import cats.effect.{Async, IO}
 import cats.syntax.all._
+import cats.effect.{Async, IO}
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.events.{CompoundEventId, EventId}
+import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
-import skunk.implicits._
+import skunk.{Decoder, _}
 import skunk.codec.all._
+import skunk.implicits._
 
 private trait EventDetailsFinder[Interpretation[_]] {
   def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]]
@@ -42,23 +44,18 @@ private class EventDetailsFinderImpl[Interpretation[_]: Async](
   import eu.timepit.refined.auto._
 
   override def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]] =
-    transactor.use { session =>
-      session.transaction.use { xa =>
-        for {
-          sp <- xa.savepoint
-          result <- measureExecutionTime(find(eventId), session).recoverWith { case e =>
-                      xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Option[CompoundEventId]])
-                    }
-        } yield result
-      }
-    }
+    transactor.use(implicit session => measureExecutionTime(find(eventId)))
 
-  private def find(eventId: CompoundEventId) = SqlQuery[Interpretation, Option[CompoundEventId]](
-    Kleisli(_.option(sql"""SELECT evt.event_id, evt.project_id
-                           FROM event evt WHERE evt.event_id = #${eventId.id} and evt.project_id = #${eventId.projectId.toString}
-                           """.query(varchar ~ int4).gmap[CompoundEventId])),
-    name = "find event details"
-  )
+  private def find(eventId: CompoundEventId) =
+    SqlQuery[Interpretation, Option[CompoundEventId]](
+      Kleisli { session =>
+        val query: Query[EventId ~ projects.Id, CompoundEventId] = sql"""SELECT evt.event_id, evt.project_id
+                           FROM event evt WHERE evt.event_id = $eventIdPut and evt.project_id = $projectIdPut
+                           """.query(compoundEventIdGet)
+        session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
+      },
+      name = "find event details"
+    )
 }
 
 private object EventDetailsFinder {

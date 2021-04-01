@@ -19,24 +19,25 @@
 package io.renku.eventlog.statuschange.commands
 
 import cats.effect.Bracket
-import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
-import doobie.implicits._
-import io.renku.eventlog.EventLogDB
+import skunk._
+import skunk.implicits._
 
 private object ProjectPathFinder {
 
   import io.renku.eventlog.TypeSerializers._
 
-  def findProjectPath[Interpretation[_]](
-      eventId:           CompoundEventId
-  )(implicit transactor: SessionResource[Interpretation, EventLogDB], ME: Bracket[Interpretation, Throwable]) =
-    sql"""|SELECT project_path
-          |FROM project 
-          |WHERE project_id = ${eventId.projectId}
-          |""".stripMargin
-      .query[projects.Path]
-      .unique
-      .transact(transactor.resource)
+  def findProjectPath[Interpretation[_]: Bracket[*[_], Throwable]](
+      eventId:        CompoundEventId
+  )(implicit session: Session[Interpretation]) = {
+
+    val query: Query[projects.Id, projects.Path] = sql"""SELECT project_path
+                                                        FROM project 
+                                                        WHERE project_id = $projectIdPut
+                                                        """.query(projectPathGet)
+
+    session.prepare(query).use(_.unique(eventId.projectId))
+  }
+
 }

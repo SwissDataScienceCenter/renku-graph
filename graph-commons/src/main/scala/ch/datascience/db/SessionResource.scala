@@ -33,8 +33,6 @@ class SessionResource[Interpretation[_], TargetDB](resource: Resource[Interpreta
 object SessionPoolResource {
   def apply[Interpretation[_]: Concurrent: ContextShift: Trace, TargetDB](
       dbConfig: DBConfig[TargetDB]
-  )(implicit
-      async: Async[Interpretation]
   ): Resource[Interpretation, SessionResource[Interpretation, TargetDB]] =
     Session
       .pooled(

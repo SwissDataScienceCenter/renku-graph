@@ -33,8 +33,6 @@ class SessionResourceResourceSpec extends AnyWordSpec with MockFactory with shou
 
     "pass the transactor built with the DBConfig and DataSourceUpdater to the given block" in new TestCase {
 
-      dataSourceUpdater.expects(*)
-
       transactedBlock.expects(*).returning(IO.unit)
 
       transactorResource.use(transactedBlock).unsafeRunSync() shouldBe ((): Unit)
@@ -44,9 +42,9 @@ class SessionResourceResourceSpec extends AnyWordSpec with MockFactory with shou
   private implicit val cs: ContextShift[IO] = IO.contextShift(global)
 
   private trait TestCase {
+    import natchez.Trace.Implicits.noop
     val transactedBlock    = mockFunction[SessionResource[IO, TestDB], IO[Unit]]
-    val dataSourceUpdater  = mockFunction[HikariDataSource, Unit]
     val dbConfig           = TestDbConfig.newDbConfig[TestDB]
-    val transactorResource = new DbSessionPoolResource[IO, TestDB](dbConfig, dataSourceUpdater)
+    val transactorResource = SessionPoolResource[IO, TestDB](dbConfig)
   }
 }

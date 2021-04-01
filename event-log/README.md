@@ -520,9 +520,10 @@ Event-log uses relational database as an internal storage. The DB has the follow
 | event_id   VARCHAR    PK    NOT NULL |
 | project_id INT4       PK FK NOT NULL |
 | status     VARCHAR          NOT NULL |
-| created_date TIMESTAMP      NOT NULL |
-| execution_date TIMESTAMP    NOT NULL |
-| event_date TIMESTAMP        NOT NULL |
+| created_date TIMESTAMPTZ    NOT NULL |
+| execution_date TIMESTAMPTZ  NOT NULL |
+| event_date TIMESTAMPTZ      NOT NULL |
+| batch_date TIMESTAMPTZ      NOT NULL |
 | event_body TEXT             NOT NULL |
 | message TEXT                         |
 

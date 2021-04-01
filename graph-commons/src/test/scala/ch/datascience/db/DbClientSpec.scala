@@ -18,15 +18,18 @@
 
 package ch.datascience.db
 
-import cats.effect.{ContextShift, IO}
+import cats.data.Kleisli
+import cats.effect.{ContextShift, IO, Resource}
 import ch.datascience.db.SqlQuery.Name
 import ch.datascience.db.TestDbConfig.newDbConfig
 import ch.datascience.metrics.{LabeledHistogram, TestLabeledHistogram}
-import doobie.implicits._
-import doobie.util.transactor.Transactor
 import eu.timepit.refined.auto._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
+import natchez.Trace.Implicits.noop
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -61,24 +64,25 @@ private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO, Name]]) e
 
   private val dbConfig: DBConfigProvider.DBConfig[TestDB] = newDbConfig[TestDB]
 
-  private val transactor: SessionResource[IO, TestDB] = DbTransactor[IO, TestDB](
-    Transactor.fromDriverManager[IO](
-      dbConfig.driver.value,
-      dbConfig.url.value,
-      dbConfig.user.value,
-      dbConfig.pass
-    )
-  )
+  private val transactorResource: Resource[IO, SessionResource[IO, TestDB]] = SessionPoolResource[IO, TestDB](dbConfig)
 
   val queryName: SqlQuery.Name = "some_id"
 
-  private def query(expected: Int) = SqlQuery(
-    sql"""select $expected;""".query[Int].unique,
-    queryName
+  private def query(expected: Int) = SqlQuery[IO, Int](Kleisli { session =>
+                                                         val query: Query[Int, Int] =
+                                                           sql"""select $int4;""".query(int4)
+                                                         session.prepare(query).use { pq =>
+                                                           pq.unique(expected)
+                                                         }
+                                                       },
+                                                       queryName
   )
 
-  def executeQuery(expected: Int) =
-    measureExecutionTime[Int] {
-      query(expected)
-    } transact transactor.resource
+  def executeQuery(expected: Int) = transactorResource.use {
+    _.use { implicit session =>
+      measureExecutionTime[Int] {
+        query(expected)
+      }
+    }
+  }
 }

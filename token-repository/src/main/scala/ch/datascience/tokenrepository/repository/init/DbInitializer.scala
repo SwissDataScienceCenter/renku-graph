@@ -24,6 +24,7 @@ import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
+import skunk.data.Completion
 
 import scala.util.control.NonFatal
 
@@ -57,7 +58,7 @@ class DbInitializer[Interpretation[_]](
           for {
             sp <- xa.savepoint
             _ <- session.execute(query).recoverWith { case e =>
-                   xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
+                   xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Completion])
                  }
           } yield ()
         }

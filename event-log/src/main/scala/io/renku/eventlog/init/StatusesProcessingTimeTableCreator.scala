@@ -18,56 +18,68 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.effect.{Async, Bracket}
 import ch.datascience.db.SessionResource
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 private trait StatusesProcessingTimeTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object StatusesProcessingTimeTableCreator {
-  def apply[Interpretation[_]](
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): StatusesProcessingTimeTableCreator[Interpretation] =
+  ): StatusesProcessingTimeTableCreator[Interpretation] =
     new StatusesProcessingTimeTableCreatorImpl[Interpretation](transactor, logger)
 }
 
-private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]](
+private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends StatusesProcessingTimeTableCreator[Interpretation] {
+) extends StatusesProcessingTimeTableCreator[Interpretation] {
 
   import cats.syntax.all._
-  import doobie.implicits._
-  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] =
     checkTableExists flatMap {
-      case true  => logger info "'status_processing_time' table exists"
-      case false => createTable
+      case true => logger info "'status_processing_time' table exists"
+      case false =>
+        transactor.use { implicit session =>
+          session.transaction.use { xa =>
+            for {
+              sp <- xa.savepoint
+              _ <- createTable recoverWith { e =>
+                     xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
+                   }
+            } yield ()
+          }
+        }
     }
 
   private def checkTableExists: Interpretation[Boolean] =
-    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'status_processing_time')"
-      .query[Boolean]
-      .unique
-      .transact(transactor.resource)
-      .recover { case _ => false }
+    transactor.use { session =>
+      val query: Query[Void, Boolean] =
+        sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'status_processing_time')".query(bool)
+      session
+        .unique(query)
+        .recover { case _ => false }
+    }
 
-  private def createTable = for {
-    _ <- createTableSql.run transact transactor.resource
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_processing_time(event_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_processing_time(project_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status         ON status_processing_time(status)")
+  private def createTable(implicit session: Session[Interpretation]) = for {
+    _ <- execute(createTableSql)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id       ON status_processing_time(event_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id     ON status_processing_time(project_id)".command)
+    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status         ON status_processing_time(status)".command)
     _ <- logger info "'status_processing_time' table created"
-    _ <- foreignKeySql.run transact transactor.resource
+    _ <- execute(foreignKeySql)
   } yield ()
 
-  private lazy val createTableSql = sql"""
+  private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS status_processing_time(
       event_id          varchar   NOT NULL,
       project_id        int4      NOT NULL,
@@ -75,10 +87,10 @@ private class StatusesProcessingTimeTableCreatorImpl[Interpretation[_]](
       processing_time   interval    NOT NULL,
       PRIMARY KEY (event_id, project_id, status)
     );
-    """.update
+    """.command
 
-  private lazy val foreignKeySql = sql"""
+  private lazy val foreignKeySql: Command[Void] = sql"""
     ALTER TABLE status_processing_time
     ADD CONSTRAINT fk_event FOREIGN KEY (event_id, project_id) REFERENCES event (event_id, project_id);
-  """.update
+  """.command
 }

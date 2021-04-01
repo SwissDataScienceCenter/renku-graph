@@ -21,26 +21,29 @@ package io.renku.eventlog.statuschange.commands
 import cats.MonadError
 import cats.data.EitherT.{fromEither, fromOption, right}
 import cats.data.{EitherT, Kleisli, NonEmptyList}
-import cats.effect.{Bracket, Sync}
+import cats.effect.{Async, Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TriplesGenerated}
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, events, projects}
 import ch.datascience.metrics.LabeledGauge
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.circe._
 import io.renku.eventlog.statuschange.commands.CommandFindingResult._
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.{EventLogDB, EventPayload}
+import io.renku.eventlog.{EventLogDB, EventPayload, ExecutionDate}
 import org.http4s.multipart.{Multipart, Part}
 import org.http4s.{MediaType, Request}
+import skunk.{Command, Session, ~}
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 import java.time.Instant
 import scala.util.control.NonFatal
 
-final case class ToTriplesGenerated[Interpretation[_]](
+final case class ToTriplesGenerated[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     eventId:                     CompoundEventId,
     payload:                     EventPayload,
     schemaVersion:               SchemaVersion,
@@ -48,12 +51,11 @@ final case class ToTriplesGenerated[Interpretation[_]](
     awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:         Option[EventProcessingTime],
     now:                         () => Instant = () => Instant.now
-)(implicit ME:                   Bracket[Interpretation, Throwable])
-    extends ChangeStatusCommand[Interpretation] {
+) extends ChangeStatusCommand[Interpretation] {
   override lazy val status: events.EventStatus = TriplesGenerated
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList(
-    SqlQuery(
+  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList(
+    SqlQuery[Interpretation, Int](
       query = updateStatus,
       name = "generating_triples->triples_generated"
     ),
@@ -65,20 +67,38 @@ final case class ToTriplesGenerated[Interpretation[_]](
     )
   )
 
-  private lazy val updateStatus = sql"""|UPDATE event
-                                        |SET status = $status, execution_date = ${now()}
-                                        |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus};
-                                        |""".stripMargin.update.run
+  private lazy val updateStatus = Kleisli[Interpretation, Session[Interpretation], Int] { session =>
+    val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] = sql"""|UPDATE event
+                                                                                                  |SET status = $eventStatusPut, execution_date = $executionDatePut
+                                                                                                  |WHERE event_id = $eventIdPut AND project_id = $projectIdPut AND status = $eventStatusPut;
+                                                                                                  |""".command
+    session
+      .prepare(query)
+      .use(_.execute(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ GeneratingTriples))
+      .map {
+        case Completion.Update(n) => n
+        case completion =>
+          throw new RuntimeException(
+            s"generating_triples->triples_generated time query failed with completion status $completion"
+          )
+      }
+  }
 
-  private lazy val upsertEventPayload = sql"""|INSERT INTO
-                                              |event_payload (event_id, project_id, payload, schema_version)
-                                              |VALUES (${eventId.id},  ${eventId.projectId}, $payload, $schemaVersion)
-                                              |ON CONFLICT (event_id, project_id, schema_version)
-                                              |DO UPDATE SET payload = EXCLUDED.payload;
-                                              |""".stripMargin.update.run
-
+  private lazy val upsertEventPayload = Kleisli[Interpretation, Session[Interpretation], Int] { session =>
+    val query: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] = sql"""
+            INSERT INTO event_payload (event_id, project_id, payload, schema_version)
+            VALUES ($eventIdPut,  $projectIdPut, $eventPayloadPut, $schemaVersionPut)
+            ON CONFLICT (event_id, project_id, schema_version)
+            DO UPDATE SET payload = EXCLUDED.payload;
+          """.command
+    session.prepare(query).use(_.execute(eventId.id ~ eventId.projectId ~ payload ~ schemaVersion)).map {
+      case Completion.Insert(n) => n
+      case completion =>
+        throw new RuntimeException(s"upsert_generated_triples time query failed with completion status $completion")
+    }
+  }
   override def updateGauges(updateResult: UpdateResult)(implicit
-      transactor:                         SessionResource[Interpretation, EventLogDB]
+      session:                            Session[Interpretation]
   ): Interpretation[Unit] = updateResult match {
     case UpdateResult.Updated =>
       for {
@@ -86,16 +106,15 @@ final case class ToTriplesGenerated[Interpretation[_]](
         _    <- awaitingTransformationGauge increment path
         _    <- underTriplesGenerationGauge decrement path
       } yield ()
-    case _ => ME.unit
+    case _ => ().pure[Interpretation]
   }
 }
 
 object ToTriplesGenerated {
   import org.http4s.circe.jsonDecoder
-  def factory[Interpretation[_]: Sync](underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
-                                       awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path]
-  )(implicit
-      ME: MonadError[Interpretation, Throwable]
+  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+      underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
+      awaitingTransformationGauge: LabeledGauge[Interpretation, projects.Path]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
     Kleisli { case (eventId, request) =>
       when(request, has = MediaType.multipart.`form-data`) {
@@ -144,7 +163,7 @@ object ToTriplesGenerated {
       PayloadMalformed("Cannot parse change status payload").asLeft[String]
     }).subflatMap[CommandFindingResult, Json](parser.parse(_).leftMap(e => PayloadMalformed(e.getMessage)))
 
-  private implicit val payloadDecoder: Decoder[(SchemaVersion, EventPayload)] = (cursor: HCursor) =>
+  private implicit val payloadDecoder: io.circe.Decoder[(SchemaVersion, EventPayload)] = (cursor: HCursor) =>
     for {
       schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
       payload       <- cursor.downField("payload").as[EventPayload]

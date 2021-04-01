@@ -17,7 +17,6 @@
  */
 
 package ch.datascience.db
-import cats.Monad
 import cats.effect.Async
 import cats.syntax.all._
 import ch.datascience.db.SqlQuery.Name
@@ -29,9 +28,8 @@ abstract class DbClient[Interpretation[_]: Async](
 ) {
 
   protected def measureExecutionTime[ResultType](
-      query:   SqlQuery[Interpretation, ResultType],
-      session: Session[Interpretation]
-  ): Interpretation[ResultType] =
+      query:          SqlQuery[Interpretation, ResultType]
+  )(implicit session: Session[Interpretation]): Interpretation[ResultType] =
     maybeHistogram match {
       case None => query.query.run(session)
       case Some(histogram) =>

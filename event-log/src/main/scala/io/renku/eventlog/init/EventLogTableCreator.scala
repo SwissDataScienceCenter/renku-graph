@@ -18,37 +18,39 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.effect.{Async, Bracket}
 import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.events.EventStatus.GenerationRecoverableFailure
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import skunk._
+import skunk.codec.all._
+import skunk.implicits._
 
 private trait EventLogTableCreator[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object EventLogTableCreator {
-  def apply[Interpretation[_]](
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): EventLogTableCreator[Interpretation] =
     new EventLogTableCreatorImpl(transactor, logger)
 }
 
-private class EventLogTableCreatorImpl[Interpretation[_]](
+private class EventLogTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends EventLogTableCreator[Interpretation]
-    with EventTableCheck[Interpretation] {
+    with EventTableCheck {
 
   import cats.syntax.all._
-  import doobie.implicits._
 
   private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
-  override def run(): Interpretation[Unit] =
+  override def run(): Interpretation[Unit] = transactor.use { implicit session =>
     whenEventTableExists(
       logger info "'event_log' table creation skipped",
       otherwise = checkTableExists flatMap {
@@ -56,29 +58,34 @@ private class EventLogTableCreatorImpl[Interpretation[_]](
         case false => createTable
       }
     )
+  }
 
   private def checkTableExists: Interpretation[Boolean] =
-    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
-      .query[Boolean]
-      .unique
-      .transact(transactor.resource)
-      .recover { case _ => false }
+    transact.use { session =>
+      val query: Query[Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
+        .query(bool)
+      session
+        .unique(query)
+        .recover { case _ => false }
+    }
 
-  private def createTable = for {
-    _ <- createTableSql.update.run transact transactor.resource
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_log(event_id)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)")
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)")
-    _ <- execute(
-           sql"UPDATE event_log set status=${GenerationRecoverableFailure.value} where status='TRIPLES_STORE_FAILURE'"
-         )
-    _ <- logger info "'event_log' table created"
-  } yield ()
+  private def createTable(implicit session: Session[Interpretation]) =
+    for {
+      _ <- execute(createTableSql)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_id ON event_log(event_id)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_status ON event_log(status)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)".command)
+      _ <-
+        execute(
+          sql"UPDATE event_log set status=#${GenerationRecoverableFailure.value} where status='TRIPLES_STORE_FAILURE'".command
+        )
+      _ <- logger info "'event_log' table created"
+    } yield ()
 
-  private lazy val createTableSql = sql"""
+  private lazy val createTableSql: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS event_log(
       event_id       varchar   NOT NULL,
       project_id     int4      NOT NULL,
@@ -90,5 +97,5 @@ private class EventLogTableCreatorImpl[Interpretation[_]](
       message        varchar,
       PRIMARY KEY (event_id, project_id)
     );
-    """
+    """.command
 }

@@ -26,7 +26,7 @@ import ch.datascience.tinytypes.constraints.{BoundedInstant, InstantNotInTheFutu
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import io.circe.Decoder
 
-import java.time.Instant
+import java.time.{Instant, OffsetDateTime}
 
 sealed trait Event extends CompoundId {
   def id:        EventId

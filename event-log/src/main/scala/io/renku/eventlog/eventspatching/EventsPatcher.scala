@@ -40,9 +40,9 @@ private class EventsPatcherImpl(
     extends DbClient(Some(queriesExecTimes))
     with EventsPatcher[IO] {
 
-  def applyToAllEvents(eventsPatch: EventsPatch[IO]): IO[Unit] = {
+  def applyToAllEvents(eventsPatch: EventsPatch[IO]): IO[Unit] = transactor.use { implicit session =>
     for {
-      _ <- measureExecutionTime(eventsPatch.query) transact transactor.resource
+      _ <- measureExecutionTime(eventsPatch.query)
       _ <- eventsPatch.updateGauges()
       _ <- logger.info(s"All events patched with ${eventsPatch.name}")
     } yield ()

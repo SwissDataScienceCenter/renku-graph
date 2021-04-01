@@ -24,13 +24,14 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, 
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import skunk.Session
 
 trait ChangeStatusCommand[Interpretation[_]] extends Product with Serializable with TypeSerializers {
   def eventId: CompoundEventId
   def status:  EventStatus
-  def queries: NonEmptyList[SqlQuery[Int]]
+  def queries: NonEmptyList[SqlQuery[Interpretation, Int]]
   def updateGauges(updateResult: UpdateResult)(implicit
-      transactor:                SessionResource[Interpretation, EventLogDB]
+      session:                   Session[Interpretation]
   ): Interpretation[Unit]
 
   def maybeProcessingTime: Option[EventProcessingTime]

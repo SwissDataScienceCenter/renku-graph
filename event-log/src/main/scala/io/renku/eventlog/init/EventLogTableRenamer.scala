@@ -18,35 +18,37 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
-import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 private trait EventLogTableRenamer[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object EventLogTableRenamer {
-  def apply[Interpretation[_]](
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
   )(implicit ME:  Bracket[Interpretation, Throwable]): EventLogTableRenamer[Interpretation] =
     new EventLogTableRenamerImpl(transactor, logger)
 }
 
-private class EventLogTableRenamerImpl[Interpretation[_]](
+private class EventLogTableRenamerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
 )(implicit ME:  Bracket[Interpretation, Throwable])
     extends EventLogTableRenamer[Interpretation]
-    with EventTableCheck[Interpretation] {
+    with EventTableCheck {
 
-  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
+  implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
-  override def run(): Interpretation[Unit] =
+  override def run(): Interpretation[Unit] = transactor.use { implicit session =>
     checkOldTableExists flatMap {
       case false => logger info "'event' table already exists"
       case true =>
@@ -55,21 +57,21 @@ private class EventLogTableRenamerImpl[Interpretation[_]](
           otherwise = renameTable()
         )
     }
+  }
 
-  private def checkOldTableExists: Interpretation[Boolean] =
-    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
-      .query[Boolean]
-      .unique
-      .transact(transactor.resource)
-      .recover { case _ => false }
+  private def checkOldTableExists(implicit session: Session[Interpretation]): Interpretation[Boolean] = {
+    val query: Query[Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
+      .query(bool)
+    session.unique(query).recover { case _ => false }
+  }
 
-  private def renameTable() = for {
-    _ <- execute(sql"ALTER TABLE event_log RENAME TO event")
+  private def renameTable()(implicit session: Session[Interpretation]) = for {
+    _ <- execute(sql"ALTER TABLE event_log RENAME TO event".command)
     _ <- logger info "'event_log' table renamed to 'event'"
   } yield ()
 
-  private def dropOldTable() = for {
-    _ <- execute(sql"DROP TABLE IF EXISTS event_log")
+  private def dropOldTable()(implicit session: Session[Interpretation]) = for {
+    _ <- execute(sql"DROP TABLE IF EXISTS event_log".command)
     _ <- logger info "'event_log' table dropped"
   } yield ()
 }

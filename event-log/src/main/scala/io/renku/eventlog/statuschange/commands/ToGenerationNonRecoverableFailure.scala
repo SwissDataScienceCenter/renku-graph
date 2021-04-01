@@ -20,57 +20,69 @@ package io.renku.eventlog.statuschange.commands
 
 import cats.MonadError
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Bracket, Sync}
+import cats.effect.{Async, Bracket, Sync}
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.{EventLogDB, EventMessage}
+import io.renku.eventlog.{EventLogDB, EventMessage, ExecutionDate}
 import org.http4s.{MediaType, Request}
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 import java.time.Instant
 
-final case class ToGenerationNonRecoverableFailure[Interpretation[_]](
+final case class ToGenerationNonRecoverableFailure[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     eventId:                     CompoundEventId,
     message:                     EventMessage,
     underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
     maybeProcessingTime:         Option[EventProcessingTime],
     now:                         () => Instant = () => Instant.now
-)(implicit ME:                   Bracket[Interpretation, Throwable])
-    extends ChangeStatusCommand[Interpretation] {
+) extends ChangeStatusCommand[Interpretation] {
 
   override lazy val status: EventStatus = GenerationNonRecoverableFailure
 
-  override def queries: NonEmptyList[SqlQuery[Int]] = NonEmptyList.of(
+  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList.of(
     SqlQuery(
-      sql"""|UPDATE event 
-            |SET status = $status, execution_date = ${now()}, message = $message
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${GeneratingTriples: EventStatus}
-            |""".stripMargin.update.run,
+      Kleisli { session =>
+        val query: Command[EventStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ EventStatus] =
+          sql"""UPDATE event 
+                SET status = $eventStatusPut, execution_date = $executionDatePut, message = $eventMessagePut
+                WHERE event_id = $eventIdPut AND project_id = $projectIdPut AND status = $eventStatusPut
+             """.command
+        session
+          .prepare(query)
+          .use(_.execute(status ~ ExecutionDate(now()) ~ message ~ eventId.id ~ eventId.projectId ~ GeneratingTriples))
+          .map {
+            case Completion.Update(n) => n
+            case completion =>
+              throw new RuntimeException(
+                s"generating_triples->generation_non_recoverable_fail time query failed with completion status $completion"
+              )
+          }
+      },
       name = "generating_triples->generation_non_recoverable_fail"
     )
   )
 
   override def updateGauges(
-      updateResult:      UpdateResult
-  )(implicit transactor: SessionResource[Interpretation, EventLogDB]): Interpretation[Unit] = updateResult match {
+      updateResult:   UpdateResult
+  )(implicit session: Session[Interpretation]): Interpretation[Unit] = updateResult match {
     case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesGenerationGauge.decrement
-    case _                    => ME.unit
+    case _                    => ().pure[Interpretation]
   }
 }
 
 object ToGenerationNonRecoverableFailure {
 
-  def factory[Interpretation[_]: Sync](
+  def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
-  )(implicit
-      ME: MonadError[Interpretation, Throwable]
   ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
     Kleisli { case (eventId, request) =>
       when(request, has = MediaType.application.json) {

@@ -24,6 +24,7 @@ import ch.datascience.db.SessionResource
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import io.chrisdavenport.log4cats.Logger
 import skunk.Command
+import skunk.data.Completion
 import skunk.implicits._
 
 private trait DuplicateProjectsRemover[Interpretation[_]] {
@@ -66,7 +67,7 @@ private class DuplicateProjectsRemoverImpl[Interpretation[_]: Bracket[*[_], Thro
         for {
           sp <- xa.savepoint
           _ <- session.execute(query).recoverWith { case e =>
-                 xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
+                 xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Completion])
                }
 
         } yield ()

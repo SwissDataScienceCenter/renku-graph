@@ -20,16 +20,11 @@ package io.renku.eventlog
 
 import cats.effect.Bracket
 import cats.syntax.all._
-import ch.datascience.db.SessionResource
-import doobie.implicits._
-import doobie.util.fragment.Fragment
+import skunk._
 
 package object init {
 
-  def execute[Interpretation[_]](
-      sql: Fragment
-  )(implicit
-      transactor: SessionResource[Interpretation, EventLogDB],
-      ME:         Bracket[Interpretation, Throwable]
-  ): Interpretation[Unit] = sql.update.run.transact(transactor.resource).void
+  def execute[Interpretation[_]: Bracket[*[_], Throwable]](sql: Command[Void])(implicit
+      session: Session[Interpretation]
+  ): Interpretation[Unit] = session.execute(sql).void
 }

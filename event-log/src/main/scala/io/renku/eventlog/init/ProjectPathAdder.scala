@@ -18,16 +18,20 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import doobie.implicits._
 import io.chrisdavenport.log4cats.Logger
 import io.circe.parser._
 import io.circe.{Decoder, HCursor}
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
+import skunk.data.Completion
 
 import scala.util.control.NonFatal
 
@@ -36,66 +40,75 @@ private trait ProjectPathAdder[Interpretation[_]] {
 }
 
 private object ProjectPathAdder {
-  def apply[Interpretation[_]](
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): ProjectPathAdder[Interpretation] =
+  ): ProjectPathAdder[Interpretation] =
     new ProjectPathAdderImpl(transactor, logger)
 }
 
-private class ProjectPathAdderImpl[Interpretation[_]](
+private class ProjectPathAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends ProjectPathAdder[Interpretation]
-    with EventTableCheck[Interpretation] {
+) extends ProjectPathAdder[Interpretation]
+    with EventTableCheck
+    with TypeSerializers {
 
   private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
-  override def run(): Interpretation[Unit] =
+  override def run(): Interpretation[Unit] = transactor.use { implicit session =>
     whenEventTableExists(
       logger info "'project_path' column adding skipped",
       otherwise = checkColumnExists flatMap {
-        case true  => logger info "'project_path' column exists"
-        case false => addColumn()
+        case true => logger info "'project_path' column exists"
+        case false =>
+          session.transaction.use { xa =>
+            for {
+              sp <- xa.savepoint
+              _ <- addColumn recoverWith { e =>
+                     xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
+                   }
+            } yield ()
+          }
       }
     )
+  }
 
-  private def checkColumnExists: Interpretation[Boolean] =
-    sql"select project_path from event_log limit 1"
-      .query[String]
-      .option
-      .transact(transactor.resource)
+  private def checkColumnExists: Interpretation[Boolean] = transactor.use { session =>
+    val query: Query[Void, String] = sql"select project_path from event_log limit 1".query(varchar)
+    session
+      .option(query)
       .map(_ => true)
       .recover { case _ => false }
+  }
 
-  private def addColumn() = {
+  private def addColumn(implicit session: Session[Interpretation]) = {
     for {
-      _                  <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS project_path VARCHAR")
+      _                  <- execute(sql"ALTER TABLE event_log ADD COLUMN IF NOT EXISTS project_path VARCHAR".command)
       projectIdsAndPaths <- findDistinctProjects
       _                  <- updatePaths(projectIdsAndPaths)
-      _                  <- execute(sql"ALTER TABLE event_log ALTER COLUMN project_path SET NOT NULL")
-      _                  <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON event_log(project_path)")
+      _                  <- execute(sql"ALTER TABLE event_log ALTER COLUMN project_path SET NOT NULL".command)
+      _                  <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON event_log(project_path)".command)
       _                  <- logger.info("'project_path' column added")
     } yield ()
   } recoverWith logging
 
-  private def findDistinctProjects: Interpretation[List[(Id, Path)]] =
-    sql"select min(event_body) from event_log group by project_id;"
-      .query[String]
-      .to[List]
-      .transact(transactor.resource)
-      .flatMap(toListOfProjectIdAndPath)
+  private def findDistinctProjects(implicit session: Session[Interpretation]): Interpretation[List[(Id, Path)]] = {
+
+    val query: Query[Void, String] = sql"select min(event_body) from event_log group by project_id;".query(varchar)
+    session.execute(query).flatMap(toListOfProjectIdAndPath)
+  }
 
   private def toListOfProjectIdAndPath(bodies: List[String]): Interpretation[List[(Id, Path)]] =
     bodies.map(parseToProjectIdAndPath).sequence
 
-  private def parseToProjectIdAndPath(body: String): Interpretation[(Id, Path)] = ME.fromEither {
-    for {
-      json  <- parse(body)
-      tuple <- json.as[(Id, Path)]
-    } yield tuple
-  }
+  private def parseToProjectIdAndPath(body: String): Interpretation[(Id, Path)] =
+    Bracket[Interpretation, Throwable].fromEither {
+      for {
+        json  <- parse(body)
+        tuple <- json.as[(Id, Path)]
+      } yield tuple
+    }
 
   private implicit lazy val projectIdAndPathDecoder: Decoder[(Id, Path)] = (cursor: HCursor) =>
     for {
@@ -103,20 +116,24 @@ private class ProjectPathAdderImpl[Interpretation[_]](
       path <- cursor.downField("project").downField("path").as[Path]
     } yield id -> path
 
-  private def updatePaths(projectIdsAndPaths: List[(Id, Path)]): Interpretation[Unit] =
+  private def updatePaths(
+      projectIdsAndPaths: List[(Id, Path)]
+  )(implicit session:     Session[Interpretation]): Interpretation[Unit] =
     projectIdsAndPaths
       .map(toSqlUpdate)
       .sequence
       .map(_ => ())
 
-  private def toSqlUpdate: ((Id, Path)) => Interpretation[Unit] = { case (projectId, projectPath) =>
-    sql"update event_log set project_path = ${projectPath.value} where project_id = ${projectId.value}".update.run
-      .transact(transactor.resource)
-      .map(_ => ())
+  private def toSqlUpdate(implicit session: Session[Interpretation]): ((Id, Path)) => Interpretation[Unit] = {
+    case (projectId, projectPath) =>
+      val query: Command[projects.Path ~ projects.Id] =
+        sql"update event_log set project_path = $projectPathPut where project_id = $projectIdPut".command
+      session.prepare(query).use(_.execute(projectPath ~ projectId)).void
   }
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)("'project_path' column adding failure")
-    ME.raiseError(exception)
+    logger
+      .error(exception)("'project_path' column adding failure")
+      .flatMap(_ => exception.raiseError[Interpretation, Unit])
   }
 }

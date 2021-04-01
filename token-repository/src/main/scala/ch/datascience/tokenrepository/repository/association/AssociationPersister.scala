@@ -61,48 +61,39 @@ private class AssociationPersister[Interpretation[_]: Async: Monad](
       case false => insert(projectId, projectPath, encryptedToken)(session)
     }
 
-  private def checkIfTokenExists(projectPath: Path)(session: Session[Interpretation]) = measureExecutionTime(
-    {
-      val query: Query[Void, String] =
-        sql"SELECT token FROM projects_tokens WHERE project_path = #${projectPath.value}".query(varchar)
-      SqlQuery(
-        Kleisli(_.option(query).map(_.isDefined)),
-        name = "associate token - check"
-      )
-    },
-    session
-  )
+  private def checkIfTokenExists(projectPath: Path)(implicit session: Session[Interpretation]) = measureExecutionTime {
+    val query: Query[Void, String] =
+      sql"SELECT token FROM projects_tokens WHERE project_path = #${projectPath.value}".query(varchar)
+    SqlQuery(
+      Kleisli(_.option(query).map(_.isDefined)),
+      name = "associate token - check"
+    )
+  }
 
-  private def update(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken)(
+  private def update(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken)(implicit
       session:                  Session[Interpretation]
-  ) = measureExecutionTime(
-    {
-      val query: Command[Void] = sql"""UPDATE projects_tokens
+  ) = measureExecutionTime {
+    val query: Command[Void] = sql"""UPDATE projects_tokens
           SET token = #${encryptedToken.value}, project_id = #${projectId.value.toString}
           WHERE project_path = #${projectPath.value} """.command
-      SqlQuery(
-        Kleisli(_.execute(query).map(failIfMultiUpdate(projectId, projectPath))),
-        name = "associate token - update"
-      )
-    },
-    session
-  )
+    SqlQuery(
+      Kleisli(_.execute(query).map(failIfMultiUpdate(projectId, projectPath))),
+      name = "associate token - update"
+    )
+  }
 
-  private def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken)(
+  private def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken)(implicit
       session:                  Session[Interpretation]
-  ) = measureExecutionTime(
-    {
-      val query: Command[Void] = sql"""INSERT INTO
+  ) = measureExecutionTime {
+    val query: Command[Void] = sql"""INSERT INTO
           projects_tokens (project_id, project_path, token)
           VALUES (#${projectId.value.toString}, #${projectPath.value}, #${encryptedToken.value})
       """.command
-      SqlQuery(
-        Kleisli(_.execute(query).map(failIfMultiUpdate(projectId, projectPath))),
-        name = "associate token - insert"
-      )
-    },
-    session
-  )
+    SqlQuery(
+      Kleisli(_.execute(query).map(failIfMultiUpdate(projectId, projectPath))),
+      name = "associate token - insert"
+    )
+  }
 
   private def failIfMultiUpdate(projectId: Id, projectPath: Path): Completion => Unit = {
     case Update(1) => ()

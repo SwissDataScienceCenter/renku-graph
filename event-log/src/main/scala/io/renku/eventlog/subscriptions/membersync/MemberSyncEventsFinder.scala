@@ -18,84 +18,124 @@
 
 package io.renku.eventlog.subscriptions.membersync
 
-import cats.effect.{Bracket, ContextShift, IO}
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket, ContextShift, IO}
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
-import doobie.free.connection.ConnectionOp
 import eu.timepit.refined.api.Refined
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.{EventDate, EventLogDB}
 import io.renku.eventlog.subscriptions.{EventFinder, LastSyncedDate, SubscriptionTypeSerializers}
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 import java.time.Instant
 
-private class MemberSyncEventFinderImpl(transactor:       SessionResource[IO, EventLogDB],
-                                        queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-                                        now:              () => Instant = () => Instant.now
-)(implicit ME:                                            Bracket[IO, Throwable], contextShift: ContextShift[IO])
-    extends DbClient(Some(queriesExecTimes))
-    with EventFinder[IO, MemberSyncEvent]
+private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
+    transactor:       SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
+    now:              () => Instant = () => Instant.now
+) extends DbClient(Some(queriesExecTimes))
+    with EventFinder[Interpretation, MemberSyncEvent]
     with SubscriptionTypeSerializers {
 
-  import cats.free.Free
-  import doobie.implicits._
+  override def popEvent(): Interpretation[Option[MemberSyncEvent]] = transactor.use { implicit session =>
+    session.transaction.use { transaction =>
+      for {
+        sp <- transaction.savepoint
+        result <- findEventAndMarkTaken recoverWith { error =>
+                    transaction.rollback(sp).flatMap(_ => error.raiseError[Interpretation, Option[MemberSyncEvent]])
+                  }
+      } yield result
+    }
+  }
 
-  override def popEvent(): IO[Option[MemberSyncEvent]] = findEventAndMarkTaken() transact transactor.resource
-
-  private def findEventAndMarkTaken() =
-    findEvent() flatMap {
+  private def findEventAndMarkTaken(implicit session: Session[Interpretation]) =
+    findEvent flatMap {
       case Some((projectId, maybeSyncedDate, event)) =>
         setSyncDate(projectId, maybeSyncedDate) map toNoneIfEventAlreadyTaken(event)
-      case None => Free.pure[ConnectionOp, Option[MemberSyncEvent]](None)
+      case None => Option.empty[MemberSyncEvent].pure[Interpretation]
     }
 
-  private def findEvent() = measureExecutionTime {
-    SqlQuery(
-      sql"""|SELECT proj.project_id, sync_time.last_synced, proj.project_path
-            |FROM project proj
-            |LEFT JOIN subscription_category_sync_time sync_time 
-            |  ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryName
-            |WHERE
-            |  sync_time.last_synced IS NULL
-            |  OR (
-            |       ((${now()} - proj.latest_event_date) < INTERVAL '1 hour' AND (${now()} - sync_time.last_synced) > INTERVAL '1 minute')
-            |    OR ((${now()} - proj.latest_event_date) < INTERVAL '1 day'  AND (${now()} - sync_time.last_synced) > INTERVAL '1 hour')
-            |    OR ((${now()} - proj.latest_event_date) > INTERVAL '1 day'  AND (${now()} - sync_time.last_synced) > INTERVAL '1 day')
-            |  )
-            |ORDER BY proj.latest_event_date DESC 
-            |LIMIT 1
-      """.stripMargin
-        .query[(projects.Id, Option[LastSyncedDate], MemberSyncEvent)]
-        .option,
+  private def findEvent(implicit session: Session[Interpretation]) = measureExecutionTime {
+    SqlQuery[Interpretation, Option[(projects.Id, Option[LastSyncedDate], MemberSyncEvent)]](
+      Kleisli { session =>
+        val query
+            : Query[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
+                    (projects.Id, Option[LastSyncedDate], MemberSyncEvent)
+            ] = sql"""SELECT proj.project_id, sync_time.last_synced, proj.project_path
+                  FROM project proj
+                  LEFT JOIN subscription_category_sync_time sync_time
+                    ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNamePut
+                  WHERE
+                    sync_time.last_synced IS NULL
+                    OR (
+                         (($eventDatePut - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 minute')
+                      OR (($eventDatePut - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 hour')
+                      OR (($eventDatePut - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 day')
+                    )
+                  ORDER BY proj.latest_event_date DESC
+                  LIMIT 1
+      """.query(projectIdGet ~ lastSyncedDateGet.opt ~ projectPathGet)
+          .map { case id ~ maybeDate ~ path => (id, maybeDate, MemberSyncEvent(path)) }
+        val eventDate    = EventDate(now())
+        val lastSyncDate = LastSyncedDate(now())
+        session
+          .prepare(query)
+          .use(_.option(categoryName ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate))
+
+      },
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event")
     )
   }
 
-  private def setSyncDate(projectId: projects.Id, maybeSyncedDate: Option[LastSyncedDate]) =
+  private def setSyncDate(projectId: projects.Id, maybeSyncedDate: Option[LastSyncedDate])(implicit
+      session:                       Session[Interpretation]
+  ) =
     if (maybeSyncedDate.isDefined) updateLastSyncedDate(projectId)
     else insertLastSyncedDate(projectId)
 
-  private def updateLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
-    SqlQuery(
-      sql"""|UPDATE subscription_category_sync_time 
-            |SET last_synced = ${now()}
-            |WHERE project_id = $projectId AND category_name = $categoryName
-            |""".stripMargin.update.run,
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced")
-    )
-  }
+  private def updateLastSyncedDate(projectId: projects.Id)(implicit session: Session[Interpretation]) =
+    measureExecutionTime {
+      SqlQuery(
+        Kleisli { session =>
+          val query: Command[LastSyncedDate ~ projects.Id ~ CategoryName] =
+            sql"""
+            UPDATE subscription_category_sync_time
+            SET last_synced = $lastSyncedDatePut
+            WHERE project_id = $projectIdPut AND category_name = $categoryNamePut
+            """.command
+          session.prepare(query).use(_.execute(LastSyncedDate(now()) ~ projectId ~ categoryName)).map {
+            case Completion.Update(n) => n
+            case _                    => 0 // TODO verify if the default value is relevant or if we should throw an error
+          }
+        },
+        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced")
+      )
+    }
 
-  private def insertLastSyncedDate(projectId: projects.Id) = measureExecutionTime {
-    SqlQuery(
-      sql"""|INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
-            |VALUES ($projectId, $categoryName, ${now()})
-            |ON CONFLICT (project_id, category_name)
-            |DO 
-            |  UPDATE SET last_synced = EXCLUDED.last_synced
-            |""".stripMargin.update.run,
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced")
-    )
-  }
+  private def insertLastSyncedDate(projectId: projects.Id)(implicit session: Session[Interpretation]) =
+    measureExecutionTime {
+      SqlQuery(
+        Kleisli { session =>
+          val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] = sql"""
+            INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
+            VALUES ($projectIdPut, $categoryNamePut, $lastSyncedDatePut)
+            ON CONFLICT (project_id, category_name)
+            DO
+              UPDATE SET last_synced = EXCLUDED.last_synced
+            """.command
+          session.prepare(query).use(_.execute(projectId ~ categoryName ~ LastSyncedDate(now()))).map {
+            case Completion.Insert(n) => n
+            case _                    => 0 // TODO verify if the default value is relevant or if we should throw an error
+          }
+        },
+        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced")
+      )
+    }
 
   private def toNoneIfEventAlreadyTaken(event: MemberSyncEvent): Int => Option[MemberSyncEvent] = {
     case 0 => None

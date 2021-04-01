@@ -18,59 +18,63 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.effect.{Async, Bracket}
 import ch.datascience.db.SessionResource
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 private trait EventPayloadSchemaVersionAdder[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
 private object EventPayloadSchemaVersionAdder {
-  def apply[Interpretation[_]](
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): EventPayloadSchemaVersionAdder[Interpretation] =
+  ): EventPayloadSchemaVersionAdder[Interpretation] =
     new EventPayloadSchemaVersionAdderImpl(transactor, logger)
 }
 
-private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]](
+private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventPayloadSchemaVersionAdder[Interpretation]
-    with EventTableCheck[Interpretation] {
+) extends EventPayloadSchemaVersionAdder[Interpretation]
+    with EventTableCheck {
 
   import cats.syntax.all._
-  import doobie.implicits._
 
-  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
-
-  override def run(): Interpretation[Unit] =
+  override def run(): Interpretation[Unit] = transactor.use { implicit session =>
     checkTableExists flatMap {
-      case true  => alterTable
-      case false => ME.raiseError(new Exception("Event payload table missing; alteration is not possible"))
+      case true => alterTable
+      case false =>
+        new Exception("Event payload table missing; alteration is not possible").raiseError[Interpretation, Unit]
     }
+  }
+// TODO verify if transaction is needed
+  private def checkTableExists(implicit session: Session[Interpretation]): Interpretation[Boolean] = {
+    val query: Query[Void, Boolean] =
+      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
+        .query(bool)
 
-  private def checkTableExists: Interpretation[Boolean] =
-    sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
-      .query[Boolean]
-      .unique
-      .transact(transactor.resource)
-      .recover { case _ => false }
+    session.unique(query).recover { case _ => false }
+  }
 
-  private def alterTable = for {
-    _ <- alterTableSql.update.run transact transactor.resource
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_schema_version ON event_payload(schema_version)")
-    _ <- logger info "'event_payload' table altered"
-  } yield ()
+  private def alterTable = transactor.use { implicit session =>
+    for {
+      _ <- session.execute(alterTableSql)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_schema_version ON event_payload(schema_version)".command)
+      _ <- logger info "'event_payload' table altered"
+    } yield ()
+  }
 
-  private lazy val alterTableSql = sql"""
+  private lazy val alterTableSql: Command[Void] = sql"""
     ALTER TABLE event_payload
     ALTER COLUMN payload SET NOT NULL,
     ADD COLUMN IF NOT EXISTS schema_version text NOT NULL,
     DROP CONSTRAINT IF EXISTS event_payload_pkey,
     ADD PRIMARY KEY (event_id, project_id, schema_version)
-    """
+    """.command
 }
