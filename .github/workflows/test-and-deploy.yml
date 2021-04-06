@@ -95,7 +95,7 @@ jobs:
         RANCHER_PROJECT_ID: ${{ secrets.CI_RANCHER_PROJECT }}
         RENKU_RELEASE: renku-kg
         RENKU_VALUES_FILE: "${{ github.workspace }}/values.yaml"
-        RENKU_VALUES: ${{ secrets.CI_RENKU_VALUES }}
+        RENKU_VALUES: ${{ secrets.CI_RENKU_KG_VALUES }}
         RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
         RENKUBOT_RANCHER_BEARER_TOKEN: ${{ secrets.RENKUBOT_RANCHER_BEARER_TOKEN }}
         RENKU_BOT_DEV_PASSWORD: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
