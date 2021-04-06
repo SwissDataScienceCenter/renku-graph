@@ -201,7 +201,7 @@ writeVersionToChart := {
 def readTag: String = {
   val tag = Vcs
     .detect(root.base)
-    .map(_.cmd("describe").!!.trim)
+    .map(_.cmd("describe", "--tags").!!.trim)
     .getOrElse(sys.error("Release Tag cannot be checked"))
 
   if (tag.matches("\\d+\\.\\d+\\.\\d+")) tag
