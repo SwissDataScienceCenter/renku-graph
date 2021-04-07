@@ -41,7 +41,7 @@ import io.renku.jsonld.{EntityId, EntityTypes, JsonLDEncoder}
 
 import scala.language.postfixOps
 
-sealed abstract class CommandParameter(val maybePrefix: Option[Prefix], val runPlan: Entity with RunPlan) {
+sealed abstract class CommandParameter(val maybePrefix: Option[Prefix], val runPlan: RunPlan) {
   val value: Value
 }
 
@@ -130,8 +130,8 @@ object CommandParameter {
   }
 
   sealed abstract class EntityCommandParameter(override val maybePrefix: Option[Prefix],
-                                               override val runPlan:     Entity with RunPlan,
-                                               val entity:               Entity with Artifact
+                                               override val runPlan:     RunPlan,
+                                               val entity:               Entity
   ) extends CommandParameter(maybePrefix, runPlan) {
     override lazy val value: Value = Value(entity.location)
   }
@@ -165,7 +165,7 @@ object CommandParameter {
 
   object Argument {
 
-    trait ArgumentFactory extends (Position => Entity with RunPlan => CommandParameter with Argument)
+    trait ArgumentFactory extends (Position => RunPlan => CommandParameter with Argument)
 
     def factory(maybePrefix: Option[Prefix] = None): ArgumentFactory =
       position => runPlan => new Argument(position, maybePrefix, runPlan)
@@ -215,16 +215,11 @@ object CommandParameter {
     sealed trait InputFactory
 
     object InputFactory {
-      trait ActivityPositionInputFactory
-          extends InputFactory
-          with (Activity => Position => Entity with RunPlan => EntityCommandParameter with Input with PositionInfo)
-      trait PositionInputFactory
-          extends InputFactory
-          with (Position => Entity with RunPlan => EntityCommandParameter with Input)
+      trait PositionInputFactory extends InputFactory with (Position => RunPlan => EntityCommandParameter with Input)
       trait MappedInputFactory
           extends InputFactory
           with (Entity with RunPlan => EntityCommandParameter with Input with InputMapping)
-      trait NoPositionInputFactory extends InputFactory with (Entity with RunPlan => EntityCommandParameter with Input)
+      trait NoPositionInputFactory extends InputFactory with (RunPlan => EntityCommandParameter with Input)
     }
 
     def from(entity: Entity with Artifact): PositionInputFactory =
@@ -271,18 +266,6 @@ object CommandParameter {
           protected override val identifier: String       = randomUUID().toString
           override val maybeStep:            Option[Step] = maybeUsedIn
         }
-
-    def factory(entityFactory: Activity => Entity with Artifact,
-                maybePrefix:   Option[Prefix] = None
-    ): ActivityPositionInputFactory =
-      activity =>
-        positionArg =>
-          runPlan =>
-            new EntityCommandParameter(maybePrefix, runPlan, entityFactory(activity)) with Input with PositionInfo {
-              protected override val identifier: String       = positionArg.toString
-              override val maybeStep:            Option[Step] = None
-              override val position:             Position     = positionArg
-            }
 
     private implicit def converter(implicit
         renkuBaseUrl:  RenkuBaseUrl,
@@ -353,23 +336,19 @@ object CommandParameter {
     object OutputFactory {
       trait PositionOutputFactory
           extends OutputFactory
-          with (Activity => Position => Entity with RunPlan => CommandParameter with Output with PositionInfo)
-      trait MappedOutputFactory
-          extends OutputFactory
-          with (Activity => Entity with RunPlan => CommandParameter with Output with OutputMapping)
-      trait NoPositionOutputFactory
-          extends OutputFactory
-          with (Activity => Entity with RunPlan => CommandParameter with Output)
+          with (Position => RunPlan => CommandParameter with Output with PositionInfo)
+      trait MappedOutputFactory     extends OutputFactory with (RunPlan => CommandParameter with Output with OutputMapping)
+      trait NoPositionOutputFactory extends OutputFactory with (RunPlan => CommandParameter with Output)
     }
 
-    def factory(entityFactory: Activity => Entity with Artifact): PositionOutputFactory =
+    def factory(entityFactory: Activity => Entity): PositionOutputFactory =
       factory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = None)
 
-    def factory(entityFactory: Activity => Entity with Artifact, producedBy: Step): PositionOutputFactory =
+    def factory(entityFactory: Activity => Entity, producedBy: Step): PositionOutputFactory =
       factory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = producedBy.some)
 
     def factory(
-        entityFactory:   Activity => Entity with Artifact,
+        entityFactory:   Activity => Entity,
         maybePrefix:     Option[Prefix],
         folderCreation:  FolderCreation,
         maybeProducedBy: Option[Step]
@@ -385,13 +364,13 @@ object CommandParameter {
             }
 
     def streamFactory(
-        entityFactory: Activity => Entity with Artifact,
+        entityFactory: Activity => Entity,
         to:            IOStream.Out
     ): MappedOutputFactory =
       streamFactory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = None, to)
 
     def streamFactory(
-        entityFactory:   Activity => Entity with Artifact,
+        entityFactory:   Activity => Entity,
         maybePrefix:     Option[Prefix],
         folderCreation:  FolderCreation,
         maybeProducedBy: Option[Step],
@@ -406,11 +385,11 @@ object CommandParameter {
             override val mappedTo:             IOStream.Out   = to
           }
 
-    def withoutPositionFactory(entityFactory: Activity => Entity with Artifact): NoPositionOutputFactory =
+    def withoutPositionFactory(entityFactory: Activity => Entity): NoPositionOutputFactory =
       withoutPositionFactory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = None)
 
     def withoutPositionFactory(
-        entityFactory:   Activity => Entity with Artifact,
+        entityFactory:   Activity => Entity,
         maybePrefix:     Option[Prefix],
         folderCreation:  FolderCreation,
         maybeProducedBy: Option[Step]
@@ -424,9 +403,8 @@ object CommandParameter {
           }
 
     private implicit def converter(implicit
-        renkuBaseUrl:  RenkuBaseUrl,
-        gitLabApiUrl:  GitLabApiUrl,
-        fusekiBaseUrl: FusekiBaseUrl
+        renkuBaseUrl: RenkuBaseUrl,
+        gitLabApiUrl: GitLabApiUrl
     ): PartialEntityConverter[CommandParameter with Output] =
       new PartialEntityConverter[CommandParameter with Output] {
         override def convert[T <: CommandParameter with Output]: T => Either[Exception, PartialEntity] = {

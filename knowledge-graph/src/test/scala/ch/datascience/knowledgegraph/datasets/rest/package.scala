@@ -96,8 +96,8 @@ package object rest {
       dataSet.usedIn match {
         case firstProject :: otherProjects =>
           val firstTuple = nonModifiedDataSetCommit(
-            commitId = commitId,
-            committedDate = maybeCommittedDate.getOrElse(CommittedDate(firstDatasetDateCreated.value)),
+            activityId = commitId,
+            startTime = maybeCommittedDate.getOrElse(CommittedDate(firstDatasetDateCreated.value)),
             committer = Person(firstProject.created.agent.name, firstProject.created.agent.maybeEmail)
           )(
             projectPath = firstProject.path,
@@ -124,7 +124,7 @@ package object rest {
             val projectDateCreated = firstDatasetDateCreated.shiftToFuture
             val dataSetId          = datasetIdentifiers.generateOne
             nonModifiedDataSetCommit(
-              committedDate = CommittedDate(projectDateCreated.value)
+              startTime = CommittedDate(projectDateCreated.value)
             )(
               projectPath = project.path,
               projectName = project.name
@@ -241,8 +241,8 @@ package object rest {
       dataSet.usedIn match {
         case firstProject :: otherProjects =>
           val firstJsonLd = modifiedDataSetCommit(
-            commitId = commitId,
-            committedDate = CommittedDate(firstDatasetDateCreated.value),
+            activityId = commitId,
+            startTime = CommittedDate(firstDatasetDateCreated.value),
             committer = Person(firstProject.created.agent.name, firstProject.created.agent.maybeEmail)
           )(
             projectPath = firstProject.path,
@@ -268,7 +268,7 @@ package object rest {
             )
 
             modifiedDataSetCommit(
-              committedDate = CommittedDate(projectDateCreated.value)
+              startTime = CommittedDate(projectDateCreated.value)
             )(
               projectPath = project.path,
               projectName = project.name

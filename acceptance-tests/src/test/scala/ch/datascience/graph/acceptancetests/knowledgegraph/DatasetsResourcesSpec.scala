@@ -104,8 +104,8 @@ class DatasetsResourcesSpec
       Given("some data in the RDF Store")
       val jsonLDTriples = JsonLD.arr(
         nonModifiedDataSetCommit(
-          commitId = dataset1CommitId,
-          committedDate = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+          activityId = dataset1CommitId,
+          startTime = dataset1Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer = dataset1Committer,
           cliVersion = currentVersionPair.cliVersion
         )(
@@ -127,8 +127,8 @@ class DatasetsResourcesSpec
           datasetImages = dataset1.images
         ),
         nonModifiedDataSetCommit(
-          commitId = dataset2CommitId,
-          committedDate = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
+          activityId = dataset2CommitId,
+          startTime = dataset2Creation.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer = Person(dataset2Creation.agent.name, dataset2Creation.agent.maybeEmail),
           cliVersion = currentVersionPair.cliVersion
         )(
@@ -150,7 +150,7 @@ class DatasetsResourcesSpec
           datasetImages = dataset2.images
         ),
         modifiedDataSetCommit(
-          committedDate = modifiedDataset2.usedIn.head.created.date.toUnsafe(date => CommittedDate.from(date.value)),
+          startTime = modifiedDataset2.usedIn.head.created.date.toUnsafe(date => CommittedDate.from(date.value)),
           committer = Person(modifiedDataset2.usedIn.head.created.agent.name,
                              modifiedDataset2.usedIn.head.created.agent.maybeEmail
           ),
@@ -427,9 +427,9 @@ class DatasetsResourcesSpec
                         overriddenIdentifier: Option[Identifier] = None
     ): JsonLD =
       nonModifiedDataSetCommit(
-        commitId = commitId,
+        activityId = commitId,
         committer = committer,
-        committedDate = committedDate,
+        startTime = committedDate,
         cliVersion = currentVersionPair.cliVersion
       )(
         projectPath = project.path,

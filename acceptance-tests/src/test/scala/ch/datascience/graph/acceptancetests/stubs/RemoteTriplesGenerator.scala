@@ -50,7 +50,7 @@ object RemoteTriplesGenerator {
       project,
       commitId,
       fileCommit(
-        commitId = commitId,
+        activityId = commitId,
         committer = committer,
         cliVersion = cliVersion
       )(

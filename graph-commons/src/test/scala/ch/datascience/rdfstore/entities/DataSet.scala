@@ -28,13 +28,14 @@ import io.renku.jsonld.EntityId
 trait DataSet {
   self: Artifact with Entity =>
 
-  val datasetId:                         Identifier
-  val datasetTitle:                      Title
-  val datasetName:                       Name
-  val datasetUrl:                        Url
-  val maybeDatasetSameAs:                Option[SameAs]
-  val maybeDatasetDerivedFrom:           Option[DerivedFrom]
-  val maybeDatasetDescription:           Option[Description]
+  val datasetId:               Identifier
+  val datasetTitle:            Title
+  val datasetName:             Name
+  val datasetUrl:              Url
+  val maybeDatasetSameAs:      Option[SameAs]
+  val maybeDatasetDerivedFrom: Option[DerivedFrom]
+  val maybeDatasetDescription: Option[Description]
+
   val datasetDates:                      Dates
   val datasetCreators:                   Set[Person]
   val datasetParts:                      List[DataSetPartArtifact]
@@ -66,7 +67,7 @@ object DataSet {
 
   type DataSetEntity = Entity with DataSet with Artifact
 
-  def nonModifiedFactory(id:                         Identifier,
+  def nonModifiedFactory(identifier:                 Identifier,
                          title:                      Title,
                          name:                       Name,
                          url:                        Url,
@@ -80,13 +81,13 @@ object DataSet {
                          overrideTopmostSameAs:      Option[TopmostSameAs] = None,
                          overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   )(activity:                                        Activity): DataSetEntity =
-    new Entity(activity.commitId,
-               Location(".renku") / "datasets" / id,
+    new Entity(activity.id,
+               Location(".renku") / "datasets" / identifier,
                activity.project,
                maybeInvalidationActivity = None,
                maybeGeneration = None
     ) with DataSet with Artifact {
-      override val datasetId:                         Identifier                 = id
+      override val datasetId:                         Identifier                 = identifier
       override val datasetTitle:                      Title                      = title
       override val datasetName:                       Name                       = name
       override val datasetUrl:                        Url                        = url
@@ -102,7 +103,7 @@ object DataSet {
       override val overrideDatasetTopmostDerivedFrom: Option[TopmostDerivedFrom] = overrideTopmostDerivedFrom
     }
 
-  def modifiedFactory(id:                         Identifier,
+  def modifiedFactory(identifier:                 Identifier,
                       title:                      Title,
                       name:                       Name,
                       url:                        Url,
@@ -116,13 +117,13 @@ object DataSet {
                       overrideTopmostSameAs:      Option[TopmostSameAs] = None,
                       overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   )(activity:                                     Activity): DataSetEntity =
-    new Entity(activity.commitId,
-               Location(".renku") / "datasets" / overrideTopmostDerivedFrom.map(_.value).getOrElse(id.value),
+    new Entity(activity.id,
+               Location(".renku") / "datasets" / overrideTopmostDerivedFrom.map(_.value).getOrElse(identifier.value),
                activity.project,
                maybeInvalidationActivity = None,
                maybeGeneration = None
     ) with DataSet with Artifact {
-      override val datasetId:                         Identifier                 = id
+      override val datasetId:                         Identifier                 = identifier
       override val datasetTitle:                      Title                      = title
       override val datasetName:                       Name                       = name
       override val datasetUrl:                        Url                        = url

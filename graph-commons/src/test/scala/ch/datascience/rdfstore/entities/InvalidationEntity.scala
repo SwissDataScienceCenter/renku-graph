@@ -22,15 +22,16 @@ import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.Activity.Id
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, JsonLDEncoder}
 
 final case class InvalidationEntity(
-    override val commitId: CommitId,
-    entityIdToInvalidate:  String,
-    override val project:  Project,
-    invalidationActivity:  Activity
-) extends Entity(commitId,
+    override val id:      Id,
+    entityIdToInvalidate: String,
+    override val project: Project,
+    invalidationActivity: Activity
+) extends Entity(id,
                  Location(".renku") / "datasets" / entityIdToInvalidate / "metadata.yml",
                  project,
                  Some(invalidationActivity),
@@ -50,7 +51,7 @@ object InvalidationEntity {
         entity => PartialEntity(schema / "isPartOf" -> entity.project.asEntityId.asJsonLD).asRight
 
       override def toEntityId: InvalidationEntity => Option[EntityId] =
-        entity => (EntityId of fusekiBaseUrl / "blob" / entity.commitId / entity.location).some
+        entity => (EntityId of fusekiBaseUrl / "blob" / entity.id / entity.location).some
     }
 
   implicit def encoder(implicit

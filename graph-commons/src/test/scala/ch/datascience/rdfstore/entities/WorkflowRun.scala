@@ -18,15 +18,14 @@
 
 package ch.datascience.rdfstore.entities
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit._
-
 import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
-import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.rdfstore.FusekiBaseUrl
-import ch.datascience.rdfstore.entities.Association.WorkflowRunPlanAssociation
+import ch.datascience.rdfstore.entities.Activity.Id
 import ch.datascience.rdfstore.entities.ProcessRun.{ChildProcessRun, WorkflowProcessRun}
+
+import java.time.Instant
+import java.time.temporal.ChronoUnit._
 
 trait WorkflowRun {
   self: Activity with WorkflowProcessRun =>
@@ -42,8 +41,8 @@ object WorkflowRun {
   import io.renku.jsonld.syntax._
 
   def apply(
-      commitId:                 CommitId,
-      committedDate:            CommittedDate,
+      commitId:                 Id,
+      committedDate:            Activity.StartTime,
       committer:                Person,
       project:                  Project,
       agent:                    Agent,
@@ -90,7 +89,7 @@ object WorkflowRun {
           } yield PartialEntity(
             EntityTypes of (wfprov / "WorkflowRun"),
             reverse,
-            rdfs / "label" -> s"${entity.workflowRunFile}@${entity.commitId}".asJsonLD
+            rdfs / "label" -> s"${entity.workflowRunFile}@${entity.id}".asJsonLD
           )
 
       override lazy val toEntityId: Activity with WorkflowRun => Option[EntityId] = _ => None

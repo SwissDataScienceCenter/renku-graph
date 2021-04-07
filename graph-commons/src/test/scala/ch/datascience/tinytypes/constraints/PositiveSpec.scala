@@ -18,7 +18,7 @@
 
 package ch.datascience.tinytypes.constraints
 
-import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{IntTinyType, LongTinyType, TinyTypeFactory}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -49,5 +49,31 @@ class PositiveIntSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sho
 }
 
 private class PositiveIntTest private (val value: Int) extends AnyVal with IntTinyType
-
 private object PositiveIntTest extends TinyTypeFactory[PositiveIntTest](new PositiveIntTest(_)) with PositiveInt
+
+class PositiveLongSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
+
+  "PositiveLong" should {
+
+    "be instantiatable when values are greater than zero" in {
+      forAll(Gen.choose(1L, Long.MaxValue)) { someValue =>
+        PositiveLongTest(someValue).value shouldBe someValue
+      }
+    }
+
+    "throw an IllegalArgumentException for 0" in {
+      intercept[IllegalArgumentException](
+        PositiveLongTest(0)
+      ).getMessage shouldBe "ch.datascience.tinytypes.constraints.PositiveLongTest cannot be <= 0"
+    }
+
+    "throw an IllegalArgumentException for negative value" in {
+      intercept[IllegalArgumentException](
+        PositiveLongTest(-1)
+      ).getMessage shouldBe "ch.datascience.tinytypes.constraints.PositiveLongTest cannot be <= 0"
+    }
+  }
+}
+
+private class PositiveLongTest private (val value: Long) extends AnyVal with LongTinyType
+private object PositiveLongTest extends TinyTypeFactory[PositiveLongTest](new PositiveLongTest(_)) with PositiveLong

@@ -60,7 +60,7 @@ object EntityGenerators {
   ): Gen[InvalidationEntity] = for {
     activity <- activities(project)
   } yield InvalidationEntity(
-    activity.commitId,
+    activity.id,
     topmostDerivedFrom.map(_.value).getOrElse(datasetId.value),
     project,
     activity

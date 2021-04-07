@@ -47,11 +47,11 @@ class IOKGProjectFinderSpec
       forAll(kgProjects(parentsGen = emptyOptionOf[Parent])) { project =>
         val maybeProjectCreator = project.created.maybeCreator
         loadToStore(
-          fileCommit(commitId = commitIds.generateOne)(projectPath = projectPaths.generateOne,
-                                                       projectVersion = projectSchemaVersions.generateOne
+          fileCommit(activityId = commitIds.generateOne)(projectPath = projectPaths.generateOne,
+                                                         projectVersion = projectSchemaVersions.generateOne
           ),
           fileCommit(
-            commitId = commitIds.generateOne,
+            activityId = commitIds.generateOne,
             committedDate = CommittedDate(project.created.date.value)
           )(
             projectPath = project.path,
@@ -71,7 +71,7 @@ class IOKGProjectFinderSpec
       forAll(kgProjects(parentsGen = parents.toGeneratorOfSomes)) { project =>
         loadToStore(
           fileCommit(
-            commitId = commitIds.generateOne
+            activityId = commitIds.generateOne
           )(
             projectPath = project.path,
             projectName = project.name,

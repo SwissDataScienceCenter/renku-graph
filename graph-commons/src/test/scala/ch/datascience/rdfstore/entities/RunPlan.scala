@@ -18,7 +18,6 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.syntax.all._
 import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Argument.ArgumentFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
@@ -27,49 +26,71 @@ import ch.datascience.rdfstore.entities.CommandParameter.Output.OutputFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Output.OutputFactory._
 import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
 import ch.datascience.rdfstore.entities.CommandParameter._
-import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt}
+import ch.datascience.rdfstore.entities.RunPlan._
+import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt, UUID}
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
 
-import scala.language.postfixOps
+final class RunPlan private (val id:            Id,
+                             val command:       Command,
+                             argumentFactories: List[ArgumentFactory],
+                             inputFactories:    List[PositionInputFactory],
+                             outputFactories:   List[OutputFactory],
+                             val subprocesses:  List[RunPlan],
+                             val successCodes:  List[SuccessCode]
+) {
+  lazy val arguments: List[CommandParameter with Argument] = toArguments(argumentFactories)
+  lazy val inputs:    List[CommandParameter with Input]    = toInputParameters(inputFactories)
+  lazy val outputs:   List[CommandParameter with Output]   = toOutputParameters(outputFactories)
 
-sealed trait RunPlan {
-  self: Entity =>
-
-  import RunPlan._
-
-  val identifier: Identifier = Identifier.generate
-  val runArguments:      List[CommandParameter with Argument]
-  val runCommandInputs:  List[CommandParameter with Input]
-  val runCommandOutputs: List[CommandParameter with Output]
-  val runSuccessCodes:   List[SuccessCode]
-
-  def output(location: Location): Entity with Artifact =
-    runCommandOutputs
-      .flatMap {
-        case output: EntityCommandParameter with Output => Some(output.entity)
-        case _ => None
+  def output(location: Location): Entity =
+    outputs
+      .collect { case output: EntityCommandParameter with Output =>
+        output.entity
       }
       .find(_.location == location)
-      .getOrElse(throw new IllegalStateException(s"No output entity for $location on RunPlan for Activity $commitId"))
+      .getOrElse(throw new IllegalStateException(s"No output entity for $location on RunPlan for Activity $id"))
+
+  private def toArguments[T](factories: List[Position => RunPlan => T]): List[T] =
+    factories.zipWithIndex.map { case (factory, idx) =>
+      factory(Position(idx + 1))(this)
+    }
+
+  private def toInputParameters(factories: List[InputFactory]): List[CommandParameter with Input] = {
+    val offset = arguments.size
+
+    factories.zipWithIndex.map {
+      case (factory: PositionInputFactory, idx) => factory(Position(idx + offset + 1))(this)
+      case (factory: MappedInputFactory, _) => factory(this)
+      case (factory: NoPositionInputFactory, _) => factory(this)
+    }
+  }
+
+  private def toOutputParameters(factories: List[OutputFactory]): List[CommandParameter with Output] = {
+    val offset = arguments.size + inputs.size
+
+    factories.zipWithIndex.map {
+      case (factory: PositionOutputFactory, idx) => factory(Position(idx + offset + 1))(this)
+      case (factory: MappedOutputFactory, _) => factory(this)
+      case (factory: NoPositionOutputFactory, _) => factory(this)
+    }
+  }
 }
 
 object RunPlan {
 
-  final class Identifier private (val value: String) extends AnyVal with StringTinyType
-  implicit object Identifier extends TinyTypeFactory[Identifier](new Identifier(_)) with NonBlank {
-    import java.util.UUID.randomUUID
-    def generate: Identifier = Identifier(randomUUID.toString)
+  final class Id private (val value: String) extends AnyVal with StringTinyType
+  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID {
+
+    def generate: Id = Id {
+      java.util.UUID.randomUUID.toString
+    }
   }
 
-  sealed trait ProcessRunPlan extends RunPlan {
-    self: Entity =>
-    val runCommand: Command
-  }
+  final class Command private (val value: String) extends AnyVal with StringTinyType
+  object Command extends TinyTypeFactory[Command](new Command(_)) with NonBlank
 
-  sealed trait WorkflowRunPlan extends RunPlan {
-    self: Entity =>
-    val runSubprocesses: List[Entity with ProcessRunPlan]
-  }
+  final class SuccessCode private (val value: Int) extends AnyVal with IntTinyType
+  implicit object SuccessCode extends TinyTypeFactory[SuccessCode](new SuccessCode(_)) with NonNegativeInt
 
   import ch.datascience.graph.config.RenkuBaseUrl
   import ch.datascience.rdfstore.FusekiBaseUrl
@@ -78,201 +99,59 @@ object RunPlan {
   import io.renku.jsonld.syntax._
 
   def workflow(
-      arguments:    List[ArgumentFactory] = Nil,
-      inputs:       List[PositionInputFactory] = Nil,
-      outputs:      List[OutputFactory] = Nil,
-      subprocesses: List[Entity with ProcessRunPlan],
-      successCodes: List[SuccessCode] = Nil
-  )(project:        Project)(activity: Activity)(workflowFile: WorkflowFile): Entity with WorkflowRunPlan =
-    new Entity(activity.commitId, workflowFile, project, maybeInvalidationActivity = None, maybeGeneration = None)
-      with WorkflowRunPlan {
-      override val runArguments: List[Argument] = toParameters(arguments, this)
-      override val runCommandInputs: List[CommandParameter with Input] =
-        toParameters(inputs, offset = arguments.length, this)
-      override val runCommandOutputs: List[CommandParameter with Output] =
-        toOutputParameters(outputs, offset = arguments.length + inputs.length, this)(activity)
-      override val runSubprocesses: List[Entity with ProcessRunPlan] = subprocesses
-      override val runSuccessCodes: List[SuccessCode]                = successCodes
-    }
+      argumentFactories: List[ArgumentFactory] = Nil,
+      inputFactories:    List[PositionInputFactory] = Nil,
+      outputFactories:   List[OutputFactory] = Nil,
+      subprocesses:      List[RunPlan],
+      successCodes:      List[SuccessCode] = Nil
+  ): RunPlan = new RunPlan(Id.generate,
+                           Command("update"),
+                           argumentFactories,
+                           inputFactories,
+                           outputFactories,
+                           subprocesses,
+                           successCodes
+  )
 
   def process(
-      workflowFile: WorkflowFile,
-      command:      Command,
-      arguments:    List[ArgumentFactory] = Nil,
-      inputs:       List[InputFactory] = Nil,
-      outputs:      List[OutputFactory] = Nil,
-      successCodes: List[SuccessCode] = Nil
-  )(activity:       Activity): Entity with ProcessRunPlan =
-    new Entity(activity.commitId,
-               workflowFile,
-               activity.project,
-               maybeInvalidationActivity = None,
-               maybeGeneration = None
-    ) with ProcessRunPlan {
-      override val runCommand:   Command        = command
-      override val runArguments: List[Argument] = toParameters(arguments, this)
-      override val runCommandInputs: List[CommandParameter with Input] =
-        toInputParameters(inputs, offset = arguments.length, this)(activity)
-      override val runCommandOutputs: List[CommandParameter with Output] =
-        toOutputParameters(outputs, offset = arguments.length + inputs.length, this)(activity)
-      override val runSuccessCodes: List[SuccessCode] = successCodes
-    }
+      command:           Command,
+      argumentFactories: List[ArgumentFactory] = Nil,
+      inputFactories:    List[PositionInputFactory] = Nil,
+      outputFactories:   List[OutputFactory] = Nil,
+      successCodes:      List[SuccessCode] = Nil
+  ): RunPlan = new RunPlan(Id.generate,
+                           command,
+                           argumentFactories,
+                           inputFactories,
+                           outputFactories,
+                           subprocesses = Nil,
+                           successCodes
+  )
 
-  private def toParameters[T](factories: List[Position => Entity with RunPlan => T],
-                              runPlan:   Entity with RunPlan
-  ): List[T] =
-    factories.zipWithIndex.map { case (factory, idx) =>
-      factory(Position(idx + 1))(runPlan)
-    }
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[RunPlan] =
+    JsonLDEncoder.instance { entity =>
+      implicit lazy val subprocessEncoder: JsonLDEncoder[(RunPlan, Int)] =
+        JsonLDEncoder.instance[(RunPlan, Int)] { case (entity, idx) =>
+          JsonLD.entity(
+            id = entity.asEntityId / "subprocess" / (idx + 1),
+            types = EntityTypes of renku / "OrderedSubprocess",
+            renku / "index"   -> idx.asJsonLD,
+            renku / "process" -> entity.asJsonLD(encoder)
+          )
+        }
 
-  private def toParameters[T](factories: List[Position => Entity with RunPlan => T],
-                              offset:    Int,
-                              runPlan:   Entity with RunPlan
-  ): List[T] =
-    factories.zipWithIndex.map { case (factory, idx) =>
-      factory(Position(idx + offset + 1))(runPlan)
-    }
-
-  private def toOutputParameters(
-      factories: List[OutputFactory],
-      offset:    Int,
-      runPlan:   Entity with RunPlan
-  )(activity:    Activity): List[CommandParameter with Output] =
-    factories.zipWithIndex.map {
-      case (factory: PositionOutputFactory, idx) => factory(activity)(Position(idx + offset + 1))(runPlan)
-      case (factory: MappedOutputFactory, _) => factory(activity)(runPlan)
-      case (factory: NoPositionOutputFactory, _) => factory(activity)(runPlan)
-    }
-
-  private def toInputParameters(
-      factories: List[InputFactory],
-      offset:    Int,
-      runPlan:   Entity with RunPlan
-  )(activity:    Activity): List[CommandParameter with Input] =
-    factories.zipWithIndex.map {
-      case (factory: ActivityPositionInputFactory, idx) =>
-        factory(activity)(Position(idx + offset + 1))(runPlan)
-      case (factory: PositionInputFactory, idx) =>
-        factory(Position(idx + offset + 1))(runPlan)
-      case (factory: MappedInputFactory, _) => factory(runPlan)
-      case (factory: NoPositionInputFactory, _) => factory(runPlan)
-    }
-
-  private[entities] implicit def workflowRunPlanConverter(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): PartialEntityConverter[Entity with WorkflowRunPlan] = new PartialEntityConverter[Entity with WorkflowRunPlan] {
-    self =>
-    override def convert[T <: Entity with WorkflowRunPlan]: T => Either[Exception, PartialEntity] = { implicit entity =>
-      PartialEntity(
+      JsonLD.entity(
+        entity.asEntityId,
         EntityTypes.of(prov / "Plan", renku / "Run"),
-        renku / "hasArguments"  -> entity.runArguments.asJsonLD,
-        renku / "hasInputs"     -> entity.runCommandInputs.asJsonLD,
-        renku / "hasOutputs"    -> entity.runCommandOutputs.asJsonLD,
-        renku / "hasSubprocess" -> entity.runSubprocesses.zipWithIndex.asJsonLD,
-        renku / "successCodes"  -> entity.runSuccessCodes.asJsonLD
-      ).asRight
+        renku / "command"       -> entity.command.asJsonLD,
+        renku / "hasArguments"  -> entity.arguments.asJsonLD,
+        renku / "hasInputs"     -> entity.inputs.asJsonLD,
+        renku / "hasOutputs"    -> entity.outputs.asJsonLD,
+        renku / "hasSubprocess" -> entity.subprocesses.zipWithIndex.asJsonLD,
+        renku / "successCodes"  -> entity.successCodes.asJsonLD
+      )
     }
 
-    override def toEntityId: Entity with WorkflowRunPlan => Option[EntityId] =
-      entity => (EntityId of renkuBaseUrl / "runs" / entity.identifier).some
-
-    private implicit def subprocessEncoder(implicit
-        parentRunPlan: Entity with WorkflowRunPlan
-    ): JsonLDEncoder[(Entity with ProcessRunPlan, Int)] =
-      JsonLDEncoder.instance[(Entity with ProcessRunPlan, Int)] { case (entity, idx) =>
-        JsonLD.entity(
-          id = parentRunPlan
-            .getEntityId(self)
-            .map(_ / "subprocess" / (idx + 1))
-            .getOrElse(
-              throw new IllegalStateException(s"No entityId for WorkflowRunPlan with ${parentRunPlan.identifier}")
-            ),
-          types = EntityTypes of renku / "OrderedSubprocess",
-          renku / "index"   -> idx.asJsonLD,
-          renku / "process" -> entity.asJsonLD
-        )
-      }
-  }
-
-  private[entities] implicit def processRunPlanConverter(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): PartialEntityConverter[Entity with ProcessRunPlan] =
-    new PartialEntityConverter[Entity with ProcessRunPlan] {
-      override def convert[T <: Entity with ProcessRunPlan]: T => Either[Exception, PartialEntity] = { entity =>
-        PartialEntity(
-          EntityTypes.of(prov / "Plan", renku / "Run"),
-          renku / "command"      -> entity.runCommand.asJsonLD,
-          renku / "hasArguments" -> entity.runArguments.asJsonLD,
-          renku / "hasInputs"    -> entity.runCommandInputs.asJsonLD,
-          renku / "hasOutputs"   -> entity.runCommandOutputs.asJsonLD,
-          renku / "successCodes" -> entity.runSuccessCodes.asJsonLD
-        ).asRight
-      }
-
-      override def toEntityId: Entity with ProcessRunPlan => Option[EntityId] =
-        entity => (EntityId of renkuBaseUrl / "runs" / entity.identifier).some
-    }
-
-  private[entities] implicit def runPlanConverter(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): PartialEntityConverter[Entity with RunPlan] = new PartialEntityConverter[Entity with RunPlan] {
-    override def convert[T <: Entity with RunPlan]: T => Either[Exception, PartialEntity] = {
-      case rp: Entity with WorkflowRunPlan =>
-        implicitly[PartialEntityConverter[Entity with WorkflowRunPlan]].convert(rp)
-      case rp: Entity with ProcessRunPlan =>
-        implicitly[PartialEntityConverter[Entity with ProcessRunPlan]].convert(rp)
-    }
-
-    override def toEntityId: Entity with RunPlan => Option[EntityId] = {
-      case rp: Entity with WorkflowRunPlan =>
-        implicitly[PartialEntityConverter[Entity with WorkflowRunPlan]].toEntityId(rp)
-      case rp: Entity with ProcessRunPlan =>
-        implicitly[PartialEntityConverter[Entity with ProcessRunPlan]].toEntityId(rp)
-    }
-  }
-
-  implicit def workflowRUnPlanEncoder(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): JsonLDEncoder[Entity with WorkflowRunPlan] =
-    JsonLDEncoder.instance { entity =>
-      entity.asPartialJsonLD[Entity] combine entity.asPartialJsonLD[Entity with WorkflowRunPlan] getOrFail
-    }
-
-  implicit def processRunPlanEncoder(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): JsonLDEncoder[Entity with ProcessRunPlan] =
-    JsonLDEncoder.instance { entity =>
-      entity.asPartialJsonLD[Entity] combine entity.asPartialJsonLD[Entity with ProcessRunPlan] getOrFail
-    }
-
-  implicit class RunPlanOps(runPlan: RunPlan) {
-
-    def asUsages(activity: Activity, step: Step): List[Usage] =
-      runPlan.runCommandInputs.foldLeft(List.empty[Usage]) {
-        case (usages, input: EntityCommandParameter with Input) => usages :+ Usage.factory(activity, input)(step)
-        case (usages, _) => usages
-      }
-
-    def asUsages(activity: Activity): List[Usage] =
-      runPlan.runCommandInputs.foldLeft(List.empty[Usage]) {
-        case (usages, input: EntityCommandParameter with Input) => usages :+ Usage(activity, input)
-        case (usages, _) => usages
-      }
-  }
-
-  final class Command private (val value: String) extends AnyVal with StringTinyType
-  object Command extends TinyTypeFactory[Command](new Command(_)) with NonBlank
-
-  final class SuccessCode private (val value: Int) extends AnyVal with IntTinyType
-  implicit object SuccessCode extends TinyTypeFactory[SuccessCode](new SuccessCode(_)) with NonNegativeInt
+  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[RunPlan] =
+    EntityIdEncoder.instance(entity => EntityId of (renkuBaseUrl / "plans" / entity.id))
 }

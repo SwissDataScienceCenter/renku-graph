@@ -83,7 +83,7 @@ class LineageQuerySpec
       Given("some data in the RDF Store")
       `data in the RDF store`(
         project,
-        commitId,
+        activityId,
         committer,
         JsonLD.arr(jsons: _*)
       )()

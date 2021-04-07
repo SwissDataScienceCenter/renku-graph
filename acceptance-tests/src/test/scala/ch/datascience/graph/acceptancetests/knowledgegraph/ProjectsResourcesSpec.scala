@@ -120,7 +120,7 @@ class ProjectsResourcesSpec
 
       val parentProjectCommitter = persons.generateOne
       val jsonLDParentProjectTriples = JsonLD.arr(
-        nonModifiedDataSetCommit(commitId = parentProjectCommit, committer = parentProjectCommitter)(
+        nonModifiedDataSetCommit(activityId = parentProjectCommit, committer = parentProjectCommitter)(
           projectPath = parentProject.path,
           projectName = parentProject.name,
           projectDateCreated = parentProject.created.date,
@@ -137,7 +137,7 @@ class ProjectsResourcesSpec
 
       val jsonLDTriples = JsonLD.arr(
         nonModifiedDataSetCommit(
-          commitId = dataset1CommitId,
+          activityId = dataset1CommitId,
           committer = dataset1Committer,
           cliVersion = currentVersionPair.cliVersion
         )(

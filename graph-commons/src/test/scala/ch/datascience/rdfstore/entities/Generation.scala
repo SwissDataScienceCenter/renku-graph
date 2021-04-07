@@ -19,46 +19,46 @@
 package ch.datascience.rdfstore.entities
 
 import ch.datascience.graph.config.GitLabApiUrl
-import ch.datascience.rdfstore.entities.ProcessRun.ChildProcessRun
+import ch.datascience.rdfstore.entities.Generation.{Id, Role}
+import ch.datascience.rdfstore.entities.RunPlan.Id
+import ch.datascience.tinytypes.constraints.{NonBlank, UUID}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-final case class Generation(location:           Location,
-                            activity:           Activity,
-                            maybeReverseEntity: Option[Entity with Artifact] = None
-)
+// TODO: role to be taken from the RunPlan's output parameter
+final case class Generation(id: Id, activity: Activity, role: Role, entity: Entity)
 
 object Generation {
 
+  final class Id private (val value: String) extends AnyVal with StringTinyType
+  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID {
+    def generate: Id = Id {
+      java.util.UUID.randomUUID.toString
+    }
+  }
+
+  final class Role private (val value: String) extends AnyVal with StringTinyType
+  implicit object Role extends TinyTypeFactory[Role](new Role(_)) with NonBlank
+
   import ch.datascience.graph.config.RenkuBaseUrl
-  import ch.datascience.rdfstore.FusekiBaseUrl
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  def factory(entityFactory: Activity => Entity with Artifact): Activity => Generation = activity => {
-    val entity = entityFactory(activity)
-    Generation(entity.location, activity, Some(entity))
-  }
+  def factory(role: Role, entityFactory: Activity => Entity): Activity => Generation =
+    activity => Generation(Id.generate, activity, role, entityFactory(activity))
 
-  implicit def encoder(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): JsonLDEncoder[Generation] =
-    JsonLDEncoder.instance { entity =>
-      val maybeStep = entity.activity match {
-        case a: ChildProcessRun => Some(a.processRunStep)
-        case _ => None
-      }
-      val reverseEntity = entity.maybeReverseEntity
-        .flatMap { entity =>
-          Reverse.of(prov / "qualifiedGeneration" -> entity.asJsonLD).toOption
-        }
-        .getOrElse(Reverse.empty)
-
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Generation] =
+    JsonLDEncoder.instance { generation =>
       JsonLD.entity(
-        EntityId of fusekiBaseUrl / "activities" / "commit" / entity.activity.commitId / maybeStep / "tree" / entity.location,
+        generation.asEntityId,
         EntityTypes of prov / "Generation",
-        reverseEntity,
-        prov / "activity" -> entity.activity.asEntityId.asJsonLD
+        Reverse.ofJsonLDsUnsafe(prov / "qualifiedGeneration" -> generation.entity.asJsonLD),
+        prov / "activity" -> generation.activity.asEntityId.asJsonLD,
+        prov / "hadRole"  -> generation.role.asJsonLD
       )
     }
+
+  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Generation] =
+    EntityIdEncoder.instance(entity =>
+      entity.activity.asEntityId / "generation" / entity.id / entity.entity.checksum / entity.entity.location
+    )
 }

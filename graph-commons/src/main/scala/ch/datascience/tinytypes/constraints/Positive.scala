@@ -26,3 +26,10 @@ trait PositiveInt extends Constraints[Int] {
     message = _ => s"$typeName cannot be <= 0"
   )
 }
+
+trait PositiveLong extends Constraints[Long] {
+  addConstraint(
+    check = _ > 0,
+    message = _ => s"$typeName cannot be <= 0"
+  )
+}

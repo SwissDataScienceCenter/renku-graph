@@ -43,14 +43,14 @@ object DataSetPart {
   def factory(name: PartName, location: PartLocation, maybeUrl: Option[Url] = None)(
       activity:     Activity
   ): DataSetPartArtifact =
-    new Entity(activity.commitId,
+    new Entity(activity.id,
                Location(location.value),
                activity.project,
                maybeInvalidationActivity = None,
                maybeGeneration = None
     ) with Artifact with DataSetPart {
       override val partName:        PartName    = name
-      override val partDateCreated: DateCreated = DateCreated(activity.committedDate.value)
+      override val partDateCreated: DateCreated = DateCreated(activity.startTime.value)
       override val maybePartUrl:    Option[Url] = maybeUrl
     }
 

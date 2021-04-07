@@ -24,13 +24,13 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.{listOf, nonEmptySet, setOf}
 import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
-import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
+import ch.datascience.graph.model.EventsGenerators.activityIds
 import ch.datascience.graph.model.GraphModelGenerators._
-import ch.datascience.graph.model.datasets.{Dates, DerivedFrom, Description, Identifier, ImageUri, Keyword, Name, PartLocation, PartName, SameAs, Title, TopmostDerivedFrom, TopmostSameAs, Url}
-import ch.datascience.graph.model.events.{CommitId, CommittedDate}
-import ch.datascience.graph.model.projects.{DateCreated, Path, Visibility}
 import ch.datascience.graph.model._
+import ch.datascience.graph.model.datasets.{Dates, DerivedFrom, Description, Identifier, ImageUri, Keyword, Name, PartLocation, PartName, SameAs, Title, TopmostDerivedFrom, TopmostSameAs, Url}
+import ch.datascience.graph.model.projects.{DateCreated, Path, Visibility}
 import ch.datascience.rdfstore.FusekiBaseUrl
+import ch.datascience.rdfstore.entities.Activity.Id
 import ch.datascience.rdfstore.entities.CommandParameter.Mapping.IOStream
 import ch.datascience.rdfstore.entities.CommandParameter.PositionInfo.Position
 import ch.datascience.rdfstore.entities.CommandParameter._
@@ -53,6 +53,7 @@ object bundles extends Schemas {
     Project(
       path,
       projectNames.generateOne,
+      cliVersions.generateOne,
       projectCreatedDates.generateOne,
       projectCreators.generateOption,
       projectVisibilities.generateOption,
@@ -61,24 +62,26 @@ object bundles extends Schemas {
 
   def fileCommit(
       location:      Location = locations.generateOne,
-      commitId:      CommitId = commitIds.generateOne,
-      committedDate: CommittedDate = committedDates.generateOne,
+      activityId:    Id = activityIds.generateOne,
+      committedDate: Activity.StartTime = activityStartTimes.generateOne,
       committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
       cliVersion:    CliVersion = cliVersions.generateOne
   )(
       projectPath:         Path = projectPaths.generateOne,
       projectName:         projects.Name = projectNames.generateOne,
+      agent:               CliVersion = cliVersions.generateOne,
       projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
       maybeVisibility:     Option[Visibility] = None,
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeParent:         Option[Project] = None,
       projectVersion:      SchemaVersion
   )(implicit renkuBaseUrl: RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD = Activity(
-    commitId,
+    activityId,
     committedDate,
     committer,
     Project(projectPath,
             projectName,
+            agent,
             projectDateCreated,
             maybeProjectCreator,
             maybeVisibility,
@@ -98,15 +101,16 @@ object bundles extends Schemas {
     Gen.oneOf(nonModifiedDataSetActivity()()(), modifiedDataSetActivity()()()).generateOne
 
   def nonModifiedDataSetCommit(
-      commitId:      CommitId = commitIds.generateOne,
-      committedDate: CommittedDate = committedDates.generateOne,
-      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
-      cliVersion:    CliVersion = cliVersions.generateOne
+      activityId: Id = activityIds.generateOne,
+      startTime:  Activity.StartTime = activityStartTimes.generateOne,
+      committer:  Person = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion: CliVersion = cliVersions.generateOne
   )(
       projectPath:         Path = projectPaths.generateOne,
       projectName:         projects.Name = projectNames.generateOne,
+      agent:               CliVersion = cliVersions.generateOne,
       maybeVisibility:     Option[Visibility] = None,
-      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      projectDateCreated:  projects.DateCreated = DateCreated(startTime.value),
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeParent:         Option[Project] = None,
       projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
@@ -126,11 +130,19 @@ object bundles extends Schemas {
       overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   )(implicit renkuBaseUrl:        RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
     nonModifiedDataSetActivity(
-      commitId,
-      committedDate,
+      activityId,
+      startTime,
       committer,
       cliVersion
-    )(projectPath, projectName, maybeVisibility, projectDateCreated, maybeProjectCreator, maybeParent, projectVersion)(
+    )(projectPath,
+      projectName,
+      agent,
+      maybeVisibility,
+      projectDateCreated,
+      maybeProjectCreator,
+      maybeParent,
+      projectVersion
+    )(
       datasetIdentifier,
       datasetTitle,
       datasetName,
@@ -147,15 +159,16 @@ object bundles extends Schemas {
     ).asJsonLD
 
   def nonModifiedDataSetActivity(
-      commitId:      CommitId = commitIds.generateOne,
-      committedDate: CommittedDate = committedDates.generateOne,
-      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
-      cliVersion:    CliVersion = cliVersions.generateOne
+      id:                Id = activityIds.generateOne,
+      activityStartTime: Activity.StartTime = activityStartTimes.generateOne,
+      committer:         Person = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion:        CliVersion = cliVersions.generateOne
   )(
       projectPath:         Path = projectPaths.generateOne,
       projectName:         projects.Name = projectNames.generateOne,
+      agent:               CliVersion = cliVersions.generateOne,
       maybeVisibility:     Option[Visibility] = None,
-      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      projectDateCreated:  projects.DateCreated = DateCreated(activityStartTime.value),
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeParent:         Option[Project] = None,
       projectVersion:      SchemaVersion = projectSchemaVersions.generateOne
@@ -174,11 +187,12 @@ object bundles extends Schemas {
       overrideTopmostSameAs:      Option[TopmostSameAs] = None,
       overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   ): Activity = Activity(
-    commitId,
-    committedDate,
+    id,
+    activityStartTime,
     committer,
     Project(projectPath,
             projectName,
+            agent,
             projectDateCreated,
             maybeProjectCreator,
             maybeVisibility,
@@ -210,14 +224,15 @@ object bundles extends Schemas {
   )
 
   def modifiedDataSetCommit(
-      commitId:      CommitId = commitIds.generateOne,
-      committedDate: CommittedDate = committedDates.generateOne,
-      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
-      cliVersion:    CliVersion = cliVersions.generateOne
+      activityId: Id = activityIds.generateOne,
+      startTime:  Activity.StartTime = activityStartTimes.generateOne,
+      committer:  Person = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion: CliVersion = cliVersions.generateOne
   )(
       projectPath:         Path = projectPaths.generateOne,
       projectName:         projects.Name = projectNames.generateOne,
-      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      agent:               CliVersion = cliVersions.generateOne,
+      projectDateCreated:  projects.DateCreated = DateCreated(startTime.value),
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeVisibility:     Option[Visibility] = None,
       maybeParent:         Option[Project] = None,
@@ -238,11 +253,19 @@ object bundles extends Schemas {
       overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   )(implicit renkuBaseUrl:        RenkuBaseUrl, fusekiBaseUrl: FusekiBaseUrl): JsonLD =
     modifiedDataSetActivity(
-      commitId,
-      committedDate,
+      activityId,
+      startTime,
       committer,
       cliVersion
-    )(projectPath, projectName, projectDateCreated, maybeProjectCreator, maybeVisibility, maybeParent, projectVersion)(
+    )(projectPath,
+      projectName,
+      agent,
+      projectDateCreated,
+      maybeProjectCreator,
+      maybeVisibility,
+      maybeParent,
+      projectVersion
+    )(
       datasetIdentifier,
       datasetTitle,
       datasetName,
@@ -259,14 +282,15 @@ object bundles extends Schemas {
     ).asJsonLD
 
   def modifiedDataSetActivity(
-      commitId:      CommitId = commitIds.generateOne,
-      committedDate: CommittedDate = committedDates.generateOne,
-      committer:     Person = Person(userNames.generateOne, userEmails.generateOne),
-      cliVersion:    CliVersion = cliVersions.generateOne
+      activityId: Id = activityIds.generateOne,
+      startTime:  Activity.StartTime = activityStartTimes.generateOne,
+      committer:  Person = Person(userNames.generateOne, userEmails.generateOne),
+      cliVersion: CliVersion = cliVersions.generateOne
   )(
       projectPath:         Path = projectPaths.generateOne,
       projectName:         projects.Name = projectNames.generateOne,
-      projectDateCreated:  projects.DateCreated = DateCreated(committedDate.value),
+      agent:               CliVersion = cliVersions.generateOne,
+      projectDateCreated:  projects.DateCreated = DateCreated(startTime.value),
       maybeProjectCreator: Option[Person] = projectCreators.generateOption,
       maybeVisibility:     Option[Visibility] = None,
       maybeParent:         Option[Project] = None,
@@ -286,11 +310,12 @@ object bundles extends Schemas {
       overrideTopmostSameAs:      Option[TopmostSameAs] = None,
       overrideTopmostDerivedFrom: Option[TopmostDerivedFrom] = None
   ): Activity = Activity(
-    commitId,
-    committedDate,
+    activityId,
+    startTime,
     committer,
     Project(projectPath,
             projectName,
+            agent,
             projectDateCreated,
             maybeProjectCreator,
             maybeVisibility,
@@ -325,7 +350,7 @@ object bundles extends Schemas {
 
     final case class ExamplarData(
         location:          Location,
-        commitId:          CommitId,
+        activityId:        Id,
         committer:         Person,
         `sha3 zhbikes`:    NodeDef,
         `sha7 plot_data`:  NodeDef,
@@ -346,6 +371,7 @@ object bundles extends Schemas {
       val project = Project(
         projectPath,
         projectNames.generateOne,
+        cliVersions.generateOne,
         projectCreatedDates.generateOne,
         projectCreators.generateOption,
         projectVisibilities.generateSome,
@@ -367,7 +393,7 @@ object bundles extends Schemas {
       def dataSetGenerationFactory(partsFactories: List[Activity => DataSetPartArtifact]) =
         Generation.factory(
           entityFactory = DataSet.nonModifiedFactory(
-            id = dataSetId,
+            identifier = dataSetId,
             title = datasets.Title("zhbikes"),
             name = datasets.Name("zhbikes"),
             url = datasetUrls.generateOne,
@@ -378,8 +404,8 @@ object bundles extends Schemas {
         )
 
       val commit2DataSetCreation = Activity(
-        CommitId("000002"),
-        committedDates.generateOne,
+        Id("000002"),
+        activityStartTimes.generateOne,
         persons.generateOne,
         project,
         agent,
@@ -388,8 +414,8 @@ object bundles extends Schemas {
       )
 
       val commit3AddingDataSetFile = Activity(
-        CommitId("000003"),
-        committedDates.generateOne,
+        Id("000003"),
+        activityStartTimes.generateOne,
         persons.generateOne,
         project,
         agent,
@@ -403,8 +429,8 @@ object bundles extends Schemas {
       )
 
       val commit4Activity = Activity(
-        CommitId("000004"),
-        committedDates.generateOne,
+        Id("000004"),
+        activityStartTimes.generateOne,
         persons.generateOne,
         project,
         agent,
@@ -423,9 +449,9 @@ object bundles extends Schemas {
       )
 
       val commit5Activity = Activity(
-        CommitId("000005"),
-        committedDates.generateOne,
-        committer = persons.generateOne,
+        Id("000005"),
+        activityStartTimes.generateOne,
+        author = persons.generateOne,
         project,
         agent,
         comment = "packages installed",
@@ -436,9 +462,9 @@ object bundles extends Schemas {
       )
 
       val commit6Activity = Activity(
-        CommitId("000006"),
-        committedDates.generateOne,
-        committer = persons.generateOne,
+        Id("000006"),
+        activityStartTimes.generateOne,
+        author = persons.generateOne,
         project,
         agent,
         comment = "added notebook",
@@ -449,9 +475,9 @@ object bundles extends Schemas {
       )
 
       val commit7Activity = Activity(
-        CommitId("000007"),
-        committedDates.generateOne,
-        committer = persons.generateOne,
+        Id("000007"),
+        activityStartTimes.generateOne,
+        author = persons.generateOne,
         project,
         agent,
         comment = "added refactored scripts",
@@ -463,8 +489,8 @@ object bundles extends Schemas {
       )
 
       val oldCommit8ProcessRun = Activity(
-        commitIds.generateOne,
-        committedDates.generateOne,
+        activityIds.generateOne,
+        activityStartTimes.generateOne,
         persons.generateOne,
         project,
         agent,
@@ -477,8 +503,8 @@ object bundles extends Schemas {
 
       val commit8ParquetEntityFactory = (activity: Activity) => Entity(Generation(bikesParquet, activity))
       val commit8ProcessRun = ProcessRun.standAlone(
-        CommitId("000008"),
-        committedDates.generateOne,
+        Id("000008"),
+        activityStartTimes.generateOne,
         persons.generateOne,
         project,
         agent,
@@ -500,8 +526,8 @@ object bundles extends Schemas {
       )
 
       val oldCommit9ProcessRun = Activity(
-        commitIds.generateOne,
-        committedDates.generateOne,
+        activityIds.generateOne,
+        activityStartTimes.generateOne,
         persons.generateOne,
         project,
         agent,
@@ -514,8 +540,8 @@ object bundles extends Schemas {
 
       val commit9GridPlotEntityFactory = (activity: Activity) => Entity(Generation(gridPlotPng, activity))
       val commit9ProcessRun = ProcessRun.standAlone(
-        CommitId("000009"),
-        committedDates.generateOne,
+        Id("000009"),
+        activityStartTimes.generateOne,
         persons.generateOne,
         project,
         agent,
@@ -539,8 +565,8 @@ object bundles extends Schemas {
       )
 
       val commit10Activity = Activity(
-        CommitId("0000010"),
-        committedDates.generateOne,
+        Id("0000010"),
+        activityStartTimes.generateOne,
         persons.generateOne,
         project,
         agent,
@@ -552,8 +578,8 @@ object bundles extends Schemas {
       )
 
       val commit11Activity = Activity(
-        CommitId("0000011"),
-        committedDates.generateOne,
+        Id("0000011"),
+        activityStartTimes.generateOne,
         persons.generateOne,
         project,
         agent,
@@ -573,8 +599,8 @@ object bundles extends Schemas {
       )
 
       val oldCommit12Workflow = Activity(
-        commitIds.generateOne,
-        committedDates.generateOne,
+        activityIds.generateOne,
+        activityStartTimes.generateOne,
         persons.generateOne,
         project,
         agent,
@@ -586,8 +612,8 @@ object bundles extends Schemas {
       )
 
       val oldCommit12WorkflowStep0 = Activity(
-        commitIds.generateOne,
-        committedDates.generateOne,
+        activityIds.generateOne,
+        activityStartTimes.generateOne,
         persons.generateOne,
         project,
         agent,
@@ -599,8 +625,8 @@ object bundles extends Schemas {
       )
 
       val oldCommit12WorkflowStep1 = Activity(
-        commitIds.generateOne,
-        committedDates.generateOne,
+        activityIds.generateOne,
+        activityStartTimes.generateOne,
         persons.generateOne,
         project,
         agent,
@@ -616,8 +642,8 @@ object bundles extends Schemas {
       val commit12ParquetEntityFactory       = (activity: Activity) => Entity(Generation(bikesParquet, activity))
       val commit12Committer                  = persons.generateOne
       val commit12Workflow = WorkflowRun(
-        CommitId("0000012"),
-        committedDates.generateOne,
+        Id("0000012"),
+        activityStartTimes.generateOne,
         commit12Committer,
         project,
         agent,
@@ -627,7 +653,7 @@ object bundles extends Schemas {
         associationFactory = Association.workflow(
           agent.copy(cliVersion = cliVersions.generateOne),
           RunPlan.workflow(
-            inputs = List(
+            inputFactories = List(
               Input.from(commit7Activity.entity(cleanData), usedIn = Step.one),
               Input.from(commit10Activity.entity(dataSetFolder), usedIn = Step.one),
               Input.from(commit7Activity.entity(plotData), usedIn = Step.two)
@@ -662,7 +688,7 @@ object bundles extends Schemas {
 
       val examplarData = ExamplarData(
         gridPlotPng,
-        commit12Workflow.commitId,
+        commit12Workflow.id,
         commit12Committer,
         NodeDef(commit3AddingDataSetFile.entity(dataSetFolder)),
         NodeDef(commit7Activity.entity(plotData)),

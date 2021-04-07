@@ -21,8 +21,7 @@ package ch.datascience.rdfstore.entities
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators.{commitIds, committedDates}
-import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectPaths, projectSchemaVersions, projectVisibilities, userAffiliations, userEmails, userGitLabIds, userNames}
+import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectPaths, projectSchemaVersions, userAffiliations, userEmails, userGitLabIds, userNames}
 import ch.datascience.graph.model.users.{Email, GitLabId}
 import eu.timepit.refined.api.Refined.unsafeApply
 import eu.timepit.refined.auto._
@@ -32,22 +31,26 @@ object EntitiesGenerators extends EntitiesGenerators
 
 trait EntitiesGenerators {
 
-  val locations:              Gen[Location]     = relativePaths() map Location.apply
-  val cwlFiles:               Gen[WorkflowFile] = nonBlankStrings() map (n => WorkflowFile.cwl(unsafeApply(s"$n.cwl")))
-  val yamlFiles:              Gen[WorkflowFile] = nonBlankStrings() map (n => WorkflowFile.yaml(unsafeApply(s"$n.yaml")))
-  implicit val workflowFiles: Gen[WorkflowFile] = Gen.oneOf(cwlFiles, yamlFiles)
+  val activityIds:            Gen[Activity.Id]        = Gen.uuid.map(uuid => Activity.Id(uuid.toString))
+  val activityStartTimes:     Gen[Activity.StartTime] = timestampsNotInTheFuture.map(Activity.StartTime.apply)
+  val locations:              Gen[Location]           = relativePaths() map Location.apply
+  val cwlFiles:               Gen[WorkflowFile]       = nonBlankStrings() map (n => WorkflowFile.cwl(unsafeApply(s"$n.cwl")))
+  val yamlFiles:              Gen[WorkflowFile]       = nonBlankStrings() map (n => WorkflowFile.yaml(unsafeApply(s"$n.yaml")))
+  implicit val workflowFiles: Gen[WorkflowFile]       = Gen.oneOf(cwlFiles, yamlFiles)
 
   implicit val runPlanCommands: Gen[RunPlan.Command] = nonBlankStrings() map (c => RunPlan.Command(c.value))
 
   implicit val projectEntities: Gen[Project] = for {
     path         <- projectPaths
     name         <- projectNames
+    agent        <- cliVersions
     dateCreated  <- projectCreatedDates
     maybeCreator <- persons.toGeneratorOfOptions
     members      <- persons(userGitLabIds.toGeneratorOfSomes).toGeneratorOfSet(minElements = 0)
     version      <- projectSchemaVersions
   } yield Project(path,
                   name,
+                  agent,
                   dateCreated,
                   maybeCreator,
                   maybeVisibility = None,
@@ -59,12 +62,12 @@ trait EntitiesGenerators {
   implicit val agentEntities: Gen[Agent] = cliVersions map Agent.apply
 
   implicit val activityEntities: Gen[Activity] = for {
-    commitId      <- commitIds
-    committedDate <- committedDates
-    committer     <- persons
-    project       <- projectEntities
-    agent         <- agentEntities
-  } yield Activity(commitId, committedDate, committer, project, agent)
+    activityId <- activityIds
+    startTime  <- activityStartTimes
+    committer  <- persons
+    project    <- projectEntities
+    agent      <- agentEntities
+  } yield Activity(activityId, startTime, committer, project, agent)
 
   implicit lazy val persons: Gen[Person] = persons()
 

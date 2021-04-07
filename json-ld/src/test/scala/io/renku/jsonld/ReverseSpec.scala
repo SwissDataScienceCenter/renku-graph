@@ -57,7 +57,8 @@ class ReverseSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
     }
   }
 
-  "of var args of Property to JsonLD" should {
+  "of varargs of Property to JsonLD" should {
+
     "return an instance of Reverse if the given properties' values are JsonLDEntities" in {
       forAll(properties, jsonLDEntities, properties, jsonLDEntities) { (property1, entity1, property2, entity2) =>
         val Right(reverse) = Reverse.of(
@@ -109,6 +110,39 @@ class ReverseSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.
 
           exception            shouldBe an[IllegalArgumentException]
           exception.getMessage shouldBe s""""@reverse" "$property2" property has to exist on each object of an array"""
+      }
+    }
+  }
+
+  "ofJsonLDsUnsafe" should {
+
+    "return an instance of Reverse if the given properties' values are JsonLDEntities" in {
+      forAll(properties, jsonLDEntities, properties, jsonLDEntities) { (property1, entity1, property2, entity2) =>
+        Reverse
+          .ofJsonLDsUnsafe(
+            property1 -> entity1,
+            property2 -> entity2
+          )
+          .asJson shouldBe json"""{
+          ${property1.url}: ${entity1.toJson},
+          ${property2.url}: ${entity2.toJson}
+        }"""
+      }
+    }
+
+    "fail if there are properties with values neither JsonLDEntities nor arrays of JsonLDEntities" in {
+      forAll(properties, jsonLDEntities, properties, jsonLDValues, properties, jsonLDEntities) {
+        (property1, entity1, property2, value2, property3, entity3) =>
+          val exception = intercept[Exception] {
+            Reverse.ofJsonLDsUnsafe(
+              property1 -> entity1,
+              property2 -> value2,
+              property3 -> entity3
+            )
+          }
+
+          exception            shouldBe an[IllegalArgumentException]
+          exception.getMessage shouldBe s""""@reverse" "$property2" property has to exist on an object"""
       }
     }
   }

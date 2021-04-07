@@ -95,7 +95,7 @@ class IOEdgesFinderSpec extends AnyWordSpec with InMemoryRdfStore with ExternalS
     def activity(creating: Location) = Activity(
       commitIds.generateOne,
       committedDates.generateOne,
-      committer = persons.generateOne,
+      author = persons.generateOne,
       project,
       agent,
       comment = "committing 1 file",

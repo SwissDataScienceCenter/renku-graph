@@ -21,6 +21,7 @@ package ch.datascience.rdfstore.entities
 import cats.syntax.all._
 import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
+import ch.datascience.rdfstore.entities.Activity.Id
 import ch.datascience.rdfstore.entities.Association.{ChildRunPlanAssociation, ProcessRunPlanAssociation, WorkflowRunPlanAssociation}
 import ch.datascience.rdfstore.entities.RunPlan.{ProcessRunPlan, WorkflowRunPlan}
 import ch.datascience.rdfstore.entities.WorkflowRun.ActivityWorkflowRun
@@ -63,9 +64,9 @@ object ProcessRun {
       associationFactory: ActivityWorkflowRun => Step => ChildRunPlanAssociation,
       maybeInvalidation:  Option[Entity with Artifact] = None
   )(workflowRun:          ActivityWorkflowRun)(step: Step): Activity with ChildProcessRun =
-    new Activity(workflowRun.commitId,
-                 workflowRun.committedDate,
-                 workflowRun.committer,
+    new Activity(workflowRun.id,
+                 workflowRun.startTime,
+                 workflowRun.author,
                  workflowRun.project,
                  workflowRun.agent,
                  workflowRun.comment,
@@ -84,8 +85,8 @@ object ProcessRun {
     }
 
   def workflow(
-      id:                CommitId,
-      committedDate:     CommittedDate,
+      id:                Id,
+      committedDate:     Activity.StartTime,
       committer:         Person,
       project:           Project,
       agent:             Agent,
@@ -111,8 +112,8 @@ object ProcessRun {
     }
 
   def standAlone(
-      id:                 CommitId,
-      committedDate:      CommittedDate,
+      id:                 Id,
+      committedDate:      Activity.StartTime,
       committer:          Person,
       project:            Project,
       agent:              Agent,
@@ -147,7 +148,7 @@ object ProcessRun {
         entity =>
           PartialEntity(
             EntityTypes of (wfprov / "ProcessRun"),
-            rdfs / "label"                  -> s"${entity.processRunAssociation.runPlan.location}@${entity.commitId}".asJsonLD,
+            rdfs / "label"                  -> s"${entity.processRunAssociation.runPlan.location}@${entity.id}".asJsonLD,
             prov / "qualifiedAssociation"   -> entity.processRunAssociation.asJsonLD,
             prov / "atLocation"             -> entity.processRunAssociation.runPlan.location.asJsonLD,
             prov / "qualifiedUsage"         -> entity.processRunUsages.asJsonLD,
@@ -155,7 +156,7 @@ object ProcessRun {
           ).asRight
 
       override def toEntityId: Activity with ChildProcessRun => Option[EntityId] =
-        entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId / entity.processRunStep).some
+        entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.id / entity.processRunStep).some
     }
 
   private[entities] implicit def standAloneProcessRunConverter(implicit
@@ -168,14 +169,14 @@ object ProcessRun {
         entity =>
           PartialEntity(
             EntityTypes of (wfprov / "ProcessRun"),
-            rdfs / "label"                -> s"${entity.processRunAssociation.runPlan.location}@${entity.commitId}".asJsonLD,
+            rdfs / "label"                -> s"${entity.processRunAssociation.runPlan.location}@${entity.id}".asJsonLD,
             prov / "qualifiedAssociation" -> entity.processRunAssociation.asJsonLD,
             prov / "atLocation"           -> entity.processRunAssociation.runPlan.location.asJsonLD,
             prov / "qualifiedUsage"       -> entity.processRunUsages.asJsonLD
           ).asRight
 
       override def toEntityId: Activity with StandAloneProcessRun => Option[EntityId] =
-        entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId).some
+        entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.id).some
     }
 
   private[entities] implicit def workflowProcessRunConverter(implicit
@@ -188,14 +189,14 @@ object ProcessRun {
         entity =>
           PartialEntity(
             EntityTypes of (wfprov / "ProcessRun"),
-            rdfs / "label"                -> s"${entity.processRunAssociation.runPlan.location}@${entity.commitId}".asJsonLD,
+            rdfs / "label"                -> s"${entity.processRunAssociation.runPlan.location}@${entity.id}".asJsonLD,
             prov / "qualifiedAssociation" -> entity.processRunAssociation.asJsonLD,
             prov / "atLocation"           -> entity.processRunAssociation.runPlan.location.asJsonLD,
             prov / "qualifiedUsage"       -> entity.processRunUsages.asJsonLD
           ).asRight
 
       override def toEntityId: Activity with WorkflowProcessRun => Option[EntityId] =
-        entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.commitId).some
+        entity => (EntityId of fusekiBaseUrl / "activities" / "commit" / entity.id).some
     }
 
   implicit def childProcessRunEncoder(implicit

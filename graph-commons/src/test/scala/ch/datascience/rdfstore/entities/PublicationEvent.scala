@@ -18,23 +18,23 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.syntax.all._
-import ch.datascience.graph.config.RenkuBaseUrl
-import ch.datascience.rdfstore.FusekiBaseUrl
-import io.renku.jsonld.{EntityId, EntityTypes}
+import ch.datascience.graph.model.datasets.Description
+import ch.datascience.rdfstore.entities.PublicationEvent.Name
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.NonBlank
 
-trait Artifact
+import java.awt.desktop.AboutEvent
 
-object Artifact {
+case class PublicationEvent(aboutEvent:  AboutEvent,
+                            description: Description,
+                            location:    Location,
+                            name:        Name,
+                            startDate:   Activity.StartTime
+)
 
-  private[entities] implicit def converter(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): PartialEntityConverter[Artifact] =
-    new PartialEntityConverter[Artifact] {
-      override def convert[T <: Artifact]: T => Either[Exception, PartialEntity] =
-        _ => PartialEntity(EntityTypes of wfprov / "Artifact").asRight
+object PublicationEvent {
 
-      override val toEntityId: Artifact => Option[EntityId] = _ => None
-    }
+  final class Name private (val value: String) extends AnyVal with StringTinyType
+  implicit object Name extends TinyTypeFactory[Name](new Name(_)) with NonBlank
+
 }

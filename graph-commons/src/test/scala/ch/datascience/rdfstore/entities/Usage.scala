@@ -21,13 +21,20 @@ package ch.datascience.rdfstore.entities
 import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.CommandParameter.{EntityCommandParameter, Input}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.UUID
+import Usage._
 
-final class Usage private (val activity:     Activity,
+final class Usage private (val id:           Id,
+                           val activity:     Activity,
                            val commandInput: EntityCommandParameter with Input,
                            val maybeStep:    Option[Step]
 )
 
 object Usage {
+
+  final class Id private (val value: String) extends AnyVal with StringTinyType
+  implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID
 
   def apply(activity: Activity, commandInput: EntityCommandParameter with Input): Usage =
     new Usage(activity, commandInput, maybeStep = None)
@@ -47,9 +54,9 @@ object Usage {
     JsonLDEncoder.instance { entity =>
       val entityId = entity.maybeStep match {
         case None =>
-          EntityId of fusekiBaseUrl / "activities" / entity.activity.commitId / "inputs" / entity.commandInput.toString
+          EntityId of fusekiBaseUrl / "activities" / entity.activity.id / "inputs" / entity.commandInput.toString
         case Some(step) =>
-          EntityId of fusekiBaseUrl / "activities" / entity.activity.commitId / "steps" / step / "inputs" / entity.commandInput.toString
+          EntityId of fusekiBaseUrl / "activities" / entity.activity.id / "steps" / step / "inputs" / entity.commandInput.toString
       }
       JsonLD.entity(
         entityId,

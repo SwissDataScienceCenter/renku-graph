@@ -20,11 +20,12 @@ package ch.datascience.rdfstore.entities
 
 import cats.syntax.all._
 import ch.datascience.graph.config.GitLabApiUrl
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId, Visibility}
 
 final case class Project(path:               Path,
                          name:               Name,
+                         agent:              CliVersion,
                          dateCreated:        DateCreated,
                          maybeCreator:       Option[Person],
                          maybeVisibility:    Option[Visibility] = None,
@@ -51,6 +52,7 @@ object Project {
             PartialEntity(
               EntityTypes.of(prov / "Location", schema / "Project"),
               schema / "name"             -> entity.name.asJsonLD,
+              schema / "agent"            -> entity.agent.asJsonLD,
               schema / "dateCreated"      -> entity.dateCreated.asJsonLD,
               schema / "creator"          -> entity.maybeCreator.asJsonLD,
               renku / "projectVisibility" -> entity.maybeVisibility.asJsonLD,
