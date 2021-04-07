@@ -83,7 +83,7 @@ jobs:
     needs: [unit-tests, acceptance-tests, formatter]
     if: "github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/hotfix-')"
     environment:
-      name: renku-kg
+      name: kg
     steps:
     - name: deploy-master
       uses: SwissDataScienceCenter/renku/actions/deploy-renku@master
@@ -93,7 +93,7 @@ jobs:
         GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
         KUBECONFIG: "${{ github.workspace }}/renkubot-kube.config"
         RANCHER_PROJECT_ID: ${{ secrets.CI_RANCHER_PROJECT }}
-        RENKU_RELEASE: renku-kg
+        RENKU_RELEASE: kg
         RENKU_VALUES_FILE: "${{ github.workspace }}/values.yaml"
         RENKU_VALUES: ${{ secrets.CI_RENKU_KG_VALUES }}
         RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
