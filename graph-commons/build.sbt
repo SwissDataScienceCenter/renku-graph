@@ -18,11 +18,11 @@
 
 name := "graph-commons"
 
-val pureConfigVersion = "0.14.0"
+val pureConfigVersion = "0.14.1"
 libraryDependencies += "com.github.pureconfig" %% "pureconfig"      % pureConfigVersion
 libraryDependencies += "com.github.pureconfig" %% "pureconfig-cats" % pureConfigVersion
 
-val refinedVersion = "0.9.20"
+val refinedVersion = "0.9.23"
 libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 
@@ -34,14 +34,14 @@ libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
 
-libraryDependencies += "io.sentry" % "sentry-logback" % "3.2.0"
+libraryDependencies += "io.sentry" % "sentry-logback" % "4.3.0"
 
 val doobieVersion = "0.10.0"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 
-val catsVersion = "2.3.1"
+val catsVersion = "2.4.1"
 libraryDependencies += "org.typelevel" %% "cats-core"   % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-effect" % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-free"   % catsVersion
@@ -65,7 +65,7 @@ libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % 
 libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.1.0"   % Test
 libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.1 is broken
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
-libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.3"   % Test
+libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.6"   % Test
 
 val testContainersScalaVersion = "0.38.8"
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
