@@ -20,4 +20,4 @@ name := "acceptance-tests"
 
 parallelExecution in Test := false
 
-libraryDependencies += "org.apache.jena" % "jena-fuseki-main" % "3.14.0" % Test
+libraryDependencies += "org.apache.jena" % "jena-fuseki-main" % "3.14.0" % Test // 4.0.0 seems to make acceptance tests fail
