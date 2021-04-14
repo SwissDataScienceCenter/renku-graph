@@ -35,9 +35,9 @@ import scala.util.Try
 object TestExecutionTimeRecorder {
 
   def apply[Interpretation[_]](
-                                logger: Logger[Interpretation],
-                                maybeHistogram: Option[Histogram] = None
-                              )(implicit ME: MonadError[Interpretation, Throwable]): TestExecutionTimeRecorder[Interpretation] =
+      logger:         Logger[Interpretation],
+      maybeHistogram: Option[Histogram] = None
+  )(implicit ME:      MonadError[Interpretation, Throwable]): TestExecutionTimeRecorder[Interpretation] =
     new TestExecutionTimeRecorder[Interpretation](
       threshold = elapsedTimes.generateOne,
       logger,
@@ -52,19 +52,19 @@ object TestExecutionTimeRecorder {
 }
 
 class TestExecutionTimeRecorder[Interpretation[_]](
-                                                    threshold: ElapsedTime,
-                                                    logger: Logger[Interpretation],
-                                                    maybeHistogram: Option[Histogram]
-                                                  )(implicit clock: Clock[Interpretation], ME: MonadError[Interpretation, Throwable])
-  extends ExecutionTimeRecorder[Interpretation](threshold, logger, maybeHistogram) {
+    threshold:      ElapsedTime,
+    logger:         Logger[Interpretation],
+    maybeHistogram: Option[Histogram]
+)(implicit clock:   Clock[Interpretation], ME: MonadError[Interpretation, Throwable])
+    extends ExecutionTimeRecorder[Interpretation](threshold, logger, maybeHistogram) {
 
-  val elapsedTime: ElapsedTime = threshold
-  lazy val executionTimeInfo: String = s" in ${threshold}ms"
+  val elapsedTime:            ElapsedTime = threshold
+  lazy val executionTimeInfo: String      = s" in ${threshold}ms"
 
   override def measureExecutionTime[BlockOut](
-                                               block: => Interpretation[BlockOut],
-                                               maybeHistogramLabel: Option[String Refined NonEmpty] = None
-                                             ): Interpretation[(ElapsedTime, BlockOut)] =
+      block:               => Interpretation[BlockOut],
+      maybeHistogramLabel: Option[String Refined NonEmpty] = None
+  ): Interpretation[(ElapsedTime, BlockOut)] =
     for {
       _ <- ME.unit
       maybeHistogramTimer = startTimer(maybeHistogramLabel)

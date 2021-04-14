@@ -31,10 +31,10 @@ trait AccessTokenFinder[Interpretation[_]] {
 }
 
 class IOAccessTokenFinder(
-                           tokenRepositoryUrl: TokenRepositoryUrl,
-                           logger: Logger[IO]
-                         )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-  extends IORestClient(Throttler.noThrottling, logger)
+    tokenRepositoryUrl:      TokenRepositoryUrl,
+    logger:                  Logger[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORestClient(Throttler.noThrottling, logger)
     with AccessTokenFinder[IO] {
 
   import cats.effect._
@@ -45,13 +45,13 @@ class IOAccessTokenFinder(
 
   def findAccessToken[ID](projectId: ID)(implicit toPathSegment: ID => String): IO[Option[AccessToken]] =
     for {
-      uri <- validateUri(s"$tokenRepositoryUrl/projects/${toPathSegment(projectId)}/tokens")
+      uri         <- validateUri(s"$tokenRepositoryUrl/projects/${toPathSegment(projectId)}/tokens")
       accessToken <- send(request(GET, uri))(mapResponse)
     } yield accessToken
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[AccessToken]]] = {
     case (Ok, _, response) => response.as[Option[AccessToken]]
-    case (NotFound, _, _) => IO.pure(None)
+    case (NotFound, _, _)  => IO.pure(None)
   }
 
   private implicit lazy val accessTokenEntityDecoder: EntityDecoder[IO, Option[AccessToken]] =
@@ -63,15 +63,15 @@ object IOAccessTokenFinder {
   import ch.datascience.http.client.UrlEncoder.urlEncode
 
   implicit val projectPathToPath: Path => String = path => urlEncode(path.value)
-  implicit val projectIdToPath: Id => String = _.toString
+  implicit val projectIdToPath:   Id => String   = _.toString
 
   def apply(
-             logger: Logger[IO]
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             timer: Timer[IO]
-           ): IO[AccessTokenFinder[IO]] =
+      logger: Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[AccessTokenFinder[IO]] =
     for {
       tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
     } yield new IOAccessTokenFinder(tokenRepositoryUrl, logger)

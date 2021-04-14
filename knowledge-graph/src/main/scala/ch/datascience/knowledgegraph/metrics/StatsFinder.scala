@@ -36,16 +36,16 @@ trait StatsFinder[Interpretation[_]] {
 }
 
 class StatsFinderImpl(
-                       rdfStoreConfig: RdfStoreConfig,
-                       logger: Logger[IO],
-                       timeRecorder: SparqlQueryTimeRecorder[IO]
-                     )(implicit
-                       executionContext: ExecutionContext,
-                       contextShift: ContextShift[IO],
-                       timer: Timer[IO],
-                       ME: MonadError[IO, Throwable]
-                     ) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
-  with StatsFinder[IO] {
+    rdfStoreConfig: RdfStoreConfig,
+    logger:         Logger[IO],
+    timeRecorder:   SparqlQueryTimeRecorder[IO]
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO],
+    ME:               MonadError[IO, Throwable]
+) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    with StatsFinder[IO] {
 
   import EntityCount._
   import ch.datascience.graph.Schemas._
@@ -56,11 +56,11 @@ class StatsFinderImpl(
   private lazy val query = SparqlQuery.of(
     name = "entities - counts",
     Prefixes.of(
-      rdf -> "rdf",
-      prov -> "prov",
+      rdf    -> "rdf",
+      prov   -> "prov",
       schema -> "schema",
       wfprov -> "wfprov",
-      renku -> "renku"
+      renku  -> "renku"
     ),
     s"""|SELECT ?type ?count
         |WHERE {
@@ -109,7 +109,7 @@ private object EntityCount {
     val counts: Decoder[(EntityType, EntitiesCount)] = { cursor =>
       for {
         entityType <- cursor.downField("type").downField("value").as[String].flatMap(convert[String, EntityType])
-        count <- cursor.downField("count").downField("value").as[Long].flatMap(convert[Long, EntitiesCount])
+        count      <- cursor.downField("count").downField("value").as[Long].flatMap(convert[Long, EntitiesCount])
       } yield entityType -> count
     }
 
@@ -118,9 +118,9 @@ private object EntityCount {
       .as(decodeList(counts))
   }
 
-  private def convert[IN, OUT <: TinyType {type V = IN}](implicit
-                                                         tinyTypeFactory: TinyTypeFactory[OUT]
-                                                        ): IN => Either[DecodingFailure, OUT] =
+  private def convert[IN, OUT <: TinyType { type V = IN }](implicit
+      tinyTypeFactory: TinyTypeFactory[OUT]
+  ): IN => Either[DecodingFailure, OUT] =
     value =>
       tinyTypeFactory
         .from(value)
@@ -129,15 +129,15 @@ private object EntityCount {
 
 object IOStatsFinder {
   def apply(
-             timeRecorder: SparqlQueryTimeRecorder[IO],
-             logger: Logger[IO],
-             rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO]()
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             timer: Timer[IO],
-             ME: MonadError[IO, Throwable]
-           ): IO[StatsFinder[IO]] =
+      timeRecorder:   SparqlQueryTimeRecorder[IO],
+      logger:         Logger[IO],
+      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO]()
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO],
+      ME:               MonadError[IO, Throwable]
+  ): IO[StatsFinder[IO]] =
     for {
       config <- rdfStoreConfig
     } yield new StatsFinderImpl(config, logger, timeRecorder)

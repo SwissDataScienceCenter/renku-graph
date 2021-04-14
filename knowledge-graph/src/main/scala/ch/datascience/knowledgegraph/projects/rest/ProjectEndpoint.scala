@@ -39,12 +39,12 @@ import org.http4s.dsl.Http4sDsl
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class ProjectEndpoint[Interpretation[_] : Effect](
-                                                   projectFinder: ProjectFinder[Interpretation],
-                                                   renkuResourcesUrl: renku.ResourcesUrl,
-                                                   executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-                                                   logger: Logger[Interpretation]
-                                                 ) extends Http4sDsl[Interpretation] {
+class ProjectEndpoint[Interpretation[_]: Effect](
+    projectFinder:         ProjectFinder[Interpretation],
+    renkuResourcesUrl:     renku.ResourcesUrl,
+    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
+    logger:                Logger[Interpretation]
+) extends Http4sDsl[Interpretation] {
 
   import executionTimeRecorder._
   import io.circe.literal._
@@ -61,19 +61,18 @@ class ProjectEndpoint[Interpretation[_] : Effect](
     } map logExecutionTimeWhen(finishedSuccessfully(path))
 
   private def toHttpResult(
-                            path: projects.Path
-                          ): Option[Project] => Interpretation[Response[Interpretation]] = {
-    case None => NotFound(InfoMessage(s"No '$path' project found"))
+      path: projects.Path
+  ): Option[Project] => Interpretation[Response[Interpretation]] = {
+    case None          => NotFound(InfoMessage(s"No '$path' project found"))
     case Some(project) => Ok(project.asJson)
   }
 
   private def httpResult(
-                          path: projects.Path
-                        ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding '$path' project failed")
-      logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+      path: projects.Path
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+    val errorMessage = ErrorMessage(s"Finding '$path' project failed")
+    logger.error(exception)(errorMessage.value)
+    InternalServerError(errorMessage)
   }
 
   private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[Interpretation], String] = {
@@ -97,7 +96,7 @@ class ProjectEndpoint[Interpretation[_] : Effect](
       "statistics": ${project.statistics},
       "version":    ${project.version.value}
     }""" deepMerge _links(
-      Link(Rel.Self -> Href(renkuResourcesUrl / "projects" / project.path)),
+      Link(Rel.Self        -> Href(renkuResourcesUrl / "projects" / project.path)),
       Link(Rel("datasets") -> Href(renkuResourcesUrl / "projects" / project.path / "datasets"))
     ) deepMerge (project.maybeDescription.map(desc => json"""{"description": ${desc.value}}""") getOrElse Json.obj())
   }
@@ -141,10 +140,10 @@ class ProjectEndpoint[Interpretation[_] : Effect](
       "projectAccess": ${projectAccessLevel.accessLevel},
       "groupAccess":   ${groupAccessLevel.accessLevel}
     }"""
-    case ProjectPermissions(accessLevel) => json"""{
+    case ProjectPermissions(accessLevel)                                  => json"""{
       "projectAccess": ${accessLevel.accessLevel}
     }"""
-    case GroupPermissions(accessLevel) => json"""{
+    case GroupPermissions(accessLevel)                                    => json"""{
       "groupAccess": ${accessLevel.accessLevel}
     }"""
   }
@@ -172,16 +171,16 @@ class ProjectEndpoint[Interpretation[_] : Effect](
 object IOProjectEndpoint {
 
   def apply(
-             gitLabThrottler: Throttler[IO, GitLab],
-             timeRecorder: SparqlQueryTimeRecorder[IO]
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             timer: Timer[IO]
-           ): IO[ProjectEndpoint[IO]] =
+      gitLabThrottler: Throttler[IO, GitLab],
+      timeRecorder:    SparqlQueryTimeRecorder[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ProjectEndpoint[IO]] =
     for {
-      projectFinder <- IOProjectFinder(gitLabThrottler, ApplicationLogger, timeRecorder)
-      renkuResourceUrl <- renku.ResourcesUrl[IO]()
+      projectFinder         <- IOProjectFinder(gitLabThrottler, ApplicationLogger, timeRecorder)
+      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new ProjectEndpoint[IO](
       projectFinder,

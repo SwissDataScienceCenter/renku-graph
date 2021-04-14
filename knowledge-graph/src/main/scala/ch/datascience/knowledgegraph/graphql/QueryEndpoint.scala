@@ -36,11 +36,11 @@ import scala.concurrent.ExecutionContext
 import scala.util.Try
 import scala.util.control.NonFatal
 
-class QueryEndpoint[Interpretation[_] : Effect](
-                                                 querySchema: Schema[QueryContext[Interpretation], Unit],
-                                                 queryRunner: QueryRunner[Interpretation, QueryContext[Interpretation]]
-                                               )(implicit ME: MonadError[Interpretation, Throwable])
-  extends Http4sDsl[Interpretation] {
+class QueryEndpoint[Interpretation[_]: Effect](
+    querySchema: Schema[QueryContext[Interpretation], Unit],
+    queryRunner: QueryRunner[Interpretation, QueryContext[Interpretation]]
+)(implicit ME:   MonadError[Interpretation, Throwable])
+    extends Http4sDsl[Interpretation] {
 
   import ErrorMessage._
   import QueryEndpoint._
@@ -54,15 +54,14 @@ class QueryEndpoint[Interpretation[_] : Effect](
 
   def handleQuery(request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
-      query <- request.as[UserQuery] recoverWith badRequest
-      result <- queryRunner run query recoverWith badRequestForInvalidQuery
+      query    <- request.as[UserQuery] recoverWith badRequest
+      result   <- queryRunner run query recoverWith badRequestForInvalidQuery
       response <- Ok(result)
     } yield response
   } recoverWith httpResponse
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[UserQuery]] = {
-    case NonFatal(exception) =>
-      ME.raiseError(BadRequestError(exception))
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[UserQuery]] = { case NonFatal(exception) =>
+    ME.raiseError(BadRequestError(exception))
   }
 
   private lazy val badRequestForInvalidQuery: PartialFunction[Throwable, Interpretation[Json]] = {
@@ -73,7 +72,7 @@ class QueryEndpoint[Interpretation[_] : Effect](
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
     case BadRequestError(exception) => BadRequest(ErrorMessage(exception))
-    case NonFatal(exception) => InternalServerError(ErrorMessage(exception))
+    case NonFatal(exception)        => InternalServerError(ErrorMessage(exception))
   }
 
   private implicit lazy val queryEntityDecoder: EntityDecoder[Interpretation, UserQuery] =
@@ -87,22 +86,22 @@ private object QueryEndpoint {
   implicit val queryDecoder: Decoder[UserQuery] = cursor =>
     for {
       query <- cursor
-        .downField("query")
-        .as[String]
-        .flatMap(rawQuery => Either.fromTry(QueryParser.parse(rawQuery)))
-        .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
+                 .downField("query")
+                 .as[String]
+                 .flatMap(rawQuery => Either.fromTry(QueryParser.parse(rawQuery)))
+                 .leftMap(exception => DecodingFailure(exception.getMessage, Nil))
       variables <- cursor
-        .downField("variables")
-        .as[Option[Map[String, Any]]]
-        .map(_.getOrElse(Map.empty))
+                     .downField("variables")
+                     .as[Option[Map[String, Any]]]
+                     .map(_.getOrElse(Map.empty))
     } yield UserQuery(query, variables)
 
   private implicit lazy val variablesValueDecoder: Decoder[Any] =
     _.value match {
-      case v if v.isString => v.as[String]
+      case v if v.isString  => v.as[String]
       case v if v.isBoolean => v.as[Boolean]
-      case v if v.isNumber => v.as[Double]
-      case v => Left(DecodingFailure(s"Cannot find a decoder for variable with value '$v'", Nil))
+      case v if v.isNumber  => v.as[Double]
+      case v                => Left(DecodingFailure(s"Cannot find a decoder for variable with value '$v'", Nil))
     }
 }
 
@@ -111,13 +110,13 @@ object IOQueryEndpoint {
   import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 
   def apply(
-             timeRecorder: SparqlQueryTimeRecorder[IO],
-             logger: Logger[IO]
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             timer: Timer[IO]
-           ): IO[QueryEndpoint[IO]] =
+      timeRecorder: SparqlQueryTimeRecorder[IO],
+      logger:       Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[QueryEndpoint[IO]] =
     for {
       queryContext <- IOQueryContext(timeRecorder, logger)
       querySchema = QuerySchema[IO](lineage.graphql.QueryFields())

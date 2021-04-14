@@ -39,16 +39,16 @@ trait RenkuVersionPairFinder[Interpretation[_]] {
 }
 
 private class IORenkuVersionPairFinder(rdfStoreConfig: RdfStoreConfig,
-                                       renkuBaseUrl: RenkuBaseUrl,
-                                       logger: Logger[IO],
-                                       timeRecorder: SparqlQueryTimeRecorder[IO]
-                                      )(implicit
-                                        executionContext: ExecutionContext,
-                                        contextShift: ContextShift[IO],
-                                        timer: Timer[IO],
-                                        ME: MonadError[IO, Throwable]
-                                      ) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
-  with RenkuVersionPairFinder[IO] {
+                                       renkuBaseUrl:   RenkuBaseUrl,
+                                       logger:         Logger[IO],
+                                       timeRecorder:   SparqlQueryTimeRecorder[IO]
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO],
+    ME:               MonadError[IO, Throwable]
+) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    with RenkuVersionPairFinder[IO] {
 
   override def find(): IO[Option[RenkuVersionPair]] = queryExpecting[List[RenkuVersionPair]] {
     val entityId = (renkuBaseUrl / "version-pair").showAs[RdfResource]
@@ -64,7 +64,7 @@ private class IORenkuVersionPairFinder(rdfStoreConfig: RdfStoreConfig,
           |""".stripMargin
     )
   }.flatMap {
-    case Nil => None.pure[IO]
+    case Nil         => None.pure[IO]
     case head :: Nil => head.some.pure[IO]
     case versionPairs =>
       new IllegalStateException(s"Too many Version pair found: $versionPairs").raiseError[IO, Option[RenkuVersionPair]]

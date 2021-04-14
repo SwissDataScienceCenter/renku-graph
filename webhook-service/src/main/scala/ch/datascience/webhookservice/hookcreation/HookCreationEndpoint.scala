@@ -43,16 +43,16 @@ trait HookCreationEndpoint[Interpretation[_]] {
   def createHook(projectId: Id, authUser: AuthUser): Interpretation[Response[Interpretation]]
 }
 
-class HookCreationEndpointImpl[Interpretation[_] : Effect](
-                                                            hookCreator: HookCreator[Interpretation],
-                                                            logger: Logger[Interpretation]
-                                                          ) extends Http4sDsl[Interpretation]
-  with HookCreationEndpoint[Interpretation] {
+class HookCreationEndpointImpl[Interpretation[_]: Effect](
+    hookCreator: HookCreator[Interpretation],
+    logger:      Logger[Interpretation]
+) extends Http4sDsl[Interpretation]
+    with HookCreationEndpoint[Interpretation] {
 
   def createHook(projectId: Id, authUser: AuthUser): Interpretation[Response[Interpretation]] = {
     for {
       creationResult <- hookCreator.createHook(projectId, authUser.accessToken)
-      response <- toHttpResponse(creationResult)
+      response       <- toHttpResponse(creationResult)
     } yield response
   } recoverWith httpResponse
 
@@ -62,7 +62,7 @@ class HookCreationEndpointImpl[Interpretation[_] : Effect](
   }
 
   private lazy val httpResponse: PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case ex@UnauthorizedException =>
+    case ex @ UnauthorizedException =>
       Response[Interpretation](Status.Unauthorized)
         .withEntity[ErrorMessage](ErrorMessage(ex))
         .pure[Interpretation]
@@ -74,17 +74,17 @@ class HookCreationEndpointImpl[Interpretation[_] : Effect](
 
 object IOHookCreationEndpoint {
   def apply(
-             projectHookUrl: ProjectHookUrl,
-             gitLabThrottler: Throttler[IO, GitLab],
-             hookTokenCrypto: HookTokenCrypto[IO],
-             executionTimeRecorder: ExecutionTimeRecorder[IO],
-             logger: Logger[IO]
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             clock: Clock[IO],
-             timer: Timer[IO]
-           ): IO[HookCreationEndpoint[IO]] = for {
+      projectHookUrl:        ProjectHookUrl,
+      gitLabThrottler:       Throttler[IO, GitLab],
+      hookTokenCrypto:       HookTokenCrypto[IO],
+      executionTimeRecorder: ExecutionTimeRecorder[IO],
+      logger:                Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      clock:            Clock[IO],
+      timer:            Timer[IO]
+  ): IO[HookCreationEndpoint[IO]] = for {
     hookCreator <- HookCreator(projectHookUrl, gitLabThrottler, hookTokenCrypto, executionTimeRecorder, logger)
   } yield new HookCreationEndpointImpl[IO](hookCreator, logger)
 }

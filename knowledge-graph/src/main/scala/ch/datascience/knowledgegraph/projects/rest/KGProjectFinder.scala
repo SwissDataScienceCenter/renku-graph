@@ -37,12 +37,12 @@ trait KGProjectFinder[Interpretation[_]] {
 
 object KGProjectFinder {
 
-  final case class KGProject(path: Path,
-                             name: Name,
-                             created: ProjectCreation,
+  final case class KGProject(path:        Path,
+                             name:        Name,
+                             created:     ProjectCreation,
                              maybeParent: Option[Parent],
-                             version: SchemaVersion
-                            )
+                             version:     SchemaVersion
+  )
 
   final case class ProjectCreation(date: DateCreated, maybeCreator: Option[ProjectCreator])
 
@@ -53,17 +53,17 @@ object KGProjectFinder {
 }
 
 private class IOKGProjectFinder(
-                                 rdfStoreConfig: RdfStoreConfig,
-                                 renkuBaseUrl: RenkuBaseUrl,
-                                 logger: Logger[IO],
-                                 timeRecorder: SparqlQueryTimeRecorder[IO]
-                               )(implicit
-                                 executionContext: ExecutionContext,
-                                 contextShift: ContextShift[IO],
-                                 timer: Timer[IO],
-                                 ME: MonadError[IO, Throwable]
-                               ) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
-  with KGProjectFinder[IO] {
+    rdfStoreConfig: RdfStoreConfig,
+    renkuBaseUrl:   RenkuBaseUrl,
+    logger:         Logger[IO],
+    timeRecorder:   SparqlQueryTimeRecorder[IO]
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO],
+    ME:               MonadError[IO, Throwable]
+) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    with KGProjectFinder[IO] {
 
   import cats.syntax.all._
   import eu.timepit.refined.auto._
@@ -119,18 +119,18 @@ private class IOKGProjectFinder(
 
     val project: Decoder[KGProject] = { cursor =>
       for {
-        name <- cursor.downField("name").downField("value").as[Name]
-        dateCreated <- cursor.downField("dateCreated").downField("value").as[DateCreated]
-        maybeCreatorName <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
-        maybeCreatorEmail <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[users.Email]]
-        maybeParentId <- cursor.downField("maybeParentId").downField("value").as[Option[ResourceId]]
-        maybeParentName <- cursor.downField("maybeParentName").downField("value").as[Option[Name]]
+        name                   <- cursor.downField("name").downField("value").as[Name]
+        dateCreated            <- cursor.downField("dateCreated").downField("value").as[DateCreated]
+        maybeCreatorName       <- cursor.downField("maybeCreatorName").downField("value").as[Option[users.Name]]
+        maybeCreatorEmail      <- cursor.downField("maybeCreatorEmail").downField("value").as[Option[users.Email]]
+        maybeParentId          <- cursor.downField("maybeParentId").downField("value").as[Option[ResourceId]]
+        maybeParentName        <- cursor.downField("maybeParentName").downField("value").as[Option[Name]]
         maybeParentDateCreated <- cursor.downField("maybeParentDateCreated").downField("value").as[Option[DateCreated]]
         maybeParentCreatorName <- cursor.downField("maybeParentCreatorName").downField("value").as[Option[users.Name]]
         maybeParentCreatorEmail <- cursor
-          .downField("maybeParentCreatorEmail")
-          .downField("value")
-          .as[Option[users.Email]]
+                                     .downField("maybeParentCreatorEmail")
+                                     .downField("value")
+                                     .as[Option[users.Email]]
         version <- cursor.downField("schemaVersion").downField("value").as[SchemaVersion]
       } yield KGProject(
         path,
@@ -139,10 +139,10 @@ private class IOKGProjectFinder(
         maybeParent =
           (maybeParentId, maybeParentName, maybeParentDateCreated) mapN { case (parentId, name, dateCreated) =>
             Parent(parentId,
-              name,
-              ProjectCreation(dateCreated,
-                maybeParentCreatorName.map(name => ProjectCreator(maybeParentCreatorEmail, name))
-              )
+                   name,
+                   ProjectCreation(dateCreated,
+                                   maybeParentCreatorName.map(name => ProjectCreator(maybeParentCreatorEmail, name))
+                   )
             )
           },
         version
@@ -153,26 +153,26 @@ private class IOKGProjectFinder(
   }
 
   private lazy val toSingleProject: List[KGProject] => IO[Option[KGProject]] = {
-    case Nil => ME.pure(None)
+    case Nil            => ME.pure(None)
     case project +: Nil => ME.pure(Some(project))
-    case projects => ME.raiseError(new RuntimeException(s"More than one project with ${projects.head.path} path"))
+    case projects       => ME.raiseError(new RuntimeException(s"More than one project with ${projects.head.path} path"))
   }
 }
 
 private object IOKGProjectFinder {
 
   def apply(
-             timeRecorder: SparqlQueryTimeRecorder[IO],
-             rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-             renkuBaseUrl: IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
-             logger: Logger[IO] = ApplicationLogger
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             timer: Timer[IO]
-           ): IO[KGProjectFinder[IO]] =
+      timeRecorder:   SparqlQueryTimeRecorder[IO],
+      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
+      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
+      logger:         Logger[IO] = ApplicationLogger
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[KGProjectFinder[IO]] =
     for {
-      config <- rdfStoreConfig
+      config       <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl
     } yield new IOKGProjectFinder(config, renkuBaseUrl, logger, timeRecorder)
 }

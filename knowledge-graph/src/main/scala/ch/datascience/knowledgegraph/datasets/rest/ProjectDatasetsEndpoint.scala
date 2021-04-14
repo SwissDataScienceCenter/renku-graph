@@ -40,12 +40,12 @@ import org.http4s.dsl.Http4sDsl
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class ProjectDatasetsEndpoint[Interpretation[_] : Effect](
-                                                           projectDatasetsFinder: ProjectDatasetsFinder[Interpretation],
-                                                           renkuResourcesUrl: renku.ResourcesUrl,
-                                                           executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-                                                           logger: Logger[Interpretation]
-                                                         ) extends Http4sDsl[Interpretation] {
+class ProjectDatasetsEndpoint[Interpretation[_]: Effect](
+    projectDatasetsFinder: ProjectDatasetsFinder[Interpretation],
+    renkuResourcesUrl:     renku.ResourcesUrl,
+    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
+    logger:                Logger[Interpretation]
+) extends Http4sDsl[Interpretation] {
 
   import ProjectDatasetsFinder.SameAsOrDerived
   import executionTimeRecorder._
@@ -60,12 +60,11 @@ class ProjectDatasetsEndpoint[Interpretation[_] : Effect](
     } map logExecutionTimeWhen(finishedSuccessfully(projectPath))
 
   private def httpResult(
-                          projectPath: projects.Path
-                        ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(s"Finding $projectPath's datasets failed")
-      logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+      projectPath: projects.Path
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+    val errorMessage = ErrorMessage(s"Finding $projectPath's datasets failed")
+    logger.error(exception)(errorMessage.value)
+    InternalServerError(errorMessage)
   }
 
   private def finishedSuccessfully(projectPath: projects.Path): PartialFunction[Response[Interpretation], String] = {
@@ -91,7 +90,7 @@ class ProjectDatasetsEndpoint[Interpretation[_] : Effect](
         .deepMerge(sameAsOrDerived.asJson)
         .deepMerge(
           _links(
-            Rel("details") -> Href(renkuResourcesUrl / "datasets" / id),
+            Rel("details")         -> Href(renkuResourcesUrl / "datasets" / id),
             Rel("initial-version") -> Href(renkuResourcesUrl / "datasets" / initialVersion)
           )
         )
@@ -101,16 +100,16 @@ class ProjectDatasetsEndpoint[Interpretation[_] : Effect](
 object IOProjectDatasetsEndpoint {
 
   def apply(
-             timeRecorder: SparqlQueryTimeRecorder[IO]
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             timer: Timer[IO]
-           ): IO[ProjectDatasetsEndpoint[IO]] =
+      timeRecorder: SparqlQueryTimeRecorder[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ProjectDatasetsEndpoint[IO]] =
     for {
-      rdfStoreConfig <- RdfStoreConfig[IO]()
-      renkuBaseUrl <- RenkuBaseUrl[IO]()
-      renkuResourceUrl <- renku.ResourcesUrl[IO]()
+      rdfStoreConfig        <- RdfStoreConfig[IO]()
+      renkuBaseUrl          <- RenkuBaseUrl[IO]()
+      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new ProjectDatasetsEndpoint[IO](
       new IOProjectDatasetsFinder(rdfStoreConfig, renkuBaseUrl, ApplicationLogger, timeRecorder),

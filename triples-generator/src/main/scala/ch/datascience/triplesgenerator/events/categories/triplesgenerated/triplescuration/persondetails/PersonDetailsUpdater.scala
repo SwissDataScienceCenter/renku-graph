@@ -35,19 +35,19 @@ import scala.concurrent.ExecutionContext
 
 private[triplescuration] trait PersonDetailsUpdater[Interpretation[_]] {
   def updatePersonDetails(curatedTriples: CuratedTriples[Interpretation],
-                          project: Project,
-                          eventId: EventId
-                         ): CurationResults[Interpretation]
+                          project:        Project,
+                          eventId:        EventId
+  ): CurationResults[Interpretation]
 }
 
-private class PersonDetailsUpdaterImpl[Interpretation[_] : Monad](
-                                                                   personTrimmer: PersonTrimmer[Interpretation],
-                                                                   accessTokenFinder: AccessTokenFinder[Interpretation],
-                                                                   projectMembersFinder: GitLabProjectMembersFinder[Interpretation],
-                                                                   personsAndProjectMembersMatcher: PersonsAndProjectMembersMatcher,
-                                                                   updatesCreator: UpdatesCreator
-                                                                 )(implicit ME: MonadError[Interpretation, Throwable])
-  extends PersonDetailsUpdater[Interpretation] {
+private class PersonDetailsUpdaterImpl[Interpretation[_]: Monad](
+    personTrimmer:                   PersonTrimmer[Interpretation],
+    accessTokenFinder:               AccessTokenFinder[Interpretation],
+    projectMembersFinder:            GitLabProjectMembersFinder[Interpretation],
+    personsAndProjectMembersMatcher: PersonsAndProjectMembersMatcher,
+    updatesCreator:                  UpdatesCreator
+)(implicit ME:                       MonadError[Interpretation, Throwable])
+    extends PersonDetailsUpdater[Interpretation] {
 
   import IOAccessTokenFinder._
   import accessTokenFinder._
@@ -56,9 +56,9 @@ private class PersonDetailsUpdaterImpl[Interpretation[_] : Monad](
   import updatesCreator._
 
   def updatePersonDetails(curatedTriples: CuratedTriples[Interpretation],
-                          project: Project,
-                          eventId: EventId
-                         ): CurationResults[Interpretation] =
+                          project:        Project,
+                          eventId:        EventId
+  ): CurationResults[Interpretation] =
     for {
       maybeAccessToken <- findAccessToken(project.path).toRightT
       triplesAndPersons <-
@@ -67,7 +67,7 @@ private class PersonDetailsUpdaterImpl[Interpretation[_] : Monad](
       (updatedTriples, trimmedPersons) = triplesAndPersons
       projectMembers <- findProjectMembers(project.path)(maybeAccessToken)
       personsWithGitlabIds = merge(trimmedPersons, projectMembers)
-      newUpdatesGroups = personsWithGitlabIds map prepareUpdates[Interpretation]
+      newUpdatesGroups     = personsWithGitlabIds map prepareUpdates[Interpretation]
     } yield CuratedTriples(updatedTriples, curatedTriples.updatesGroups ++ newUpdatesGroups)
 
   private implicit class ResultOps[T](out: Interpretation[T]) {
@@ -81,17 +81,17 @@ private[triplescuration] object PersonDetailsUpdater {
   import cats.effect.IO
 
   def apply(
-             gitLabThrottler: Throttler[IO, GitLab],
-             logger: Logger[IO]
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             timer: Timer[IO]
-           ): IO[PersonDetailsUpdater[IO]] = for {
+      gitLabThrottler: Throttler[IO, GitLab],
+      logger:          Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[PersonDetailsUpdater[IO]] = for {
     projectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
-    accessTokenFinder <- IOAccessTokenFinder(logger)
-    gitLabUrl <- GitLabUrl[IO]()
-    personTrimmer <- IOPersonTrimmer(gitLabThrottler, logger)
+    accessTokenFinder    <- IOAccessTokenFinder(logger)
+    gitLabUrl            <- GitLabUrl[IO]()
+    personTrimmer        <- IOPersonTrimmer(gitLabThrottler, logger)
   } yield new PersonDetailsUpdaterImpl[IO](
     personTrimmer,
     accessTokenFinder,

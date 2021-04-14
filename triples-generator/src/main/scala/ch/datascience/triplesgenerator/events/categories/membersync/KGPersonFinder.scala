@@ -30,24 +30,24 @@ import scala.concurrent.ExecutionContext
 
 private trait KGPersonFinder[Interpretation[_]] {
   def findPersonIds(
-                     membersToAdd: Set[GitLabProjectMember]
-                   ): Interpretation[Set[(GitLabProjectMember, Option[ResourceId])]]
+      membersToAdd: Set[GitLabProjectMember]
+  ): Interpretation[Set[(GitLabProjectMember, Option[ResourceId])]]
 }
 
 private class KGPersonFinderImpl(
-                                  rdfStoreConfig: RdfStoreConfig,
-                                  logger: Logger[IO],
-                                  timeRecorder: SparqlQueryTimeRecorder[IO]
-                                )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-  extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    rdfStoreConfig:          RdfStoreConfig,
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with KGPersonFinder[IO] {
 
   import eu.timepit.refined.auto._
   import io.circe.Decoder
 
   def findPersonIds(
-                     membersToAdd: Set[GitLabProjectMember]
-                   ): IO[Set[(GitLabProjectMember, Option[ResourceId])]] = for {
+      membersToAdd: Set[GitLabProjectMember]
+  ): IO[Set[(GitLabProjectMember, Option[ResourceId])]] = for {
     gitLabIdsAndIds <- queryExpecting[Set[(GitLabId, ResourceId)]](using = query(membersToAdd)).map(_.toMap)
   } yield membersToAdd.map(member => member -> gitLabIdsAndIds.get(member.gitLabId))
 
@@ -83,10 +83,10 @@ private class KGPersonFinderImpl(
 }
 
 private object KGPersonFinder {
-  def apply(logger: Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
-                                                                           executionContext: ExecutionContext,
-                                                                           contextShift: ContextShift[IO],
-                                                                           timer: Timer[IO]
+  def apply(logger:     Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
   ): IO[KGPersonFinderImpl] = for {
     rdfStoreConfig <- RdfStoreConfig[IO]()
   } yield new KGPersonFinderImpl(rdfStoreConfig, logger, timeRecorder)

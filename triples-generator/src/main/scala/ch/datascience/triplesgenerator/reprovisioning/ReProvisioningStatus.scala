@@ -49,16 +49,16 @@ trait ReProvisioningStatus[Interpretation[_]] {
 }
 
 private class ReProvisioningStatusImpl(
-                                        eventConsumersRegistry: EventConsumersRegistry[IO],
-                                        rdfStoreConfig: RdfStoreConfig,
-                                        renkuBaseUrl: RenkuBaseUrl,
-                                        logger: Logger[IO],
-                                        timeRecorder: SparqlQueryTimeRecorder[IO],
-                                        statusRefreshInterval: FiniteDuration,
-                                        cacheRefreshInterval: FiniteDuration,
-                                        lastCacheCheckTimeRef: Ref[IO, Long]
-                                      )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-  extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    eventConsumersRegistry:  EventConsumersRegistry[IO],
+    rdfStoreConfig:          RdfStoreConfig,
+    renkuBaseUrl:            RenkuBaseUrl,
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO],
+    statusRefreshInterval:   FiniteDuration,
+    cacheRefreshInterval:    FiniteDuration,
+    lastCacheCheckTimeRef:   Ref[IO, Long]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with ReProvisioningStatus[IO] {
 
   private val applicative = Applicative[IO]
@@ -102,20 +102,20 @@ private class ReProvisioningStatusImpl(
   override def isReProvisioning(): IO[Boolean] = for {
     isCacheExpired <- isCacheExpired
     flag <- if (isCacheExpired) fetchStatus flatMap {
-      case Some(Running) => triggerPeriodicStatusCheck() map (_ => true)
-      case _ => updateCacheCheckTime() map (_ => false)
-    }
-    else false.pure[IO]
+              case Some(Running) => triggerPeriodicStatusCheck() map (_ => true)
+              case _             => updateCacheCheckTime() map (_ => false)
+            }
+            else false.pure[IO]
   } yield flag
 
   private def isCacheExpired: IO[Boolean] = for {
     lastCheckTime <- lastCacheCheckTimeRef.get
-    currentTime <- timer.clock.monotonic(TimeUnit.MILLISECONDS)
+    currentTime   <- timer.clock.monotonic(TimeUnit.MILLISECONDS)
   } yield currentTime - lastCheckTime > cacheRefreshInterval.toMillis
 
   private def updateCacheCheckTime() = for {
     currentTime <- timer.clock.monotonic(TimeUnit.MILLISECONDS)
-    _ <- lastCacheCheckTimeRef set currentTime
+    _           <- lastCacheCheckTimeRef set currentTime
   } yield ()
 
   private def triggerPeriodicStatusCheck(): IO[Unit] =
@@ -127,11 +127,11 @@ private class ReProvisioningStatusImpl(
   private def periodicStatusCheck: IO[Unit] = for {
     _ <- timer sleep statusRefreshInterval
     _ <- fetchStatus flatMap {
-      case Some(Running) => periodicStatusCheck
-      case _ =>
-        runningStatusCheckStarted set false
-        renewAllSubscriptions()
-    }
+           case Some(Running) => periodicStatusCheck
+           case _ =>
+             runningStatusCheckStarted set false
+             renewAllSubscriptions()
+         }
   } yield ()
 
   private def fetchStatus: IO[Option[Status]] = queryExpecting[Option[Status]] {
@@ -150,7 +150,7 @@ private class ReProvisioningStatusImpl(
   private lazy val statusDecoder: Decoder[Option[Status]] = {
     val ofStatuses: Decoder[Status] = _.downField("status").downField("value").as[String].flatMap {
       case Running.toString => Right(Running)
-      case status => Left(DecodingFailure(s"$status not a valid status", Nil))
+      case status           => Left(DecodingFailure(s"$status not a valid status", Nil))
     }
 
     _.downField("results")
@@ -162,31 +162,31 @@ private class ReProvisioningStatusImpl(
 
 object ReProvisioningStatus {
 
-  private val CacheRefreshInterval: FiniteDuration = 2 minutes
+  private val CacheRefreshInterval:  FiniteDuration = 2 minutes
   private val StatusRefreshInterval: FiniteDuration = 15 seconds
 
   def apply(
-             eventConsumersRegistry: EventConsumersRegistry[IO],
-             logger: Logger[IO],
-             timeRecorder: SparqlQueryTimeRecorder[IO],
-             configuration: Config = ConfigFactory.load()
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             timer: Timer[IO]
-           ): IO[ReProvisioningStatus[IO]] =
+      eventConsumersRegistry: EventConsumersRegistry[IO],
+      logger:                 Logger[IO],
+      timeRecorder:           SparqlQueryTimeRecorder[IO],
+      configuration:          Config = ConfigFactory.load()
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[ReProvisioningStatus[IO]] =
     for {
-      rdfStoreConfig <- RdfStoreConfig[IO](configuration)
-      renkuBaseUrl <- RenkuBaseUrl[IO]()
+      rdfStoreConfig        <- RdfStoreConfig[IO](configuration)
+      renkuBaseUrl          <- RenkuBaseUrl[IO]()
       lastCacheCheckTimeRef <- Ref.of[IO, Long](0)
     } yield new ReProvisioningStatusImpl(eventConsumersRegistry,
-      rdfStoreConfig,
-      renkuBaseUrl,
-      logger,
-      timeRecorder,
-      StatusRefreshInterval,
-      CacheRefreshInterval,
-      lastCacheCheckTimeRef
+                                         rdfStoreConfig,
+                                         renkuBaseUrl,
+                                         logger,
+                                         timeRecorder,
+                                         StatusRefreshInterval,
+                                         CacheRefreshInterval,
+                                         lastCacheCheckTimeRef
     )
 }
 
@@ -196,7 +196,7 @@ private case object ReProvisioningJsonLD {
 
   def id(implicit renkuBaseUrl: RenkuBaseUrl) = EntityId.of((renkuBaseUrl / "re-provisioning").toString)
 
-  val objectType = renku / "ReProvisioning"
+  val objectType           = renku / "ReProvisioning"
   val reProvisioningStatus = renku / "reProvisioningStatus"
 
   sealed trait Status

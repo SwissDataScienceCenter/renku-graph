@@ -32,11 +32,11 @@ import io.circe.HCursor
 import scala.concurrent.ExecutionContext
 
 private class CreatorsFinder(
-                              rdfStoreConfig: RdfStoreConfig,
-                              logger: Logger[IO],
-                              timeRecorder: SparqlQueryTimeRecorder[IO]
-                            )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-  extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
+    rdfStoreConfig:          RdfStoreConfig,
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
 
   import CreatorsFinder._
 
@@ -78,8 +78,8 @@ private object CreatorsFinder {
 
     val creator: Decoder[DatasetCreator] = { cursor =>
       for {
-        maybeEmail <- cursor.downField("email").downField("value").as[Option[Email]]
-        name <- cursor.downField("name").downField("value").as[UserName]
+        maybeEmail       <- cursor.downField("email").downField("value").as[Option[Email]]
+        name             <- cursor.downField("name").downField("value").as[UserName]
         maybeAffiliation <- extract("affiliation", from = cursor).map(blankToNone).flatMap(toOption[Affiliation])
       } yield DatasetCreator(maybeEmail, name, maybeAffiliation)
     }

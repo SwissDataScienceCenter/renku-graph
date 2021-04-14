@@ -38,16 +38,16 @@ private trait MembersSynchronizer[Interpretation[_]] {
 }
 
 private class MembersSynchronizerImpl[Interpretation[_]](
-                                                          accessTokenFinder: AccessTokenFinder[Interpretation],
-                                                          gitLabProjectMembersFinder: GitLabProjectMembersFinder[Interpretation],
-                                                          kGProjectMembersFinder: KGProjectMembersFinder[Interpretation],
-                                                          kGPersonFinder: KGPersonFinder[Interpretation],
-                                                          updatesCreator: UpdatesCreator,
-                                                          querySender: QuerySender[Interpretation],
-                                                          logger: Logger[Interpretation],
-                                                          executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
-                                                        )(implicit ME: MonadError[Interpretation, Throwable])
-  extends MembersSynchronizer[Interpretation] {
+    accessTokenFinder:          AccessTokenFinder[Interpretation],
+    gitLabProjectMembersFinder: GitLabProjectMembersFinder[Interpretation],
+    kGProjectMembersFinder:     KGProjectMembersFinder[Interpretation],
+    kGPersonFinder:             KGPersonFinder[Interpretation],
+    updatesCreator:             UpdatesCreator,
+    querySender:                QuerySender[Interpretation],
+    logger:                     Logger[Interpretation],
+    executionTimeRecorder:      ExecutionTimeRecorder[Interpretation]
+)(implicit ME:                  MonadError[Interpretation, Throwable])
+    extends MembersSynchronizer[Interpretation] {
 
   import ch.datascience.graph.tokenrepository.IOAccessTokenFinder._
   import executionTimeRecorder._
@@ -55,13 +55,13 @@ private class MembersSynchronizerImpl[Interpretation[_]](
   override def synchronizeMembers(projectPath: projects.Path): Interpretation[Unit] = measureExecutionTime {
     for {
       maybeAccessToken <- accessTokenFinder.findAccessToken(projectPath)
-      membersInGitLab <- gitLabProjectMembersFinder.findProjectMembers(projectPath)(maybeAccessToken)
-      membersInKG <- kGProjectMembersFinder.findProjectMembers(projectPath)
+      membersInGitLab  <- gitLabProjectMembersFinder.findProjectMembers(projectPath)(maybeAccessToken)
+      membersInKG      <- kGProjectMembersFinder.findProjectMembers(projectPath)
       membersToAdd = findMembersToAdd(membersInGitLab, membersInKG)
       membersToAddWithIds <- kGPersonFinder.findPersonIds(membersToAdd)
       insertionUpdates = updatesCreator.insertion(projectPath, membersToAddWithIds)
-      membersToRemove = findMembersToRemove(membersInGitLab, membersInKG)
-      removalUpdates = updatesCreator.removal(projectPath, membersToRemove)
+      membersToRemove  = findMembersToRemove(membersInGitLab, membersInKG)
+      removalUpdates   = updatesCreator.removal(projectPath, membersToRemove)
       _ <- (insertionUpdates :+ removalUpdates).map(querySender.send).sequence
     } yield SyncSummary(projectPath, membersAdded = membersToAdd.size, membersRemoved = membersToRemove.size)
   } flatMap logSummary recoverWith { case NonFatal(exception) =>
@@ -69,15 +69,15 @@ private class MembersSynchronizerImpl[Interpretation[_]](
   }
 
   def findMembersToAdd(membersInGitLab: Set[GitLabProjectMember],
-                       membersInKG: Set[KGProjectMember]
-                      ): Set[GitLabProjectMember] = membersInGitLab.collect {
-    case member@GitLabProjectMember(gitlabId, _) if !membersInKG.exists(_.gitLabId == gitlabId) => member
+                       membersInKG:     Set[KGProjectMember]
+  ): Set[GitLabProjectMember] = membersInGitLab.collect {
+    case member @ GitLabProjectMember(gitlabId, _) if !membersInKG.exists(_.gitLabId == gitlabId) => member
   }
 
   def findMembersToRemove(membersInGitLab: Set[GitLabProjectMember],
-                          membersInKG: Set[KGProjectMember]
-                         ): Set[KGProjectMember] = membersInKG.collect {
-    case member@KGProjectMember(_, gitlabId) if !membersInGitLab.exists(_.gitLabId == gitlabId) => member
+                          membersInKG:     Set[KGProjectMember]
+  ): Set[KGProjectMember] = membersInKG.collect {
+    case member @ KGProjectMember(_, gitlabId) if !membersInGitLab.exists(_.gitLabId == gitlabId) => member
   }
 
   private case class SyncSummary(projectPath: projects.Path, membersAdded: Int, membersRemoved: Int)
@@ -93,28 +93,28 @@ private class MembersSynchronizerImpl[Interpretation[_]](
 
 private object MembersSynchronizer {
   def apply(gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(
-    implicit
-    executionContext: ExecutionContext,
-    contextShift: ContextShift[IO],
-    timer: Timer[IO]
+      implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
   ): IO[MembersSynchronizer[IO]] = for {
-    accessTokenFinder <- IOAccessTokenFinder(logger)
+    accessTokenFinder          <- IOAccessTokenFinder(logger)
     gitLabProjectMembersFinder <- IOGitLabProjectMembersFinder(gitLabThrottler, logger)
-    kGProjectMembersFinder <- KGProjectMembersFinder(logger, timeRecorder)
-    kGPersonFinder <- KGPersonFinder(logger, timeRecorder)
-    updatesCreator <- UpdatesCreator()
-    rdfStoreConfig <- RdfStoreConfig[IO]()
+    kGProjectMembersFinder     <- KGProjectMembersFinder(logger, timeRecorder)
+    kGPersonFinder             <- KGPersonFinder(logger, timeRecorder)
+    updatesCreator             <- UpdatesCreator()
+    rdfStoreConfig             <- RdfStoreConfig[IO]()
     querySender <- IO(new IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) with QuerySender[IO] {
-      override def send(query: SparqlQuery): IO[Unit] = updateWithNoResult(query)
-    })
+                     override def send(query: SparqlQuery): IO[Unit] = updateWithNoResult(query)
+                   })
     executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = None)
   } yield new MembersSynchronizerImpl[IO](accessTokenFinder,
-    gitLabProjectMembersFinder,
-    kGProjectMembersFinder,
-    kGPersonFinder,
-    updatesCreator,
-    querySender,
-    logger,
-    executionTimeRecorder
+                                          gitLabProjectMembersFinder,
+                                          kGProjectMembersFinder,
+                                          kGPersonFinder,
+                                          updatesCreator,
+                                          querySender,
+                                          logger,
+                                          executionTimeRecorder
   )
 }

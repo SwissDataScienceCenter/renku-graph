@@ -41,22 +41,22 @@ private trait TriplesUploader[Interpretation[_]] {
 }
 
 private class IOTriplesUploader(
-                                 rdfStoreConfig: RdfStoreConfig,
-                                 logger: Logger[IO],
-                                 timeRecorder: SparqlQueryTimeRecorder[IO],
-                                 retryInterval: FiniteDuration = SleepAfterConnectionIssue,
-                                 maxRetries: Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
-                                 idleTimeout: Duration = 6 minutes,
-                                 requestTimeout: Duration = 5 minutes
-                               )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-  extends IORestClient[Any](Throttler.noThrottling,
-    logger,
-    maybeTimeRecorder = timeRecorder.instance.some,
-    retryInterval = retryInterval,
-    maxRetries = maxRetries,
-    idleTimeoutOverride = idleTimeout.some,
-    requestTimeoutOverride = requestTimeout.some
-  )
+    rdfStoreConfig:          RdfStoreConfig,
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO],
+    retryInterval:           FiniteDuration = SleepAfterConnectionIssue,
+    maxRetries:              Int Refined NonNegative = MaxRetriesAfterConnectionTimeout,
+    idleTimeout:             Duration = 6 minutes,
+    requestTimeout:          Duration = 5 minutes
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORestClient[Any](Throttler.noThrottling,
+                              logger,
+                              maybeTimeRecorder = timeRecorder.instance.some,
+                              retryInterval = retryInterval,
+                              maxRetries = maxRetries,
+                              idleTimeoutOverride = idleTimeout.some,
+                              requestTimeoutOverride = requestTimeout.some
+    )
     with TriplesUploader[IO] {
 
   import TriplesUploadResult._
@@ -71,7 +71,7 @@ private class IOTriplesUploader(
 
   def upload(triples: JsonLDTriples): IO[TriplesUploadResult] = {
     for {
-      uri <- validateUri(dataUploadUrl.value)
+      uri          <- validateUri(dataUploadUrl.value)
       uploadResult <- send(uploadRequest(uri, triples))(mapResponse)
     } yield uploadResult
   } recover withUploadingError
@@ -85,8 +85,8 @@ private class IOTriplesUploader(
     )
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[TriplesUploadResult]] = {
-    case (Ok, _, _) => IO.pure(DeliverySuccess)
-    case (BadRequest, _, response) => singleLineBody(response).map(InvalidTriplesFailure.apply)
+    case (Ok, _, _)                         => IO.pure(DeliverySuccess)
+    case (BadRequest, _, response)          => singleLineBody(response).map(InvalidTriplesFailure.apply)
     case (InternalServerError, _, response) => singleLineBody(response).map(InvalidTriplesFailure.apply)
     case (other, _, response) =>
       singleLineBody(response).map(message => s"$other: $message").map(RecoverableFailure.apply)
@@ -95,8 +95,7 @@ private class IOTriplesUploader(
   private def singleLineBody(response: Response[IO]): IO[String] =
     response.as[String].map(LogMessage.toSingleLine)
 
-  private lazy val withUploadingError: PartialFunction[Throwable, TriplesUploadResult] = {
-    case NonFatal(exception) =>
-      RecoverableFailure(exception.getMessage)
+  private lazy val withUploadingError: PartialFunction[Throwable, TriplesUploadResult] = { case NonFatal(exception) =>
+    RecoverableFailure(exception.getMessage)
   }
 }

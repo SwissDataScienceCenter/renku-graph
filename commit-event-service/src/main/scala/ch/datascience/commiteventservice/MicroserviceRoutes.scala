@@ -31,11 +31,11 @@ import org.http4s.dsl.Http4sDsl
 
 import scala.concurrent.ExecutionContext
 
-private class MicroserviceRoutes[Interpretation[_] : ConcurrentEffect](
-                                                                        eventEndpoint: EventEndpoint[Interpretation],
-                                                                        routesMetrics: RoutesMetrics[Interpretation]
-                                                                      )(implicit clock: Clock[Interpretation])
-  extends Http4sDsl[Interpretation] {
+private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect](
+    eventEndpoint: EventEndpoint[Interpretation],
+    routesMetrics: RoutesMetrics[Interpretation]
+)(implicit clock:  Clock[Interpretation])
+    extends Http4sDsl[Interpretation] {
 
   import eventEndpoint._
   import org.http4s.HttpRoutes
@@ -51,16 +51,16 @@ private class MicroserviceRoutes[Interpretation[_] : ConcurrentEffect](
 
 private object MicroserviceRoutes {
   def apply(
-             consumersRegistry: EventConsumersRegistry[IO],
-             metricsRegistry: MetricsRegistry[IO],
-             gitLabThrottler: Throttler[IO, GitLab],
-             executionTimeRecorder: ExecutionTimeRecorder[IO],
-             logger: Logger[IO]
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             timer: Timer[IO]
-           ): IO[MicroserviceRoutes[IO]] =
+      consumersRegistry:     EventConsumersRegistry[IO],
+      metricsRegistry:       MetricsRegistry[IO],
+      gitLabThrottler:       Throttler[IO, GitLab],
+      executionTimeRecorder: ExecutionTimeRecorder[IO],
+      logger:                Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[MicroserviceRoutes[IO]] =
     for {
       eventEndpoint <- EventEndpoint(consumersRegistry, logger)
     } yield new MicroserviceRoutes(

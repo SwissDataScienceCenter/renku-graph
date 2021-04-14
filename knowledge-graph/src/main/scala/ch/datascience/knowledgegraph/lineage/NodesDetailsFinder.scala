@@ -37,9 +37,9 @@ import scala.concurrent.ExecutionContext
 private trait NodesDetailsFinder[Interpretation[_]] {
 
   def findDetails[T](
-                      location: Set[T],
-                      projectPath: projects.Path
-                    )(implicit query: (T, ResourceId) => SparqlQuery): Interpretation[Set[Node]]
+      location:     Set[T],
+      projectPath:  projects.Path
+  )(implicit query: (T, ResourceId) => SparqlQuery): Interpretation[Set[Node]]
 }
 
 private object NodesDetailsFinder {
@@ -149,18 +149,18 @@ private object NodesDetailsFinder {
 }
 
 private class IONodesDetailsFinder(
-                                    rdfStoreConfig: RdfStoreConfig,
-                                    renkuBaseUrl: RenkuBaseUrl,
-                                    logger: Logger[IO],
-                                    timeRecorder: SparqlQueryTimeRecorder[IO]
-                                  )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-  extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+    rdfStoreConfig:          RdfStoreConfig,
+    renkuBaseUrl:            RenkuBaseUrl,
+    logger:                  Logger[IO],
+    timeRecorder:            SparqlQueryTimeRecorder[IO]
+)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with NodesDetailsFinder[IO] {
 
   override def findDetails[T](
-                               ids: Set[T],
-                               projectPath: projects.Path
-                             )(implicit query: (T, ResourceId) => SparqlQuery): IO[Set[Node]] =
+      ids:          Set[T],
+      projectPath:  projects.Path
+  )(implicit query: (T, ResourceId) => SparqlQuery): IO[Set[Node]] =
     ids.toList
       .map { id =>
         queryExpecting[Option[Node]](using = query(id, ResourceId(renkuBaseUrl, projectPath))) flatMap failIf(no = id)
@@ -170,14 +170,14 @@ private class IONodesDetailsFinder(
 
   private implicit val nodeDecoder: Decoder[Option[Node]] = {
     implicit val locationDecoder: Decoder[Node.Location] = TinyTypeDecoders.stringDecoder(Node.Location)
-    implicit val labelDecoder: Decoder[Node.Label] = TinyTypeDecoders.stringDecoder(Node.Label)
-    implicit val typeDecoder: Decoder[Node.Type] = TinyTypeDecoders.stringDecoder(Node.Type)
+    implicit val labelDecoder:    Decoder[Node.Label]    = TinyTypeDecoders.stringDecoder(Node.Label)
+    implicit val typeDecoder:     Decoder[Node.Type]     = TinyTypeDecoders.stringDecoder(Node.Type)
 
     implicit lazy val fieldsDecoder: Decoder[Option[(Node.Location, Node.Type, Node.Label)]] = { cursor =>
       for {
         maybeNodeType <- cursor.downField("type").downField("value").as[Option[Node.Type]]
         maybeLocation <- cursor.downField("location").downField("value").as[Option[Node.Location]]
-        maybeLabel <- cursor.downField("label").downField("value").as[Option[Node.Label]].map(trimValue)
+        maybeLabel    <- cursor.downField("label").downField("value").as[Option[Node.Label]].map(trimValue)
       } yield (maybeLocation, maybeNodeType, maybeLabel) mapN ((_, _, _))
     }
 
@@ -189,7 +189,7 @@ private class IONodesDetailsFinder(
         Some {
           tail.foldLeft(Node(location, label, Set(typ))) {
             case (node, (`location`, t, `label`)) => node.copy(types = node.types + t)
-            case (node, _) => node
+            case (node, _)                        => node
           }
         }
     }
@@ -206,7 +206,7 @@ private class IONodesDetailsFinder(
     case _ =>
       no match {
         case _: Node.Location => new IllegalArgumentException(s"No entity with $no").raiseError[IO, Node]
-        case _: EntityId => new IllegalArgumentException(s"No runPlan with $no").raiseError[IO, Node]
+        case _: EntityId      => new IllegalArgumentException(s"No runPlan with $no").raiseError[IO, Node]
       }
   }
 }
@@ -214,17 +214,17 @@ private class IONodesDetailsFinder(
 private object IOLineageNodeDetailsFinder {
 
   def apply(
-             timeRecorder: SparqlQueryTimeRecorder[IO],
-             rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-             renkuBaseUrl: IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
-             logger: Logger[IO]
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             timer: Timer[IO]
-           ): IO[NodesDetailsFinder[IO]] =
+      timeRecorder:   SparqlQueryTimeRecorder[IO],
+      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
+      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
+      logger:         Logger[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[NodesDetailsFinder[IO]] =
     for {
-      config <- rdfStoreConfig
+      config       <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl
     } yield new IONodesDetailsFinder(
       config,

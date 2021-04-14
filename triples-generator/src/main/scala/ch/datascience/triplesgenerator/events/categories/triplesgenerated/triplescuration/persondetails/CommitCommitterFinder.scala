@@ -41,34 +41,34 @@ import scala.concurrent.ExecutionContext
 
 private trait CommitCommitterFinder[Interpretation[_]] {
 
-  def findCommitPeople(projectId: projects.Id,
-                       commitId: CommitId,
+  def findCommitPeople(projectId:        projects.Id,
+                       commitId:         CommitId,
                        maybeAccessToken: Option[AccessToken]
-                      ): EitherT[Interpretation, ProcessingRecoverableError, CommitPersonsInfo]
+  ): EitherT[Interpretation, ProcessingRecoverableError, CommitPersonsInfo]
 }
 
 private class CommitCommitterFinderImpl(
-                                         gitLabApiUrl: GitLabApiUrl,
-                                         gitLabThrottler: Throttler[IO, GitLab],
-                                         logger: Logger[IO]
-                                       )(implicit
-                                         executionContext: ExecutionContext,
-                                         contextShift: ContextShift[IO],
-                                         timer: Timer[IO]
-                                       ) extends IORestClient(gitLabThrottler, logger)
-  with CommitCommitterFinder[IO] {
+    gitLabApiUrl:    GitLabApiUrl,
+    gitLabThrottler: Throttler[IO, GitLab],
+    logger:          Logger[IO]
+)(implicit
+    executionContext: ExecutionContext,
+    contextShift:     ContextShift[IO],
+    timer:            Timer[IO]
+) extends IORestClient(gitLabThrottler, logger)
+    with CommitCommitterFinder[IO] {
 
-  def findCommitPeople(projectId: projects.Id,
-                       commitId: CommitId,
+  def findCommitPeople(projectId:        projects.Id,
+                       commitId:         CommitId,
                        maybeAccessToken: Option[AccessToken]
-                      ): EitherT[IO, ProcessingRecoverableError, CommitPersonsInfo] =
+  ): EitherT[IO, ProcessingRecoverableError, CommitPersonsInfo] =
     for {
-      uri <- validateUri(s"$gitLabApiUrl/projects/$projectId/repository/commits/$commitId").toRightT
+      uri    <- validateUri(s"$gitLabApiUrl/projects/$projectId/repository/commits/$commitId").toRightT
       result <- EitherT(send(request(GET, uri, maybeAccessToken))(mapResponse) recoverWith maybeRecoverableError)
     } yield result
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[
-    Either[ProcessingRecoverableError, (CommitPersonsInfo)]
+    Either[ProcessingRecoverableError, CommitPersonsInfo]
   ]] = {
     case (Ok, _, response) => response.as[CommitPersonsInfo].map(info => Right(info))
     case (ServiceUnavailable, _, _) =>
@@ -81,7 +81,7 @@ private class CommitCommitterFinderImpl(
     jsonOf[IO, CommitPersonsInfo]
 
   private lazy val maybeRecoverableError
-  : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, CommitPersonsInfo]]] = {
+      : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, CommitPersonsInfo]]] = {
     case ConnectivityException(message, cause) =>
       IO.pure(Either.left(CurationRecoverableError(message, cause)))
   }
@@ -95,8 +95,8 @@ private class CommitCommitterFinderImpl(
 
 private object IOCommitCommitterFinder {
   def apply(gitLabApiUrl: GitLabApiUrl, gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
-                                                                                                    executionContext: ExecutionContext,
-                                                                                                    contextShift: ContextShift[IO],
-                                                                                                    timer: Timer[IO]
+      executionContext:   ExecutionContext,
+      contextShift:       ContextShift[IO],
+      timer:              Timer[IO]
   ): IO[CommitCommitterFinder[IO]] = IO(new CommitCommitterFinderImpl(gitLabApiUrl, gitLabThrottler, logger))
 }

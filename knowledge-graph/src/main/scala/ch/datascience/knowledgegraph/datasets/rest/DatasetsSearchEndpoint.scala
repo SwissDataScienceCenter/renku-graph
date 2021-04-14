@@ -41,13 +41,13 @@ import org.http4s.dsl.impl.OptionalValidatingQueryParamDecoderMatcher
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class DatasetsSearchEndpoint[Interpretation[_] : Effect](
-                                                          datasetsFinder: DatasetsFinder[Interpretation],
-                                                          renkuResourcesUrl: renku.ResourcesUrl,
-                                                          executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
-                                                          logger: Logger[Interpretation]
-                                                        )(implicit ME: MonadError[Interpretation, Throwable])
-  extends Http4sDsl[Interpretation] {
+class DatasetsSearchEndpoint[Interpretation[_]: Effect](
+    datasetsFinder:        DatasetsFinder[Interpretation],
+    renkuResourcesUrl:     renku.ResourcesUrl,
+    executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
+    logger:                Logger[Interpretation]
+)(implicit ME:             MonadError[Interpretation, Throwable])
+    extends Http4sDsl[Interpretation] {
 
   import DatasetsFinder.DatasetSearchResult
   import DatasetsSearchEndpoint.Query._
@@ -60,9 +60,9 @@ class DatasetsSearchEndpoint[Interpretation[_] : Effect](
   import io.circe.literal._
 
   def searchForDatasets(maybePhrase: Option[Phrase],
-                        sort: Sort.By,
-                        paging: PagingRequest
-                       ): Interpretation[Response[Interpretation]] =
+                        sort:        Sort.By,
+                        paging:      PagingRequest
+  ): Interpretation[Response[Interpretation]] =
     measureExecutionTime {
       implicit val datasetsUrl: renku.ResourceUrl = requestedUrl(maybePhrase, sort, paging)
 
@@ -76,16 +76,15 @@ class DatasetsSearchEndpoint[Interpretation[_] : Effect](
     (renkuResourcesUrl / "datasets") ? (page.parameterName -> paging.page) & (perPage.parameterName -> paging.perPage) & (Sort.sort.parameterName -> sort) && (query.parameterName -> maybePhrase)
 
   private def httpResult(
-                          maybePhrase: Option[Phrase]
-                        ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
-    case NonFatal(exception) =>
-      val errorMessage = ErrorMessage(
-        maybePhrase
-          .map(phrase => s"Finding datasets matching '$phrase' failed")
-          .getOrElse("Finding all datasets failed")
-      )
-      logger.error(exception)(errorMessage.value)
-      InternalServerError(errorMessage)
+      maybePhrase: Option[Phrase]
+  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
+    val errorMessage = ErrorMessage(
+      maybePhrase
+        .map(phrase => s"Finding datasets matching '$phrase' failed")
+        .getOrElse("Finding all datasets failed")
+    )
+    logger.error(exception)(errorMessage.value)
+    InternalServerError(errorMessage)
   }
 
   private def finishedSuccessfully(maybePhrase: Option[Phrase]): PartialFunction[Response[Interpretation], String] = {
@@ -136,7 +135,7 @@ class DatasetsSearchEndpoint[Interpretation[_] : Effect](
 object DatasetsSearchEndpoint {
 
   object Query {
-    final class Phrase private(val value: String) extends AnyVal with StringTinyType
+    final class Phrase private (val value: String) extends AnyVal with StringTinyType
 
     implicit object Phrase extends TinyTypeFactory[Phrase](new Phrase(_)) with NonBlank
 
@@ -178,21 +177,21 @@ object DatasetsSearchEndpoint {
 object IODatasetsSearchEndpoint {
 
   def apply(
-             timeRecorder: SparqlQueryTimeRecorder[IO]
-           )(implicit
-             executionContext: ExecutionContext,
-             contextShift: ContextShift[IO],
-             timer: Timer[IO]
-           ): IO[DatasetsSearchEndpoint[IO]] =
+      timeRecorder: SparqlQueryTimeRecorder[IO]
+  )(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): IO[DatasetsSearchEndpoint[IO]] =
     for {
-      rdfStoreConfig <- RdfStoreConfig[IO]()
-      renkuResourceUrl <- renku.ResourcesUrl[IO]()
+      rdfStoreConfig        <- RdfStoreConfig[IO]()
+      renkuResourceUrl      <- renku.ResourcesUrl[IO]()
       executionTimeRecorder <- ExecutionTimeRecorder[IO](ApplicationLogger)
     } yield new DatasetsSearchEndpoint[IO](
       new IODatasetsFinder(rdfStoreConfig,
-        new CreatorsFinder(rdfStoreConfig, ApplicationLogger, timeRecorder),
-        ApplicationLogger,
-        timeRecorder
+                           new CreatorsFinder(rdfStoreConfig, ApplicationLogger, timeRecorder),
+                           ApplicationLogger,
+                           timeRecorder
       ),
       renkuResourceUrl,
       executionTimeRecorder,

@@ -45,19 +45,19 @@ import scala.util.control.NonFatal
 
 private trait EventProcessor[Interpretation[_]] {
   def process(
-               triplesGeneratedEvent: TriplesGeneratedEvent
-             ): Interpretation[Unit]
+      triplesGeneratedEvent: TriplesGeneratedEvent
+  ): Interpretation[Unit]
 }
 
 private class TriplesGeneratedEventProcessor[Interpretation[_]](
-                                                                 accessTokenFinder: AccessTokenFinder[Interpretation],
-                                                                 triplesCurator: TriplesTransformer[Interpretation],
-                                                                 uploader: Uploader[Interpretation],
-                                                                 statusUpdater: EventStatusUpdater[Interpretation],
-                                                                 logger: Logger[Interpretation],
-                                                                 executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
-                                                               )(implicit ME: MonadError[Interpretation, Throwable])
-  extends EventProcessor[Interpretation] {
+    accessTokenFinder:     AccessTokenFinder[Interpretation],
+    triplesCurator:        TriplesTransformer[Interpretation],
+    uploader:              Uploader[Interpretation],
+    statusUpdater:         EventStatusUpdater[Interpretation],
+    logger:                Logger[Interpretation],
+    executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
+)(implicit ME:             MonadError[Interpretation, Throwable])
+    extends EventProcessor[Interpretation] {
 
   import IOAccessTokenFinder._
   import UploadingResult._
@@ -69,10 +69,10 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   def process(triplesGeneratedEvent: TriplesGeneratedEvent): Interpretation[Unit] = {
     for {
       maybeAccessToken <- findAccessToken(triplesGeneratedEvent.project.path)
-        .recoverWith(rollback(triplesGeneratedEvent))
+                            .recoverWith(rollback(triplesGeneratedEvent))
       results <- measureExecutionTime(transformAndUpload(triplesGeneratedEvent)(maybeAccessToken))
-      _ <- updateEventLog(results)
-      _ <- logSummary(triplesGeneratedEvent)(results)
+      _       <- updateEventLog(results)
+      _       <- logSummary(triplesGeneratedEvent)(results)
     } yield ()
   } recoverWith logError(triplesGeneratedEvent)
 
@@ -84,8 +84,8 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   }
 
   private def transformAndUpload(
-                                  triplesGeneratedEvent: TriplesGeneratedEvent
-                                )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
+      triplesGeneratedEvent:   TriplesGeneratedEvent
+  )(implicit maybeAccessToken: Option[AccessToken]): Interpretation[UploadingResult] = {
     for {
       curatedTriples <-
         transform(triplesGeneratedEvent).leftSemiflatMap(
@@ -96,24 +96,24 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   }.merge recoverWith nonRecoverableFailure(triplesGeneratedEvent)
 
   private def toUploadingResult(triplesGeneratedEvent: TriplesGeneratedEvent,
-                                triplesUploadResult: TriplesUploadResult
-                               ): Interpretation[UploadingResult] = triplesUploadResult match {
+                                triplesUploadResult:   TriplesUploadResult
+  ): Interpretation[UploadingResult] = triplesUploadResult match {
     case DeliverySuccess =>
       (Uploaded(triplesGeneratedEvent): UploadingResult)
         .pure[Interpretation]
-    case error@RecoverableFailure(message) =>
+    case error @ RecoverableFailure(message) =>
       logger
         .error(error)(
           s"${logMessageCommon(triplesGeneratedEvent)} $message"
         )
         .map(_ => RecoverableError(triplesGeneratedEvent, error))
-    case error@InvalidTriplesFailure(message) =>
+    case error @ InvalidTriplesFailure(message) =>
       logger
         .error(error)(
           s"${logMessageCommon(triplesGeneratedEvent)} $message"
         )
         .map(_ => NonRecoverableError(triplesGeneratedEvent, error: Throwable))
-    case error@InvalidUpdatesFailure(message) =>
+    case error @ InvalidUpdatesFailure(message) =>
       logger
         .error(error)(
           s"${logMessageCommon(triplesGeneratedEvent)} $message"
@@ -122,18 +122,17 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   }
 
   private def nonRecoverableFailure(
-                                     triplesGeneratedEvent: TriplesGeneratedEvent
-                                   ): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
-    case NonFatal(exception) =>
-      logger
-        .error(exception)(s"${logMessageCommon(triplesGeneratedEvent)} ${exception.getMessage}")
-        .map(_ => NonRecoverableError(triplesGeneratedEvent, exception))
+      triplesGeneratedEvent: TriplesGeneratedEvent
+  ): PartialFunction[Throwable, Interpretation[UploadingResult]] = { case NonFatal(exception) =>
+    logger
+      .error(exception)(s"${logMessageCommon(triplesGeneratedEvent)} ${exception.getMessage}")
+      .map(_ => NonRecoverableError(triplesGeneratedEvent, exception))
   }
 
   private def toUploadingError(
-                                triplesGeneratedEvent: TriplesGeneratedEvent
-                              ): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
-    case curationError@CurationRecoverableError(message, _) =>
+      triplesGeneratedEvent: TriplesGeneratedEvent
+  ): PartialFunction[Throwable, Interpretation[UploadingResult]] = {
+    case curationError @ CurationRecoverableError(message, _) =>
       logger
         .error(curationError)(s"${logMessageCommon(triplesGeneratedEvent)} $message")
         .map(_ => RecoverableError(triplesGeneratedEvent, curationError))
@@ -154,35 +153,32 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
         .recoverWith(logEventLogUpdateError(event, "as failed nonrecoverably"))
   }
 
-  private def logEventLogUpdateError(event: TriplesGeneratedEvent,
+  private def logEventLogUpdateError(event:   TriplesGeneratedEvent,
                                      message: String
-                                    ): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      logger.error(exception)(s"${logMessageCommon(event)} failed to mark $message in the Event Log")
+  ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+    logger.error(exception)(s"${logMessageCommon(event)} failed to mark $message in the Event Log")
   }
 
   private def logSummary(
-                          triplesGeneratedEvent: TriplesGeneratedEvent
-                        ): ((ElapsedTime, UploadingResult)) => Interpretation[Unit] = {
-    case (elapsedTime, uploadingResult) =>
-      val message = uploadingResult match {
-        case Uploaded(_) => "was successfully uploaded"
-        case _ => "failed to upload"
-      }
-      logger.info(s"${logMessageCommon(triplesGeneratedEvent)} processed in ${elapsedTime}ms: $message")
+      triplesGeneratedEvent: TriplesGeneratedEvent
+  ): ((ElapsedTime, UploadingResult)) => Interpretation[Unit] = { case (elapsedTime, uploadingResult) =>
+    val message = uploadingResult match {
+      case Uploaded(_) => "was successfully uploaded"
+      case _           => "failed to upload"
+    }
+    logger.info(s"${logMessageCommon(triplesGeneratedEvent)} processed in ${elapsedTime}ms: $message")
   }
 
   private def logMessageCommon(event: TriplesGeneratedEvent): String =
     s"$categoryName: ${event.compoundEventId}, projectPath: ${event.project.path}"
 
   private def rollback(
-                        triplesGeneratedEvent: TriplesGeneratedEvent
-                      ): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = {
-    case NonFatal(exception) =>
-      statusUpdater.rollback[TriplesGenerated](triplesGeneratedEvent.compoundEventId) >> new Exception(
-        "transformation failure -> Event rolled back",
-        exception
-      ).raiseError[Interpretation, Option[AccessToken]]
+      triplesGeneratedEvent: TriplesGeneratedEvent
+  ): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = { case NonFatal(exception) =>
+    statusUpdater.rollback[TriplesGenerated](triplesGeneratedEvent.compoundEventId) >> new Exception(
+      "transformation failure -> Event rolled back",
+      exception
+    ).raiseError[Interpretation, Option[AccessToken]]
   }
 
   private sealed trait UploadingResult extends Product with Serializable {
@@ -216,20 +212,20 @@ private object IOTriplesGeneratedEventProcessor {
         50000000, 100000000, 500000000)
 
   def apply(
-             metricsRegistry: MetricsRegistry[IO],
-             gitLabThrottler: Throttler[IO, GitLab],
-             timeRecorder: SparqlQueryTimeRecorder[IO],
-             logger: Logger[IO]
-           )(implicit
-             contextShift: ContextShift[IO],
-             executionContext: ExecutionContext,
-             timer: Timer[IO]
-           ): IO[TriplesGeneratedEventProcessor[IO]] =
+      metricsRegistry: MetricsRegistry[IO],
+      gitLabThrottler: Throttler[IO, GitLab],
+      timeRecorder:    SparqlQueryTimeRecorder[IO],
+      logger:          Logger[IO]
+  )(implicit
+      contextShift:     ContextShift[IO],
+      executionContext: ExecutionContext,
+      timer:            Timer[IO]
+  ): IO[TriplesGeneratedEventProcessor[IO]] =
     for {
-      uploader <- IOUploader(logger, timeRecorder)
-      accessTokenFinder <- IOAccessTokenFinder(logger)
-      triplesCurator <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)
-      eventStatusUpdater <- EventStatusUpdater(categoryName, logger)
+      uploader              <- IOUploader(logger, timeRecorder)
+      accessTokenFinder     <- IOAccessTokenFinder(logger)
+      triplesCurator        <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)
+      eventStatusUpdater    <- EventStatusUpdater(categoryName, logger)
       eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
       executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
     } yield new TriplesGeneratedEventProcessor(
