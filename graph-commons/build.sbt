@@ -26,15 +26,21 @@ val refinedVersion = "0.9.23"
 libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 
-libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.0.1"
-
 val circeVersion = "0.13.0"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
-libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
+libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
 libraryDependencies += "io.sentry" % "sentry-logback" % "4.3.0"
+
+val http4sVersion = "0.21.22"
+libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-circe"              % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-dsl"                % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sVersion
+libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
 
 val doobieVersion = "0.12.1"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
@@ -46,15 +52,13 @@ libraryDependencies += "org.typelevel" %% "cats-core"   % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-free"   % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-effect" % "2.4.1"
 
-val http4sVersion = "0.21.22"
-libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sVersion
-libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sVersion
-libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion
-libraryDependencies += "org.http4s" %% "http4s-circe"              % http4sVersion
-libraryDependencies += "org.http4s" %% "http4s-dsl"                % http4sVersion
-libraryDependencies += "org.http4s" %% "http4s-prometheus-metrics" % http4sVersion
+libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.0.1"
 
 // Test dependencies
+val testContainersScalaVersion = "0.38.8"
+libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
+libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
+
 libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.27.2" % Test
 
 val jenaVersion = "3.14.0" // 4.0.0 requires IRI encoding
@@ -62,14 +66,10 @@ libraryDependencies += "org.apache.jena" % "jena-fuseki-main"   % jenaVersion % 
 libraryDependencies += "org.apache.jena" % "jena-rdfconnection" % jenaVersion % Test
 libraryDependencies += "org.apache.jena" % "jena-text"          % jenaVersion % Test
 
-libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.1.0"   % Test
 libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Test // version 1.15.1 is broken
-libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
+libraryDependencies += "org.scalamock"     %% "scalamock"       % "5.1.0"   % Test
 libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.6"   % Test
-
-val testContainersScalaVersion = "0.38.8"
-libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
-libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
+libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
 
 libraryDependencies += "org.tpolecat" %% "doobie-h2"        % doobieVersion % Test
 libraryDependencies += "org.tpolecat" %% "doobie-scalatest" % doobieVersion % Test
