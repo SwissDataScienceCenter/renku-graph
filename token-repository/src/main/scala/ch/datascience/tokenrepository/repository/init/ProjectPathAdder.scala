@@ -29,7 +29,7 @@ import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
 import doobie.implicits._
 import doobie.util.fragment.Fragment
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 

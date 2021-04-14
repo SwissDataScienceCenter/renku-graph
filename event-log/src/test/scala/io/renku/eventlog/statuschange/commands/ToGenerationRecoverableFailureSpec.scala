@@ -21,7 +21,6 @@ package io.renku.eventlog.statuschange.commands
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.jsons
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.EventStatus
@@ -30,17 +29,11 @@ import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.circe.Json
-import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventContentGenerators.{eventDates, eventMessages, executionDates}
 import io.renku.eventlog._
+import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
+import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
-import io.renku.eventlog.subscriptions.EventDelivery
-import org.http4s.circe.jsonEncoder
-import org.http4s.headers.`Content-Type`
-import org.http4s.{MediaType, Request}
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -85,23 +78,20 @@ class ToGenerationRecoverableFailureSpec
 
         (awaitingTriplesGenerationGauge.increment _).expects(projectPath).returning(IO.unit)
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
-        (eventDelivery.unregister _).expects(eventId).returning(IO.unit)
 
-        val maybeMessage = Gen.option(eventMessages).generateOne
-        val command =
-          ToGenerationRecoverableFailure[IO](eventId,
-                                             maybeMessage,
-                                             awaitingTriplesGenerationGauge,
-                                             underTriplesGenerationGauge,
-                                             processingTime,
-                                             eventDelivery,
-                                             currentTime
-          )
+        val message = eventMessages.generateOne
+        val command = ToGenerationRecoverableFailure[IO](eventId,
+                                                         message,
+                                                         awaitingTriplesGenerationGauge,
+                                                         underTriplesGenerationGauge,
+                                                         processingTime,
+                                                         currentTime
+        )
 
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
         findEvent(eventId) shouldBe Some(
-          (ExecutionDate(now.plus(10, MINUTES)), GenerationRecoverableFailure, maybeMessage)
+          (ExecutionDate(now.plus(10, MINUTES)), GenerationRecoverableFailure, Some(message))
         )
         findProcessingTime(eventId).eventIdsOnly shouldBe List(eventId)
 
@@ -110,7 +100,7 @@ class ToGenerationRecoverableFailureSpec
 
     EventStatus.all.filterNot(status => status == GeneratingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.NotFound}" in new TestCase {
+        s"and return ${UpdateResult.Failure}" in new TestCase {
 
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
@@ -123,94 +113,77 @@ class ToGenerationRecoverableFailureSpec
 
           findEvent(eventId) shouldBe Some((executionDate, eventStatus, None))
 
-          val maybeMessage = Gen.option(eventMessages).generateOne
-          val command =
-            ToGenerationRecoverableFailure[IO](eventId,
-                                               maybeMessage,
-                                               awaitingTriplesGenerationGauge,
-                                               underTriplesGenerationGauge,
-                                               processingTime,
-                                               eventDelivery,
-                                               currentTime
-            )
+          val message = eventMessages.generateOne
+          val command = ToGenerationRecoverableFailure[IO](eventId,
+                                                           message,
+                                                           awaitingTriplesGenerationGauge,
+                                                           underTriplesGenerationGauge,
+                                                           processingTime,
+                                                           currentTime
+          )
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
+          (commandRunner run command).unsafeRunSync() shouldBe a[UpdateResult.Failure]
 
           findEvent(eventId)          shouldBe Some((executionDate, eventStatus, None))
           findProcessingTime(eventId) shouldBe List()
 
           histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
+      s"do nothing when updating event with $eventStatus status " +
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
+
+          findEvent(eventId) shouldBe None
+
+          val command = ToGenerationRecoverableFailure[IO](eventId,
+                                                           eventMessages.generateOne,
+                                                           awaitingTriplesGenerationGauge,
+                                                           underTriplesGenerationGauge,
+                                                           processingTime,
+                                                           currentTime
+          )
+
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
+
+          findEvent(eventId)          shouldBe None
+          findProcessingTime(eventId) shouldBe List()
+        }
     }
 
     "factory" should {
-      "return a CommandFound when properly decoding a request" in new TestCase {
-        val maybeMessage        = eventMessages.generateOption
+      "return a CommandFound when the change status request is acceptable" in new TestCase {
+        val message             = eventMessages.generateOne
         val maybeProcessingTime = eventProcessingTimes.generateOption
-        val expected =
-          ToGenerationRecoverableFailure(eventId,
-                                         maybeMessage,
-                                         awaitingTriplesGenerationGauge,
-                                         underTriplesGenerationGauge,
-                                         maybeProcessingTime,
-                                         eventDelivery
-          )
-
-        val body = json"""{
-            "status": ${EventStatus.GenerationRecoverableFailure.value}
-          }""" deepMerge maybeMessage
-          .map(m => json"""{"message": ${m.value}}""")
-          .getOrElse(Json.obj()) deepMerge maybeProcessingTime
-          .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-          .getOrElse(Json.obj())
-
-        val request = Request[IO]().withEntity(body)
 
         val actual = ToGenerationRecoverableFailure
-          .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge, eventDelivery)
-          .run((eventId, request))
-        actual.unsafeRunSync() shouldBe CommandFound(expected)
+          .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
+          .run(EventOnlyRequest(eventId, GenerationRecoverableFailure, maybeProcessingTime, Some(message)))
+
+        actual.unsafeRunSync() shouldBe CommandFound(
+          ToGenerationRecoverableFailure(eventId,
+                                         message,
+                                         awaitingTriplesGenerationGauge,
+                                         underTriplesGenerationGauge,
+                                         maybeProcessingTime
+          )
+        )
+      }
+
+      "return a PayloadMalformed when status change request does not have a message" in new TestCase {
+        ToGenerationRecoverableFailure
+          .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
+          .run(EventOnlyRequest(eventId, GenerationRecoverableFailure, eventProcessingTimes.generateOption, None))
+          .unsafeRunSync() shouldBe PayloadMalformed("No message provided")
       }
 
       EventStatus.all.filterNot(status => status == GenerationRecoverableFailure) foreach { eventStatus =>
         s"return NotSupported if the decoding failed with status: $eventStatus " in new TestCase {
-          val body =
-            json"""{
-              "status": ${eventStatus.value}
-            }"""
-
-          val request = Request[IO]().withEntity(body)
-
-          val actual =
-            ToGenerationRecoverableFailure
-              .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge, eventDelivery)
-              .run((eventId, request))
-          actual.unsafeRunSync() shouldBe NotSupported
-        }
-      }
-
-      "return PayloadMalformed if the decoding failed because no status is present " in new TestCase {
-        val body = json"""{ }"""
-
-        val request = Request[IO]().withEntity(body)
-
-        val actual = ToGenerationRecoverableFailure
-          .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge, eventDelivery)
-          .run((eventId, request))
-
-        actual.unsafeRunSync() shouldBe PayloadMalformed("No status property in status change payload")
-      }
-
-      "return NotSupported if the decoding failed because of unsupported content type " in new TestCase {
-        val request =
-          Request[IO]().withEntity(jsons.generateOne).withHeaders(`Content-Type`(MediaType.multipart.`form-data`))
-
-        val actual =
           ToGenerationRecoverableFailure
-            .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge, eventDelivery)
-            .run((eventId, request))
-
-        actual.unsafeRunSync() shouldBe NotSupported
+            .factory[IO](awaitingTriplesGenerationGauge, underTriplesGenerationGauge)
+            .run(
+              EventOnlyRequest(eventId, eventStatus, eventProcessingTimes.generateOption, eventMessages.generateOption)
+            )
+            .unsafeRunSync() shouldBe NotSupported
+        }
       }
     }
   }
@@ -224,8 +197,8 @@ class ToGenerationRecoverableFailureSpec
     val eventBatchDate                 = batchDates.generateOne
     val processingTime                 = eventProcessingTimes.generateSome
     val commandRunner                  = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
-    val eventDelivery                  = mock[EventDelivery[IO, ToGenerationRecoverableFailure[IO]]]
     val now                            = Instant.now()
+
     currentTime.expects().returning(now).anyNumberOfTimes()
   }
 

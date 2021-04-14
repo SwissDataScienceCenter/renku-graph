@@ -18,30 +18,23 @@
 
 package io.renku.eventlog.statuschange.commands
 
+import Generators._
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
-import ch.datascience.events.consumers.subscriptions.SubscriberUrl
-import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.jsons
 import ch.datascience.graph.model.EventsGenerators.{batchDates, compoundEventIds, eventBodies, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
+import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
 import eu.timepit.refined.auto._
-import io.circe.Json
-import io.circe.literal.JsonStringContext
-import io.renku.eventlog.EventContentGenerators.{eventDates, executionDates}
+import io.renku.eventlog.EventContentGenerators.{eventDates, executionDates, _}
+import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
+import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.StatusUpdatesRunnerImpl
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
-import io.renku.eventlog.subscriptions.EventDelivery
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
-import org.http4s.circe.jsonEncoder
-import org.http4s.headers.`Content-Type`
-import org.http4s.{MediaType, Request}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -97,21 +90,13 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
         findEvents(status = TriplesStore) shouldBe List.empty
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
-        (eventDelivery.unregister _).expects(eventId).returning(IO.unit)
-        val command =
-          ToTriplesStore[IO](eventId, underTriplesGenerationGauge, processingTime, eventDelivery, currentTime)
+        val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, processingTime, currentTime)
         (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.Updated
 
         (underTriplesGenerationGauge.decrement _).expects(projectPath).returning(IO.unit)
-        (eventDelivery.unregister _).expects(transfromingTriplesId).returning(IO.unit)
 
         val transformingTriplesCommand =
-          ToTriplesStore[IO](transfromingTriplesId,
-                             underTriplesGenerationGauge,
-                             processingTime,
-                             eventDelivery,
-                             currentTime
-          )
+          ToTriplesStore[IO](transfromingTriplesId, underTriplesGenerationGauge, processingTime, currentTime)
         (commandRunner run transformingTriplesCommand).unsafeRunSync() shouldBe UpdateResult.Updated
 
         findEvents(status = TriplesStore) shouldBe List((eventId, ExecutionDate(now), eventBatchDate),
@@ -124,7 +109,7 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
     EventStatus.all.filterNot(status => status == TransformingTriples) foreach { eventStatus =>
       s"do nothing when updating event with $eventStatus status " +
-        s"and return ${UpdateResult.NotFound}" in new TestCase {
+        s"and return ${UpdateResult.Failure}" in new TestCase {
 
           val executionDate = executionDates.generateOne
           storeEvent(eventId,
@@ -138,9 +123,9 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
           findEvents(status = eventStatus) shouldBe List((eventId, executionDate, eventBatchDate))
 
           val command =
-            ToTriplesStore[IO](eventId, underTriplesGenerationGauge, processingTime, eventDelivery, currentTime)
+            ToTriplesStore[IO](eventId, underTriplesGenerationGauge, processingTime, currentTime)
 
-          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
+          (commandRunner run command).unsafeRunSync() shouldBe a[UpdateResult.Failure]
 
           val expectedEvents =
             if (eventStatus != TriplesStore) List.empty
@@ -150,53 +135,50 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
 
           histogram.verifyExecutionTimeMeasured(command.queries.head.name)
         }
-    }
-    "factory" should {
-      "return a CommandFound when properly decoding a request" in new TestCase {
-        val maybeProcessingTime = eventProcessingTimes.generateOption
-        val expected =
-          ToTriplesStore(eventId, underTriplesGenerationGauge, maybeProcessingTime, eventDelivery)
 
-        val body = json"""{
-            "status": ${EventStatus.TriplesStore.value}
-          }""" deepMerge maybeProcessingTime
-          .map(processingTime => json"""{"processingTime": ${processingTime.value.toString}  }""")
-          .getOrElse(Json.obj())
+      s"do nothing when updating event with $eventStatus status " +
+        s"and return ${UpdateResult.NotFound}" in new TestCase {
 
-        val request = Request[IO]().withEntity(body)
+          findEvents(status = eventStatus) shouldBe List()
 
-        val actual = ToTriplesStore.factory[IO](underTriplesGenerationGauge, eventDelivery).run((eventId, request))
-        actual.unsafeRunSync() shouldBe CommandFound(expected)
-      }
+          val command = ToTriplesStore[IO](eventId, underTriplesGenerationGauge, processingTime, currentTime)
 
-      EventStatus.all.filterNot(status => status == TriplesStore) foreach { eventStatus =>
-        s"return NotSupported if the decoding failed with status: $eventStatus " in new TestCase {
-          val body    = json"""{ "status": ${eventStatus.value} }"""
-          val request = Request[IO]().withEntity(body)
+          (commandRunner run command).unsafeRunSync() shouldBe UpdateResult.NotFound
 
-          val actual = ToTriplesStore.factory[IO](underTriplesGenerationGauge, eventDelivery).run((eventId, request))
-
-          actual.unsafeRunSync() shouldBe NotSupported
+          findEvents(status = TriplesStore)        shouldBe List()
+          findProcessingTime(eventId).eventIdsOnly shouldBe List()
         }
-      }
+    }
+  }
 
-      "return PayloadMalformed if the decoding failed because no status is present " in new TestCase {
-        val body = json"""{ }"""
+  "factory" should {
 
-        val request = Request[IO]().withEntity(body)
+    "return a CommandFound when properly decoding a request" in new TestCase {
+      val maybeProcessingTime = eventProcessingTimes.generateSome
 
-        val actual = ToTriplesStore.factory[IO](underTriplesGenerationGauge, eventDelivery).run((eventId, request))
+      val actual = ToTriplesStore
+        .factory[IO](underTriplesGenerationGauge)
+        .run(EventOnlyRequest(eventId, TriplesStore, maybeProcessingTime, eventMessages.generateOption))
+        .unsafeRunSync()
 
-        actual.unsafeRunSync() shouldBe PayloadMalformed("No status property in status change payload")
-      }
+      actual shouldBe CommandFound(
+        ToTriplesStore(eventId, underTriplesGenerationGauge, maybeProcessingTime)
+      )
+    }
 
-      "return NotSupported if the decoding failed because of unsupported content type " in new TestCase {
-        val request =
-          Request[IO]().withEntity(jsons.generateOne).withHeaders(`Content-Type`(MediaType.multipart.`form-data`))
+    "return PayloadMalformed if there's no processing time in the request" in new TestCase {
+      ToTriplesStore
+        .factory[IO](underTriplesGenerationGauge)
+        .run(EventOnlyRequest(eventId, TriplesStore, maybeProcessingTime = None, eventMessages.generateOption))
+        .unsafeRunSync() shouldBe PayloadMalformed("No processing time provided")
+    }
 
-        val actual = ToTriplesStore.factory[IO](underTriplesGenerationGauge, eventDelivery).run((eventId, request))
-
-        actual.unsafeRunSync() shouldBe NotSupported
+    EventStatus.all.filterNot(status => status == TriplesStore) foreach { eventStatus =>
+      s"return NotSupported if the decoding failed with status: $eventStatus " in new TestCase {
+        ToTriplesStore
+          .factory[IO](underTriplesGenerationGauge)
+          .run(changeStatusRequestsWith(eventStatus).generateOne)
+          .unsafeRunSync() shouldBe NotSupported
       }
     }
   }
@@ -209,7 +191,6 @@ class ToTriplesStoreSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Mo
     val processingTime              = eventProcessingTimes.generateSome
     val eventBatchDate              = batchDates.generateOne
 
-    val eventDelivery = mock[EventDelivery[IO, ToTriplesStore[IO]]]
     val commandRunner = new StatusUpdatesRunnerImpl(transactor, histogram, TestLogger[IO]())
 
     val now = Instant.now()

@@ -18,69 +18,111 @@
 
 package io.renku.eventlog.statuschange
 
+import ChangeStatusRequest.EventOnlyRequest
+import CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import cats.MonadError
-import cats.data.Kleisli
+import cats.data.EitherT.right
+import cats.data.{EitherT, Kleisli}
 import cats.effect.{ContextShift, Effect}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.CompoundEventId
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.EventLogDB
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
+import org.typelevel.log4cats.Logger
+import io.circe.{Decoder, Json}
 import io.renku.eventlog.statuschange.commands._
-import io.renku.eventlog.subscriptions.EventDelivery
-import org.http4s.Request
+import io.renku.eventlog.{EventLogDB, EventMessage}
 import org.http4s.dsl.Http4sDsl
+import org.http4s.multipart.{Multipart, Part}
 
+import scala.language.implicitConversions
 import scala.util.control.NonFatal
 
-class StatusChangeEndpoint[Interpretation[_]: Effect](
+class StatusChangeEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable]](
     statusUpdatesRunner: StatusUpdatesRunner[Interpretation],
-    commandFactories: Set[
-      Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult]
-    ],
-    logger:    Logger[Interpretation]
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+    commandFactories:    Set[Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult]],
+    logger:              Logger[Interpretation]
+) extends Http4sDsl[Interpretation] {
 
   import ch.datascience.http.InfoMessage
   import ch.datascience.http.InfoMessage._
+  import org.http4s.circe.jsonDecoder
   import org.http4s.{Request, Response}
   import statusUpdatesRunner.run
 
   def changeStatus(eventId: CompoundEventId,
                    request: Request[Interpretation]
-  ): Interpretation[Response[Interpretation]] =
-    tryCommandFactory(eventId, request, commandFactories.toList)
+  ): Interpretation[Response[Interpretation]] = {
+    for {
+      changeStatusRequest <- decodeRequest(eventId, request)
+      response            <- right[Response[Interpretation]](tryCommandFactory(commandFactories.toList, changeStatusRequest))
+    } yield response
+  }.merge
+
+  private def decodeRequest(eventId: CompoundEventId,
+                            request: Request[Interpretation]
+  ): EitherT[Interpretation, Response[Interpretation], ChangeStatusRequest] = EitherT {
+    {
+      for {
+        multipart <- request.as[Multipart[Interpretation]]
+        eventPart <-
+          multipart.parts
+            .find(_.name.contains("event"))
+            .map(_.pure[Interpretation])
+            .getOrElse(
+              new Exception("No event part in change status payload").raiseError[Interpretation, Part[Interpretation]]
+            )
+        eventJson <- eventPart.as[Json]
+        eventOnlyRequest <- eventJson
+                              .as[EventOnlyRequest](requestDecoder(eventId))
+                              .fold(_.raiseError[Interpretation, EventOnlyRequest], _.pure[Interpretation])
+        changeStatusRequest <- createRequest(eventOnlyRequest)(multipart.parts.find(_.name.contains("payload")))
+      } yield changeStatusRequest
+    }.map(_.asRight[Response[Interpretation]]) recoverWith badRequest
+  }
+
+  private implicit def requestDecoder(eventId: CompoundEventId): Decoder[EventOnlyRequest] = { cursor =>
+    for {
+      status              <- cursor.downField("status").as[EventStatus]
+      maybeProcessingTime <- cursor.downField("processingTime").as[Option[EventProcessingTime]]
+      maybeMessage        <- cursor.downField("message").as[Option[EventMessage]]
+    } yield EventOnlyRequest(eventId, status, maybeProcessingTime, maybeMessage)
+  }
+
+  private def createRequest(
+      eventOnlyRequest: EventOnlyRequest
+  ): Kleisli[Interpretation, Option[Part[Interpretation]], ChangeStatusRequest] = Kleisli {
+    case Some(payloadPart) => payloadPart.as[String].map(payload => eventOnlyRequest.addPayload(payload))
+    case None              => (eventOnlyRequest: ChangeStatusRequest).pure[Interpretation]
+  }
+
+  def badRequest: PartialFunction[Throwable, Interpretation[Either[Response[Interpretation], ChangeStatusRequest]]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)("Decoding status change request body failed")
+      BadRequest(ErrorMessage("Malformed event or payload")).map(_.asLeft[ChangeStatusRequest])
+  }
 
   private def tryCommandFactory(
-      eventId: CompoundEventId,
-      request: Request[Interpretation],
-      commandFactories: List[
-        Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult]
-      ]
+      commandFactories:    List[Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult]],
+      changeStatusRequest: ChangeStatusRequest
   ): Interpretation[Response[Interpretation]] = commandFactories match {
     case Nil => BadRequest(ErrorMessage("No event command found"))
-    case head :: tail =>
-      head(eventId -> request).flatMap {
+    case headFactory :: otherFactories =>
+      headFactory.run(changeStatusRequest).flatMap {
         case command: CommandFound[Interpretation] =>
           run(command.command).flatMap(_.asHttpResponse) recoverWith httpResponse
-        case NotSupported              => tryCommandFactory(eventId, request, tail)
+        case NotSupported              => tryCommandFactory(otherFactories, changeStatusRequest)
         case PayloadMalformed(message) => BadRequest(ErrorMessage(message))
       }
   }
 
   private implicit class ResultOps(result: UpdateResult) {
     lazy val asHttpResponse: Interpretation[Response[Interpretation]] = result match {
-      case UpdateResult.Updated  => Ok(InfoMessage("Event status updated"))
-      case UpdateResult.NotFound => NotFound(InfoMessage("Event not found"))
-      case UpdateResult.Conflict => Conflict(InfoMessage("Event status cannot be updated"))
-      case UpdateResult.Failure(message) =>
-        logger.error(message.value)
-        InternalServerError(ErrorMessage(message.value))
+      case UpdateResult.Updated          => Ok(InfoMessage("Event status updated"))
+      case UpdateResult.NotFound         => NotFound(InfoMessage("Event not found"))
+      case UpdateResult.Failure(message) => InternalServerError(ErrorMessage(message.value))
     }
   }
 
@@ -97,6 +139,7 @@ class StatusChangeEndpoint[Interpretation[_]: Effect](
 }
 
 object IOStatusChangeEndpoint {
+
   import cats.effect.IO
 
   def apply(
@@ -110,63 +153,24 @@ object IOStatusChangeEndpoint {
   )(implicit contextShift:                ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {
       statusUpdatesRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
-      eventDeliveryTriplesStore <-
-        EventDelivery[ToTriplesStore[IO]](transactor, (_: ToTriplesStore[IO]).eventId, queriesExecTimes)
-      eventDeliveryGenerationNonRecoverable <- EventDelivery[ToGenerationNonRecoverableFailure[IO]](
-                                                 transactor,
-                                                 (_: ToGenerationNonRecoverableFailure[IO]).eventId,
-                                                 queriesExecTimes
-                                               )
-      eventDeliveryTransformationNonRecoverable <- EventDelivery[ToTransformationNonRecoverableFailure[IO]](
-                                                     transactor,
-                                                     (_: ToTransformationNonRecoverableFailure[IO]).eventId,
-                                                     queriesExecTimes
-                                                   )
-      eventDeliveryTriplesGenerated <- EventDelivery[ToTriplesGenerated[IO]](
-                                         transactor,
-                                         (_: ToTriplesGenerated[IO]).eventId,
-                                         queriesExecTimes
-                                       )
-      eventDeliverySkipped <- EventDelivery[ToSkipped[IO]](
-                                transactor,
-                                (_: ToSkipped[IO]).eventId,
-                                queriesExecTimes
-                              )
-      eventDeliveryGenerationRecoverable <- EventDelivery[ToGenerationRecoverableFailure[IO]](
-                                              transactor,
-                                              (_: ToGenerationRecoverableFailure[IO]).eventId,
-                                              queriesExecTimes
-                                            )
-      eventDeliveryTransformationRecoverable <- EventDelivery[ToTransformationRecoverableFailure[IO]](
-                                                  transactor,
-                                                  (_: ToTransformationRecoverableFailure[IO]).eventId,
-                                                  queriesExecTimes
-                                                )
     } yield new StatusChangeEndpoint(statusUpdatesRunner,
                                      Set(
-                                       ToTriplesStore.factory(underTriplesTransformationGauge,
-                                                              eventDeliveryTriplesStore
-                                       ),
+                                       ToTriplesStore.factory(underTriplesTransformationGauge),
                                        ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
-                                       ToTriplesGenerated.factory(underTriplesGenerationGauge,
-                                                                  awaitingTriplesTransformationGauge,
-                                                                  eventDeliveryTriplesGenerated
+                                       ToTriplesGenerated.factory(transactor,
+                                                                  underTriplesTransformationGauge,
+                                                                  underTriplesGenerationGauge,
+                                                                  awaitingTriplesTransformationGauge
                                        ),
-                                       ToSkipped.factory(underTriplesGenerationGauge, eventDeliverySkipped),
-                                       ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge,
-                                                                                 eventDeliveryGenerationNonRecoverable
-                                       ),
+                                       ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),
                                        ToGenerationRecoverableFailure.factory(awaitingTriplesGenerationGauge,
-                                                                              underTriplesGenerationGauge,
-                                                                              eventDeliveryGenerationRecoverable
+                                                                              underTriplesGenerationGauge
                                        ),
                                        ToTransformationNonRecoverableFailure.factory(
-                                         underTriplesTransformationGauge,
-                                         eventDeliveryTransformationNonRecoverable
+                                         underTriplesTransformationGauge
                                        ),
                                        ToTransformationRecoverableFailure.factory(awaitingTriplesTransformationGauge,
-                                                                                  underTriplesTransformationGauge,
-                                                                                  eventDeliveryTransformationRecoverable
+                                                                                  underTriplesTransformationGauge
                                        )
                                      ),
                                      logger

@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.config.certificates
 
 import cats.MonadError
 import ch.datascience.config.certificates.Certificate
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 

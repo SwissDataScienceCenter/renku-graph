@@ -28,7 +28,7 @@ import ch.datascience.http.ErrorMessage
 import ch.datascience.http.client.AccessToken
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
@@ -71,6 +71,7 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
 }
 
 object IOAssociateTokenEndpoint {
+
   import cats.effect.{ContextShift, IO, Timer}
 
   import scala.concurrent.ExecutionContext

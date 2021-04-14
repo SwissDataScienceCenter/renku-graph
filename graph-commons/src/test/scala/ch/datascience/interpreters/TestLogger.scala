@@ -18,13 +18,13 @@
 
 package ch.datascience.interpreters
 
-import java.util.concurrent.ConcurrentLinkedQueue
-
 import cats.Monad
 import ch.datascience.interpreters.TestLogger.LogMessage._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.scalatest.Assertion
 import org.scalatest.matchers.should
+
+import java.util.concurrent.ConcurrentLinkedQueue
 import scala.jdk.CollectionConverters._
 
 class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] with should.Matchers {
@@ -34,6 +34,9 @@ class TestLogger[Interpretation[_]: Monad] extends Logger[Interpretation] with s
   import LogMessage._
 
   private[this] val invocations = new ConcurrentLinkedQueue[LogEntry]()
+
+  def getMessages(severity: Level): List[LogMessage] =
+    invocations.asScala.filter(_.level === severity).toList.map(_.message)
 
   def logged(expected: LogEntry*): Assertion =
     invocations should contain allElementsOf expected
@@ -142,7 +145,9 @@ object TestLogger {
     final case object Trace extends Level
   }
 
-  sealed trait LogMessage
+  sealed trait LogMessage {
+    val message: String
+  }
   object LogMessage {
     final case class Message(message: String) extends LogMessage
     final case class MessageAndThrowableMatcher(message: String, throwableMatcher: Matcher) extends LogMessage

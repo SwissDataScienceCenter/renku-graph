@@ -21,27 +21,25 @@ package io.renku.eventlog
 import cats.data.ValidatedNel
 import cats.effect.{Clock, ConcurrentEffect, ContextShift, Resource}
 import cats.syntax.all._
-import ch.datascience.http.ErrorMessage._
 import ch.datascience.graph.http.server.binders._
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.metrics.RoutesMetrics
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
-import io.renku.eventlog.latestevents.LatestEventsEndpoint
 import io.renku.eventlog.processingstatus.ProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.StatusChangeEndpoint
 import io.renku.eventlog.subscriptions.SubscriptionsEndpoint
+import org.http4s._
 import org.http4s.dsl.Http4sDsl
-import org.http4s.{ParseFailure, QueryParamDecoder, QueryParameterValue, Response}
 
 import scala.util.Try
 
 private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     eventEndpoint:            EventEndpoint[F],
-    latestEventsEndpoint:     LatestEventsEndpoint[F],
     processingStatusEndpoint: ProcessingStatusEndpoint[F],
     eventsPatchingEndpoint:   EventsPatchingEndpoint[F],
     statusChangeEndpoint:     StatusChangeEndpoint[F],
@@ -51,23 +49,20 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
 )(implicit clock:             Clock[F], contextShift: ContextShift[F])
     extends Http4sDsl[F] {
 
-  import LatestPerProjectParameter._
   import ProjectIdParameter._
+  import eventDetailsEndpoint._
   import eventEndpoint._
   import eventsPatchingEndpoint._
-  import latestEventsEndpoint._
   import org.http4s.HttpRoutes
   import processingStatusEndpoint._
   import routesMetrics._
   import statusChangeEndpoint._
   import subscriptionsEndpoint._
-  import eventDetailsEndpoint._
 
   // format: off
   lazy val routes: Resource[F, HttpRoutes[F]] = HttpRoutes.of[F] {
     case request @ POST  -> Root / "events"                                            => processEvent(request)
     case request @ PATCH -> Root / "events"                                            => triggerEventsPatching(request)
-    case           GET   -> Root / "events" :? `latest-per-project`(maybeValue)        => maybeFindLatestEvents(maybeValue)
     case           GET   -> Root / "events"/ EventId(eventId) / ProjectId(projectId)   => getDetails(CompoundEventId(eventId, projectId))
     case request @ PATCH -> Root / "events" / EventId(eventId) / ProjectId(projectId)  => changeStatus(CompoundEventId(eventId, projectId), request)
     case           GET   -> Root / "processing-status" :? `project-id`(maybeProjectId) => maybeFindProcessingStatus(maybeProjectId)
@@ -89,20 +84,6 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
       val parameterName:     String = "latest-per-project"
       override val toString: String = parameterName
     }
-  }
-
-  private def maybeFindLatestEvents(
-      maybeValue: Option[ValidatedNel[ParseFailure, Boolean]]
-  ): F[Response[F]] = maybeValue match {
-    case None =>
-      NotFound(ErrorMessage(s"No '${`latest-per-project`}' parameter"))
-    case Some(maybeTrue) =>
-      maybeTrue.fold(
-        errors => BadRequest(ErrorMessage(errors.map(_.getMessage()).toList.mkString("; "))),
-        value =>
-          if (value) findLatestEvents()
-          else BadRequest(ErrorMessage(s"'${`latest-per-project`}' parameter with invalid value"))
-      )
   }
 
   private object ProjectIdParameter {

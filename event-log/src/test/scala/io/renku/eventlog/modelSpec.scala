@@ -18,6 +18,7 @@
 
 package io.renku.eventlog
 
+import ch.datascience.data.ErrorMessage
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.events.CompoundEventId
@@ -93,14 +94,8 @@ class EventMessageSpec extends AnyWordSpec with ScalaCheckPropertyChecks with sh
     }
 
     "be instantiatable from an exception and contain the stack trace" in {
-      import java.io._
-
       forAll(nestedExceptions) { exception =>
-        val exceptionAsString = new StringWriter
-        exception.printStackTrace(new PrintWriter(exceptionAsString))
-        exceptionAsString.flush()
-
-        EventMessage(exception).map(_.value) shouldBe Some(exceptionAsString.toString)
+        EventMessage(exception).value shouldBe ErrorMessage.withStackTrace(exception).value
       }
     }
   }

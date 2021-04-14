@@ -22,12 +22,12 @@ import cats.MonadError
 import cats.data.EitherT
 import cats.data.EitherT.{leftT, rightT}
 import cats.effect.{ContextShift, IO, Timer}
-import cats.syntax.all._
 import ch.datascience.control.Throttler
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.events.EventStatus.TriplesGenerated
 import ch.datascience.graph.model.events._
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
@@ -190,7 +190,7 @@ class TriplesGeneratedEventProcessorSpec
 
       val exception = exceptions.generateOne
       (eventStatusUpdater
-        .markEventDone(_: CompoundEventId, _: EventProcessingTime))
+        .toTriplesStore(_: CompoundEventId, _: EventProcessingTime))
         .expects(triplesGeneratedEvent.compoundEventId,
                  EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
         )
@@ -208,7 +208,7 @@ class TriplesGeneratedEventProcessorSpec
       givenFetchingAccessToken(forProjectPath = triplesGeneratedEvent.project.path)
         .returning(context.raiseError(exception))
 
-      expectEventMarkedAsTriplesGenerated(triplesGeneratedEvent)
+      expectEventRolledBackToTriplesGenerated(triplesGeneratedEvent)
 
       eventProcessor.process(triplesGeneratedEvent) shouldBe context.unit
 
@@ -295,27 +295,35 @@ class TriplesGeneratedEventProcessorSpec
     }
 
     def expectEventMarkedAsRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
-      (eventStatusUpdater
-        .markEventTransformationFailedRecoverably(_: CompoundEventId, _: Throwable))
-        .expects(commitEventId, exception)
+      (eventStatusUpdater.toFailure _)
+        .expects(commitEventId, EventStatus.TransformationRecoverableFailure, exception)
         .returning(context.unit)
 
     def expectEventMarkedAsNonRecoverableFailure(commitEventId: CompoundEventId, exception: Throwable) =
-      (eventStatusUpdater
-        .markEventTransformationFailedNonRecoverably(_: CompoundEventId, _: Throwable))
-        .expects(commitEventId, exception)
+      (eventStatusUpdater.toFailure _)
+        .expects(commitEventId, EventStatus.TransformationNonRecoverableFailure, exception)
         .returning(context.unit)
 
     def expectEventMarkedAsDone(compoundEventId: CompoundEventId) =
       (eventStatusUpdater
-        .markEventDone(_: CompoundEventId, _: EventProcessingTime))
+        .toTriplesStore(_: CompoundEventId, _: EventProcessingTime))
         .expects(compoundEventId, EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value)))
         .returning(context.unit)
 
     def expectEventMarkedAsTriplesGenerated(event: TriplesGeneratedEvent) =
       (eventStatusUpdater
-        .markTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion, _: Option[EventProcessingTime]))
-        .expects(event.compoundEventId, event.triples, event.schemaVersion, None)
+        .toTriplesGenerated(_: CompoundEventId, _: JsonLDTriples, _: SchemaVersion, _: EventProcessingTime))
+        .expects(event.compoundEventId,
+                 event.triples,
+                 event.schemaVersion,
+                 EventProcessingTime(Duration.ofMillis(executionTimeRecorder.elapsedTime.value))
+        )
+        .returning(context.unit)
+
+    def expectEventRolledBackToTriplesGenerated(event: TriplesGeneratedEvent) =
+      (eventStatusUpdater
+        .rollback[TriplesGenerated](_: CompoundEventId)(_: () => TriplesGenerated))
+        .expects(event.compoundEventId, *)
         .returning(context.unit)
 
     def logSummary(triplesGeneratedEvent: TriplesGeneratedEvent, isSuccessful: Boolean): Assertion =

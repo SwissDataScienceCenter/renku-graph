@@ -26,9 +26,9 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.RenkuBaseUrl
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetIdentifiers, userAffiliations, userEmails}
+import ch.datascience.graph.model.GraphModelGenerators.{datasetCreatedDates, datasetIdentifiers, datasetKeywords, userAffiliations, userEmails}
 import ch.datascience.graph.model.datasets.Dates.{AllDatasetDates, ImportedDatasetDates, RenkuDatasetDates}
-import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, Dates, DerivedFrom, Description, Name, PublishedDate, SameAs, Title, TopmostDerivedFrom, TopmostSameAs}
+import ch.datascience.graph.model.datasets.{DateCreated, DateCreatedInProject, Dates, DerivedFrom, Description, Keyword, Name, PublishedDate, SameAs, Title, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.graph.model.events.{CommitId, CommittedDate}
 import ch.datascience.graph.model.users.{Name => UserName}
 import ch.datascience.knowledgegraph.datasets.DatasetsGenerators.{addedToProjectObjects, datasetProjects}
@@ -199,6 +199,11 @@ package object rest {
         )
       )
     }
+
+    def makeKeywordsContaining(phrase: Phrase): NonModifiedDataset =
+      dataSet.copy(
+        keywords = dataSet.keywords :+ Keyword(phrase.toString)
+      )
 
     def makeDescContaining(maybePhrase: Option[Phrase]): NonModifiedDataset =
       maybePhrase map makeDescContaining getOrElse dataSet

@@ -23,7 +23,7 @@ import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUr
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.GraphModelGenerators.{projectPaths, schemaVersions}
-import ch.datascience.graph.model.SchemaVersion
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.graph.model.events.EventStatus.{TransformationRecoverableFailure, TransformingTriples, TriplesGenerated}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects.Path
@@ -76,12 +76,17 @@ trait EventLogDataProvisioning {
   }
 
   protected def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit =
+    upsertProject(compoundEventId.projectId, projectPath, eventDate)
+
+  protected def upsertProject(projectId: projects.Id, projectPath: Path, eventDate: EventDate): Unit =
     execute {
       sql"""|INSERT INTO
             |project (project_id, project_path, latest_event_date)
-            |VALUES (${compoundEventId.projectId}, $projectPath, $eventDate)
+            |VALUES ($projectId, $projectPath, $eventDate)
             |ON CONFLICT (project_id)
-            |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
+            |DO UPDATE 
+            |  SET latest_event_date = excluded.latest_event_date 
+            |  WHERE excluded.latest_event_date > project.latest_event_date
       """.stripMargin.update.run.void
     }
 
@@ -136,7 +141,9 @@ trait EventLogDataProvisioning {
       """.stripMargin.update.run.void
   }
 
-  protected def upsertEventDelivery(eventId: CompoundEventId, deliveryId: SubscriberId): Unit = execute {
+  protected def upsertEventDelivery(eventId:    CompoundEventId,
+                                    deliveryId: SubscriberId = subscriberIds.generateOne
+  ): Unit = execute {
     sql"""|INSERT INTO
           |event_delivery (event_id, project_id, delivery_id)
           |VALUES (${eventId.id}, ${eventId.projectId}, $deliveryId)

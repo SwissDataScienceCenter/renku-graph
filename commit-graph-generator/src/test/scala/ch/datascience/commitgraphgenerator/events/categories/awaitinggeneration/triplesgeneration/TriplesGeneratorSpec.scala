@@ -24,7 +24,7 @@ import ch.datascience.commitgraphgenerator.config.TriplesGeneration
 import ch.datascience.commitgraphgenerator.config.TriplesGeneration._
 import ch.datascience.commitgraphgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog.RenkuLogTriplesGenerator
 import com.typesafe.config.ConfigFactory
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 

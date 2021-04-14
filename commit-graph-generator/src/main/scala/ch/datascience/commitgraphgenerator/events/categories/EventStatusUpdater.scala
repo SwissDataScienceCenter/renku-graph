@@ -30,7 +30,7 @@ import ch.datascience.http.client.IORestClient
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.commitgraphgenerator.Microservice
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.circe.jsonEncoder
 import org.http4s.{Status, Uri}
 

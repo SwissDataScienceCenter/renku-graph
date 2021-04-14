@@ -29,8 +29,8 @@ import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult._
-import ch.datascience.webhookservice.project.ProjectHookUrl
-import io.chrisdavenport.log4cats.Logger
+import ch.datascience.webhookservice.model.ProjectHookUrl
+import org.typelevel.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Response, Status}
 
@@ -79,8 +79,7 @@ object IOHookValidationEndpoint {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[HookValidationEndpoint[IO]] =
-    for {
-      hookValidator <- IOHookValidator(projectHookUrl, gitLabThrottler)
-    } yield new HookValidationEndpointImpl[IO](hookValidator, logger)
+  ): IO[HookValidationEndpoint[IO]] = for {
+    hookValidator <- HookValidator(projectHookUrl, gitLabThrottler)
+  } yield new HookValidationEndpointImpl[IO](hookValidator, logger)
 }

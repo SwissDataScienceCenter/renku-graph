@@ -21,7 +21,7 @@ package io.renku.eventlog.init
 import cats.effect.Bracket
 import ch.datascience.db.DbTransactor
 import ch.datascience.graph.model.events.EventStatus.GenerationRecoverableFailure
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
 private trait EventLogTableCreator[Interpretation[_]] {

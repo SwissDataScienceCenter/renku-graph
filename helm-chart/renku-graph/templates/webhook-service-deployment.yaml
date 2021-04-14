@@ -54,18 +54,6 @@ spec:
               {{- else }}
               value: {{ printf "http://$(SELF_IP):9001" | quote }}
               {{- end }}
-            - name: EVENTS_SYNCHRONIZATION_JOB_DELAY
-              {{- if .Values.webhookService.eventsSynchronization.initialDelay }}
-              value: {{ .Values.webhookService.eventsSynchronization.initialDelay }}
-              {{- else }}
-              value: 1 minute
-              {{- end }}
-            - name: EVENTS_SYNCHRONIZATION_JOB_INTERVAL
-              {{- if .Values.webhookService.eventsSynchronization.interval }}
-              value: {{ .Values.webhookService.eventsSynchronization.interval }}
-              {{- else }}
-              value: 1 hour
-              {{- end }}
             - name: SENTRY_ENABLED
               value: "{{ .Values.sentry.enabled }}"
               {{- if .Values.sentry.enabled }}

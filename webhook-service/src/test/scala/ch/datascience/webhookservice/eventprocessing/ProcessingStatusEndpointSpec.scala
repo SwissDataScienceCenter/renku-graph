@@ -22,22 +22,21 @@ import ProcessingStatusGenerator._
 import cats.MonadError
 import cats.data.OptionT
 import cats.effect.IO
-import ch.datascience.http.InfoMessage._
-import ch.datascience.http.InfoMessage
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
 import ch.datascience.graph.model.projects.Id
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.InfoMessage._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.server.EndpointTester._
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Warn}
 import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
+import ch.datascience.webhookservice.hookvalidation.HookValidator
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import ch.datascience.webhookservice.hookvalidation.HookValidator.NoAccessTokenException
-import ch.datascience.webhookservice.hookvalidation.IOHookValidator
 import io.circe.Json
 import io.circe.literal._
 import io.circe.syntax._
@@ -186,7 +185,7 @@ class ProcessingStatusEndpointSpec extends AnyWordSpec with MockFactory with sho
 
     val projectId = projectIds.generateOne
 
-    val hookValidator           = mock[IOHookValidator]
+    val hookValidator           = mock[HookValidator[IO]]
     val processingStatusFetcher = mock[ProcessingStatusFetcher[IO]]
     val logger                  = TestLogger[IO]()
     val executionTimeRecorder   = TestExecutionTimeRecorder[IO](logger)

@@ -25,7 +25,7 @@ import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.metrics.LabeledHistogram
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Encoder
 import io.circe.literal.JsonStringContext
 import io.circe.syntax.EncoderOps

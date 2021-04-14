@@ -24,7 +24,7 @@ import ch.datascience.control.{RateLimit, Throttler}
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.circe.jsonOf
 
 import scala.concurrent.ExecutionContext

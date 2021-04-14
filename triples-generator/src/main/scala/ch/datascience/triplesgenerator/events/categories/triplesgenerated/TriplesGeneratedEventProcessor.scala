@@ -22,7 +22,8 @@ import cats.MonadError
 import cats.data.EitherT.right
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
-import ch.datascience.graph.model.events.EventProcessingTime
+import ch.datascience.graph.model.events.EventStatus.TriplesGenerated
+import ch.datascience.graph.model.events.{EventProcessingTime, EventStatus}
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.logging.ExecutionTimeRecorder
@@ -33,8 +34,9 @@ import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triple
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{IOTriplesCurator, TriplesTransformer}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.TriplesUploadResult._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
-import ch.datascience.triplesgenerator.events.categories.{EventStatusUpdater, IOEventStatusUpdater}
-import io.chrisdavenport.log4cats.Logger
+import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
+import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater._
+import org.typelevel.log4cats.Logger
 import io.prometheus.client.Histogram
 
 import java.time.Duration
@@ -51,7 +53,7 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
     accessTokenFinder:     AccessTokenFinder[Interpretation],
     triplesCurator:        TriplesTransformer[Interpretation],
     uploader:              Uploader[Interpretation],
-    eventStatusUpdater:    EventStatusUpdater[Interpretation],
+    statusUpdater:         EventStatusUpdater[Interpretation],
     logger:                Logger[Interpretation],
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
 )(implicit ME:             MonadError[Interpretation, Throwable])
@@ -60,7 +62,6 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   import IOAccessTokenFinder._
   import UploadingResult._
   import accessTokenFinder._
-  import eventStatusUpdater._
   import executionTimeRecorder._
   import triplesCurator._
   import uploader._
@@ -139,13 +140,16 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
 
   private lazy val updateEventLog: ((ElapsedTime, UploadingResult)) => Interpretation[Unit] = {
     case (elapsedTime, Uploaded(event)) =>
-      markEventDone(event.compoundEventId, EventProcessingTime(Duration ofMillis elapsedTime.value))
+      statusUpdater
+        .toTriplesStore(event.compoundEventId, EventProcessingTime(Duration ofMillis elapsedTime.value))
         .recoverWith(logEventLogUpdateError(event, "done"))
     case (_, RecoverableError(event, cause)) =>
-      markEventTransformationFailedRecoverably(event.compoundEventId, cause)
+      statusUpdater
+        .toFailure(event.compoundEventId, EventStatus.TransformationRecoverableFailure, cause)
         .recoverWith(logEventLogUpdateError(event, "as failed recoverably"))
     case (_, NonRecoverableError(event, cause)) =>
-      markEventTransformationFailedNonRecoverably(event.compoundEventId, cause)
+      statusUpdater
+        .toFailure(event.compoundEventId, EventStatus.TransformationNonRecoverableFailure, cause)
         .recoverWith(logEventLogUpdateError(event, "as failed nonrecoverably"))
   }
 
@@ -171,28 +175,31 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   private def rollback(
       triplesGeneratedEvent: TriplesGeneratedEvent
   ): PartialFunction[Throwable, Interpretation[Option[AccessToken]]] = { case NonFatal(exception) =>
-    markTriplesGenerated(triplesGeneratedEvent.compoundEventId,
-                         triplesGeneratedEvent.triples,
-                         triplesGeneratedEvent.schemaVersion,
-                         maybeProcessingTime = None
-    ) >> new Exception("transformation failure -> Event rolled back", exception)
-      .raiseError[Interpretation, Option[AccessToken]]
+    statusUpdater.rollback[TriplesGenerated](triplesGeneratedEvent.compoundEventId) >> new Exception(
+      "transformation failure -> Event rolled back",
+      exception
+    ).raiseError[Interpretation, Option[AccessToken]]
   }
 
   private sealed trait UploadingResult extends Product with Serializable {
     val event: TriplesGeneratedEvent
   }
+
   private sealed trait UploadingError extends UploadingResult {
     val cause: Throwable
   }
+
   private object UploadingResult {
     case class Uploaded(event: TriplesGeneratedEvent) extends UploadingResult
+
     case class RecoverableError(event: TriplesGeneratedEvent, cause: Throwable) extends UploadingError
+
     case class NonRecoverableError(event: TriplesGeneratedEvent, cause: Throwable) extends UploadingError
   }
 }
 
 private object IOTriplesGeneratedEventProcessor {
+
   import ch.datascience.config.GitLab
   import ch.datascience.control.Throttler
 
@@ -218,7 +225,7 @@ private object IOTriplesGeneratedEventProcessor {
       uploader              <- IOUploader(logger, timeRecorder)
       accessTokenFinder     <- IOAccessTokenFinder(logger)
       triplesCurator        <- IOTriplesCurator(gitLabThrottler, logger, timeRecorder)
-      eventStatusUpdater    <- IOEventStatusUpdater(logger)
+      eventStatusUpdater    <- EventStatusUpdater(categoryName, logger)
       eventsProcessingTimes <- metricsRegistry.register[Histogram, Histogram.Builder](eventsProcessingTimesBuilder)
       executionTimeRecorder <- ExecutionTimeRecorder[IO](logger, maybeHistogram = Some(eventsProcessingTimes))
     } yield new TriplesGeneratedEventProcessor(

@@ -26,7 +26,7 @@ import ch.datascience.http.client.IORestClient.MaxRetriesAfterConnectionTimeout
 import ch.datascience.microservices.MicroserviceBaseUrl
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.Status.Ok
 import org.http4s._
 

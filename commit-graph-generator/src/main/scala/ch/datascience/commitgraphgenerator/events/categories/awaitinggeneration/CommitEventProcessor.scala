@@ -33,7 +33,7 @@ import ch.datascience.rdfstore.{JsonLDTriples, SparqlQueryTimeRecorder}
 import ch.datascience.commitgraphgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.commitgraphgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
 import ch.datascience.commitgraphgenerator.events.categories.{EventStatusUpdater, IOEventStatusUpdater}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.prometheus.client.Histogram
 
 import java.time.Duration

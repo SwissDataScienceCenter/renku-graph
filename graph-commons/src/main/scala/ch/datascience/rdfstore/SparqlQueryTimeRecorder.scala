@@ -24,7 +24,7 @@ import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.prometheus.client.Histogram
 
 class SparqlQueryTimeRecorder[Interpretation[_]](val instance: ExecutionTimeRecorder[Interpretation])

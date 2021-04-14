@@ -26,7 +26,7 @@ import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.jsonld.EntityId
 
 import scala.concurrent.ExecutionContext
@@ -62,6 +62,7 @@ private class IOEdgesFinder(
                    }
       } yield results
     }
+
     fetchPaginatedResult(Set.empty[EdgeData], using, offset = 0)
   }
 

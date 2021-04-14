@@ -32,12 +32,12 @@ import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import org.http4s.Method.GET
 import org.http4s._
 import org.http4s.circe.jsonOf
-import org.http4s.dsl.io.{Forbidden, NotFound, Ok, Unauthorized}
+import org.http4s.dsl.io._
 import org.http4s.util.CaseInsensitiveString
 
 import scala.concurrent.ExecutionContext
@@ -94,6 +94,8 @@ private class IOGitLabProjectMembersFinder(
         .map(members => Right(members.toSet -> maybeNextPage(response)))
     case (NotFound, _, _) =>
       Right(Set.empty[GitLabProjectMember] -> Option.empty[Int]).pure[IO]
+    case (ServiceUnavailable, _, _) =>
+      Left(CurationRecoverableError("Service unavailable")).pure[IO]
     case (Forbidden | Unauthorized, _, _) =>
       Left(CurationRecoverableError("Access token not valid to fetch project members")).pure[IO]
   }

@@ -34,7 +34,7 @@ trait StatusProcessingTime extends TypeSerializers {
                     |VALUES(${eventId.id}, ${eventId.projectId}, $status, $processingTime)
                     |ON CONFLICT (event_id, project_id, status)
                     |DO UPDATE SET processing_time = EXCLUDED.processing_time;
-                    |""".stripMargin.update.run,
+                    |""".stripMargin.update.run.map(_ => 1),
       name = "upsert_processing_time"
     )
   }

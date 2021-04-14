@@ -16,17 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.subscriptions.membersync
+package io.renku.eventlog.subscriptions
+package membersync
 
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.LastSyncedDate
 import ch.datascience.metrics.TestLabeledHistogram
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.subscriptions.{LastSyncedDate, SubscriptionDataProvisioning}
+import io.renku.eventlog.subscriptions.SubscriptionDataProvisioning
 import io.renku.eventlog.{EventDate, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -44,16 +46,22 @@ class MemberSyncEventFinderSpec
   "popEvent" should {
 
     "return the event for the project with the latest event date " +
-      "when the subscription_category_sync_times table is empty" in new TestCase {
+      s"when the subscription_category_sync_times table has no rows for the $categoryName" in new TestCase {
+
         finder.popEvent().unsafeRunSync() shouldBe None
 
         val projectPath0 = projectPaths.generateOne
         val eventDate0   = eventDates.generateOne
         upsertProject(compoundEventIds.generateOne, projectPath0, eventDate0)
 
+        val eventId1     = compoundEventIds.generateOne
         val projectPath1 = projectPaths.generateOne
         val eventDate1   = eventDates.generateOne
-        upsertProject(compoundEventIds.generateOne, projectPath1, eventDate1)
+        upsertProject(eventId1, projectPath1, eventDate1)
+        upsertLastSynced(eventId1.projectId,
+                         commitsync.categoryName,
+                         relativeTimestamps(moreThanAgo = Duration.ofDays(30)).generateAs(LastSyncedDate)
+        )
 
         val projectPathsByDateDecreasing = List(
           (projectPath0, eventDate0),

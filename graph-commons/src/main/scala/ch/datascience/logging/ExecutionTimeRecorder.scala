@@ -27,7 +27,7 @@ import ch.datascience.tinytypes.{LongTinyType, TinyTypeFactory}
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.prometheus.client.Histogram
 
 import scala.jdk.CollectionConverters._

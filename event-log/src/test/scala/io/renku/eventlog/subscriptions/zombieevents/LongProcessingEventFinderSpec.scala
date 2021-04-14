@@ -22,17 +22,13 @@ import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.{projectIds, projectPaths}
+import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
 import ch.datascience.metrics.TestLabeledHistogram
-import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog.{ExecutionDate, InMemoryEventLogDbSpec}
-import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -47,268 +43,22 @@ class LongProcessingEventFinderSpec
 
   "popEvent" should {
 
-    "return an event if " +
-      s"it's in the $GeneratingTriples status " +
-      "there's no info about the last processing times for the project, " +
-      "there's delivery info for it " +
-      "and it's in the status for more than the MaxProcessingTime" in new TestCase {
+    GeneratingTriples +: TransformingTriples +: Nil foreach { status =>
+      "return no event if " +
+        s"it's in the $status status " +
+        "but there's delivery info for it" in new TestCase {
 
-        val eventId = compoundEventIds.generateOne
-        addEvent(
-          eventId,
-          GeneratingTriples,
-          relativeTimestamps(
-            moreThanAgo = maxProcessingTime.value plusMinutes positiveInts().generateOne.value
-          ).generateAs(ExecutionDate)
-        )
-        upsertEventDeliveryInfo(eventId)
-
-        val eventInProcessingStatusTooShort = compoundEventIds.generateOne
-        addEvent(
-          eventInProcessingStatusTooShort,
-          GeneratingTriples,
-          relativeTimestamps(
-            lessThanAgo = maxProcessingTime.value minusMinutes positiveInts(max = 59).generateOne.value
-          ).generateAs(ExecutionDate)
-        )
-        upsertEventDeliveryInfo(eventInProcessingStatusTooShort)
-
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          ZombieEvent(finder.processName, eventId, projectPath, GeneratingTriples)
-        )
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
-
-    "return an event if " +
-      s"it's in the $TransformingTriples status " +
-      "there's no info about the last processing times for the project " +
-      "there's delivery info for it " +
-      "and it's in the status for more than the MaxProcessingTime" in new TestCase {
-
-        val eventId = compoundEventIds.generateOne
-        addEvent(
-          eventId,
-          TransformingTriples,
-          relativeTimestamps(
-            moreThanAgo = maxProcessingTime.value plusMinutes positiveInts().generateOne.value
-          ).generateAs(ExecutionDate)
-        )
-        upsertEventDeliveryInfo(eventId)
-
-        val eventInProcessingStatusTooShort = compoundEventIds.generateOne
-        addEvent(
-          eventInProcessingStatusTooShort,
-          TransformingTriples,
-          relativeTimestamps(
-            lessThanAgo = maxProcessingTime.value minusMinutes positiveInts(max = 59).generateOne.value
-          ).generateAs(ExecutionDate)
-        )
-        upsertEventDeliveryInfo(eventInProcessingStatusTooShort)
-
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          ZombieEvent(finder.processName, eventId, projectPath, TransformingTriples)
-        )
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
-
-    "return an event if " +
-      s"it's in the $GeneratingTriples status " +
-      "there's info about the last processing times for the project " +
-      "there's delivery info for it " +
-      "and it's in the status for more than the (median from last 3 events) * 2 " +
-      "case when median is more than 2.5 min" in new TestCase {
-
-        val projectId = projectIds.generateOne
-        val datesAndProcessingTimes = {
-          for {
-            executionDate  <- executionDates
-            processingTime <- longEventProcessingTimes
-          } yield addEvent(projectId,
-                           executionDate,
-                           currentEventStatus = Gen.oneOf(TriplesGenerated, TriplesStore).generateOne,
-                           processingTime,
-                           processingTimeStatus = TriplesGenerated
+          val eventId = compoundEventIds.generateOne
+          addEvent(
+            eventId,
+            GeneratingTriples,
+            relativeTimestamps().generateAs(ExecutionDate)
           )
-        }.generateNonEmptyList().toList
+          upsertEventDeliveryInfo(eventId)
 
-        val medianProcessingTime = {
-          val threeMostEvents = datesAndProcessingTimes.sortBy(_._1).reverse.take(3)
-          threeMostEvents.map(_._2).sorted.reverse(threeMostEvents.size / 2)
+          finder.popEvent().unsafeRunSync() shouldBe None
         }
-
-        val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
-        addEvent(
-          eventId,
-          GeneratingTriples,
-          relativeTimestamps(
-            moreThanAgo =
-              (medianProcessingTime * maxProcessingTimeRatio).value plusMinutes positiveInts().generateOne.value
-          ).generateAs(ExecutionDate)
-        )
-        upsertEventDeliveryInfo(eventId)
-
-        val eventInProcessingStatusTooShort = compoundEventIds.generateOne.copy(projectId = projectId)
-        addEvent(
-          eventInProcessingStatusTooShort,
-          GeneratingTriples,
-          relativeTimestamps(
-            lessThanAgo = (medianProcessingTime * maxProcessingTimeRatio).value minusMinutes 2
-          ).generateAs(ExecutionDate)
-        )
-        upsertEventDeliveryInfo(eventInProcessingStatusTooShort)
-
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          ZombieEvent(finder.processName, eventId, projectPath, GeneratingTriples)
-        )
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
-
-    "return an event if " +
-      s"it's in the $GeneratingTriples status " +
-      "there's info about the last processing times for the project " +
-      "there's delivery info for it " +
-      "and it's in the status for more than the (median from last 3 events) * 2 " +
-      "case when median is less than 2.5 min" in new TestCase {
-
-        val projectId = projectIds.generateOne
-
-        {
-          for {
-            executionDate  <- executionDates
-            processingTime <- shortEventProcessingTimes
-          } yield addEvent(projectId,
-                           executionDate,
-                           currentEventStatus = TriplesStore,
-                           processingTime,
-                           processingTimeStatus = TriplesGenerated
-          )
-        }.generateNonEmptyList().toList
-
-        val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
-        addEvent(
-          eventId,
-          GeneratingTriples,
-          relativeTimestamps(
-            moreThanAgo = (Duration ofSeconds 150) plusMinutes positiveInts().generateOne.value
-          ).generateAs(ExecutionDate)
-        )
-        upsertEventDeliveryInfo(eventId)
-
-        val eventInProcessingStatusTooShort = compoundEventIds.generateOne.copy(projectId = projectId)
-        addEvent(
-          eventInProcessingStatusTooShort,
-          GeneratingTriples,
-          relativeTimestamps(
-            lessThanAgo = Duration ofSeconds 145
-          ).generateAs(ExecutionDate)
-        )
-        upsertEventDeliveryInfo(eventInProcessingStatusTooShort)
-
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          ZombieEvent(finder.processName, eventId, projectPath, GeneratingTriples)
-        )
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
-
-    "return an event if " +
-      s"it's in the $TransformingTriples status " +
-      "there's info about the last processing times for the project " +
-      "there's delivery info for it " +
-      "and it's in the status for more than the (median from last 3 events) * 2 " +
-      "case when median is more than 2.5 min" in new TestCase {
-
-        val projectId = projectIds.generateOne
-        val datesAndProcessingTimes = {
-          for {
-            executionDate  <- executionDates
-            processingTime <- longEventProcessingTimes
-          } yield addEvent(projectId,
-                           executionDate,
-                           currentEventStatus = TriplesStore,
-                           processingTime,
-                           processingTimeStatus = TriplesStore
-          )
-        }.generateNonEmptyList().toList
-
-        val medianProcessingTime = {
-          val threeMostEvents = datesAndProcessingTimes.sortBy(_._1).reverse.take(3)
-          val sortedTimes     = threeMostEvents.map(_._2).sorted.reverse
-          sortedTimes(sortedTimes.size / 2)
-        }
-
-        val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
-        addEvent(
-          eventId,
-          TransformingTriples,
-          relativeTimestamps(
-            moreThanAgo =
-              (medianProcessingTime * maxProcessingTimeRatio).value plusMinutes positiveInts().generateOne.value
-          ).generateAs(ExecutionDate)
-        )
-        upsertEventDeliveryInfo(eventId)
-
-        val eventInProcessingStatusTooShort = compoundEventIds.generateOne.copy(projectId = projectId)
-        addEvent(
-          eventInProcessingStatusTooShort,
-          TransformingTriples,
-          relativeTimestamps(
-            lessThanAgo = (medianProcessingTime * maxProcessingTimeRatio).value minusMinutes 2
-          ).generateAs(ExecutionDate)
-        )
-        upsertEventDeliveryInfo(eventInProcessingStatusTooShort)
-
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          ZombieEvent(finder.processName, eventId, projectPath, TransformingTriples)
-        )
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
-
-    "return an event if " +
-      s"it's in the $TransformingTriples status " +
-      "there's info about the last processing times for the project " +
-      "there's delivery info for it " +
-      "and it's in the status for more than the (median from last 3 events) * 2 " +
-      "case when median is less than 2.5 min" in new TestCase {
-
-        val projectId = projectIds.generateOne
-
-        {
-          for {
-            executionDate  <- executionDates
-            processingTime <- shortEventProcessingTimes
-          } yield addEvent(projectId,
-                           executionDate,
-                           currentEventStatus = TriplesStore,
-                           processingTime,
-                           processingTimeStatus = TriplesStore
-          )
-        }.generateNonEmptyList().toList
-
-        val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
-        addEvent(
-          eventId,
-          TransformingTriples,
-          relativeTimestamps(
-            moreThanAgo = (Duration ofSeconds 150) plusMinutes positiveInts().generateOne.value
-          ).generateAs(ExecutionDate)
-        )
-        upsertEventDeliveryInfo(eventId)
-
-        val eventInProcessingStatusTooShort = compoundEventIds.generateOne.copy(projectId = projectId)
-        addEvent(
-          eventInProcessingStatusTooShort,
-          TransformingTriples,
-          relativeTimestamps(
-            lessThanAgo = Duration ofSeconds 145
-          ).generateAs(ExecutionDate)
-        )
-        upsertEventDeliveryInfo(eventInProcessingStatusTooShort)
-
-        finder.popEvent().unsafeRunSync() shouldBe Some(
-          ZombieEvent(finder.processName, eventId, projectPath, TransformingTriples)
-        )
-        finder.popEvent().unsafeRunSync() shouldBe None
-      }
+    }
 
     GeneratingTriples +: TransformingTriples +: Nil foreach { status =>
       "return an event if " +
@@ -342,12 +92,9 @@ class LongProcessingEventFinderSpec
 
     val projectPath = projectPaths.generateOne
 
-    val maxProcessingTime = javaDurations(min = Duration.ofHours(1)).generateAs(EventProcessingTime)
-    val maxProcessingTimeRatio: Int Refined Positive = 2
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
 
-    val finder =
-      new LongProcessingEventFinder(transactor, maxProcessingTime, maxProcessingTimeRatio, queriesExecTimes)
+    val finder = new LongProcessingEventFinder(transactor, queriesExecTimes)
 
     def addEvent(eventId: CompoundEventId, status: EventStatus, executionDate: ExecutionDate): Unit =
       storeEvent(
@@ -358,23 +105,5 @@ class LongProcessingEventFinderSpec
         eventBodies.generateOne,
         projectPath = projectPath
       )
-
-    def addEvent(projectId:            projects.Id,
-                 executionDate:        ExecutionDate,
-                 currentEventStatus:   EventStatus,
-                 processingTime:       EventProcessingTime,
-                 processingTimeStatus: EventStatus
-    ): (ExecutionDate, EventProcessingTime) = {
-      val eventId = compoundEventIds.generateOne.copy(projectId = projectId)
-      addEvent(eventId, currentEventStatus, executionDate)
-      upsertProcessingTime(eventId, processingTimeStatus, processingTime)
-      executionDate -> processingTime
-    }
   }
-
-  private lazy val longEventProcessingTimes: Gen[EventProcessingTime] =
-    javaDurations(min = Duration ofSeconds 155).map(EventProcessingTime.apply)
-
-  private lazy val shortEventProcessingTimes: Gen[EventProcessingTime] =
-    javaDurations(max = Duration ofSeconds 145).map(EventProcessingTime.apply)
 }

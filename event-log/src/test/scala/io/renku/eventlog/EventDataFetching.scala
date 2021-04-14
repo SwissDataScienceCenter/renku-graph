@@ -42,14 +42,14 @@ trait EventDataFetching {
 
   protected def findPayload(eventId: CompoundEventId): Option[(CompoundEventId, EventPayload)] =
     execute {
-      (fr"""SELECT event_id, project_id, payload
+      fr"""SELECT event_id, project_id, payload
             FROM event_payload
-            WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId};""")
+            WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId};"""
         .query[(CompoundEventId, EventPayload)]
         .option
     }
 
-  protected def findProjects(): List[(projects.Id, projects.Path, EventDate)] = execute {
+  protected def findProjects: List[(projects.Id, projects.Path, EventDate)] = execute {
     sql"""SELECT * FROM project"""
       .query[(projects.Id, projects.Path, EventDate)]
       .to[List]

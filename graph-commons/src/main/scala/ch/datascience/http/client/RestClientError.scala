@@ -18,11 +18,15 @@
 
 package ch.datascience.http.client
 
+import org.http4s.Status
+
 sealed trait RestClientError extends Exception
 
 object RestClientError {
 
-  final case class UnexpectedResponseException(message: String) extends Exception(message) with RestClientError
+  final case class UnexpectedResponseException(status: Status, message: String)
+      extends Exception(message)
+      with RestClientError
 
   final case class BadRequestException(message: String) extends Exception(message) with RestClientError
 

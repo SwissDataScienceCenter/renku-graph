@@ -23,7 +23,7 @@ import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import doobie.implicits._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 private trait DuplicateProjectsRemover[Interpretation[_]] {
   def run(): Interpretation[Unit]

@@ -29,9 +29,9 @@ import doobie.implicits._
 import doobie.util.fragment.Fragment
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
+import io.renku.eventlog.subscriptions._
 
 import java.time.Instant
 
@@ -46,7 +46,6 @@ trait StatsFinder[Interpretation[_]] {
 class StatsFinderImpl(
     transactor:       DbTransactor[IO, EventLogDB],
     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-    categoryNames:    Set[CategoryName] Refined NonEmpty,
     now:              () => Instant = () => Instant.now
 )(implicit ME:        Bracket[IO, Throwable])
     extends DbClient(Some(queriesExecTimes))
@@ -58,40 +57,52 @@ class StatsFinderImpl(
       .transact(transactor.get)
       .map(_.toMap)
 
-  // format: off
   private lazy val countEventsPerCategoryName = SqlQuery(
-    (fr"""SELECT all_counts.category_name, SUM(all_counts.count)
-          FROM (
-            (
-              SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id)
-              FROM project proj
-              JOIN subscription_category_sync_time sync_time ON sync_time.project_id = proj.project_id
-              WHERE
-                   ((${now()} - proj.latest_event_date) < INTERVAL '1 hour' AND (${now()} - sync_time.last_synced) > INTERVAL '1 minute')
-                OR ((${now()} - proj.latest_event_date) < INTERVAL '1 day'  AND (${now()} - sync_time.last_synced) > INTERVAL '1 hour')
-                OR ((${now()} - proj.latest_event_date) > INTERVAL '1 day'  AND (${now()} - sync_time.last_synced) > INTERVAL '1 day')
-              GROUP BY sync_time.category_name
-            ) UNION """ ++ (categoryNames map generateUnions).reduce(_ ++ fr" UNION " ++ _) ++ fr"""
-          ) all_counts
-          GROUP BY all_counts.category_name;
-          """)
+    sql"""|SELECT all_counts.category_name, SUM(all_counts.count)
+          |FROM (
+          |  (
+          |    SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
+          |    FROM project proj
+          |    JOIN subscription_category_sync_time sync_time
+          |      ON sync_time.project_id = proj.project_id AND sync_time.category_name = ${membersync.categoryName.value}
+          |    WHERE
+          |         ((${now()} - proj.latest_event_date) < INTERVAL '1 hour' AND (${now()} - sync_time.last_synced) > INTERVAL '1 minute')
+          |      OR ((${now()} - proj.latest_event_date) < INTERVAL '1 day'  AND (${now()} - sync_time.last_synced) > INTERVAL '1 hour')
+          |      OR ((${now()} - proj.latest_event_date) > INTERVAL '1 day'  AND (${now()} - sync_time.last_synced) > INTERVAL '1 day')
+          |    GROUP BY sync_time.category_name
+          |  ) UNION ALL (
+          |    SELECT ${membersync.categoryName.value} AS category_name, COUNT(DISTINCT proj.project_id) AS count
+          |    FROM project proj
+          |    WHERE proj.project_id NOT IN (
+          |      SELECT project_id 
+          |      FROM subscription_category_sync_time 
+          |      WHERE category_name = ${membersync.categoryName.value}
+          |    )
+          |  ) UNION ALL (
+          |    SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
+          |    FROM project proj
+          |    JOIN subscription_category_sync_time sync_time
+          |      ON sync_time.project_id = proj.project_id AND sync_time.category_name = ${commitsync.categoryName.value}
+          |    WHERE
+          |         ((${now()} - proj.latest_event_date) <= INTERVAL '7 days' AND (${now()} - sync_time.last_synced) > INTERVAL '1 hour')
+          |      OR ((${now()} - proj.latest_event_date) >  INTERVAL '7 days' AND (${now()} - sync_time.last_synced) > INTERVAL '1 day')
+          |    GROUP BY sync_time.category_name
+          |  ) UNION ALL (
+          |    SELECT ${commitsync.categoryName.value} AS category_name, COUNT(DISTINCT proj.project_id) AS count
+          |    FROM project proj
+          |    WHERE proj.project_id NOT IN (
+          |      SELECT project_id 
+          |      FROM subscription_category_sync_time 
+          |      WHERE category_name = ${commitsync.categoryName.value}
+          |    )
+          |  )
+          |) all_counts
+          |GROUP BY all_counts.category_name
+          |""".stripMargin
       .query[(CategoryName, Long)]
       .to[List],
     name = "category name events count"
   )
-  // format: on
-
-  private def generateUnions(categoryName: CategoryName) = Fragment.const {
-    s"""  (
-            SELECT '$categoryName' AS category_name, COUNT(DISTINCT proj.project_id)
-            FROM project proj
-            WHERE
-              proj.project_id NOT IN (
-                SELECT project_id from subscription_category_sync_time WHERE category_name = '$categoryName'
-              )
-          )
-    """
-  }
 
   override def statuses(): IO[Map[EventStatus, Long]] =
     measureExecutionTime(findStatuses)
@@ -175,16 +186,10 @@ class StatsFinderImpl(
 
 object IOStatsFinder {
 
-  import io.renku.eventlog.subscriptions.membersync
-
   def apply(
       transactor:          DbTransactor[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[StatsFinder[IO]] = IO {
-    new StatsFinderImpl(
-      transactor,
-      queriesExecTimes,
-      categoryNames = Refined.unsafeApply(Set(membersync.categoryName))
-    )
+    new StatsFinderImpl(transactor, queriesExecTimes)
   }
 }

@@ -23,6 +23,7 @@ tokenRepository:
     secret:
 
 triplesGenerator:
+  replicas: 1
   image:
     repository: renku/triples-generator
     tag: 'latest'
@@ -60,14 +61,11 @@ webhookService:
     port: 80
   resources:
     limits:
-      memory: 2500Mi
-  jvmXmx: 300M
-  eventsSynchronization:
-    initialDelay: 2 minutes
-    interval: 30 minutes
+      memory: 1900Mi
+  jvmXmx: 100M
   gitlab:
     rateLimit: 100/sec
-  threadsNumber: 4
+  threadsNumber: 3
   hookToken:
     ## A secret for signing request header tokens to be sent by GitLab with the Push Events
     ## Generated using: `openssl rand -hex 8|base64`
@@ -108,6 +106,22 @@ eventLog:
   jvmXmx: 200M
   threadsNumber: 6
   connectionPool: 10
+
+commitEventService:
+  image:
+    repository: jachro/commit-event-service
+    tag: 'latest'
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 9006
+  resources:
+    limits:
+      memory: 2000Mi
+  jvmXmx: 200M
+  gitlab:
+    rateLimit: 100/sec
+  threadsNumber: 3
 
 sentry:
   enabled: false

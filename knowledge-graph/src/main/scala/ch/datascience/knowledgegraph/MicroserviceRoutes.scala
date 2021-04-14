@@ -38,7 +38,7 @@ import ch.datascience.knowledgegraph.graphql.{IOQueryEndpoint, QueryEndpoint}
 import ch.datascience.knowledgegraph.projects.rest.{IOProjectEndpoint, ProjectEndpoint}
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.AuthMiddleware
 import org.http4s.{AuthedRoutes, ParseFailure, Response}
@@ -68,22 +68,17 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
   import routesMetrics._
 
   // format: off
-  private lazy val authorizedRoutes: HttpRoutes[F] = authMiddleware {
-    AuthedRoutes.of {
-      case GET -> "knowledge-graph" /: "projects" /: path as maybeUser => routeToProjectsEndpoints(path, maybeUser)
-    }
-  }
-
   private lazy val nonAuthorizedRoutes: HttpRoutes[F] = HttpRoutes.of[F] {
     case         GET  -> Root / "ping"                                                                                                       => Ok("pong")
     case         GET  -> Root / "knowledge-graph" /  "datasets" :? query(maybePhrase) +& sort(maybeSortBy) +& page(page) +& perPage(perPage) => searchForDatasets(maybePhrase, maybeSortBy,page, perPage)
     case         GET ->  Root / "knowledge-graph" /  "datasets" / DatasetId(id)                                                              => getDataset(id)
     case         GET ->  Root / "knowledge-graph" /  "graphql"                                                                               => schema()
     case request@POST -> Root / "knowledge-graph" /  "graphql"                                                                               => handleQuery(request)
+    case         GET ->         "knowledge-graph" /: "projects" /: path => routeToProjectsEndpoints(path, maybeAuthUser = None)
   }
   // format: on
 
-  lazy val routes: Resource[F, HttpRoutes[F]] = (nonAuthorizedRoutes <+> authorizedRoutes).withMetrics
+  lazy val routes: Resource[F, HttpRoutes[F]] = nonAuthorizedRoutes.withMetrics
 
   private def searchForDatasets(
       maybePhrase:  Option[ValidatedNel[ParseFailure, DatasetsSearchEndpoint.Query.Phrase]],
@@ -105,12 +100,7 @@ private class MicroserviceRoutes[F[_]: ConcurrentEffect](
     case projectPathParts :+ "datasets" => projectPathParts.toProjectPath.fold(identity, getProjectDatasets)
     case projectPathParts =>
       projectPathParts.toProjectPath.map { projectPath =>
-        {
-          for {
-            _        <- projectAuthorizer.authorize(projectPath, maybeAuthUser).leftMap(_.toHttpResponse)
-            response <- EitherT.right[Response[F]](getProject(projectPath, maybeAuthUser))
-          } yield response
-        }.merge
+        EitherT.right[Response[F]](getProject(projectPath, maybeAuthUser)).merge
       }.merge
   }
 

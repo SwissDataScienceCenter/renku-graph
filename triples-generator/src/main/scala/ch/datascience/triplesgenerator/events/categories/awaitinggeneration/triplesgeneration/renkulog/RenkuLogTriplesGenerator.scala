@@ -16,7 +16,8 @@
  * limitations under the License.
  */
 
-package ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.renkulog
+package ch.datascience.triplesgenerator.events.categories.awaitinggeneration
+package triplesgeneration.renkulog
 
 import cats.Applicative
 import cats.data.EitherT
@@ -36,7 +37,6 @@ import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.trip
 import java.security.SecureRandom
 import scala.concurrent.ExecutionContext
 import scala.language.postfixOps
-import scala.util.control.NonFatal
 
 private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
     gitRepoUrlFinder:    GitLabRepoUrlFinder[IO],
@@ -64,7 +64,7 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
     EitherT {
       createRepositoryDirectory(commitEvent.project.path)
         .bracket(path => cloneCheckoutGenerate(commitEvent)(maybeAccessToken, RepositoryPath(path)))(deleteDirectory)
-        .recoverWith(meaningfulError(maybeAccessToken))
+        .recoverWith(meaningfulError(commitEvent, maybeAccessToken))
     }
 
   private def cloneCheckoutGenerate(commitEvent: CommitEvent)(implicit
@@ -135,17 +135,20 @@ private[awaitinggeneration] class RenkuLogTriplesGenerator private[renkulog] (
   }
 
   private def meaningfulError(
+      commitEvent:      CommitEvent,
       maybeAccessToken: Option[AccessToken]
-  ): PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, JsonLDTriples]]] = { case NonFatal(exception) =>
+  ): PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, JsonLDTriples]]] = { case exception =>
     IO.raiseError {
       (Option(exception.getMessage) -> maybeAccessToken)
         .mapN { (message, token) =>
           if (message contains token.value)
-            new Exception(s"Triples generation failed: ${message.replaceAll(token.value, token.toString)}")
+            new Exception(
+              s"${logMessageCommon(commitEvent)} triples generation failed: ${message.replaceAll(token.value, token.toString)}"
+            )
           else
-            new Exception("Triples generation failed", exception)
+            new Exception(s"${logMessageCommon(commitEvent)} triples generation failed", exception)
         }
-        .getOrElse(new Exception("Triples generation failed", exception))
+        .getOrElse(new Exception(s"${logMessageCommon(commitEvent)} triples generation failed", exception))
     }
   }
 }

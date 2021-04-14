@@ -23,15 +23,14 @@ import cats.syntax.all._
 import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators.exceptions
-import ch.datascience.graph.model.events.EventStatus.TransformationNonRecoverableFailure
+import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.metrics.LabeledGauge
 import io.renku.eventlog.statuschange.StatusUpdatesRunner
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
-import io.renku.eventlog.statuschange.commands.{ToTransformationNonRecoverableFailure, UpdateResult}
-import io.renku.eventlog.subscriptions.EventDelivery
+import io.renku.eventlog.statuschange.commands._
 import org.scalamock.matchers.ArgCapture.CaptureAll
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -43,11 +42,28 @@ import scala.language.postfixOps
 
 class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFactory {
 
+  "returnToQueue" should {
+
+    s"change the status back to $TriplesGenerated" in new TestCase {
+
+      val backToTriplesGeneratedStatusUpdate = CaptureAll[TransformingToTriplesGenerated[IO]]()
+
+      (statusUpdateRunner.run _)
+        .expects(capture(backToTriplesGeneratedStatusUpdate))
+        .returning(Updated.pure[IO])
+
+      dispatchRecovery.returnToQueue(event).unsafeRunSync() shouldBe ()
+
+      backToTriplesGeneratedStatusUpdate.value.eventId                         shouldBe event.id
+      backToTriplesGeneratedStatusUpdate.value.awaitingTransformationGauge     shouldBe awaitingTransformationGauge
+      backToTriplesGeneratedStatusUpdate.value.underTriplesTransformationGauge shouldBe underTriplesTransformationGauge
+    }
+  }
+
   "recovery" should {
 
     "retry changing event status if status update failed initially" in new TestCase {
 
-      val event      = triplesGeneratedEvents.generateOne
       val exception  = exceptions.generateOne
       val subscriber = subscriberUrls.generateOne
 
@@ -66,10 +82,7 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
 
       nonRecoverableStatusUpdate.value.eventId                         shouldBe event.id
       nonRecoverableStatusUpdate.value.underTriplesTransformationGauge shouldBe underTriplesTransformationGauge
-      val eventMessageBody = nonRecoverableStatusUpdate.value.maybeMessage
-        .map(_.value)
-        .getOrElse(fail("Expected some EventMessage"))
-      eventMessageBody should include(exception.getMessage)
+      nonRecoverableStatusUpdate.value.message.value                     should include(exception.getMessage)
 
       logger.loggedOnly(
         Error(s"${SubscriptionCategory.name}: Marking event as $TransformationNonRecoverableFailure failed", exception),
@@ -83,14 +96,16 @@ class DispatchRecoverySpec extends AnyWordSpec with should.Matchers with MockFac
   private implicit val timer: Timer[IO] = IO.timer(ExecutionContext.global)
 
   private trait TestCase {
+    val event = triplesGeneratedEvents.generateOne
+
+    val awaitingTransformationGauge     = mock[LabeledGauge[IO, projects.Path]]
     val underTriplesTransformationGauge = mock[LabeledGauge[IO, projects.Path]]
     val statusUpdateRunner              = mock[StatusUpdatesRunner[IO]]
     val logger                          = TestLogger[IO]()
-    val eventDelivery                   = mock[EventDelivery[IO, ToTransformationNonRecoverableFailure[IO]]]
     val dispatchRecovery = new DispatchRecoveryImpl[IO](
+      awaitingTransformationGauge,
       underTriplesTransformationGauge,
       statusUpdateRunner,
-      eventDelivery,
       logger,
       onErrorSleep = 100 millis
     )

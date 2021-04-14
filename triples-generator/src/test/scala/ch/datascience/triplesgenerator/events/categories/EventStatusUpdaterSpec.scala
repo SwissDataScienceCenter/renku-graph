@@ -18,72 +18,62 @@
 
 package ch.datascience.triplesgenerator.events.categories
 
+import EventStatusUpdater._
 import cats.effect.{ContextShift, IO, Timer}
+import ch.datascience.data.ErrorMessage
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.config.EventLogUrl
-import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes}
+import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.EventStatus.{TriplesGenerated, _}
 import ch.datascience.interpreters.TestLogger
-import ch.datascience.json.JsonOps._
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.http.Fault
+import com.github.tomakehurst.wiremock.stubbing.Scenario
 import io.circe.literal._
 import org.http4s.Status._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-import java.io.{PrintWriter, StringWriter}
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.duration._
+import scala.language.postfixOps
 
 class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing with should.Matchers {
 
-  "markNew" should {
+  "toTriplesGenerated" should {
 
-    Set(Ok, Conflict, NotFound) foreach { status =>
-      s"succeed if remote responds with $status" in new TestCase {
-        stubFor {
-          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withRequestBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
-            .willReturn(aResponse().withStatus(status.code))
-        }
-
-        updater.markEventNew(eventId).unsafeRunSync() shouldBe ((): Unit)
-      }
-    }
-
-    s"fail if remote responds with status different than $Ok" in new TestCase {
-      val status = BadRequest
-      stubFor {
-        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-          .withRequestBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
-          .willReturn(aResponse().withStatus(status.code))
-      }
-
-      intercept[Exception] {
-        updater.markEventNew(eventId).unsafeRunSync() shouldBe ((): Unit)
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
-    }
-  }
-
-  "markDone" should {
-
-    Set(Ok, Conflict, NotFound) foreach { status =>
+    Set(Ok, NotFound) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
         val processingTime = eventProcessingTimes.generateOne
 
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withRequestBody(
-              equalToJson(
-                json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2
-              )
+            .withMultipartRequestBody(
+              aMultipart("event")
+                .withBody(
+                  equalToJson(
+                    json"""{"status": "TRIPLES_GENERATED", "processingTime": ${processingTime.value}}""".spaces2
+                  )
+                )
+            )
+            .withMultipartRequestBody(
+              aMultipart("payload")
+                .withBody(
+                  equalToJson(
+                    json"""{"schemaVersion": ${schemaVersion.value} , "payload": ${rawTriples.value.noSpaces}}""".noSpaces
+                  )
+                )
             )
             .willReturn(aResponse().withStatus(status.code))
         }
 
-        updater.markEventDone(eventId, processingTime).unsafeRunSync() shouldBe ((): Unit)
+        updater
+          .toTriplesGenerated(eventId, rawTriples, schemaVersion, processingTime)
+          .unsafeRunSync() shouldBe ((): Unit)
       }
     }
 
@@ -93,68 +83,11 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
 
       stubFor {
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-          .withRequestBody(
-            equalToJson(
-              json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2
-            )
-          )
-          .willReturn(aResponse().withStatus(status.code))
-      }
-
-      intercept[Exception] {
-        updater.markEventDone(eventId, processingTime).unsafeRunSync() shouldBe ((): Unit)
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
-    }
-  }
-
-  "markTriplesGenerated" should {
-
-    Set(Ok, Conflict, NotFound) foreach { status =>
-      s"succeed if remote responds with $status" in new TestCase {
-        val maybeProcessingTime = eventProcessingTimes.generateOption
-
-        stubFor {
-          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withMultipartRequestBody(
-              aMultipart("event")
-                .withBody(
-                  equalToJson(
-                    json"""{"status": "TRIPLES_GENERATED"}"""
-                      .addIfDefined("processingTime" -> maybeProcessingTime)
-                      .spaces2
-                  )
-                )
-            )
-            .withMultipartRequestBody(
-              aMultipart("payload")
-                .withBody(
-                  equalToJson(
-                    json"""{"schemaVersion": ${schemaVersion.value} , "payload": ${rawTriples.value.noSpaces} }""".noSpaces
-                  )
-                )
-            )
-            .willReturn(aResponse().withStatus(status.code))
-        }
-
-        updater
-          .markTriplesGenerated(eventId, rawTriples, schemaVersion, maybeProcessingTime)
-          .unsafeRunSync() shouldBe ((): Unit)
-      }
-    }
-
-    s"fail if remote responds with status different than $Ok" in new TestCase {
-      val maybeProcessingTime = eventProcessingTimes.generateOption
-      val status              = BadRequest
-
-      stubFor {
-        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
           .withMultipartRequestBody(
             aMultipart("event")
               .withBody(
                 equalToJson(
-                  json"""{"status": "TRIPLES_GENERATED"}"""
-                    .addIfDefined("processingTime" -> maybeProcessingTime)
-                    .spaces2
+                  json"""{"status": "TRIPLES_GENERATED", "processingTime": ${processingTime.value}}""".spaces2
                 )
               )
           )
@@ -170,134 +103,232 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
       }
 
       intercept[Exception] {
-        updater.markTriplesGenerated(eventId, rawTriples, schemaVersion, maybeProcessingTime).unsafeRunSync()
+        updater.toTriplesGenerated(eventId, rawTriples, schemaVersion, processingTime).unsafeRunSync()
       }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
   }
 
-  "markEventTransformationFailedRecoverably" should {
+  "toTriplesStore" should {
 
-    Set(Ok, Conflict, NotFound) foreach { status =>
+    Set(Ok, NotFound) foreach { status =>
       s"succeed if remote responds with $status" in new TestCase {
-        val exception = exceptions.generateOne
+        val processingTime = eventProcessingTimes.generateOne
+
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withRequestBody(equalToJson(json"""{"status": "TRANSFORMATION_RECOVERABLE_FAILURE", "message": ${asString(
-              exception
-            )}}""".spaces2))
-            .willReturn(aResponse().withStatus(status.code))
-        }
-
-        updater.markEventTransformationFailedRecoverably(eventId, exception).unsafeRunSync() shouldBe ((): Unit)
-      }
-    }
-
-    s"fail if remote responds with status different than $Ok" in new TestCase {
-      val status = BadRequest
-
-      stubFor {
-        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-          .willReturn(aResponse().withStatus(status.code))
-      }
-
-      intercept[Exception] {
-        updater.markEventTransformationFailedRecoverably(eventId, exceptions.generateOne).unsafeRunSync()
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
-    }
-  }
-
-  "markEventFailedRecoverably" should {
-
-    Set(Ok, Conflict, NotFound) foreach { status =>
-      s"succeed if remote responds with $status" in new TestCase {
-        val exception = exceptions.generateOne
-        stubFor {
-          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withRequestBody(equalToJson(json"""{"status": "GENERATION_RECOVERABLE_FAILURE", "message": ${asString(
-              exception
-            )}}""".spaces2))
-            .willReturn(aResponse().withStatus(status.code))
-        }
-
-        updater.markEventFailedRecoverably(eventId, exception).unsafeRunSync() shouldBe ((): Unit)
-      }
-    }
-
-    s"fail if remote responds with status different than $Ok" in new TestCase {
-      val status = BadRequest
-
-      stubFor {
-        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-          .willReturn(aResponse().withStatus(status.code))
-      }
-
-      intercept[Exception] {
-        updater.markEventFailedRecoverably(eventId, exceptions.generateOne).unsafeRunSync()
-      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
-    }
-  }
-
-  "markEventTransformationFailedNonRecoverably" should {
-
-    Set(Ok, Conflict, NotFound) foreach { status =>
-      s"succeed if remote responds with $status" in new TestCase {
-        val exception = exceptions.generateOne
-        stubFor {
-          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withRequestBody(
-              equalToJson(
-                json"""{"status": "TRANSFORMATION_NON_RECOVERABLE_FAILURE"}""".spaces2
-              )
+            .withMultipartRequestBody(
+              aMultipart("event")
+                .withBody(
+                  equalToJson(json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2)
+                )
             )
             .willReturn(aResponse().withStatus(status.code))
         }
 
-        updater.markEventTransformationFailedNonRecoverably(eventId, exception).unsafeRunSync() shouldBe ((): Unit)
+        updater.toTriplesStore(eventId, processingTime).unsafeRunSync() shouldBe ((): Unit)
       }
     }
 
     s"fail if remote responds with status different than $Ok" in new TestCase {
-      val status = BadRequest
+      val processingTime = eventProcessingTimes.generateOne
+      val status         = BadRequest
 
       stubFor {
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          .withMultipartRequestBody(
+            aMultipart("event")
+              .withBody(
+                equalToJson(json"""{"status": "TRIPLES_STORE", "processingTime": $processingTime}""".spaces2)
+              )
+          )
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
-        updater.markEventTransformationFailedNonRecoverably(eventId, exceptions.generateOne).unsafeRunSync()
+        updater.toTriplesStore(eventId, processingTime).unsafeRunSync() shouldBe ((): Unit)
       }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
     }
   }
 
-  "markEventFailedNonRecoverably" should {
+  "rollback" should {
 
-    Set(Ok, Conflict, NotFound) foreach { status =>
-      s"succeed if remote responds with $status" in new TestCase {
-        val exception = exceptions.generateOne
+    Set(Ok, NotFound) foreach { status =>
+      s"succeed if remote responds with $status - case of $New" in new TestCase {
         stubFor {
           patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
-            .withRequestBody(equalToJson(json"""{"status": "GENERATION_NON_RECOVERABLE_FAILURE", "message": ${asString(
-              exception
-            )}}""".spaces2))
+            .withMultipartRequestBody(
+              aMultipart("event")
+                .withBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
+            )
             .willReturn(aResponse().withStatus(status.code))
         }
 
-        updater.markEventFailedNonRecoverably(eventId, exception).unsafeRunSync() shouldBe ((): Unit)
+        updater.rollback[New](eventId).unsafeRunSync() shouldBe ((): Unit)
+      }
+
+      s"succeed if remote responds with $status - case of $TriplesGenerated" in new TestCase {
+        stubFor {
+          patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+            .withMultipartRequestBody(
+              aMultipart("event")
+                .withBody(equalToJson(json"""{"status": "TRIPLES_GENERATED"}""".spaces2))
+            )
+            .willReturn(aResponse().withStatus(status.code))
+        }
+
+        updater.rollback[TriplesGenerated](eventId).unsafeRunSync() shouldBe ((): Unit)
       }
     }
 
-    s"fail if remote responds with status different than $Ok" in new TestCase {
+    s"fail if remote responds with status different than $Ok - case of $New" in new TestCase {
       val status = BadRequest
-
       stubFor {
         patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          .withMultipartRequestBody(
+            aMultipart("event")
+              .withBody(equalToJson(json"""{"status": "NEW"}""".spaces2))
+          )
           .willReturn(aResponse().withStatus(status.code))
       }
 
       intercept[Exception] {
-        updater.markEventFailedNonRecoverably(eventId, exceptions.generateOne).unsafeRunSync()
+        updater.rollback[New](eventId).unsafeRunSync() shouldBe ((): Unit)
       }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+    }
+
+    s"fail if remote responds with status different than $Ok - case of $TriplesGenerated" in new TestCase {
+      val status = BadRequest
+      stubFor {
+        patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          .withMultipartRequestBody(
+            aMultipart("event")
+              .withBody(equalToJson(json"""{"status": "TRIPLES_GENERATED"}""".spaces2))
+          )
+          .willReturn(aResponse().withStatus(status.code))
+      }
+
+      intercept[Exception] {
+        updater.rollback[TriplesGenerated](eventId).unsafeRunSync() shouldBe ((): Unit)
+      }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+    }
+  }
+
+  "toFailure" should {
+
+    GenerationRecoverableFailure +: GenerationNonRecoverableFailure +: TransformationRecoverableFailure +: TransformationNonRecoverableFailure +: Nil foreach {
+      eventStatus =>
+        Set(Ok, NotFound) foreach { status =>
+          s"succeed if remote responds with $status for $eventStatus" in new TestCase {
+            val exception = exceptions.generateOne
+            stubFor {
+              patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+                .withMultipartRequestBody(
+                  aMultipart("event")
+                    .withBody(
+                      equalToJson(
+                        json"""{
+                          "status":  ${eventStatus.value},
+                          "message": ${ErrorMessage.withStackTrace(exception).value}
+                        }""".spaces2
+                      )
+                    )
+                )
+                .willReturn(aResponse().withStatus(status.code))
+            }
+
+            updater.toFailure(eventId, eventStatus, exception).unsafeRunSync() shouldBe ((): Unit)
+          }
+        }
+
+        s"fail if remote responds with status different than $Ok for $eventStatus" in new TestCase {
+          val status = BadRequest
+
+          stubFor {
+            patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+              .willReturn(aResponse().withStatus(status.code))
+          }
+
+          intercept[Exception] {
+            updater.toFailure(eventId, eventStatus, exceptions.generateOne).unsafeRunSync()
+          }.getMessage shouldBe s"PATCH $eventLogUrl/events/${eventId.id}/${eventId.projectId} returned $status; body: "
+        }
+    }
+  }
+
+  "eventStatusUpdater" should {
+
+    Set(BadGateway, ServiceUnavailable, GatewayTimeout) foreach { errorStatus =>
+      s"retry if remote responds with status such as $errorStatus" in new TestCase {
+        Set(
+          updater.toTriplesGenerated(eventId, rawTriples, schemaVersion, eventProcessingTimes.generateOne),
+          updater.toTriplesStore(eventId, eventProcessingTimes.generateOne),
+          updater.rollback[New](eventId),
+          updater.toFailure(eventId, failureEventStatuses.generateOne, exceptions.generateOne)
+        ) foreach { updateFunction =>
+          val patchRequest = patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+            .inScenario("Retry")
+
+          stubFor {
+            patchRequest
+              .whenScenarioStateIs(Scenario.STARTED)
+              .willSetStateTo("Error")
+              .willReturn(aResponse().withStatus(errorStatus.code))
+          }
+
+          stubFor {
+            patchRequest
+              .whenScenarioStateIs("Error")
+              .willSetStateTo("Successful")
+              .willReturn(aResponse().withStatus(errorStatus.code))
+          }
+
+          stubFor {
+            patchRequest
+              .whenScenarioStateIs("Successful")
+              .willReturn(aResponse().withStatus(Ok.code))
+          }
+
+          updateFunction.unsafeRunSync() shouldBe ()
+
+          reset()
+        }
+      }
+    }
+
+    s"retry if remote is not reachable" in new TestCase {
+      Set(
+        updater.toTriplesGenerated(eventId, rawTriples, schemaVersion, eventProcessingTimes.generateOne),
+        updater.toTriplesStore(eventId, eventProcessingTimes.generateOne),
+        updater.rollback[New](eventId),
+        updater.toFailure(eventId, failureEventStatuses.generateOne, exceptions.generateOne)
+      ) foreach { updateFunction =>
+        val patchRequest = patch(urlEqualTo(s"/events/${eventId.id}/${eventId.projectId}"))
+          .inScenario("Retry")
+
+        stubFor {
+          patchRequest
+            .whenScenarioStateIs(Scenario.STARTED)
+            .willSetStateTo("Error")
+            .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
+        }
+
+        stubFor {
+          patchRequest
+            .whenScenarioStateIs("Error")
+            .willSetStateTo("Successful")
+            .willReturn(aResponse().withFault(Fault.CONNECTION_RESET_BY_PEER))
+        }
+
+        stubFor {
+          patchRequest
+            .whenScenarioStateIs("Successful")
+            .willReturn(aResponse().withStatus(Ok.code))
+        }
+
+        updateFunction.unsafeRunSync() shouldBe ()
+
+        reset()
+      }
     }
   }
 
@@ -309,15 +340,8 @@ class EventStatusUpdaterSpec extends AnyWordSpec with ExternalServiceStubbing wi
     val rawTriples    = jsonLDTriples.generateOne
     val schemaVersion = schemaVersions.generateOne
 
-    val eventLogUrl         = EventLogUrl(externalServiceBaseUrl)
-    val microserviceBaseUrl = microserviceBaseUrls.generateOne
-    val updater             = new IOEventStatusUpdater(eventLogUrl, microserviceBaseUrl, TestLogger())
-  }
-
-  private def asString(exception: Exception): String = {
-    val exceptionAsString = new StringWriter
-    exception.printStackTrace(new PrintWriter(exceptionAsString))
-    exceptionAsString.flush()
-    exceptionAsString.toString.trim
+    val eventLogUrl = EventLogUrl(externalServiceBaseUrl)
+    val updater =
+      new EventStatusUpdaterImpl(eventLogUrl, categoryNames.generateOne, retryDelay = 500 millis, TestLogger())
   }
 }

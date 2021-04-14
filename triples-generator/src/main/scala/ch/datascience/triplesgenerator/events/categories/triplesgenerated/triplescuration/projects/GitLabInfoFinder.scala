@@ -26,7 +26,7 @@ import ch.datascience.graph.model.projects.{DateCreated, Name, Path}
 import ch.datascience.graph.model.{projects, users}
 import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

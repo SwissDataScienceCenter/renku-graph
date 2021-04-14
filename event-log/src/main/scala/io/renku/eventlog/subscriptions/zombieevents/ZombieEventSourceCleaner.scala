@@ -24,8 +24,9 @@ import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
+import doobie.ConnectionIO
 import eu.timepit.refined.api.Refined
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
 
 import scala.concurrent.ExecutionContext
@@ -48,8 +49,8 @@ private class ZombieEventSourceCleanerImpl(transactor:           DbTransactor[IO
 
   override def removeZombieSources(): IO[Unit] = for {
     maybeZombieRecords <- findPotentialZombieRecords
-    nonHealthySources  <- (maybeZombieRecords map isHealthy).parSequence.map(_.collect(nonHealthy))
-    _                  <- (nonHealthySources map delete).sequence
+    actions            <- (maybeZombieRecords map toAction).parSequence.map(_.filter(_.actionable))
+    _                  <- (actions map toQuery map execute).sequence
   } yield ()
 
   private def findPotentialZombieRecords: IO[List[(MicroserviceBaseUrl, SubscriberUrl)]] = measureExecutionTime {
@@ -64,24 +65,41 @@ private class ZombieEventSourceCleanerImpl(transactor:           DbTransactor[IO
     )
   } transact transactor.get
 
-  private def isHealthy: ((MicroserviceBaseUrl, SubscriberUrl)) => IO[(MicroserviceBaseUrl, SubscriberUrl, Boolean)] = {
-    case (sourceUrl, subscriberUrl) =>
-      for {
-        subscriberAsBaseUrl <- subscriberUrl.as[IO, MicroserviceBaseUrl]
-        subscriberHealthy   <- ping(subscriberAsBaseUrl)
-        sourceHealthy       <- ping(sourceUrl)
-      } yield sourceHealthy -> subscriberHealthy match {
-        case (true, _)  => (sourceUrl, subscriberUrl, true)
-        case (false, _) => (sourceUrl, subscriberUrl, subscriberHealthy)
+  private def toAction: ((MicroserviceBaseUrl, SubscriberUrl)) => IO[Action] = { case (sourceUrl, subscriberUrl) =>
+    for {
+      subscriberAsBaseUrl <- subscriberUrl.as[IO, MicroserviceBaseUrl]
+      subscriberHealthy   <- ping(subscriberAsBaseUrl)
+      sourceHealthy       <- ping(sourceUrl)
+    } yield sourceHealthy -> subscriberHealthy match {
+      case (true, _)      => NoAction
+      case (false, false) => Delete(sourceUrl, subscriberUrl)
+      case (false, true)  => Upsert(sourceUrl, subscriberUrl)
+    }
+  }
+
+  private def toQuery: Action => ConnectionIO[Int] = {
+    case Delete(sourceUrl, subscriberUrl, _) =>
+      delete(sourceUrl, subscriberUrl)
+    case Upsert(sourceUrl, subscriberUrl, _) =>
+      checkIfExist(microserviceBaseUrl, subscriberUrl) flatMap {
+        case true  => delete(sourceUrl, subscriberUrl)
+        case false => move(sourceUrl, subscriberUrl)
       }
+    case _ => 1.pure[ConnectionIO]
   }
 
-  private lazy val nonHealthy
-      : PartialFunction[(MicroserviceBaseUrl, SubscriberUrl, Boolean), (MicroserviceBaseUrl, SubscriberUrl)] = {
-    case (serviceUrl, subscriberUrl, false) => serviceUrl -> subscriberUrl
-  }
+  private def checkIfExist(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) =
+    measureExecutionTime {
+      SqlQuery(
+        sql"""|SELECT source_url
+              |FROM subscriber
+              |WHERE source_url = $sourceUrl AND delivery_url = $subscriberUrl
+              |""".stripMargin.query[String].option.map(_.isDefined),
+        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - check source & delivery exists")
+      )
+    }
 
-  private def delete: ((MicroserviceBaseUrl, SubscriberUrl)) => IO[Unit] = { case (sourceUrl, subscriberUrl) =>
+  private def delete(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) =
     measureExecutionTime {
       SqlQuery(
         sql"""|DELETE
@@ -90,7 +108,28 @@ private class ZombieEventSourceCleanerImpl(transactor:           DbTransactor[IO
               |""".stripMargin.update.run,
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete zombie source")
       )
-    }.transact(transactor.get).void
+    }
+
+  private def move(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) =
+    measureExecutionTime {
+      SqlQuery(
+        sql"""|UPDATE subscriber
+              |SET source_url = $microserviceBaseUrl
+              |WHERE source_url = $sourceUrl AND delivery_url = $subscriberUrl
+              |""".stripMargin.update.run,
+        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - move subscriber")
+      )
+    }
+
+  private def execute(query: ConnectionIO[Int]): IO[Unit] = query.transact(transactor.get).void
+
+  private sealed trait Action { val actionable: Boolean }
+  private case class Delete(source: MicroserviceBaseUrl, delivery: SubscriberUrl, actionable: Boolean = true)
+      extends Action
+  private case class Upsert(source: MicroserviceBaseUrl, delivery: SubscriberUrl, actionable: Boolean = true)
+      extends Action
+  private case object NoAction extends Action {
+    val actionable: Boolean = false
   }
 }
 

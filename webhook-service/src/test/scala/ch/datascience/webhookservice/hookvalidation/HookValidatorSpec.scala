@@ -28,13 +28,11 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.{Error, Info}
-import ch.datascience.webhookservice.generators.WebhookServiceGenerators._
+import ch.datascience.webhookservice.WebhookServiceGenerators._
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.{HookExists, HookMissing}
 import ch.datascience.webhookservice.hookvalidation.HookValidator.NoAccessTokenException
 import ch.datascience.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
-import ch.datascience.webhookservice.project._
 import ch.datascience.webhookservice.tokenrepository.{AccessTokenAssociator, AccessTokenRemover}
-import io.chrisdavenport.log4cats.Logger
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -261,7 +259,7 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
     val accessTokenAssociator = mock[AccessTokenAssociator[Try]]
     val accessTokenRemover    = mock[AccessTokenRemover[Try]]
     val logger                = TestLogger[Try]()
-    val validator = new HookValidator[Try](
+    val validator = new HookValidatorImpl[Try](
       projectHookUrl,
       projectHookVerifier,
       accessTokenFinder,
@@ -280,18 +278,3 @@ class HookValidatorSpec extends AnyWordSpec with MockFactory with should.Matcher
     }
   }
 }
-
-class TryHookValidator(
-    projectHookUrl:        ProjectHookUrl,
-    projectHookVerifier:   ProjectHookVerifier[Try],
-    accessTokenFinder:     AccessTokenFinder[Try],
-    accessTokenAssociator: AccessTokenAssociator[Try],
-    accessTokenRemover:    AccessTokenRemover[Try],
-    logger:                Logger[Try]
-) extends HookValidator[Try](projectHookUrl,
-                             projectHookVerifier,
-                             accessTokenFinder,
-                             accessTokenAssociator,
-                             accessTokenRemover,
-                             logger
-    )

@@ -14,7 +14,25 @@ data:
 
     JAVA=$JAVA_HOME/bin/java
     JAR=$FUSEKI_HOME/fuseki-server.jar
+    ATTEMPT=1
 
+    wait_for_db_folder () {
+      if [ ! -d "${FUSEKI_BASE}/databases/{{ .Values.global.graph.jena.dataset }}" ]
+      then
+        if [ "$ATTEMPT" -lt "6" ]
+        then
+          ATTEMPT=$((ATTEMPT + 1))
+          sleep 5s
+          echo "${FUSEKI_BASE}/databases/{{ .Values.global.graph.jena.dataset }} doesn't exist"
+          wait_for_db_folder
+        fi
+      fi
+    }
+
+    echo Waiting for mount points...
+    wait_for_db_folder
+
+    echo Preparing for Lucene indices rebuilding...
     # killing Jena if already started as Lucene indexing cannot happen on started Jena
     killall -9 java
     rm $FUSEKI_BASE/databases/{{ .Values.global.graph.jena.dataset }}/tdb.lock

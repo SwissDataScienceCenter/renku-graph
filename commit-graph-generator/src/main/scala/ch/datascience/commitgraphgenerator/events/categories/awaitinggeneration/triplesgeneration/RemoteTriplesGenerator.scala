@@ -29,7 +29,7 @@ import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 import ch.datascience.commitgraphgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.commitgraphgenerator.events.categories.awaitinggeneration.CommitEvent
 import com.typesafe.config.{Config, ConfigFactory}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Json
 
 import scala.concurrent.ExecutionContext

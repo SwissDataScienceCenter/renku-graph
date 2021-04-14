@@ -18,8 +18,7 @@
 
 package io.renku.jsonld
 
-/**
-  * A type class that provides a conversion from a value of type `A` to a [[EntityId]] value.
+/** A type class that provides a conversion from a value of type `A` to a [[EntityId]] value.
   */
 trait EntityIdEncoder[A] {
   def apply(a: A): EntityId

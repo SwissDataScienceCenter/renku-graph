@@ -25,8 +25,8 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import ch.datascience.webhookservice.project.ProjectHookUrl
-import io.chrisdavenport.log4cats.Logger
+import ch.datascience.webhookservice.model.ProjectHookUrl
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder.decodeList
 
 import scala.concurrent.ExecutionContext
@@ -39,11 +39,7 @@ private trait ProjectHookVerifier[Interpretation[_]] {
 }
 
 private object ProjectHookVerifier {
-
-  final case class HookIdentifier(
-      projectId:      Id,
-      projectHookUrl: ProjectHookUrl
-  )
+  final case class HookIdentifier(projectId: Id, projectHookUrl: ProjectHookUrl)
 }
 
 private class IOProjectHookVerifier(

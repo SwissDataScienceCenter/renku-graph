@@ -21,12 +21,12 @@ package ch.datascience.graph.model
 import cats.syntax.all._
 import ch.datascience.tinytypes._
 import ch.datascience.tinytypes.constraints._
-import ch.datascience.tinytypes.json.TinyTypeDecoders.durationDecoder
+import ch.datascience.tinytypes.json.TinyTypeDecoders.{durationDecoder, instantDecoder}
 import ch.datascience.tinytypes.json.TinyTypeEncoders.durationEncoder
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.circe.{Decoder, Encoder}
 import io.circe.Decoder.decodeString
+import io.circe.{Decoder, Encoder}
 
 import java.time.{Clock, Duration, Instant}
 
@@ -92,6 +92,7 @@ object events {
         TransformationNonRecoverableFailure
       )
 
+    type New = New.type
     final case object New extends EventStatus {
       override val value: String = "NEW"
     }
@@ -101,6 +102,7 @@ object events {
       override val value: String = "GENERATING_TRIPLES"
     }
 
+    type TriplesGenerated = TriplesGenerated.type
     final case object TriplesGenerated extends EventStatus {
       override val value: String = "TRIPLES_GENERATED"
     }
@@ -171,5 +173,10 @@ object events {
       def /(multiplier: Int Refined Positive): EventProcessingTime =
         EventProcessingTime(Duration.ofMillis(processingTime.value.toMillis / multiplier.value))
     }
+  }
+
+  final class LastSyncedDate private (val value: Instant) extends AnyVal with InstantTinyType
+  object LastSyncedDate extends TinyTypeFactory[LastSyncedDate](new LastSyncedDate(_)) with InstantNotInTheFuture {
+    implicit val decoder: Decoder[LastSyncedDate] = instantDecoder(LastSyncedDate)
   }
 }

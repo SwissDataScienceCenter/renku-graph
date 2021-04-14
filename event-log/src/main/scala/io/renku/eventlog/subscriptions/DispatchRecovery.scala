@@ -19,30 +19,36 @@
 package io.renku.eventlog.subscriptions
 
 import cats.MonadError
+import cats.syntax.all._
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 
 private trait DispatchRecovery[Interpretation[_], CategoryEvent] {
-  def recover(
-      url:           SubscriberUrl,
-      categoryEvent: CategoryEvent
-  ): PartialFunction[Throwable, Interpretation[Unit]]
+
+  def returnToQueue(event: CategoryEvent): Interpretation[Unit]
+
+  def recover(url: SubscriberUrl, event: CategoryEvent): PartialFunction[Throwable, Interpretation[Unit]]
 }
 
 private object LoggingDispatchRecovery {
 
-  def apply[Interpretation[_], CategoryEvent](
+  def apply[Interpretation[_]: MonadError[*[_], Throwable], CategoryEvent](
       categoryName: CategoryName,
       logger:       Logger[Interpretation]
-  )(implicit
-      ME: MonadError[Interpretation, Throwable]
   ): Interpretation[DispatchRecovery[Interpretation, CategoryEvent]] =
-    ME.catchNonFatal { (url: SubscriberUrl, categoryEvent: CategoryEvent) =>
-      { case NonFatal(exception) =>
-        logger.error(exception)(s"$categoryName: $categoryEvent, url = $url failed")
+    implicitly[MonadError[Interpretation, Throwable]].catchNonFatal {
+      new DispatchRecovery[Interpretation, CategoryEvent] {
+
+        override def returnToQueue(event: CategoryEvent): Interpretation[Unit] = ().pure[Interpretation]
+
+        override def recover(url:   SubscriberUrl,
+                             event: CategoryEvent
+        ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
+          logger.error(exception)(s"$categoryName: $event, url = $url failed")
+        }
       }
     }
 }
