@@ -24,53 +24,54 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventFinder
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-private class ZombieEventFinder[Interpretation[_]: MonadError[*[_], Throwable]](
-    longProcessingEventsFinder: EventFinder[Interpretation, ZombieEvent],
-    lostSubscriberEventFinder:  EventFinder[Interpretation, ZombieEvent],
-    zombieEventSourceCleaner:   ZombieEventSourceCleaner[Interpretation],
-    lostZombieEventFinder:      EventFinder[Interpretation, ZombieEvent],
-    logger:                     Logger[Interpretation]
-) extends EventFinder[Interpretation, ZombieEvent] {
+private class ZombieEventFinder[Interpretation[_] : MonadError[*[_], Throwable]](
+                                                                                  longProcessingEventsFinder: EventFinder[Interpretation, ZombieEvent],
+                                                                                  lostSubscriberEventFinder: EventFinder[Interpretation, ZombieEvent],
+                                                                                  zombieEventSourceCleaner: ZombieEventSourceCleaner[Interpretation],
+                                                                                  lostZombieEventFinder: EventFinder[Interpretation, ZombieEvent],
+                                                                                  logger: Logger[Interpretation]
+                                                                                ) extends EventFinder[Interpretation, ZombieEvent] {
   override def popEvent(): Interpretation[Option[ZombieEvent]] = for {
     _ <- zombieEventSourceCleaner.removeZombieSources() recoverWith logError
     maybeEvent <- OptionT(longProcessingEventsFinder.popEvent())
-                    .orElseF(lostSubscriberEventFinder.popEvent())
-                    .orElseF(lostZombieEventFinder.popEvent())
-                    .value
+      .orElseF(lostSubscriberEventFinder.popEvent())
+      .orElseF(lostZombieEventFinder.popEvent())
+      .value
   } yield maybeEvent
 
-  private lazy val logError: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(e) =>
-    logger.error(e)("ZombieEventSourceCleaner - failure during clean up")
+  private lazy val logError: PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(e) =>
+      logger.error(e)("ZombieEventSourceCleaner - failure during clean up")
   }
 }
 
 private object ZombieEventFinder {
 
   def apply(
-      transactor:       DbTransactor[IO, EventLogDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-      logger:           Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[EventFinder[IO, ZombieEvent]] = for {
+             transactor: DbTransactor[IO, EventLogDB],
+             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+             logger: Logger[IO]
+           )(implicit
+             executionContext: ExecutionContext,
+             contextShift: ContextShift[IO],
+             timer: Timer[IO]
+           ): IO[EventFinder[IO, ZombieEvent]] = for {
     longProcessingEventFinder <- LongProcessingEventFinder(transactor, queriesExecTimes)
     lostSubscriberEventFinder <- LostSubscriberEventFinder(transactor, queriesExecTimes)
-    zombieEventSourceCleaner  <- ZombieEventSourceCleaner(transactor, queriesExecTimes, logger)
-    lostZombieEventFinder     <- LostZombieEventFinder(transactor, queriesExecTimes)
+    zombieEventSourceCleaner <- ZombieEventSourceCleaner(transactor, queriesExecTimes, logger)
+    lostZombieEventFinder <- LostZombieEventFinder(transactor, queriesExecTimes)
   } yield new ZombieEventFinder[IO](longProcessingEventFinder,
-                                    lostSubscriberEventFinder,
-                                    zombieEventSourceCleaner,
-                                    lostZombieEventFinder,
-                                    logger
+    lostSubscriberEventFinder,
+    zombieEventSourceCleaner,
+    lostZombieEventFinder,
+    logger
   )
 }
 

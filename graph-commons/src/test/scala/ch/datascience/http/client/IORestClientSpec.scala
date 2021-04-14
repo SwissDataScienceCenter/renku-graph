@@ -34,7 +34,7 @@ import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Json
 import io.prometheus.client.Histogram
 import org.http4s.Method.{GET, POST}

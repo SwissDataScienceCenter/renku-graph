@@ -29,7 +29,7 @@ import doobie.free.connection
 import doobie.free.connection.ConnectionIO
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
@@ -41,11 +41,11 @@ trait StatusUpdatesRunner[Interpretation[_]] {
 }
 
 class StatusUpdatesRunnerImpl(
-    transactor:       DbTransactor[IO, EventLogDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-    logger:           Logger[IO]
-)(implicit ME:        Bracket[IO, Throwable])
-    extends DbClient(Some(queriesExecTimes))
+                               transactor: DbTransactor[IO, EventLogDB],
+                               queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+                               logger: Logger[IO]
+                             )(implicit ME: Bracket[IO, Throwable])
+  extends DbClient(Some(queriesExecTimes))
     with StatusUpdatesRunner[IO]
     with StatusProcessingTime {
 
@@ -55,11 +55,11 @@ class StatusUpdatesRunnerImpl(
 
   override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] = for {
     _ <- deleteDelivery(command) transact transactor.get recoverWith errorToUpdateResult(
-           s"Event ${command.eventId} - cannot remove event delivery"
-         )
+      s"Event ${command.eventId} - cannot remove event delivery"
+    )
     updateResult <- executeCommand(command) transact transactor.get recoverWith errorToUpdateResult(
-                      s"Event ${command.eventId} got ${command.status}"
-                    )
+      s"Event ${command.eventId} got ${command.status}"
+    )
     _ <- logInfo(command, updateResult)
     _ <- command updateGauges updateResult
   } yield updateResult
@@ -72,7 +72,7 @@ class StatusUpdatesRunnerImpl(
 
   private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {
     case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
-    case _       => ME.unit
+    case _ => ME.unit
   }
 
   private def executeCommand(command: ChangeStatusCommand[IO]): Free[connection.ConnectionOp, UpdateResult] =
@@ -96,7 +96,7 @@ class StatusUpdatesRunnerImpl(
 
   private def toUpdateResult: UpdateResult => ConnectionIO[UpdateResult] = {
     case UpdateResult.Failure(message) => new Exception(message).raiseError[ConnectionIO, UpdateResult]
-    case result                        => result.pure[ConnectionIO]
+    case result => result.pure[ConnectionIO]
   }
 
   private def checkIfPersisted(eventId: CompoundEventId) = measureExecutionTime {
@@ -116,7 +116,7 @@ class StatusUpdatesRunnerImpl(
 
   private def runUpdateQueriesIfSuccessful(queries: List[SqlQuery[Int]],
                                            command: ChangeStatusCommand[IO]
-  ): ConnectionIO[UpdateResult] =
+                                          ): ConnectionIO[UpdateResult] =
     queries
       .map(query => measureExecutionTime(query).map(query -> _))
       .sequence
@@ -137,10 +137,10 @@ object IOUpdateCommandsRunner {
 
   import cats.effect.IO
 
-  def apply(transactor:       DbTransactor[IO, EventLogDB],
+  def apply(transactor: DbTransactor[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-            logger:           Logger[IO]
-  ): IO[StatusUpdatesRunner[IO]] = IO {
+            logger: Logger[IO]
+           ): IO[StatusUpdatesRunner[IO]] = IO {
     new StatusUpdatesRunnerImpl(transactor, queriesExecTimes, logger)
   }
 }

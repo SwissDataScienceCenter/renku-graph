@@ -30,7 +30,7 @@ import ch.datascience.http.client.RestClientError.{ConnectivityException, Unauth
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.Method.GET
 import org.http4s.Status.{Ok, Unauthorized}
 import org.http4s.circe.jsonOf
@@ -41,29 +41,29 @@ import scala.concurrent.ExecutionContext
 
 private trait CommitCommitterFinder[Interpretation[_]] {
 
-  def findCommitPeople(projectId:        projects.Id,
-                       commitId:         CommitId,
+  def findCommitPeople(projectId: projects.Id,
+                       commitId: CommitId,
                        maybeAccessToken: Option[AccessToken]
-  ): EitherT[Interpretation, ProcessingRecoverableError, CommitPersonsInfo]
+                      ): EitherT[Interpretation, ProcessingRecoverableError, CommitPersonsInfo]
 }
 
 private class CommitCommitterFinderImpl(
-    gitLabApiUrl:    GitLabApiUrl,
-    gitLabThrottler: Throttler[IO, GitLab],
-    logger:          Logger[IO]
-)(implicit
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO]
-) extends IORestClient(gitLabThrottler, logger)
-    with CommitCommitterFinder[IO] {
+                                         gitLabApiUrl: GitLabApiUrl,
+                                         gitLabThrottler: Throttler[IO, GitLab],
+                                         logger: Logger[IO]
+                                       )(implicit
+                                         executionContext: ExecutionContext,
+                                         contextShift: ContextShift[IO],
+                                         timer: Timer[IO]
+                                       ) extends IORestClient(gitLabThrottler, logger)
+  with CommitCommitterFinder[IO] {
 
-  def findCommitPeople(projectId:        projects.Id,
-                       commitId:         CommitId,
+  def findCommitPeople(projectId: projects.Id,
+                       commitId: CommitId,
                        maybeAccessToken: Option[AccessToken]
-  ): EitherT[IO, ProcessingRecoverableError, CommitPersonsInfo] =
+                      ): EitherT[IO, ProcessingRecoverableError, CommitPersonsInfo] =
     for {
-      uri    <- validateUri(s"$gitLabApiUrl/projects/$projectId/repository/commits/$commitId").toRightT
+      uri <- validateUri(s"$gitLabApiUrl/projects/$projectId/repository/commits/$commitId").toRightT
       result <- EitherT(send(request(GET, uri, maybeAccessToken))(mapResponse) recoverWith maybeRecoverableError)
     } yield result
 
@@ -81,10 +81,11 @@ private class CommitCommitterFinderImpl(
     jsonOf[IO, CommitPersonsInfo]
 
   private lazy val maybeRecoverableError
-      : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, CommitPersonsInfo]]] = {
+  : PartialFunction[Throwable, IO[Either[ProcessingRecoverableError, CommitPersonsInfo]]] = {
     case ConnectivityException(message, cause) =>
       IO.pure(Either.left(CurationRecoverableError(message, cause)))
   }
+
   private implicit class ResultOps[T](out: IO[T]) {
     lazy val toRightT: EitherT[IO, ProcessingRecoverableError, T] =
       EitherT.right[ProcessingRecoverableError](out)
@@ -94,8 +95,8 @@ private class CommitCommitterFinderImpl(
 
 private object IOCommitCommitterFinder {
   def apply(gitLabApiUrl: GitLabApiUrl, gitLabThrottler: Throttler[IO, GitLab], logger: Logger[IO])(implicit
-      executionContext:   ExecutionContext,
-      contextShift:       ContextShift[IO],
-      timer:              Timer[IO]
+                                                                                                    executionContext: ExecutionContext,
+                                                                                                    contextShift: ContextShift[IO],
+                                                                                                    timer: Timer[IO]
   ): IO[CommitCommitterFinder[IO]] = IO(new CommitCommitterFinderImpl(gitLabApiUrl, gitLabThrottler, logger))
 }

@@ -32,7 +32,7 @@ import ch.datascience.logging.TestExecutionTimeRecorder
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Json
 import org.http4s.Status.{BadRequest, Ok}
 import org.http4s.{Request, Response, Status}

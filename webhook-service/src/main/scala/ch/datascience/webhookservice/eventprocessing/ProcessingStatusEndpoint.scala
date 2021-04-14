@@ -33,7 +33,7 @@ import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.Pro
 import ch.datascience.webhookservice.hookvalidation.HookValidator
 import ch.datascience.webhookservice.hookvalidation.HookValidator.{HookValidationResult, NoAccessTokenException}
 import ch.datascience.webhookservice.model.ProjectHookUrl
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}
@@ -48,13 +48,13 @@ trait ProcessingStatusEndpoint[Interpretation[_]] {
   def fetchProcessingStatus(projectId: Id): Interpretation[Response[Interpretation]]
 }
 
-class ProcessingStatusEndpointImpl[Interpretation[_]: Effect](
-    hookValidator:           HookValidator[Interpretation],
-    processingStatusFetcher: ProcessingStatusFetcher[Interpretation],
-    executionTimeRecorder:   ExecutionTimeRecorder[Interpretation],
-    logger:                  Logger[Interpretation]
-)(implicit ME:               MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation]
+class ProcessingStatusEndpointImpl[Interpretation[_] : Effect](
+                                                                hookValidator: HookValidator[Interpretation],
+                                                                processingStatusFetcher: ProcessingStatusFetcher[Interpretation],
+                                                                executionTimeRecorder: ExecutionTimeRecorder[Interpretation],
+                                                                logger: Logger[Interpretation]
+                                                              )(implicit ME: MonadError[Interpretation, Throwable])
+  extends Http4sDsl[Interpretation]
     with ProcessingStatusEndpoint[Interpretation] {
 
   import HookValidationResult._
@@ -64,7 +64,7 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: Effect](
   def fetchProcessingStatus(projectId: Id): Interpretation[Response[Interpretation]] = measureExecutionTime {
     {
       for {
-        _        <- validateHook(projectId)
+        _ <- validateHook(projectId)
         response <- findStatus(projectId)
       } yield response
     }.getOrElseF(NotFound(InfoMessage(s"Progress status for project '$projectId' not found")))
@@ -84,25 +84,28 @@ class ProcessingStatusEndpointImpl[Interpretation[_]: Effect](
 
   private lazy val hookMissingToNone: HookValidationResult => Option[Unit] = {
     case HookExists => Some(())
-    case _          => None
+    case _ => None
   }
 
-  private lazy val noAccessTokenToNone: PartialFunction[Throwable, Option[Unit]] = { case NoAccessTokenException(_) =>
-    None
+  private lazy val noAccessTokenToNone: PartialFunction[Throwable, Option[Unit]] = {
+    case NoAccessTokenException(_) =>
+      None
   }
 
   private def httpResponse(
-      projectId: projects.Id
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
-    logger.error(exception)(s"Finding progress status for project '$projectId' failed")
-    InternalServerError(ErrorMessage(exception))
+                            projectId: projects.Id
+                          ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(s"Finding progress status for project '$projectId' failed")
+      InternalServerError(ErrorMessage(exception))
   }
 }
 
 private object ProcessingStatusEndpoint {
 
-  implicit val processingStatusEncoder: Encoder[ProcessingStatus] = { case ProcessingStatus(done, total, progress) =>
-    json"""
+  implicit val processingStatusEncoder: Encoder[ProcessingStatus] = {
+    case ProcessingStatus(done, total, progress) =>
+      json"""
       {
        "done": ${done.value},
        "total": ${total.value},
@@ -110,7 +113,8 @@ private object ProcessingStatusEndpoint {
       }"""
   }
 
-  val zeroProcessingStatusJson: Json = json"""
+  val zeroProcessingStatusJson: Json =
+    json"""
       {
        "done": ${0},
        "total": ${0}
@@ -119,17 +123,17 @@ private object ProcessingStatusEndpoint {
 
 object IOProcessingStatusEndpoint {
   def apply(
-      projectHookUrl:        ProjectHookUrl,
-      gitLabThrottler:       Throttler[IO, GitLab],
-      executionTimeRecorder: ExecutionTimeRecorder[IO],
-      logger:                Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      clock:            Clock[IO],
-      timer:            Timer[IO]
-  ): IO[ProcessingStatusEndpoint[IO]] = for {
-    fetcher       <- IOProcessingStatusFetcher(logger)
+             projectHookUrl: ProjectHookUrl,
+             gitLabThrottler: Throttler[IO, GitLab],
+             executionTimeRecorder: ExecutionTimeRecorder[IO],
+             logger: Logger[IO]
+           )(implicit
+             executionContext: ExecutionContext,
+             contextShift: ContextShift[IO],
+             clock: Clock[IO],
+             timer: Timer[IO]
+           ): IO[ProcessingStatusEndpoint[IO]] = for {
+    fetcher <- IOProcessingStatusFetcher(logger)
     hookValidator <- HookValidator(projectHookUrl, gitLabThrottler)
   } yield new ProcessingStatusEndpointImpl[IO](hookValidator, fetcher, executionTimeRecorder, logger)
 }

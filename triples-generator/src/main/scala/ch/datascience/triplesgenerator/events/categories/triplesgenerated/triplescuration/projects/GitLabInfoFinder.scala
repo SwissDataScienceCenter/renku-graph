@@ -26,7 +26,7 @@ import ch.datascience.graph.model.projects.{DateCreated, Name, Path}
 import ch.datascience.graph.model.{projects, users}
 import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -36,11 +36,11 @@ private trait GitLabInfoFinder[Interpretation[_]] {
 }
 
 private class IOGitLabInfoFinder(
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(gitLabThrottler, logger)
+                                  gitLabUrl: GitLabUrl,
+                                  gitLabThrottler: Throttler[IO, GitLab],
+                                  logger: Logger[IO]
+                                )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+  extends IORestClient(gitLabThrottler, logger)
     with GitLabInfoFinder[IO] {
 
   import cats.data.OptionT
@@ -58,8 +58,8 @@ private class IOGitLabInfoFinder(
   private type ProjectAndCreatorId = (GitLabProject, Option[users.GitLabId])
 
   override def findProject(
-      path:                    projects.Path
-  )(implicit maybeAccessToken: Option[AccessToken]): IO[Option[GitLabProject]] = {
+                            path: projects.Path
+                          )(implicit maybeAccessToken: Option[AccessToken]): IO[Option[GitLabProject]] = {
     for {
       projectsUri <- OptionT.liftF(validateUri(s"$gitLabUrl/api/v4/projects/${urlEncode(path.value)}"))
       (project, maybeCreatorId) <-
@@ -68,25 +68,25 @@ private class IOGitLabInfoFinder(
     } yield project.copy(maybeCreator = maybeCreator)
   }.value
 
-  private def fetchCreator(maybeCreatorId:   Option[users.GitLabId],
+  private def fetchCreator(maybeCreatorId: Option[users.GitLabId],
                            maybeAccessToken: Option[AccessToken]
-  ): OptionT[IO, Option[GitLabCreator]] =
+                          ): OptionT[IO, Option[GitLabCreator]] =
     maybeCreatorId match {
       case None => OptionT.some[IO](Option.empty[GitLabCreator])
       case Some(creatorId) =>
         OptionT.liftF {
           for {
-            usersUri     <- validateUri(s"$gitLabUrl/api/v4/users/$creatorId")
+            usersUri <- validateUri(s"$gitLabUrl/api/v4/users/$creatorId")
             maybeCreator <- send(request(GET, usersUri, maybeAccessToken))(mapTo[GitLabCreator])
           } yield maybeCreator
         }
     }
 
   private def mapTo[OUT](implicit
-      decoder: EntityDecoder[IO, OUT]
-  ): PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[OUT]]] = {
+                         decoder: EntityDecoder[IO, OUT]
+                        ): PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[OUT]]] = {
     case (Ok, _, response) => response.as[OUT].map(Option.apply)
-    case (NotFound, _, _)  => None.pure[IO]
+    case (NotFound, _, _) => None.pure[IO]
   }
 
   private implicit lazy val projectDecoder: EntityDecoder[IO, ProjectAndCreatorId] = {
@@ -95,14 +95,14 @@ private class IOGitLabInfoFinder(
 
     implicit val decoder: Decoder[ProjectAndCreatorId] = cursor =>
       for {
-        path           <- cursor.downField("path_with_namespace").as[projects.Path]
-        name           <- cursor.downField("name").as[projects.Name]
-        visibility     <- cursor.downField("visibility").as[projects.Visibility]
-        dateCreated    <- cursor.downField("created_at").as[projects.DateCreated]
+        path <- cursor.downField("path_with_namespace").as[projects.Path]
+        name <- cursor.downField("name").as[projects.Name]
+        visibility <- cursor.downField("visibility").as[projects.Visibility]
+        dateCreated <- cursor.downField("created_at").as[projects.DateCreated]
         maybeCreatorId <- cursor.downField("creator_id").as[Option[users.GitLabId]]
         maybeParentPath <- cursor
-                             .downField("forked_from_project")
-                             .as[Option[projects.Path]](decodeOption(parentPathDecoder))
+          .downField("forked_from_project")
+          .as[Option[projects.Path]](decodeOption(parentPathDecoder))
       } yield GitLabProject(path, name, visibility, dateCreated, maybeParentPath, maybeCreator = None) -> maybeCreatorId
 
     jsonOf[IO, ProjectAndCreatorId]
@@ -113,7 +113,7 @@ private class IOGitLabInfoFinder(
     implicit val decoder: Decoder[GitLabCreator] = cursor =>
       for {
         gitLabId <- cursor.downField("id").as[users.GitLabId]
-        name     <- cursor.downField("name").as[users.Name]
+        name <- cursor.downField("name").as[users.Name]
       } yield GitLabCreator(gitLabId, name)
 
     jsonOf[IO, GitLabCreator]
@@ -127,13 +127,13 @@ private class IOGitLabInfoFinder(
 private object IOGitLabInfoFinder {
 
   def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[GitLabInfoFinder[IO]] =
+             gitLabThrottler: Throttler[IO, GitLab],
+             logger: Logger[IO]
+           )(implicit
+             executionContext: ExecutionContext,
+             contextShift: ContextShift[IO],
+             timer: Timer[IO]
+           ): IO[GitLabInfoFinder[IO]] =
     for {
       gitLabUrl <- GitLabUrl[IO]()
     } yield new IOGitLabInfoFinder(gitLabUrl, gitLabThrottler, logger)

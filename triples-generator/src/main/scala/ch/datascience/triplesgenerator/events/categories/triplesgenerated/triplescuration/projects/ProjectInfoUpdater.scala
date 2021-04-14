@@ -26,26 +26,26 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.{CuratedTriples, CurationResults}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 trait ProjectInfoUpdater[Interpretation[_]] {
   def updateProjectInfo(
-      event:                   TriplesGeneratedEvent,
-      givenCuratedTriples:     CuratedTriples[Interpretation]
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
+                         event: TriplesGeneratedEvent,
+                         givenCuratedTriples: CuratedTriples[Interpretation]
+                       )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[Interpretation]
 }
 
 class ProjectInfoUpdaterImpl(
-    payloadTransformer:     PayloadTransformer[IO],
-    updateFunctionsCreator: UpdatesCreator[IO]
-) extends ProjectInfoUpdater[IO] {
+                              payloadTransformer: PayloadTransformer[IO],
+                              updateFunctionsCreator: UpdatesCreator[IO]
+                            ) extends ProjectInfoUpdater[IO] {
 
   override def updateProjectInfo(
-      event:                   TriplesGeneratedEvent,
-      curatedTriples:          CuratedTriples[IO]
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[IO] =
+                                  event: TriplesGeneratedEvent,
+                                  curatedTriples: CuratedTriples[IO]
+                                )(implicit maybeAccessToken: Option[AccessToken]): CurationResults[IO] =
     payloadTransformer
       .transform(event, curatedTriples)
       .map { transformedTriples =>
@@ -55,12 +55,12 @@ class ProjectInfoUpdaterImpl(
 
 object IOProjectInfoUpdater {
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      logger:                  Logger[IO],
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[ProjectInfoUpdater[IO]] =
+             gitLabThrottler: Throttler[IO, GitLab],
+             logger: Logger[IO],
+             timeRecorder: SparqlQueryTimeRecorder[IO]
+           )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[ProjectInfoUpdater[IO]] =
     for {
-      payloadTransformer     <- IOPayloadTransformer(gitLabThrottler, logger)
+      payloadTransformer <- IOPayloadTransformer(gitLabThrottler, logger)
       updateFunctionsCreator <- IOUpdateFunctionsCreator(gitLabThrottler, logger, timeRecorder)
     } yield new ProjectInfoUpdaterImpl(payloadTransformer, updateFunctionsCreator)
 }

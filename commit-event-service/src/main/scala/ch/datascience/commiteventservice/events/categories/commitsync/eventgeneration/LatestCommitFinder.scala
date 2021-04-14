@@ -25,7 +25,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 import org.http4s.circe.jsonOf
@@ -35,17 +35,17 @@ import scala.concurrent.ExecutionContext
 
 private trait LatestCommitFinder[Interpretation[_]] {
   def findLatestCommit(
-      projectId:        Id,
-      maybeAccessToken: Option[AccessToken]
-  ): OptionT[Interpretation, CommitInfo]
+                        projectId: Id,
+                        maybeAccessToken: Option[AccessToken]
+                      ): OptionT[Interpretation, CommitInfo]
 }
 
 private class LatestCommitFinderImpl(
-    gitLabUrl:               GitLabUrl,
-    gitLabThrottler:         Throttler[IO, GitLab],
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient(gitLabThrottler, logger)
+                                      gitLabUrl: GitLabUrl,
+                                      gitLabThrottler: Throttler[IO, GitLab],
+                                      logger: Logger[IO]
+                                    )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+  extends IORestClient(gitLabThrottler, logger)
     with LatestCommitFinder[IO] {
 
   import CommitInfo._
@@ -55,19 +55,19 @@ private class LatestCommitFinderImpl(
   import org.http4s.{Request, Response}
 
   override def findLatestCommit(
-      projectId:        Id,
-      maybeAccessToken: Option[AccessToken]
-  ): OptionT[IO, CommitInfo] = OptionT {
+                                 projectId: Id,
+                                 maybeAccessToken: Option[AccessToken]
+                               ): OptionT[IO, CommitInfo] = OptionT {
     for {
-      stringUri       <- IO.pure(s"$gitLabUrl/api/v4/projects/$projectId/repository/commits")
-      uri             <- validateUri(stringUri) map (_.withQueryParam("per_page", "1"))
+      stringUri <- IO.pure(s"$gitLabUrl/api/v4/projects/$projectId/repository/commits")
+      uri <- validateUri(stringUri) map (_.withQueryParam("per_page", "1"))
       maybeCommitInfo <- send(request(GET, uri, maybeAccessToken))(mapResponse)
     } yield maybeCommitInfo
   }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[CommitInfo]]] = {
-    case (Ok, _, response)    => response.as[List[CommitInfo]] map (_.headOption)
-    case (NotFound, _, _)     => IO.pure(None)
+    case (Ok, _, response) => response.as[List[CommitInfo]] map (_.headOption)
+    case (NotFound, _, _) => IO.pure(None)
     case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
   }
 
@@ -79,13 +79,13 @@ private class LatestCommitFinderImpl(
 
 private object LatestCommitFinder {
   def apply(
-      gitLabThrottler: Throttler[IO, GitLab],
-      logger:          Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[LatestCommitFinder[IO]] = for {
+             gitLabThrottler: Throttler[IO, GitLab],
+             logger: Logger[IO]
+           )(implicit
+             executionContext: ExecutionContext,
+             contextShift: ContextShift[IO],
+             timer: Timer[IO]
+           ): IO[LatestCommitFinder[IO]] = for {
     gitLabUrl <- GitLabUrl[IO]()
   } yield new LatestCommitFinderImpl(gitLabUrl, gitLabThrottler, logger)
 }

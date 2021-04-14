@@ -25,7 +25,7 @@ import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, I
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -35,16 +35,16 @@ private trait ProjectDatasetsFinder[Interpretation[_]] {
 
 private object ProjectDatasetsFinder {
   type SameAsOrDerived = Either[SameAs, DerivedFrom]
-  type ProjectDataset  = (Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUri])
+  type ProjectDataset = (Identifier, InitialVersion, Title, Name, SameAsOrDerived, List[ImageUri])
 }
 
 private class IOProjectDatasetsFinder(
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+                                       rdfStoreConfig: RdfStoreConfig,
+                                       renkuBaseUrl: RenkuBaseUrl,
+                                       logger: Logger[IO],
+                                       timeRecorder: SparqlQueryTimeRecorder[IO]
+                                     )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+  extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with ProjectDatasetsFinder[IO] {
 
   import IOProjectDatasetsFinder._
@@ -107,7 +107,7 @@ private object IOProjectDatasetsFinder {
 
     def sameAsOrDerived(from: SameAs, and: Option[DerivedFrom]): SameAsOrDerived = from -> and match {
       case (_, Some(derivedFrom)) => Right(derivedFrom)
-      case (sameAs, _)            => Left(sameAs)
+      case (sameAs, _) => Left(sameAs)
     }
 
     def toListOfImageUrls(urlString: Option[String]): List[ImageUri] =
@@ -125,13 +125,13 @@ private object IOProjectDatasetsFinder {
 
     implicit val recordDecoder: Decoder[ProjectDataset] = { cursor =>
       for {
-        id               <- cursor.downField("identifier").downField("value").as[Identifier]
-        title            <- cursor.downField("name").downField("value").as[Title]
-        name             <- cursor.downField("alternateName").downField("value").as[Name]
-        sameAs           <- cursor.downField("topmostSameAs").downField("value").as[SameAs]
+        id <- cursor.downField("identifier").downField("value").as[Identifier]
+        title <- cursor.downField("name").downField("value").as[Title]
+        name <- cursor.downField("alternateName").downField("value").as[Name]
+        sameAs <- cursor.downField("topmostSameAs").downField("value").as[SameAs]
         maybeDerivedFrom <- cursor.downField("maybeDerivedFrom").downField("value").as[Option[DerivedFrom]]
-        initialVersion   <- cursor.downField("initialVersion").downField("value").as[InitialVersion]
-        images           <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
+        initialVersion <- cursor.downField("initialVersion").downField("value").as[InitialVersion]
+        images <- cursor.downField("images").downField("value").as[Option[String]].map(toListOfImageUrls)
       } yield (id, initialVersion, title, name, sameAsOrDerived(from = sameAs, and = maybeDerivedFrom), images)
     }
 

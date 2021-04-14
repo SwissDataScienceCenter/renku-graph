@@ -27,7 +27,7 @@ import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.graph.model.projects.Visibility.Public
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

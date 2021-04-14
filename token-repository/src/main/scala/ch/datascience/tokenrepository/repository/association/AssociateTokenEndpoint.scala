@@ -28,26 +28,26 @@ import ch.datascience.http.ErrorMessage
 import ch.datascience.http.client.AccessToken
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{EntityDecoder, Request, Response}
 
 import scala.util.control.NonFatal
 
-class AssociateTokenEndpoint[Interpretation[_]: Effect](
-    tokenAssociator: TokenAssociator[Interpretation],
-    logger:          Logger[Interpretation]
-)(implicit ME:       MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+class AssociateTokenEndpoint[Interpretation[_] : Effect](
+                                                          tokenAssociator: TokenAssociator[Interpretation],
+                                                          logger: Logger[Interpretation]
+                                                        )(implicit ME: MonadError[Interpretation, Throwable])
+  extends Http4sDsl[Interpretation] {
 
   import tokenAssociator._
 
   def associateToken(projectId: Id, request: Request[Interpretation]): Interpretation[Response[Interpretation]] = {
     for {
       accessToken <- request.as[AccessToken] recoverWith badRequest
-      _           <- associate(projectId, accessToken)
-      response    <- NoContent()
+      _ <- associate(projectId, accessToken)
+      response <- NoContent()
     } yield response
   } recoverWith httpResponse(projectId)
 
@@ -56,8 +56,9 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
 
   private case class BadRequestError(cause: Throwable) extends Exception(cause)
 
-  private lazy val badRequest: PartialFunction[Throwable, Interpretation[AccessToken]] = { case NonFatal(exception) =>
-    ME.raiseError(BadRequestError(exception))
+  private lazy val badRequest: PartialFunction[Throwable, Interpretation[AccessToken]] = {
+    case NonFatal(exception) =>
+      ME.raiseError(BadRequestError(exception))
   }
 
   private def httpResponse(projectId: Id): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
@@ -71,19 +72,20 @@ class AssociateTokenEndpoint[Interpretation[_]: Effect](
 }
 
 object IOAssociateTokenEndpoint {
+
   import cats.effect.{ContextShift, IO, Timer}
 
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor:       DbTransactor[IO, ProjectsTokensDB],
-      queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
-      logger:           Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[AssociateTokenEndpoint[IO]] =
+             transactor: DbTransactor[IO, ProjectsTokensDB],
+             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+             logger: Logger[IO]
+           )(implicit
+             executionContext: ExecutionContext,
+             contextShift: ContextShift[IO],
+             timer: Timer[IO]
+           ): IO[AssociateTokenEndpoint[IO]] =
     for {
       tokenAssociator <- IOTokenAssociator(transactor, queriesExecTimes, logger)
     } yield new AssociateTokenEndpoint[IO](tokenAssociator, logger)

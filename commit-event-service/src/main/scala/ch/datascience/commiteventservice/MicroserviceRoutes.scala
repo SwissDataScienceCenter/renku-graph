@@ -26,16 +26,16 @@ import ch.datascience.events.consumers.EventConsumersRegistry
 import ch.datascience.graph.http.server.security.GitLabAuthenticator
 import ch.datascience.logging.ExecutionTimeRecorder
 import ch.datascience.metrics.{MetricsRegistry, RoutesMetrics}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 
 import scala.concurrent.ExecutionContext
 
-private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect](
-    eventEndpoint: EventEndpoint[Interpretation],
-    routesMetrics: RoutesMetrics[Interpretation]
-)(implicit clock:  Clock[Interpretation])
-    extends Http4sDsl[Interpretation] {
+private class MicroserviceRoutes[Interpretation[_] : ConcurrentEffect](
+                                                                        eventEndpoint: EventEndpoint[Interpretation],
+                                                                        routesMetrics: RoutesMetrics[Interpretation]
+                                                                      )(implicit clock: Clock[Interpretation])
+  extends Http4sDsl[Interpretation] {
 
   import eventEndpoint._
   import org.http4s.HttpRoutes
@@ -43,24 +43,24 @@ private class MicroserviceRoutes[Interpretation[_]: ConcurrentEffect](
 
   // format: off
   lazy val routes: Resource[Interpretation, HttpRoutes[Interpretation]] = HttpRoutes.of[Interpretation] {
-    case           GET  -> Root / "ping"   => Ok("pong")
-    case request @ POST -> Root / "events" => processEvent(request)
+    case GET -> Root / "ping" => Ok("pong")
+    case request@POST -> Root / "events" => processEvent(request)
   }.withMetrics
   // format: on
 }
 
 private object MicroserviceRoutes {
   def apply(
-      consumersRegistry:     EventConsumersRegistry[IO],
-      metricsRegistry:       MetricsRegistry[IO],
-      gitLabThrottler:       Throttler[IO, GitLab],
-      executionTimeRecorder: ExecutionTimeRecorder[IO],
-      logger:                Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[MicroserviceRoutes[IO]] =
+             consumersRegistry: EventConsumersRegistry[IO],
+             metricsRegistry: MetricsRegistry[IO],
+             gitLabThrottler: Throttler[IO, GitLab],
+             executionTimeRecorder: ExecutionTimeRecorder[IO],
+             logger: Logger[IO]
+           )(implicit
+             executionContext: ExecutionContext,
+             contextShift: ContextShift[IO],
+             timer: Timer[IO]
+           ): IO[MicroserviceRoutes[IO]] =
     for {
       eventEndpoint <- EventEndpoint(consumersRegistry, logger)
     } yield new MicroserviceRoutes(

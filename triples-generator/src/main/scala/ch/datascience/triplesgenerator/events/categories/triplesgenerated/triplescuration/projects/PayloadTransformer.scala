@@ -29,32 +29,32 @@ import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecove
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 private trait PayloadTransformer[Interpretation[_]] {
   def transform(
-      event:                   TriplesGeneratedEvent,
-      curatedTriples:          CuratedTriples[Interpretation]
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, ProcessingRecoverableError, JsonLDTriples]
+                 event: TriplesGeneratedEvent,
+                 curatedTriples: CuratedTriples[Interpretation]
+               )(implicit maybeAccessToken: Option[AccessToken]): EitherT[Interpretation, ProcessingRecoverableError, JsonLDTriples]
 }
 
 private class PayloadTransformerImpl(
-    gitLab:                   GitLabInfoFinder[IO],
-    projectPropertiesRemover: JsonLDTriples => JsonLDTriples
-)(implicit ME:                MonadError[IO, Throwable], cs: ContextShift[IO])
-    extends PayloadTransformer[IO] {
+                                      gitLab: GitLabInfoFinder[IO],
+                                      projectPropertiesRemover: JsonLDTriples => JsonLDTriples
+                                    )(implicit ME: MonadError[IO, Throwable], cs: ContextShift[IO])
+  extends PayloadTransformer[IO] {
 
   override def transform(
-      event:                   TriplesGeneratedEvent,
-      curatedTriples:          CuratedTriples[IO]
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = EitherT {
+                          event: TriplesGeneratedEvent,
+                          curatedTriples: CuratedTriples[IO]
+                        )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] = EitherT {
     gitLab
       .findProject(event.project.path)
       .map {
         case None => curatedTriples.triples.pure[IO]
-        case _    => projectPropertiesRemover(curatedTriples.triples).pure[IO]
+        case _ => projectPropertiesRemover(curatedTriples.triples).pure[IO]
       }
       .flatten
       .map(_.asRight[ProcessingRecoverableError])
@@ -62,7 +62,7 @@ private class PayloadTransformerImpl(
   }
 
   private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, Either[ProcessingRecoverableError, JsonLDTriples]] = {
+  : PartialFunction[Throwable, Either[ProcessingRecoverableError, JsonLDTriples]] = {
     case e: UnexpectedResponseException =>
       Left[ProcessingRecoverableError, JsonLDTriples](
         CurationRecoverableError("Problem with finding fork info", e)
@@ -75,14 +75,15 @@ private class PayloadTransformerImpl(
 }
 
 private object IOPayloadTransformer {
+
   import cats.effect.Timer
   import ch.datascience.config.GitLab
   import ch.datascience.control.Throttler
 
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      logger:                  Logger[IO]
-  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[PayloadTransformer[IO]] =
+             gitLabThrottler: Throttler[IO, GitLab],
+             logger: Logger[IO]
+           )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[PayloadTransformer[IO]] =
     for {
       gitLabInfoFinder <- IOGitLabInfoFinder(gitLabThrottler, logger)
       triplesTransformer = new ProjectPropertiesRemover

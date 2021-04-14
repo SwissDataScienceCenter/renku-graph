@@ -24,7 +24,7 @@ import ch.datascience.events.consumers.EventHandler
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
 import scala.concurrent.ExecutionContext

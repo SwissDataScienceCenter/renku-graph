@@ -26,7 +26,7 @@ import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.jsonld.EntityId
 
 import scala.concurrent.ExecutionContext
@@ -36,12 +36,12 @@ private trait EdgesFinder[Interpretation[_]] {
 }
 
 private class IOEdgesFinder(
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+                             rdfStoreConfig: RdfStoreConfig,
+                             renkuBaseUrl: RenkuBaseUrl,
+                             logger: Logger[IO],
+                             timeRecorder: SparqlQueryTimeRecorder[IO]
+                           )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+  extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with EdgesFinder[IO] {
 
   private type EdgeData = (EntityId, Option[Node.Location], Option[Node.Location])
@@ -57,11 +57,12 @@ private class IOEdgesFinder(
       for {
         edges <- queryExpecting[Set[EdgeData]](queryWithOffset)
         results <- edges match {
-                     case e if e.size < pageSize => (into ++ edges).pure[IO]
-                     case fullPage               => fetchPaginatedResult(into ++ fullPage, using, offset + pageSize)
-                   }
+          case e if e.size < pageSize => (into ++ edges).pure[IO]
+          case fullPage => fetchPaginatedResult(into ++ fullPage, using, offset + pageSize)
+        }
       } yield results
     }
+
     fetchPaginatedResult(Set.empty[EdgeData], using, offset = 0)
   }
 
@@ -105,7 +106,7 @@ private class IOEdgesFinder(
 
     implicit lazy val edgeDecoder: Decoder[EdgeData] = { implicit cursor =>
       for {
-        runPlanId      <- cursor.downField("runPlan").downField("value").as[EntityId]
+        runPlanId <- cursor.downField("runPlan").downField("value").as[EntityId]
         sourceLocation <- cursor.downField("sourceEntityLocation").downField("value").as[Option[Node.Location]]
         targetLocation <- cursor.downField("targetEntityLocation").downField("value").as[Option[Node.Location]]
       } yield (runPlanId, sourceLocation, targetLocation)
@@ -120,12 +121,12 @@ private class IOEdgesFinder(
       edges.foldLeft(Map.empty[EntityId, (Set[Node.Location], Set[Node.Location])]) {
         case (locations, (runPlanId, Some(source), None)) =>
           locations.get(runPlanId) match {
-            case None             => locations + (runPlanId -> (Set(source), Set.empty))
+            case None => locations + (runPlanId -> (Set(source), Set.empty))
             case Some((from, to)) => locations + (runPlanId -> (from + source, to))
           }
         case (locations, (runPlanId, None, Some(target))) =>
           locations.get(runPlanId) match {
-            case None             => locations + (runPlanId -> (Set.empty, Set(target)))
+            case None => locations + (runPlanId -> (Set.empty, Set(target)))
             case Some((from, to)) => locations + (runPlanId -> (from, to + target))
           }
         case (locations, _) => locations
@@ -136,17 +137,17 @@ private class IOEdgesFinder(
 private object IOEdgesFinder {
 
   def apply(
-      timeRecorder:   SparqlQueryTimeRecorder[IO],
-      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
-      logger:         Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[EdgesFinder[IO]] =
+             timeRecorder: SparqlQueryTimeRecorder[IO],
+             rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
+             renkuBaseUrl: IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
+             logger: Logger[IO]
+           )(implicit
+             executionContext: ExecutionContext,
+             contextShift: ContextShift[IO],
+             timer: Timer[IO]
+           ): IO[EdgesFinder[IO]] =
     for {
-      config       <- rdfStoreConfig
+      config <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl
     } yield new IOEdgesFinder(
       config,

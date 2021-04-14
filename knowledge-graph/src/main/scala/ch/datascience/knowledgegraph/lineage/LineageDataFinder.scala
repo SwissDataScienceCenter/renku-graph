@@ -27,7 +27,7 @@ import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.knowledgegraph.lineage.model._
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -36,12 +36,12 @@ private trait LineageDataFinder[Interpretation[_]] {
 }
 
 private class IOLineageDataFinder(
-    rdfStoreConfig:          RdfStoreConfig,
-    renkuBaseUrl:            RenkuBaseUrl,
-    logger:                  Logger[IO],
-    timeRecorder:            SparqlQueryTimeRecorder[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
+                                   rdfStoreConfig: RdfStoreConfig,
+                                   renkuBaseUrl: RenkuBaseUrl,
+                                   logger: Logger[IO],
+                                   timeRecorder: SparqlQueryTimeRecorder[IO]
+                                 )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+  extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder)
     with LineageDataFinder[IO] {
 
   private type EdgeData = (Node.Location, Option[Node.Location], Option[Node.Location])
@@ -50,11 +50,11 @@ private class IOLineageDataFinder(
     for {
       edges <- queryExpecting[Set[EdgeData]](using = query(projectPath))
       nodes <- edges.toNodesLocations
-                 .flatMap(toNodeQueries(projectPath))
-                 .map(queryExpecting[Option[Node]](_).flatMap(toNodeOrError(projectPath)))
-                 .toList
-                 .parSequence
-                 .map(_.toSet)
+        .flatMap(toNodeQueries(projectPath))
+        .map(queryExpecting[Option[Node]](_).flatMap(toNodeOrError(projectPath)))
+        .toList
+        .parSequence
+        .map(_.toSet)
       maybeLineage <- toLineage(edges, nodes)
     } yield maybeLineage
   }
@@ -137,13 +137,13 @@ private class IOLineageDataFinder(
   import ch.datascience.tinytypes.json.TinyTypeDecoders
   import io.circe.Decoder
 
-  private implicit val nodeIdDecoder:   Decoder[Node.Id]       = TinyTypeDecoders.stringDecoder(Node.Id)
+  private implicit val nodeIdDecoder: Decoder[Node.Id] = TinyTypeDecoders.stringDecoder(Node.Id)
   private implicit val locationDecoder: Decoder[Node.Location] = TinyTypeDecoders.stringDecoder(Node.Location)
 
   private implicit val edgesDecoder: Decoder[Set[EdgeData]] = {
     implicit lazy val edgeDecoder: Decoder[EdgeData] = { implicit cursor =>
       for {
-        command        <- cursor.downField("command").downField("value").as[Node.Location]
+        command <- cursor.downField("command").downField("value").as[Node.Location]
         sourceLocation <- cursor.downField("sourceEntityLocation").downField("value").as[Option[Node.Location]]
         targetLocation <- cursor.downField("targetEntityLocation").downField("value").as[Option[Node.Location]]
       } yield (command, sourceLocation, targetLocation)
@@ -154,13 +154,13 @@ private class IOLineageDataFinder(
 
   private implicit val nodeDecoder: Decoder[Option[Node]] = {
     implicit val labelDecoder: Decoder[Node.Label] = TinyTypeDecoders.stringDecoder(Node.Label)
-    implicit val typeDecoder:  Decoder[Node.Type]  = TinyTypeDecoders.stringDecoder(Node.Type)
+    implicit val typeDecoder: Decoder[Node.Type] = TinyTypeDecoders.stringDecoder(Node.Type)
 
     implicit lazy val fieldsDecoder: Decoder[(Node.Location, Node.Type, Node.Label)] = { implicit cursor =>
       for {
         nodeType <- cursor.downField("type").downField("value").as[Node.Type]
         location <- cursor.downField("location").downField("value").as[Node.Location]
-        label    <- cursor.downField("label").downField("value").as[Node.Label]
+        label <- cursor.downField("label").downField("value").as[Node.Label]
       } yield (location, nodeType, label)
     }
 
@@ -170,7 +170,7 @@ private class IOLineageDataFinder(
         Some {
           tail.foldLeft(Node(location, label, Set(typ))) {
             case (node, (`location`, t, `label`)) => node.copy(types = node.types + t)
-            case (node, _)                        => node
+            case (node, _) => node
           }
         }
     }
@@ -187,7 +187,7 @@ private class IOLineageDataFinder(
       edges.foldLeft(Map.empty[Node.Location, Set[Node.Location]]) {
         case (locations, (command, maybeSource, maybeTarget)) =>
           locations.get(command) match {
-            case None           => locations + (command -> Set(maybeSource, maybeTarget).flatten)
+            case None => locations + (command -> Set(maybeSource, maybeTarget).flatten)
             case Some(entities) => locations + (command -> (entities ++ Set(maybeSource, maybeTarget).flatten))
           }
       }
@@ -195,14 +195,14 @@ private class IOLineageDataFinder(
 
   private def toNodeOrError(projectPath: Path): Option[Node] => IO[Node] = {
     case Some(node) => node.pure[IO]
-    case _          => new Exception(s"Cannot find node details for $projectPath").raiseError[IO, Node]
+    case _ => new Exception(s"Cannot find node details for $projectPath").raiseError[IO, Node]
   }
 
   private lazy val toLineage: (Set[EdgeData], Set[Node]) => IO[Option[Lineage]] = {
     case (edgesAndLocations, _) if edgesAndLocations.isEmpty => IO.pure(Option.empty)
     case (edgesAndLocations, nodes) =>
       for {
-        edges   <- edgesAndLocations.toEdges
+        edges <- edgesAndLocations.toEdges
         lineage <- Lineage.from[IO](edges, nodes) map Option.apply
       } yield lineage
   }
@@ -211,7 +211,7 @@ private class IOLineageDataFinder(
     lazy val toEdges: IO[Set[Edge]] = (edgesAndLocations map {
       case (command, Some(sourceLocation), None) => Edge(sourceLocation, command).pure[IO]
       case (command, None, Some(targetLocation)) => Edge(command, targetLocation).pure[IO]
-      case _                                     => new Exception("Cannot instantiate an Edge").raiseError[IO, Edge]
+      case _ => new Exception("Cannot instantiate an Edge").raiseError[IO, Edge]
     }).toList.sequence.map(_.toSet)
   }
 }
@@ -219,17 +219,17 @@ private class IOLineageDataFinder(
 private object IOLineageDataFinder {
 
   def apply(
-      timeRecorder:   SparqlQueryTimeRecorder[IO],
-      rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
-      renkuBaseUrl:   IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
-      logger:         Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[LineageDataFinder[IO]] =
+             timeRecorder: SparqlQueryTimeRecorder[IO],
+             rdfStoreConfig: IO[RdfStoreConfig] = RdfStoreConfig[IO](),
+             renkuBaseUrl: IO[RenkuBaseUrl] = RenkuBaseUrl[IO](),
+             logger: Logger[IO]
+           )(implicit
+             executionContext: ExecutionContext,
+             contextShift: ContextShift[IO],
+             timer: Timer[IO]
+           ): IO[LineageDataFinder[IO]] =
     for {
-      config       <- rdfStoreConfig
+      config <- rdfStoreConfig
       renkuBaseUrl <- renkuBaseUrl
     } yield new IOLineageDataFinder(
       config,

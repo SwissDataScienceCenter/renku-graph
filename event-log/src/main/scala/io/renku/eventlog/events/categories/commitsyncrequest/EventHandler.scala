@@ -28,7 +28,7 @@ import ch.datascience.events.consumers.EventSchedulingResult.{Accepted, BadReque
 import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResult}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.metrics.LabeledHistogram
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import io.renku.eventlog.EventLogDB
 

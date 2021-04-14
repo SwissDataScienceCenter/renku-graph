@@ -31,7 +31,7 @@ import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecove
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import com.typesafe.config.{Config, ConfigFactory}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Json
 
 import scala.concurrent.ExecutionContext
@@ -42,24 +42,24 @@ import scala.languageFeature.higherKinds
 private[events] object RemoteTriplesGenerator extends ConfigLoader[IO] {
 
   def apply(
-      configuration: Config = ConfigFactory.load()
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[TriplesGenerator[IO]] =
+             configuration: Config = ConfigFactory.load()
+           )(implicit
+             executionContext: ExecutionContext,
+             contextShift: ContextShift[IO],
+             timer: Timer[IO]
+           ): IO[TriplesGenerator[IO]] =
     for {
       serviceUrl <- find[String]("services.triples-generator.url", configuration) flatMap (url =>
-                      IO.fromEither(TriplesGenerationServiceUrl from url)
-                    )
+        IO.fromEither(TriplesGenerationServiceUrl from url)
+        )
     } yield new RemoteTriplesGenerator(serviceUrl, ApplicationLogger)
 }
 
 private[awaitinggeneration] class RemoteTriplesGenerator(
-    serviceUrl:              TriplesGenerationServiceUrl,
-    logger:                  Logger[IO]
-)(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
-    extends IORestClient[RemoteTriplesGenerator](Throttler.noThrottling, logger)
+                                                          serviceUrl: TriplesGenerationServiceUrl,
+                                                          logger: Logger[IO]
+                                                        )(implicit executionContext: ExecutionContext, contextShift: ContextShift[IO], timer: Timer[IO])
+  extends IORestClient[RemoteTriplesGenerator](Throttler.noThrottling, logger)
     with TriplesGenerator[IO] {
 
   import cats.data.EitherT
@@ -72,25 +72,26 @@ private[awaitinggeneration] class RemoteTriplesGenerator(
   import org.http4s.dsl.io._
 
   override def generateTriples(
-      commitEvent:             CommitEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
+                                commitEvent: CommitEvent
+                              )(implicit maybeAccessToken: Option[AccessToken]): EitherT[IO, ProcessingRecoverableError, JsonLDTriples] =
     EitherT {
       (for {
-        uri           <- validateUri(s"$serviceUrl/projects/${commitEvent.project.id}/commits/${commitEvent.commitId}")
+        uri <- validateUri(s"$serviceUrl/projects/${commitEvent.project.id}/commits/${commitEvent.commitId}")
         triplesInJson <- send(request(GET, uri))(mapResponse)
-        triples       <- IO.fromEither(JsonLDTriples from triplesInJson)
+        triples <- IO.fromEither(JsonLDTriples from triplesInJson)
       } yield triples.asRight[ProcessingRecoverableError]).recoverWith { case UnauthorizedException =>
         GenerationRecoverableError("Unauthorized exception").asLeft[JsonLDTriples].pure[IO]
       }
     }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Json]] = {
-    case (Ok, _, response)    => response.as[Json]
+    case (Ok, _, response) => response.as[Json]
     case (Unauthorized, _, _) => IO.raiseError(UnauthorizedException)
   }
 }
 
-class TriplesGenerationServiceUrl private (val value: String) extends AnyVal with StringTinyType
+class TriplesGenerationServiceUrl private(val value: String) extends AnyVal with StringTinyType
+
 object TriplesGenerationServiceUrl
-    extends TinyTypeFactory[TriplesGenerationServiceUrl](new TriplesGenerationServiceUrl(_))
+  extends TinyTypeFactory[TriplesGenerationServiceUrl](new TriplesGenerationServiceUrl(_))
     with Url

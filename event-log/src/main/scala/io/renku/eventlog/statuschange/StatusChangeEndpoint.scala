@@ -30,7 +30,7 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, 
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.{Decoder, Json}
 import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.{EventLogDB, EventMessage}
@@ -40,11 +40,11 @@ import org.http4s.multipart.{Multipart, Part}
 import scala.language.implicitConversions
 import scala.util.control.NonFatal
 
-class StatusChangeEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable]](
-    statusUpdatesRunner: StatusUpdatesRunner[Interpretation],
-    commandFactories:    Set[Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult]],
-    logger:              Logger[Interpretation]
-) extends Http4sDsl[Interpretation] {
+class StatusChangeEndpoint[Interpretation[_] : Effect : MonadError[*[_], Throwable]](
+                                                                                      statusUpdatesRunner: StatusUpdatesRunner[Interpretation],
+                                                                                      commandFactories: Set[Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult]],
+                                                                                      logger: Logger[Interpretation]
+                                                                                    ) extends Http4sDsl[Interpretation] {
 
   import ch.datascience.http.InfoMessage
   import ch.datascience.http.InfoMessage._
@@ -54,16 +54,16 @@ class StatusChangeEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable
 
   def changeStatus(eventId: CompoundEventId,
                    request: Request[Interpretation]
-  ): Interpretation[Response[Interpretation]] = {
+                  ): Interpretation[Response[Interpretation]] = {
     for {
       changeStatusRequest <- decodeRequest(eventId, request)
-      response            <- right[Response[Interpretation]](tryCommandFactory(commandFactories.toList, changeStatusRequest))
+      response <- right[Response[Interpretation]](tryCommandFactory(commandFactories.toList, changeStatusRequest))
     } yield response
   }.merge
 
   private def decodeRequest(eventId: CompoundEventId,
                             request: Request[Interpretation]
-  ): EitherT[Interpretation, Response[Interpretation], ChangeStatusRequest] = EitherT {
+                           ): EitherT[Interpretation, Response[Interpretation], ChangeStatusRequest] = EitherT {
     {
       for {
         multipart <- request.as[Multipart[Interpretation]]
@@ -76,8 +76,8 @@ class StatusChangeEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable
             )
         eventJson <- eventPart.as[Json]
         eventOnlyRequest <- eventJson
-                              .as[EventOnlyRequest](requestDecoder(eventId))
-                              .fold(_.raiseError[Interpretation, EventOnlyRequest], _.pure[Interpretation])
+          .as[EventOnlyRequest](requestDecoder(eventId))
+          .fold(_.raiseError[Interpretation, EventOnlyRequest], _.pure[Interpretation])
         changeStatusRequest <- createRequest(eventOnlyRequest)(multipart.parts.find(_.name.contains("payload")))
       } yield changeStatusRequest
     }.map(_.asRight[Response[Interpretation]]) recoverWith badRequest
@@ -85,17 +85,17 @@ class StatusChangeEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable
 
   private implicit def requestDecoder(eventId: CompoundEventId): Decoder[EventOnlyRequest] = { cursor =>
     for {
-      status              <- cursor.downField("status").as[EventStatus]
+      status <- cursor.downField("status").as[EventStatus]
       maybeProcessingTime <- cursor.downField("processingTime").as[Option[EventProcessingTime]]
-      maybeMessage        <- cursor.downField("message").as[Option[EventMessage]]
+      maybeMessage <- cursor.downField("message").as[Option[EventMessage]]
     } yield EventOnlyRequest(eventId, status, maybeProcessingTime, maybeMessage)
   }
 
   private def createRequest(
-      eventOnlyRequest: EventOnlyRequest
-  ): Kleisli[Interpretation, Option[Part[Interpretation]], ChangeStatusRequest] = Kleisli {
+                             eventOnlyRequest: EventOnlyRequest
+                           ): Kleisli[Interpretation, Option[Part[Interpretation]], ChangeStatusRequest] = Kleisli {
     case Some(payloadPart) => payloadPart.as[String].map(payload => eventOnlyRequest.addPayload(payload))
-    case None              => (eventOnlyRequest: ChangeStatusRequest).pure[Interpretation]
+    case None => (eventOnlyRequest: ChangeStatusRequest).pure[Interpretation]
   }
 
   def badRequest: PartialFunction[Throwable, Interpretation[Either[Response[Interpretation], ChangeStatusRequest]]] = {
@@ -105,23 +105,23 @@ class StatusChangeEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable
   }
 
   private def tryCommandFactory(
-      commandFactories:    List[Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult]],
-      changeStatusRequest: ChangeStatusRequest
-  ): Interpretation[Response[Interpretation]] = commandFactories match {
+                                 commandFactories: List[Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult]],
+                                 changeStatusRequest: ChangeStatusRequest
+                               ): Interpretation[Response[Interpretation]] = commandFactories match {
     case Nil => BadRequest(ErrorMessage("No event command found"))
     case headFactory :: otherFactories =>
       headFactory.run(changeStatusRequest).flatMap {
         case command: CommandFound[Interpretation] =>
           run(command.command).flatMap(_.asHttpResponse) recoverWith httpResponse
-        case NotSupported              => tryCommandFactory(otherFactories, changeStatusRequest)
+        case NotSupported => tryCommandFactory(otherFactories, changeStatusRequest)
         case PayloadMalformed(message) => BadRequest(ErrorMessage(message))
       }
   }
 
   private implicit class ResultOps(result: UpdateResult) {
     lazy val asHttpResponse: Interpretation[Response[Interpretation]] = result match {
-      case UpdateResult.Updated          => Ok(InfoMessage("Event status updated"))
-      case UpdateResult.NotFound         => NotFound(InfoMessage("Event not found"))
+      case UpdateResult.Updated => Ok(InfoMessage("Event status updated"))
+      case UpdateResult.NotFound => NotFound(InfoMessage("Event not found"))
       case UpdateResult.Failure(message) => InternalServerError(ErrorMessage(message.value))
     }
   }
@@ -139,39 +139,40 @@ class StatusChangeEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable
 }
 
 object IOStatusChangeEndpoint {
+
   import cats.effect.IO
 
   def apply(
-      transactor:                         DbTransactor[IO, EventLogDB],
-      awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
-      awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-      underTriplesTransformationGauge:    LabeledGauge[IO, projects.Path],
-      queriesExecTimes:                   LabeledHistogram[IO, SqlQuery.Name],
-      logger:                             Logger[IO]
-  )(implicit contextShift:                ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
+             transactor: DbTransactor[IO, EventLogDB],
+             awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+             underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+             awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
+             underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
+             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+             logger: Logger[IO]
+           )(implicit contextShift: ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {
       statusUpdatesRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
     } yield new StatusChangeEndpoint(statusUpdatesRunner,
-                                     Set(
-                                       ToTriplesStore.factory(underTriplesTransformationGauge),
-                                       ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
-                                       ToTriplesGenerated.factory(transactor,
-                                                                  underTriplesTransformationGauge,
-                                                                  underTriplesGenerationGauge,
-                                                                  awaitingTriplesTransformationGauge
-                                       ),
-                                       ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),
-                                       ToGenerationRecoverableFailure.factory(awaitingTriplesGenerationGauge,
-                                                                              underTriplesGenerationGauge
-                                       ),
-                                       ToTransformationNonRecoverableFailure.factory(
-                                         underTriplesTransformationGauge
-                                       ),
-                                       ToTransformationRecoverableFailure.factory(awaitingTriplesTransformationGauge,
-                                                                                  underTriplesTransformationGauge
-                                       )
-                                     ),
-                                     logger
+      Set(
+        ToTriplesStore.factory(underTriplesTransformationGauge),
+        ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
+        ToTriplesGenerated.factory(transactor,
+          underTriplesTransformationGauge,
+          underTriplesGenerationGauge,
+          awaitingTriplesTransformationGauge
+        ),
+        ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),
+        ToGenerationRecoverableFailure.factory(awaitingTriplesGenerationGauge,
+          underTriplesGenerationGauge
+        ),
+        ToTransformationNonRecoverableFailure.factory(
+          underTriplesTransformationGauge
+        ),
+        ToTransformationRecoverableFailure.factory(awaitingTriplesTransformationGauge,
+          underTriplesTransformationGauge
+        )
+      ),
+      logger
     )
 }

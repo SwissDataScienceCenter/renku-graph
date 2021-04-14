@@ -23,7 +23,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.users
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

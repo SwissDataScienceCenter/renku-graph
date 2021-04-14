@@ -29,7 +29,7 @@ import ch.datascience.events.consumers.{EventRequestContent, EventSchedulingResu
 import ch.datascience.graph.model.events.{BatchDate, CategoryName, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.{Decoder, DecodingFailure, HCursor}
 import io.renku.eventlog.Event.{NewEvent, SkippedEvent}
 import io.renku.eventlog._

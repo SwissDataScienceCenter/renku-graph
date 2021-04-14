@@ -26,26 +26,26 @@ import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
 import ch.datascience.triplesgenerator.Microservice
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
 object SubscriptionFactory {
   def apply(
-      metricsRegistry: MetricsRegistry[IO],
-      gitLabThrottler: Throttler[IO, GitLab],
-      timeRecorder:    SparqlQueryTimeRecorder[IO],
-      logger:          Logger[IO]
-  )(implicit
-      contextShift:     ContextShift[IO],
-      executionContext: ExecutionContext,
-      timer:            Timer[IO]
-  ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
+             metricsRegistry: MetricsRegistry[IO],
+             gitLabThrottler: Throttler[IO, GitLab],
+             timeRecorder: SparqlQueryTimeRecorder[IO],
+             logger: Logger[IO]
+           )(implicit
+             contextShift: ContextShift[IO],
+             executionContext: ExecutionContext,
+             timer: Timer[IO]
+           ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
     subscriptionMechanism <- SubscriptionMechanism(
-                               categoryName,
-                               categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier),
-                               logger
-                             )
+      categoryName,
+      categoryAndUrlPayloadsComposerFactory(Microservice.ServicePort, Microservice.Identifier),
+      logger
+    )
     handler <- EventHandler(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
   } yield handler -> subscriptionMechanism
 }

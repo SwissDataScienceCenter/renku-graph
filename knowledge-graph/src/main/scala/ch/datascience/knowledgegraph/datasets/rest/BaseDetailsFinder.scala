@@ -28,22 +28,22 @@ import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetProject}
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.{DecodingFailure, HCursor}
 
 import scala.concurrent.ExecutionContext
 import scala.util.Try
 
 private class BaseDetailsFinder(
-    rdfStoreConfig: RdfStoreConfig,
-    logger:         Logger[IO],
-    timeRecorder:   SparqlQueryTimeRecorder[IO]
-)(implicit
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO],
-    ME:               MonadError[IO, Throwable]
-) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
+                                 rdfStoreConfig: RdfStoreConfig,
+                                 logger: Logger[IO],
+                                 timeRecorder: SparqlQueryTimeRecorder[IO]
+                               )(implicit
+                                 executionContext: ExecutionContext,
+                                 contextShift: ContextShift[IO],
+                                 timer: Timer[IO],
+                                 ME: MonadError[IO, Throwable]
+                               ) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder) {
 
   import BaseDetailsFinder._
   import ch.datascience.graph.Schemas._
@@ -57,9 +57,9 @@ private class BaseDetailsFinder(
   private def queryForDatasetDetails(identifier: Identifier) = SparqlQuery.of(
     name = "ds by id - details",
     Prefixes.of(
-      prov   -> "prov",
-      rdf    -> "rdf",
-      renku  -> "renku",
+      prov -> "prov",
+      rdf -> "rdf",
+      renku -> "renku",
       schema -> "schema"
     ),
     s"""|SELECT DISTINCT ?identifier ?name ?maybeDateCreated ?alternateName ?url ?topmostSameAs ?maybeDerivedFrom ?initialVersion ?description ?maybePublishedDate ?projectId
@@ -136,13 +136,14 @@ private class BaseDetailsFinder(
   )
 
   private lazy val toSingleDataset: List[Dataset] => IO[Option[Dataset]] = {
-    case Nil            => Option.empty[Dataset].pure[IO]
+    case Nil => Option.empty[Dataset].pure[IO]
     case dataset :: Nil => Option(dataset).pure[IO]
-    case dataset :: _   => new Exception(s"More than one dataset with ${dataset.id} id").raiseError[IO, Option[Dataset]]
+    case dataset :: _ => new Exception(s"More than one dataset with ${dataset.id} id").raiseError[IO, Option[Dataset]]
   }
 }
 
 private object BaseDetailsFinder {
+
   import io.circe.Decoder
   import Decoder._
   import ch.datascience.graph.model.datasets._
@@ -152,27 +153,27 @@ private object BaseDetailsFinder {
   private[rest] def datasetsDecoder(usedIns: List[DatasetProject]): Decoder[List[Dataset]] = {
     val dataset: Decoder[Dataset] = { implicit cursor =>
       for {
-        identifier         <- extract[Identifier]("identifier")
-        title              <- extract[Title]("name")
-        name               <- extract[Name]("alternateName")
-        url                <- extract[Url]("url")
-        maybeDerivedFrom   <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
-        sameAs             <- extract[SameAs]("topmostSameAs")
-        initialVersion     <- extract[InitialVersion]("initialVersion")
+        identifier <- extract[Identifier]("identifier")
+        title <- extract[Title]("name")
+        name <- extract[Name]("alternateName")
+        url <- extract[Url]("url")
+        maybeDerivedFrom <- extract[Option[DerivedFrom]]("maybeDerivedFrom")
+        sameAs <- extract[SameAs]("topmostSameAs")
+        initialVersion <- extract[InitialVersion]("initialVersion")
         maybePublishedDate <- extract[Option[PublishedDate]]("maybePublishedDate")
-        maybeDateCreated   <- extract[Option[DateCreated]]("maybeDateCreated")
+        maybeDateCreated <- extract[Option[DateCreated]]("maybeDateCreated")
         maybeDescription <- extract[Option[String]]("description")
-                              .map(blankToNone)
-                              .flatMap(toOption[Description])
+          .map(blankToNone)
+          .flatMap(toOption[Description])
         dates <- Dates
-                   .from(maybeDateCreated, maybePublishedDate)
-                   .leftMap(e => DecodingFailure(e.getMessage, Nil))
+          .from(maybeDateCreated, maybePublishedDate)
+          .leftMap(e => DecodingFailure(e.getMessage, Nil))
         path <-
           extract[projects.ResourceId]("projectId")
             .flatMap(toProjectPath)
         project <- Either.fromOption(usedIns.find(_.path == path),
-                                     ifNone = DecodingFailure("Could not find project in UsedIns", Nil)
-                   )
+          ifNone = DecodingFailure("Could not find project in UsedIns", Nil)
+        )
       } yield maybeDerivedFrom match {
         case Some(derivedFrom) =>
           ModifiedDataset(

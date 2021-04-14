@@ -19,7 +19,7 @@
 package ch.datascience.config.certificates
 
 import cats.MonadError
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 trait CertificateLoader[Interpretation[_]] {
   def run(): Interpretation[Unit]
@@ -30,8 +30,8 @@ object CertificateLoader {
   import cats.syntax.all._
 
   def apply[Interpretation[_]](
-      logger:    Logger[Interpretation]
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[CertificateLoader[Interpretation]] =
+                                logger: Logger[Interpretation]
+                              )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[CertificateLoader[Interpretation]] =
     for {
       keystore <- Keystore[Interpretation]()
     } yield new CertificateLoaderImpl[Interpretation](
@@ -42,16 +42,16 @@ object CertificateLoader {
     )
 }
 
-class CertificateLoaderImpl[Interpretation[_]] private[certificates] (
-    keystore:         Keystore[Interpretation],
-    findCertificate:  () => Interpretation[Option[Certificate]],
-    createSslContext: Keystore[Interpretation] => Interpretation[SslContext],
-    makeSslContextDefault: (SslContext, MonadError[Interpretation, Throwable]) => Interpretation[Unit] =
-      (context: SslContext, ME: MonadError[Interpretation, Throwable]) =>
-        SslContext.makeDefault[Interpretation](context)(ME),
-    logger:    Logger[Interpretation]
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends CertificateLoader[Interpretation] {
+class CertificateLoaderImpl[Interpretation[_]] private[certificates](
+                                                                      keystore: Keystore[Interpretation],
+                                                                      findCertificate: () => Interpretation[Option[Certificate]],
+                                                                      createSslContext: Keystore[Interpretation] => Interpretation[SslContext],
+                                                                      makeSslContextDefault: (SslContext, MonadError[Interpretation, Throwable]) => Interpretation[Unit] =
+                                                                      (context: SslContext, ME: MonadError[Interpretation, Throwable]) =>
+                                                                        SslContext.makeDefault[Interpretation](context)(ME),
+                                                                      logger: Logger[Interpretation]
+                                                                    )(implicit ME: MonadError[Interpretation, Throwable])
+  extends CertificateLoader[Interpretation] {
 
   import cats.syntax.all._
 
@@ -60,19 +60,20 @@ class CertificateLoaderImpl[Interpretation[_]] private[certificates] (
   override def run(): Interpretation[Unit] = {
     for {
       maybeCertificate <- findCertificate()
-      _                <- maybeCertificate map addCertificate getOrElse logger.info("No client certificate found")
+      _ <- maybeCertificate map addCertificate getOrElse logger.info("No client certificate found")
     } yield ()
   } recoverWith loggingError
 
   private def addCertificate(certificate: Certificate): Interpretation[Unit] = for {
-    _          <- keystore load certificate
+    _ <- keystore load certificate
     sslContext <- createSslContext(keystore)
-    _          <- makeSslContextDefault(sslContext, ME)
-    _          <- logger.info("Client certificate added")
+    _ <- makeSslContextDefault(sslContext, ME)
+    _ <- logger.info("Client certificate added")
   } yield ()
 
-  private lazy val loggingError: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)("Loading client certificate failed")
-    exception.raiseError[Interpretation, Unit]
+  private lazy val loggingError: PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)("Loading client certificate failed")
+      exception.raiseError[Interpretation, Unit]
   }
 }

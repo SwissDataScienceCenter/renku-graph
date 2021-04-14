@@ -32,19 +32,19 @@ import ch.datascience.graph.model.SchemaVersion
 import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventBody}
 import ch.datascience.metrics.MetricsRegistry
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.parser
 
 import scala.concurrent.ExecutionContext
 
-private[events] class EventHandler[Interpretation[_]: Effect](
-    override val categoryName: CategoryName,
-    eventsProcessingRunner:    EventsProcessingRunner[Interpretation],
-    eventBodyDeserializer:     EventBodyDeserializer[Interpretation],
-    logger:                    Logger[Interpretation]
-)(implicit
-    ME: MonadError[Interpretation, Throwable]
-) extends consumers.EventHandler[Interpretation] {
+private[events] class EventHandler[Interpretation[_] : Effect](
+                                                                override val categoryName: CategoryName,
+                                                                eventsProcessingRunner: EventsProcessingRunner[Interpretation],
+                                                                eventBodyDeserializer: EventBodyDeserializer[Interpretation],
+                                                                logger: Logger[Interpretation]
+                                                              )(implicit
+                                                                ME: MonadError[Interpretation, Throwable]
+                                                              ) extends consumers.EventHandler[Interpretation] {
 
   import ch.datascience.tinytypes.json.TinyTypeDecoders._
   import eventsProcessingRunner.scheduleForProcessing
@@ -55,7 +55,7 @@ private[events] class EventHandler[Interpretation[_]: Effect](
   override def handle(request: EventRequestContent): Interpretation[EventSchedulingResult] = {
 
     for {
-      _       <- fromEither[Interpretation](request.event.validateCategoryName)
+      _ <- fromEither[Interpretation](request.event.validateCategoryName)
       eventId <- fromEither(request.event.getEventId)
       project <- fromEither(request.event.getProject)
       eventBodyJson <-
@@ -67,19 +67,20 @@ private[events] class EventHandler[Interpretation[_]: Effect](
           .toTriplesGeneratedEvent(eventId, project, schemaVersion, eventBody)
           .toRightT(recoverTo = BadRequest)
       result <- scheduleForProcessing(triplesGeneratedEvent).toRightT
-                  .semiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
-                  .leftSemiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
+        .semiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
+        .leftSemiflatTap(logger.log(eventId -> triplesGeneratedEvent.project))
     } yield result
   }.merge
 
-  private implicit lazy val eventInfoToString: ((CompoundEventId, Project)) => String = { case (eventId, project) =>
-    s"$eventId, projectPath = ${project.path}"
+  private implicit lazy val eventInfoToString: ((CompoundEventId, Project)) => String = {
+    case (eventId, project) =>
+      s"$eventId, projectPath = ${project.path}"
   }
 
   private implicit val eventBodyDecoder: Decoder[(EventBody, SchemaVersion)] = { implicit cursor =>
     for {
       schemaVersion <- cursor.downField("schemaVersion").as[SchemaVersion]
-      eventBody     <- cursor.downField("payload").as[EventBody]
+      eventBody <- cursor.downField("payload").as[EventBody]
     } yield (eventBody, schemaVersion)
   }
 }
@@ -87,16 +88,16 @@ private[events] class EventHandler[Interpretation[_]: Effect](
 private[events] object EventHandler {
 
   def apply(
-      metricsRegistry:       MetricsRegistry[IO],
-      gitLabThrottler:       Throttler[IO, GitLab],
-      timeRecorder:          SparqlQueryTimeRecorder[IO],
-      subscriptionMechanism: SubscriptionMechanism[IO],
-      logger:                Logger[IO]
-  )(implicit
-      contextShift:     ContextShift[IO],
-      executionContext: ExecutionContext,
-      timer:            Timer[IO]
-  ): IO[EventHandler[IO]] = for {
+             metricsRegistry: MetricsRegistry[IO],
+             gitLabThrottler: Throttler[IO, GitLab],
+             timeRecorder: SparqlQueryTimeRecorder[IO],
+             subscriptionMechanism: SubscriptionMechanism[IO],
+             logger: Logger[IO]
+           )(implicit
+             contextShift: ContextShift[IO],
+             executionContext: ExecutionContext,
+             timer: Timer[IO]
+           ): IO[EventHandler[IO]] = for {
     processingRunner <-
       IOEventsProcessingRunner(metricsRegistry, gitLabThrottler, timeRecorder, subscriptionMechanism, logger)
   } yield new EventHandler[IO](categoryName, processingRunner, EventBodyDeserializer(), logger)

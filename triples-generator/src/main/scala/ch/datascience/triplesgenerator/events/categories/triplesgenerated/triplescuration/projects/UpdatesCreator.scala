@@ -32,29 +32,29 @@ import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.Comm
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import eu.timepit.refined.auto._
 
 import scala.concurrent.ExecutionContext
 
 private trait UpdatesCreator[Interpretation[_]] {
-  def create(event:     TriplesGeneratedEvent)(implicit
-      maybeAccessToken: Option[AccessToken]
+  def create(event: TriplesGeneratedEvent)(implicit
+                                           maybeAccessToken: Option[AccessToken]
   ): CurationUpdatesGroup[Interpretation]
 }
 
 private class UpdatesCreatorImpl(
-    gitLab:              GitLabInfoFinder[IO],
-    kg:                  KGInfoFinder[IO],
-    updatesQueryCreator: UpdatesQueryCreator
-)(implicit ME:           MonadError[IO, Throwable], cs: ContextShift[IO])
-    extends UpdatesCreator[IO] {
+                                  gitLab: GitLabInfoFinder[IO],
+                                  kg: KGInfoFinder[IO],
+                                  updatesQueryCreator: UpdatesQueryCreator
+                                )(implicit ME: MonadError[IO, Throwable], cs: ContextShift[IO])
+  extends UpdatesCreator[IO] {
 
   import updatesQueryCreator._
 
   override def create(
-      event:                   TriplesGeneratedEvent
-  )(implicit maybeAccessToken: Option[AccessToken]): CurationUpdatesGroup[IO] =
+                       event: TriplesGeneratedEvent
+                     )(implicit maybeAccessToken: Option[AccessToken]): CurationUpdatesGroup[IO] =
     CurationUpdatesGroup[IO](
       "Fork info updates",
       () =>
@@ -80,15 +80,15 @@ private class UpdatesCreatorImpl(
 
   private object `when project has a creator` {
     def unapply(maybeProject: Option[GitLabProject]): Option[(GitLabCreator, GitLabProject)] = maybeProject match {
-      case Some(project @ GitLabProject(_, _, _, _, _, Some(creator))) => (creator -> project).some
-      case _                                                           => None
+      case Some(project@GitLabProject(_, _, _, _, _, Some(creator))) => (creator -> project).some
+      case _ => None
     }
   }
 
   private object `when project has no creator` {
     def unapply(maybeProject: Option[GitLabProject]): Option[GitLabProject] = maybeProject match {
-      case Some(project @ GitLabProject(_, _, _, _, _, None)) => project.some
-      case _                                                  => None
+      case Some(project@GitLabProject(_, _, _, _, _, None)) => project.some
+      case _ => None
     }
   }
 
@@ -114,7 +114,7 @@ private class UpdatesCreatorImpl(
       upsertVisibility(gitLabProject.path, gitLabProject.visibility)
 
   private lazy val maybeToRecoverableError
-      : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[SparqlQuery]]] = {
+  : PartialFunction[Throwable, Either[ProcessingRecoverableError, List[SparqlQuery]]] = {
     case e: UnexpectedResponseException =>
       Left[ProcessingRecoverableError, List[SparqlQuery]](
         CurationRecoverableError("Problem with finding fork info", e)
@@ -127,19 +127,20 @@ private class UpdatesCreatorImpl(
 }
 
 private object IOUpdateFunctionsCreator {
+
   import cats.effect.Timer
   import ch.datascience.config.GitLab
   import ch.datascience.control.Throttler
 
   def apply(
-      gitLabThrottler:         Throttler[IO, GitLab],
-      logger:                  Logger[IO],
-      timeRecorder:            SparqlQueryTimeRecorder[IO]
-  )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[UpdatesCreator[IO]] =
+             gitLabThrottler: Throttler[IO, GitLab],
+             logger: Logger[IO],
+             timeRecorder: SparqlQueryTimeRecorder[IO]
+           )(implicit executionContext: ExecutionContext, cs: ContextShift[IO], timer: Timer[IO]): IO[UpdatesCreator[IO]] =
     for {
-      renkuBaseUrl     <- RenkuBaseUrl[IO]()
-      gitLabApiUrl     <- GitLabUrl[IO]().map(_.apiV4)
+      renkuBaseUrl <- RenkuBaseUrl[IO]()
+      gitLabApiUrl <- GitLabUrl[IO]().map(_.apiV4)
       gitLabInfoFinder <- IOGitLabInfoFinder(gitLabThrottler, logger)
-      kgInfoFinder     <- IOKGInfoFinder(timeRecorder, logger)
+      kgInfoFinder <- IOKGInfoFinder(timeRecorder, logger)
     } yield new UpdatesCreatorImpl(gitLabInfoFinder, kgInfoFinder, new UpdatesQueryCreator(renkuBaseUrl, gitLabApiUrl))
 }

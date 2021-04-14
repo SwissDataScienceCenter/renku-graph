@@ -26,7 +26,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.EventBody
 import ch.datascience.http.client.IORestClient
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.Status
 import org.http4s.Status.Accepted
 
@@ -37,16 +37,16 @@ private trait CommitEventSender[Interpretation[_]] {
 }
 
 private class CommitEventSenderImpl(
-    eventLogUrl:           EventLogUrl,
-    commitEventSerializer: CommitEventSerializer[IO],
-    logger:                Logger[IO]
-)(implicit
-    ME:               MonadError[IO, Throwable],
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO]
-) extends IORestClient(Throttler.noThrottling, logger)
-    with CommitEventSender[IO] {
+                                     eventLogUrl: EventLogUrl,
+                                     commitEventSerializer: CommitEventSerializer[IO],
+                                     logger: Logger[IO]
+                                   )(implicit
+                                     ME: MonadError[IO, Throwable],
+                                     executionContext: ExecutionContext,
+                                     contextShift: ContextShift[IO],
+                                     timer: Timer[IO]
+                                   ) extends IORestClient(Throttler.noThrottling, logger)
+  with CommitEventSender[IO] {
 
   import cats.effect._
   import commitEventSerializer._
@@ -58,8 +58,8 @@ private class CommitEventSenderImpl(
 
   def send(commitEvent: CommitEvent): IO[Unit] = for {
     serialisedEvent <- serialiseToJsonString(commitEvent)
-    eventBody       <- ME.fromEither(EventBody.from(serialisedEvent))
-    uri             <- validateUri(s"$eventLogUrl/events")
+    eventBody <- ME.fromEither(EventBody.from(serialisedEvent))
+    uri <- validateUri(s"$eventLogUrl/events")
     sendingResult <-
       send(request(POST, uri).withMultipartBuilder.addPart("event", (commitEvent -> eventBody).asJson).build())(
         mapResponse
@@ -105,12 +105,12 @@ private class CommitEventSenderImpl(
 private object CommitEventSender {
 
   def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[CommitEventSender[IO]] =
+             logger: Logger[IO]
+           )(implicit
+             executionContext: ExecutionContext,
+             contextShift: ContextShift[IO],
+             timer: Timer[IO]
+           ): IO[CommitEventSender[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
     } yield new CommitEventSenderImpl(eventLogUrl, new CommitEventSerializer[IO], logger)

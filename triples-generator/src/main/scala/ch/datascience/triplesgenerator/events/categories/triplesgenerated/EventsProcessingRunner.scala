@@ -34,7 +34,7 @@ import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -44,28 +44,27 @@ private trait EventsProcessingRunner[Interpretation[_]] {
 }
 
 private class EventsProcessingRunnerImpl(
-    eventProcessor:        EventProcessor[IO],
-    generationProcesses:   Long Refined Positive,
-    semaphore:             Semaphore[IO],
-    subscriptionMechanism: SubscriptionMechanism[IO],
-    logger:                Logger[IO]
-)(implicit cs:             ContextShift[IO])
-    extends EventsProcessingRunner[IO] {
+                                          eventProcessor: EventProcessor[IO],
+                                          generationProcesses: Long Refined Positive,
+                                          semaphore: Semaphore[IO],
+                                          subscriptionMechanism: SubscriptionMechanism[IO],
+                                          logger: Logger[IO]
+                                        )(implicit cs: ContextShift[IO])
+  extends EventsProcessingRunner[IO] {
 
   import subscriptionMechanism._
 
   override def scheduleForProcessing(
-      triplesGeneratedEvent: TriplesGeneratedEvent
-  ): IO[EventSchedulingResult] =
+                                      triplesGeneratedEvent: TriplesGeneratedEvent
+                                    ): IO[EventSchedulingResult] =
     semaphore.available flatMap {
       case 0 => Busy.pure[IO]
-      case _ =>
-        {
-          for {
-            _ <- semaphore.acquire
-            _ <- process(triplesGeneratedEvent).start
-          } yield Accepted: EventSchedulingResult
-        } recoverWith releasingSemaphore
+      case _ => {
+        for {
+          _ <- semaphore.acquire
+          _ <- process(triplesGeneratedEvent).start
+        } yield Accepted: EventSchedulingResult
+      } recoverWith releasingSemaphore
     }
 
   private def process(triplesGeneratedEvent: TriplesGeneratedEvent) = {
@@ -80,14 +79,15 @@ private class EventsProcessingRunnerImpl(
     } yield ()
   }
 
-  private def releasingSemaphore[O]: PartialFunction[Throwable, IO[O]] = { case NonFatal(exception) =>
-    semaphore.available flatMap {
-      case available if available == generationProcesses.value => exception.raiseError[IO, O]
-      case _ =>
-        semaphore.release flatMap { _ =>
-          exception.raiseError[IO, O]
-        }
-    }
+  private def releasingSemaphore[O]: PartialFunction[Throwable, IO[O]] = {
+    case NonFatal(exception) =>
+      semaphore.available flatMap {
+        case available if available == generationProcesses.value => exception.raiseError[IO, O]
+        case _ =>
+          semaphore.release flatMap { _ =>
+            exception.raiseError[IO, O]
+          }
+      }
   }
 
   private def releaseAndNotify(): IO[Unit] =
@@ -105,25 +105,25 @@ private object IOEventsProcessingRunner {
   import scala.language.postfixOps
 
   def apply(
-      metricsRegistry:       MetricsRegistry[IO],
-      gitLabThrottler:       Throttler[IO, GitLab],
-      timeRecorder:          SparqlQueryTimeRecorder[IO],
-      subscriptionMechanism: SubscriptionMechanism[IO],
-      logger:                Logger[IO],
-      config:                Config = ConfigFactory.load()
-  )(implicit
-      contextShift:     ContextShift[IO],
-      executionContext: ExecutionContext,
-      timer:            Timer[IO]
-  ): IO[EventsProcessingRunner[IO]] =
+             metricsRegistry: MetricsRegistry[IO],
+             gitLabThrottler: Throttler[IO, GitLab],
+             timeRecorder: SparqlQueryTimeRecorder[IO],
+             subscriptionMechanism: SubscriptionMechanism[IO],
+             logger: Logger[IO],
+             config: Config = ConfigFactory.load()
+           )(implicit
+             contextShift: ContextShift[IO],
+             executionContext: ExecutionContext,
+             timer: Timer[IO]
+           ): IO[EventsProcessingRunner[IO]] =
     for {
-      eventProcessor      <- IOTriplesGeneratedEventProcessor(metricsRegistry, gitLabThrottler, timeRecorder, logger)
+      eventProcessor <- IOTriplesGeneratedEventProcessor(metricsRegistry, gitLabThrottler, timeRecorder, logger)
       generationProcesses <- find[IO, Long Refined Positive]("transformation-processes-number", config)
-      semaphore           <- Semaphore(generationProcesses.value)
+      semaphore <- Semaphore(generationProcesses.value)
     } yield new EventsProcessingRunnerImpl(eventProcessor,
-                                           generationProcesses,
-                                           semaphore,
-                                           subscriptionMechanism,
-                                           logger
+      generationProcesses,
+      semaphore,
+      subscriptionMechanism,
+      logger
     )
 }

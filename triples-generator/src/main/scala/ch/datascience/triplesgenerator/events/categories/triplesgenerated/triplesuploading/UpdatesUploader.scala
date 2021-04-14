@@ -24,7 +24,7 @@ import ch.datascience.http.client.IORestClient.{MaxRetriesAfterConnectionTimeout
 import ch.datascience.rdfstore._
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -34,18 +34,18 @@ private trait UpdatesUploader[Interpretation[_]] {
 }
 
 private class IOUpdatesUploader(
-    rdfStoreConfig: RdfStoreConfig,
-    logger:         Logger[IO],
-    timeRecorder:   SparqlQueryTimeRecorder[IO],
-    retryInterval:  FiniteDuration = SleepAfterConnectionIssue,
-    maxRetries:     Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
-)(implicit
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO],
-    ME:               MonadError[IO, Throwable]
-) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder, retryInterval, maxRetries)
-    with UpdatesUploader[IO] {
+                                 rdfStoreConfig: RdfStoreConfig,
+                                 logger: Logger[IO],
+                                 timeRecorder: SparqlQueryTimeRecorder[IO],
+                                 retryInterval: FiniteDuration = SleepAfterConnectionIssue,
+                                 maxRetries: Int Refined NonNegative = MaxRetriesAfterConnectionTimeout
+                               )(implicit
+                                 executionContext: ExecutionContext,
+                                 contextShift: ContextShift[IO],
+                                 timer: Timer[IO],
+                                 ME: MonadError[IO, Throwable]
+                               ) extends IORdfStoreClient(rdfStoreConfig, logger, timeRecorder, retryInterval, maxRetries)
+  with UpdatesUploader[IO] {
 
   import LogMessage._
   import TriplesUploadResult._
@@ -59,11 +59,11 @@ private class IOUpdatesUploader(
     updateWitMapping(updateQuery, responseMapper(updateQuery)) recoverWith deliveryFailure
 
   private def responseMapper(
-      updateQuery: SparqlQuery
-  ): PartialFunction[(Status, Request[IO], Response[IO]), IO[TriplesUploadResult]] = {
-    case (Ok, _, _)                => IO.pure(DeliverySuccess)
+                              updateQuery: SparqlQuery
+                            ): PartialFunction[(Status, Request[IO], Response[IO]), IO[TriplesUploadResult]] = {
+    case (Ok, _, _) => IO.pure(DeliverySuccess)
     case (BadRequest, _, response) => response.as[String] map toSingleLine map toInvalidUpdatesFailure(updateQuery)
-    case (other, _, response)      => response.as[String] map toSingleLine map toDeliveryFailure(other)
+    case (other, _, response) => response.as[String] map toSingleLine map toDeliveryFailure(other)
   }
 
   private def toInvalidUpdatesFailure(updateQuery: SparqlQuery)(responseMessage: String) =
@@ -72,7 +72,8 @@ private class IOUpdatesUploader(
   private def toDeliveryFailure(status: Status)(message: String) =
     RecoverableFailure(s"Triples curation update failed: $status: $message")
 
-  private def deliveryFailure: PartialFunction[Throwable, IO[TriplesUploadResult]] = { case NonFatal(exception) =>
-    ME.pure(RecoverableFailure(exception.getMessage))
+  private def deliveryFailure: PartialFunction[Throwable, IO[TriplesUploadResult]] = {
+    case NonFatal(exception) =>
+      ME.pure(RecoverableFailure(exception.getMessage))
   }
 }

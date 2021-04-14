@@ -24,7 +24,7 @@ import ch.datascience.graph.model.events.EventStatus.GeneratingTriples
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{Gauge, LabeledGauge, MetricsRegistry}
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 object UnderTriplesGenerationGauge {
 

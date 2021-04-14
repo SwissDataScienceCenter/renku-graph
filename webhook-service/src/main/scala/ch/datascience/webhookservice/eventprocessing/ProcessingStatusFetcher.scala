@@ -29,7 +29,7 @@ import ch.datascience.http.client.IORestClient
 import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 
 import scala.concurrent.ExecutionContext
@@ -43,30 +43,30 @@ private object ProcessingStatusFetcher {
 
   import ProcessingStatus._
 
-  case class ProcessingStatus private (
-      done:     Done,
-      total:    Total,
-      progress: Progress
-  )
+  case class ProcessingStatus private(
+                                       done: Done,
+                                       total: Total,
+                                       progress: Progress
+                                     )
 
   object ProcessingStatus {
 
-    type Done     = Int Refined NonNegative
-    type Total    = Int Refined NonNegative
+    type Done = Int Refined NonNegative
+    type Total = Int Refined NonNegative
     type Progress = Double Refined NonNegative
 
     def from(
-        done:     Int,
-        total:    Int,
-        progress: Double
-    ): Either[String, ProcessingStatus] = {
+              done: Int,
+              total: Int,
+              progress: Double
+            ): Either[String, ProcessingStatus] = {
       import eu.timepit.refined.api.RefType.applyRef
 
       for {
-        validDone     <- applyRef[Done](done).leftMap(_ => "ProcessingStatus's 'done' cannot be negative")
-        validTotal    <- applyRef[Total](total).leftMap(_ => "ProcessingStatus's 'total' cannot be negative")
+        validDone <- applyRef[Done](done).leftMap(_ => "ProcessingStatus's 'done' cannot be negative")
+        validTotal <- applyRef[Total](total).leftMap(_ => "ProcessingStatus's 'total' cannot be negative")
         validProgress <- applyRef[Progress](progress).leftMap(_ => "ProcessingStatus's 'progress' cannot be negative")
-        _             <- if (done <= total) Right(()) else Left("ProcessingStatus's 'done' > 'total'")
+        _ <- if (done <= total) Right(()) else Left("ProcessingStatus's 'done' > 'total'")
         expectedProgress = BigDecimal((done.toDouble / total) * 100).setScale(2, RoundingMode.HALF_DOWN).toDouble
         _ <- if (expectedProgress == progress) Right(()) else Left("ProcessingStatus's 'progress' is invalid")
       } yield new ProcessingStatus(validDone, validTotal, validProgress)
@@ -75,15 +75,15 @@ private object ProcessingStatusFetcher {
 }
 
 private class IOProcessingStatusFetcher(
-    eventLogUrl: EventLogUrl,
-    logger:      Logger[IO]
-)(implicit
-    ME:               MonadError[IO, Throwable],
-    executionContext: ExecutionContext,
-    contextShift:     ContextShift[IO],
-    timer:            Timer[IO]
-) extends IORestClient(Throttler.noThrottling, logger)
-    with ProcessingStatusFetcher[IO] {
+                                         eventLogUrl: EventLogUrl,
+                                         logger: Logger[IO]
+                                       )(implicit
+                                         ME: MonadError[IO, Throwable],
+                                         executionContext: ExecutionContext,
+                                         contextShift: ContextShift[IO],
+                                         timer: Timer[IO]
+                                       ) extends IORestClient(Throttler.noThrottling, logger)
+  with ProcessingStatusFetcher[IO] {
 
   import IOProcessingStatusFetcher._
   import ProcessingStatusFetcher._
@@ -95,13 +95,13 @@ private class IOProcessingStatusFetcher(
 
   override def fetchProcessingStatus(projectId: projects.Id): OptionT[IO, ProcessingStatus] = OptionT {
     for {
-      uri          <- validateUri(s"$eventLogUrl/processing-status") map (_.withQueryParam("project-id", projectId.toString))
+      uri <- validateUri(s"$eventLogUrl/processing-status") map (_.withQueryParam("project-id", projectId.toString))
       latestEvents <- send(request(GET, uri))(mapResponse)
     } yield latestEvents
   }
 
   private lazy val mapResponse: PartialFunction[(Status, Request[IO], Response[IO]), IO[Option[ProcessingStatus]]] = {
-    case (NotFound, _, _)  => Option.empty[ProcessingStatus].pure[IO]
+    case (NotFound, _, _) => Option.empty[ProcessingStatus].pure[IO]
     case (Ok, _, response) => response.as[ProcessingStatus].map(Option.apply)
   }
 
@@ -109,24 +109,25 @@ private class IOProcessingStatusFetcher(
 }
 
 private object IOProcessingStatusFetcher {
+
   import io.circe.DecodingFailure
 
   def apply(
-      logger: Logger[IO]
-  )(implicit
-      executionContext: ExecutionContext,
-      contextShift:     ContextShift[IO],
-      timer:            Timer[IO]
-  ): IO[ProcessingStatusFetcher[IO]] =
+             logger: Logger[IO]
+           )(implicit
+             executionContext: ExecutionContext,
+             contextShift: ContextShift[IO],
+             timer: Timer[IO]
+           ): IO[ProcessingStatusFetcher[IO]] =
     for {
       eventLogUrl <- EventLogUrl[IO]()
     } yield new IOProcessingStatusFetcher(eventLogUrl, logger)
 
   implicit lazy val processingStatusDecoder: Decoder[ProcessingStatus] = cursor =>
     for {
-      done           <- cursor.downField("done").as[Int]
-      total          <- cursor.downField("total").as[Int]
-      progress       <- cursor.downField("progress").as[Double]
+      done <- cursor.downField("done").as[Int]
+      total <- cursor.downField("total").as[Int]
+      progress <- cursor.downField("progress").as[Double]
       progressStatus <- ProcessingStatus.from(done, total, progress).leftMap(DecodingFailure(_, Nil))
     } yield progressStatus
 }

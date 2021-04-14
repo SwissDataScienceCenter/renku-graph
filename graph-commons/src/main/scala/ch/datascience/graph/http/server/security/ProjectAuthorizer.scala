@@ -34,7 +34,7 @@ import ch.datascience.http.server.security.EndpointSecurityException.Authorizati
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.{Decoder, DecodingFailure}
 
 import scala.concurrent.ExecutionContext

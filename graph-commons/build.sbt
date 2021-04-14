@@ -26,7 +26,7 @@ val refinedVersion = "0.9.23"
 libraryDependencies += "eu.timepit" %% "refined"            % refinedVersion
 libraryDependencies += "eu.timepit" %% "refined-pureconfig" % refinedVersion
 
-libraryDependencies += "io.chrisdavenport" %% "log4cats-core" % "1.1.1"
+libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.0.1"
 
 val circeVersion = "0.13.0"
 libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
@@ -36,17 +36,17 @@ libraryDependencies += "io.circe" %% "circe-optics"  % circeVersion
 
 libraryDependencies += "io.sentry" % "sentry-logback" % "4.3.0"
 
-val doobieVersion = "0.10.0"
+val doobieVersion = "0.12.1"
 libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
 libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
 
-val catsVersion = "2.4.1"
+val catsVersion = "2.5.0"
 libraryDependencies += "org.typelevel" %% "cats-core"   % catsVersion
-libraryDependencies += "org.typelevel" %% "cats-effect" % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-free"   % catsVersion
+libraryDependencies += "org.typelevel" %% "cats-effect" % "2.4.1"
 
-val http4sVersion = "0.21.16"
+val http4sVersion = "0.21.22"
 libraryDependencies += "org.http4s" %% "http4s-blaze-client"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-blaze-server"       % http4sVersion
 libraryDependencies += "org.http4s" %% "http4s-server"             % http4sVersion

@@ -31,7 +31,7 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.metrics.LabeledGauge
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
@@ -82,7 +82,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     "define a POST /events endpoint" in new TestCase {
-      val request        = Request[IO](POST, uri"events")
+      val request = Request[IO](POST, uri"events")
       val expectedStatus = Gen.oneOf(Accepted, BadRequest, InternalServerError, TooManyRequests).generateOne
       (eventEndpoint.processEvent _).expects(request).returning(Response[IO](expectedStatus).pure[IO])
 
@@ -111,14 +111,14 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
         Request(GET, uri"metrics")
       )
 
-      response.status     shouldBe Ok
+      response.status shouldBe Ok
       response.body[String] should include("server_response_duration_seconds")
     }
 
     "define a GET /ping endpoint returning OK with 'pong' body" in new TestCase {
       val response = routes.call(Request(GET, uri"ping"))
 
-      response.status       shouldBe Ok
+      response.status shouldBe Ok
       response.body[String] shouldBe "pong"
     }
 
@@ -136,25 +136,25 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     "define a GET /processing-status?project-id=:id endpoint " +
       s"returning $NotFound if no project-id parameter is given" in new TestCase {
 
-        val request = Request[IO](GET, uri"processing-status")
+      val request = Request[IO](GET, uri"processing-status")
 
-        val response = routes.call(request)
+      val response = routes.call(request)
 
-        response.status            shouldBe NotFound
-        response.contentType       shouldBe Some(`Content-Type`(application.json))
-        response.body[InfoMessage] shouldBe InfoMessage("No 'project-id' parameter")
-      }
+      response.status shouldBe NotFound
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.body[InfoMessage] shouldBe InfoMessage("No 'project-id' parameter")
+    }
 
     "define a GET /processing-status?project-id=:id endpoint " +
       s"returning $BadRequest if illegal project-id parameter value is given" in new TestCase {
-        val request = Request[IO](GET, uri"processing-status".withQueryParam("project-id", "non int value"))
+      val request = Request[IO](GET, uri"processing-status".withQueryParam("project-id", "non int value"))
 
-        val response = routes.call(request)
+      val response = routes.call(request)
 
-        response.status             shouldBe BadRequest
-        response.contentType        shouldBe Some(`Content-Type`(application.json))
-        response.body[ErrorMessage] shouldBe ErrorMessage("'project-id' parameter with invalid value")
-      }
+      response.status shouldBe BadRequest
+      response.contentType shouldBe Some(`Content-Type`(application.json))
+      response.body[ErrorMessage] shouldBe ErrorMessage("'project-id' parameter with invalid value")
+    }
 
     "define a POST /subscriptions endpoint" in new TestCase {
       val request = Request[IO](POST, uri"subscriptions")
@@ -170,13 +170,13 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
   private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
 
   private trait TestCase {
-    val eventEndpoint            = mock[EventEndpoint[IO]]
+    val eventEndpoint = mock[EventEndpoint[IO]]
     val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]
-    val eventsPatchingEndpoint   = mock[EventsPatchingEndpoint[IO]]
-    val routesMetrics            = TestRoutesMetrics()
-    val statusChangeEndpoint     = mock[TestStatusChangeEndpoint]
-    val subscriptionsEndpoint    = mock[TestSubscriptionEndpoint]
-    val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
+    val eventsPatchingEndpoint = mock[EventsPatchingEndpoint[IO]]
+    val routesMetrics = TestRoutesMetrics()
+    val statusChangeEndpoint = mock[TestStatusChangeEndpoint]
+    val subscriptionsEndpoint = mock[TestSubscriptionEndpoint]
+    val eventDetailsEndpoint = mock[EventDetailsEndpoint[IO]]
     val routes = new MicroserviceRoutes[IO](
       eventEndpoint,
       processingStatusEndpoint,
@@ -189,18 +189,20 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
   }
 
   class TestProcessingStatusEndpoint(processingStatusFinder: ProcessingStatusFinder[IO], logger: Logger[IO])
-      extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
+    extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
+
   class TestSubscriptionEndpoint(
-      subscriptionCategoryRegistry: EventProducersRegistry[IO],
-      logger:                       Logger[IO]
-  ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
+                                  subscriptionCategoryRegistry: EventProducersRegistry[IO],
+                                  logger: Logger[IO]
+                                ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
+
   class TestStatusChangeEndpoint(
-      transactor:                      DbTransactor[IO, EventLogDB],
-      updateCommandsRunner:            StatusUpdatesRunner[IO],
-      awaitingTriplesGenerationGauge:  LabeledGauge[IO, projects.Path],
-      underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
-      awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
-      underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
-      logger:                          Logger[IO]
-  ) extends StatusChangeEndpoint[IO](updateCommandsRunner, Set.empty, logger)
+                                  transactor: DbTransactor[IO, EventLogDB],
+                                  updateCommandsRunner: StatusUpdatesRunner[IO],
+                                  awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+                                  underTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
+                                  awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
+                                  underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
+                                  logger: Logger[IO]
+                                ) extends StatusChangeEndpoint[IO](updateCommandsRunner, Set.empty, logger)
 }

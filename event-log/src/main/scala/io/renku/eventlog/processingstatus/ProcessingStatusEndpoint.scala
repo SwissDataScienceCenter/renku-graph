@@ -22,16 +22,16 @@ import cats.MonadError
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.metrics.LabeledHistogram
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal
 
 class ProcessingStatusEndpoint[Interpretation[_]](
-    processingStatusFinder: ProcessingStatusFinder[Interpretation],
-    logger:                 Logger[Interpretation]
-)(implicit ME:              MonadError[Interpretation, Throwable])
-    extends Http4sDsl[Interpretation] {
+                                                   processingStatusFinder: ProcessingStatusFinder[Interpretation],
+                                                   logger: Logger[Interpretation]
+                                                 )(implicit ME: MonadError[Interpretation, Throwable])
+  extends Http4sDsl[Interpretation] {
 
   import cats.syntax.all._
   import ch.datascience.http.ErrorMessage._
@@ -47,7 +47,7 @@ class ProcessingStatusEndpoint[Interpretation[_]](
   def findProcessingStatus(projectId: projects.Id): Interpretation[Response[Interpretation]] = {
     for {
       maybeProcessingStatus <- fetchStatus(projectId).value
-      response              <- maybeProcessingStatus.toResponse
+      response <- maybeProcessingStatus.toResponse
     } yield response
   } recoverWith internalServerError(projectId)
 
@@ -69,23 +69,25 @@ class ProcessingStatusEndpoint[Interpretation[_]](
   }
 
   private def internalServerError(
-      projectId: projects.Id
-  ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = { case NonFatal(exception) =>
-    val errorMessage = ErrorMessage(s"Finding processing status for project $projectId failed")
-    logger.error(exception)(errorMessage.value)
-    InternalServerError(errorMessage)
+                                   projectId: projects.Id
+                                 ): PartialFunction[Throwable, Interpretation[Response[Interpretation]]] = {
+    case NonFatal(exception) =>
+      val errorMessage = ErrorMessage(s"Finding processing status for project $projectId failed")
+      logger.error(exception)(errorMessage.value)
+      InternalServerError(errorMessage)
   }
 }
 
 object IOProcessingStatusEndpoint {
+
   import cats.effect.{ContextShift, IO}
   import io.renku.eventlog.EventLogDB
 
   def apply(
-      transactor:          DbTransactor[IO, EventLogDB],
-      queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
-      logger:              Logger[IO]
-  )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusEndpoint[IO]] =
+             transactor: DbTransactor[IO, EventLogDB],
+             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
+             logger: Logger[IO]
+           )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusEndpoint[IO]] =
     for {
       statusFinder <- IOProcessingStatusFinder(transactor, queriesExecTimes)
     } yield new ProcessingStatusEndpoint[IO](statusFinder, logger)

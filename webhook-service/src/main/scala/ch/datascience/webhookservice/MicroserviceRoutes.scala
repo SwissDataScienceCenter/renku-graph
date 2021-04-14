@@ -33,7 +33,7 @@ import ch.datascience.webhookservice.eventprocessing._
 import ch.datascience.webhookservice.hookcreation.{HookCreationEndpoint, IOHookCreationEndpoint}
 import ch.datascience.webhookservice.hookvalidation.{HookValidationEndpoint, IOHookValidationEndpoint}
 import ch.datascience.webhookservice.model.ProjectHookUrl
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.AuthedRoutes
 import org.http4s.dsl.Http4sDsl
 import org.http4s.server.AuthMiddleware
