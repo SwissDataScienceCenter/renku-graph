@@ -26,7 +26,7 @@ import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import ch.datascience.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
 import ch.datascience.triplesgenerator.Microservice
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

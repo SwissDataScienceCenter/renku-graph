@@ -28,7 +28,7 @@ import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
 import ch.datascience.graph.model.RenkuVersionPair
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

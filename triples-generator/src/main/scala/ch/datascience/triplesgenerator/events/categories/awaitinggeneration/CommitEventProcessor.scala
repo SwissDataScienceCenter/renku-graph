@@ -35,7 +35,7 @@ import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecove
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater._
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.prometheus.client.Histogram
 
 import java.time.Duration

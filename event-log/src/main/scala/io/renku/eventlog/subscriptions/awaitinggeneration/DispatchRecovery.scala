@@ -24,7 +24,7 @@ import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.DispatchRecovery

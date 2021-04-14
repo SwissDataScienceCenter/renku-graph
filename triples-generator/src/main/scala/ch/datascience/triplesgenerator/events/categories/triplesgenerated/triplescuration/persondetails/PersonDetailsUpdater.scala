@@ -29,7 +29,7 @@ import ch.datascience.graph.config.GitLabUrl
 import ch.datascience.graph.model.events.EventId
 import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFinder}
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

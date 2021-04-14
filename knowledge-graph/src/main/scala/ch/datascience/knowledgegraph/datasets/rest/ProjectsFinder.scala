@@ -26,7 +26,7 @@ import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.knowledgegraph.datasets.model.{AddedToProject, DatasetAgent, DatasetProject}
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder.decodeList
 import io.circe.DecodingFailure
 

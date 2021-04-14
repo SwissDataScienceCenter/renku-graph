@@ -25,7 +25,7 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.CommitId
 import ch.datascience.graph.model.projects
 import ch.datascience.http.client.IORestClient
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.Status.{NotFound, Ok}
 import org.http4s.{Request, Response, Status}
 

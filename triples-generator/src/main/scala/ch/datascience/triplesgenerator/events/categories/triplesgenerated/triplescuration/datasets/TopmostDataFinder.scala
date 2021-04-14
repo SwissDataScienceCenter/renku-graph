@@ -25,7 +25,7 @@ import ch.datascience.graph.model.datasets.{IdSameAs, TopmostDerivedFrom, Topmos
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.DataSetInfoFinder.DatasetInfo
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.datasets.TopmostDataFinder.TopmostData
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.jsonld.EntityId
 
 import scala.concurrent.ExecutionContext

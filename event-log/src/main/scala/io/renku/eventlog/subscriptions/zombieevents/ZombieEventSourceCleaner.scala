@@ -26,7 +26,7 @@ import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceUrlFinder}
 import doobie.ConnectionIO
 import eu.timepit.refined.api.Refined
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.{EventLogDB, Microservice, TypeSerializers}
 
 import scala.concurrent.ExecutionContext

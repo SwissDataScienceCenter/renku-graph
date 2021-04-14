@@ -25,7 +25,7 @@ import ch.datascience.graph.model.datasets.{DerivedFrom, Identifier, ImageUri, I
 import ch.datascience.graph.model.projects.{Path, ResourceId}
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

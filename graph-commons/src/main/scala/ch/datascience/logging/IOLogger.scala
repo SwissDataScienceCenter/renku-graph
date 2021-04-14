@@ -19,7 +19,7 @@
 package ch.datascience.logging
 
 import cats.effect._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.slf4j.{Logger => Slf4jLogger}
 
 class IOLogger(logger: Slf4jLogger) extends Logger[IO] {

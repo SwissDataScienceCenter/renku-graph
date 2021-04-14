@@ -30,7 +30,7 @@ import ch.datascience.http.rest.Links._
 import ch.datascience.knowledgegraph.datasets.rest.ProjectDatasetsFinder.ProjectDataset
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Encoder
 import io.circe.literal._
 import io.circe.syntax._

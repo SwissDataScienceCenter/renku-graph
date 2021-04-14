@@ -31,7 +31,7 @@ import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.constraints.NonNegativeInt
 import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.DecodingFailure
 
 import scala.concurrent.ExecutionContext

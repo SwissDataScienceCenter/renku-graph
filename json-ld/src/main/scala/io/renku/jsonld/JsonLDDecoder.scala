@@ -23,8 +23,7 @@ import io.circe.DecodingFailure
 import io.renku.jsonld.JsonLD.JsonLDValue
 import io.renku.jsonld.JsonLDDecoder.Result
 
-/**
-  * A type class that provides a conversion from a [[Cursor]] to an object of type `A`
+/** A type class that provides a conversion from a [[Cursor]] to an object of type `A`
   */
 trait JsonLDDecoder[A] extends Serializable {
   def apply(cursor: Cursor): Result[A]

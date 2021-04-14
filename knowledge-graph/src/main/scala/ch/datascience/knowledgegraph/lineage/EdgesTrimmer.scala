@@ -29,14 +29,12 @@ private trait EdgesTrimmer[Interpretation[_]] {
   def trim(edges: EdgeMap, location: Location): Interpretation[EdgeMap]
 }
 
-/**
-  * Removes graphs which are not connected to the given location of the dataset (not workflow) which are rectangles.
+/** Removes graphs which are not connected to the given location of the dataset (not workflow) which are rectangles.
   */
 private class EdgesTrimmerImpl[Interpretation[_]]()(implicit ME: MonadError[Interpretation, Throwable])
     extends EdgesTrimmer[Interpretation] {
 
-  /**
-    * @param edges Edges from the whole project
+  /** @param edges Edges from the whole project
     * @param location location of file the user selected in the UI
     * @return Trimmed graph with only nodes connected to the location
     */

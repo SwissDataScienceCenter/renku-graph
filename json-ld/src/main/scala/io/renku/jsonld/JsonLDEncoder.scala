@@ -20,8 +20,7 @@ package io.renku.jsonld
 
 import java.time.{Instant, LocalDate}
 
-/**
-  * A type class that provides a conversion from a value of type `A` to a [[JsonLD]] value.
+/** A type class that provides a conversion from a value of type `A` to a [[JsonLD]] value.
   */
 trait JsonLDEncoder[A] extends Serializable {
   def apply(a: A): JsonLD

@@ -27,7 +27,7 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

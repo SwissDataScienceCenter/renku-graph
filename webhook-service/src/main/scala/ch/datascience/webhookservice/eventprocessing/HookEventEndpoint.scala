@@ -33,7 +33,7 @@ import ch.datascience.webhookservice.CommitSyncRequestSender
 import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.crypto.HookTokenCrypto.SerializedHookToken
 import ch.datascience.webhookservice.model.{CommitSyncRequest, HookToken, Project}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import org.http4s._
 import org.http4s.circe._

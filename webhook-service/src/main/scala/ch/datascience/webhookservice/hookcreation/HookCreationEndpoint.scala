@@ -32,7 +32,7 @@ import ch.datascience.webhookservice.crypto.HookTokenCrypto
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult
 import ch.datascience.webhookservice.hookcreation.HookCreator.CreationResult.{HookCreated, HookExisted}
 import ch.datascience.webhookservice.model.ProjectHookUrl
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Response, Status}
 

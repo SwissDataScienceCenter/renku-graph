@@ -24,7 +24,7 @@ import cats.syntax.all._
 import ch.datascience.rdfstore.{RdfStoreConfig, SparqlQueryTimeRecorder}
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal

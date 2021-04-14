@@ -22,7 +22,7 @@ import cats.Applicative
 import cats.data.Kleisli
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.events.CategoryName
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration

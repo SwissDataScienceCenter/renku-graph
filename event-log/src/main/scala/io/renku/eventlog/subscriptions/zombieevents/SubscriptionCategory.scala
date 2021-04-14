@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.metrics.LabeledHistogram
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.{EventLogDB, subscriptions}
 

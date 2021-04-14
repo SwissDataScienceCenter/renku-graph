@@ -23,7 +23,7 @@ import ch.datascience.graph.model.datasets._
 import ch.datascience.knowledgegraph.datasets.model.DatasetPart
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder.decodeList
 
 import scala.concurrent.ExecutionContext

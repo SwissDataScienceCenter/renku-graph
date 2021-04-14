@@ -29,7 +29,7 @@ import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.syntax._
 import org.http4s.Response
 import org.http4s.circe._

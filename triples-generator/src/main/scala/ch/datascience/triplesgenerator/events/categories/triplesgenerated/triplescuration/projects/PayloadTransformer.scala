@@ -29,7 +29,7 @@ import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecove
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -75,6 +75,7 @@ private class PayloadTransformerImpl(
 }
 
 private object IOPayloadTransformer {
+
   import cats.effect.Timer
   import ch.datascience.config.GitLab
   import ch.datascience.control.Throttler

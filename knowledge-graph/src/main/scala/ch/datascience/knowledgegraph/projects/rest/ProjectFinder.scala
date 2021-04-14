@@ -97,7 +97,7 @@ private object IOProjectFinder {
   import cats.effect.{ContextShift, IO, Timer}
   import ch.datascience.rdfstore.SparqlQueryTimeRecorder
   import com.typesafe.config.{Config, ConfigFactory}
-  import io.chrisdavenport.log4cats.Logger
+  import org.typelevel.log4cats.Logger
 
   def apply(
       gitLabThrottler: Throttler[IO, GitLab],

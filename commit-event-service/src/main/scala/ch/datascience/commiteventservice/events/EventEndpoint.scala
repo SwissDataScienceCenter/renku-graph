@@ -26,7 +26,7 @@ import cats.syntax.all._
 import ch.datascience.events.consumers.{EventConsumersRegistry, EventRequestContent, EventSchedulingResult}
 import ch.datascience.http.InfoMessage._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Json
 import org.http4s.dsl.Http4sDsl
 import org.http4s.multipart.Multipart

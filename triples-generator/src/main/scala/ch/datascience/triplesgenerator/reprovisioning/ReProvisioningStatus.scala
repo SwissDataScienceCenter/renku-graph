@@ -29,7 +29,7 @@ import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder.decodeList
 import io.circe.{Decoder, DecodingFailure}
 import io.renku.jsonld.EntityId
@@ -62,6 +62,7 @@ private class ReProvisioningStatusImpl(
     with ReProvisioningStatus[IO] {
 
   private val applicative = Applicative[IO]
+
   import ReProvisioningJsonLD._
   import applicative._
   import eventConsumersRegistry._
@@ -190,13 +191,16 @@ object ReProvisioningStatus {
 }
 
 private case object ReProvisioningJsonLD {
+
   import ch.datascience.graph.Schemas._
 
   def id(implicit renkuBaseUrl: RenkuBaseUrl) = EntityId.of((renkuBaseUrl / "re-provisioning").toString)
+
   val objectType           = renku / "ReProvisioning"
   val reProvisioningStatus = renku / "reProvisioningStatus"
 
   sealed trait Status
+
   case object Running extends Status {
     override lazy val toString: String = "running"
   }

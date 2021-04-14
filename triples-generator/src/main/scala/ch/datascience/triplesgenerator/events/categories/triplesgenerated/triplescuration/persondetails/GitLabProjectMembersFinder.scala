@@ -32,7 +32,7 @@ import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import org.http4s.Method.GET
 import org.http4s._

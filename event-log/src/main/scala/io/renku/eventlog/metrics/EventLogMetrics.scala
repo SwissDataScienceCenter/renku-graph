@@ -23,7 +23,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.graph.model.events.{CategoryName, EventStatus}
 import ch.datascience.metrics._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration._
 import scala.language.postfixOps

@@ -30,7 +30,7 @@ import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, 
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.{Decoder, Json}
 import io.renku.eventlog.statuschange.commands._
 import io.renku.eventlog.{EventLogDB, EventMessage}
@@ -139,6 +139,7 @@ class StatusChangeEndpoint[Interpretation[_]: Effect: MonadError[*[_], Throwable
 }
 
 object IOStatusChangeEndpoint {
+
   import cats.effect.IO
 
   def apply(

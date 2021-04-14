@@ -27,7 +27,7 @@ import ch.datascience.graph.model.users.GitLabId
 import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore.{IORdfStoreClient, RdfStoreConfig, SparqlQuery, SparqlQueryTimeRecorder}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -83,6 +83,7 @@ private class KGProjectMembersFinderImpl(
   )
 
 }
+
 private object KGProjectMembersFinder {
   def apply(logger:     Logger[IO], timeRecorder: SparqlQueryTimeRecorder[IO])(implicit
       executionContext: ExecutionContext,

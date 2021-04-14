@@ -37,7 +37,7 @@ import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidation
 import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult.HookMissing
 import ch.datascience.webhookservice.model.{CommitSyncRequest, HookToken, ProjectHookUrl}
 import ch.datascience.webhookservice.tokenrepository.{AccessTokenAssociator, IOAccessTokenAssociator}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal

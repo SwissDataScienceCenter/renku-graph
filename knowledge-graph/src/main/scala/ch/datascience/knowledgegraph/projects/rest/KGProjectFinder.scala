@@ -27,7 +27,7 @@ import ch.datascience.graph.model.views.RdfResource
 import ch.datascience.knowledgegraph.projects.rest.KGProjectFinder._
 import ch.datascience.logging.ApplicationLogger
 import ch.datascience.rdfstore._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

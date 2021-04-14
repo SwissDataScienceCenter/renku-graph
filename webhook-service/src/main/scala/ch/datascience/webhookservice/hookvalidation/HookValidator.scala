@@ -33,7 +33,7 @@ import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidation
 import ch.datascience.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
 import ch.datascience.webhookservice.model.ProjectHookUrl
 import ch.datascience.webhookservice.tokenrepository._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal

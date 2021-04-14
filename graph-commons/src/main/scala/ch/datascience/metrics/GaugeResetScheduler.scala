@@ -22,7 +22,7 @@ import cats.MonadError
 import cats.effect.{IO, Timer}
 import cats.syntax.all._
 import ch.datascience.config.MetricsConfigProvider
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.duration.FiniteDuration
 import scala.util.control.NonFatal

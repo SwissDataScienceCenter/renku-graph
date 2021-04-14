@@ -25,7 +25,7 @@ import ch.datascience.graph.model.users.{Affiliation, Email, Name => UserName}
 import ch.datascience.knowledgegraph.datasets.model.DatasetCreator
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder.{Result, decodeList}
 import io.circe.HCursor
 

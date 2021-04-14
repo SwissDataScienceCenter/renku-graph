@@ -39,7 +39,7 @@ class RoutesMetrics[Interpretation[_]](metricsRegistry: MetricsRegistry[Interpre
               metrics
             )(routes)
           }
-        case _ => Resource.liftF(F.pure(routes))
+        case _ => Resource.eval(F.pure(routes))
       }
   }
 }

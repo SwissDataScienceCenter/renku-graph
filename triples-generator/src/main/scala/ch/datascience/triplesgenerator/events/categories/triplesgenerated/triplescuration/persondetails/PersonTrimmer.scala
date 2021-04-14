@@ -31,7 +31,7 @@ import ch.datascience.graph.model.{events, projects}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.rdfstore.JsonLDTriples
 import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecoverableError
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

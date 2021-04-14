@@ -51,9 +51,9 @@ class DbTransactorResource[Interpretation[_], TargetDB](
 
   private def createHikariTransactor(connectionsThreadPool: ExecutionContext, blocker: Blocker) =
     for {
-      _          <- Resource.liftF(Async[Interpretation] delay Class.forName(dbConfig.driver.value))
+      _          <- Resource.eval(Async[Interpretation] delay Class.forName(dbConfig.driver.value))
       transactor <- initial[Interpretation](connectionsThreadPool, blocker)
-      _ <- Resource.liftF {
+      _ <- Resource.eval {
              transactor.configure { dataSource =>
                Async[Interpretation] delay dataSourceUpdater(dataSource)
              }
