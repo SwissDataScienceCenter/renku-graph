@@ -17,13 +17,13 @@ data:
     ATTEMPT=1
 
     wait_for_db_folder () {
-      if [ ! -d "$FUSEKI_BASE/databases/{{ .Values.global.graph.jena.dataset }}" ];
+      if [ ! -d "${FUSEKI_BASE}/databases/{{ .Values.global.graph.jena.dataset }}" ]
       then
         if [ "$ATTEMPT" -lt "6" ]
         then
           ATTEMPT=$((ATTEMPT + 1))
           sleep 5s
-          echo $FUSEKI_BASE/databases/{{ .Values.global.graph.jena.dataset }} doesn't exist
+          echo "${FUSEKI_BASE}/databases/{{ .Values.global.graph.jena.dataset }} doesn't exist"
           wait_for_db_folder
         fi
       fi

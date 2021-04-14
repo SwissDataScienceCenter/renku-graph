@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.{AccessToken, IORestClient}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 
@@ -59,7 +59,9 @@ class IOAccessTokenFinder(
 }
 
 object IOAccessTokenFinder {
+
   import ch.datascience.http.client.UrlEncoder.urlEncode
+
   implicit val projectPathToPath: Path => String = path => urlEncode(path.value)
   implicit val projectIdToPath:   Id => String   = _.toString
 

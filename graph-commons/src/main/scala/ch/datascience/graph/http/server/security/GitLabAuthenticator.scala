@@ -26,7 +26,7 @@ import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.http.server.security.EndpointSecurityException.AuthenticationFailure
 import ch.datascience.http.server.security.model.AuthUser
 import ch.datascience.http.server.security.{Authenticator, EndpointSecurityException}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

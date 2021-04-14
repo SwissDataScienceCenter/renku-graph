@@ -36,7 +36,7 @@ import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triple
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplesuploading.{IOUploader, TriplesUploadResult, Uploader}
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater
 import ch.datascience.triplesgenerator.events.categories.EventStatusUpdater._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.prometheus.client.Histogram
 
 import java.time.Duration
@@ -184,17 +184,22 @@ private class TriplesGeneratedEventProcessor[Interpretation[_]](
   private sealed trait UploadingResult extends Product with Serializable {
     val event: TriplesGeneratedEvent
   }
+
   private sealed trait UploadingError extends UploadingResult {
     val cause: Throwable
   }
+
   private object UploadingResult {
     case class Uploaded(event: TriplesGeneratedEvent) extends UploadingResult
+
     case class RecoverableError(event: TriplesGeneratedEvent, cause: Throwable) extends UploadingError
+
     case class NonRecoverableError(event: TriplesGeneratedEvent, cause: Throwable) extends UploadingError
   }
 }
 
 private object IOTriplesGeneratedEventProcessor {
+
   import ch.datascience.config.GitLab
   import ch.datascience.control.Throttler
 

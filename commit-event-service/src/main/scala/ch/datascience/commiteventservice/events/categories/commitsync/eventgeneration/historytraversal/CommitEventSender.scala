@@ -26,7 +26,7 @@ import ch.datascience.control.Throttler
 import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.graph.model.events.EventBody
 import ch.datascience.http.client.IORestClient
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.Status
 import org.http4s.Status.Accepted
 

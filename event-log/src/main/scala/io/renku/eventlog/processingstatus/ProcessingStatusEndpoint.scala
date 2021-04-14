@@ -22,7 +22,7 @@ import cats.MonadError
 import ch.datascience.db.{DbTransactor, SqlQuery}
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.metrics.LabeledHistogram
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.dsl.Http4sDsl
 
 import scala.util.control.NonFatal
@@ -78,6 +78,7 @@ class ProcessingStatusEndpoint[Interpretation[_]](
 }
 
 object IOProcessingStatusEndpoint {
+
   import cats.effect.{ContextShift, IO}
   import io.renku.eventlog.EventLogDB
 

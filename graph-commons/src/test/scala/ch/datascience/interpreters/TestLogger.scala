@@ -20,7 +20,7 @@ package ch.datascience.interpreters
 
 import cats.Monad
 import ch.datascience.interpreters.TestLogger.LogMessage._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.scalatest.Assertion
 import org.scalatest.matchers.should
 

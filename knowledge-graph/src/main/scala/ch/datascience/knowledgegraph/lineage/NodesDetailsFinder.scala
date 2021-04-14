@@ -28,7 +28,7 @@ import ch.datascience.knowledgegraph.lineage.model.Node
 import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.json.TinyTypeDecoders
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import io.renku.jsonld.EntityId
 

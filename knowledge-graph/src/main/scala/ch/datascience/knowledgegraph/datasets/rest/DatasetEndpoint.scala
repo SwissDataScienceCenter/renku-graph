@@ -28,7 +28,7 @@ import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.knowledgegraph.datasets.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.literal._
 import io.circe.syntax._
 import io.circe.{Encoder, Json}

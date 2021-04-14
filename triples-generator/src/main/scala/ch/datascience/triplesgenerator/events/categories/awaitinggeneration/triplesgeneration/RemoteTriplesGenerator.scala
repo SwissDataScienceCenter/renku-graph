@@ -31,7 +31,7 @@ import ch.datascience.triplesgenerator.events.categories.Errors.ProcessingRecove
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.CommitEvent
 import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.triplesgeneration.TriplesGenerator.GenerationRecoverableError
 import com.typesafe.config.{Config, ConfigFactory}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Json
 
 import scala.concurrent.ExecutionContext
@@ -91,6 +91,7 @@ private[awaitinggeneration] class RemoteTriplesGenerator(
 }
 
 class TriplesGenerationServiceUrl private (val value: String) extends AnyVal with StringTinyType
+
 object TriplesGenerationServiceUrl
     extends TinyTypeFactory[TriplesGenerationServiceUrl](new TriplesGenerationServiceUrl(_))
     with Url

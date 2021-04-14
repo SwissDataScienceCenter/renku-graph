@@ -1,19 +1,19 @@
 organization := "ch.datascience"
 name := "renku-graph"
-scalaVersion := "2.13.4"
+scalaVersion := "2.13.5"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
 
 releaseVersionBump := sbtrelease.Version.Bump.Minor
 releaseIgnoreUntrackedFiles := true
-releaseTagName := (version in ThisBuild).value
+releaseTagName := (ThisBuild / version).value
 
 lazy val root = Project(
   id = "renku-graph",
   base = file(".")
 ).settings(
-  skip in publish := true,
+  publish / skip := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 ).aggregate(
   jsonLd,
@@ -146,12 +146,12 @@ lazy val acceptanceTests = Project(
 
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
-  scalaVersion := "2.13.4",
-  skip in publish := true,
+  scalaVersion := "2.13.5",
+  publish / skip  := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
-  publishArtifact in (Compile, packageDoc) := false,
-  publishArtifact in (Compile, packageSrc) := false,
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full),
+  Compile / packageDoc / publishArtifact := false,
+  Compile / packageSrc / publishArtifact := false,
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full),
   scalacOptions += "-feature",
   scalacOptions += "-unchecked",
   scalacOptions += "-deprecation",
@@ -201,7 +201,7 @@ writeVersionToChart := {
 def readTag: String = {
   val tag = Vcs
     .detect(root.base)
-    .map(_.cmd("describe").!!.trim)
+    .map(_.cmd("describe", "--tags").!!.trim)
     .getOrElse(sys.error("Release Tag cannot be checked"))
 
   if (tag.matches("\\d+\\.\\d+\\.\\d+")) tag

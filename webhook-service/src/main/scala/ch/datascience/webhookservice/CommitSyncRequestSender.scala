@@ -26,7 +26,7 @@ import ch.datascience.graph.config.EventLogUrl
 import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
 import ch.datascience.webhookservice.model.CommitSyncRequest
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.Status.{Accepted, BadGateway, GatewayTimeout, ServiceUnavailable}
 import org.http4s.{Status, Uri}
 

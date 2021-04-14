@@ -20,7 +20,7 @@ package ch.datascience.triplesgenerator.init
 
 import cats.effect.IO
 import ch.datascience.triplesgenerator.config.FusekiAdminConfig
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.util.Try
 

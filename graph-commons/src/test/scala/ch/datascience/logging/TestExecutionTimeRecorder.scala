@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.logging.ExecutionTimeRecorder.ElapsedTime
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.prometheus.client.Histogram
 
 import scala.concurrent.duration.TimeUnit
@@ -45,7 +45,8 @@ object TestExecutionTimeRecorder {
     )
 
   private implicit def clock[Interpretation[_]]: Clock[Interpretation] = new Clock[Interpretation] {
-    override def realTime(unit:  TimeUnit) = ???
+    override def realTime(unit: TimeUnit) = ???
+
     override def monotonic(unit: TimeUnit) = ???
   }
 }

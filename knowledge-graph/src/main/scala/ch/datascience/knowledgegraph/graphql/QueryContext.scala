@@ -21,7 +21,7 @@ package ch.datascience.knowledgegraph.graphql
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.knowledgegraph.lineage.{IOLineageFinder, LineageFinder, LineageFinderImpl}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

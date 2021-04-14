@@ -21,7 +21,7 @@ package ch.datascience.triplesgenerator.events.categories.triplesgenerated.tripl
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.graph.model.datasets.{DerivedFrom, IdSameAs, SameAs, TopmostDerivedFrom, TopmostSameAs}
 import ch.datascience.rdfstore._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import io.circe.Decoder.decodeList
 

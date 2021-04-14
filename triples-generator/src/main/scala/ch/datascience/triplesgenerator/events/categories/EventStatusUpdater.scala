@@ -31,7 +31,7 @@ import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, EventPr
 import ch.datascience.http.client.IORestClient
 import ch.datascience.http.client.RestClientError.{ConnectivityException, UnexpectedResponseException}
 import ch.datascience.rdfstore.JsonLDTriples
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.Status.{BadGateway, GatewayTimeout, ServiceUnavailable}
 import org.http4s.{Status, Uri}
 
@@ -45,9 +45,12 @@ private trait EventStatusUpdater[Interpretation[_]] {
                          schemaVersion:  SchemaVersion,
                          processingTime: EventProcessingTime
   ): Interpretation[Unit]
-  def toTriplesStore(eventId:             CompoundEventId, processingTime:          EventProcessingTime): Interpretation[Unit]
+
+  def toTriplesStore(eventId: CompoundEventId, processingTime: EventProcessingTime): Interpretation[Unit]
+
   def rollback[S <: EventStatus](eventId: CompoundEventId)(implicit rollbackStatus: () => S): Interpretation[Unit]
-  def toFailure(eventId:                  CompoundEventId, eventStatus:             FailureStatus, exception: Throwable): Interpretation[Unit]
+
+  def toFailure(eventId: CompoundEventId, eventStatus: FailureStatus, exception: Throwable): Interpretation[Unit]
 }
 
 private class EventStatusUpdaterImpl(

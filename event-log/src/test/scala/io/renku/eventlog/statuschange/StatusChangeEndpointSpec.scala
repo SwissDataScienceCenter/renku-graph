@@ -213,7 +213,7 @@ class StatusChangeEndpointSpec
       val multipart = Multipart[IO](
         Vector(
           Part.formData[IO]("event",
-                            (json"""{"event": ${Gen.oneOf(Gen.const(""), nonEmptyStrings()).generateOne} }""").noSpaces,
+                            json"""{"event": ${Gen.oneOf(Gen.const(""), nonEmptyStrings()).generateOne} }""".noSpaces,
                             `Content-Type`(MediaType.application.json)
           )
         )
@@ -234,9 +234,9 @@ class StatusChangeEndpointSpec
         Vector(
           Part.formData[IO](
             "event",
-            (json"""{"event": ${eventStatuses.generateOne.value}, "processingTime": ${Gen
+            json"""{"event": ${eventStatuses.generateOne.value}, "processingTime": ${Gen
               .oneOf(Gen.const(""), nonEmptyStrings())
-              .generateOne} }""").noSpaces,
+              .generateOne} }""".noSpaces,
             `Content-Type`(MediaType.application.json)
           )
         )
@@ -257,7 +257,7 @@ class StatusChangeEndpointSpec
         Vector(
           Part.formData[IO](
             "event",
-            (json"""{"event": ${eventStatuses.generateOne.value}, "processingTime": ${eventProcessingTimes.generateOne}, "message": "" }""").noSpaces,
+            json"""{"event": ${eventStatuses.generateOne.value}, "processingTime": ${eventProcessingTimes.generateOne}, "message": "" }""".noSpaces,
             `Content-Type`(MediaType.application.json)
           )
         )

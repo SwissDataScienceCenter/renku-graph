@@ -22,7 +22,7 @@ import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.DbTransactor
 import doobie.implicits._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
 private trait EventLogTableRenamer[Interpretation[_]] {

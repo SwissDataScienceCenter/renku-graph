@@ -31,7 +31,7 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.metrics.LabeledGauge
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
@@ -190,10 +190,12 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
 
   class TestProcessingStatusEndpoint(processingStatusFinder: ProcessingStatusFinder[IO], logger: Logger[IO])
       extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
+
   class TestSubscriptionEndpoint(
       subscriptionCategoryRegistry: EventProducersRegistry[IO],
       logger:                       Logger[IO]
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
+
   class TestStatusChangeEndpoint(
       transactor:                      DbTransactor[IO, EventLogDB],
       updateCommandsRunner:            StatusUpdatesRunner[IO],

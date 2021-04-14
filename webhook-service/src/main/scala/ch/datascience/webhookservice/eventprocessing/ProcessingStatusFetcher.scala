@@ -29,7 +29,7 @@ import ch.datascience.http.client.IORestClient
 import ch.datascience.webhookservice.eventprocessing.ProcessingStatusFetcher.ProcessingStatus
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.NonNegative
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 
 import scala.concurrent.ExecutionContext
@@ -109,6 +109,7 @@ private class IOProcessingStatusFetcher(
 }
 
 private object IOProcessingStatusFetcher {
+
   import io.circe.DecodingFailure
 
   def apply(
