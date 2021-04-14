@@ -25,7 +25,7 @@ libraryDependencies += "io.circe" %% "circe-core"    % circeVersion
 libraryDependencies += "io.circe" %% "circe-literal" % circeVersion
 libraryDependencies += "io.circe" %% "circe-parser"  % circeVersion
 
-libraryDependencies += "org.typelevel" %% "cats-core" % "2.4.1"
+libraryDependencies += "org.typelevel" %% "cats-core" % "2.5.0"
 
 // Test dependencies
 libraryDependencies += "eu.timepit"        %% "refined"         % "0.9.23"  % Test
