@@ -7,13 +7,13 @@ packagedArtifacts := Map.empty
 
 releaseVersionBump := sbtrelease.Version.Bump.Minor
 releaseIgnoreUntrackedFiles := true
-releaseTagName := (version in ThisBuild).value
+releaseTagName := (ThisBuild / version).value
 
 lazy val root = Project(
   id = "renku-graph",
   base = file(".")
 ).settings(
-  skip in publish := true,
+  publish / skip := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 ).aggregate(
   jsonLd,
@@ -147,10 +147,10 @@ lazy val acceptanceTests = Project(
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
   scalaVersion := "2.13.5",
-  skip in publish := true,
+  publish / skip  := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
-  publishArtifact in (Compile, packageDoc) := false,
-  publishArtifact in (Compile, packageSrc) := false,
+  Compile / packageDoc / publishArtifact := false,
+  Compile / packageSrc / publishArtifact := false,
   addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full),
   scalacOptions += "-feature",
   scalacOptions += "-unchecked",
