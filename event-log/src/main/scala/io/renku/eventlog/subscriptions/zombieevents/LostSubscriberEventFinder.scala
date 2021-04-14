@@ -18,7 +18,7 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.effect.{Bracket, ContextShift, IO}
+import cats.effect.{ContextShift, IO}
 import cats.free.Free
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
@@ -35,7 +35,7 @@ import java.time.Instant.now
 
 private class LostSubscriberEventFinder(transactor:       DbTransactor[IO, EventLogDB],
                                         queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:                                            Bracket[IO, Throwable], contextShift: ContextShift[IO])
+)(implicit contextShift:                                  ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, ZombieEvent]
     with ZombieEventSubProcess

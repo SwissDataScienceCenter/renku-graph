@@ -33,90 +33,91 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 
-class ZombieEventSourceCleanerSpec
-    extends AnyWordSpec
-    with InMemoryEventLogDbSpec
-    with MockFactory
-    with should.Matchers {
+class ZombieNodesCleanerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
-  "removeZombieSources" should {
+  "removeZombieNodes" should {
 
     "do nothing if there are no rows in the subscriber table" in new TestCase {
 
-      cleaner.removeZombieSources().unsafeRunSync() shouldBe ()
+      cleaner.removeZombieNodes().unsafeRunSync() shouldBe ()
 
       findAllSubscribers() shouldBe List()
     }
 
-    "do nothing if there are not other sources in the subscriber table" in new TestCase {
+    "do nothing if all sources and subscribers listed in the subscriber table are up" in new TestCase {
 
-      val subscriberId  = subscriberIds.generateOne
-      val subscriberUrl = subscriberUrls.generateOne
-      upsertSubscriber(subscriberId, subscriberUrl, microserviceBaseUrl)
-
-      cleaner.removeZombieSources().unsafeRunSync() shouldBe ()
-
-      findAllSubscribers() shouldBe List(
-        (subscriberId, subscriberUrl, microserviceBaseUrl)
-      )
-    }
-
-    "do nothing if there are other sources in the subscriber table but they are active" in new TestCase {
-
-      val subscriberId  = subscriberIds.generateOne
-      val subscriberUrl = subscriberUrls.generateOne
       (serviceHealthChecker.ping _)
-        .expects(subscriberUrl.toUnsafe[MicroserviceBaseUrl])
+        .expects(microserviceBaseUrl)
         .returning(true.pure[IO])
         .atLeastOnce()
 
-      val otherSources = microserviceBaseUrls.generateNonEmptyList()
-      upsertSubscriber(subscriberId, subscriberUrl, microserviceBaseUrl)
+      val subscriber1Id  = subscriberIds.generateOne
+      val subscriber1Url = subscriberUrls.generateOne
+      (serviceHealthChecker.ping _)
+        .expects(subscriber1Url.toUnsafe[MicroserviceBaseUrl])
+        .returning(true.pure[IO])
+        .atLeastOnce()
+      upsertSubscriber(subscriber1Id, subscriber1Url, microserviceBaseUrl)
 
-      otherSources.map(upsertSubscriber(subscriberId, subscriberUrl, _))
+      val subscriber2Id  = subscriberIds.generateOne
+      val subscriber2Url = subscriberUrls.generateOne
+      (serviceHealthChecker.ping _)
+        .expects(subscriber2Url.toUnsafe[MicroserviceBaseUrl])
+        .returning(true.pure[IO])
+        .atLeastOnce()
+      upsertSubscriber(subscriber2Id, subscriber2Url, microserviceBaseUrl)
+
+      val otherSources = microserviceBaseUrls.generateNonEmptyList()
+      otherSources.map(upsertSubscriber(subscriber1Id, subscriber1Url, _))
 
       otherSources.map {
         (serviceHealthChecker.ping _).expects(_).returning(true.pure[IO])
       }
 
-      cleaner.removeZombieSources().unsafeRunSync() shouldBe ()
+      cleaner.removeZombieNodes().unsafeRunSync() shouldBe ()
 
       findAllSubscribers() should contain theSameElementsAs (otherSources :+ microserviceBaseUrl)
-        .map(sourceUrl => (subscriberId, subscriberUrl, sourceUrl))
-        .toList
+        .map(sourceUrl => (subscriber1Id, subscriber1Url, sourceUrl))
+        .toList :+ (subscriber2Id, subscriber2Url, microserviceBaseUrl)
     }
 
     "remove rows from the subscriber table if both the sources and the deliveries are inactive " +
       "but move active subscribers on inactive source to the current source" in new TestCase {
 
-        val activeSubscriberId         = subscriberIds.generateOne
-        val activeSubscriberUrl        = subscriberUrls.generateOne
-        val anotherActiveSubscriberId  = subscriberIds.generateOne
-        val anotherActiveSubscriberUrl = subscriberUrls.generateOne
-        val inactiveSubscriberId       = subscriberIds.generateOne
-        val inactiveSubscriberUrl      = subscriberUrls.generateOne
+        (serviceHealthChecker.ping _)
+          .expects(microserviceBaseUrl)
+          .returning(true.pure[IO])
+          .atLeastOnce()
+
+        val activeSubscriberId  = subscriberIds.generateOne
+        val activeSubscriberUrl = subscriberUrls.generateOne
         (serviceHealthChecker.ping _)
           .expects(activeSubscriberUrl.toUnsafe[MicroserviceBaseUrl])
           .returning(true.pure[IO])
           .atLeastOnce()
+        upsertSubscriber(activeSubscriberId, activeSubscriberUrl, microserviceBaseUrl)
+
+        val anotherActiveSubscriberId  = subscriberIds.generateOne
+        val anotherActiveSubscriberUrl = subscriberUrls.generateOne
         (serviceHealthChecker.ping _)
           .expects(anotherActiveSubscriberUrl.toUnsafe[MicroserviceBaseUrl])
           .returning(true.pure[IO])
           .atLeastOnce()
+
+        val inactiveSubscriberId  = subscriberIds.generateOne
+        val inactiveSubscriberUrl = subscriberUrls.generateOne
         (serviceHealthChecker.ping _)
           .expects(inactiveSubscriberUrl.toUnsafe[MicroserviceBaseUrl])
           .returning(false.pure[IO])
           .atLeastOnce()
-
-        val otherSources = microserviceBaseUrls.generateNonEmptyList(minElements = 3)
-        upsertSubscriber(activeSubscriberId, activeSubscriberUrl, microserviceBaseUrl)
         upsertSubscriber(inactiveSubscriberId, inactiveSubscriberUrl, microserviceBaseUrl)
 
-        otherSources.map(upsertSubscriber(inactiveSubscriberId, inactiveSubscriberUrl, _))
+        val otherSources = microserviceBaseUrls.generateNonEmptyList(minElements = 3)
+        otherSources map (upsertSubscriber(inactiveSubscriberId, inactiveSubscriberUrl, _))
 
         val someInactiveSource = otherSources.head
-        upsertSubscriber(activeSubscriberId, activeSubscriberUrl, someInactiveSource)
         upsertSubscriber(anotherActiveSubscriberId, anotherActiveSubscriberUrl, someInactiveSource)
+        upsertSubscriber(activeSubscriberId, activeSubscriberUrl, someInactiveSource)
 
         val activeSource = otherSources.toList(otherSources.size / 2)
         otherSources map {
@@ -125,24 +126,53 @@ class ZombieEventSourceCleanerSpec
           case inactive =>
             (serviceHealthChecker.ping _).expects(inactive).returning(false.pure[IO]).atLeastOnce()
         }
+        upsertSubscriber(activeSubscriberId, activeSubscriberUrl, activeSource)
 
-        cleaner.removeZombieSources().unsafeRunSync() shouldBe ()
+        cleaner.removeZombieNodes().unsafeRunSync() shouldBe ()
 
         findAllSubscribers() should contain theSameElementsAs List(
           (activeSubscriberId, activeSubscriberUrl, microserviceBaseUrl),
-          (inactiveSubscriberId, inactiveSubscriberUrl, microserviceBaseUrl),
-          (inactiveSubscriberId, inactiveSubscriberUrl, activeSource),
+          (activeSubscriberId, activeSubscriberUrl, activeSource),
           (anotherActiveSubscriberId, anotherActiveSubscriberUrl, microserviceBaseUrl)
         )
       }
+
+    "remove rows from the subscriber table if there are inactive subscriber on the current source" in new TestCase {
+
+      (serviceHealthChecker.ping _)
+        .expects(microserviceBaseUrl)
+        .returning(true.pure[IO])
+        .atLeastOnce()
+
+      val activeSubscriberId  = subscriberIds.generateOne
+      val activeSubscriberUrl = subscriberUrls.generateOne
+      (serviceHealthChecker.ping _)
+        .expects(activeSubscriberUrl.toUnsafe[MicroserviceBaseUrl])
+        .returning(true.pure[IO])
+        .atLeastOnce()
+      upsertSubscriber(activeSubscriberId, activeSubscriberUrl, microserviceBaseUrl)
+
+      val inactiveSubscriberId  = subscriberIds.generateOne
+      val inactiveSubscriberUrl = subscriberUrls.generateOne
+      (serviceHealthChecker.ping _)
+        .expects(inactiveSubscriberUrl.toUnsafe[MicroserviceBaseUrl])
+        .returning(false.pure[IO])
+        .atLeastOnce()
+      upsertSubscriber(inactiveSubscriberId, inactiveSubscriberUrl, microserviceBaseUrl)
+
+      cleaner.removeZombieNodes().unsafeRunSync() shouldBe ()
+
+      findAllSubscribers() should contain theSameElementsAs List(
+        (activeSubscriberId, activeSubscriberUrl, microserviceBaseUrl)
+      )
+    }
   }
 
   private trait TestCase {
     val queriesExecTimes     = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val microserviceBaseUrl  = microserviceBaseUrls.generateOne
     val serviceHealthChecker = mock[ServiceHealthChecker[IO]]
-    val cleaner =
-      new ZombieEventSourceCleanerImpl(transactor, queriesExecTimes, microserviceBaseUrl, serviceHealthChecker)
+    val cleaner              = new ZombieNodesCleanerImpl(transactor, queriesExecTimes, microserviceBaseUrl, serviceHealthChecker)
   }
 
   private def findAllSubscribers(): List[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute {
