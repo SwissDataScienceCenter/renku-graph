@@ -74,7 +74,7 @@ package object projects {
   ): Gen[Project] = for {
     path        <- projectPaths
     createdDate <- projectCreatedDates
-    version     <- projectSchemaVersions
+    version     <- schemaVersions
   } yield Project(path,
                   name,
                   createdDate,

@@ -27,7 +27,7 @@ object VersionGenerators {
 
   implicit val renkuVersionPairs: Gen[RenkuVersionPair] = for {
     cliVersion    <- cliVersions
-    schemaVersion <- projectSchemaVersions
+    schemaVersion <- schemaVersions
   } yield RenkuVersionPair(cliVersion, schemaVersion)
 
 }

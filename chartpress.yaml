@@ -20,6 +20,10 @@ charts:
         contextPath: .
         dockerfilePath: triples-generator/Dockerfile
         valuesPath: triplesGenerator.image
+      commit-graph-generator:
+        contextPath: .
+        dockerfilePath: commit-graph-generator/Dockerfile
+        valuesPath: commitGraphGenerator.image
       knowledge-graph:
         contextPath: .
         dockerfilePath: knowledge-graph/Dockerfile

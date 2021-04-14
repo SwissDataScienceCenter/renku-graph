@@ -67,7 +67,7 @@ class EventBodyDeserialiserSpec extends AnyWordSpec with should.Matchers {
     val compoundEventId = compoundEventIds.generateOne
 
     val jsonldTriples = jsonLDTriples.generateOne
-    val schemaVersion = projectSchemaVersions.generateOne
+    val schemaVersion = schemaVersions.generateOne
 
     val projectId   = projectIds.generateOne
     val projectPath = projectPaths.generateOne

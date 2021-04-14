@@ -20,7 +20,7 @@ package io.renku.eventlog.statuschange.commands
 
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.GraphModelGenerators.projectSchemaVersions
+import ch.datascience.graph.model.GraphModelGenerators.schemaVersions
 import ch.datascience.graph.model.events.EventStatus
 import io.circe.literal._
 import io.renku.eventlog.EventContentGenerators._
@@ -41,7 +41,7 @@ private object Generators {
   def eventAndPayloadRequests(status: EventStatus) = for {
     eventOnly     <- eventOnlyRequests(status)
     payload       <- eventPayloads
-    schemaVersion <- projectSchemaVersions
+    schemaVersion <- schemaVersions
   } yield eventOnly.addPayload(json"""{
     "schemaVersion": ${schemaVersion.value},
     "payload": ${payload.value}

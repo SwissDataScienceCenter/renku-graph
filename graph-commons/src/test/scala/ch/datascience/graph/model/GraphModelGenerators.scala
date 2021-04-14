@@ -101,7 +101,7 @@ object GraphModelGenerators {
       path <- projectPaths
     } yield ResourceId.from(s"$renkuBaseUrl/projects/$path").fold(throw _, identity)
 
-  implicit val projectSchemaVersions: Gen[SchemaVersion] = Gen
+  implicit val schemaVersions: Gen[SchemaVersion] = Gen
     .listOfN(3, positiveInts(max = 50))
     .map(_.mkString("."))
     .map(SchemaVersion.apply)

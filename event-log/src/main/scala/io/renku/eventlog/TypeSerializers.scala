@@ -22,7 +22,7 @@ import cats.data.NonEmptyList
 import ch.datascience.events.consumers.Project
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
-import ch.datascience.graph.model.projects
+import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.microservices.MicroserviceBaseUrl
 import doobie.util.meta.{LegacyInstantMetaInstance, LegacyLocalDateMetaInstance}
 import doobie.util.{Get, Put, Read}
@@ -113,6 +113,9 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
   implicit val projectRead: Read[Project] = Read[(projects.Id, projects.Path)].map { case (id, path) =>
     Project(id, path)
   }
+
+  implicit val schemaVersionGet: Get[SchemaVersion] = Get[String].tmap(SchemaVersion.apply)
+  implicit val schemaVersionPut: Put[SchemaVersion] = Put[String].contramap(_.value)
 
   implicit val subscriberUrlGet: Get[SubscriberUrl] = Get[String].tmap(SubscriberUrl.apply)
   implicit val subscriberUrlPut: Put[SubscriberUrl] = Put[String].contramap(_.value)

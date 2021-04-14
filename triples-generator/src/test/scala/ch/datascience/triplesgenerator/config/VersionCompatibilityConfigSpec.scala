@@ -52,7 +52,7 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
 
     "return a list of VersionSchemaPairs if the value is set for the matrix" in new TestCase {
       val cliVersionNumbers    = cliVersions.generateNonEmptyList(2, 10)
-      val schemaVersionNumbers = projectSchemaVersions.generateNonEmptyList(2, 10)
+      val schemaVersionNumbers = schemaVersions.generateNonEmptyList(2, 10)
 
       val expected =
         cliVersionNumbers.toList.zip(schemaVersionNumbers.toList).map { case (cliVersion, schemaVersion) =>
@@ -74,7 +74,7 @@ class VersionCompatibilityConfigSpec extends AnyWordSpec with should.Matchers {
     "return a list of VersionSchemaPairs, as the first element the RenkuDevVersion if it exists and log a warning" in new TestCase {
       val cliVersionNumbers     = cliVersions.generateNonEmptyList(2, 10)
       val renkuPythonDevVersion = renkuPythonDevVersions.generateOne
-      val schemaVersionNumbers  = projectSchemaVersions.generateNonEmptyList(2, 10)
+      val schemaVersionNumbers  = schemaVersions.generateNonEmptyList(2, 10)
 
       val configVersions =
         cliVersionNumbers.toList.zip(schemaVersionNumbers.toList).map { case (cliVersion, schemaVersion) =>
