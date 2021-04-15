@@ -18,18 +18,18 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.effect.{Bracket, ContextShift, IO}
-import cats.syntax.all._
+import cats.effect.{ContextShift, IO}
 import cats.free.Free
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
+import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import doobie.free.connection.ConnectionOp
 import eu.timepit.refined.api.Refined
-import io.renku.eventlog.{EventLogDB, TypeSerializers}
 import io.renku.eventlog.subscriptions.EventFinder
+import io.renku.eventlog.{EventLogDB, TypeSerializers}
 
 import java.time.Duration
 import java.time.Instant.now
@@ -37,7 +37,7 @@ import scala.language.postfixOps
 
 private class LostZombieEventFinder(transactor:       DbTransactor[IO, EventLogDB],
                                     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:                                        Bracket[IO, Throwable], contextShift: ContextShift[IO])
+)(implicit contextShift:                              ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, ZombieEvent]
     with ZombieEventSubProcess
