@@ -26,12 +26,14 @@ import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.metrics.TestLabeledHistogram
 import ch.datascience.microservices.MicroserviceBaseUrl
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.InMemoryEventLogDbSpec
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 class ZombieEventSourceCleanerSpec
     extends AnyWordSpec
@@ -138,11 +140,15 @@ class ZombieEventSourceCleanerSpec
       new ZombieEventSourceCleanerImpl(transactor, queriesExecTimes, microserviceBaseUrl, serviceHealthChecker)
   }
 
-  private def findAllSubscribers(): List[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute {
-    sql"""|SELECT DISTINCT delivery_id, delivery_url, source_url
+  private def findAllSubscribers(): List[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute { session =>
+    val query: Query[Void, (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] =
+      sql"""|SELECT DISTINCT delivery_id, delivery_url, source_url
           |FROM subscriber
-          |""".stripMargin
-      .query[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)]
-      .to[List]
+          |"""
+        .query(subscriberIdGet ~ subscriberUrlGet ~ microserviceBaseUrlGet)
+        .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
+          (subscriberId, subscriberUrl, microserviceBaseUrl)
+        }
+    session.execute(query)
   }
 }

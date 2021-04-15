@@ -19,23 +19,20 @@
 package ch.datascience.tokenrepository.repository.association
 
 import cats.MonadError
-
+import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import ch.datascience.tokenrepository.repository.IOAccessTokenCrypto
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
-import ch.datascience.tokenrepository.repository.TryAccessTokenCrypto
-import ch.datascience.tokenrepository.repository.deletion.TryTokenRemover
+import ch.datascience.tokenrepository.repository.deletion.IOTokenRemover
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
-
-import scala.util.Try
 
 class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
@@ -144,13 +141,13 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
     val projectId   = projectIds.generateOne
     val accessToken = accessTokens.generateOne
 
-    val context = MonadError[Try, Throwable]
+    val context = MonadError[IO, Throwable]
 
-    val projectPathFinder    = mock[ProjectPathFinder[Try]]
-    val accessTokenCrypto    = mock[TryAccessTokenCrypto]
-    val associationPersister = mock[TryAssociationPersister]
-    val tokenRemover         = mock[TryTokenRemover]
-    val tokenAssociator = new TokenAssociator[Try](
+    val projectPathFinder    = mock[ProjectPathFinder[IO]]
+    val accessTokenCrypto    = mock[IOAccessTokenCrypto]
+    val associationPersister = mock[IOAssociationPersister]
+    val tokenRemover         = mock[IOTokenRemover]
+    val tokenAssociator = new TokenAssociator[IO](
       projectPathFinder,
       accessTokenCrypto,
       associationPersister,

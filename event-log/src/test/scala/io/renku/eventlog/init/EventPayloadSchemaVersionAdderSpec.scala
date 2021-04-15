@@ -20,9 +20,9 @@ package io.renku.eventlog.init
 
 import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
-import doobie.implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.implicits._
 
 class EventPayloadSchemaVersionAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
@@ -52,16 +52,16 @@ class EventPayloadSchemaVersionAdderSpec extends AnyWordSpec with DbInitSpec wit
 
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
 
-      verifyTrue(sql"ALTER TABLE event_payload DROP COLUMN schema_version;")
+      verifyTrue(sql"ALTER TABLE event_payload DROP COLUMN schema_version;".command)
     }
 
     "create indices for certain columns" in new TestCase {
 
       tableCreator.run().unsafeRunSync() shouldBe ((): Unit)
 
-      verifyTrue(sql"DROP INDEX idx_event_id;")
-      verifyTrue(sql"DROP INDEX idx_project_id;")
-      verifyTrue(sql"DROP INDEX idx_schema_version;")
+      verifyTrue(sql"DROP INDEX idx_event_id;".command)
+      verifyTrue(sql"DROP INDEX idx_project_id;".command)
+      verifyTrue(sql"DROP INDEX idx_schema_version;".command)
 
     }
   }

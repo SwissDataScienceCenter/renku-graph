@@ -184,7 +184,7 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
   )
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
-    s"status IN #${NonEmptyList.of(status, otherStatuses: _*).toList.mkString(",")}"
+    s"status IN ${NonEmptyList.of(status, otherStatuses: _*).toList.mkString(",")}"
 }
 
 object EventPersister {

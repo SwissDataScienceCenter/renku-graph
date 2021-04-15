@@ -18,10 +18,9 @@
 
 package ch.datascience.tokenrepository.repository.association
 
-import cats.Monad
 import cats.data.Kleisli
-import cats.syntax.all._
 import cats.effect._
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.LabeledHistogram
@@ -34,11 +33,10 @@ import skunk.data.Completion
 import skunk.data.Completion.Update
 import skunk.implicits._
 
-private class AssociationPersister[Interpretation[_]: Async: Monad](
+private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     transactor:       SessionResource[Interpretation, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
-)(implicit ME:        Bracket[Interpretation, Throwable])
-    extends DbClient[Interpretation](Some(queriesExecTimes)) {
+) extends DbClient[Interpretation](Some(queriesExecTimes)) {
 
   def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Interpretation[Unit] =
     transactor.use { session =>

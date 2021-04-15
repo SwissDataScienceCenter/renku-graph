@@ -146,7 +146,7 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
   // format: on
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
-    s"status IN #${NonEmptyList.of(status, otherStatuses: _*).toList.mkString(",")}"
+    s"status IN ${NonEmptyList.of(status, otherStatuses: _*).toList.mkString(",")}"
 
   private lazy val selectProject: List[(ProjectIds, Priority)] => Option[ProjectIds] = {
     case Nil                          => None

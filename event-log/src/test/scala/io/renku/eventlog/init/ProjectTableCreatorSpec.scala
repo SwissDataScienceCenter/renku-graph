@@ -22,14 +22,17 @@ import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators._
+import ch.datascience.graph.model.events.{BatchDate, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import doobie.implicits._
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.EventDate
+import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
@@ -90,9 +93,9 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
 
       tableExists("project") shouldBe true
 
-      verifyTrue(sql"DROP INDEX idx_project_id;")
-      verifyTrue(sql"DROP INDEX idx_project_path;")
-      verifyTrue(sql"DROP INDEX idx_latest_event_date;")
+      verifyTrue(sql"DROP INDEX idx_project_id;".command)
+      verifyTrue(sql"DROP INDEX idx_project_path;".command)
+      verifyTrue(sql"DROP INDEX idx_latest_event_date;".command)
     }
 
     "do nothing if the 'project' table already exists" in new TestCase {
@@ -122,21 +125,36 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
     val tableCreator = new ProjectTableCreatorImpl[IO](transactor, logger)
   }
 
-  private def fetchProjectData: List[(Id, Path, EventDate)] = execute {
-    sql"""select project_id, project_path, latest_event_date from project"""
-      .query[(Id, Path, EventDate)]
-      .to[List]
+  private def fetchProjectData: List[(Id, Path, EventDate)] = execute { session =>
+    val query: Query[Void, (Id, Path, EventDate)] =
+      sql"""select project_id, project_path, latest_event_date from project"""
+        .query(projectIdGet ~ projectPathGet ~ eventDateGet)
+        .map { case projectId ~ projectPath ~ eventDate =>
+          (projectId, projectPath, eventDate)
+        }
+    session.execute(query)
   }
 
   private def createEvent(projectId:   Id = projectIds.generateOne,
                           projectPath: Path = projectPaths.generateOne,
                           eventDate:   EventDate = eventDates.generateOne
   ): (Id, Path, EventDate) = {
-    execute {
-      sql"""|insert into
-            |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
-            |values (${eventIds.generateOne}, $projectId, $projectPath, ${eventStatuses.generateOne}, ${createdDates.generateOne}, ${executionDates.generateOne}, $eventDate, ${batchDates.generateOne}, ${eventBodies.generateOne})
-      """.stripMargin.update.run.map(_ => ())
+    execute { session =>
+      val query: Command[
+        EventId ~ Id ~ Path ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
+      ] = sql"""
+            insert into
+            event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
+            values ($eventIdPut, $projectIdPut, $projectPathPut, $eventStatusPut, $createdDatePut, $executionDatePut, $eventDatePut, $batchDatePut, $eventBodyPut)
+      """.command
+      session
+        .prepare(query)
+        .use(
+          _.execute(
+            eventIds.generateOne ~ projectId ~ projectPath ~ eventStatuses.generateOne ~ createdDates.generateOne ~ executionDates.generateOne ~ eventDate ~ batchDates.generateOne ~ eventBodies.generateOne
+          )
+        )
+        .map(_ => ())
     }
 
     (projectId, projectPath, eventDate)

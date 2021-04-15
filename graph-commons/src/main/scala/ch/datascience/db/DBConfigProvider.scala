@@ -33,11 +33,10 @@ import eu.timepit.refined.string.MatchesRegex
 import scala.concurrent.duration.FiniteDuration
 
 class DBConfigProvider[Interpretation[_], TargetDB](
-    namespace:       String,
-    dbName:          DBConfig.DbName,
-    config:          Config = ConfigFactory.load(),
-    jdbcUrlOverride: Option[DBConfig.Url] = None
-)(implicit ME:       MonadError[Interpretation, Throwable])
+    namespace: String,
+    dbName:    DBConfig.DbName,
+    config:    Config = ConfigFactory.load()
+)(implicit ME: MonadError[Interpretation, Throwable])
     extends ConfigLoader[Interpretation] {
 
   import DBConfigProvider._
@@ -47,57 +46,33 @@ class DBConfigProvider[Interpretation[_], TargetDB](
 
   def get(): Interpretation[DBConfig[TargetDB]] =
     for {
-      driver         <- find[DBConfig.Driver](s"$namespace.db-driver", config)
       host           <- find[DBConfig.Host](s"$namespace.db-host", config)
       user           <- find[DBConfig.User](s"$namespace.db-user", config)
       pass           <- find[DBConfig.Pass](s"$namespace.db-pass", config)
       connectionPool <- find[DBConfig.ConnectionPool](s"$namespace.connection-pool", config)
       maxLifetime    <- find[DBConfig.MaxLifetime](s"$namespace.max-connection-lifetime", config)
-      urlTemplate    <- find[DBConfig.UrlTemplate](s"$namespace.db-url-template", config)
-      url            <- OptionT.fromOption(jdbcUrlOverride) getOrElseF findUrl(urlTemplate, host)
-    } yield DBConfig(driver, url, host, dbName, user, pass, connectionPool, maxLifetime)
-
-  private def findUrl(urlTeplate: DBConfig.UrlTemplate, host: DBConfig.Host): Interpretation[DBConfig.Url] =
-    ME.fromEither {
-      RefType
-        .applyRef[DBConfig.Url](urlTeplate.value.replace("$host", host.value).replace("$dbName", dbName.value))
-        .leftMap(_ => new IllegalArgumentException("Invalid db url value"))
-    }
+    } yield DBConfig(host, dbName, user, pass, connectionPool, maxLifetime)
 }
 
 object DBConfigProvider {
+
   import DBConfig._
 
-  case class DBConfig[TargetDB](driver:         Driver,
-                                url:            Url,
-                                host:           Host,
-                                name:           DbName,
-                                user:           User,
-                                pass:           Pass,
-                                connectionPool: ConnectionPool,
-                                maxLifetime:    MaxLifetime
+  case class DBConfig[TargetDB](
+      host:           Host,
+      name:           DbName,
+      user:           User,
+      pass:           Pass,
+      connectionPool: ConnectionPool,
+      maxLifetime:    MaxLifetime
   )
+
   object DBConfig {
-    type Driver         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type Url            = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type Host           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type UrlTemplate    = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type DbName         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type User           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type Pass           = String
     type ConnectionPool = Int Refined Positive
     type MaxLifetime    = FiniteDuration
-  }
-
-  val JdbcUrl: String = "jdbc-url"
-
-  implicit class SettingsListOps(settings: List[String]) {
-
-    private val jdbcUrlExtractor = s"$JdbcUrl=(.*)$$".r
-
-    lazy val findJdbcUrl: Option[DBConfig.Url] =
-      settings
-        .collectFirst { case jdbcUrlExtractor(url) => url }
-        .flatMap(url => RefType.applyRef[DBConfig.Url](url).fold(_ => Option.empty[DBConfig.Url], Option.apply))
   }
 }

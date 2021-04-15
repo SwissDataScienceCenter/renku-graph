@@ -18,14 +18,15 @@
 
 package io.renku.eventlog.statuschange
 
-import cats.data.NonEmptyList
+import cats.data.{Kleisli, NonEmptyList}
+import cats.syntax.all._
 import cats.effect.IO
 import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventBodies, eventProcessingTimes}
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventProcessingTime, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
@@ -38,6 +39,9 @@ import io.renku.eventlog.{EventLogDB, InMemoryEventLogDbSpec}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
 
 class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
@@ -141,16 +145,25 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
                                  gauge:               LabeledGauge[IO, projects.Path],
                                  maybeProcessingTime: Option[EventProcessingTime] = eventProcessingTimes.generateSome
   ) extends ChangeStatusCommand[IO] {
-    import doobie.implicits._
 
     override def status: EventStatus = GeneratingTriples
 
     override def queries = NonEmptyList(
       SqlQuery(
-        sql"""|UPDATE event 
-              |SET status = $status
-              |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${New: EventStatus}
-              |""".stripMargin.update.run,
+        Kleisli { session =>
+          val query: Command[EventStatus ~ EventId ~ projects.Id ~ EventStatus] = sql"""
+            UPDATE event 
+            SET status = $eventStatusPut
+            WHERE event_id = $eventIdPut AND project_id = $projectIdPut AND status = $eventStatusPut
+            """.command
+          session.prepare(query).use(_.execute(status ~ eventId.id ~ eventId.projectId ~ New)).map {
+            case Completion.Update(n) => n
+            case completion =>
+              throw new RuntimeException(
+                s"generating_triples->generation_non_recoverable_fail time query failed with completion status $completion"
+              )
+          }
+        },
         name = "test_status_update"
       ),
       Nil
@@ -163,8 +176,8 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     }
 
     override def updateGauges(
-        updateResult:      UpdateResult
-    )(implicit transactor: SessionResource[IO, EventLogDB]) = gauge increment projectPath
+        updateResult:   UpdateResult
+    )(implicit session: Session[IO]) = gauge increment projectPath
   }
 
   private def store(eventId: CompoundEventId, projectPath: projects.Path, status: EventStatus): Unit =
@@ -181,18 +194,11 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
                                         gauge:               LabeledGauge[IO, projects.Path],
                                         maybeProcessingTime: Option[EventProcessingTime]
   ) extends ChangeStatusCommand[IO] {
-    import doobie.implicits._
 
     override def status: EventStatus = GeneratingTriples
 
     override def queries = NonEmptyList.of(
-      SqlQuery(
-        sql"""|UPDATE event
-              |SET status = $status
-              |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId} AND status = ${New: EventStatus}
-              |""".stripMargin.update.run.map(_ => 0),
-        name = "test_failure_status_update"
-      )
+      SqlQuery(Kleisli(_ => 0.pure[IO]), name = "test_failure_status_update")
     )
 
     override def mapResult: Int => UpdateResult = {
@@ -202,7 +208,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     }
 
     override def updateGauges(
-        updateResult:      UpdateResult
-    )(implicit transactor: SessionResource[IO, EventLogDB]) = gauge increment projectPath
+        updateResult:   UpdateResult
+    )(implicit session: Session[IO]) = gauge increment projectPath
   }
 }

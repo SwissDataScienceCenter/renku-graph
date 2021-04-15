@@ -20,7 +20,7 @@ package ch.datascience.tokenrepository.repository.fetching
 
 import cats.MonadError
 import cats.data.OptionT
-
+import cats.effect.IO
 import ch.datascience.generators.CommonGraphGenerators._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
@@ -28,8 +28,8 @@ import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.http.client.AccessToken
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
+import ch.datascience.tokenrepository.repository.IOAccessTokenCrypto
 import ch.datascience.tokenrepository.repository.RepositoryGenerators._
-import ch.datascience.tokenrepository.repository.TryAccessTokenCrypto
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -66,7 +66,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (tokenInRepoFinder
         .findToken(_: Id))
         .expects(projectId)
-        .returning(OptionT.none[Try, EncryptedAccessToken])
+        .returning(OptionT.none[IO, EncryptedAccessToken])
 
       tokenFinder.findToken(projectId) shouldBe OptionT.none[Try, AccessToken]
     }
@@ -79,7 +79,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (tokenInRepoFinder
         .findToken(_: Id))
         .expects(projectId)
-        .returning(OptionT.liftF[Try, EncryptedAccessToken](context.raiseError(exception)))
+        .returning(OptionT.liftF[IO, EncryptedAccessToken](context.raiseError(exception)))
 
       tokenFinder.findToken(projectId).value shouldBe context.raiseError(exception)
     }
@@ -132,7 +132,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (tokenInRepoFinder
         .findToken(_: Path))
         .expects(projectPath)
-        .returning(OptionT.none[Try, EncryptedAccessToken])
+        .returning(OptionT.none[IO, EncryptedAccessToken])
 
       tokenFinder.findToken(projectPath) shouldBe OptionT.none[Try, AccessToken]
     }
@@ -145,7 +145,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
       (tokenInRepoFinder
         .findToken(_: Path))
         .expects(projectPath)
-        .returning(OptionT.liftF[Try, EncryptedAccessToken](context.raiseError(exception)))
+        .returning(OptionT.liftF[IO, EncryptedAccessToken](context.raiseError(exception)))
 
       tokenFinder.findToken(projectPath).value shouldBe context.raiseError(exception)
     }
@@ -171,10 +171,10 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
   }
 
   private trait TestCase {
-    val context = MonadError[Try, Throwable]
+    val context = MonadError[IO, Throwable]
 
-    val accessTokenCrypto = mock[TryAccessTokenCrypto]
-    val tokenInRepoFinder = mock[TryPersistedTokensFinder]
-    val tokenFinder       = new TokenFinder[Try](tokenInRepoFinder, accessTokenCrypto)
+    val accessTokenCrypto = mock[IOAccessTokenCrypto]
+    val tokenInRepoFinder = mock[IOPersistedTokensFinder]
+    val tokenFinder       = new TokenFinder[IO](tokenInRepoFinder, accessTokenCrypto)
   }
 }

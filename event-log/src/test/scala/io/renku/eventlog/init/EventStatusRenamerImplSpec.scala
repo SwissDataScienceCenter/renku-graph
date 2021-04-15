@@ -20,17 +20,20 @@ package io.renku.eventlog.init
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.EventId
+import ch.datascience.graph.model.events.{BatchDate, EventId}
 import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.circe.literal.JsonStringContext
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 class EventStatusRenamerImplSpec
     extends AnyWordSpec
@@ -112,19 +115,31 @@ class EventStatusRenamerImplSpec
 
   private def store(event: Event, withStatus: String): Unit = {
     upsertProject(event.compoundEventId, event.project.path, event.date)
-    execute {
-      sql"""|INSERT INTO 
-            |event (event_id, project_id, status, created_date, execution_date, event_date, event_body, batch_date) 
-            |values (
-            |${event.id}, 
-            |${event.project.id}, 
-            |$withStatus, 
-            |${createdDates.generateOne},
-            |${executionDates.generateOne}, 
-            |${event.date}, 
-            |${toJsonBody(event)},
-            |${event.batchDate})
-      """.stripMargin.update.run.map(_ => ())
+    execute { session =>
+      val query
+          : Command[EventId ~ projects.Id ~ String ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String ~ BatchDate] =
+        sql"""INSERT INTO 
+              event (event_id, project_id, status, created_date, execution_date, event_date, event_body, batch_date) 
+              values (
+              $eventIdPut, 
+              $projectIdPut, 
+              $varchar, 
+              $createdDatePut,
+              $executionDatePut, 
+              $eventDatePut, 
+              $text,
+              $batchDatePut)
+      """.command
+      session
+        .prepare(query)
+        .use(
+          _.execute(
+            event.id ~ event.project.id ~ withStatus ~ createdDates.generateOne ~ executionDates.generateOne ~ event.date ~ toJsonBody(
+              event
+            ) ~ event.batchDate
+          )
+        )
+        .map(_ => ())
     }
   }
 
@@ -135,11 +150,11 @@ class EventStatusRenamerImplSpec
      }
   }""".noSpaces
 
-  private def findEventsId: Set[EventId] =
-    sql"SELECT event_id FROM event"
-      .query[EventId]
-      .to[List]
-      .transact(transactor.resource)
-      .unsafeRunSync()
-      .toSet
+  private def findEventsId: Set[EventId] = transactor
+    .use { session =>
+      val query: Query[Void, EventId] = sql"SELECT event_id FROM event".query(eventIdGet)
+      session.execute(query)
+    }
+    .unsafeRunSync()
+    .toSet
 }

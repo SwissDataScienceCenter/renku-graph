@@ -21,7 +21,7 @@ package io.renku.eventlog.statuschange
 import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.IO
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.EventsGenerators.{compoundEventIds, eventProcessingTimes, eventStatuses}
@@ -33,12 +33,10 @@ import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Error
 import ch.datascience.metrics.LabeledGauge
-import doobie.free.connection.ConnectionIO
 import eu.timepit.refined.api.Refined
 import io.circe.Json
 import io.circe.syntax._
 import io.prometheus.client.Gauge
-import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
 import io.renku.eventlog.statuschange.commands.UpdateResult.Updated
 import io.renku.eventlog.statuschange.commands._
@@ -51,6 +49,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.Session
 
 class StatusChangeEndpointSpec
     extends AnyWordSpec
@@ -221,11 +220,11 @@ class StatusChangeEndpointSpec
     private case class MockChangeStatusCommand() extends ChangeStatusCommand[IO] {
       val eventId: CompoundEventId = compoundEventIds.generateOne
       val status:  EventStatus     = eventStatuses.generateOne
-      val queries: NonEmptyList[SqlQuery[Int]] =
-        nonEmptyStrings().generateNonEmptyList().map(s => SqlQuery[Int](1.pure[ConnectionIO], Refined.unsafeApply(s)))
-      def updateGauges(updateResult: UpdateResult)(implicit
-          transactor:                SessionResource[IO, EventLogDB]
-      ): IO[Unit] = ().pure[IO]
+      val queries: NonEmptyList[SqlQuery[IO, Int]] =
+        nonEmptyStrings()
+          .generateNonEmptyList()
+          .map(s => SqlQuery[IO, Int](Kleisli(_ => 1.pure[IO]), Refined.unsafeApply(s)))
+      def updateGauges(updateResult: UpdateResult)(implicit session: Session[IO]): IO[Unit] = ().pure[IO]
 
       def maybeProcessingTime: Option[EventProcessingTime] = eventProcessingTimes.generateOption
     }

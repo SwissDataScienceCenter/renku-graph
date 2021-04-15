@@ -27,12 +27,6 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.util.Try
 
-private class TryAssociationPersister(
-    transactor:       SessionResource[Try, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:        Bracket[Try, Throwable])
-    extends AssociationPersister[Try](transactor, queriesExecTimes)
-
 private class IOTokenAssociator(
     pathFinder:           ProjectPathFinder[IO],
     accessTokenCrypto:    AccessTokenCrypto[IO],

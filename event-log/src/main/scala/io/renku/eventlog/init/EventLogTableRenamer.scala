@@ -46,8 +46,6 @@ private class EventLogTableRenamerImpl[Interpretation[_]: Async: Bracket[*[_], T
     extends EventLogTableRenamer[Interpretation]
     with EventTableCheck {
 
-  implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
-
   override def run(): Interpretation[Unit] = transactor.use { implicit session =>
     checkOldTableExists flatMap {
       case false => logger info "'event' table already exists"

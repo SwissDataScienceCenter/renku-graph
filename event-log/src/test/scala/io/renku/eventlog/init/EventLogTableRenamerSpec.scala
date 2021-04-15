@@ -21,9 +21,11 @@ package io.renku.eventlog.init
 import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import doobie.implicits._
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 class EventLogTableRenamerSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
@@ -100,8 +102,8 @@ class EventLogTableRenamerSpec extends AnyWordSpec with DbInitSpec with should.M
     val tableRenamer = new EventLogTableRenamerImpl[IO](transactor, logger)
   }
 
-  private def createEventLogTable(): Unit = execute {
-    sql"""
+  private def createEventLogTable(): Unit = execute { session =>
+    val query: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS event_log(
       event_id       varchar   NOT NULL,
       project_id     int4      NOT NULL,
@@ -113,6 +115,9 @@ class EventLogTableRenamerSpec extends AnyWordSpec with DbInitSpec with should.M
       message        varchar,
       PRIMARY KEY (event_id, project_id)
     );
-    """.update.run.map(_ => ())
+    """.command
+    session
+      .execute(query)
+      .map(_ => ())
   }
 }

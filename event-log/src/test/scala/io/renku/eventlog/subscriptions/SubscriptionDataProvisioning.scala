@@ -20,19 +20,22 @@ package io.renku.eventlog.subscriptions
 
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
-import doobie.implicits._
 import io.renku.eventlog.{EventLogDataProvisioning, InMemoryEventLogDb}
+import skunk._
+import skunk.implicits._
 
 trait SubscriptionDataProvisioning extends EventLogDataProvisioning with SubscriptionTypeSerializers {
   self: InMemoryEventLogDb =>
 
   protected def upsertLastSynced(projectId: projects.Id, categoryName: CategoryName, lastSynced: LastSyncedDate): Unit =
-    execute {
-      sql"""|INSERT INTO
-            |subscription_category_sync_time (project_id, category_name, last_synced)
-            |VALUES ($projectId, $categoryName, $lastSynced)
-            |ON CONFLICT (project_id, category_name)
-            |DO UPDATE SET  last_synced = excluded.last_synced 
-      """.stripMargin.update.run.map(_ => ())
+    execute { session =>
+      val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] = sql"""
+        INSERT INTO
+        subscription_category_sync_time (project_id, category_name, last_synced)
+        VALUES ($projectIdPut, $categoryNamePut, $lastSyncedDatePut)
+        ON CONFLICT (project_id, category_name)
+        DO UPDATE SET  last_synced = excluded.last_synced 
+      """.command
+      session.prepare(query).use(_.execute(projectId ~ categoryName ~ lastSynced)).void
     }
 }

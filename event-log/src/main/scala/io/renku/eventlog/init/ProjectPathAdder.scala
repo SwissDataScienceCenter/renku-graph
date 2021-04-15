@@ -54,8 +54,6 @@ private class ProjectPathAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throw
     with EventTableCheck
     with TypeSerializers {
 
-  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
-
   override def run(): Interpretation[Unit] = transactor.use { implicit session =>
     whenEventTableExists(
       logger info "'project_path' column adding skipped",

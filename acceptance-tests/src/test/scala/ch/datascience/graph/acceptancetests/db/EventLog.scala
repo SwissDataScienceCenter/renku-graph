@@ -22,15 +22,15 @@ import cats.data.NonEmptyList
 import cats.effect.{ContextShift, IO}
 import ch.datascience.db.{DBConfigProvider, SessionResource}
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
-import ch.datascience.graph.model.events.{CommitId, EventId, EventStatus}
+import ch.datascience.graph.model.events.{CommitId, EventStatus}
+import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
 import com.dimafeng.testcontainers.{Container, JdbcDatabaseContainer, PostgreSQLContainer}
-import doobie.Transactor
-import doobie.free.connection.ConnectionIO
-import doobie.implicits._
-import doobie.util.fragments.in
 import io.renku.eventlog._
+import natchez.Trace.Implicits.noop
 import org.testcontainers.utility.DockerImageName
+import skunk._
+import skunk.implicits._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.language.postfixOps
@@ -40,23 +40,21 @@ object EventLog extends TypeSerializers {
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
   private val logger = TestLogger()
 
-  def findEvents(projectId: Id, status: EventStatus*): List[CommitId] = execute {
-    (fr"""
+  def findEvents(projectId: Id, status: EventStatus*): List[CommitId] = execute { session =>
+    val query: Query[projects.Id, CommitId] = sql"""
      SELECT event_id
      FROM event
-     WHERE project_id = $projectId AND """ ++ `status IN`(status.toList))
-      .query[EventId]
-      .to[List]
-      .map(_.map(eventId => CommitId(eventId.value)))
+     WHERE project_id = $projectIdPut AND #${`status IN`(status.toList)}"""
+      .query(eventIdGet)
+      .map(eventId => CommitId(eventId.value))
+    session.prepare(query).use(_.stream(projectId, 32).compile.toList)
   }
 
   private def `status IN`(status: List[EventStatus]) =
-    in(fr"status", NonEmptyList.fromListUnsafe(status))
+    s"status IN ${NonEmptyList.fromListUnsafe(status).toList.mkString(",")}"
 
-  def execute[O](query: ConnectionIO[O]): O =
-    query
-      .transact(transactor.resource)
-      .unsafeRunSync()
+  def execute[O](query: Session[IO] => IO[O]): O =
+    transactor.use(session => query(session)).unsafeRunSync()
 
   private val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
     new EventLogDbConfigProvider[IO].get().unsafeRunSync()
@@ -75,12 +73,12 @@ object EventLog extends TypeSerializers {
     _ <- logger.info("event_log DB started")
   } yield ()
 
-  private lazy val transactor: SessionResource[IO, EventLogDB] = DbTransactor[IO, EventLogDB] {
-    Transactor.fromDriverManager[IO](
-      dbConfig.driver.value,
-      postgresContainer.jdbcUrl,
-      dbConfig.user.value,
-      dbConfig.pass
+  private lazy val transactor: SessionResource[IO, EventLogDB] = new SessionResource[IO, EventLogDB](
+    Session.single(
+      host = postgresContainer.jdbcUrl,
+      database = dbConfig.name.value,
+      user = dbConfig.user.value,
+      password = Some(dbConfig.pass)
     )
-  }
+  )
 }

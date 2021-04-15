@@ -62,7 +62,10 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Async: Bracket[
         maybeProjectAndEvent <- findEventAndUpdateForProcessing recoverWith { error =>
                                   transaction
                                     .rollback(sp)
-                                    .flatMap(_ => error.raiseError[Interpretation, Option[TriplesGeneratedEvent]])
+                                    .flatMap(_ =>
+                                      error
+                                        .raiseError[Interpretation, (Option[ProjectIds], Option[TriplesGeneratedEvent])]
+                                    )
                                 }
         (maybeProject, maybeTriplesGeneratedEvent) = maybeProjectAndEvent
         _ <- maybeUpdateMetrics(maybeProject, maybeTriplesGeneratedEvent)
@@ -129,7 +132,7 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Async: Bracket[
   // format: on
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
-    s"status IN #${NonEmptyList.of(status, otherStatuses: _*).toList.mkString(",")}"
+    s"status IN ${NonEmptyList.of(status, otherStatuses: _*).toList.mkString(",")}"
 
   private lazy val selectProject: List[(ProjectIds, Priority)] => Option[ProjectIds] = {
     case Nil                          => None

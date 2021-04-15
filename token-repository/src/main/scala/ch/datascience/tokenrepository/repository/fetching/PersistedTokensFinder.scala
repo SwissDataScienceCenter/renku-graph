@@ -18,22 +18,20 @@
 
 package ch.datascience.tokenrepository.repository.fetching
 
-import cats.{Applicative, FlatMap, Monad}
 import cats.data.{Kleisli, OptionT}
 import cats.effect._
+import cats.implicits._
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import eu.timepit.refined.auto._
-import cats.effect._
-import cats.implicits._
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
+import skunk.implicits._
 
-private class PersistedTokensFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]: FlatMap](
+private class PersistedTokensFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes)) {

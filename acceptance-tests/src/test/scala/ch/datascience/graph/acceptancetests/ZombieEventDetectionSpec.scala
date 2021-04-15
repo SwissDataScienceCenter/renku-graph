@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.acceptancetests
 
+import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
@@ -28,21 +29,23 @@ import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
 import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
-import ch.datascience.graph.model.events.CommitId
+import ch.datascience.graph.model.events.{BatchDate, CommitId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
+import ch.datascience.graph.model.projects._
 import ch.datascience.http.client.AccessToken
 import ch.datascience.knowledgegraph.projects.ProjectsGenerators.projects
 import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.microservices.MicroserviceIdentifier
 import ch.datascience.rdfstore.entities.EntitiesGenerators.persons
-import doobie.implicits._
 import io.circe.literal._
 import io.renku.eventlog.EventContentGenerators.eventDates
-import io.renku.eventlog.{EventDate, TypeSerializers}
+import io.renku.eventlog.{CreatedDate, EventDate, ExecutionDate, TypeSerializers}
 import org.scalatest.GivenWhenThen
 import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
+import skunk._
+import skunk.implicits._
 
 import java.time.Instant
 
@@ -85,7 +88,7 @@ class ZombieEventDetectionSpec
 
     And("an event that should be classified as zombie is in the EventLog DB")
     insertProjectToDB(project, eventDate) shouldBe 1
-    EventLog.execute {
+    EventLog.execute { implicit session =>
       insertEventToDB(commitId, project, eventDate) >> insertEventDeliveryToDB(commitId, project)
     }
 
@@ -96,32 +99,51 @@ class ZombieEventDetectionSpec
     }
   }
 
-  private def insertProjectToDB(project: Project, eventDate: EventDate) = EventLog.execute {
-    sql"""|INSERT INTO project (project_id, project_path, latest_event_date)
-          |VALUES (${project.id.value}, ${project.path.value}, $eventDate)
+  private def insertProjectToDB(project: Project, eventDate: EventDate) = EventLog.execute { session =>
+    val query: Command[Id ~ Path ~ EventDate] =
+      sql"""|INSERT INTO project (project_id, project_path, latest_event_date)
+          |VALUES ($projectIdPut, $projectPathPut, $eventDatePut)
           |ON CONFLICT (project_id)
           |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
-          |""".stripMargin.update.run
+          |""".command
+    session.prepare(query).use(_.execute(project.id ~ project.path ~ eventDate))
   }
 
-  private def insertEventToDB(commitId: CommitId, project: Project, eventDate: EventDate) =
-    sql"""|INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
-          |VALUES (${commitId.value}, ${project.id.value}, ${GeneratingTriples.value}, $eventDate,
-          |${Instant.now.minusSeconds(60 * 6)},
-          |$eventDate,
-          |$eventDate,
-          |${json"""{
+  private def insertEventToDB(commitId: CommitId, project: Project, eventDate: EventDate)(implicit
+      session:                          Session[IO]
+  ) = {
+    val query: Command[EventId ~ Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
+      sql"""
+          INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
+          VALUES ($eventIdPut, $projectIdPut, $eventStatusPut, $createdDatePut,
+          $executionDatePut,
+          $eventDatePut,
+          $batchDatePut,
+          $eventBodyPut)
+          """.command
+    session
+      .prepare(query)
+      .use(
+        _.execute(
+          EventId(commitId.value) ~ project.id ~ GeneratingTriples ~ CreatedDate(eventDate.value) ~ ExecutionDate(
+            Instant.now.minusSeconds(60 * 6)
+          ) ~ eventDate ~ BatchDate(eventDate.value) ~ EventBody(json"""{
                       "id": ${commitId.value},
                       "project": {
                         "id":   ${project.id.value},
                         "path": ${project.path.value}
                       },
                       "parents": []
-                    }""".noSpaces})
-            """.stripMargin.update.run
+                    }""".noSpaces)
+        )
+      )
+  }
 
-  private def insertEventDeliveryToDB(commitId: CommitId, project: Project) =
-    sql"""|INSERT INTO event_delivery (event_id, project_id, delivery_id)
-          |VALUES (${commitId.value}, ${project.id.value}, ${MicroserviceIdentifier.generate.value})
-          |""".stripMargin.update.run
+  private def insertEventDeliveryToDB(commitId: CommitId, project: Project)(implicit session: Session[IO]) = {
+    val query: Command[EventId ~ Id ~ MicroserviceIdentifier] = sql"""
+          INSERT INTO event_delivery (event_id, project_id, delivery_id)
+          VALUES ($eventIdPut, $projectIdPut, $microserviceIdentifierPut)
+          """.command
+    session.prepare(query).use(_.execute(EventId(commitId.value) ~ project.id ~ MicroserviceIdentifier.generate))
+  }
 }

@@ -18,20 +18,20 @@
 
 package io.renku.eventlog.subscriptions
 
-import Generators._
-import cats.syntax.all._
 import ch.datascience.db.SqlQuery
 import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.metrics.TestLabeledHistogram
 import ch.datascience.microservices.MicroserviceBaseUrl
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.InMemoryEventLogDbSpec
+import io.renku.eventlog.subscriptions.Generators._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.implicits._
 
 class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with MockFactory with should.Matchers {
 
@@ -146,19 +146,28 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
 
   private def findSubscriber(subscriberUrl: SubscriberUrl,
                              sourceUrl:     MicroserviceBaseUrl
-  ): Option[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute {
-    sql"""|SELECT delivery_id, delivery_url, source_url
-          |FROM subscriber
-          |WHERE delivery_url = ${subscriberUrl.value} AND source_url = ${sourceUrl.value}""".stripMargin
-      .query[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)]
-      .option
+  ): Option[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute { session =>
+    val query: Query[SubscriberUrl ~ MicroserviceBaseUrl, (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] =
+      sql"""SELECT delivery_id, delivery_url, source_url
+            FROM subscriber
+            WHERE delivery_url = $subscriberUrlPut AND source_url = $microserviceBaseUrlPut"""
+        .query(subscriberIdGet ~ subscriberUrlGet ~ microserviceBaseUrlGet)
+        .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
+          (subscriberId, subscriberUrl, microserviceBaseUrl)
+        }
+    session.prepare(query).use(_.option(subscriberUrl ~ sourceUrl))
   }
 
   private def storeSubscriptionInfo(subscriptionInfo: SubscriptionInfo, sourceUrl: MicroserviceBaseUrl): Unit =
-    execute {
-      sql"""|INSERT INTO
-            |subscriber (delivery_id, delivery_url, source_url)
-            |VALUES (${subscriptionInfo.subscriberId}, ${subscriptionInfo.subscriberUrl}, $sourceUrl)
-      """.stripMargin.update.run.void
+    execute { session =>
+      val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl] = sql"""
+            INSERT INTO
+            subscriber (delivery_id, delivery_url, source_url)
+            VALUES ($subscriberIdPut, $subscriberUrlPut, $microserviceBaseUrlPut)
+      """.command
+      session
+        .prepare(query)
+        .use(_.execute(subscriptionInfo.subscriberId ~ subscriptionInfo.subscriberUrl ~ sourceUrl))
+        .void
     }
 }

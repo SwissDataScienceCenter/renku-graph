@@ -44,8 +44,6 @@ private[eventlog] class LatestEventDatesViewRemoverImpl[Interpretation[_]: Async
 ) extends DbClient[Interpretation](maybeHistogram = None)
     with LatestEventDatesViewRemover[Interpretation] {
 
-  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
-
   override def run(): Interpretation[Unit] = transactor.use { session =>
     for {
       _ <- session.execute(dropView)

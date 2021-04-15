@@ -19,9 +19,11 @@
 package io.renku.eventlog.init
 
 import cats.syntax.all._
-import doobie.implicits._
 import io.renku.eventlog.InMemoryEventLogDb
 import org.scalatest.{BeforeAndAfter, Suite}
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 import scala.language.reflectiveCalls
 
@@ -35,12 +37,12 @@ trait DbInitSpec extends InMemoryEventLogDb with EventLogDbMigrations with Befor
     migrationsToRun.map(_.run()).sequence.unsafeRunSync()
   }
 
-  private def findAllTables(): List[String] = execute {
-    sql"""|SELECT DISTINCT tablename FROM pg_tables
-          |WHERE schemaname != 'pg_catalog'
-          |  AND schemaname != 'information_schema'""".stripMargin
-      .query[String]
-      .to[List]
+  private def findAllTables(): List[String] = execute { session =>
+    val query: Query[Void, String] = sql"""
+          SELECT DISTINCT tablename FROM pg_tables
+          WHERE schemaname != 'pg_catalog'
+            AND schemaname != 'information_schema'""".query(varchar)
+    session.execute(query)
   }
 
   protected def createEventTable(): Unit =

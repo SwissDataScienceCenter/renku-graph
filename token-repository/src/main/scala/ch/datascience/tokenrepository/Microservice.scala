@@ -40,7 +40,7 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      transactorResource <- new ProjectsTokensDbConfigProvider[IO](args) map SessionPoolResource[IO, ProjectsTokensDB]
+      transactorResource <- new ProjectsTokensDbConfigProvider[IO]() map SessionPoolResource[IO, ProjectsTokensDB]
       exitCode           <- runMicroservice(transactorResource, args)
     } yield exitCode
 

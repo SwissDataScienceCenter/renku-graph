@@ -26,12 +26,6 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.util.Try
 
-private class TryPersistedTokensFinder(
-    transactor:       SessionResource[Try, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:        Bracket[Try, Throwable])
-    extends PersistedTokensFinder[Try](transactor, queriesExecTimes)
-
 private class IOTokenFinder(
     tokenInRepoFinder: PersistedTokensFinder[IO],
     accessTokenCrypto: AccessTokenCrypto[IO]

@@ -18,16 +18,17 @@
 
 package ch.datascience.tokenrepository.repository
 
-import cats.effect.{ContextShift, IO}
+import cats.data.Kleisli
 import cats.syntax.all._
+import cats.effect.{Concurrent, ContextShift, IO}
 import ch.datascience.db.SessionResource
 import com.dimafeng.testcontainers._
-import doobie.free.connection.ConnectionIO
-import doobie.implicits._
-import doobie.util.fragment.Fragment
-import doobie.util.transactor.Transactor
 import org.scalatest.Suite
 import org.testcontainers.utility.DockerImageName
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
+import natchez.Trace.Implicits.noop
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -35,6 +36,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
   self: Suite =>
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+  implicit val concurrent:   Concurrent[IO]   = IO.ioConcurrentEffect
 
   private val dbConfig = new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
@@ -45,42 +47,55 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
     password = dbConfig.pass
   )
 
-  lazy val transactor: SessionResource[IO, ProjectsTokensDB] = DbTransactor[IO, ProjectsTokensDB] {
-    Transactor.fromDriverManager[IO](
-      dbConfig.driver.value,
-      container.jdbcUrl,
-      dbConfig.user.value,
-      dbConfig.pass
+  lazy val transactor: SessionResource[IO, ProjectsTokensDB] = new SessionResource[IO, ProjectsTokensDB](
+    Session.single(
+      host = container.jdbcUrl,
+      database = dbConfig.name.value,
+      user = dbConfig.user.value,
+      password = Some(dbConfig.pass)
     )
-  }
+  )
 
-  def execute[O](query: ConnectionIO[O]): O =
-    query
-      .transact(transactor.resource)
+  def execute[O](query: Kleisli[IO, Session[IO], O]): O =
+    transactor
+      .use { session =>
+        query.run(session)
+      }
       .unsafeRunSync()
 
   protected def tableExists(): Boolean =
-    sql"""select exists (select * from projects_tokens);""".query.option
-      .transact(transactor.resource)
-      .recover { case _ => None }
+    transactor
+      .use { session =>
+        val query: Query[Void, Boolean] = sql"""select exists (select * from projects_tokens);""".query(bool)
+        session.option(query).recover { case _ => None }
+      }
       .unsafeRunSync()
       .isDefined
 
   protected def createTable(): Unit = execute {
-    sql"""
-         |CREATE TABLE projects_tokens(
-         | project_id int4 PRIMARY KEY,
-         | project_path VARCHAR NOT NULL,
-         | token VARCHAR NOT NULL
-         |);
-       """.stripMargin.update.run.map(_ => ())
+    Kleisli[IO, Session[IO], Unit] { session =>
+      val query: Command[Void] =
+        sql"""
+             |CREATE TABLE projects_tokens(
+             | project_id int4 PRIMARY KEY,
+             | project_path VARCHAR NOT NULL,
+             | token VARCHAR NOT NULL
+             |);
+       """.command
+      session.execute(query).map(_ => ())
+    }
   }
 
   protected def dropTable(): Unit = execute {
-    sql"DROP TABLE IF EXISTS projects_tokens".update.run.map(_ => ())
+    Kleisli[IO, Session[IO], Unit] { session =>
+      val query: Command[Void] = sql"DROP TABLE IF EXISTS projects_tokens".command
+      session.execute(query).map(_ => ())
+    }
   }
 
-  protected def verifyTrue(sql: Fragment): Unit = execute {
-    sql.update.run.map(_ => ())
+  protected def verifyTrue(sql: Command[Void]): Unit = execute {
+    Kleisli[IO, Session[IO], Unit] { session =>
+      session.execute(sql).map(_ => ())
+    }
   }
 }

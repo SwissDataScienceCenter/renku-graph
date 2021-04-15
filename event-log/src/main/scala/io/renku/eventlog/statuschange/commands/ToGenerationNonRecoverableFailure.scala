@@ -65,7 +65,7 @@ final case class ToGenerationNonRecoverableFailure[Interpretation[_]: Async: Bra
               throw new RuntimeException(
                 s"generating_triples->generation_non_recoverable_fail time query failed with completion status $completion"
               )
-          }
+          } // TODO Verify
       },
       name = "generating_triples->generation_non_recoverable_fail"
     )

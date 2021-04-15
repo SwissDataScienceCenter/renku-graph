@@ -18,20 +18,22 @@
 
 package io.renku.eventlog.init
 
-import java.time.Instant
-
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
-import ch.datascience.graph.model.events.BatchDate
+import ch.datascience.graph.model.events.{BatchDate, EventId}
+import ch.datascience.graph.model.{events, projects}
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
 import io.circe.literal._
 import io.renku.eventlog.EventContentGenerators._
-import io.renku.eventlog.{CreatedDate, Event}
+import io.renku.eventlog.{CreatedDate, Event, EventDate, ExecutionDate}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
@@ -83,7 +85,7 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
       findBatchDates shouldBe Set(BatchDate(event1CreatedDate.value), BatchDate(event2CreatedDate.value))
 
-      verifyTrue(sql"DROP INDEX idx_batch_date;")
+      verifyTrue(sql"DROP INDEX idx_batch_date;".command)
 
       logger.loggedOnly(Info("'batch_date' column added"))
     }
@@ -95,27 +97,43 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
   }
 
   private def checkColumnExists: Boolean =
-    sql"select batch_date from event_log limit 1"
-      .query[Instant]
-      .option
-      .transact(transactor.resource)
-      .map(_ => true)
-      .recover { case _ => false }
+    transactor
+      .use { session =>
+        val query: Query[Void, BatchDate] = sql"select batch_date from event_log limit 1"
+          .query(batchDateGet)
+        session
+          .option(query)
+          .map(_ => true)
+          .recover { case _ => false }
+      }
       .unsafeRunSync()
 
-  private def storeEvent(event: Event, createdDate: CreatedDate): Unit = execute {
-    sql"""|insert into 
-          |event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 
-          |values (
-          |${event.id}, 
-          |${event.project.id}, 
-          |${event.project.path}, 
-          |${eventStatuses.generateOne}, 
-          |$createdDate,
-          |${executionDates.generateOne}, 
-          |${event.date}, 
-          |${toJsonBody(event)})
-      """.stripMargin.update.run.map(_ => ())
+  private def storeEvent(event: Event, createdDate: CreatedDate): Unit = execute { session =>
+    val query: Command[
+      EventId ~ projects.Id ~ projects.Path ~ events.EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String
+    ] = sql"""insert into
+              event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 
+              values (
+                $eventIdPut, 
+                $projectIdPut, 
+                $projectPathPut, 
+                $eventStatusPut, 
+                $createdDatePut,
+                $executionDatePut, 
+                $eventDatePut, 
+                $text
+              )
+      """.command
+    session
+      .prepare(query)
+      .use(
+        _.execute(
+          event.id ~ event.project.id ~ event.project.path ~ eventStatuses.generateOne ~ createdDate ~ executionDates.generateOne ~ event.date ~ toJsonBody(
+            event
+          )
+        )
+      )
+      .map(_ => ())
   }
 
   private def toJsonBody(event: Event): String = json"""{
@@ -126,10 +144,13 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
   }""".noSpaces
 
   private def findBatchDates: Set[BatchDate] =
-    sql"select batch_date from event_log"
-      .query[BatchDate]
-      .to[List]
-      .transact(transactor.resource)
+    transactor
+      .use { session =>
+        val query: Query[Void, BatchDate] = sql"select batch_date from event_log"
+          .query(batchDateGet)
+
+        session.execute(query)
+      }
       .unsafeRunSync()
       .toSet
 }

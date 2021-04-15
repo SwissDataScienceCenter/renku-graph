@@ -30,15 +30,13 @@ import scala.language.postfixOps
 private object DbConfigGenerator {
 
   val dbConfigs: Gen[DBConfig[TestDB]] = for {
-    driver         <- nonEmptyStrings() map (RefType.applyRef[Driver](_).getOrError)
-    url            <- relativePaths() map (RefType.applyRef[Url](_).getOrError)
     user           <- nonEmptyStrings() map (RefType.applyRef[User](_).getOrError)
     pass           <- nonEmptyStrings()
     name           <- nonEmptyStrings() map (RefType.applyRef[DbName](_).getOrError)
     host           <- nonEmptyStrings() map (RefType.applyRef[Host](_).getOrError)
     connectionPool <- positiveInts() map (_.value) map (RefType.applyRef[ConnectionPool](_).getOrError)
     maxLifetime    <- durations(max = 60 minutes)
-  } yield DBConfig(driver, url, host, name, user, pass, connectionPool, maxLifetime)
+  } yield DBConfig(host, name, user, pass, connectionPool, maxLifetime)
 
   implicit class RefinedOps[V](maybeValue: Either[String, V]) {
     lazy val getOrError: V = maybeValue.fold(s => throw new IllegalArgumentException(s), identity)

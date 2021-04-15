@@ -23,7 +23,7 @@ import ch.datascience.events.consumers.Project
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, projects}
-import ch.datascience.microservices.MicroserviceBaseUrl
+import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
 import doobie.util.meta.{LegacyInstantMetaInstance, LegacyLocalDateMetaInstance}
 import doobie.util.{Get, Put}
 import org.postgresql.util.PGInterval
@@ -135,6 +135,9 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
 
   val subscriberIdGet: Decoder[SubscriberId] = varchar.map(SubscriberId.apply)
   val subscriberIdPut: Encoder[SubscriberId] = varchar.values.contramap(_.value)
+
+  val microserviceIdentifierGet: Decoder[MicroserviceIdentifier] = varchar.map(MicroserviceIdentifier.apply)
+  val microserviceIdentifierPut: Encoder[MicroserviceIdentifier] = varchar.values.contramap(_.value)
 
   val microserviceUrlGet: Decoder[MicroserviceBaseUrl] = varchar.map(MicroserviceBaseUrl.apply)
   val microserviceUrlPut: Encoder[MicroserviceBaseUrl] = varchar.values.contramap(_.value)

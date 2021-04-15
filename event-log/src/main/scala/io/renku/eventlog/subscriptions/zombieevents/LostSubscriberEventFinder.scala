@@ -18,74 +18,108 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
-import cats.effect.{Bracket, ContextShift, IO}
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket, ContextShift, IO}
 import cats.free.Free
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, TransformingTriples}
-import ch.datascience.graph.model.events.{CompoundEventId, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
-import doobie.free.connection.ConnectionOp
+import doobie.free.connection.{ConnectionOp, raiseError}
 import eu.timepit.refined.api.Refined
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
+import skunk.data.Completion
 
 import java.time.Instant.now
+import java.time.{OffsetDateTime, ZoneId}
 
-private class LostSubscriberEventFinder(transactor:       SessionResource[IO, EventLogDB],
-                                        queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:                                            Bracket[IO, Throwable], contextShift: ContextShift[IO])
-    extends DbClient(Some(queriesExecTimes))
-    with EventFinder[IO, ZombieEvent]
+private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
+    transactor:       SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
+) extends DbClient(Some(queriesExecTimes))
+    with EventFinder[Interpretation, ZombieEvent]
     with ZombieEventSubProcess
     with TypeSerializers {
 
-  import doobie.implicits._
+  override def popEvent(): Interpretation[Option[ZombieEvent]] = transactor.use { implicit session =>
+    session.transaction.use { transation =>
+      for {
+        sp <- transation.savepoint
+        result <- (findEvents >>= markEventTaken) recoverWith { error =>
+                    transation.rollback(sp).flatMap(_ => error.raiseError[Interpretation, Option[ZombieEvent]])
+                  }
+      } yield result
+    }
+  }
 
-  override def popEvent(): IO[Option[ZombieEvent]] = (findEvents >>= markEventTaken) transact transactor.resource
-
-  private def findEvents = measureExecutionTime {
+  private def findEvents(implicit session: Session[Interpretation]) = measureExecutionTime {
     SqlQuery(
-      sql"""|SELECT DISTINCT evt.event_id, evt.project_id, proj.project_path, evt.status
-            |FROM event_delivery delivery
-            |JOIN event evt ON evt.event_id = delivery.event_id
-            |  AND evt.project_id = delivery.project_id
-            |  AND (evt.status = ${GeneratingTriples: EventStatus} OR evt.status = ${TransformingTriples: EventStatus})
-            |  AND (evt.message IS NULL OR evt.message <> $zombieMessage)
-            |JOIN project proj ON evt.project_id = proj.project_id
-            |WHERE NOT EXISTS ( 
-            |  SELECT sub.delivery_id 
-            |  FROM subscriber sub 
-            |  WHERE sub.delivery_id = delivery.delivery_id
-            |)
-            |LIMIT 1
-    """.stripMargin
-        .query[(CompoundEventId, projects.Path, EventStatus)]
-        .option
-        .map(_.map { case (id, path, status) => ZombieEvent(processName, id, path, status) }),
+      Kleisli { session =>
+        val query: Query[EventStatus ~ EventStatus ~ String, ZombieEvent] =
+          sql"""SELECT DISTINCT evt.event_id, evt.project_id, proj.project_path, evt.status
+                FROM event_delivery delivery
+                JOIN event evt ON evt.event_id = delivery.event_id
+                  AND evt.project_id = delivery.project_id
+                  AND (evt.status = $eventStatusPut OR evt.status = $eventStatusPut)
+                  AND (evt.message IS NULL OR evt.message <> $text)
+                JOIN project proj ON evt.project_id = proj.project_id
+                WHERE NOT EXISTS ( 
+                  SELECT sub.delivery_id 
+                  FROM subscriber sub 
+                  WHERE sub.delivery_id = delivery.delivery_id
+                )
+                LIMIT 1
+            """.query(eventIdGet ~ projectIdGet ~ projectPathGet ~ eventStatusGet).map {
+            case eventId ~ projectId ~ projectPath ~ status =>
+              ZombieEvent(processName, CompoundEventId(eventId, projectId), projectPath, status)
+          }
+        session.prepare(query).use(_.option(GeneratingTriples ~ TransformingTriples ~ zombieMessage))
+      },
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lse - find events")
     )
   }
 
-  private def markEventTaken: Option[ZombieEvent] => Free[ConnectionOp, Option[ZombieEvent]] = {
-    case None        => Free.pure[ConnectionOp, Option[ZombieEvent]](None)
+  private def markEventTaken(implicit
+      session: Session[Interpretation]
+  ): Option[ZombieEvent] => Interpretation[Option[ZombieEvent]] = {
+    case None        => Option.empty[ZombieEvent].pure[Interpretation]
     case Some(event) => updateMessage(event.eventId) map toNoneIfEventAlreadyTaken(event)
   }
 
-  private def updateMessage(eventId: CompoundEventId) = measureExecutionTime {
-    SqlQuery(
-      sql"""|UPDATE event
-            |SET message = $zombieMessage, execution_date = ${now()}
-            |WHERE event_id = ${eventId.id} AND project_id = ${eventId.projectId}
-            |""".stripMargin.update.run,
-      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lse - update message")
-    )
-  }
+  private def updateMessage(eventId: CompoundEventId)(implicit session: Session[Interpretation]) =
+    measureExecutionTime {
+      SqlQuery(
+        Kleisli { session =>
+          val query: Command[String ~ OffsetDateTime ~ EventId ~ projects.Id] =
+            sql"""UPDATE event
+                  SET message = $text, execution_date = $timestamptz
+                  WHERE event_id = $eventIdPut AND project_id = $projectIdPut
+                  """.command
+          session
+            .prepare(query)
+            .use(
+              _.execute(
+                zombieMessage ~ OffsetDateTime.ofInstant(now(), ZoneId.systemDefault()) ~ eventId.id ~ eventId.projectId
+              )
+            )
+        },
+        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lse - update message")
+      )
+    }
 
-  private def toNoneIfEventAlreadyTaken(event: ZombieEvent): Int => Option[ZombieEvent] = {
-    case 0 => None
-    case 1 => Some(event)
+  private def toNoneIfEventAlreadyTaken(event: ZombieEvent): Completion => Option[ZombieEvent] = {
+    case Completion.Update(0) => None
+    case Completion.Update(1) => Some(event)
+    case completion =>
+      throw new Exception(
+        s"${categoryName.value.toLowerCase} - lse - Query failed with status $completion"
+      ) // TODO verify
   }
 
   override val processName: ZombieEventProcess = ZombieEventProcess("lse")
@@ -96,6 +130,6 @@ private object LostSubscriberEventFinder {
       transactor:          SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
-    new LostSubscriberEventFinder(transactor, queriesExecTimes)
+    new LostSubscriberEventFinder[IO](transactor, queriesExecTimes)
   }
 }

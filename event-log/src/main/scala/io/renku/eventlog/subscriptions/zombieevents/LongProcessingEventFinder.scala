@@ -30,8 +30,7 @@ import eu.timepit.refined.api.Refined
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
 import skunk._
-import skunk.codec.all.varchar
-import skunk.codec.text
+import skunk.codec.all._
 import skunk.data.Completion
 import skunk.implicits._
 
@@ -50,7 +49,7 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
     session.transaction.use { transaction =>
       for {
         sp <- transaction.savepoint
-        result <- findPotentialZombies >>= lookForZombie >>= markEventTaken recoverWith { error =>
+        result <- (findPotentialZombies >>= lookForZombie >>= markEventTaken) recoverWith { error =>
                     transaction.rollback(sp).flatMap(_ => error.raiseError[Interpretation, Option[ZombieEvent]])
                   }
       } yield result
@@ -68,8 +67,8 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
         val query: Query[EventStatus ~ EventStatus, (projects.Id, TransformationStatus)] = sql"""
           SELECT DISTINCT evt.project_id, evt.status
           FROM event evt
-          WHERE evt.status = ${GeneratingTriples: EventStatus}
-            OR evt.status = ${TransformingTriples: EventStatus}
+          WHERE evt.status = $eventStatusPut
+            OR evt.status = $eventStatusPut
           """
           .query(projectIdGet ~ transformationStatusGet)
           .map { case id ~ status => (id, status) }

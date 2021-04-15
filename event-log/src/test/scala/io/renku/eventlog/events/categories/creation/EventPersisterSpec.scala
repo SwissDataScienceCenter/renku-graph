@@ -24,10 +24,9 @@ import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
 import ch.datascience.graph.model.GraphModelGenerators.projectPaths
 import ch.datascience.graph.model.events.EventStatus._
-import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventStatus}
+import ch.datascience.graph.model.events.{CompoundEventId, EventBody, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, TestLabeledHistogram}
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import io.renku.eventlog.EventContentGenerators._
 import io.renku.eventlog._
@@ -35,6 +34,9 @@ import io.renku.eventlog.events.categories.creation.EventPersister.Result._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit.HOURS
@@ -294,23 +296,40 @@ class EventPersisterSpec
     def storedEvent(
         compoundEventId: CompoundEventId
     ): (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage]) =
-      execute {
-        sql"""|SELECT event_id, project_id, status, created_date, execution_date, event_date, event_body, message
-              |FROM event  
-              |WHERE event_id = ${compoundEventId.id} AND project_id = ${compoundEventId.projectId}
-              |""".stripMargin
-          .query[
-            (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage])
-          ]
-          .unique
+      execute { session =>
+        val query: Query[
+          EventId ~ projects.Id,
+          (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage])
+        ] = sql"""SELECT event_id, project_id, status, created_date, execution_date, event_date, event_body, message
+                  FROM event  
+                  WHERE event_id = $eventIdPut AND project_id = $projectIdPut
+                  """
+          .query(
+            eventIdGet ~ projectIdGet ~ eventStatusGet ~ createdDateGet ~ executionDateGet ~ eventDateGet ~ eventBodyGet ~ eventMessageGet.opt
+          )
+          .map {
+            case eventId ~ projectId ~ eventStatus ~ createdDate ~ executionDate ~ eventDate ~ eventBody ~ maybeEventMessage =>
+              (
+                CompoundEventId(eventId, projectId),
+                eventStatus,
+                createdDate,
+                executionDate,
+                eventDate,
+                eventBody,
+                maybeEventMessage
+              )
+          }
+        session.prepare(query).use(_.unique(compoundEventId.id ~ compoundEventId.projectId))
       }
   }
 
-  private def storedProjects: List[(projects.Id, projects.Path, EventDate)] = execute {
-    sql"""|SELECT project_id, project_path, latest_event_date
-          |FROM project
-          |""".stripMargin
-      .query[(projects.Id, projects.Path, EventDate)]
-      .to[List]
+  private def storedProjects: List[(projects.Id, projects.Path, EventDate)] = execute { session =>
+    val query: Query[Void, (projects.Id, projects.Path, EventDate)] = sql"""
+          SELECT project_id, project_path, latest_event_date
+          FROM project
+          """
+      .query(projectIdGet ~ projectPathGet ~ eventDateGet)
+      .map { case projectId ~ projectPath ~ eventDate => (projectId, projectPath, eventDate) }
+    session.execute(query)
   }
 }

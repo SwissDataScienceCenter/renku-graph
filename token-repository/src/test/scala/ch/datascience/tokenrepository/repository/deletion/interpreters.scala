@@ -26,12 +26,6 @@ import io.chrisdavenport.log4cats.Logger
 
 import scala.util.Try
 
-class TryTokenRemover(
-    transactor:       SessionResource[Try, ProjectsTokensDB],
-    queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-)(implicit ME:        Bracket[Try, Throwable])
-    extends TokenRemover[Try](transactor, queriesExecTimes)
-
 class IOTokenRemover(
     transactor:       SessionResource[IO, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]

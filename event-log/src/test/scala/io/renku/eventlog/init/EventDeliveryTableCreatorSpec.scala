@@ -21,9 +21,9 @@ package io.renku.eventlog.init
 import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import doobie.implicits.toSqlInterpolator
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk.implicits._
 
 class EventDeliveryTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
@@ -68,9 +68,9 @@ class EventDeliveryTableCreatorSpec extends AnyWordSpec with DbInitSpec with sho
 
       tableExists("event_delivery") shouldBe true
 
-      verifyTrue(sql"DROP INDEX idx_event_id;")
-      verifyTrue(sql"DROP INDEX idx_project_id;")
-      verifyTrue(sql"DROP INDEX idx_delivery_url;")
+      verifyTrue(sql"DROP INDEX idx_event_id;".command)
+      verifyTrue(sql"DROP INDEX idx_project_id;".command)
+      verifyTrue(sql"DROP INDEX idx_delivery_url;".command)
     }
 
   }

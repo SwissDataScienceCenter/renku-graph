@@ -47,8 +47,6 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-driver"               -> driver.value,
-            "db-url-template"         -> urlTemplate.value,
             "db-host"                 -> host.value,
             "db-user"                 -> user,
             "db-pass"                 -> password,
@@ -60,8 +58,6 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
 
       val Success(dbConfig) = new DBConfigProvider[Try, TestDB](namespace, dbName, config).get()
 
-      dbConfig.driver         shouldBe driver
-      dbConfig.url.value      shouldBe urlTemplate.value.replace("$host", host.value).replace("$dbName", dbName.value)
       dbConfig.user.value     shouldBe user
       dbConfig.pass           shouldBe password
       dbConfig.connectionPool shouldBe connectionPool
@@ -74,13 +70,10 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val password       = nonEmptyStrings().generateOne
       val connectionPool = positiveInts().generateOne
       val maxLifetime    = durations(max = 30 minutes).generateOne
-      val url: Url = Refined.unsafeApply(httpUrls().generateOne)
 
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-driver"               -> driver.value,
-            "db-url-template"         -> urlTemplate.value,
             "db-host"                 -> host.value,
             "db-user"                 -> user,
             "db-pass"                 -> password,
@@ -93,12 +86,9 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val Success(dbConfig) = new DBConfigProvider[Try, TestDB](
         namespace,
         dbName,
-        config,
-        jdbcUrlOverride = Some(url)
+        config
       ).get()
 
-      dbConfig.url            shouldBe url
-      dbConfig.driver         shouldBe driver
       dbConfig.user.value     shouldBe user
       dbConfig.pass           shouldBe password
       dbConfig.connectionPool shouldBe connectionPool
@@ -112,32 +102,10 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       exception shouldBe a[ConfigLoadingException]
     }
 
-    "fail if there is no '<config-namespace>.db-driver' in the config" in new TestCase {
-      val config = ConfigFactory.parseMap(
-        Map(
-          namespace -> Map(
-            "db-driver"               -> "",
-            "db-url-template"         -> nonEmptyStrings().generateOne,
-            "db-host"                 -> hosts.generateOne.value,
-            "db-user"                 -> nonEmptyStrings().generateOne,
-            "db-pass"                 -> nonEmptyStrings().generateOne,
-            "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
-          ).asJava
-        ).asJava
-      )
-
-      val Failure(exception) = new DBConfigProvider[Try, TestDB](namespace, dbName, config).get()
-
-      exception shouldBe a[ConfigLoadingException]
-    }
-
     "fail if there is no '<config-namespace>.db-host' in the config" in new TestCase {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-driver"               -> nonEmptyStrings().generateOne,
-            "db-url-template"         -> nonEmptyStrings().generateOne,
             "db-host"                 -> "",
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
@@ -156,8 +124,6 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-driver"               -> nonEmptyStrings().generateOne,
-            "db-url-template"         -> nonEmptyStrings().generateOne,
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> "",
             "db-pass"                 -> nonEmptyStrings().generateOne,
@@ -176,8 +142,6 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-driver"               -> nonEmptyStrings().generateOne,
-            "db-url-template"         -> nonEmptyStrings().generateOne,
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
@@ -195,8 +159,6 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-driver"               -> nonEmptyStrings().generateOne,
-            "db-url-template"         -> nonEmptyStrings().generateOne,
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
@@ -214,8 +176,6 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val config = ConfigFactory.parseMap(
         Map(
           namespace -> Map(
-            "db-driver"       -> nonEmptyStrings().generateOne,
-            "db-url-template" -> nonEmptyStrings().generateOne,
             "db-host"         -> hosts.generateOne.value,
             "db-user"         -> nonEmptyStrings().generateOne,
             "db-pass"         -> nonEmptyStrings().generateOne,
@@ -228,50 +188,6 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
 
       exception shouldBe a[ConfigLoadingException]
     }
-
-    "fail if there is no '<config-namespace>.db-url-template' in the config" in new TestCase {
-      val config = ConfigFactory.parseMap(
-        Map(
-          namespace -> Map(
-            "db-driver"               -> nonEmptyStrings().generateOne,
-            "db-url-template"         -> "",
-            "db-host"                 -> hosts.generateOne.value,
-            "db-user"                 -> nonEmptyStrings().generateOne,
-            "db-pass"                 -> nonEmptyStrings().generateOne,
-            "connection-pool"         -> positiveInts().generateOne.value,
-            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
-          ).asJava
-        ).asJava
-      )
-
-      val Failure(exception) = new DBConfigProvider[Try, TestDB](namespace, dbName, config).get()
-
-      exception shouldBe a[ConfigLoadingException]
-    }
-  }
-
-  "findJdbcUrl" should {
-
-    import DBConfigProvider._
-
-    "return some DBConfig.Url if there's a 'jdbc-url=url' entry in the given list of settings" in {
-
-      val jdbcUrl: DBConfig.Url = Refined.unsafeApply(httpUrls().generateOne)
-
-      List(
-        nonBlankStrings().generateOne.value,
-        s"jdbc-url=$jdbcUrl",
-        nonBlankStrings().generateOne.value
-      ).findJdbcUrl shouldBe Some(jdbcUrl)
-    }
-
-    "return None if there's no 'jdbc-url=url' entry in the given list of settings" in {
-      List("jdbc-url=").findJdbcUrl shouldBe None
-    }
-
-    "return None if there's a 'jdbc-url=url' entry without a value" in {
-      List().findJdbcUrl shouldBe None
-    }
   }
 
   private trait TestCase {
@@ -279,15 +195,9 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
 
     val namespace = nonEmptyStrings().generateOne
 
-    val driver = RefType
-      .applyRef[Driver](nonEmptyStrings().generateOne)
-      .getOrElse(throw new IllegalArgumentException("Invalid driver value"))
     val dbName = RefType
       .applyRef[DbName](nonEmptyStrings().generateOne)
       .getOrElse(throw new IllegalArgumentException("Invalid dbName value"))
-    val urlTemplate = RefType
-      .applyRef[UrlTemplate](s"${nonEmptyStrings().generateOne}/$$host/$$dbName")
-      .getOrElse(throw new IllegalArgumentException("Invalid urlPrefix value"))
 
     val hosts: Gen[Host] = for {
       hostname <- nonEmptyStrings()

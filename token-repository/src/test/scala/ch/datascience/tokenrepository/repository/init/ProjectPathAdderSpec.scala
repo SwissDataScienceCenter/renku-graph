@@ -18,6 +18,7 @@
 
 package ch.datascience.tokenrepository.repository.init
 
+import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.db.SqlQuery
@@ -34,12 +35,15 @@ import ch.datascience.tokenrepository.repository.RepositoryGenerators.encryptedA
 import ch.datascience.tokenrepository.repository.association.ProjectPathFinder
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{IOAccessTokenCrypto, InMemoryProjectsTokensDbSpec}
-import doobie.implicits._
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.codec.all._
+import skunk.data.Completion
+import skunk.implicits._
 
 class ProjectPathAdderSpec
     extends AnyWordSpec
@@ -95,7 +99,7 @@ class ProjectPathAdderSpec
         logger.loggedOnly(Info("'project_path' column added"))
       }
       eventually {
-        verifyTrue(sql"DROP INDEX idx_project_path;")
+        verifyTrue(sql"DROP INDEX idx_project_path;".command)
       }
     }
 
@@ -126,7 +130,7 @@ class ProjectPathAdderSpec
       }
 
       eventually {
-        verifyTrue(sql"DROP INDEX idx_project_path;")
+        verifyTrue(sql"DROP INDEX idx_project_path;".command)
       }
 
       eventually {
@@ -161,40 +165,52 @@ class ProjectPathAdderSpec
   }
 
   private def addProjectPath(): Unit = execute {
-    sql"""
-         |ALTER TABLE projects_tokens
-         |ADD COLUMN project_path VARCHAR;
-       """.stripMargin.update.run.map(_ => ())
+    Kleisli[IO, Session[IO], Unit] { session =>
+      val query: Command[Void] = sql"""
+        ALTER TABLE projects_tokens
+        ADD COLUMN project_path VARCHAR;
+      """.command
+      session.execute(query).void
+    }
   }
 
-  private def checkColumnExists: Boolean =
-    sql"select project_path from projects_tokens limit 1"
-      .query[String]
-      .option
-      .transact(transactor.resource)
-      .map(_ => true)
-      .recover { case _ => false }
-      .unsafeRunSync()
+  private def checkColumnExists: Boolean = transactor
+    .use { session =>
+      val query: Query[Void, Path] = sql"select project_path from projects_tokens limit 1"
+        .query(varchar)
+        .gmap[Path]
+      session
+        .option(query)
+        .map(_ => true)
+        .recover { case _ => false }
+    }
+    .unsafeRunSync()
 
   def insert(projectId: Id, encryptedToken: EncryptedAccessToken): Unit = execute {
-    sql"""insert into
+    Kleisli[IO, Session[IO], Unit] { session =>
+      val query: Command[Int ~ String] =
+        sql"""insert into
             projects_tokens (project_id, token)
-            values (${projectId.value}, ${encryptedToken.value})
-         """.update.run
-      .map(assureInserted)
+            values ($int4, $varchar)
+         """.command
+      session.prepare(query).use(_.execute(projectId.value ~ encryptedToken.value)).map(assureInserted)
+    }
   }
 
-  private lazy val assureInserted: Int => Unit = {
-    case 1 => ()
-    case _ => fail("insertion problem")
+  private lazy val assureInserted: Completion => Unit = {
+    case Completion.Insert(1) => ()
+    case _                    => fail("insertion problem")
   }
 
   protected override def createTable(): Unit = execute {
-    sql"""
-         |CREATE TABLE projects_tokens(
-         | project_id int4 PRIMARY KEY,
-         | token VARCHAR NOT NULL
-         |);
-       """.stripMargin.update.run.map(_ => ())
+    Kleisli[IO, Session[IO], Unit] { session =>
+      val query: Command[Void] = sql"""
+        CREATE TABLE projects_tokens(
+          project_id int4 PRIMARY KEY,
+          token VARCHAR NOT NULL
+        );
+      """.command
+      session.execute(query).void
+    }
   }
 }

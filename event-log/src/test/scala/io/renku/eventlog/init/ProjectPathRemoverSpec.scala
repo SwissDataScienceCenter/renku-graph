@@ -20,12 +20,15 @@ package io.renku.eventlog.init
 
 import cats.effect.IO
 import cats.syntax.all._
+import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
-import doobie.implicits._
 import org.scalatest.concurrent.{Eventually, IntegrationPatience}
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import skunk._
+import skunk.implicits._
+import skunk.codec.all._
 
 class ProjectPathRemoverSpec
     extends AnyWordSpec
@@ -76,12 +79,15 @@ class ProjectPathRemoverSpec
     val projectPathRemover = new ProjectPathRemoverImpl[IO](transactor, logger)
   }
 
-  private def checkColumnExists: Boolean =
-    sql"select project_path from event_log limit 1"
-      .query[String]
-      .option
-      .transact(transactor.resource)
-      .map(_ => true)
-      .recover { case _ => false }
-      .unsafeRunSync()
+  private def checkColumnExists: Boolean = transactor
+    .use { session =>
+      val query: Query[Void, projects.Path] = sql"select project_path from event_log limit 1"
+        .query(projectPathGet)
+      session
+        .option(query)
+        .map(_ => true)
+        .recover { case _ => false }
+    }
+    .unsafeRunSync()
+
 }
