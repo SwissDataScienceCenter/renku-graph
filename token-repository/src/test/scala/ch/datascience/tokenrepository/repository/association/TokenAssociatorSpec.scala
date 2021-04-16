@@ -56,7 +56,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
         .expects(projectId, projectPath, encryptedAccessToken)
         .returning(context.unit)
 
-      tokenAssociator.associate(projectId, accessToken) shouldBe context.unit
+      tokenAssociator.associate(projectId, accessToken).unsafeRunSync() shouldBe ()
     }
 
     "succeed if finding the Project Path returns none and removing the token is successful" in new TestCase {
@@ -70,7 +70,7 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
         .expects(projectId)
         .returning(context.unit)
 
-      tokenAssociator.associate(projectId, accessToken) shouldBe context.unit
+      tokenAssociator.associate(projectId, accessToken).unsafeRunSync() shouldBe ()
     }
 
     "fail if finding Project Path fails" in new TestCase {
@@ -80,7 +80,9 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
         .expects(projectId, Some(accessToken))
         .returning(context raiseError exception)
 
-      tokenAssociator.associate(projectId, accessToken) shouldBe context.raiseError(exception)
+      intercept[Exception] {
+        tokenAssociator.associate(projectId, accessToken).unsafeRunSync()
+      }.getMessage shouldBe exception.getMessage
     }
 
     "fail if token encryption fails" in new TestCase {
@@ -96,7 +98,9 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
         .expects(accessToken)
         .returning(context.raiseError(exception))
 
-      tokenAssociator.associate(projectId, accessToken) shouldBe context.raiseError(exception)
+      intercept[Exception] {
+        tokenAssociator.associate(projectId, accessToken).unsafeRunSync()
+      }.getMessage shouldBe exception.getMessage
     }
 
     "fail if storing in the db fails" in new TestCase {
@@ -118,7 +122,9 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
         .expects(projectId, projectPath, encryptedAccessToken)
         .returning(context.raiseError(exception))
 
-      tokenAssociator.associate(projectId, accessToken) shouldBe context.raiseError(exception)
+      intercept[Exception] {
+        tokenAssociator.associate(projectId, accessToken).unsafeRunSync()
+      }.getMessage shouldBe exception.getMessage
     }
 
     "fail if removing the token fails" in new TestCase {
@@ -133,7 +139,9 @@ class TokenAssociatorSpec extends AnyWordSpec with MockFactory with should.Match
         .expects(projectId)
         .returning(context raiseError exception)
 
-      tokenAssociator.associate(projectId, accessToken) shouldBe context.raiseError(exception)
+      intercept[Exception] {
+        tokenAssociator.associate(projectId, accessToken).unsafeRunSync()
+      }.getMessage shouldBe exception.getMessage
     }
   }
 

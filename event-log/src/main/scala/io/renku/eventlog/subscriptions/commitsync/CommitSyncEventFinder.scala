@@ -138,8 +138,8 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
     }
 
   private def toNoneIfEventAlreadyTaken(event: CommitSyncEvent): Completion => Option[CommitSyncEvent] = {
-    case Completion.Update(1) => Some(event)
-    case _                    => None
+    case Completion.Update(1) | Completion.Insert(1) => Some(event)
+    case _                                           => None
   }
 
 }

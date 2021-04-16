@@ -145,7 +145,7 @@ class ProjectPathAdderSpec
     val pathFinder        = mock[ProjectPathFinder[IO]]
     val queriesExecTimes  = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val tokenRemover      = new TokenRemover[IO](transactor, queriesExecTimes)
-    val projectPathAdder  = new IOProjectPathAdder(transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
+    val projectPathAdder  = new ProjectPathAdderImpl[IO](transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
 
     def assumePathExistsInGitLab(projectId:        Id,
                                  maybeProjectPath: Option[Path],

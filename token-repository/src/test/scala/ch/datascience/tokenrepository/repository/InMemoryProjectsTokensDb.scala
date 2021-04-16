@@ -40,7 +40,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
 
   private val dbConfig = new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
-  override val container: Container with JdbcDatabaseContainer = PostgreSQLContainer(
+  override val container: PostgreSQLContainer = PostgreSQLContainer(
     dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
     databaseName = "projects_tokens",
     username = dbConfig.user.value,
@@ -49,10 +49,11 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
 
   lazy val transactor: SessionResource[IO, ProjectsTokensDB] = new SessionResource[IO, ProjectsTokensDB](
     Session.single(
-      host = container.jdbcUrl,
+      host = container.host,
       database = dbConfig.name.value,
       user = dbConfig.user.value,
-      password = Some(dbConfig.pass)
+      password = Some(dbConfig.pass),
+      port = container.container.getMappedPort(5432)
     )
   )
 
@@ -80,7 +81,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
               project_path VARCHAR NOT NULL,
               token VARCHAR NOT NULL
              );
-       """.command
+        """.command
       session.execute(query).map(_ => ())
     }
   }

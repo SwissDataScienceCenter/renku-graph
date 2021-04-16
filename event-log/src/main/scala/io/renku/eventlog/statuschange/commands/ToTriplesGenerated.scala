@@ -68,10 +68,11 @@ final case class ToTriplesGenerated[Interpretation[_]: Async: Bracket[*[_], Thro
   )
 
   private lazy val updateStatus = Kleisli[Interpretation, Session[Interpretation], Int] { session =>
-    val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] = sql"""|UPDATE event
-                                                                                                  |SET status = $eventStatusPut, execution_date = $executionDatePut
-                                                                                                  |WHERE event_id = $eventIdPut AND project_id = $projectIdPut AND status = $eventStatusPut;
-                                                                                                  |""".command
+    val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] = sql"""
+      UPDATE event
+      SET status = $eventStatusPut, execution_date = $executionDatePut
+      WHERE event_id = $eventIdPut AND project_id = $projectIdPut AND status = $eventStatusPut;
+      """.command
     session
       .prepare(query)
       .use(_.execute(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ GeneratingTriples))

@@ -56,7 +56,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(encryptedToken)
         .returning(context.pure(accessToken))
 
-      tokenFinder.findToken(projectId) shouldBe OptionT.some[Try](accessToken)
+      tokenFinder.findToken(projectId).value.unsafeRunSync() shouldBe Some(accessToken)
     }
 
     "return None if no token was found in the db" in new TestCase {
@@ -68,7 +68,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(projectId)
         .returning(OptionT.none[IO, EncryptedAccessToken])
 
-      tokenFinder.findToken(projectId) shouldBe OptionT.none[Try, AccessToken]
+      tokenFinder.findToken(projectId).value.unsafeRunSync() shouldBe None
     }
 
     "fail if finding token in the db fails" in new TestCase {
@@ -81,7 +81,9 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(projectId)
         .returning(OptionT.liftF[IO, EncryptedAccessToken](context.raiseError(exception)))
 
-      tokenFinder.findToken(projectId).value shouldBe context.raiseError(exception)
+      intercept[Exception] {
+        tokenFinder.findToken(projectId).value.unsafeRunSync()
+      }.getMessage shouldBe exception.getMessage
     }
 
     "fail if decrypting found token fails" in new TestCase {
@@ -99,8 +101,9 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .decrypt(_: EncryptedAccessToken))
         .expects(encryptedToken)
         .returning(context.raiseError(exception))
-
-      tokenFinder.findToken(projectId).value shouldBe context.raiseError(exception)
+      intercept[Exception] {
+        tokenFinder.findToken(projectId).value.unsafeRunSync()
+      }.getMessage shouldBe exception.getMessage
     }
   }
 
@@ -122,7 +125,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(encryptedToken)
         .returning(context.pure(accessToken))
 
-      tokenFinder.findToken(projectPath) shouldBe OptionT.some[Try](accessToken)
+      tokenFinder.findToken(projectPath).value.unsafeRunSync() shouldBe Some(accessToken)
     }
 
     "return None if no token was found in the db" in new TestCase {
@@ -134,7 +137,7 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(projectPath)
         .returning(OptionT.none[IO, EncryptedAccessToken])
 
-      tokenFinder.findToken(projectPath) shouldBe OptionT.none[Try, AccessToken]
+      tokenFinder.findToken(projectPath).value.unsafeRunSync() shouldBe None
     }
 
     "fail if finding token in the db fails" in new TestCase {
@@ -146,8 +149,9 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .findToken(_: Path))
         .expects(projectPath)
         .returning(OptionT.liftF[IO, EncryptedAccessToken](context.raiseError(exception)))
-
-      tokenFinder.findToken(projectPath).value shouldBe context.raiseError(exception)
+      intercept[Exception] {
+        tokenFinder.findToken(projectPath).value.unsafeRunSync()
+      }.getMessage shouldBe exception.getMessage
     }
 
     "fail if decrypting found token fails" in new TestCase {
@@ -166,7 +170,9 @@ class TokenFinderSpec extends AnyWordSpec with MockFactory with should.Matchers 
         .expects(encryptedToken)
         .returning(context.raiseError(exception))
 
-      tokenFinder.findToken(projectPath).value shouldBe context.raiseError(exception)
+      intercept[Exception] {
+        tokenFinder.findToken(projectPath).value.unsafeRunSync()
+      }.getMessage shouldBe exception.getMessage
     }
   }
 

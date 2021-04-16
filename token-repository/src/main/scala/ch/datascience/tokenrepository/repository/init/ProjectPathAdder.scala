@@ -27,11 +27,10 @@ import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAccessToken
 import ch.datascience.tokenrepository.repository.association.{IOProjectPathFinder, ProjectPathFinder}
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
-import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB}
+import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB, TokenRepositoryTypeSerializers}
 import io.chrisdavenport.log4cats.Logger
 import skunk._
 import skunk.implicits._
-import skunk.codec.all._
 
 import scala.util.control.NonFatal
 
@@ -39,46 +38,43 @@ private trait ProjectPathAdder[Interpretation[_]] {
   def run(): Interpretation[Unit]
 }
 
-private class IOProjectPathAdder(
-    transactor:        SessionResource[IO, ProjectsTokensDB],
-    accessTokenCrypto: AccessTokenCrypto[IO],
-    pathFinder:        ProjectPathFinder[IO],
-    tokenRemover:      TokenRemover[IO],
-    logger:            Logger[IO]
-)(implicit ME:         Bracket[IO, Throwable], contextShift: ContextShift[IO])
-    extends ProjectPathAdder[IO] {
+private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], Throwable]: ContextShift](
+    transactor:        SessionResource[Interpretation, ProjectsTokensDB],
+    accessTokenCrypto: AccessTokenCrypto[Interpretation],
+    pathFinder:        ProjectPathFinder[Interpretation],
+    tokenRemover:      TokenRemover[Interpretation],
+    logger:            Logger[Interpretation]
+) extends ProjectPathAdder[Interpretation]
+    with TokenRepositoryTypeSerializers {
 
   import accessTokenCrypto._
   import pathFinder._
 
-  def run(): IO[Unit] =
+  def run(): Interpretation[Unit] =
     checkColumnExists flatMap {
       case true  => logger.info("'project_path' column exists")
       case false => addColumn()
     }
 
-  private def checkColumnExists: IO[Boolean] = {
-
+  private def checkColumnExists: Interpretation[Boolean] = {
     val query: Query[skunk.Void, projects.Path] = sql"select project_path from projects_tokens limit 1"
-      .query(varchar)
-      .gmap[projects.Path]
-
+      .query(projectPathGet)
     transactor.use { session =>
       session
         .option(query)
         .map(_ => true)
-        .recover { case _ => false } // TODO verify this was using a transaction
+        .recover { case _ => false }
     }
   }
 
   private def addColumn() = {
     for {
       _ <- execute(sql"ALTER TABLE projects_tokens ADD COLUMN IF NOT EXISTS project_path VARCHAR".command, transactor)
-      _ <- addMissingPaths().start
+      _ <- Concurrent[Interpretation].start(addMissingPaths())
     } yield ()
   } recoverWith logging
 
-  private def addMissingPaths(): IO[Unit] =
+  private def addMissingPaths(): Interpretation[Unit] =
     for {
       _ <- addPathIfMissing()
       _ <- execute(sql"ALTER TABLE projects_tokens ALTER COLUMN project_path SET NOT NULL".command, transactor)
@@ -87,41 +83,19 @@ private class IOProjectPathAdder(
       _ <- logger.info("'project_path' column added")
     } yield ()
 
-  private def addPathIfMissing(): IO[Unit] =
+  private def addPathIfMissing(): Interpretation[Unit] =
     findEntryWithoutPath flatMap {
-      case None                              => ME.unit
+      case None                              => ().pure[Interpretation]
       case Some((projectId, encryptedToken)) => addPathOrRemoveRow(projectId, encryptedToken)
     }
 
-  private def findEntryWithoutPath: IO[Option[(Id, EncryptedAccessToken)]] = {
-    val query: Query[Void, (Int, String)] =
+  private def findEntryWithoutPath: Interpretation[Option[(Id, EncryptedAccessToken)]] = {
+    val query: Query[Void, (Id, EncryptedAccessToken)] =
       sql"select project_id, token from projects_tokens where project_path IS NULL limit 1;"
-        .query(int4 ~ varchar)
+        .query(projectIdGet ~ encryptedAccessTokenGet)
+        .map { case id ~ token => (id, token) }
     transactor
-      .use { session =>
-        session.transaction.use { xa =>
-          for {
-            sp <- xa.savepoint
-            maybeIdAndToken <-
-              session.option[(Int, String)](query).recoverWith { case NonFatal(exception) =>
-                xa.rollback(sp).flatMap(_ => logAndThrow(exception))
-              }
-            maybeProjectAndToken <- maybeIdAndToken match {
-                                      case None =>
-                                        Option.empty[(Id, EncryptedAccessToken)].pure[IO]
-                                      case Some((id, token)) =>
-                                        ME.fromEither(
-                                          (Id from id, EncryptedAccessToken from token)
-                                            .mapN { // TODO Verify if the deserializer is can be called by skunk
-                                              case (projectId, encryptedToken) =>
-                                                Option(projectId -> encryptedToken)
-                                            }
-                                        )
-                                    }
-
-          } yield maybeProjectAndToken
-        }
-      }
+      .use(session => session.option(query))
   }
 
   private def addPathOrRemoveRow(id: Id, encryptedToken: EncryptedAccessToken) = {
@@ -136,46 +110,27 @@ private class IOProjectPathAdder(
     addPathIfMissing()
   }
 
-  private def addOrRemove(id: Id, maybePath: Option[Path]): IO[Unit] =
+  private def addOrRemove(id: Id, maybePath: Option[Path]): Interpretation[Unit] =
     maybePath match {
       case Some(path) => addPath(id, path)
       case None       => tokenRemover.delete(id)
     }
 
-  private def addPath(id: Id, path: Path): IO[Unit] =
+  private def addPath(id: Id, path: Path): Interpretation[Unit] =
     transactor.use { session =>
-      session.transaction.use { xa =>
-        val query: Command[Void] =
-          sql"update projects_tokens set project_path = #${path.value} where project_id = #${id.value.toString}".command
-        for {
-          sp <- xa.savepoint
-          _ <- session.execute(query).recoverWith { case NonFatal(exception) =>
-                 xa.rollback(sp).flatMap(_ => logAndThrow(exception))
-               }
-        } yield ()
-      }
+      val query: Command[Path ~ Id] =
+        sql"update projects_tokens set project_path = $projectPathPut where project_id = $projectIdPut".command
+      session.prepare(query).use(_.execute(path ~ id)).void
     }
 
-  private def execute(sql: Command[Void], transactor: SessionResource[IO, ProjectsTokensDB]): IO[Unit] =
-    transactor.use { session =>
-      session.transaction.use { xa =>
-        for {
-          sp <- xa.savepoint
-          _ <- session.execute(sql).recoverWith { case NonFatal(exception) =>
-                 xa.rollback(sp).flatMap(_ => logAndThrow(exception))
-               }
-        } yield ()
-      }
-    }
+  private def execute(sql:        Command[Void],
+                      transactor: SessionResource[Interpretation, ProjectsTokensDB]
+  ): Interpretation[Unit] =
+    transactor.use(session => session.execute(sql).void)
 
-  private lazy val logging: PartialFunction[Throwable, IO[Unit]] = { case NonFatal(exception) =>
+  private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     logger.error(exception)("'project_path' column adding failure")
-    ME.raiseError(exception)
-  }
-
-  private def logAndThrow[A](exception: Throwable) = {
-    logger.error(exception)("'project_path' column adding failure")
-    ME.raiseError[A](exception)
+    exception.raiseError[Interpretation, Unit]
   }
 }
 
@@ -198,5 +153,5 @@ private object IOProjectPathAdder {
       accessTokenCrypto <- AccessTokenCrypto[IO]()
       pathFinder        <- IOProjectPathFinder(logger)
       tokenRemover = new TokenRemover[IO](transactor, queriesExecTimes)
-    } yield new IOProjectPathAdder(transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
+    } yield new ProjectPathAdderImpl[IO](transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
 }
