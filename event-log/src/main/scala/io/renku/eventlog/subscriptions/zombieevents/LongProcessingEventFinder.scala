@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions.zombieevents
 
 import cats.data.Nested
-import cats.effect.{Bracket, ContextShift, IO}
+import cats.effect.{ContextShift, IO}
 import cats.free.Free
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, DbTransactor, SqlQuery}
@@ -38,7 +38,7 @@ import java.time.{Duration, Instant}
 private class LongProcessingEventFinder(transactor:       DbTransactor[IO, EventLogDB],
                                         queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
                                         now:              () => Instant = () => Instant.now
-)(implicit ME:                                            Bracket[IO, Throwable], contextShift: ContextShift[IO])
+)(implicit contextShift:                                  ContextShift[IO])
     extends DbClient(Some(queriesExecTimes))
     with EventFinder[IO, ZombieEvent]
     with ZombieEventSubProcess
