@@ -75,12 +75,11 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
   protected def createTable(): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
       val query: Command[Void] =
-        sql"""
-             |CREATE TABLE projects_tokens(
-             | project_id int4 PRIMARY KEY,
-             | project_path VARCHAR NOT NULL,
-             | token VARCHAR NOT NULL
-             |);
+        sql"""CREATE TABLE projects_tokens(
+              project_id int4 PRIMARY KEY,
+              project_path VARCHAR NOT NULL,
+              token VARCHAR NOT NULL
+             );
        """.command
       session.execute(query).map(_ => ())
     }

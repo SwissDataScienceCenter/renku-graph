@@ -110,8 +110,8 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
         ORDER BY proj.latest_event_date DESC
         LIMIT $int4
       ) proj
-      """ .query(projectIdGet ~ projectPathGet ~ eventDateGet ~ int4)
-      .map { case projectId ~ projectPath ~ eventDate ~ currentOccupancy => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy)) }
+      """ .query(projectIdGet ~ projectPathGet ~ eventDateGet ~ int8)
+      .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt)) }
       session.prepare(query).use{_.stream(GeneratingTriples ~ ExecutionDate(now()) ~ projectsFetchingLimit.value, 32).compile.toList}
   },
     name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
@@ -146,7 +146,7 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
   // format: on
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
-    s"status IN ${NonEmptyList.of(status, otherStatuses: _*).toList.mkString(",")}"
+    s"status IN (${NonEmptyList.of(status, otherStatuses: _*).toList.map(el => s"'$el'").mkString(",")})"
 
   private lazy val selectProject: List[(ProjectIds, Priority)] => Option[ProjectIds] = {
     case Nil                          => None

@@ -77,14 +77,13 @@ class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
             ) UNION #${(categoryNames map generateUnions).reduce(_ ++ " UNION " ++ _)}
           ) all_counts
           GROUP BY all_counts.category_name;
-          """.query(categoryNameGet ~ int8).map{ case categoryName ~ count => (categoryName, count)}
+          """.query(categoryNameGet ~ numeric).map{ case categoryName ~ (count:BigDecimal) => (categoryName, count.longValue)}
       val eventDate = EventDate(now())
       val lastSyncedDate = LastSyncedDate(now())
       session.prepare(query).use{_.stream(eventDate ~lastSyncedDate ~ eventDate ~lastSyncedDate ~ eventDate ~lastSyncedDate, 32).compile.toList}
     },
     name = "category name events count"
   )
-  // TODO Why do  I need to use stream?
   // format: on
   // TODO could we make it safer with sql string interpolation
   private def generateUnions(categoryName: CategoryName) =
@@ -147,7 +146,7 @@ class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
                       FROM event evt
                       WHERE evt.project_id = prj.project_id AND status IN (#${statuses.toSql})
                     )
-              """.query(projectPathGet ~ int8)
+              """.query(projectPathGet ~ int8).map { case path ~ count => (path, count) }
       session.execute(query)
     },
     name = "projects events count"

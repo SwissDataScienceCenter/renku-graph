@@ -93,7 +93,7 @@ private class ProjectPathAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throw
 
   private def findDistinctProjects(implicit session: Session[Interpretation]): Interpretation[List[(Id, Path)]] = {
 
-    val query: Query[Void, String] = sql"select min(event_body) from event_log group by project_id;".query(varchar)
+    val query: Query[Void, String] = sql"select min(event_body) from event_log group by project_id;".query(text)
     session.execute(query).flatMap(toListOfProjectIdAndPath)
   }
 

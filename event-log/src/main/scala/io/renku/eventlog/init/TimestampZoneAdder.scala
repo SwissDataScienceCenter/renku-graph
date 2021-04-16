@@ -44,9 +44,9 @@ private case class TimestampZoneAdderImpl[Interpretation[_]: Async: Bracket[*[_]
 ) extends TimestampZoneAdder[Interpretation]
     with EventTableCheck {
   override def run(): Interpretation[Unit] =
-    checkIfAlreadyTimestampz flatMap {
+    checkIfAlreadyTimestamptz flatMap {
       case true =>
-        logger.info("Fields are already in timestampz type")
+        logger.info("Fields are already in timestamptz type")
       case false =>
         transactor.use { implicit session =>
           session.transaction.use { xa =>
@@ -60,17 +60,22 @@ private case class TimestampZoneAdderImpl[Interpretation[_]: Async: Bracket[*[_]
         }
     }
 
-  private val columnsToMigrate = List("batch_date", "created_date", "execution_date", "event_date")
+  private val columnsToMigrate =
+    List("batch_date", "created_date", "execution_date", "event_date", "last_synced", "latest_event_date")
 
-  private def checkIfAlreadyTimestampz = transactor.use { session =>
-    val query: Query[Void, String ~ String] = sql"""SELECT column_name, data_type FROM information_schema.columns WHERE
-         table_name = event;""".query(varchar ~ varchar)
+  private def checkIfAlreadyTimestamptz = transactor.use { session =>
+    val query: Query[Void, String ~ String] = sql"""
+         SELECT column_name, data_type FROM information_schema.columns""".query(varchar ~ varchar)
 
     session
       .execute(query)
-      .map(_.filter { case (columnName, _) => columnsToMigrate.contains(columnName) }.forall { case (_, columnType) =>
-        columnType == "timestampz"
-      })
+      .map {
+        _.filter { case columnName ~ _ =>
+          columnsToMigrate.contains(columnName)
+        }.forall { case _ ~ columnType =>
+          columnType == "timestamp with time zone"
+        }
+      }
       .recover(_ => false)
   }
 
@@ -84,5 +89,13 @@ private case class TimestampZoneAdderImpl[Interpretation[_]: Async: Bracket[*[_]
         sql"ALTER table event ALTER execution_date TYPE timestamptz USING execution_date AT TIME ZONE 'CEST' ".command
       )
     _ <- execute(sql"ALTER table event ALTER event_date TYPE timestamptz USING event_date AT TIME ZONE 'CEST' ".command)
+    _ <-
+      execute(
+        sql"ALTER table subscription_category_sync_time ALTER last_synced TYPE timestamptz USING last_synced AT TIME ZONE 'CEST' ".command
+      )
+    _ <-
+      execute(
+        sql"ALTER table project ALTER latest_event_date TYPE timestamptz USING latest_event_date AT TIME ZONE 'CEST' ".command
+      )
   } yield ()
 }

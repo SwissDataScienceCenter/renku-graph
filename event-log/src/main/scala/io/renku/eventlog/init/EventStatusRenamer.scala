@@ -25,6 +25,7 @@ import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import skunk._
 import skunk.implicits._
+import skunk.codec.all._
 
 import scala.util.control.NonFatal
 
@@ -51,8 +52,8 @@ private case class EventStatusRenamerImpl[Interpretation[_]: Async: Bracket[*[_]
   }
 
   private def renameAllStatuses(from: String, to: String) = transactor.use { session =>
-    val query: Command[Void] = sql"""UPDATE event SET status = #$to WHERE status = #$from""".command
-    session.execute(query).void
+    val query: Command[String ~ String] = sql"""UPDATE event SET status = $varchar WHERE status = $varchar""".command
+    session.prepare(query).use(_.execute(to ~ from)).void
   }
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
@@ -65,6 +66,6 @@ private object EventStatusRenamer {
   def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): EventStatusRenamer[Interpretation] =
+  ): EventStatusRenamer[Interpretation] =
     EventStatusRenamerImpl(transactor, logger)
 }

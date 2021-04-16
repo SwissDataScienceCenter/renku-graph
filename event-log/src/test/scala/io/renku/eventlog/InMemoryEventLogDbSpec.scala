@@ -43,7 +43,7 @@ trait InMemoryEventLogDbSpec
     val query: Query[Void, String] = sql"""SELECT DISTINCT tablename FROM pg_tables
                                 WHERE schemaname != 'pg_catalog'
                                 AND schemaname != 'information_schema'"""
-      .query(varchar)
+      .query(name)
     session.execute(query)
   }
 

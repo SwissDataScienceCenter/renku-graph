@@ -42,23 +42,30 @@ class TimestampZoneAdderSpec extends AnyWordSpec with DbInitSpec with should.Mat
     eventDeliveryTableCreator
   )
 
+  private val timestampType   = "timestamp without time zone"
+  private val timestamptzType = "timestamp with time zone"
+
   "run" should {
 
     "modify the type of the timestamp columns" in new TestCase {
 
       tableExists("event") shouldBe true
 
-      verify("batch_date", "timestamp")
-      verify("create_date", "timestamp")
-      verify("event_date", "timestamp")
-      verify("execution_date", "timestamp")
+      verify("batch_date", timestampType)
+      verify("create_date", timestampType)
+      verify("event_date", timestampType)
+      verify("execution_date", timestampType)
+      verify("last_synced", timestampType)
+      verify("latest_event_date", timestampType)
 
       tableRefactor.run().unsafeRunSync() shouldBe ((): Unit)
 
-      verify("batch_date", "timestampz")
-      verify("create_date", "timestampz")
-      verify("event_date", "timestampz")
-      verify("execution_date", "timestampz")
+      verify("batch_date", timestamptzType)
+      verify("create_date", timestamptzType)
+      verify("event_date", timestamptzType)
+      verify("execution_date", timestamptzType)
+      verify("last_synced", timestamptzType)
+      verify("latest_event_date", timestamptzType)
 
     }
 
@@ -68,19 +75,23 @@ class TimestampZoneAdderSpec extends AnyWordSpec with DbInitSpec with should.Mat
 
       tableRefactor.run().unsafeRunSync() shouldBe ((): Unit)
 
-      verify("batch_date", "timestampz")
-      verify("create_date", "timestampz")
-      verify("event_date", "timestampz")
-      verify("execution_date", "timestampz")
+      verify("batch_date", timestamptzType)
+      verify("create_date", timestamptzType)
+      verify("event_date", timestamptzType)
+      verify("execution_date", timestamptzType)
+      verify("last_synced", timestamptzType)
+      verify("latest_event_date", timestamptzType)
 
       tableRefactor.run().unsafeRunSync() shouldBe ((): Unit)
 
-      verify("batch_date", "timestampz")
-      verify("create_date", "timestampz")
-      verify("event_date", "timestampz")
-      verify("execution_date", "timestampz")
+      verify("batch_date", timestamptzType)
+      verify("create_date", timestamptzType)
+      verify("event_date", timestamptzType)
+      verify("execution_date", timestamptzType)
+      verify("last_synced", timestamptzType)
+      verify("latest_event_date", timestamptzType)
 
-      logger.loggedOnly(Info("Fields are already in timestampz type"))
+      logger.loggedOnly(Info("Fields are already in timestamptz type"))
 
     }
 

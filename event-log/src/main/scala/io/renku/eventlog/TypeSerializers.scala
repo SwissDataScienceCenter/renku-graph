@@ -46,8 +46,8 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
   val projectPathPut: Encoder[projects.Path] =
     varchar.values.contramap((b: projects.Path) => b.value)
 
-  val eventBodyGet: Decoder[EventBody] = varchar.map(EventBody.apply)
-  val eventBodyPut: Encoder[EventBody] = varchar.values.contramap(_.value)
+  val eventBodyGet: Decoder[EventBody] = text.map(EventBody.apply)
+  val eventBodyPut: Encoder[EventBody] = text.values.contramap(_.value)
 
   val createdDateGet: Decoder[CreatedDate] = timestamptz.map(timestamp => CreatedDate(timestamp.toInstant))
   val createdDatePut: Encoder[CreatedDate] =
@@ -58,7 +58,6 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
   val executionDatePut: Encoder[ExecutionDate] =
     timestamptz.values.contramap((b: ExecutionDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
 
-  // TODO revamp all the codecs
   val eventDateGet: Decoder[EventDate] = timestamptz.map(timestamp => EventDate(timestamp.toInstant))
   val eventDatePut: Encoder[EventDate] =
     timestamptz.values.contramap((b: EventDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
@@ -88,7 +87,7 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
   private val secsPerDay     = 86400
   private val secsPerMonth   = 30 * secsPerDay
   private val secsPerYear    = (365.25 * secsPerDay).toInt
-
+  // TODO revamp all the codecs
   implicit val statusProcessingTimeGet: Get[EventProcessingTime] =
     Get.Advanced.other[PGInterval](NonEmptyList.of("interval")).tmap { pgInterval =>
       val nanos = (pgInterval.getSeconds - pgInterval.getSeconds.floor) * nanosPerSecond
@@ -133,8 +132,8 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
   val microserviceBaseUrlGet: Decoder[MicroserviceBaseUrl] = varchar.map(MicroserviceBaseUrl.apply)
   val microserviceBaseUrlPut: Encoder[MicroserviceBaseUrl] = varchar.values.contramap(_.value)
 
-  val subscriberIdGet: Decoder[SubscriberId] = varchar.map(SubscriberId.apply)
-  val subscriberIdPut: Encoder[SubscriberId] = varchar.values.contramap(_.value)
+  val subscriberIdGet: Decoder[SubscriberId] = varchar(19).map(SubscriberId.apply)
+  val subscriberIdPut: Encoder[SubscriberId] = varchar(19).values.contramap(_.value)
 
   val microserviceIdentifierGet: Decoder[MicroserviceIdentifier] = varchar.map(MicroserviceIdentifier.apply)
   val microserviceIdentifierPut: Encoder[MicroserviceIdentifier] = varchar.values.contramap(_.value)

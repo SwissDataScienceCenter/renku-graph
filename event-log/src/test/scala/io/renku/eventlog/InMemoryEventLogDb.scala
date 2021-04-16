@@ -18,17 +18,16 @@
 
 package io.renku.eventlog
 
-import cats.effect.{ContextShift, IO, Resource}
+import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
 import com.dimafeng.testcontainers._
+import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
 import org.testcontainers.utility.DockerImageName
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
-import eu.timepit.refined.auto._
-import natchez.Trace.Implicits.noop
+import skunk.implicits._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -39,7 +38,7 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
 
   private val dbConfig = new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
-  override val container: Container with JdbcDatabaseContainer = PostgreSQLContainer(
+  override val container: PostgreSQLContainer = PostgreSQLContainer(
     dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
     databaseName = "event_log",
     username = dbConfig.user.value,
@@ -48,7 +47,8 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
 
   lazy val transactor: SessionResource[IO, EventLogDB] = new SessionResource[IO, EventLogDB](
     Session.single(
-      host = container.jdbcUrl,
+      host = container.host,
+      port = container.container.getMappedPort(5432),
       user = dbConfig.user.value,
       database = dbConfig.name.value,
       password = Some(dbConfig.pass)
@@ -61,15 +61,15 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
   def verifyTrue(sql: Command[Void]): Unit = execute(session => session.execute(sql).void)
 
   def verify(column: String, hasType: String) = execute { session =>
-    val query: Query[Void, String] = sql"""SELECT data_type FROM information_schema.columns WHERE
-         table_name = event AND column_name = #$column;""".query(varchar)
-    session.unique(query).map(dataType => dataType == hasType).recover { case _ => false }
+    val query: Query[String, String] = sql"""SELECT data_type FROM information_schema.columns WHERE
+         table_name = event AND column_name = $varchar;""".query(varchar)
+    session.prepare(query).use(_.unique(column)).map(dataType => dataType == hasType).recover { case _ => false }
   }
 
   def tableExists(tableName: String): Boolean = execute { session =>
-    val query: Query[Void, Boolean] =
-      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = #$tableName)".query(bool)
-    session.unique(query).recover { case _ => false }
+    val query: Query[String, Boolean] =
+      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = $varchar)".query(bool)
+    session.prepare(query).use(_.unique(tableName)).recover { case _ => false }
   }
 
   def viewExists(viewName: String): Boolean = execute { session =>

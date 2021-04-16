@@ -47,8 +47,8 @@ trait EventDataFetching {
     execute { session =>
       val query: Query[EventId ~ projects.Id, (CompoundEventId, EventPayload)] =
         sql"""SELECT event_id, project_id, payload
-            FROM event_payload
-            WHERE event_id = $eventIdPut AND project_id = $projectIdPut;"""
+              FROM event_payload
+              WHERE event_id = $eventIdPut AND project_id = $projectIdPut;"""
           .query(eventIdGet ~ projectIdGet ~ eventPayloadGet)
           .map { case eventId ~ projectId ~ eventPayload =>
             (CompoundEventId(eventId, projectId), eventPayload)

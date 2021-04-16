@@ -71,10 +71,10 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: Async: Bracket[*[_], Th
     measureExecutionTime {
       SqlQuery(
         Kleisli { session =>
-          val query: Command[Void] = sql"""DELETE FROM event_delivery
-            WHERE event_id = #${eventId.id.value} AND project_id = #${eventId.projectId.toString}
+          val query: Command[EventId ~ projects.Id] = sql"""DELETE FROM event_delivery
+            WHERE event_id = $eventIdPut AND project_id = $projectIdPut
             """.command
-          session.execute(query)
+          session.prepare(query).use(_ execute (eventId.id ~ eventId.projectId))
         },
         name = "zombie_chasing - clean deliveries"
       )

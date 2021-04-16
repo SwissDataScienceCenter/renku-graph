@@ -142,9 +142,8 @@ class ZombieEventSourceCleanerSpec
 
   private def findAllSubscribers(): List[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute { session =>
     val query: Query[Void, (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] =
-      sql"""|SELECT DISTINCT delivery_id, delivery_url, source_url
-          |FROM subscriber
-          |"""
+      sql"""SELECT DISTINCT delivery_id, delivery_url, source_url
+            FROM subscriber"""
         .query(subscriberIdGet ~ subscriberUrlGet ~ microserviceBaseUrlGet)
         .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
           (subscriberId, subscriberUrl, microserviceBaseUrl)

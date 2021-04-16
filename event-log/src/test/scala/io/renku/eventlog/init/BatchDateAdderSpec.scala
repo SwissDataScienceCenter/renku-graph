@@ -35,6 +35,8 @@ import skunk._
 import skunk.implicits._
 import skunk.codec.all._
 
+import java.time.{Instant, LocalDateTime, ZoneId, ZoneOffset}
+
 class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matchers {
 
   protected override lazy val migrationsToRun: List[Migration] = List(
@@ -100,7 +102,8 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
     transactor
       .use { session =>
         val query: Query[Void, BatchDate] = sql"select batch_date from event_log limit 1"
-          .query(batchDateGet)
+          .query(timestamp)
+          .map { case time: LocalDateTime => BatchDate(time.toInstant(ZoneOffset.UTC)) }
         session
           .option(query)
           .map(_ => true)
@@ -147,7 +150,8 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
     transactor
       .use { session =>
         val query: Query[Void, BatchDate] = sql"select batch_date from event_log"
-          .query(batchDateGet)
+          .query(timestamp)
+          .map { case time: LocalDateTime => BatchDate(time.toInstant(ZoneOffset.UTC)) }
 
         session.execute(query)
       }

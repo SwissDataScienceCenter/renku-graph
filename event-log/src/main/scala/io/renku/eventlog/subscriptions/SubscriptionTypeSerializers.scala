@@ -19,7 +19,7 @@
 package io.renku.eventlog.subscriptions
 import ch.datascience.graph.model.events.CategoryName
 import io.renku.eventlog.TypeSerializers
-import skunk.codec.all.{text, timestamptz}
+import skunk.codec.all.{timestamptz, varchar}
 import skunk.{Decoder, Encoder}
 
 import java.time.{OffsetDateTime, ZoneId}
@@ -31,6 +31,6 @@ trait SubscriptionTypeSerializers extends TypeSerializers {
   val lastSyncedDatePut: Encoder[LastSyncedDate] =
     timestamptz.values.contramap((b: LastSyncedDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
 
-  val categoryNameGet: Decoder[CategoryName] = text.map(CategoryName.apply)
-  val categoryNamePut: Encoder[CategoryName] = text.contramap(_.value)
+  val categoryNameGet: Decoder[CategoryName] = varchar.map(CategoryName.apply)
+  val categoryNamePut: Encoder[CategoryName] = varchar.contramap(_.value)
 }

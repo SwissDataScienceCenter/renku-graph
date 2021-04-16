@@ -25,7 +25,7 @@ import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.events.{CommitId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
-import com.dimafeng.testcontainers.{Container, JdbcDatabaseContainer, PostgreSQLContainer}
+import com.dimafeng.testcontainers.{Container, GenericContainer, JdbcDatabaseContainer, PostgreSQLContainer}
 import io.renku.eventlog._
 import natchez.Trace.Implicits.noop
 import org.testcontainers.utility.DockerImageName
@@ -51,7 +51,7 @@ object EventLog extends TypeSerializers {
   }
 
   private def `status IN`(status: List[EventStatus]) =
-    s"status IN ${NonEmptyList.fromListUnsafe(status).toList.mkString(",")}"
+    s"status IN (${NonEmptyList.fromListUnsafe(status).map(el => s"'$el'").toList.mkString(",")})"
 
   def execute[O](query: Session[IO] => IO[O]): O =
     transactor.use(session => query(session)).unsafeRunSync()
@@ -59,14 +59,12 @@ object EventLog extends TypeSerializers {
   private val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
     new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
-  private val postgresContainer: Container with JdbcDatabaseContainer = PostgreSQLContainer(
+  private val postgresContainer: PostgreSQLContainer = PostgreSQLContainer(
     dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
     databaseName = "event_log",
     username = dbConfig.user.value,
     password = dbConfig.pass
   )
-
-  lazy val jdbcUrl: String = postgresContainer.jdbcUrl
 
   def startDB(): IO[Unit] = for {
     _ <- IO(postgresContainer.start())
@@ -75,7 +73,8 @@ object EventLog extends TypeSerializers {
 
   private lazy val transactor: SessionResource[IO, EventLogDB] = new SessionResource[IO, EventLogDB](
     Session.single(
-      host = postgresContainer.jdbcUrl,
+      host = postgresContainer.host,
+      port = postgresContainer.container.getMappedPort(5432),
       database = dbConfig.name.value,
       user = dbConfig.user.value,
       password = Some(dbConfig.pass)

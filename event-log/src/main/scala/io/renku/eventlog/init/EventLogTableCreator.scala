@@ -20,9 +20,10 @@ package io.renku.eventlog.init
 
 import cats.effect.{Async, Bracket}
 import ch.datascience.db.SessionResource
+import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus.GenerationRecoverableFailure
 import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.EventLogDB
+import io.renku.eventlog.{EventLogDB, TypeSerializers}
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._
@@ -35,20 +36,18 @@ private object EventLogTableCreator {
   def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       transactor: SessionResource[Interpretation, EventLogDB],
       logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): EventLogTableCreator[Interpretation] =
+  ): EventLogTableCreator[Interpretation] =
     new EventLogTableCreatorImpl(transactor, logger)
 }
 
 private class EventLogTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     transactor: SessionResource[Interpretation, EventLogDB],
     logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends EventLogTableCreator[Interpretation]
-    with EventTableCheck {
+) extends EventLogTableCreator[Interpretation]
+    with EventTableCheck
+    with TypeSerializers {
 
   import cats.syntax.all._
-
-  private implicit val transact: SessionResource[Interpretation, EventLogDB] = transactor
 
   override def run(): Interpretation[Unit] = transactor.use { implicit session =>
     whenEventTableExists(
@@ -61,7 +60,7 @@ private class EventLogTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], T
   }
 
   private def checkTableExists: Interpretation[Boolean] =
-    transact.use { session =>
+    transactor.use { session =>
       val query: Query[Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
         .query(bool)
       session
@@ -78,10 +77,7 @@ private class EventLogTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], T
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_execution_date ON event_log(execution_date DESC)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)".command)
-      _ <-
-        execute(
-          sql"UPDATE event_log set status=#${GenerationRecoverableFailure.value} where status='TRIPLES_STORE_FAILURE'".command
-        )
+      _ <- revertStatusToGenerationRecoverableFailure
       _ <- logger info "'event_log' table created"
     } yield ()
 
@@ -98,4 +94,11 @@ private class EventLogTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], T
       PRIMARY KEY (event_id, project_id)
     );
     """.command
+
+  private lazy val revertStatusToGenerationRecoverableFailure = transactor.use { session =>
+    val query: Command[EventStatus] =
+      sql"UPDATE event_log set status=$eventStatusPut where status='TRIPLES_STORE_FAILURE'".command
+    session.prepare(query).use(_.execute(GenerationRecoverableFailure))
+  }
+
 }

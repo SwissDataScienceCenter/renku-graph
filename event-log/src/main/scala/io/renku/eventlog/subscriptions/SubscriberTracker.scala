@@ -49,11 +49,11 @@ private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Thro
       SqlQuery(
         Kleisli { session =>
           val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId] =
-            sql"""|INSERT INTO subscriber (delivery_id, delivery_url, source_url)
-                                                  |VALUES ($subscriberIdPut, $subscriberUrlPut, $microserviceBaseUrlPut)
-                                                  |ON CONFLICT (delivery_url, source_url)
-                                                  |DO UPDATE SET delivery_id = $subscriberIdPut, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
-                                                  |""".command
+            sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
+                  VALUES ($subscriberIdPut, $subscriberUrlPut, $microserviceBaseUrlPut)
+                  ON CONFLICT (delivery_url, source_url)
+                  DO UPDATE SET delivery_id = $subscriberIdPut, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
+               """.command
           session.prepare(query).use {
             _.execute(
               subscriptionInfo.subscriberId ~ subscriptionInfo.subscriberUrl ~ sourceUrl ~ subscriptionInfo.subscriberId
@@ -68,9 +68,10 @@ private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Thro
     measureExecutionTime(
       SqlQuery(
         Kleisli { session =>
-          val query: Command[SubscriberUrl ~ MicroserviceBaseUrl] = sql"""|DELETE FROM subscriber
-                                                                                 |WHERE delivery_url = $subscriberUrlPut AND source_url = $microserviceBaseUrlPut
-                                                                                 |""".command
+          val query: Command[SubscriberUrl ~ MicroserviceBaseUrl] = sql"""
+            DELETE FROM subscriber
+            WHERE delivery_url = $subscriberUrlPut AND source_url = $microserviceBaseUrlPut
+          """.command
           session.prepare(query).use(_.execute(subscriberUrl ~ sourceUrl))
         },
         name = "subscriber - delete"

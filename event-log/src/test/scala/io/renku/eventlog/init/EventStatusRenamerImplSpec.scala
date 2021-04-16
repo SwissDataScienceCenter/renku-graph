@@ -20,7 +20,7 @@ package io.renku.eventlog.init
 
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.graph.model.events.{BatchDate, EventId}
+import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects
 import ch.datascience.interpreters.TestLogger
@@ -33,7 +33,9 @@ import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
 import skunk._
 import skunk.implicits._
-import skunk.codec.all._
+import skunk.codec.all.{timestamp, _}
+
+import java.time.{LocalDateTime, ZoneId, ZoneOffset}
 
 class EventStatusRenamerImplSpec
     extends AnyWordSpec
@@ -69,15 +71,15 @@ class EventStatusRenamerImplSpec
 
         eventStatusRenamer.run().unsafeRunSync() shouldBe ((): Unit)
 
-        findEvents(status = GeneratingTriples).eventIdsOnly.toSet shouldBe processingEvents
+        findEventsCompoundId(status = GeneratingTriples).toSet shouldBe processingEvents
           .map(_.compoundEventId)
           .toList
           .toSet
-        findEvents(status = GenerationRecoverableFailure).eventIdsOnly.toSet shouldBe recoverableEvents
+        findEventsCompoundId(status = GenerationRecoverableFailure).toSet shouldBe recoverableEvents
           .map(_.compoundEventId)
           .toList
           .toSet
-        findEvents(status = GenerationNonRecoverableFailure).eventIdsOnly.toSet shouldBe nonRecoverableEvents
+        findEventsCompoundId(status = GenerationNonRecoverableFailure).toSet shouldBe nonRecoverableEvents
           .map(_.compoundEventId)
           .toList
           .toSet
@@ -95,7 +97,7 @@ class EventStatusRenamerImplSpec
 
       eventStatusRenamer.run().unsafeRunSync() shouldBe ((): Unit)
 
-      findEvents(status = GeneratingTriples).eventIdsOnly.toSet shouldBe Set.empty[CompoundId]
+      findEventsCompoundId(status = GeneratingTriples).toSet shouldBe Set.empty[CompoundId]
 
       findEventsId shouldBe otherEvents.map(_.id).toList.toSet
 
@@ -157,4 +159,16 @@ class EventStatusRenamerImplSpec
     }
     .unsafeRunSync()
     .toSet
+
+  private def findEventsCompoundId(status: EventStatus): List[CompoundEventId] =
+    execute { session: Session[IO] =>
+      val query: Query[EventStatus, CompoundEventId] = sql"""
+            SELECT event_id, project_id
+            FROM event
+            WHERE status = $eventStatusPut
+            ORDER BY created_date asc"""
+        .query(eventIdGet ~ projectIdGet)
+        .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
+      session.prepare(query).use(_.stream(status, 32).compile.toList)
+    }
 }

@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.db.DBConfigProvider
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
-import com.dimafeng.testcontainers.{Container, JdbcDatabaseContainer, PostgreSQLContainer}
+import com.dimafeng.testcontainers.PostgreSQLContainer
 import org.testcontainers.utility.DockerImageName
 
 object TokenRepository {
@@ -32,14 +32,12 @@ object TokenRepository {
   private val dbConfig: DBConfigProvider.DBConfig[ProjectsTokensDB] =
     new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
-  private val postgresContainer: Container with JdbcDatabaseContainer = PostgreSQLContainer(
+  private val postgresContainer: PostgreSQLContainer = PostgreSQLContainer(
     dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
     databaseName = "projects_tokens",
     username = dbConfig.user.value,
     password = dbConfig.pass
   )
-
-  lazy val jdbcUrl: String = postgresContainer.jdbcUrl
 
   def startDB(): IO[Unit] = for {
     _ <- IO(postgresContainer.start())

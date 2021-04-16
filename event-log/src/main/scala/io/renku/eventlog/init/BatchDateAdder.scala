@@ -21,12 +21,14 @@ package io.renku.eventlog.init
 import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
+import ch.datascience.graph.model.events.BatchDate
 import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import skunk._
-import skunk.codec.all.bool
+import skunk.codec.all.{bool, timestamp}
 import skunk.implicits._
 
+import java.time.{LocalDateTime, ZoneOffset}
 import scala.util.control.NonFatal
 
 private trait BatchDateAdder[Interpretation[_]] {
@@ -59,8 +61,9 @@ private class BatchDateAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throwab
     )
   }
   private def checkColumnExists: Interpretation[Boolean] = transactor.use { session =>
-    val query: Query[skunk.Void, Boolean] = sql"SELECT batch_date FROM event_log limit 1"
-      .query(bool)
+    val query: Query[skunk.Void, BatchDate] = sql"SELECT batch_date FROM event_log limit 1"
+      .query(timestamp)
+      .map { case time: LocalDateTime => BatchDate(time.toInstant(ZoneOffset.UTC)) }
     session
       .option(query)
       .map(_ => true)

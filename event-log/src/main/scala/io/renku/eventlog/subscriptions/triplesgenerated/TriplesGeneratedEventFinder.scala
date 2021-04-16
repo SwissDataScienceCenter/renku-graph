@@ -132,7 +132,7 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Async: Bracket[
   // format: on
 
   private def `status IN`(status: EventStatus, otherStatuses: EventStatus*) =
-    s"status IN ${NonEmptyList.of(status, otherStatuses: _*).toList.mkString(",")}"
+    s"status IN (${NonEmptyList.of(status, otherStatuses: _*).map(el => s"'$el'").toList.mkString(",")})"
 
   private lazy val selectProject: List[(ProjectIds, Priority)] => Option[ProjectIds] = {
     case Nil                          => None

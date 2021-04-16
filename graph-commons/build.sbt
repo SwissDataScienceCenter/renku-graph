@@ -70,7 +70,7 @@ libraryDependencies += "org.scalacheck"    %% "scalacheck"      % "1.14.3"  % Te
 libraryDependencies += "org.scalatestplus" %% "scalacheck-1-14" % "3.2.2.0" % Test
 libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.3"   % Test
 
-val testContainersScalaVersion = "0.38.8"
+val testContainersScalaVersion = "0.39.3"
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
 
