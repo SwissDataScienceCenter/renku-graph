@@ -20,10 +20,17 @@ jobs:
       - uses: rokroskar/workflow-run-cleanup-action@v0.3.0
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+  conventional-commits:
+    name: Commit message check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@v1.1.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    needs: [cleanup-previous-runs]
+    needs: [ cleanup-previous-runs, conventional-commits ]
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 1.11
@@ -42,7 +49,7 @@ jobs:
   acceptance-tests:
     name: Acceptance Tests
     runs-on: ubuntu-latest
-    needs: [cleanup-previous-runs]
+    needs: [ cleanup-previous-runs, conventional-commits ]
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 1.11
@@ -61,7 +68,7 @@ jobs:
   formatter:
     name: Formatter
     runs-on: ubuntu-latest
-    needs: [cleanup-previous-runs]
+    needs: [ cleanup-previous-runs, conventional-commits ]
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 1.11
@@ -80,30 +87,30 @@ jobs:
   deploy-to-graph:
     name: Deploy to renku-graph
     runs-on: ubuntu-20.04
-    needs: [unit-tests, acceptance-tests, formatter]
+    needs: [ unit-tests, acceptance-tests, formatter ]
     if: "github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/heads/hotfix-')"
     environment:
       name: renku-kg-dev
     steps:
-    - name: deploy-master
-      uses: SwissDataScienceCenter/renku/actions/deploy-renku@master
-      env:
-        DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
-        DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
-        GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
-        KUBECONFIG: "${{ github.workspace }}/renkubot-kube.config"
-        RANCHER_PROJECT_ID: ${{ secrets.CI_RANCHER_PROJECT }}
-        RENKU_RELEASE: renku-kg-dev
-        RENKU_VALUES_FILE: "${{ github.workspace }}/values.yaml"
-        RENKU_VALUES: ${{ secrets.CI_RENKU_KG_VALUES }}
-        RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
-        RENKUBOT_RANCHER_BEARER_TOKEN: ${{ secrets.RENKUBOT_RANCHER_BEARER_TOKEN }}
-        RENKU_BOT_DEV_PASSWORD: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
-        RENKU_ANONYMOUS_SESSIONS: true
-        RENKU_TESTS_ENABLED: true
-        TEST_ARTIFACTS_PATH: "tests-artifacts-${{ github.sha }}"
-        renku_graph: "@master"
-        renku: "@master"
+      - name: deploy-master
+        uses: SwissDataScienceCenter/renku/actions/deploy-renku@master
+        env:
+          DOCKER_PASSWORD: ${{ secrets.RENKU_DOCKER_PASSWORD }}
+          DOCKER_USERNAME: ${{ secrets.RENKU_DOCKER_USERNAME }}
+          GITLAB_TOKEN: ${{ secrets.DEV_GITLAB_TOKEN }}
+          KUBECONFIG: "${{ github.workspace }}/renkubot-kube.config"
+          RANCHER_PROJECT_ID: ${{ secrets.CI_RANCHER_PROJECT }}
+          RENKU_RELEASE: renku-kg-dev
+          RENKU_VALUES_FILE: "${{ github.workspace }}/values.yaml"
+          RENKU_VALUES: ${{ secrets.CI_RENKU_KG_VALUES }}
+          RENKUBOT_KUBECONFIG: ${{ secrets.RENKUBOT_DEV_KUBECONFIG }}
+          RENKUBOT_RANCHER_BEARER_TOKEN: ${{ secrets.RENKUBOT_RANCHER_BEARER_TOKEN }}
+          RENKU_BOT_DEV_PASSWORD: ${{ secrets.RENKU_BOT_DEV_PASSWORD }}
+          RENKU_ANONYMOUS_SESSIONS: true
+          RENKU_TESTS_ENABLED: true
+          TEST_ARTIFACTS_PATH: "tests-artifacts-${{ github.sha }}"
+          renku_graph: "@master"
+          renku: "@master"
   renku-acceptance-tests:
     name: Renku Acceptance Tests
     runs-on: ubuntu-20.04
