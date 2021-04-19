@@ -54,20 +54,31 @@ class StatusUpdatesRunnerImpl(
   import doobie.implicits._
 
   override def run(command: ChangeStatusCommand[IO]): IO[UpdateResult] = for {
-    _ <- deleteDelivery(command) transact transactor.get recoverWith errorToUpdateResult(
-           s"Event ${command.eventId} - cannot remove event delivery"
-         )
-    updateResult <- executeCommand(command) transact transactor.get recoverWith errorToUpdateResult(
-                      s"Event ${command.eventId} got ${command.status}"
-                    )
+    updateResult <- (deleteDelivery(command) >> executeCommand(command))
+                      .transact(transactor.get)
+                      .recoverWith(deliveryCleanUp(command))
     _ <- logInfo(command, updateResult)
     _ <- command updateGauges updateResult
   } yield updateResult
 
-  private def errorToUpdateResult(message: String): PartialFunction[Throwable, IO[UpdateResult]] = {
+  private def deliveryCleanUp(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
     case NonFatal(exception) =>
-      logger.error(exception)(message)
-      UpdateResult.Failure(ErrorMessage.withExceptionMessage(exception)).pure[IO]
+      deleteDelivery(command)
+        .transact(transactor.get)
+        .recoverWith(deliveryErrorToResult(command)) >>= {
+        case UpdateResult.Updated => logAndAsResult(s"Event ${command.eventId} got ${command.status}", exception)
+        case deletionResult       => deletionResult.pure[IO]
+      }
+  }
+
+  private def deliveryErrorToResult(command: ChangeStatusCommand[IO]): PartialFunction[Throwable, IO[UpdateResult]] = {
+    case NonFatal(exception) =>
+      logAndAsResult(s"Event ${command.eventId} - cannot remove event delivery", exception)
+  }
+
+  private def logAndAsResult(message: String, cause: Throwable): IO[UpdateResult] = {
+    logger.error(cause)(message)
+    UpdateResult.Failure(ErrorMessage.withExceptionMessage(cause)).pure[IO]
   }
 
   private def logInfo(command: ChangeStatusCommand[IO], updateResult: UpdateResult) = updateResult match {
@@ -78,8 +89,8 @@ class StatusUpdatesRunnerImpl(
   private def executeCommand(command: ChangeStatusCommand[IO]): Free[connection.ConnectionOp, UpdateResult] =
     checkIfPersisted(command.eventId) >>= {
       case true =>
-        runUpdateQueriesIfSuccessful(
-          command.queries.toList :++ maybeUpdateProcessingTimeQuery(command),
+        executeQueries(
+          queries = command.queries.toList :++ maybeUpdateProcessingTimeQuery(command),
           command
         ) >>= toUpdateResult
       case false => NotFound.pure[ConnectionIO].widen[commands.UpdateResult]
@@ -114,8 +125,8 @@ class StatusUpdatesRunnerImpl(
   private def maybeUpdateProcessingTimeQuery(command: ChangeStatusCommand[IO]) =
     upsertStatusProcessingTime(command.eventId, command.status, command.maybeProcessingTime)
 
-  private def runUpdateQueriesIfSuccessful(queries: List[SqlQuery[Int]],
-                                           command: ChangeStatusCommand[IO]
+  private def executeQueries(queries: List[SqlQuery[Int]],
+                             command: ChangeStatusCommand[IO]
   ): ConnectionIO[UpdateResult] =
     queries
       .map(query => measureExecutionTime(query).map(query -> _))
