@@ -123,5 +123,5 @@ object Activity {
     }
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Activity] =
-    EntityIdEncoder.instance(entity => EntityId of (renkuBaseUrl / "activities" / entity.id))
+    EntityIdEncoder.instance(entity => EntityId of renkuBaseUrl / "activities" / entity.id)
 }

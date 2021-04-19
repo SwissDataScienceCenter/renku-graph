@@ -18,51 +18,34 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.config.GitLabApiUrl
-import ch.datascience.rdfstore.FusekiBaseUrl
-import ch.datascience.rdfstore.entities.CommandParameter.{EntityCommandParameter, Input}
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import ch.datascience.tinytypes.constraints.UUID
 import Usage._
+import ch.datascience.rdfstore.entities.CommandParameter.{EntityCommandParameter, Input}
+import ch.datascience.tinytypes.constraints.UUID
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-final class Usage private (val id:           Id,
-                           val activity:     Activity,
-                           val commandInput: EntityCommandParameter with Input,
-                           val maybeStep:    Option[Step]
-)
+final case class Usage(id: Id, activity: Activity, commandInput: EntityCommandParameter with Input)
 
 object Usage {
 
   final class Id private (val value: String) extends AnyVal with StringTinyType
   implicit object Id extends TinyTypeFactory[Id](new Id(_)) with UUID
 
-  def apply(activity: Activity, commandInput: EntityCommandParameter with Input): Usage =
-    new Usage(activity, commandInput, maybeStep = None)
-
-  def factory(activity: Activity, commandInput: EntityCommandParameter with Input): Step => Usage =
-    step => new Usage(activity, commandInput, maybeStep = Some(step))
-
   import ch.datascience.graph.config.RenkuBaseUrl
   import io.renku.jsonld._
   import io.renku.jsonld.syntax._
 
-  implicit def encoder(implicit
-      renkuBaseUrl:  RenkuBaseUrl,
-      gitLabApiUrl:  GitLabApiUrl,
-      fusekiBaseUrl: FusekiBaseUrl
-  ): JsonLDEncoder[Usage] =
-    JsonLDEncoder.instance { entity =>
-      val entityId = entity.maybeStep match {
-        case None =>
-          EntityId of fusekiBaseUrl / "activities" / entity.activity.id / "inputs" / entity.commandInput.toString
-        case Some(step) =>
-          EntityId of fusekiBaseUrl / "activities" / entity.activity.id / "steps" / step / "inputs" / entity.commandInput.toString
-      }
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Usage] =
+    JsonLDEncoder.instance { usage =>
       JsonLD.entity(
-        entityId,
+        usage.asEntityId,
         EntityTypes of (prov / "Usage"),
-        prov / "entity"  -> entity.commandInput.entity.asJsonLD,
-        prov / "hadRole" -> entity.commandInput.toString.asJsonLD
+        prov / "entity"  -> usage.commandInput.entity.asJsonLD,
+        prov / "hadRole" -> usage.commandInput.role.asJsonLD
       )
     }
+
+  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Usage] =
+    EntityIdEncoder.instance(usage =>
+      usage.activity.asEntityId.asUrlEntityId / "usage" / usage.id / usage.commandInput.entity.checksum / usage.commandInput.entity.location
+    )
 }

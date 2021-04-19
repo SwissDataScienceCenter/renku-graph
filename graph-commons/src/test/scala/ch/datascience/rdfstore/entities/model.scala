@@ -18,12 +18,8 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.tinytypes.constraints.{NonNegativeInt, PathSegment}
-import ch.datascience.tinytypes.{IntTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.constraints.NonBlank
 
-final class Step private (val value: Int) extends AnyVal with IntTinyType
-object Step extends TinyTypeFactory[Step](new Step(_)) with NonNegativeInt {
-  val one:   Step = Step(1)
-  val two:   Step = Step(2)
-  val three: Step = Step(3)
-}
+final class Role private (val value: String) extends AnyVal with StringTinyType
+object Role extends TinyTypeFactory[Role](new Role(_)) with NonBlank

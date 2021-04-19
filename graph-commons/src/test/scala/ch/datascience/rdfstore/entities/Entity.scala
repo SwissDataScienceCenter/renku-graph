@@ -21,7 +21,7 @@ package ch.datascience.rdfstore.entities
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.rdfstore.entities.Entity.Checksum
 import ch.datascience.tinytypes.constraints.NonBlank
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
+import ch.datascience.tinytypes.{StringTinyType, TinyType, TinyTypeFactory}
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
 
@@ -33,7 +33,12 @@ final case class Entity(checksum:                  Checksum,
                         project:                   Project,
                         maybeInvalidationActivity: Option[Activity],
                         maybeGeneration:           Option[Generation]
-)
+) extends EntityOps
+
+trait EntityOps {
+  self: Entity =>
+  lazy val pathIdentifier: List[TinyType] = List(checksum, location)
+}
 
 object Entity {
 
@@ -68,5 +73,5 @@ object Entity {
     }
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Entity] =
-    EntityIdEncoder.instance(entity => EntityId of (renkuBaseUrl / "blob" / entity.checksum / entity.location))
+    EntityIdEncoder.instance(entity => EntityId of renkuBaseUrl / "blob" / entity.checksum / entity.location)
 }

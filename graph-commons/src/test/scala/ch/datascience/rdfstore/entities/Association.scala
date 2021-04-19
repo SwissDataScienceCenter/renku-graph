@@ -38,5 +38,5 @@ object Association {
     }
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Association] =
-    EntityIdEncoder.instance(entity => entity.activity.asEntityId / "association")
+    EntityIdEncoder.instance(entity => entity.activity.asEntityId.asUrlEntityId / "association")
 }

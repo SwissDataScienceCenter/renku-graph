@@ -19,9 +19,9 @@
 package ch.datascience.rdfstore.entities
 
 import ch.datascience.graph.config.GitLabApiUrl
-import ch.datascience.rdfstore.entities.Generation.{Id, Role}
+import ch.datascience.rdfstore.entities.Generation.Id
 import ch.datascience.rdfstore.entities.RunPlan.Id
-import ch.datascience.tinytypes.constraints.{NonBlank, UUID}
+import ch.datascience.tinytypes.constraints.UUID
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
 // TODO: role to be taken from the RunPlan's output parameter
@@ -35,9 +35,6 @@ object Generation {
       java.util.UUID.randomUUID.toString
     }
   }
-
-  final class Role private (val value: String) extends AnyVal with StringTinyType
-  implicit object Role extends TinyTypeFactory[Role](new Role(_)) with NonBlank
 
   import ch.datascience.graph.config.RenkuBaseUrl
   import io.renku.jsonld._
@@ -58,7 +55,7 @@ object Generation {
     }
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Generation] =
-    EntityIdEncoder.instance(entity =>
-      entity.activity.asEntityId / "generation" / entity.id / entity.entity.checksum / entity.entity.location
+    EntityIdEncoder.instance(generation =>
+      generation.activity.asEntityId.asUrlEntityId / "generation" / generation.id / generation.entity.checksum / generation.entity.location
     )
 }

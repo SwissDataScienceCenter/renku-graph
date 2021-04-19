@@ -19,7 +19,7 @@
 package io.renku.jsonld.generators
 
 import Generators._
-import io.renku.jsonld.JsonLD.{JsonLDEntity}
+import io.renku.jsonld.JsonLD.JsonLDEntity
 import io.renku.jsonld._
 import org.scalacheck.{Arbitrary, Gen}
 

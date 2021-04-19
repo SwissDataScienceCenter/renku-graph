@@ -18,7 +18,6 @@
 
 package ch.datascience.rdfstore
 
-import java.time.{Instant, LocalDate}
 import cats.kernel.Semigroup
 import ch.datascience.graph.Schemas
 import ch.datascience.graph.config.RenkuBaseUrl
@@ -26,9 +25,11 @@ import ch.datascience.graph.model.datasets.{IdSameAs, SameAs, UrlSameAs}
 import ch.datascience.graph.model.projects.Visibility
 import ch.datascience.graph.model.projects.Visibility.{Internal, Private, Public}
 import ch.datascience.tinytypes._
-import ch.datascience.tinytypes.constraints.PathSegment
+import ch.datascience.tinytypes.constraints._
 import io.renku.jsonld._
 import io.renku.jsonld.syntax._
+
+import java.time.{Instant, LocalDate}
 
 package object entities extends Schemas with EntitiesGenerators {
 
@@ -88,9 +89,18 @@ package object entities extends Schemas with EntitiesGenerators {
   }
 
   implicit class EntityIdOps(entityId: EntityId) {
-    import ch.datascience.http.client.UrlEncoder._
 
-    def /(value: Any): EntityId = EntityId.of(s"$entityId/${urlEncode(value.toString)}")
+    case class UrlfiedEntityId(value: String) extends EntityId with StringTinyType {
+      override type Value = String
+    }
+
+    object UrlfiedEntityId
+        extends TinyTypeFactory[UrlfiedEntityId](new UrlfiedEntityId(_))
+        with Url
+        with UrlOps[UrlfiedEntityId]
+        with UrlResourceRenderer[UrlfiedEntityId]
+
+    lazy val asUrlEntityId: UrlfiedEntityId = UrlfiedEntityId(entityId.value.toString)
   }
 
   implicit class PropertiesOps(x: List[(Property, JsonLD)]) {

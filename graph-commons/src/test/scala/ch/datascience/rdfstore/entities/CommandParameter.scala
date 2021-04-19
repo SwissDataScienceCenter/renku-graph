@@ -18,8 +18,6 @@
 
 package ch.datascience.rdfstore.entities
 
-import java.util.UUID.randomUUID
-
 import cats.syntax.all._
 import ch.datascience.graph.config.{GitLabApiUrl, RenkuBaseUrl}
 import ch.datascience.rdfstore.FusekiBaseUrl
@@ -39,6 +37,7 @@ import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld.syntax._
 import io.renku.jsonld.{EntityId, EntityTypes, JsonLDEncoder}
 
+import java.util.UUID.randomUUID
 import scala.language.postfixOps
 
 sealed abstract class CommandParameter(val maybePrefix: Option[Prefix], val runPlan: RunPlan) {
@@ -206,8 +205,8 @@ object CommandParameter {
     self: CommandParameter =>
 
     val maybeStep:            Option[Step]
+    val role:                 Role
     protected val identifier: String
-    override lazy val toString: String = s"input_$identifier"
   }
 
   object Input {
@@ -222,16 +221,13 @@ object CommandParameter {
       trait NoPositionInputFactory extends InputFactory with (RunPlan => EntityCommandParameter with Input)
     }
 
-    def from(entity: Entity with Artifact): PositionInputFactory =
+    def from(entity: Entity): PositionInputFactory =
       from(entity, maybePrefix = None, maybeUsedIn = None)
 
-    def from(entity: Entity with Artifact, usedIn: Step): PositionInputFactory =
+    def from(entity: Entity, usedIn: Step): PositionInputFactory =
       from(entity, maybePrefix = None, maybeUsedIn = usedIn.some)
 
-    def from(entity:      Entity with Artifact,
-             maybePrefix: Option[Prefix],
-             maybeUsedIn: Option[Step]
-    ): PositionInputFactory =
+    def from(entity: Entity, maybePrefix: Option[Prefix], maybeUsedIn: Option[Step]): PositionInputFactory =
       positionArg =>
         runPlan =>
           new EntityCommandParameter(maybePrefix, runPlan, entity) with Input with PositionInfo {
@@ -240,13 +236,10 @@ object CommandParameter {
             override val position:             Position     = positionArg
           }
 
-    def streamFrom(entity: Entity with Artifact): MappedInputFactory =
+    def streamFrom(entity: Entity): MappedInputFactory =
       streamFrom(entity, maybePrefix = None, maybeUsedIn = None)
 
-    def streamFrom(entity:      Entity with Artifact,
-                   maybePrefix: Option[Prefix],
-                   maybeUsedIn: Option[Step]
-    ): MappedInputFactory =
+    def streamFrom(entity: Entity, maybePrefix: Option[Prefix], maybeUsedIn: Option[Step]): MappedInputFactory =
       runPlan =>
         new EntityCommandParameter(maybePrefix, runPlan, entity) with Input with InputMapping {
           protected override val identifier: String       = StdIn.name.value
@@ -254,10 +247,10 @@ object CommandParameter {
           override val mappedTo:             IOStream.In  = StdIn
         }
 
-    def withoutPositionFrom(entity: Entity with Artifact): NoPositionInputFactory =
+    def withoutPositionFrom(entity: Entity): NoPositionInputFactory =
       withoutPositionFrom(entity, maybePrefix = None, maybeUsedIn = None)
 
-    def withoutPositionFrom(entity:      Entity with Artifact,
+    def withoutPositionFrom(entity:      Entity,
                             maybePrefix: Option[Prefix],
                             maybeUsedIn: Option[Step]
     ): NoPositionInputFactory =
@@ -324,6 +317,7 @@ object CommandParameter {
 
     import CommandParameter.Output.FolderCreation
 
+    val role:                 Role
     val outputFolderCreation: FolderCreation
     val maybeProducedByStep:  Option[Step]
     protected val identifier: String
