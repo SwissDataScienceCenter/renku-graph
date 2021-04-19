@@ -23,6 +23,7 @@ jobs:
   conventional-commits:
     name: Commit message check
     runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
     steps:
       - uses: amannn/action-semantic-pull-request@v1.1.1
         env:
@@ -30,7 +31,7 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-latest
-    needs: [ cleanup-previous-runs, conventional-commits ]
+    needs: cleanup-previous-runs
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 1.11
@@ -49,7 +50,7 @@ jobs:
   acceptance-tests:
     name: Acceptance Tests
     runs-on: ubuntu-latest
-    needs: [ cleanup-previous-runs, conventional-commits ]
+    needs: cleanup-previous-runs
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 1.11
@@ -68,7 +69,7 @@ jobs:
   formatter:
     name: Formatter
     runs-on: ubuntu-latest
-    needs: [ cleanup-previous-runs, conventional-commits ]
+    needs: cleanup-previous-runs
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 1.11
