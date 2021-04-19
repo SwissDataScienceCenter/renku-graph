@@ -22,15 +22,14 @@ import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{Async, Bracket, ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
-import ch.datascience.graph.model.events.{CategoryName, EventStatus}
+import ch.datascience.graph.model.events.{CategoryName, EventStatus, LastSyncedDate}
 import ch.datascience.graph.model.projects.Path
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import io.renku.eventlog._
-import io.renku.eventlog.subscriptions.{LastSyncedDate, SubscriptionTypeSerializers}
+import io.renku.eventlog.subscriptions.{SubscriptionTypeSerializers, commitsync, membersync}
 import skunk._
 import skunk.implicits._
 import skunk.codec.all._
@@ -48,7 +47,6 @@ trait StatsFinder[Interpretation[_]] {
 class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     transactor:       SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
-    categoryNames:    Set[CategoryName] Refined NonEmpty,
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with StatsFinder[Interpretation]
@@ -60,42 +58,59 @@ class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
   }
 
   // format: off
-  
+
   private lazy val countEventsPerCategoryName = SqlQuery[Interpretation, List[(CategoryName, Long)]](
     Kleisli{ session =>
-      val query : Query[EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate, (CategoryName, Long)] = sql"""SELECT all_counts.category_name, SUM(all_counts.count)
+      val query : Query[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ 
+        CategoryName ~ CategoryName ~ CategoryName ~  EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ CategoryName ~ 
+        CategoryName, (CategoryName, Long)] = sql"""
+          SELECT all_counts.category_name, SUM(all_counts.count)
           FROM (
             (
-              SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id)
+              SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
-              JOIN subscription_category_sync_time sync_time ON sync_time.project_id = proj.project_id
+              JOIN subscription_category_sync_time sync_time
+                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNamePut
               WHERE
                    (($eventDatePut - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 minute')
                 OR (($eventDatePut - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 hour')
                 OR (($eventDatePut - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 day')
               GROUP BY sync_time.category_name
-            ) UNION #${(categoryNames map generateUnions).reduce(_ ++ " UNION " ++ _)}
+            ) UNION ALL (
+              SELECT $categoryNamePut AS category_name, COUNT(DISTINCT proj.project_id) AS count
+              FROM project proj
+              WHERE proj.project_id NOT IN (
+                SELECT project_id
+                FROM subscription_category_sync_time
+                WHERE category_name = $categoryNamePut
+              )
+            ) UNION ALL (
+              SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
+              FROM project proj
+              JOIN subscription_category_sync_time sync_time
+                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNamePut
+              WHERE
+                   (($eventDatePut - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 hour')
+                OR (($eventDatePut - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 day')
+              GROUP BY sync_time.category_name
+            ) UNION ALL (
+              SELECT $categoryNamePut AS category_name, COUNT(DISTINCT proj.project_id) AS count
+              FROM project proj
+              WHERE proj.project_id NOT IN (
+                SELECT project_id
+                FROM subscription_category_sync_time
+                WHERE category_name = $categoryNamePut
+              )
+            )
           ) all_counts
-          GROUP BY all_counts.category_name;
+          GROUP BY all_counts.category_name
           """.query(categoryNameGet ~ numeric).map{ case categoryName ~ (count:BigDecimal) => (categoryName, count.longValue)}
       val eventDate = EventDate(now())
       val lastSyncedDate = LastSyncedDate(now())
-      session.prepare(query).use{_.stream(eventDate ~lastSyncedDate ~ eventDate ~lastSyncedDate ~ eventDate ~lastSyncedDate, 32).compile.toList}
+      session.prepare(query).use{_.stream(membersync.categoryName ~ eventDate ~lastSyncedDate ~ eventDate ~lastSyncedDate ~ eventDate ~lastSyncedDate ~ membersync.categoryName ~ membersync.categoryName  ~ commitsync.categoryName ~  eventDate ~lastSyncedDate ~ eventDate ~lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName, 32).compile.toList}
     },
     name = "category name events count"
   )
-  // format: on
-  // TODO could we make it safer with sql string interpolation
-  private def generateUnions(categoryName: CategoryName) =
-    s"""  (
-            SELECT '$categoryName' AS category_name, COUNT(DISTINCT proj.project_id)
-            FROM project proj
-            WHERE
-              proj.project_id NOT IN (
-                SELECT project_id from subscription_category_sync_time WHERE category_name = '$categoryName'
-              )
-          )
-    """
 
   override def statuses(): Interpretation[Map[EventStatus, Long]] = transactor.use { implicit session =>
     measureExecutionTime(findStatuses)
@@ -183,16 +198,10 @@ class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
 
 object IOStatsFinder {
 
-  import io.renku.eventlog.subscriptions.membersync
-
   def apply(
       transactor:          SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[StatsFinder[IO]] = IO {
-    new StatsFinderImpl(
-      transactor,
-      queriesExecTimes,
-      categoryNames = Refined.unsafeApply(Set(membersync.categoryName))
-    )
+    new StatsFinderImpl(transactor, queriesExecTimes)
   }
 }

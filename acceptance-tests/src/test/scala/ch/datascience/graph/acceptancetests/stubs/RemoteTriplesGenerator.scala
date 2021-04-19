@@ -19,7 +19,6 @@
 package ch.datascience.graph.acceptancetests.stubs
 
 import ch.datascience.graph.acceptancetests.data._
-import ch.datascience.graph.acceptancetests.stubs.GitLab.port
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.CliVersion
 import ch.datascience.graph.model.events.CommitId
@@ -27,8 +26,8 @@ import ch.datascience.knowledgegraph.projects.model.Project
 import ch.datascience.rdfstore.entities.Person
 import ch.datascience.rdfstore.entities.bundles._
 import com.github.tomakehurst.wiremock.WireMockServer
+import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.client.{MappingBuilder, WireMock}
-import com.github.tomakehurst.wiremock.client.WireMock.{get, ok, stubFor}
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import eu.timepit.refined.api.Refined
@@ -73,6 +72,28 @@ object RemoteTriplesGenerator {
         .willReturn(
           ok(triples.toJson.spaces2)
         )
+    }
+    ()
+  }
+
+  def `GET <triples-generator>/projects/:id/commits/:id fails non recoverably`(
+      project:  Project,
+      commitId: CommitId
+  ): Unit = {
+    stubFor {
+      get(s"/projects/${project.id}/commits/$commitId")
+        .willReturn(badRequest())
+    }
+    ()
+  }
+
+  def `GET <triples-generator>/projects/:id/commits/:id fails recoverably`(
+      project:  Project,
+      commitId: CommitId
+  ): Unit = {
+    stubFor {
+      get(s"/projects/${project.id}/commits/$commitId")
+        .willReturn(unauthorized())
     }
     ()
   }

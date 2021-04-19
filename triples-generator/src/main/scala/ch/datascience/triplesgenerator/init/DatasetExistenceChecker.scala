@@ -22,7 +22,7 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.control.Throttler
 import ch.datascience.http.client.IORestClient
 import ch.datascience.triplesgenerator.config.FusekiAdminConfig
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 

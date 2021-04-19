@@ -97,6 +97,9 @@ trait EventLogDataProvisioning {
   }
 
   protected def upsertProject(compoundEventId: CompoundEventId, projectPath: Path, eventDate: EventDate): Unit =
+    upsertProject(compoundEventId.projectId, projectPath, eventDate)
+
+  protected def upsertProject(projectId: projects.Id, projectPath: Path, eventDate: EventDate): Unit =
     execute { session =>
       val query: Command[projects.Id ~ projects.Path ~ EventDate] = sql"""
             INSERT INTO
@@ -105,7 +108,7 @@ trait EventLogDataProvisioning {
             ON CONFLICT (project_id)
             DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
       """.command
-      session.prepare(query).use(_.execute(compoundEventId.projectId ~ projectPath ~ eventDate)).void
+      session.prepare(query).use(_.execute(projectId ~ projectPath ~ eventDate)).void
     }
 
   protected def upsertEventPayload(compoundEventId: CompoundEventId,

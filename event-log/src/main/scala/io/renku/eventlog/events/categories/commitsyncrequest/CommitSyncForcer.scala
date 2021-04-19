@@ -1,0 +1,99 @@
+/*
+ * Copyright 2021 Swiss Data Science Center (SDSC)
+ * A partnership between École Polytechnique Fédérale de Lausanne (EPFL) and
+ * Eidgenössische Technische Hochschule Zürich (ETHZ).
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package io.renku.eventlog.events.categories.commitsyncrequest
+
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket, IO}
+import cats.syntax.all._
+import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
+import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.graph.model.projects
+import ch.datascience.metrics.LabeledHistogram
+import eu.timepit.refined.api.Refined
+import io.renku.eventlog.subscriptions.{SubscriptionTypeSerializers, commitsync}
+import io.renku.eventlog.{EventDate, EventLogDB, TypeSerializers}
+import skunk._
+import skunk.data.Completion
+import skunk.implicits._
+
+import java.time.Instant
+
+private trait CommitSyncForcer[Interpretation[_]] {
+  def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): Interpretation[Unit]
+}
+
+private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    transactor:       SessionResource[Interpretation, EventLogDB],
+    queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
+    now:              () => Instant = () => Instant.now
+) extends DbClient(Some(queriesExecTimes))
+    with CommitSyncForcer[Interpretation]
+    with TypeSerializers
+    with SubscriptionTypeSerializers {
+
+  override def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): Interpretation[Unit] =
+    transactor.use { implicit session =>
+      deleteLastSyncedDate(projectId) flatMap {
+        case Completion.Delete(0) => upsertProject(projectId, projectPath).void
+        case _                    => ().pure[Interpretation]
+      }
+    }
+
+  private def deleteLastSyncedDate(projectId: projects.Id)(implicit session: Session[Interpretation]) =
+    measureExecutionTime {
+      SqlQuery(
+        Kleisli { session =>
+          val query: Command[projects.Id ~ CategoryName] = sql"""
+            DELETE FROM subscription_category_sync_time
+            WHERE project_id = $projectIdPut AND category_name = $categoryNamePut
+          """.command
+          session.prepare(query).use(_.execute(projectId ~ commitsync.categoryName))
+        },
+        name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced")
+      )
+    }
+
+  private def upsertProject(projectId: projects.Id, projectPath: projects.Path)(implicit
+      session:                         Session[Interpretation]
+  ) = measureExecutionTime {
+    SqlQuery(
+      Kleisli { session =>
+        val query: Command[projects.Id ~ projects.Path ~ EventDate] = sql"""
+          INSERT INTO
+          project (project_id, project_path, latest_event_date)
+          VALUES ($projectIdPut, $projectPathPut, $eventDatePut)
+          ON CONFLICT (project_id)
+          DO NOTHING
+      """.command
+        session.prepare(query).use(_.execute(projectId ~ projectPath ~ EventDate(now())))
+      },
+      name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert project")
+    )
+  }
+}
+
+private object CommitSyncForcer {
+  import cats.effect.IO
+
+  def apply(transactor:       SessionResource[IO, EventLogDB],
+            queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
+  ): IO[CommitSyncForcer[IO]] = IO {
+    new CommitSyncForcerImpl(transactor, queriesExecTimes)
+  }
+}

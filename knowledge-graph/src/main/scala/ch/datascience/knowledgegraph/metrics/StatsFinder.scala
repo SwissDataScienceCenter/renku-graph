@@ -25,7 +25,7 @@ import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import ch.datascience.tinytypes.{TinyType, TinyTypeFactory}
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder.decodeList
 import io.circe.{Decoder, DecodingFailure}
 

@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions
 import cats.MonadError
 import cats.effect.Effect
 import ch.datascience.http.ErrorMessage
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Json
 import io.renku.eventlog.subscriptions.EventProducersRegistry.{SubscriptionResult, UnsupportedPayload}
 import org.http4s.dsl.Http4sDsl

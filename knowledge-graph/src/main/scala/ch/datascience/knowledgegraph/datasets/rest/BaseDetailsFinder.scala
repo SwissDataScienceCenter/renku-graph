@@ -28,7 +28,7 @@ import ch.datascience.knowledgegraph.datasets.model.{Dataset, DatasetProject}
 import ch.datascience.rdfstore.SparqlQuery.Prefixes
 import ch.datascience.rdfstore._
 import eu.timepit.refined.auto._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.{DecodingFailure, HCursor}
 
 import scala.concurrent.ExecutionContext
@@ -143,6 +143,7 @@ private class BaseDetailsFinder(
 }
 
 private object BaseDetailsFinder {
+
   import io.circe.Decoder
   import Decoder._
   import ch.datascience.graph.model.datasets._

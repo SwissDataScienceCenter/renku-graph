@@ -28,9 +28,10 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import eu.timepit.refined.auto._
 import io.renku.eventlog.ExecutionDate
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
+import io.renku.eventlog.statuschange.ChangeStatusRequest.EventOnlyRequest
+import io.renku.eventlog.statuschange.CommandFindingResult.{CommandFound, NotSupported}
 import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import org.http4s.{MediaType, Request}
+import io.renku.eventlog.statuschange.{ChangeStatusRequest, CommandFindingResult}
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
@@ -47,7 +48,7 @@ final case class ToNew[Interpretation[_]: Async: Bracket[*[_], Throwable]](
 
   override lazy val status: EventStatus = New
 
-  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList(
+  override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList.of(
     SqlQuery(
       Kleisli { session =>
         val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
@@ -67,8 +68,7 @@ final case class ToNew[Interpretation[_]: Async: Bracket[*[_], Throwable]](
           }
       },
       name = "generating_triples->new"
-    ),
-    Nil
+    )
   )
 
   override def updateGauges(
@@ -88,22 +88,11 @@ object ToNew {
   def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       awaitingTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[Interpretation, projects.Path]
-  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
-    Kleisli { case (eventId, request) =>
-      when(request, has = MediaType.application.json) {
-        {
-          for {
-            _                   <- request.validate(status = New)
-            maybeProcessingTime <- request.getProcessingTime
-          } yield CommandFound(
-            ToNew[Interpretation](
-              eventId,
-              awaitingTriplesGenerationGauge,
-              underTriplesGenerationGauge,
-              maybeProcessingTime
-            )
-          )
-        }.merge
-      }
-    }
+  ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
+    case EventOnlyRequest(eventId, New, maybeProcessingTime, _) =>
+      CommandFound(
+        ToNew[Interpretation](eventId, awaitingTriplesGenerationGauge, underTriplesGenerationGauge, maybeProcessingTime)
+      )
+    case _ => NotSupported
+  }
 }

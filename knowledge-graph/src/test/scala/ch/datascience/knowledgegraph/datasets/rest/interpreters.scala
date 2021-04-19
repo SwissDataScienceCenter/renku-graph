@@ -22,7 +22,7 @@ import cats.effect.IO
 import ch.datascience.config.renku
 import ch.datascience.knowledgegraph.projects.rest.{ProjectEndpoint, ProjectFinder}
 import ch.datascience.logging.ExecutionTimeRecorder
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 class IOProjectEndpointStub(projectFinder:         ProjectFinder[IO],
                             renkuResourcesUrl:     renku.ResourcesUrl,

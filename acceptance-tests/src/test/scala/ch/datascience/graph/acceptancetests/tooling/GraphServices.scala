@@ -44,6 +44,7 @@ trait GraphServices extends BeforeAndAfterAll {
   protected val knowledgeGraphClient:   KnowledgeGraphClient = GraphServices.knowledgeGraphClient
   protected val eventLogClient:         ServiceClient        = GraphServices.eventLogClient
   protected val webhookService:         ServiceRun           = GraphServices.webhookService
+  protected val commitEventService:     ServiceRun           = GraphServices.commitEventService
   protected val tokenRepository:        ServiceRun           = GraphServices.tokenRepository
   protected val triplesGenerator:       ServiceRun           = GraphServices.triplesGenerator
   protected val knowledgeGraph:         ServiceRun           = GraphServices.knowledgeGraph
@@ -57,6 +58,7 @@ trait GraphServices extends BeforeAndAfterAll {
         tokenRepository,
         eventLog,
         webhookService,
+        commitEventService,
         triplesGenerator,
         knowledgeGraph
       )
@@ -73,29 +75,35 @@ object GraphServices {
   implicit lazy val contextShift:     ContextShift[IO] = IO.contextShift(executionContext)
   implicit lazy val timer:            Timer[IO]        = IO.timer(executionContext)
 
-  val webhookServiceClient   = WebhookServiceClient()
-  val triplesGeneratorClient = TriplesGeneratorClient()
-  val tokenRepositoryClient  = TokenRepositoryClient()
-  val knowledgeGraphClient   = KnowledgeGraphClient()
-  val eventLogClient         = EventLogClient()
+  val webhookServiceClient:     WebhookServiceClient          = WebhookServiceClient()
+  val commitEventServiceClient: ServiceClient                 = CommitEventServiceClient()
+  val triplesGeneratorClient:   ServiceClient                 = TriplesGeneratorClient()
+  val tokenRepositoryClient:    ServiceClient                 = TokenRepositoryClient()
+  val knowledgeGraphClient:     KnowledgeGraphClient          = KnowledgeGraphClient()
+  val eventLogClient:           EventLogClient.EventLogClient = EventLogClient()
 
-  val webhookService = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
-  val knowledgeGraph = ServiceRun("knowledge-graph", knowledgegraph.Microservice, knowledgeGraphClient)
-  val tokenRepository = ServiceRun(
+  private val webhookService = ServiceRun("webhook-service", webhookservice.Microservice, webhookServiceClient)
+  private val commitEventService = ServiceRun(
+    "commit-event-service",
+    commiteventservice.Microservice,
+    commitEventServiceClient
+  )
+  private val knowledgeGraph = ServiceRun("knowledge-graph", knowledgegraph.Microservice, knowledgeGraphClient)
+  private val tokenRepository = ServiceRun(
     "token-repository",
     tokenrepository.Microservice,
     tokenRepositoryClient,
     preServiceStart = List(TokenRepository.startDB()),
     serviceArgsList = List()
   )
-  val eventLog = ServiceRun(
+  private val eventLog = ServiceRun(
     "event-log",
     eventlog.Microservice,
     eventLogClient,
     preServiceStart = List(EventLog.startDB()),
     serviceArgsList = List()
   )
-  val triplesGenerator = ServiceRun(
+  private val triplesGenerator = ServiceRun(
     "triples-generator",
     service = triplesgenerator.Microservice,
     serviceClient = triplesGeneratorClient,

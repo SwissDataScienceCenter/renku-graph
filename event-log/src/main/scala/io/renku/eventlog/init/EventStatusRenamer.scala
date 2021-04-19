@@ -21,7 +21,7 @@ package io.renku.eventlog.init
 import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import skunk._
 import skunk.implicits._

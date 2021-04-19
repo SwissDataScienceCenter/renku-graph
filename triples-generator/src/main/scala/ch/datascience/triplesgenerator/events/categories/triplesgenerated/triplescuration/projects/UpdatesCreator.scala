@@ -32,7 +32,7 @@ import ch.datascience.triplesgenerator.events.categories.awaitinggeneration.Comm
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedEvent
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CuratedTriples.CurationUpdatesGroup
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import eu.timepit.refined.auto._
 
 import scala.concurrent.ExecutionContext
@@ -127,6 +127,7 @@ private class UpdatesCreatorImpl(
 }
 
 private object IOUpdateFunctionsCreator {
+
   import cats.effect.Timer
   import ch.datascience.config.GitLab
   import ch.datascience.control.Throttler

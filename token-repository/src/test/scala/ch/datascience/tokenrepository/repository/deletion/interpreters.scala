@@ -22,7 +22,7 @@ import cats.effect._
 import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.util.Try
 

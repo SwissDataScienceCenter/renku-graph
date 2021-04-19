@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "commitEventService.fullname" . }}
+  labels:
+    app: {{ template "commitEventService.name" . }}
+    chart: {{ template "graph.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+  annotations:
+    prometheus.io/scrape: 'true'
+    prometheus.io/path: '/metrics'
+    prometheus.io/port: '9006'
+spec:
+  type: {{ .Values.commitEventService.service.type }}
+  ports:
+    - port: {{ .Values.commitEventService.service.port }}
+      targetPort: http-commit-sv
+      protocol: TCP
+      name: http
+  selector:
+    app: {{ template "commitEventService.name" . }}
+    release: {{ .Release.Name }}

@@ -24,7 +24,7 @@ import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.{Id, Path}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.parser._
 import io.circe.{Decoder, HCursor}
 import io.renku.eventlog.{EventLogDB, TypeSerializers}

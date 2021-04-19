@@ -24,8 +24,8 @@ import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, ToTransformationNonRecoverableFailure, UpdateResult}
+import org.typelevel.log4cats.Logger
+import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, ToTransformationNonRecoverableFailure, TransformingToTriplesGenerated, UpdateResult}
 import io.renku.eventlog.statuschange.{IOUpdateCommandsRunner, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.DispatchRecovery
 import io.renku.eventlog.{EventLogDB, EventMessage, subscriptions}
@@ -35,12 +35,21 @@ import scala.language.postfixOps
 import scala.util.control.NonFatal
 
 private class DispatchRecoveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    awaitingTransformationGauge:     LabeledGauge[Interpretation, projects.Path],
     underTriplesTransformationGauge: LabeledGauge[Interpretation, projects.Path],
     statusUpdatesRunner:             StatusUpdatesRunner[Interpretation],
     logger:                          Logger[Interpretation],
     onErrorSleep:                    FiniteDuration
 )(implicit timer:                    Timer[Interpretation])
     extends subscriptions.DispatchRecovery[Interpretation, TriplesGeneratedEvent] {
+
+  override def returnToQueue(event: TriplesGeneratedEvent): Interpretation[Unit] = {
+    val toTriplesGeneratedCommand = TransformingToTriplesGenerated[Interpretation](event.id,
+                                                                                   awaitingTransformationGauge,
+                                                                                   underTriplesTransformationGauge
+    )
+    statusUpdatesRunner run toTriplesGeneratedCommand void
+  }
 
   override def recover(
       url:   SubscriberUrl,
@@ -50,7 +59,7 @@ private class DispatchRecoveryImpl[Interpretation[_]: Async: Bracket[*[_], Throw
       event.id,
       EventMessage(exception),
       underTriplesTransformationGauge,
-      None
+      maybeProcessingTime = None
     )
     for {
       _ <- statusUpdatesRunner run markEventFailed recoverWith retry(markEventFailed)
@@ -76,10 +85,16 @@ private object DispatchRecovery {
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
   def apply(transactor:                      SessionResource[IO, EventLogDB],
+            awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
             underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
             queriesExecTimes:                LabeledHistogram[IO, SqlQuery.Name],
             logger:                          Logger[IO]
   )(implicit timer:                          Timer[IO]): IO[DispatchRecovery[IO, TriplesGeneratedEvent]] = for {
     updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
-  } yield new DispatchRecoveryImpl[IO](underTriplesTransformationGauge, updateCommandRunner, logger, OnErrorSleep)
+  } yield new DispatchRecoveryImpl[IO](awaitingTransformationGauge,
+                                       underTriplesTransformationGauge,
+                                       updateCommandRunner,
+                                       logger,
+                                       OnErrorSleep
+  )
 }

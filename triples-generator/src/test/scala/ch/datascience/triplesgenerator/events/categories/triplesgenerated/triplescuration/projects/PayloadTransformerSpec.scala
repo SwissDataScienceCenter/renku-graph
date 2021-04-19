@@ -28,9 +28,9 @@ import ch.datascience.graph.model.projects.Path
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError._
 import ch.datascience.rdfstore.JsonLDTriples
-import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.TriplesGeneratedGenerators._
 import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.CurationGenerators._
+import ch.datascience.triplesgenerator.events.categories.triplesgenerated.triplescuration.IOTriplesCurator.CurationRecoverableError
 import eu.timepit.refined.auto._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
@@ -81,7 +81,7 @@ class PayloadTransformerSpec extends AnyWordSpec with MockFactory with should.Ma
     }
 
     Set(
-      UnexpectedResponseException(nonBlankStrings().generateOne),
+      UnexpectedResponseException(serverErrorHttpStatuses.generateOne, nonBlankStrings().generateOne),
       ConnectivityException(nonBlankStrings().generateOne, exceptions.generateOne)
     ) foreach { exception =>
       s"return $CurationRecoverableError if finding GitLab project fails with ${exception.getClass.getSimpleName}" in new TestCase {

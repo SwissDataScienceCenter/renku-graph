@@ -18,9 +18,9 @@
 
 package ch.datascience.webhookservice.hookvalidation
 
-import cats.MonadError
 import cats.effect.{ContextShift, IO, Timer}
 import cats.syntax.all._
+import cats.{Applicative, MonadError}
 import ch.datascience.config.GitLab
 import ch.datascience.control.Throttler
 import ch.datascience.graph.config.GitLabUrl
@@ -29,22 +29,29 @@ import ch.datascience.graph.tokenrepository.{AccessTokenFinder, IOAccessTokenFin
 import ch.datascience.http.client.AccessToken
 import ch.datascience.http.client.RestClientError.UnauthorizedException
 import ch.datascience.logging.ApplicationLogger
+import ch.datascience.webhookservice.hookvalidation.HookValidator.HookValidationResult
 import ch.datascience.webhookservice.hookvalidation.ProjectHookVerifier.HookIdentifier
-import ch.datascience.webhookservice.project._
+import ch.datascience.webhookservice.model.ProjectHookUrl
 import ch.datascience.webhookservice.tokenrepository._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-class HookValidator[Interpretation[_]](
+trait HookValidator[Interpretation[_]] {
+  def validateHook(projectId: Id, maybeAccessToken: Option[AccessToken]): Interpretation[HookValidationResult]
+}
+
+class HookValidatorImpl[Interpretation[_]: MonadError[*[_], Throwable]](
     projectHookUrl:        ProjectHookUrl,
     projectHookVerifier:   ProjectHookVerifier[Interpretation],
     accessTokenFinder:     AccessTokenFinder[Interpretation],
     accessTokenAssociator: AccessTokenAssociator[Interpretation],
     accessTokenRemover:    AccessTokenRemover[Interpretation],
     logger:                Logger[Interpretation]
-)(implicit ME:             MonadError[Interpretation, Throwable]) {
+) extends HookValidator[Interpretation] {
+
+  private val applicative = Applicative[Interpretation]
 
   import HookValidator.HookValidationResult._
   import HookValidator._
@@ -53,6 +60,7 @@ class HookValidator[Interpretation[_]](
   import accessTokenAssociator._
   import accessTokenFinder._
   import accessTokenRemover._
+  import applicative._
   import projectHookVerifier._
 
   def validateHook(projectId: Id, maybeAccessToken: Option[AccessToken]): Interpretation[HookValidationResult] =
@@ -60,15 +68,15 @@ class HookValidator[Interpretation[_]](
       case GivenToken(token) =>
         for {
           hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token)
-          _                <- if (hookPresent) associate(projectId, token) else ME.unit
-          _                <- if (!hookPresent) removeAccessToken(projectId) else ME.unit
-          validationResult <- toValidationResult(hookPresent)
+          _                <- whenA(hookPresent)(associate(projectId, token))
+          _                <- whenA(!hookPresent)(removeAccessToken(projectId))
+          validationResult <- toValidationResult(hookPresent).pure[Interpretation]
         } yield validationResult
       case StoredToken(token) =>
         for {
           hookPresent      <- checkHookPresence(HookIdentifier(projectId, projectHookUrl), token)
-          _                <- if (!hookPresent) removeAccessToken(projectId) else ME.unit
-          validationResult <- toValidationResult(hookPresent)
+          _                <- whenA(!hookPresent)(removeAccessToken(projectId))
+          validationResult <- toValidationResult(hookPresent).pure[Interpretation]
         } yield validationResult
     } recoverWith loggingError(projectId)
 
@@ -84,26 +92,28 @@ class HookValidator[Interpretation[_]](
     findAccessToken(projectId) flatMap getOrError(projectId) recoverWith storedAccessTokenError(projectId)
 
   private def getOrError(projectId: Id): Option[AccessToken] => Interpretation[Token] = {
-    case Some(token) => ME.pure(StoredToken(token))
-    case None        => ME.raiseError[Token](NoAccessTokenException(s"No access token found for projectId $projectId"))
+    case Some(token) =>
+      (StoredToken(token): Token).pure[Interpretation]
+    case None =>
+      NoAccessTokenException(s"No access token found for projectId $projectId").raiseError[Interpretation, Token]
   }
 
   private def storedAccessTokenError(
       projectId: Id
   ): PartialFunction[Throwable, Interpretation[Token]] = { case UnauthorizedException =>
-    ME.raiseError(new Exception(s"Stored access token for $projectId is invalid"))
+    new Exception(s"Stored access token for $projectId is invalid").raiseError[Interpretation, Token]
   }
 
-  private def toValidationResult(projectHookPresent: Boolean): Interpretation[HookValidationResult] =
-    if (projectHookPresent) ME.pure(HookExists) else ME.pure(HookMissing)
+  private def toValidationResult(projectHookPresent: Boolean): HookValidationResult =
+    if (projectHookPresent) HookExists else HookMissing
 
   private def loggingError(projectId: Id): PartialFunction[Throwable, Interpretation[HookValidationResult]] = {
     case exception @ NoAccessTokenException(message) =>
       logger.info(s"Hook validation failed: $message")
-      ME.raiseError(exception)
+      exception.raiseError[Interpretation, HookValidationResult]
     case NonFatal(exception) =>
       logger.error(exception)(s"Hook validation failed for project with id $projectId")
-      ME.raiseError(exception)
+      exception.raiseError[Interpretation, HookValidationResult]
   }
 
   private sealed abstract class Token(val value: AccessToken)
@@ -122,9 +132,7 @@ object HookValidator {
   }
 
   final case class NoAccessTokenException(message: String) extends RuntimeException(message)
-}
 
-object IOHookValidator {
   def apply(
       projectHookUrl:  ProjectHookUrl,
       gitLabThrottler: Throttler[IO, GitLab]
@@ -132,16 +140,15 @@ object IOHookValidator {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): IO[HookValidator[IO]] =
-    for {
-      tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
-      gitLabUrl          <- GitLabUrl[IO]()
-    } yield new HookValidator[IO](
-      projectHookUrl,
-      new IOProjectHookVerifier(gitLabUrl, gitLabThrottler, ApplicationLogger),
-      new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
-      new IOAccessTokenAssociator(tokenRepositoryUrl, ApplicationLogger),
-      new IOAccessTokenRemover(tokenRepositoryUrl, ApplicationLogger),
-      ApplicationLogger
-    )
+  ): IO[HookValidator[IO]] = for {
+    tokenRepositoryUrl <- TokenRepositoryUrl[IO]()
+    gitLabUrl          <- GitLabUrl[IO]()
+  } yield new HookValidatorImpl[IO](
+    projectHookUrl,
+    new IOProjectHookVerifier(gitLabUrl, gitLabThrottler, ApplicationLogger),
+    new IOAccessTokenFinder(tokenRepositoryUrl, ApplicationLogger),
+    new IOAccessTokenAssociator(tokenRepositoryUrl, ApplicationLogger),
+    new IOAccessTokenRemover(tokenRepositoryUrl, ApplicationLogger),
+    ApplicationLogger
+  )
 }

@@ -37,7 +37,6 @@ class LoggingDispatchRecoverySpec extends AnyWordSpec with should.Matchers with 
   "recover" should {
 
     "log an error" in new TestCase {
-      val event      = testCategoryEvents.generateOne
       val exception  = exceptions.generateOne
       val subscriber = subscriberUrls.generateOne
 
@@ -49,7 +48,15 @@ class LoggingDispatchRecoverySpec extends AnyWordSpec with should.Matchers with 
     }
   }
 
+  "returnToQueue" should {
+    "return unit" in new TestCase {
+      recovery.returnToQueue(event) shouldBe ().pure[Try]
+    }
+  }
+
   private trait TestCase {
+    val event = testCategoryEvents.generateOne
+
     val categoryName      = categoryNames.generateOne
     val logger            = TestLogger[Try]()
     val Success(recovery) = LoggingDispatchRecovery[Try, TestCategoryEvent](categoryName, logger)

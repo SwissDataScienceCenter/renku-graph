@@ -19,12 +19,13 @@
 package io.renku.eventlog.subscriptions
 
 import cats.MonadError
+import cats.data.OptionT
 import cats.effect.{ContextShift, Effect, IO, Timer}
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
 import ch.datascience.events.consumers.subscriptions.SubscriberUrl
 import ch.datascience.graph.model.events.CategoryName
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.subscriptions.EventsSender.SendingResult
 
@@ -50,6 +51,7 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], 
 )(implicit timer:     Timer[Interpretation])
     extends EventsDistributor[Interpretation] {
 
+  import dispatchRecovery._
   import eventsSender._
   import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
   import subscribers._
@@ -57,67 +59,58 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], 
   def run(): Interpretation[Unit] = {
     for {
       _ <- ().pure[Interpretation]
-      _ <- popEvent flatMap { categoryEvent =>
-             runOnSubscriber(dispatch(categoryEvent)) recoverWith tryReDispatch(categoryEvent)
-           }
+      _ <- runOnSubscriber(popAndDispatch) recoverWith logAndWait
     } yield ()
   }.foreverM[Unit]
 
-  private def popEvent: Interpretation[CategoryEvent] =
-    eventsFinder
-      .popEvent()
-      .recoverWith(loggingErrorAndRetry(retry = () => eventsFinder.popEvent()))
-      .flatMap {
-        case None            => (timer sleep noEventSleep) flatMap (_ => popEvent)
-        case Some(idAndBody) => idAndBody.pure[Interpretation]
-      }
+  private lazy val popAndDispatch: SubscriberUrl => Interpretation[Unit] =
+    subscriber => (popEvent semiflatMap dispatch(subscriber)).value.void
 
-  private def dispatch(event: CategoryEvent)(subscriber: SubscriberUrl): Interpretation[Unit] = {
+  private def popEvent: OptionT[Interpretation, CategoryEvent] = OptionT {
+    eventsFinder.popEvent() recoverWith logError
+  }.flatTapNone(timer sleep noEventSleep)
+
+  private def dispatch(subscriber: SubscriberUrl)(event: CategoryEvent): Interpretation[Unit] = {
+    sendEvent(subscriber, event) >>= handleResult(subscriber, event)
+  } recoverWith recover(subscriber, event)
+
+  private lazy val logAndWait: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     for {
-      result <- sendEvent(subscriber, event)
-      _      <- logStatement(result, subscriber, event)
-      _ <- result match {
-             case Delivered =>
-               eventDelivery.registerSending(event, subscriber) recoverWith anErrorLog(event, subscriber)
-             case ServiceBusy =>
-               (markBusy(subscriber) recover withNothing) >> runOnSubscriber(dispatch(event))
-             case Misdelivered =>
-               (delete(subscriber) recover withNothing) >> runOnSubscriber(dispatch(event))
-           }
+      _ <- logger.error(exception)(s"$categoryName: executing event distribution on a subscriber failed")
+      _ <- timer sleep onErrorSleep
     } yield ()
-  } recoverWith dispatchRecovery.recover(subscriber, event)
-
-  private def tryReDispatch(categoryEvent: CategoryEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
-    case NonFatal(exception) =>
-      for {
-        _ <- logger.error(exception)(s"$categoryName: Dispatching an event failed")
-        _ <- timer sleep onErrorSleep
-        _ <- runOnSubscriber(dispatch(categoryEvent))
-      } yield ()
   }
 
-  private def logStatement(result: SendingResult, url: SubscriberUrl, event: CategoryEvent): Interpretation[Unit] =
-    result match {
-      case result @ Delivered    => logger.info(s"$categoryName: $event, url = $url -> $result")
-      case ServiceBusy           => ().pure[Interpretation]
-      case result @ Misdelivered => logger.error(s"$categoryName: $event, url = $url -> $result")
-    }
+  private def handleResult(subscriber: SubscriberUrl, event: CategoryEvent): SendingResult => Interpretation[Unit] = {
+    case result @ Delivered =>
+      logger.info(s"$categoryName: $event, url = $subscriber -> $result")
+      eventDelivery.registerSending(event, subscriber) recoverWith logError(event, subscriber)
+    case ServiceBusy =>
+      (markBusy(subscriber) recover withNothing) >> (returnToQueue(event) recoverWith logError(event))
+    case result @ Misdelivered =>
+      logger.error(s"$categoryName: $event, url = $subscriber -> $result")
+      (delete(subscriber) recover withNothing) >> (returnToQueue(event) recoverWith logError(event))
+  }
 
   private lazy val withNothing: PartialFunction[Throwable, Unit] = { case NonFatal(_) => () }
 
-  private def anErrorLog(event:         CategoryEvent,
-                         subscriberUrl: SubscriberUrl
+  private def logError(event:         CategoryEvent,
+                       subscriberUrl: SubscriberUrl
   ): PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     logger.error(exception)(s"$categoryName: registering sending $event to $subscriberUrl failed")
   }
 
-  private def loggingErrorAndRetry[O](retry: () => Interpretation[O]): PartialFunction[Throwable, Interpretation[O]] = {
+  private def logError(event: CategoryEvent): PartialFunction[Throwable, Interpretation[Unit]] = {
+    case NonFatal(exception) =>
+      logger.error(exception)(s"$categoryName: $event -> returning an event to the queue failed")
+  }
+
+  private lazy val logError: PartialFunction[Throwable, Interpretation[Option[CategoryEvent]]] = {
     case NonFatal(exception) =>
       for {
-        _      <- logger.error(exception)(s"$categoryName: Finding events to dispatch failed")
-        _      <- timer sleep onErrorSleep
-        result <- retry() recoverWith loggingErrorAndRetry(retry)
-      } yield result
+        _ <- logger.error(exception)(s"$categoryName: finding events to dispatch failed")
+        _ <- timer sleep onErrorSleep
+      } yield Option.empty[CategoryEvent]
   }
 }
 

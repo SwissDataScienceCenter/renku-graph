@@ -22,11 +22,10 @@ import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.events.consumers.EventHandler
 import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
-import ch.datascience.events.consumers.subscriptions.SubscriptionPayloadComposer.categoryAndUrlPayloadsComposerFactory
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
-import io.renku.eventlog.{EventLogDB, Microservice}
+import org.typelevel.log4cats.Logger
+import io.renku.eventlog.EventLogDB
 
 import scala.concurrent.ExecutionContext
 

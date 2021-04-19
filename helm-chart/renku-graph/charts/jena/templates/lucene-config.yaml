@@ -51,4 +51,5 @@ data:
         [ text:field "name" ; text:predicate <http://schema.org/name> ]
         [ text:field "description" ; text:predicate <http://schema.org/description> ]
         [ text:field "alternateName" ; text:predicate <http://schema.org/alternateName> ]
+        [ text:field "keywords" ; text:predicate <http://schema.org/keywords> ]
       ) .

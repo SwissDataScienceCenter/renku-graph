@@ -18,6 +18,7 @@
 
 package ch.datascience.graph.model
 
+import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.events.EventStatus._
@@ -35,15 +36,12 @@ object EventsGenerators {
   implicit val eventIds:       Gen[EventId]       = shas map EventId.apply
   implicit val batchDates:     Gen[BatchDate]     = timestampsNotInTheFuture map BatchDate.apply
   implicit val eventBodies:    Gen[EventBody]     = jsons.map(_.noSpaces).map(EventBody.apply)
-  implicit val eventStatuses: Gen[EventStatus] = Gen.oneOf(
-    New,
-    GeneratingTriples,
-    TriplesGenerated,
-    TransformingTriples,
-    TriplesStore,
-    Skipped,
+  implicit val eventStatuses:  Gen[EventStatus]   = Gen.oneOf(EventStatus.all)
+  val failureEventStatuses: Gen[FailureStatus] = Gen.oneOf(
+    GenerationNonRecoverableFailure,
     GenerationRecoverableFailure,
-    GenerationNonRecoverableFailure
+    TransformationNonRecoverableFailure,
+    TransformationRecoverableFailure
   )
 
   implicit val compoundEventIds: Gen[CompoundEventId] = for {
@@ -53,4 +51,6 @@ object EventsGenerators {
 
   implicit lazy val eventProcessingTimes: Gen[EventProcessingTime] =
     javaDurations(min = Duration ofMinutes 10).map(EventProcessingTime.apply)
+
+  implicit lazy val lastSyncedDates: Gen[LastSyncedDate] = timestampsNotInTheFuture.toGeneratorOf(LastSyncedDate)
 }

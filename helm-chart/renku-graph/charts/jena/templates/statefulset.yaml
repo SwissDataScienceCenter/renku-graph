@@ -1,0 +1,104 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ template "jena.fullname" . }}-master
+  labels:
+    app: {{ template "jena.name" . }}
+    chart: {{ template "jena.chart" . }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
+spec:
+  replicas: 1
+  serviceName: {{ include "jena.fullname" . }}-headless
+  selector:
+    matchLabels:
+      app: {{ include "jena.name" . }}
+      release: {{ .Release.Name }}
+      role: master
+  template:
+    metadata:
+      labels:
+        app: {{ include "jena.name" . }}
+        chart: {{ template "jena.chart" . }}
+        release: {{ .Release.Name }}
+        role: master
+    spec:
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: JAVA_OPTS
+              value: -Xmx{{ .Values.jvmXmx }} -XX:+UseG1GC
+          ports:
+            - name: jena
+              containerPort: 3030
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /$/ping
+              port: jena
+            periodSeconds: 10
+            successThreshold: 1
+            failureThreshold: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /$/ping
+              port: jena
+            periodSeconds: 60
+            successThreshold: 1
+            failureThreshold: 3
+          volumeMounts:
+            - name: lucene-config
+              mountPath: /fuseki/configuration/{{ .Values.global.graph.jena.dataset }}.ttl
+              subPath: {{ .Values.global.graph.jena.dataset }}.ttl
+              readOnly: true
+            - name: shiro-config
+              mountPath: /fuseki/shiro.ini
+              subPath: shiro.ini
+              readOnly: true
+            - name: fuseki-server
+              mountPath: /fuseki/fuseki-server.sh
+              subPath: fuseki-server.sh
+            - name: jena-persistence
+              mountPath: /fuseki
+            - name: docker-entrypoint
+              mountPath: /docker-entrypoint.sh
+              subPath: docker-entrypoint.sh
+          resources:
+{{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: docker-entrypoint
+          configMap:
+            name: docker-entrypoint-sh
+            defaultMode: 0555
+        - name: fuseki-server
+          configMap:
+            name: fuseki-server-sh
+            defaultMode: 0555
+        - name: jena-persistence
+        {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim | default (include "jena.fullname" .) }}
+        {{- else }}
+          emptyDir: {}
+        {{- end }}
+        - name: shiro-config
+          secret:
+            secretName: jena-shiro-ini
+        - name: lucene-config
+          configMap:
+            name: lucene-config-ttl
+    {{- with .Values.nodeSelector }}
+      nodeSelector:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+{{ toYaml . | indent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+{{ toYaml . | indent 8 }}
+    {{- end }}

@@ -16,22 +16,19 @@
  * limitations under the License.
  */
 
-package io.renku.eventlog.statuschange.commands
+package io.renku.eventlog.statuschange
+package commands
 
-import cats.MonadError
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{Async, Bracket, Sync}
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
-import ch.datascience.db.{SessionResource, SqlQuery}
+import ch.datascience.db.SqlQuery
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledGauge
 import eu.timepit.refined.auto._
-import io.renku.eventlog.statuschange.commands.CommandFindingResult.CommandFound
-import io.renku.eventlog.statuschange.commands.ProjectPathFinder.findProjectPath
-import io.renku.eventlog.{EventLogDB, EventMessage, ExecutionDate}
-import org.http4s.{MediaType, Request}
+import io.renku.eventlog.{EventMessage, ExecutionDate}
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
@@ -46,13 +43,15 @@ final case class ToGenerationNonRecoverableFailure[Interpretation[_]: Async: Bra
     now:                         () => Instant = () => Instant.now
 ) extends ChangeStatusCommand[Interpretation] {
 
+  import ProjectPathFinder.findProjectPath
+
   override lazy val status: EventStatus = GenerationNonRecoverableFailure
 
   override def queries: NonEmptyList[SqlQuery[Interpretation, Int]] = NonEmptyList.of(
     SqlQuery(
       Kleisli { session =>
         val query: Command[EventStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ EventStatus] =
-          sql"""UPDATE event 
+          sql"""UPDATE event
                 SET status = $eventStatusPut, execution_date = $executionDatePut, message = $eventMessagePut
                 WHERE event_id = $eventIdPut AND project_id = $projectIdPut AND status = $eventStatusPut
              """.command
@@ -81,25 +80,21 @@ final case class ToGenerationNonRecoverableFailure[Interpretation[_]: Async: Bra
 
 object ToGenerationNonRecoverableFailure {
 
+  import ChangeStatusRequest.EventOnlyRequest
+  import CommandFindingResult.{CommandFound, NotSupported, PayloadMalformed}
+
   def factory[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       underTriplesGenerationGauge: LabeledGauge[Interpretation, projects.Path]
-  ): Kleisli[Interpretation, (CompoundEventId, Request[Interpretation]), CommandFindingResult] =
-    Kleisli { case (eventId, request) =>
-      when(request, has = MediaType.application.json) {
-        {
-          for {
-            _                   <- request.validate(status = GenerationNonRecoverableFailure)
-            maybeProcessingTime <- request.getProcessingTime
-            message             <- request.message
-          } yield CommandFound(
-            ToGenerationNonRecoverableFailure[Interpretation](eventId,
-                                                              message,
-                                                              underTriplesGenerationGauge,
-                                                              maybeProcessingTime
-            )
-          )
-        }.merge
-      }
-
-    }
+  ): Kleisli[Interpretation, ChangeStatusRequest, CommandFindingResult] = Kleisli.fromFunction {
+    case EventOnlyRequest(eventId, GenerationNonRecoverableFailure, maybeProcessingTime, Some(message)) =>
+      CommandFound(
+        ToGenerationNonRecoverableFailure[Interpretation](eventId,
+                                                          message,
+                                                          underTriplesGenerationGauge,
+                                                          maybeProcessingTime
+        )
+      )
+    case EventOnlyRequest(_, GenerationNonRecoverableFailure, _, None) => PayloadMalformed("No message provided")
+    case _                                                             => NotSupported
+  }
 }

@@ -160,7 +160,7 @@ class DatasetsSearchEndpointSpec
     ).searchForDatasets _
 
     lazy val toJson: DatasetSearchResult => Json = {
-      case DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, images) =>
+      case DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, keywords, images) =>
         json"""{
           "identifier": $id,
           "title": $title,
@@ -168,6 +168,7 @@ class DatasetsSearchEndpointSpec
           "published": ${creators -> dates.maybeDatePublished},
           "date": ${dates.date},
           "projectsCount": ${projectsCount.value},
+          "keywords": ${keywords.map(_.value)},
           "images": ${images.map(_.value)},
           "_links": [{
             "rel": "details",
@@ -212,6 +213,7 @@ class DatasetsSearchEndpointSpec
     creators         <- nonEmptySet(datasetCreators, maxElements = 4)
     dates            <- datasetDates
     projectsCount    <- nonNegativeInts() map (_.value) map ProjectsCount.apply
+    keywords         <- listOf(datasetKeywords)
     images           <- listOf(imageUris)
-  } yield DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, images)
+  } yield DatasetSearchResult(id, title, name, maybeDescription, creators, dates, projectsCount, keywords, images)
 }

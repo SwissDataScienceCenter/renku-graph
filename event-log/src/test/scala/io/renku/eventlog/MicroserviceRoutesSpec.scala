@@ -20,6 +20,7 @@ package io.renku.eventlog
 
 import cats.effect.{Clock, IO}
 import cats.syntax.all._
+import ch.datascience.db.SessionResource
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators.compoundEventIds
 import ch.datascience.graph.model.GraphModelGenerators.projectIds
@@ -30,13 +31,10 @@ import ch.datascience.http.server.EndpointTester._
 import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.interpreters.TestRoutesMetrics
 import ch.datascience.metrics.LabeledGauge
-import io.chrisdavenport.log4cats.Logger
 import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.EventsPatchingEndpoint
-import io.renku.eventlog.latestevents.{LatestEventsEndpoint, LatestEventsFinder}
 import io.renku.eventlog.processingstatus.{ProcessingStatusEndpoint, ProcessingStatusFinder}
-import io.renku.eventlog.statuschange.commands.{ToGenerationNonRecoverableFailure, ToGenerationRecoverableFailure, ToNew, ToTransformationNonRecoverableFailure, ToTransformationRecoverableFailure, ToTriplesGenerated, ToTriplesStore}
 import io.renku.eventlog.statuschange.{StatusChangeEndpoint, StatusUpdatesRunner}
 import io.renku.eventlog.subscriptions.{EventProducersRegistry, SubscriptionsEndpoint}
 import org.http4s.MediaType.application
@@ -49,6 +47,7 @@ import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.language.reflectiveCalls
@@ -56,33 +55,6 @@ import scala.language.reflectiveCalls
 class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Matchers {
 
   "routes" should {
-
-    "define a GET /events?latest-per-project=true" in new TestCase {
-      val request = Request[IO](GET, uri"events".withQueryParam("latest-per-project", "true"))
-      (latestEventsEndpoint.findLatestEvents _).expects().returning(Response[IO](Ok).pure[IO])
-
-      val response = routes.call(request)
-
-      response.status shouldBe Ok
-    }
-
-    "define a GET /events?latest-per-project=true " +
-      s"returning $NotFound if no latest-per-project parameter given" in new TestCase {
-        val response = routes call Request[IO](GET, uri"events")
-
-        response.status            shouldBe NotFound
-        response.contentType       shouldBe Some(`Content-Type`(application.json))
-        response.body[InfoMessage] shouldBe InfoMessage("No 'latest-per-project' parameter")
-      }
-
-    "define a GET /events?latest-per-project=true " +
-      s"returning $BadRequest if latest-per-project parameter has invalid value" in new TestCase {
-        val response = routes call Request[IO](GET, uri"events".withQueryParam("latest-per-project", "xxx"))
-
-        response.status             shouldBe BadRequest
-        response.contentType        shouldBe Some(`Content-Type`(application.json))
-        response.body[ErrorMessage] shouldBe ErrorMessage("'latest-per-project' parameter with invalid value")
-      }
 
     "define a GET /events/:event-id/:project-:id endpoint" in new TestCase {
       val eventId = compoundEventIds.generateOne
@@ -198,7 +170,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
   private implicit val clock: Clock[IO] = IO.timer(ExecutionContext.global).clock
 
   private trait TestCase {
-    val latestEventsEndpoint     = mock[TestLatestEventsEndpoint]
     val eventEndpoint            = mock[EventEndpoint[IO]]
     val processingStatusEndpoint = mock[TestProcessingStatusEndpoint]
     val eventsPatchingEndpoint   = mock[EventsPatchingEndpoint[IO]]
@@ -208,7 +179,6 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     val eventDetailsEndpoint     = mock[EventDetailsEndpoint[IO]]
     val routes = new MicroserviceRoutes[IO](
       eventEndpoint,
-      latestEventsEndpoint,
       processingStatusEndpoint,
       eventsPatchingEndpoint,
       statusChangeEndpoint,
@@ -218,38 +188,21 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
     ).routes.map(_.or(notAvailableResponse))
   }
 
-  class TestLatestEventsEndpoint(latestEventsFinder: LatestEventsFinder[IO], logger: Logger[IO])
-      extends LatestEventsEndpoint[IO](latestEventsFinder, logger)
   class TestProcessingStatusEndpoint(processingStatusFinder: ProcessingStatusFinder[IO], logger: Logger[IO])
       extends ProcessingStatusEndpoint[IO](processingStatusFinder, logger)
+
   class TestSubscriptionEndpoint(
       subscriptionCategoryRegistry: EventProducersRegistry[IO],
       logger:                       Logger[IO]
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
+
   class TestStatusChangeEndpoint(
+      transactor:                      SessionResource[IO, EventLogDB],
       updateCommandsRunner:            StatusUpdatesRunner[IO],
       awaitingTriplesGenerationGauge:  LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
       awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
       underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
       logger:                          Logger[IO]
-  ) extends StatusChangeEndpoint[IO](updateCommandsRunner,
-                                     Set(
-                                       ToTriplesStore.factory(underTriplesGenerationGauge),
-                                       ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
-                                       ToTriplesGenerated.factory(underTriplesGenerationGauge,
-                                                                  awaitingTransformationGauge
-                                       ),
-                                       ToGenerationNonRecoverableFailure.factory(underTriplesGenerationGauge),
-                                       ToGenerationRecoverableFailure.factory(awaitingTriplesGenerationGauge,
-                                                                              underTriplesGenerationGauge
-                                       ),
-                                       ToTransformationNonRecoverableFailure.factory(underTriplesTransformationGauge),
-                                       ToTransformationRecoverableFailure.factory(
-                                         awaitingTransformationGauge,
-                                         underTriplesTransformationGauge
-                                       )
-                                     ),
-                                     logger
-      )
+  ) extends StatusChangeEndpoint[IO](updateCommandsRunner, Set.empty, logger)
 }

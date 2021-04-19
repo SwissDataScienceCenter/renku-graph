@@ -32,7 +32,7 @@ object ErrorMessage {
 
   def apply(errorMessage: String): ErrorMessage = DataErrorMessage(errorMessage)
 
-  def apply(exception: Throwable): ErrorMessage = DataErrorMessage(exception)
+  def apply(exception: Throwable): ErrorMessage = DataErrorMessage.withExceptionMessage(exception)
 
   implicit val errorMessageEncoder: Encoder[ErrorMessage] = Encoder.instance[ErrorMessage] { message =>
     Json.obj("message" -> Json.fromString(message.value))

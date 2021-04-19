@@ -67,15 +67,24 @@ object WebhookServiceClient {
   }
 }
 
+object CommitEventServiceClient {
+  def apply()(implicit
+      executionContext: ExecutionContext,
+      contextShift:     ContextShift[IO],
+      timer:            Timer[IO]
+  ): ServiceClient = new ServiceClient {
+    override val baseUrl: String Refined Url = "http://localhost:9006"
+  }
+}
+
 object TriplesGeneratorClient {
   def apply()(implicit
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): ServiceClient =
-    new ServiceClient {
-      override val baseUrl: String Refined Url = "http://localhost:9002"
-    }
+  ): ServiceClient = new ServiceClient {
+    override val baseUrl: String Refined Url = "http://localhost:9002"
+  }
 }
 
 object TokenRepositoryClient {
@@ -83,10 +92,9 @@ object TokenRepositoryClient {
       executionContext: ExecutionContext,
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
-  ): ServiceClient =
-    new ServiceClient {
-      override val baseUrl: String Refined Url = "http://localhost:9003"
-    }
+  ): ServiceClient = new ServiceClient {
+    override val baseUrl: String Refined Url = "http://localhost:9003"
+  }
 
   implicit class AccessTokenOps(accessToken: AccessToken) {
 

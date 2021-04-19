@@ -22,12 +22,12 @@ import cats.data.Kleisli
 import cats.effect.{Async, Bracket, ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
-import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
 import io.renku.eventlog.{EventDate, EventLogDB}
-import io.renku.eventlog.subscriptions.{EventFinder, LastSyncedDate, SubscriptionTypeSerializers}
+import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._

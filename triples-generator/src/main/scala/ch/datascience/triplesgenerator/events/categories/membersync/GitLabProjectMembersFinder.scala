@@ -28,7 +28,7 @@ import ch.datascience.graph.model.users.{GitLabId, Name, Username}
 import ch.datascience.http.client.UrlEncoder.urlEncode
 import ch.datascience.http.client.{AccessToken, IORestClient}
 import ch.datascience.tinytypes.json.TinyTypeDecoders._
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Decoder
 import org.http4s.Method.GET
 import org.http4s._

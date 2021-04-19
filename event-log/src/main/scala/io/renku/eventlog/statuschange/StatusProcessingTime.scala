@@ -48,11 +48,7 @@ trait StatusProcessingTime extends TypeSerializers {
         session
           .prepare(query)
           .use(_.execute(eventId.id ~ eventId.projectId ~ status ~ processingTime))
-          .map {
-            case Completion.Insert(n) => n
-            case completion =>
-              throw new RuntimeException(s"upsert_processing_time time query failed with completion status $completion")
-          }
+          .map(_ => 1)
       },
       name = "upsert_processing_time"
     )

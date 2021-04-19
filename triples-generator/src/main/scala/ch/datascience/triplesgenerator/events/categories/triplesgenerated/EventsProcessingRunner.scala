@@ -34,7 +34,7 @@ import ch.datascience.events.consumers.subscriptions.SubscriptionMechanism
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.numeric.Positive
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal

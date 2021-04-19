@@ -56,8 +56,8 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
       runner.run(command).unsafeRunSync() shouldBe NotFound
     }
 
-    "execute query from the given command, " +
-      "update the delivery status, " +
+    "remove the delivery info " +
+      "execute query from the given command, " +
       "map the result using command's result mapping rules, " +
       "and update metrics gauges" in new TestCase {
 
@@ -104,7 +104,8 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
       }
 
     "execute query from the given command, " +
-      "if the query fails rollback to the initial state" in new TestCase {
+      "if the query fails rollback to the initial state " +
+      "except from the event delivery info" in new TestCase {
 
         store(eventId, projectPath, New)
         upsertEventDelivery(eventId)
@@ -113,20 +114,20 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
         val command = TestFailingCommand(eventId, projectPath, gauge, eventProcessingTimes.generateSome)
 
-        runner.run(command).unsafeRunSync() shouldBe NotFound
+        val UpdateResult.Failure(message) = runner.run(command).unsafeRunSync()
 
+        message.value shouldBe s"${command.queries.head.name} failed for event $eventId " +
+          s"to status ${command.status} with result ${command.queryResult}. " +
+          s"Rolling back queries: ${List(command.queries.head.name.value, "upsert_processing_time")
+            .mkString(", ")}"
+
+        findEvents(status = New).eventIdsOnly               shouldBe List(eventId)
         findEvents(status = GeneratingTriples).eventIdsOnly shouldBe List()
         findProcessingTime(eventId).eventIdsOnly            shouldBe List()
 
-        logger.loggedOnly(
-          Info(
-            s"${command.queries.head.name} failed for event ${command.eventId} to status ${command.status} with result $NotFound. Rolling back queries: ${command.queries.map(_.name.toString).toList.mkString(", ")}"
-          )
-        )
-
         histogram.verifyExecutionTimeMeasured(command.queries.map(_.name))
 
-        findAllDeliveries.map(_._1) shouldBe List(eventId)
+        findAllDeliveries.map(_._1) shouldBe Nil
       }
   }
 
@@ -152,7 +153,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
       SqlQuery(
         Kleisli { session =>
           val query: Command[EventStatus ~ EventId ~ projects.Id ~ EventStatus] = sql"""
-            UPDATE event 
+            UPDATE event
             SET status = $eventStatusPut
             WHERE event_id = $eventIdPut AND project_id = $projectIdPut AND status = $eventStatusPut
             """.command
@@ -168,12 +169,6 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
       ),
       Nil
     )
-
-    override def mapResult: Int => UpdateResult = {
-      case 0 => UpdateResult.NotFound
-      case 1 => UpdateResult.Updated
-      case _ => UpdateResult.Conflict
-    }
 
     override def updateGauges(
         updateResult:   UpdateResult
@@ -197,15 +192,11 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
 
     override def status: EventStatus = GeneratingTriples
 
+    val queryResult: Int = 0
+
     override def queries = NonEmptyList.of(
       SqlQuery(Kleisli(_ => 0.pure[IO]), name = "test_failure_status_update")
     )
-
-    override def mapResult: Int => UpdateResult = {
-      case 0 => UpdateResult.NotFound
-      case 1 => UpdateResult.Updated
-      case _ => UpdateResult.Conflict
-    }
 
     override def updateGauges(
         updateResult:   UpdateResult

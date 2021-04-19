@@ -98,7 +98,7 @@ trait ContainerTestDb extends ForAllTestContainer {
   lazy val transactorResource: Resource[IO, Resource[IO, Session[IO]]] =
     Session.pooled(
       host = container.host,
-      port = container.container.getMappedPort(5432),
+      port = container.container.getMappedPort(dbConfig.port),
       user = dbConfig.user.value,
       database = dbConfig.name.value,
       password = Some(dbConfig.pass),

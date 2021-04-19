@@ -65,7 +65,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     }
 
     s"return $BadRequest if the eventJson is malformed" in new TestCase {
-      val event = jsons.generateOne deepMerge (json""" {"categoryName":${categoryName.value} }""")
+      val event = jsons.generateOne deepMerge json""" {"categoryName":${categoryName.value} }"""
 
       val requestContent = eventRequestContents.generateOne.copy(event)
 
@@ -87,7 +87,7 @@ class EventHandlerSpec extends AnyWordSpec with MockFactory with should.Matchers
     unacceptableStatuses.foreach { unacceptableStatus =>
       s"return $BadRequest if the event status is $unacceptableStatus" in new TestCase {
         val event =
-          newOrSkippedEvents.generateOne.asJson deepMerge (json"""{"status": ${unacceptableStatus.value}}""")
+          newOrSkippedEvents.generateOne.asJson deepMerge json"""{"status": ${unacceptableStatus.value}}"""
 
         val requestContent = eventRequestContents.generateOne.copy(event)
 

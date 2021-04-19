@@ -22,7 +22,7 @@ import cats.effect.{Bracket, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 
 import scala.util.control.NonFatal

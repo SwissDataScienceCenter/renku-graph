@@ -21,7 +21,7 @@ package io.renku.eventlog.subscriptions.commitsync
 import cats.effect.{ContextShift, IO, Timer}
 import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.metrics.LabeledHistogram
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.{EventLogDB, subscriptions}
 

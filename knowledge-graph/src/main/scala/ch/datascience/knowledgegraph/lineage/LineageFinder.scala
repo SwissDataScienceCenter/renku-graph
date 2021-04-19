@@ -25,7 +25,7 @@ import ch.datascience.graph.model.projects.Path
 import ch.datascience.knowledgegraph.lineage.model.Node.Location
 import ch.datascience.knowledgegraph.lineage.model.{Edge, Lineage, Node}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.jsonld.EntityId
 
 import scala.concurrent.ExecutionContext

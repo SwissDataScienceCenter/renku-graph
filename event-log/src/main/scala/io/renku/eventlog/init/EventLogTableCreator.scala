@@ -22,7 +22,7 @@ import cats.effect.{Async, Bracket}
 import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus.GenerationRecoverableFailure
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
 import skunk._
 import skunk.codec.all._

@@ -40,6 +40,15 @@ object EventLog extends TypeSerializers {
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
   private val logger = TestLogger()
 
+  def findEvents(projectId: Id): List[(EventId, EventStatus)] = execute {
+    fr"""
+     SELECT event_id, status
+     FROM event
+     WHERE project_id = $projectId"""
+      .query[(EventId, EventStatus)]
+      .to[List]
+  }
+
   def findEvents(projectId: Id, status: EventStatus*): List[CommitId] = execute { session =>
     val query: Query[projects.Id, CommitId] = sql"""
      SELECT event_id

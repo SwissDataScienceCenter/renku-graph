@@ -18,18 +18,16 @@
 
 package ch.datascience.graph.acceptancetests
 
-import cats.data.NonEmptyList
 import ch.datascience.generators.CommonGraphGenerators.accessTokens
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators._
 import ch.datascience.graph.acceptancetests.db.EventLog
 import ch.datascience.graph.acceptancetests.flows.AccessTokenPresence.givenAccessTokenPresentFor
 import ch.datascience.graph.acceptancetests.stubs.GitLab._
 import ch.datascience.graph.acceptancetests.stubs.RemoteTriplesGenerator._
 import ch.datascience.graph.acceptancetests.testing.AcceptanceTestPatience
-import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.acceptancetests.tooling.ResponseTools._
 import ch.datascience.graph.acceptancetests.tooling.TokenRepositoryClient._
+import ch.datascience.graph.acceptancetests.tooling.{GraphServices, ModelImplicits}
 import ch.datascience.graph.model.EventsGenerators.commitIds
 import ch.datascience.graph.model.events.EventStatus._
 import ch.datascience.graph.model.projects.Visibility.Public
@@ -113,7 +111,7 @@ class EventsProcessingStatusSpec
       projectId:          Id,
       projectPath:        Path
   )(implicit accessToken: AccessToken): Unit = {
-    `GET <gitlabApi>/projects/:id returning OK with Project Path`(projectId, projectPath)
+    `GET <gitlabApi>/projects/:id returning OK`(projectId, projectPath)
     tokenRepositoryClient
       .PUT(s"projects/$projectId/tokens", accessToken.toJson, maybeAccessToken = None)
       .status shouldBe NoContent
@@ -123,11 +121,7 @@ class EventsProcessingStatusSpec
 
   private def sendEventsForProcessing(project: Project)(implicit accessToken: AccessToken) = {
 
-    val allCommitIds = nonEmptyList(
-      commitIds,
-      minElements = numberOfEvents,
-      maxElements = numberOfEvents
-    ).generateOne
+    val allCommitIds = commitIds.generateNonEmptyList(minElements = numberOfEvents, maxElements = numberOfEvents).toList
 
     givenAccessTokenPresentFor(project)
 
@@ -135,10 +129,13 @@ class EventsProcessingStatusSpec
                                                                                         allCommitIds.head,
                                                                                         allCommitIds.tail.toSet
     )
+
+    `GET <gitlabApi>/projects/:id/repository/commits returning OK with a commit`(project.id, allCommitIds.head)
+
     // assuring there's project info in GitLab for the triples curation process
     `GET <gitlabApi>/projects/:path returning OK with`(project)
 
-    allCommitIds.map { commitId =>
+    allCommitIds foreach { commitId =>
       // GitLab to return commit info about all the parent commits
       if (commitId != allCommitIds.head)
         `GET <gitlabApi>/projects/:id/repository/commits/:sha returning OK with some event`(project.id, commitId)

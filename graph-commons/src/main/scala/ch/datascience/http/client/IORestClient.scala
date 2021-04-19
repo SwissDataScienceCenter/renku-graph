@@ -28,7 +28,7 @@ import ch.datascience.logging.ExecutionTimeRecorder
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.NonNegative
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.circe.Json
 import org.http4s.AuthScheme.Bearer
 import org.http4s.Credentials.Token
@@ -149,7 +149,7 @@ abstract class IORestClient[ThrottlingTarget](
       response
         .as[String]
         .flatMap { bodyAsString =>
-          IO.raiseError(UnexpectedResponseException(LogMessage(request, response, bodyAsString)))
+          IO.raiseError(UnexpectedResponseException(response.status, LogMessage(request, response, bodyAsString)))
         }
   }
 

@@ -32,8 +32,7 @@ import scala.util.Try
 
 class EdgesTrimmerSpec extends AnyWordSpec with ScalaCheckPropertyChecks with should.Matchers {
 
-  /**
-    *             i _
+  /**             i _
     *                 \
     *  a -- B -- c -- H -- j
     *  e _/   \_ d

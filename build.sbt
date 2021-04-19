@@ -1,19 +1,19 @@
 organization := "ch.datascience"
 name := "renku-graph"
-scalaVersion := "2.13.4"
+scalaVersion := "2.13.5"
 
 // This project contains nothing to package, like pure POM maven project
 packagedArtifacts := Map.empty
 
 releaseVersionBump := sbtrelease.Version.Bump.Minor
 releaseIgnoreUntrackedFiles := true
-releaseTagName := (version in ThisBuild).value
+releaseTagName := (ThisBuild / version).value
 
 lazy val root = Project(
   id = "renku-graph",
   base = file(".")
 ).settings(
-  skip in publish := true,
+  publish / skip := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 ).aggregate(
   jsonLd,
@@ -21,6 +21,7 @@ lazy val root = Project(
   eventLog,
   tokenRepository,
   webhookService,
+  commitEventService,
   triplesGenerator,
   knowledgeGraph
 )
@@ -62,6 +63,19 @@ lazy val eventLog = Project(
 lazy val webhookService = Project(
   id = "webhook-service",
   base = file("webhook-service")
+).settings(
+  commonSettings
+).dependsOn(
+  graphCommons % "compile->compile",
+  graphCommons % "test->test"
+).enablePlugins(
+  JavaAppPackaging,
+  AutomateHeaderPlugin
+)
+
+lazy val commitEventService = Project(
+  id = "commit-event-service",
+  base = file("commit-event-service")
 ).settings(
   commonSettings
 ).dependsOn(
@@ -120,6 +134,7 @@ lazy val acceptanceTests = Project(
   commonSettings
 ).dependsOn(
   webhookService,
+  commitEventService,
   triplesGenerator,
   tokenRepository,
   knowledgeGraph % "test->test",
@@ -131,12 +146,12 @@ lazy val acceptanceTests = Project(
 
 lazy val commonSettings = Seq(
   organization := "ch.datascience",
-  scalaVersion := "2.13.4",
-  skip in publish := true,
+  scalaVersion := "2.13.5",
+  publish / skip  := true,
   publishTo := Some(Resolver.file("Unused transient repository", file("target/unusedrepo"))),
-  publishArtifact in (Compile, packageDoc) := false,
-  publishArtifact in (Compile, packageSrc) := false,
-  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.1" cross CrossVersion.full),
+  Compile / packageDoc / publishArtifact := false,
+  Compile / packageSrc / publishArtifact := false,
+  addCompilerPlugin("org.typelevel" %% "kind-projector" % "0.11.3" cross CrossVersion.full),
   scalacOptions += "-feature",
   scalacOptions += "-unchecked",
   scalacOptions += "-deprecation",
@@ -167,73 +182,12 @@ lazy val commonSettings = Seq(
   )
 )
 
-import ReleaseTransformations._
-import sbtrelease.ReleasePlugin.autoImport.ReleaseKeys._
-import sbtrelease.ReleasePlugin.autoImport._
-import sbtrelease.{Vcs, Versions}
-
-releaseTagComment :=
-  Vcs
-    .detect(root.base)
-    .map { implicit vcs =>
-      s"Release Notes for ${(version in ThisBuild).value}\n* $lastCommitMessage"
-    }
-    .getOrElse {
-      sys.error("Release Tag comment cannot be calculated")
-    }
-
-def lastCommitMessage()(implicit vcs: Vcs): String =
-  vcs.cmd("log", "--format=%s", "-1", "HEAD").!!.trim
-
-releaseProcess := Seq[ReleaseStep](
-  log("Checking snapshot dependencies"),
-  checkSnapshotDependencies,
-  log("Inquiring version"),
-  inquireVersions,
-  log("Cleaning"),
-  runClean,
-  log("Checking Tag"),
-  verifyTagDoesNotExist,
-  log("Tagging Release"),
-  tagRelease,
-  log("Pushing Tag"),
-  pushChanges
-)
-
-def log(message: String): ReleaseStep = { state: State =>
-  println(message)
-  state
-}
-
-lazy val verifyTagDoesNotExist: ReleaseStep = { state: State =>
-  val version = findVersion(_._1, state)
-
-  Vcs
-    .detect(root.base)
-    .map { implicit vcs =>
-      if (vcs.cmd("tag", "-l").!!.trim contains version)
-        sys.error(s"Tag $version already exists")
-      else Unit
-    }
-    .getOrElse {
-      sys.error("Release Tag comment cannot be calculated")
-    }
-
-  state
-}
-
-def findVersion(selectVersion: Versions => String, state: State): String = {
-  val allVersions = state.get(versions).getOrElse {
-    sys.error("No versions are set! Was this release part executed before inquireVersions?")
-  }
-
-  selectVersion(allVersions)
-}
+import sbtrelease.Vcs
 
 lazy val writeVersionToChart = taskKey[Unit]("Write release version to Chart.yaml")
 
 writeVersionToChart := {
-  val version = readVersionFromVersionSbt
+  val version = readTag
 
   val chartFile = root.base / "helm-chart" / "renku-graph" / "Chart.yaml"
 
@@ -245,25 +199,12 @@ writeVersionToChart := {
   IO.writeLines(chartFile, updatedLines)
 }
 
-def readVersionFromVersionSbt: String =
-  IO
-    .readLines(root.base / "version.sbt")
-    .mkString("")
-    .trim
-    .replace("version in ThisBuild := ", "")
-    .replace("\"", "")
-
-lazy val checkTagExists = taskKey[Unit]("Checks if tag already exists")
-
-checkTagExists := {
-
-  val version = readVersionFromVersionSbt
-
-  val tagExists = Vcs
+def readTag: String = {
+  val tag = Vcs
     .detect(root.base)
-    .map(_.cmd("tag", "-n", version).!!.trim.nonEmpty)
+    .map(_.cmd("describe", "--tags").!!.trim)
     .getOrElse(sys.error("Release Tag cannot be checked"))
 
-  if (tagExists) sys.error(s"Tag '$version' already exists")
-  else ()
+  if (tag.matches("\\d+\\.\\d+\\.\\d+")) tag
+  else sys.error("Current commit is not tagged")
 }

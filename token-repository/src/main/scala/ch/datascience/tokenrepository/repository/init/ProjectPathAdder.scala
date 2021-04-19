@@ -28,7 +28,7 @@ import ch.datascience.tokenrepository.repository.AccessTokenCrypto.EncryptedAcce
 import ch.datascience.tokenrepository.repository.association.{IOProjectPathFinder, ProjectPathFinder}
 import ch.datascience.tokenrepository.repository.deletion.TokenRemover
 import ch.datascience.tokenrepository.repository.{AccessTokenCrypto, ProjectsTokensDB, TokenRepositoryTypeSerializers}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.implicits._
 

@@ -30,7 +30,7 @@ trait EventDataFetching {
   // format: off
   protected def findEvents(status:  EventStatus,
                            orderBy: Fragment[Void] = sql"created_date asc"): List[(CompoundEventId, ExecutionDate, BatchDate)] =
-    execute { session: Session[IO] => 
+    execute { session: Session[IO] =>
       val query : Query[(EventStatus, Void), (CompoundEventId, ExecutionDate, BatchDate)] = (sql"""
             SELECT event_id, project_id, execution_date, batch_date
             FROM event
@@ -56,7 +56,7 @@ trait EventDataFetching {
       session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
     }
 
-  protected def findProjects(): List[(projects.Id, projects.Path, EventDate)] = execute { session =>
+  protected def findProjects: List[(projects.Id, projects.Path, EventDate)] = execute { session =>
     val query: Query[Void, (projects.Id, projects.Path, EventDate)] = sql"""SELECT * FROM project"""
       .query(projectIdGet ~ projectPathGet ~ eventDateGet)
       .map { case projectId ~ projectPath ~ eventDate => (projectId, projectPath, eventDate) }
@@ -77,7 +77,7 @@ trait EventDataFetching {
     execute { session =>
       val query: Query[EventId ~ projects.Id, (ExecutionDate, EventStatus, Option[EventMessage])] = sql"""
         SELECT execution_date, status, message
-        FROM event 
+        FROM event
         WHERE event_id = $eventIdPut AND project_id = $projectIdPut
       """.query(executionDateGet ~ eventStatusGet ~ eventMessageGet.opt).map {
         case executionDate ~ eventStatus ~ maybeEventMessage => (executionDate, eventStatus, maybeEventMessage)

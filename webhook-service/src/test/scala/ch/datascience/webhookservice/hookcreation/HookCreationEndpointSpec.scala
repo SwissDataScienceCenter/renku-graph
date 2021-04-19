@@ -114,7 +114,7 @@ class HookCreationEndpointSpec extends AnyWordSpec with MockFactory with should.
 
     val logger = TestLogger[IO]()
 
-    val hookCreator = mock[IOHookCreator]
+    val hookCreator = mock[HookCreator[IO]]
     val createHook  = new HookCreationEndpointImpl[IO](hookCreator, logger).createHook _
   }
 }

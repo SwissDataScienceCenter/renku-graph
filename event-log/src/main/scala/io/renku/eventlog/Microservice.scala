@@ -35,7 +35,6 @@ import io.renku.eventlog.eventdetails.EventDetailsEndpoint
 import io.renku.eventlog.events.EventEndpoint
 import io.renku.eventlog.eventspatching.IOEventsPatchingEndpoint
 import io.renku.eventlog.init.DbInitializer
-import io.renku.eventlog.latestevents.IOLatestEventsEndpoint
 import io.renku.eventlog.metrics._
 import io.renku.eventlog.processingstatus.IOProcessingStatusEndpoint
 import io.renku.eventlog.statuschange.IOStatusChangeEndpoint
@@ -100,10 +99,17 @@ object Microservice extends IOMicroservice {
                                       queriesExecTimes,
                                       ApplicationLogger
                                     )
-        eventConsumersRegistry <-
-          consumers.EventConsumersRegistry(ApplicationLogger, creationSubscription, zombieEventsSubscription)
+        commitSyncRequestSubscription <- events.categories.commitsyncrequest.SubscriptionFactory(
+                                           transactor,
+                                           queriesExecTimes,
+                                           ApplicationLogger
+                                         )
+        eventConsumersRegistry <- consumers.EventConsumersRegistry(ApplicationLogger,
+                                                                   creationSubscription,
+                                                                   zombieEventsSubscription,
+                                                                   commitSyncRequestSubscription
+                                  )
         eventEndpoint            <- EventEndpoint(eventConsumersRegistry)
-        latestEventsEndpoint     <- IOLatestEventsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         processingStatusEndpoint <- IOProcessingStatusEndpoint(transactor, queriesExecTimes, ApplicationLogger)
         eventsPatchingEndpoint <- IOEventsPatchingEndpoint(transactor,
                                                            awaitingGenerationGauge,
@@ -132,17 +138,15 @@ object Microservice extends IOMicroservice {
                                   )
         subscriptionsEndpoint <- IOSubscriptionsEndpoint(eventProducersRegistry, ApplicationLogger)
         eventDetailsEndpoint  <- EventDetailsEndpoint(transactor, queriesExecTimes, ApplicationLogger)
-        microserviceRoutes =
-          new MicroserviceRoutes[IO](
-            eventEndpoint,
-            latestEventsEndpoint,
-            processingStatusEndpoint,
-            eventsPatchingEndpoint,
-            statusChangeEndpoint,
-            subscriptionsEndpoint,
-            eventDetailsEndpoint,
-            new RoutesMetrics[IO](metricsRegistry)
-          ).routes
+        microserviceRoutes = new MicroserviceRoutes[IO](
+                               eventEndpoint,
+                               processingStatusEndpoint,
+                               eventsPatchingEndpoint,
+                               statusChangeEndpoint,
+                               subscriptionsEndpoint,
+                               eventDetailsEndpoint,
+                               new RoutesMetrics[IO](metricsRegistry)
+                             ).routes
         exitCode <- microserviceRoutes.use { routes =>
                       val httpServer = new HttpServer[IO](serverPort = ServicePort.value, routes)
 

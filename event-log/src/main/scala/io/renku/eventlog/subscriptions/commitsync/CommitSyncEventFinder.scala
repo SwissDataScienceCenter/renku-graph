@@ -22,11 +22,11 @@ import cats.data.Kleisli
 import cats.effect.{Async, Bracket, ContextShift, IO}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
-import ch.datascience.graph.model.events.CategoryName
+import ch.datascience.graph.model.events.{CategoryName, CompoundEventId, LastSyncedDate}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
-import io.renku.eventlog.subscriptions.{EventFinder, LastSyncedDate, SubscriptionTypeSerializers}
+import io.renku.eventlog.subscriptions.{EventFinder, SubscriptionTypeSerializers}
 import io.renku.eventlog.{EventDate, EventLogDB}
 import skunk._
 import skunk.data.Completion
@@ -54,7 +54,7 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
   }
 
   private def findEventAndMarkTaken(implicit session: Session[Interpretation]) =
-    findEvent flatMap {
+    findEvent >>= {
       case Some((event, maybeSyncDate)) =>
         setSyncDate(event, maybeSyncDate) map toNoneIfEventAlreadyTaken(event)
       case None => Option.empty[CommitSyncEvent].pure[Interpretation]
@@ -65,34 +65,40 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
       Kleisli { session =>
         val query: Query[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
                          (CommitSyncEvent, Option[LastSyncedDate])
-        ] = sql"""
-         SELECT
-           (SELECT evt.event_id FROM event evt WHERE evt.project_id = proj.project_id AND evt.event_date = proj.latest_event_date),
-           proj.project_id,
-           proj.project_path,
-           sync_time.last_synced,
-           proj.latest_event_date
-         FROM project proj
-         LEFT JOIN subscription_category_sync_time sync_time
-           ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNamePut
-         WHERE
-           sync_time.last_synced IS NULL
-           OR (
-                (($eventDatePut - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 hour')
-             OR (($eventDatePut - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 day')
-           )
-         ORDER BY proj.latest_event_date DESC
-         LIMIT 1
-        """
-          .query(compoundEventIdGet ~ projectPathGet ~ lastSyncedDateGet.opt ~ eventDateGet)
-          .map { case id ~ projectPath ~ maybeLastSyncDate ~ latestEventDate =>
-            CommitSyncEvent(id,
-                            projectPath,
-                            maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
-            ) -> maybeLastSyncDate
+        ] = sql"""SELECT
+                    (SELECT evt.event_id
+                      FROM event evt
+                      WHERE evt.project_id = proj.project_id
+                        AND evt.event_date = proj.latest_event_date
+                      ORDER BY created_date DESC
+                      LIMIT 1
+                    ),
+                    proj.project_id,
+                    proj.project_path,
+                    sync_time.last_synced,
+                    proj.latest_event_date
+                  FROM project proj
+                  LEFT JOIN subscription_category_sync_time sync_time
+                    ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNamePut
+                  WHERE
+                    sync_time.last_synced IS NULL
+                    OR (
+                         (($eventDatePut - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 hour')
+                      OR (($eventDatePut - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 day')
+                    )
+                  ORDER BY proj.latest_event_date DESC
+                  LIMIT 1"""
+          .query(eventIdGet.opt ~ projectIdGet ~ projectPathGet ~ lastSyncedDateGet.opt ~ eventDateGet)
+          .map {
+            case Some(eventId) ~ projectId ~ projectPath ~ maybeLastSyncDate ~ latestEventDate =>
+              FullCommitSyncEvent(CompoundEventId(eventId, projectId),
+                                  projectPath,
+                                  maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
+              ) -> maybeLastSyncDate
+            case None ~ projectId ~ projectPath ~ maybeLastSyncDate ~ _ =>
+              MinimalCommitSyncEvent(projectId, projectPath) -> maybeLastSyncDate
           }
-        val eventDate    = EventDate(now())
-        val lastSyncDate = LastSyncedDate(now())
+        val (eventDate, lastSyncDate) = (EventDate.apply _ &&& LastSyncedDate.apply _)(now())
         session.prepare(query).use(_.option(categoryName ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate))
       },
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - find event")
@@ -114,7 +120,7 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
                   SET last_synced = $lastSyncedDatePut
                   WHERE project_id = $projectIdPut AND category_name = $categoryNamePut
               """.command
-          session.prepare(query).use(_.execute(LastSyncedDate(now()) ~ event.id.projectId ~ categoryName))
+          session.prepare(query).use(_.execute(LastSyncedDate(now()) ~ event.projectId ~ categoryName))
         },
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced")
       )
@@ -128,14 +134,21 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
           INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
           VALUES ($projectIdPut, $categoryNamePut, $lastSyncedDatePut)
           ON CONFLICT (project_id, category_name)
-          DO UPDATE 
-          SET last_synced = EXCLUDED.last_synced
+          DO UPDATE
+            SET last_synced = EXCLUDED.last_synced
           """.command
-          session.prepare(query).use(_.execute(event.id.projectId ~ categoryName ~ LastSyncedDate(now())))
+          session.prepare(query).use(_.execute(event.projectId ~ categoryName ~ LastSyncedDate(now())))
         },
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced")
       )
     }
+
+  private implicit class SyncEventOps(commitSyncEvent: CommitSyncEvent) {
+    lazy val projectId: projects.Id = commitSyncEvent match {
+      case FullCommitSyncEvent(eventId, _, _)   => eventId.projectId
+      case MinimalCommitSyncEvent(projectId, _) => projectId
+    }
+  }
 
   private def toNoneIfEventAlreadyTaken(event: CommitSyncEvent): Completion => Option[CommitSyncEvent] = {
     case Completion.Update(1) | Completion.Insert(1) => Some(event)

@@ -68,9 +68,9 @@ private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], 
                   AND (evt.status = $eventStatusPut OR evt.status = $eventStatusPut)
                   AND (evt.message IS NULL OR evt.message <> $text)
                 JOIN project proj ON evt.project_id = proj.project_id
-                WHERE NOT EXISTS ( 
-                  SELECT sub.delivery_id 
-                  FROM subscriber sub 
+                WHERE NOT EXISTS (
+                  SELECT sub.delivery_id
+                  FROM subscriber sub
                   WHERE sub.delivery_id = delivery.delivery_id
                 )
                 LIMIT 1

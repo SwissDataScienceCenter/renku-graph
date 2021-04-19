@@ -28,6 +28,8 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
 import io.renku.eventlog.subscriptions.EventFinder
+import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
 import skunk._
 import skunk.codec.all._

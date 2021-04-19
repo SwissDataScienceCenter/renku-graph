@@ -32,7 +32,7 @@ import ch.datascience.knowledgegraph.projects.model.Permissions._
 import ch.datascience.knowledgegraph.projects.model._
 import ch.datascience.logging.{ApplicationLogger, ExecutionTimeRecorder}
 import ch.datascience.rdfstore.SparqlQueryTimeRecorder
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.Response
 import org.http4s.dsl.Http4sDsl
 

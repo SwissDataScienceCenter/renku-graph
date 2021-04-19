@@ -21,7 +21,7 @@ package io.renku.eventlog.init
 import cats.MonadError
 import cats.effect.{Async, Bracket}
 import ch.datascience.db.SessionResource
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import skunk.codec.all._
 import skunk._

@@ -23,7 +23,7 @@ import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.CategoryName
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import io.renku.eventlog.subscriptions._
 import io.renku.eventlog.{EventLogDB, subscriptions}
 
@@ -47,7 +47,8 @@ private[subscriptions] object SubscriptionCategory {
     subscribers <- Subscribers(name, subscriberTracker, logger)
     eventFetcher <-
       IOTriplesGeneratedEventFinder(transactor, awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
-    dispatchRecovery <- DispatchRecovery(transactor, underTransformationGauge, queriesExecTimes, logger)
+    dispatchRecovery <-
+      DispatchRecovery(transactor, awaitingTransformationGauge, underTransformationGauge, queriesExecTimes, logger)
     eventDelivery <- EventDelivery[TriplesGeneratedEvent](transactor,
                                                           compoundEventIdExtractor = (_: TriplesGeneratedEvent).id,
                                                           queriesExecTimes

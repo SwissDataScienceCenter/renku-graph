@@ -25,7 +25,7 @@ import ch.datascience.graph.model.events.EventStatus.New
 import ch.datascience.graph.model.projects
 import ch.datascience.http.ErrorMessage
 import ch.datascience.metrics.{LabeledGauge, LabeledHistogram}
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import org.http4s.circe.jsonOf
 import org.http4s.dsl.Http4sDsl
 import org.http4s.{Request, Response}

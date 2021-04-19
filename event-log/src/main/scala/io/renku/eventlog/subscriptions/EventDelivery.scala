@@ -36,7 +36,6 @@ import skunk.implicits._
 
 private[subscriptions] trait EventDelivery[Interpretation[_], CategoryEvent] {
   def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit]
-  def unregister(event:      CompoundEventId): Interpretation[Unit]
 }
 
 private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwable], CategoryEvent](
@@ -56,10 +55,6 @@ private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwabl
         result <- insert(id, projectId, subscriberUrl)
       } yield result
   } flatMap toResult
-
-  def unregister(eventId: CompoundEventId): Interpretation[Unit] = transactor.use { implicit session =>
-    deleteDelivery(eventId.id, eventId.projectId)
-  }
 
   private def insert(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl)(implicit
       session:                Session[Interpretation]
@@ -87,8 +82,8 @@ private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwabl
     SqlQuery(
       Kleisli { session =>
         val query: Command[EventId ~ projects.Id] = sql"""DELETE FROM event_delivery
-                                                        WHERE event_id = $eventIdPut AND project_id = $projectIdPut
-                                                     """.command
+                                                          WHERE event_id = $eventIdPut AND project_id = $projectIdPut
+                                                       """.command
         session.prepare(query).use(_.execute(eventId ~ projectId)).void
       },
       name = "event delivery info - remove"
@@ -127,8 +122,5 @@ private class NoOpEventDelivery[Interpretation[_]: MonadError[*[_], Throwable], 
     extends EventDelivery[Interpretation, CategoryEvent] {
 
   override def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit] =
-    ().pure[Interpretation]
-
-  override def unregister(eventId: CompoundEventId): Interpretation[Unit] =
     ().pure[Interpretation]
 }

@@ -22,7 +22,7 @@ import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
-import io.chrisdavenport.log4cats.Logger
+import org.typelevel.log4cats.Logger
 import skunk.Command
 import skunk.data.Completion
 import skunk.implicits._
