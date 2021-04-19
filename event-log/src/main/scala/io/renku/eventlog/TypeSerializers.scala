@@ -18,23 +18,19 @@
 
 package io.renku.eventlog
 
-import cats.data.NonEmptyList
 import ch.datascience.events.consumers.Project
 import ch.datascience.events.consumers.subscriptions.{SubscriberId, SubscriberUrl}
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventBody, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.{SchemaVersion, projects}
 import ch.datascience.microservices.{MicroserviceBaseUrl, MicroserviceIdentifier}
-import doobie.util.meta.{LegacyInstantMetaInstance, LegacyLocalDateMetaInstance}
-import doobie.util.{Get, Put}
-import org.postgresql.util.PGInterval
 import skunk.codec.all._
 import skunk.{Decoder, Encoder}
 
-import java.time.{Duration, OffsetDateTime, ZoneId}
+import java.time.{OffsetDateTime, ZoneId}
 
 object TypeSerializers extends TypeSerializers
 
-trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMetaInstance {
+trait TypeSerializers {
 
   val eventIdGet: Decoder[EventId] = varchar.map(EventId.apply)
   val eventIdPut: Encoder[EventId] = varchar.values.contramap(_.value)
@@ -80,48 +76,6 @@ trait TypeSerializers extends LegacyLocalDateMetaInstance with LegacyInstantMeta
 
   val schemaVersionGet: Decoder[SchemaVersion] = text.map(SchemaVersion.apply)
   val schemaVersionPut: Encoder[SchemaVersion] = text.values.contramap(_.value)
-
-  private val nanosPerSecond = 1000000000L
-  private val secsPerMinute  = 60
-  private val secsPerHour    = 3600
-  private val secsPerDay     = 86400
-  private val secsPerMonth   = 30 * secsPerDay
-  private val secsPerYear    = (365.25 * secsPerDay).toInt
-  // TODO revamp all the codecs
-  implicit val statusProcessingTimeGet: Get[EventProcessingTime] =
-    Get.Advanced.other[PGInterval](NonEmptyList.of("interval")).tmap { pgInterval =>
-      val nanos = (pgInterval.getSeconds - pgInterval.getSeconds.floor) * nanosPerSecond
-      val seconds = pgInterval.getSeconds.toLong +
-        pgInterval.getMinutes * secsPerMinute +
-        pgInterval.getHours * secsPerHour +
-        pgInterval.getDays * secsPerDay +
-        pgInterval.getMonths * secsPerMonth +
-        pgInterval.getYears * secsPerYear
-      EventProcessingTime(Duration.ofSeconds(seconds, nanos.toLong))
-    }
-  implicit val statusProcessingTimePut: Put[EventProcessingTime] =
-    Put.Advanced.other[PGInterval](NonEmptyList.of("interval")).tcontramap[EventProcessingTime] { processingTime =>
-      val nano         = processingTime.value.getNano.toDouble / nanosPerSecond.toDouble
-      val totalSeconds = processingTime.value.getSeconds
-      val years        = totalSeconds / secsPerYear
-      val yearLeft     = totalSeconds % secsPerYear
-      val months       = yearLeft / secsPerMonth
-      val monthLeft    = yearLeft     % secsPerMonth
-      val days         = monthLeft / secsPerDay
-      val dayLeft      = monthLeft    % secsPerDay
-      val hours        = dayLeft / secsPerHour
-      val hoursLeft    = dayLeft      % secsPerHour
-      val minutes      = hoursLeft / secsPerMinute
-      val seconds      = (hoursLeft % secsPerMinute).toDouble + nano
-      new PGInterval(
-        years.toInt,
-        months.toInt,
-        days.toInt,
-        hours.toInt,
-        minutes.toInt,
-        seconds
-      )
-    }
 
   val compoundEventIdGet: Decoder[CompoundEventId] = (eventIdGet ~ projectIdGet).gmap[CompoundEventId]
   val projectGet:         Decoder[Project]         = (projectIdGet ~ projectPathGet).gmap[Project]

@@ -20,7 +20,6 @@ package ch.datascience.interpreters
 
 import cats.effect.{IO, Resource}
 import ch.datascience.db.SessionResource
-import doobie.util.transactor.Transactor
 import skunk.Session
 
 class TestSessionResource[TargetDB](transactor: Resource[IO, Session[IO]])

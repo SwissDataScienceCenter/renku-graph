@@ -23,23 +23,28 @@ import cats.effect.{ContextShift, IO, Resource}
 import ch.datascience.db.SqlQuery.Name
 import ch.datascience.db.TestDbConfig.newDbConfig
 import ch.datascience.metrics.{LabeledHistogram, TestLabeledHistogram}
+import com.dimafeng.testcontainers.{ForAllTestContainer, PostgreSQLContainer}
 import eu.timepit.refined.auto._
+import natchez.Trace.Implicits.noop
+import org.scalatest.Suite
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
+import org.testcontainers.utility.DockerImageName
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
-import natchez.Trace.Implicits.noop
+import skunk.implicits._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class DbClientSpec extends AnyWordSpec with should.Matchers {
+class DbClientSpec extends AnyWordSpec with should.Matchers with ContainerTestDb {
 
   "measureExecutionTime" should {
 
     "execute the query and do nothing if no histogram given" in {
       val result = 1
-      new TestDbClient(maybeHistogram = None).executeQuery(expected = result).unsafeRunSync() shouldBe result
+      new TestDbClient(maybeHistogram = None)
+        .executeQuery(expected = result)(transactorResource)
+        .unsafeRunSync() shouldBe result
     }
 
     "execute the query and measure execution time with the given histogram" in {
@@ -49,23 +54,14 @@ class DbClientSpec extends AnyWordSpec with should.Matchers {
       val dbClient = new TestDbClient(maybeHistogram = Some(histogram))
 
       val result = 1
-      dbClient.executeQuery(expected = result).unsafeRunSync() shouldBe result
+      dbClient.executeQuery(expected = result)(transactorResource).unsafeRunSync() shouldBe result
 
       histogram.verifyExecutionTimeMeasured(forLabelValue = dbClient.queryName)
     }
   }
 }
 
-private trait TestDB
-
 private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO, Name]]) extends DbClient(maybeHistogram) {
-
-  private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
-
-  private val dbConfig: DBConfigProvider.DBConfig[TestDB] = newDbConfig[TestDB]
-
-  private val transactorResource: Resource[IO, SessionResource[IO, TestDB]] = SessionPoolResource[IO, TestDB](dbConfig)
-
   val queryName: SqlQuery.Name = "some_id"
 
   private def query(expected: Int) = SqlQuery[IO, Int](Kleisli { session =>
@@ -78,11 +74,37 @@ private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO, Name]]) e
                                                        queryName
   )
 
-  def executeQuery(expected: Int) = transactorResource.use {
-    _.use { implicit session =>
-      measureExecutionTime[Int] {
-        query(expected)
-      }
+  def executeQuery(expected: Int)(transactorResource: Resource[IO, Resource[IO, Session[IO]]]) =
+    transactorResource.use {
+      _.use(implicit session => measureExecutionTime[Int](query(expected)))
     }
-  }
+}
+
+trait ContainerTestDb extends ForAllTestContainer {
+  self: Suite =>
+
+  private trait TestDB
+  private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+
+  private val dbConfig: DBConfigProvider.DBConfig[TestDB] = newDbConfig[TestDB]
+
+  override val container: PostgreSQLContainer = PostgreSQLContainer(
+    dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
+    databaseName = dbConfig.name.value,
+    username = dbConfig.user.value,
+    password = dbConfig.pass
+  )
+
+  lazy val transactorResource: Resource[IO, Resource[IO, Session[IO]]] =
+    Session.pooled(
+      host = container.host,
+      port = container.container.getMappedPort(5432),
+      user = dbConfig.user.value,
+      database = dbConfig.name.value,
+      password = Some(dbConfig.pass),
+      max = dbConfig.connectionPool.value,
+      readTimeout = dbConfig.maxLifetime,
+      writeTimeout = dbConfig.maxLifetime
+    )
+
 }

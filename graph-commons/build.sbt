@@ -39,11 +39,6 @@ libraryDependencies += "io.sentry" % "sentry-logback" % "3.2.0"
 val skunkVersion = "0.0.24"
 libraryDependencies += "org.tpolecat" %% "skunk-core" % skunkVersion
 
-val doobieVersion = "0.10.0"
-libraryDependencies += "org.tpolecat" %% "doobie-core"     % doobieVersion
-libraryDependencies += "org.tpolecat" %% "doobie-hikari"   % doobieVersion
-libraryDependencies += "org.tpolecat" %% "doobie-postgres" % doobieVersion
-
 val catsVersion = "2.3.1"
 libraryDependencies += "org.typelevel" %% "cats-core"   % catsVersion
 libraryDependencies += "org.typelevel" %% "cats-effect" % catsVersion
@@ -73,6 +68,3 @@ libraryDependencies += "org.scalatest"     %% "scalatest"       % "3.2.3"   % Te
 val testContainersScalaVersion = "0.39.3"
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
-
-libraryDependencies += "org.tpolecat" %% "doobie-h2"        % doobieVersion % Test
-libraryDependencies += "org.tpolecat" %% "doobie-scalatest" % doobieVersion % Test

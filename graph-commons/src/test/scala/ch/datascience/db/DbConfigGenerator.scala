@@ -29,18 +29,19 @@ import scala.language.postfixOps
 
 private object DbConfigGenerator {
 
-  val dbConfigs: Gen[DBConfig[TestDB]] = for {
-    user           <- nonEmptyStrings() map (RefType.applyRef[User](_).getOrError)
-    pass           <- nonEmptyStrings()
-    name           <- nonEmptyStrings() map (RefType.applyRef[DbName](_).getOrError)
-    host           <- nonEmptyStrings() map (RefType.applyRef[Host](_).getOrError)
-    connectionPool <- positiveInts() map (_.value) map (RefType.applyRef[ConnectionPool](_).getOrError)
-    maxLifetime    <- durations(max = 60 minutes)
-  } yield DBConfig(host, name, user, pass, connectionPool, maxLifetime)
-
-  implicit class RefinedOps[V](maybeValue: Either[String, V]) {
-    lazy val getOrError: V = maybeValue.fold(s => throw new IllegalArgumentException(s), identity)
-  }
+//  val dbConfigs: Gen[DBConfig[TestDB]] = for {
+//    user           <- nonEmptyStrings() map (RefType.applyRef[User](_).getOrError)
+//    pass           <- nonEmptyStrings() map (RefType.applyRef[Pass](_).getOrError)
+//    name           <- nonEmptyStrings() map (RefType.applyRef[DbName](_).getOrError)
+//    host           <- nonEmptyStrings() map (RefType.applyRef[Host](_).getOrError)
+//    connectionPool <- positiveInts() map (_.value) map (RefType.applyRef[ConnectionPool](_).getOrError)
+//    port           <- positiveInts() map (_.value) map (RefType.applyRef[Port](_).getOrError)
+//    maxLifetime    <- durations(max = 60 minutes)
+//  } yield DBConfig(host, port, name, user, pass, connectionPool, maxLifetime)
+//
+//  implicit class RefinedOps[V](maybeValue: Either[String, V]) {
+//    lazy val getOrError: V = maybeValue.fold(s => throw new IllegalArgumentException(s), identity)
+//  }
 
   trait TestDB
 }

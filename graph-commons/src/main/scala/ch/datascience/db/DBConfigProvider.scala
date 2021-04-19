@@ -26,18 +26,18 @@ import ch.datascience.db.DBConfigProvider.DBConfig
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.timepit.refined.W
 import eu.timepit.refined.api.{RefType, Refined}
+import eu.timepit.refined.collection.NonEmpty
 import eu.timepit.refined.numeric.Positive
 import eu.timepit.refined.pureconfig._
 import eu.timepit.refined.string.MatchesRegex
 
 import scala.concurrent.duration.FiniteDuration
 
-class DBConfigProvider[Interpretation[_], TargetDB](
+class DBConfigProvider[Interpretation[_]: MonadError[*[_], Throwable], TargetDB](
     namespace: String,
     dbName:    DBConfig.DbName,
     config:    Config = ConfigFactory.load()
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends ConfigLoader[Interpretation] {
+) extends ConfigLoader[Interpretation] {
 
   import DBConfigProvider._
 
@@ -47,11 +47,12 @@ class DBConfigProvider[Interpretation[_], TargetDB](
   def get(): Interpretation[DBConfig[TargetDB]] =
     for {
       host           <- find[DBConfig.Host](s"$namespace.db-host", config)
+      port           <- find[DBConfig.Port](s"$namespace.db-port", config)
       user           <- find[DBConfig.User](s"$namespace.db-user", config)
       pass           <- find[DBConfig.Pass](s"$namespace.db-pass", config)
       connectionPool <- find[DBConfig.ConnectionPool](s"$namespace.connection-pool", config)
       maxLifetime    <- find[DBConfig.MaxLifetime](s"$namespace.max-connection-lifetime", config)
-    } yield DBConfig(host, dbName, user, pass, connectionPool, maxLifetime)
+    } yield DBConfig(host, port, dbName, user, pass, connectionPool, maxLifetime)
 }
 
 object DBConfigProvider {
@@ -60,6 +61,7 @@ object DBConfigProvider {
 
   case class DBConfig[TargetDB](
       host:           Host,
+      port:           Port,
       name:           DbName,
       user:           User,
       pass:           Pass,
@@ -69,9 +71,10 @@ object DBConfigProvider {
 
   object DBConfig {
     type Host           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
+    type Port           = Int Refined Positive
     type DbName         = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
     type User           = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]
-    type Pass           = String
+    type Pass           = String Refined NonEmpty
     type ConnectionPool = Int Refined Positive
     type MaxLifetime    = FiniteDuration
   }

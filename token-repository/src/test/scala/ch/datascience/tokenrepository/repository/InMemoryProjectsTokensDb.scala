@@ -19,16 +19,16 @@
 package ch.datascience.tokenrepository.repository
 
 import cats.data.Kleisli
+import cats.effect.{ContextShift, IO}
 import cats.syntax.all._
-import cats.effect.{Concurrent, ContextShift, IO}
 import ch.datascience.db.SessionResource
 import com.dimafeng.testcontainers._
+import natchez.Trace.Implicits.noop
 import org.scalatest.Suite
 import org.testcontainers.utility.DockerImageName
 import skunk._
-import skunk.implicits._
 import skunk.codec.all._
-import natchez.Trace.Implicits.noop
+import skunk.implicits._
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -36,7 +36,6 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
   self: Suite =>
 
   implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
-  implicit val concurrent:   Concurrent[IO]   = IO.ioConcurrentEffect
 
   private val dbConfig = new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
@@ -44,7 +43,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
     dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
     databaseName = "projects_tokens",
     username = dbConfig.user.value,
-    password = dbConfig.pass
+    password = dbConfig.pass.value
   )
 
   lazy val transactor: SessionResource[IO, ProjectsTokensDB] = new SessionResource[IO, ProjectsTokensDB](
@@ -52,8 +51,8 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
       host = container.host,
       database = dbConfig.name.value,
       user = dbConfig.user.value,
-      password = Some(dbConfig.pass),
-      port = container.container.getMappedPort(5432)
+      password = Some(dbConfig.pass.value),
+      port = container.container.getMappedPort(dbConfig.port.value)
     )
   )
 

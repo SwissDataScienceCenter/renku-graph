@@ -34,9 +34,9 @@ object TokenRepository {
 
   private val postgresContainer: PostgreSQLContainer = PostgreSQLContainer(
     dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
-    databaseName = "projects_tokens",
+    databaseName = dbConfig.name.value,
     username = dbConfig.user.value,
-    password = dbConfig.pass
+    password = dbConfig.pass.value
   )
 
   def startDB(): IO[Unit] = for {

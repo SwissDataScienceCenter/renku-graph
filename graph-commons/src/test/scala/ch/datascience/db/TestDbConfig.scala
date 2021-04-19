@@ -20,7 +20,7 @@ package ch.datascience.db
 
 import ch.datascience.db.DBConfigProvider.DBConfig
 import ch.datascience.generators.Generators.Implicits._
-import ch.datascience.generators.Generators.nonEmptyStrings
+import ch.datascience.generators.Generators.{nonEmptyStrings, positiveInts}
 import eu.timepit.refined.api.{RefType, Refined}
 import eu.timepit.refined.auto._
 
@@ -34,8 +34,9 @@ object TestDbConfig {
     DBConfig[TargetDb](
       name = Refined.unsafeApply(dbName),
       host = "localhost",
+      port = 5432,
       user = "user",
-      pass = "",
+      pass = "test",
       connectionPool = 20,
       maxLifetime = 5 seconds
     )

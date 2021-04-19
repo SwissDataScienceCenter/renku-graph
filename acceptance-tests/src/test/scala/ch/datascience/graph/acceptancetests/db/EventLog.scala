@@ -25,7 +25,7 @@ import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.events.{CommitId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
-import com.dimafeng.testcontainers.{Container, GenericContainer, JdbcDatabaseContainer, PostgreSQLContainer}
+import com.dimafeng.testcontainers.PostgreSQLContainer
 import io.renku.eventlog._
 import natchez.Trace.Implicits.noop
 import org.testcontainers.utility.DockerImageName
@@ -63,7 +63,7 @@ object EventLog extends TypeSerializers {
     dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
     databaseName = "event_log",
     username = dbConfig.user.value,
-    password = dbConfig.pass
+    password = dbConfig.pass.value
   )
 
   def startDB(): IO[Unit] = for {
@@ -74,10 +74,10 @@ object EventLog extends TypeSerializers {
   private lazy val transactor: SessionResource[IO, EventLogDB] = new SessionResource[IO, EventLogDB](
     Session.single(
       host = postgresContainer.host,
-      port = postgresContainer.container.getMappedPort(5432),
+      port = postgresContainer.container.getMappedPort(dbConfig.port.value),
       database = dbConfig.name.value,
       user = dbConfig.user.value,
-      password = Some(dbConfig.pass)
+      password = Some(dbConfig.pass.value)
     )
   )
 }

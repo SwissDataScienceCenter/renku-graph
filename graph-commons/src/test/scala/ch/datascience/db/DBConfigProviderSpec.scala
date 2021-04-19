@@ -23,6 +23,7 @@ import ch.datascience.db.DBConfigProvider.DBConfig._
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.generators.Generators._
 import com.typesafe.config.ConfigFactory
+import eu.timepit.refined.api.RefType.refinedRefType
 import eu.timepit.refined.api.{RefType, Refined}
 import org.scalacheck.Gen
 import org.scalatest.matchers.should
@@ -40,6 +41,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
     "return db config read from the configuration" in new TestCase {
       val host           = hosts.generateOne
       val user           = nonEmptyStrings().generateOne
+      val port           = ports.generateOne
       val password       = nonEmptyStrings().generateOne
       val connectionPool = positiveInts().generateOne
       val maxLifetime    = durations(max = 30 minutes).generateOne
@@ -48,6 +50,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
         Map(
           namespace -> Map(
             "db-host"                 -> host.value,
+            "db-port"                 -> port.value,
             "db-user"                 -> user,
             "db-pass"                 -> password,
             "connection-pool"         -> connectionPool.value,
@@ -59,38 +62,9 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
       val Success(dbConfig) = new DBConfigProvider[Try, TestDB](namespace, dbName, config).get()
 
       dbConfig.user.value     shouldBe user
-      dbConfig.pass           shouldBe password
-      dbConfig.connectionPool shouldBe connectionPool
-      dbConfig.maxLifetime    shouldBe maxLifetime
-    }
-
-    "return db config read from the configuration except from url if overridden" in new TestCase {
-      val host           = hosts.generateOne
-      val user           = nonEmptyStrings().generateOne
-      val password       = nonEmptyStrings().generateOne
-      val connectionPool = positiveInts().generateOne
-      val maxLifetime    = durations(max = 30 minutes).generateOne
-
-      val config = ConfigFactory.parseMap(
-        Map(
-          namespace -> Map(
-            "db-host"                 -> host.value,
-            "db-user"                 -> user,
-            "db-pass"                 -> password,
-            "connection-pool"         -> connectionPool.value,
-            "max-connection-lifetime" -> maxLifetime.toString()
-          ).asJava
-        ).asJava
-      )
-
-      val Success(dbConfig) = new DBConfigProvider[Try, TestDB](
-        namespace,
-        dbName,
-        config
-      ).get()
-
-      dbConfig.user.value     shouldBe user
-      dbConfig.pass           shouldBe password
+      dbConfig.host           shouldBe host
+      dbConfig.port           shouldBe port
+      dbConfig.pass.value     shouldBe password
       dbConfig.connectionPool shouldBe connectionPool
       dbConfig.maxLifetime    shouldBe maxLifetime
     }
@@ -107,6 +81,25 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
         Map(
           namespace -> Map(
             "db-host"                 -> "",
+            "db-port"                 -> positiveInts().generateOne.value,
+            "db-user"                 -> nonEmptyStrings().generateOne,
+            "db-pass"                 -> nonEmptyStrings().generateOne,
+            "connection-pool"         -> positiveInts().generateOne.value,
+            "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
+          ).asJava
+        ).asJava
+      )
+
+      val Failure(exception) = new DBConfigProvider[Try, TestDB](namespace, dbName, config).get()
+
+      exception shouldBe a[ConfigLoadingException]
+    }
+
+    "fail if there is no '<config-namespace>.db-port' in the config" in new TestCase {
+      val config = ConfigFactory.parseMap(
+        Map(
+          namespace -> Map(
+            "db-host"                 -> nonEmptyStrings().generateOne,
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
@@ -126,6 +119,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
           namespace -> Map(
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> "",
+            "db-port"                 -> positiveInts().generateOne.value,
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "connection-pool"         -> positiveInts().generateOne.value,
             "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
@@ -144,6 +138,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
           namespace -> Map(
             "db-host"                 -> hosts.generateOne.value,
             "db-user"                 -> nonEmptyStrings().generateOne,
+            "db-port"                 -> positiveInts().generateOne.value,
             "connection-pool"         -> positiveInts().generateOne.value,
             "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
           ).asJava
@@ -160,6 +155,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
         Map(
           namespace -> Map(
             "db-host"                 -> hosts.generateOne.value,
+            "db-port"                 -> positiveInts().generateOne.value,
             "db-user"                 -> nonEmptyStrings().generateOne,
             "db-pass"                 -> nonEmptyStrings().generateOne,
             "max-connection-lifetime" -> durations(max = 30 minutes).generateOne.toString()
@@ -178,6 +174,7 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
           namespace -> Map(
             "db-host"         -> hosts.generateOne.value,
             "db-user"         -> nonEmptyStrings().generateOne,
+            "db-port"         -> positiveInts().generateOne.value,
             "db-pass"         -> nonEmptyStrings().generateOne,
             "connection-pool" -> positiveInts().generateOne.value
           ).asJava
@@ -201,9 +198,13 @@ class DBConfigProviderSpec extends AnyWordSpec with should.Matchers {
 
     val hosts: Gen[Host] = for {
       hostname <- nonEmptyStrings()
-      port     <- positiveInts()
     } yield RefType
-      .applyRef[Host](s"$hostname:$port")
+      .applyRef[Host](s"$hostname")
       .getOrElse(throw new IllegalArgumentException("Invalid host` value"))
+
+    val ports: Gen[Port] = positiveInts().map(p =>
+      RefType.applyRef[Port](p.value).getOrElse(throw new IllegalArgumentException("Invalid port` value"))
+    )
   }
+
 }

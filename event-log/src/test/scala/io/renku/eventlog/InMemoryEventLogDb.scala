@@ -40,18 +40,18 @@ trait InMemoryEventLogDb extends ForAllTestContainer with TypeSerializers {
 
   override val container: PostgreSQLContainer = PostgreSQLContainer(
     dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
-    databaseName = "event_log",
+    databaseName = dbConfig.name.value,
     username = dbConfig.user.value,
-    password = dbConfig.pass
+    password = dbConfig.pass.value
   )
 
   lazy val transactor: SessionResource[IO, EventLogDB] = new SessionResource[IO, EventLogDB](
     Session.single(
       host = container.host,
-      port = container.container.getMappedPort(5432),
+      port = container.container.getMappedPort(dbConfig.port.value),
       user = dbConfig.user.value,
       database = dbConfig.name.value,
-      password = Some(dbConfig.pass)
+      password = Some(dbConfig.pass.value)
     )
   )
 

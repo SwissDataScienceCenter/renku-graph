@@ -25,9 +25,8 @@ import eu.timepit.refined.auto._
 
 sealed trait ProjectsTokensDB
 
-class ProjectsTokensDbConfigProvider[Interpretation[_]](
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends DBConfigProvider[Interpretation, ProjectsTokensDB](
+class ProjectsTokensDbConfigProvider[Interpretation[_]: MonadError[*[_], Throwable]](
+) extends DBConfigProvider[Interpretation, ProjectsTokensDB](
       namespace = "projects-tokens",
       dbName = "projects_tokens"
     )

@@ -57,8 +57,6 @@ private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwabl
       } yield result
   } flatMap toResult
 
-  // TODO not sure if a transaction is needed
-
   def unregister(eventId: CompoundEventId): Interpretation[Unit] = transactor.use { implicit session =>
     deleteDelivery(eventId.id, eventId.projectId)
   }

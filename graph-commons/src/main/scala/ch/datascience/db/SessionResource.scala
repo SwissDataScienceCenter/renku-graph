@@ -37,10 +37,10 @@ object SessionPoolResource {
     Session
       .pooled(
         host = dbConfig.host.value,
-        port = 5432,
+        port = dbConfig.port.value,
         user = dbConfig.user.value,
         database = dbConfig.name.value,
-        password = Some(dbConfig.pass),
+        password = Some(dbConfig.pass.value),
         max = dbConfig.connectionPool.value,
         readTimeout = dbConfig.maxLifetime,
         writeTimeout = dbConfig.maxLifetime

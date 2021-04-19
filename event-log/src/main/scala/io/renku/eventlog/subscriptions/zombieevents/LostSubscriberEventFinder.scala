@@ -27,7 +27,6 @@ import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, Transfo
 import ch.datascience.graph.model.events.{CompoundEventId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
-import doobie.free.connection.{ConnectionOp, raiseError}
 import eu.timepit.refined.api.Refined
 import io.renku.eventlog.subscriptions.EventFinder
 import io.renku.eventlog.{EventLogDB, TypeSerializers}

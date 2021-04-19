@@ -36,7 +36,7 @@ abstract class DbClient[Interpretation[_]: Async](
         for {
           timer  <- histogram.startTimer(query.name)
           result <- query.query.run(session)
-          _      <- timer.observeDuration // TODO verify if Async is needed
+          _      <- timer.observeDuration
         } yield result
     }
 

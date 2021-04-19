@@ -53,7 +53,6 @@ private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]: Async: Brack
         new Exception("Event payload table missing; alteration is not possible").raiseError[Interpretation, Unit]
     }
   }
-// TODO verify if transaction is needed
   private def checkTableExists(implicit session: Session[Interpretation]): Interpretation[Boolean] = {
     val query: Query[Void, Boolean] =
       sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"

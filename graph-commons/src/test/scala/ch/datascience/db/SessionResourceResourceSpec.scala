@@ -18,9 +18,8 @@
 
 package ch.datascience.db
 
-import DbConfigGenerator._
 import cats.effect.{ContextShift, IO}
-import com.zaxxer.hikari.HikariDataSource
+import ch.datascience.db.DbConfigGenerator._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
