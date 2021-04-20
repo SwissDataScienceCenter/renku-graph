@@ -36,10 +36,9 @@ import io.circe.parser._
 import scala.language.implicitConversions
 import scala.util.control.NonFatal
 
-private class AccessTokenCrypto[Interpretation[_]](
-    secret:    Secret
-)(implicit ME: MonadError[Interpretation, Throwable])
-    extends AesCrypto[Interpretation, AccessToken, EncryptedAccessToken](secret) {
+private class AccessTokenCrypto[Interpretation[_]: MonadError[*[_], Throwable]](
+    secret: Secret
+) extends AesCrypto[Interpretation, AccessToken, EncryptedAccessToken](secret) {
 
   override def encrypt(accessToken: AccessToken): Interpretation[EncryptedAccessToken] =
     for {
@@ -61,7 +60,7 @@ private class AccessTokenCrypto[Interpretation[_]](
   }
 
   private def validate(value: String): Interpretation[EncryptedAccessToken] =
-    ME.fromEither[EncryptedAccessToken] {
+    MonadError[Interpretation, Throwable].fromEither[EncryptedAccessToken] {
       EncryptedAccessToken.from(value)
     }
 
@@ -85,13 +84,14 @@ private class AccessTokenCrypto[Interpretation[_]](
         .map(Option.apply)
   }
 
-  private def deserialize(serializedToken: String): Interpretation[AccessToken] = ME.fromEither {
-    parse(serializedToken)
-      .flatMap(_.as[AccessToken])
-  }
+  private def deserialize(serializedToken: String): Interpretation[AccessToken] =
+    MonadError[Interpretation, Throwable].fromEither {
+      parse(serializedToken)
+        .flatMap(_.as[AccessToken])
+    }
 
   private lazy val meaningfulError: PartialFunction[Throwable, Interpretation[AccessToken]] = { case NonFatal(cause) =>
-    ME.raiseError(new RuntimeException("AccessToken decryption failed", cause))
+    MonadError[Interpretation, Throwable].raiseError(new RuntimeException("AccessToken decryption failed", cause))
   }
 }
 
@@ -99,9 +99,9 @@ private object AccessTokenCrypto {
 
   import ch.datascience.config.ConfigLoader._
 
-  def apply[Interpretation[_]](
-      config:    Config = ConfigFactory.load()
-  )(implicit ME: MonadError[Interpretation, Throwable]): Interpretation[AccessTokenCrypto[Interpretation]] =
+  def apply[Interpretation[_]: MonadError[*[_], Throwable]](
+      config: Config = ConfigFactory.load()
+  ): Interpretation[AccessTokenCrypto[Interpretation]] =
     find[Interpretation, Secret]("projects-tokens.secret", config) map (new AccessTokenCrypto[Interpretation](_))
 
   type EncryptedAccessToken = String Refined MatchesRegex[W.`"""^(?!\\s*$).+"""`.T]

@@ -49,15 +49,14 @@ private trait EventProcessor[Interpretation[_]] {
   ): Interpretation[Unit]
 }
 
-private class TriplesGeneratedEventProcessor[Interpretation[_]](
+private class TriplesGeneratedEventProcessor[Interpretation[_]: MonadError[*[_], Throwable]](
     accessTokenFinder:     AccessTokenFinder[Interpretation],
     triplesCurator:        TriplesTransformer[Interpretation],
     uploader:              Uploader[Interpretation],
     statusUpdater:         EventStatusUpdater[Interpretation],
     logger:                Logger[Interpretation],
     executionTimeRecorder: ExecutionTimeRecorder[Interpretation]
-)(implicit ME:             MonadError[Interpretation, Throwable])
-    extends EventProcessor[Interpretation] {
+) extends EventProcessor[Interpretation] {
 
   import IOAccessTokenFinder._
   import UploadingResult._

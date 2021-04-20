@@ -59,8 +59,9 @@ class DbInitializer[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     }
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
-    logger.error(exception)("Projects Tokens database initialization failure")
-    Bracket[Interpretation, Throwable].raiseError(exception)
+    logger
+      .error(exception)("Projects Tokens database initialization failure")
+      .flatMap(_ => Bracket[Interpretation, Throwable].raiseError(exception))
   }
 }
 

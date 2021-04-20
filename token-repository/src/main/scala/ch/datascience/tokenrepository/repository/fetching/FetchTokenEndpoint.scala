@@ -21,19 +21,18 @@ package ch.datascience.tokenrepository.repository.fetching
 import cats.data.OptionT
 import cats.effect.{ContextShift, Effect, IO}
 import cats.syntax.all._
-import ch.datascience.http.ErrorMessage._
-import ch.datascience.http.InfoMessage
 import ch.datascience.db.{SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects
-import ch.datascience.http.{ErrorMessage, InfoMessage}
+import ch.datascience.http.ErrorMessage._
 import ch.datascience.http.client.AccessToken
+import ch.datascience.http.{ErrorMessage, InfoMessage}
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
-import org.typelevel.log4cats.Logger
 import io.circe.syntax._
 import org.http4s.Response
 import org.http4s.circe._
 import org.http4s.dsl.Http4sDsl
+import org.typelevel.log4cats.Logger
 
 import scala.util.control.NonFatal
 

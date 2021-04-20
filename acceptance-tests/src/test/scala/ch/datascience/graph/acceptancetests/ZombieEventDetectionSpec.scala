@@ -45,6 +45,7 @@ import org.scalatest.concurrent.Eventually
 import org.scalatest.featurespec.AnyFeatureSpec
 import org.scalatest.matchers.should
 import skunk._
+import skunk.data.Completion
 import skunk.implicits._
 
 import java.time.Instant
@@ -104,12 +105,15 @@ class ZombieEventDetectionSpec
 
   private def insertProjectToDB(project: Project, eventDate: EventDate) = EventLog.execute { session =>
     val query: Command[Id ~ Path ~ EventDate] =
-      sql"""|INSERT INTO project (project_id, project_path, latest_event_date)
-          |VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
-          |ON CONFLICT (project_id)
-          |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
-          |""".command
-    session.prepare(query).use(_.execute(project.id ~ project.path ~ eventDate))
+      sql"""INSERT INTO project (project_id, project_path, latest_event_date)
+          VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
+          ON CONFLICT (project_id)
+          DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
+          """.command
+    session.prepare(query).use(_.execute(project.id ~ project.path ~ eventDate)).map {
+      case Completion.Insert(n) => n
+      case completion           => throw new Exception(s"insertProjectToDB failed with completion code $completion")
+    }
   }
 
   private def insertEventToDB(commitId: CommitId, project: Project, eventDate: EventDate)(implicit

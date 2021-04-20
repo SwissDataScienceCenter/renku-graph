@@ -38,7 +38,7 @@ spec:
                   key: tokenRepository-tokenEncryption-secret
             - name: TOKEN_REPOSITORY_POSTGRES_HOST
               value: "{{ template "postgresql.fullname" . }}"
-            - name: TOKEN_REPOSITORY_POSTGRES_HOST
+            - name: TOKEN_REPOSITORY_POSTGRES_PORT
               value: 5432
             - name: TOKEN_REPOSITORY_POSTGRES_USER
               value: {{ .Values.global.graph.tokenRepository.postgresUser }}

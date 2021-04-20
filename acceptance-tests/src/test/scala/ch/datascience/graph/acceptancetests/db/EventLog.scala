@@ -25,10 +25,9 @@ import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.events.{CommitId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
-import com.dimafeng.testcontainers.PostgreSQLContainer
+import com.dimafeng.testcontainers.FixedHostPortGenericContainer
 import io.renku.eventlog._
 import natchez.Trace.Implicits.noop
-import org.testcontainers.utility.DockerImageName
 import skunk._
 import skunk.implicits._
 
@@ -73,11 +72,16 @@ object EventLog extends TypeSerializers {
   private val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
     new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
-  private val postgresContainer: PostgreSQLContainer = PostgreSQLContainer(
-    dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
-    databaseName = dbConfig.name.value,
-    username = dbConfig.user.value,
-    password = dbConfig.pass.value
+  private val postgresContainer = FixedHostPortGenericContainer(
+    imageName = "postgres:9.6.19-alpine",
+    env = Map("POSTGRES_USER"     -> dbConfig.user.value,
+              "POSTGRES_PASSWORD" -> dbConfig.pass.value,
+              "POSTGRES_DB"       -> dbConfig.name.value
+    ),
+    exposedPorts = Seq(dbConfig.port.value),
+    exposedHostPort = dbConfig.port.value,
+    exposedContainerPort = dbConfig.port.value,
+    command = Seq(s"-p ${dbConfig.port.value}")
   )
 
   def startDB(): IO[Unit] = for {

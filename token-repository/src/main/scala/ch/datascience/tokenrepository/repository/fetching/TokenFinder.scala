@@ -27,10 +27,10 @@ import ch.datascience.http.client.AccessToken
 import ch.datascience.metrics.LabeledHistogram
 import ch.datascience.tokenrepository.repository._
 
-private class TokenFinder[Interpretation[_]](
+private class TokenFinder[Interpretation[_]: MonadError[*[_], Throwable]](
     tokenInRepoFinder: PersistedTokensFinder[Interpretation],
     accessTokenCrypto: AccessTokenCrypto[Interpretation]
-)(implicit ME:         MonadError[Interpretation, Throwable]) {
+) {
 
   import accessTokenCrypto._
 

@@ -22,8 +22,7 @@ import cats.effect.IO
 import ch.datascience.db.DBConfigProvider
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, ProjectsTokensDbConfigProvider}
-import com.dimafeng.testcontainers.PostgreSQLContainer
-import org.testcontainers.utility.DockerImageName
+import com.dimafeng.testcontainers.FixedHostPortGenericContainer
 
 object TokenRepository {
 
@@ -32,11 +31,16 @@ object TokenRepository {
   private val dbConfig: DBConfigProvider.DBConfig[ProjectsTokensDB] =
     new ProjectsTokensDbConfigProvider[IO].get().unsafeRunSync()
 
-  private val postgresContainer: PostgreSQLContainer = PostgreSQLContainer(
-    dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
-    databaseName = dbConfig.name.value,
-    username = dbConfig.user.value,
-    password = dbConfig.pass.value
+  private val postgresContainer = FixedHostPortGenericContainer(
+    imageName = "postgres:9.6.19-alpine",
+    env = Map("POSTGRES_USER"     -> dbConfig.user.value,
+              "POSTGRES_PASSWORD" -> dbConfig.pass.value,
+              "POSTGRES_DB"       -> dbConfig.name.value
+    ),
+    exposedPorts = Seq(dbConfig.port.value),
+    exposedHostPort = dbConfig.port.value,
+    exposedContainerPort = dbConfig.port.value,
+    command = Seq(s"-p ${dbConfig.port.value}")
   )
 
   def startDB(): IO[Unit] = for {
