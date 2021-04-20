@@ -157,12 +157,12 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
             SET status = $eventStatusEncoder
             WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
             """.command
-          session.prepare(query).use(_.execute(status ~ eventId.id ~ eventId.projectId ~ New)).map {
-            case Completion.Update(n) => n
+          session.prepare(query).use(_.execute(status ~ eventId.id ~ eventId.projectId ~ New)).flatMap {
+            case Completion.Update(n) => n.pure[IO]
             case completion =>
-              throw new RuntimeException(
+              new RuntimeException(
                 s"generating_triples->generation_non_recoverable_fail time query failed with completion status $completion"
-              )
+              ).raiseError[IO, Int]
           }
         },
         name = "test_status_update"

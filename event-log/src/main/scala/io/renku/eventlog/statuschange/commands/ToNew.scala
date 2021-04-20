@@ -59,12 +59,12 @@ final case class ToNew[Interpretation[_]: Async: Bracket[*[_], Throwable]](
         session
           .prepare(query)
           .use(_.execute(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ GeneratingTriples))
-          .map {
-            case Completion.Update(n) => n
+          .flatMap {
+            case Completion.Update(n) => n.pure[Interpretation]
             case completion =>
-              throw new RuntimeException(
+              new RuntimeException(
                 s"generating_triples->new time query failed with completion status $completion"
-              )
+              ).raiseError[Interpretation, Int]
           }
       },
       name = "generating_triples->new"

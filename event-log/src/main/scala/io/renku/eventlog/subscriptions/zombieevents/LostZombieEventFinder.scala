@@ -87,13 +87,9 @@ private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Thro
     case Some(event) => updateExecutionDate(event.eventId) map toNoneIfEventAlreadyTaken(event)
   }
 
-  private def toNoneIfEventAlreadyTaken(event: ZombieEvent): Completion => Option[ZombieEvent] = {
-    case Completion.Update(0) => None
-    case Completion.Update(1) => Some(event)
-    case completion =>
-      throw new Exception(
-        s"${categoryName.value.toLowerCase} - lze - Query failed with status $completion"
-      ) // TODO verify
+  private def toNoneIfEventAlreadyTaken(event: ZombieEvent): Boolean => Option[ZombieEvent] = {
+    case true  => Some(event)
+    case false => None
   }
 
   private def updateExecutionDate(eventId: CompoundEventId) =
@@ -106,7 +102,17 @@ private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Thro
               SET execution_date = $executionDateEncoder
               WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND message = $text
               """.command
-          session.prepare(query).use(_.execute(ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ zombieMessage))
+          session
+            .prepare(query)
+            .use(_.execute(ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ zombieMessage))
+            .flatMap {
+              case Completion.Update(1) => true.pure[Interpretation]
+              case Completion.Update(0) => false.pure[Interpretation]
+              case completion =>
+                new Exception(
+                  s"${categoryName.value.toLowerCase} - lze - update execution date failed with status $completion"
+                ).raiseError[Interpretation, Boolean]
+            }
         },
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lze - update execution date")
       )

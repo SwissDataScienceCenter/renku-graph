@@ -98,20 +98,23 @@ private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], 
             .use(
               _.execute(
                 zombieMessage ~ OffsetDateTime.ofInstant(now(), ZoneId.systemDefault()) ~ eventId.id ~ eventId.projectId
-              )
+              ).flatMap {
+                case Completion.Update(0) => false.pure[Interpretation]
+                case Completion.Update(1) => true.pure[Interpretation]
+                case completion =>
+                  new Exception(
+                    s"${categoryName.value.toLowerCase} - lse - update message failed with status $completion"
+                  ).raiseError[Interpretation, Boolean]
+              }
             )
         },
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lse - update message")
       )
     }
 
-  private def toNoneIfEventAlreadyTaken(event: ZombieEvent): Completion => Option[ZombieEvent] = {
-    case Completion.Update(0) => None
-    case Completion.Update(1) => Some(event)
-    case completion =>
-      throw new Exception(
-        s"${categoryName.value.toLowerCase} - lse - Query failed with status $completion"
-      ) // TODO verify
+  private def toNoneIfEventAlreadyTaken(event: ZombieEvent): Boolean => Option[ZombieEvent] = {
+    case true  => Some(event)
+    case false => None
   }
 
   override val processName: ZombieEventProcess = ZombieEventProcess("lse")

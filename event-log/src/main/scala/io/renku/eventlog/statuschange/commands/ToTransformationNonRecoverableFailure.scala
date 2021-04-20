@@ -61,12 +61,12 @@ final case class ToTransformationNonRecoverableFailure[Interpretation[_]: Async:
           .use(
             _.execute(status ~ ExecutionDate(now()) ~ message ~ eventId.id ~ eventId.projectId ~ TransformingTriples)
           )
-          .map {
-            case Completion.Update(n) => n
+          .flatMap {
+            case Completion.Update(n) => n.pure[Interpretation]
             case completion =>
-              throw new RuntimeException(
-                s"transforming_triples->transformation_non_recoverable_fail time query failed with completion status $completion"
-              )
+              new RuntimeException(
+                s"transforming_triples->transformation_non_recoverable_fail query failed with completion status $completion"
+              ).raiseError[Interpretation, Int]
           }
       },
       name = "transforming_triples->transformation_non_recoverable_fail"

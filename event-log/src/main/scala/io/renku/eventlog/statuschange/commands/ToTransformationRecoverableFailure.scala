@@ -67,12 +67,12 @@ final case class ToTransformationRecoverableFailure[Interpretation[_]: Async: Br
               ) ~ message ~ eventId.id ~ eventId.projectId ~ TransformingTriples
             )
           }
-          .map {
-            case Completion.Update(n) => n
+          .flatMap {
+            case Completion.Update(n) => n.pure[Interpretation]
             case completion =>
-              throw new RuntimeException(
+              new RuntimeException(
                 s"transforming_triples->transformation_recoverable_fail time query failed with completion status $completion"
-              )
+              ).raiseError[Interpretation, Int]
           }
       },
       name = "transforming_triples->transformation_recoverable_fail"

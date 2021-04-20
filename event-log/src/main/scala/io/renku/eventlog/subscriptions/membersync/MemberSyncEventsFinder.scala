@@ -86,7 +86,9 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], 
     )
   }
 
-  private def setSyncDate(projectId: projects.Id, maybeSyncedDate: Option[LastSyncedDate]) =
+  private def setSyncDate(projectId:       projects.Id,
+                          maybeSyncedDate: Option[LastSyncedDate]
+  ): Kleisli[Interpretation, Session[Interpretation], Boolean] =
     if (maybeSyncedDate.isDefined) updateLastSyncedDate(projectId)
     else insertLastSyncedDate(projectId)
 
@@ -100,9 +102,13 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], 
             SET last_synced = $lastSyncedDateEncoder
             WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
             """.command
-          session.prepare(query).use(_.execute(LastSyncedDate(now()) ~ projectId ~ categoryName)).map {
-            case Completion.Update(n) => n
-            case _                    => 0 // TODO verify if the default value is relevant or if we should throw an error
+          session.prepare(query).use(_.execute(LastSyncedDate(now()) ~ projectId ~ categoryName)).flatMap {
+            case Completion.Update(1) => true.pure[Interpretation]
+            case Completion.Update(0) => false.pure[Interpretation]
+            case completion =>
+              new Exception(
+                s"${categoryName.value.toLowerCase} - update last_synced failed with completion code $completion"
+              ).raiseError[Interpretation, Boolean]
           }
         },
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced")
@@ -121,18 +127,22 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], 
             DO
               UPDATE SET last_synced = EXCLUDED.last_synced
             """.command
-          session.prepare(query).use(_.execute(projectId ~ categoryName ~ LastSyncedDate(now()))).map {
-            case Completion.Insert(n) => n
-            case _                    => 0 // TODO verify if the default value is relevant or if we should throw an error
+          session.prepare(query).use(_.execute(projectId ~ categoryName ~ LastSyncedDate(now()))).flatMap {
+            case Completion.Insert(1) => true.pure[Interpretation]
+            case Completion.Insert(0) => false.pure[Interpretation]
+            case completion =>
+              new Exception(
+                s"${categoryName.value.toLowerCase} - insert last_synced failed with completion code $completion"
+              ).raiseError[Interpretation, Boolean]
           }
         },
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced")
       )
     }
 
-  private def toNoneIfEventAlreadyTaken(event: MemberSyncEvent): Int => Option[MemberSyncEvent] = {
-    case 0 => None
-    case 1 => Some(event)
+  private def toNoneIfEventAlreadyTaken(event: MemberSyncEvent): Boolean => Option[MemberSyncEvent] = {
+    case true  => Some(event)
+    case false => None
   }
 }
 

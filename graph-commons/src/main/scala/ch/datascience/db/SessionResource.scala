@@ -30,9 +30,6 @@ class SessionResource[Interpretation[_]: Bracket[*[_], Throwable], TargetDB](
     resource: Resource[Interpretation, Session[Interpretation]]
 ) {
 
-//  def use[G[x] >: Interpretation[x], B](f: Session[Interpretation] => G[B])(implicit F: BracketThrow[G]): G[B] =
-//    resource.use(f)
-
   def useK[ResultType](
       query: Kleisli[Interpretation, Session[Interpretation], ResultType]
   ): Interpretation[ResultType] = resource.use(query.run)

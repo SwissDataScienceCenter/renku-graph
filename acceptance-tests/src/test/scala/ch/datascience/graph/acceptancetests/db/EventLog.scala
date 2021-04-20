@@ -41,10 +41,9 @@ object EventLog extends TypeSerializers {
 
   def findEvents(projectId: Id): List[(EventId, EventStatus)] = execute { session =>
     val query: Query[projects.Id, (EventId, EventStatus)] =
-      sql"""
-     SELECT event_id, status
-     FROM event
-     WHERE project_id = $projectIdEncoder"""
+      sql"""SELECT event_id, status
+         FROM event
+         WHERE project_id = $projectIdEncoder"""
         .query(eventIdDecoder ~ eventStatusDecoder)
         .map { case id ~ status => (id, status) }
     session.prepare(query).use(_.stream(projectId, 32).compile.toList)

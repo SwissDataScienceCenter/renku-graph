@@ -107,10 +107,11 @@ class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
           ) all_counts
           GROUP BY all_counts.category_name
           """.query(categoryNameDecoder ~ numeric).map { case categoryName ~ (count: BigDecimal) => (categoryName, count.longValue) }
-      val eventDate = EventDate(now())
-      val lastSyncedDate = LastSyncedDate(now())
+      val (eventDate, lastSyncedDate) = (EventDate.apply _ &&& LastSyncedDate.apply _)(now())
       session.prepare(query).use {
-        _.stream(membersync.categoryName ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ membersync.categoryName ~ membersync.categoryName ~ commitsync.categoryName ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName, 32).compile.toList
+        _.stream(membersync.categoryName ~ eventDate ~ lastSyncedDate ~ eventDate ~ lastSyncedDate ~ eventDate ~ 
+          lastSyncedDate ~ membersync.categoryName ~ membersync.categoryName ~ commitsync.categoryName ~ eventDate ~ 
+          lastSyncedDate ~ eventDate ~ lastSyncedDate ~ commitsync.categoryName ~ commitsync.categoryName, 32).compile.toList
       }
     },
     name = "category name events count"

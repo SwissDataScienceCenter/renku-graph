@@ -79,12 +79,12 @@ final case class GeneratingToTriplesGenerated[Interpretation[_]: Async: Bracket[
     session
       .prepare(query)
       .use(_.execute(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ GeneratingTriples))
-      .map {
-        case Completion.Update(n) => n
+      .flatMap {
+        case Completion.Update(n) => n.pure[Interpretation]
         case completion =>
-          throw new RuntimeException(
+          new RuntimeException(
             s"generating_triples->triples_generated time query failed with completion status $completion"
-          )
+          ).raiseError[Interpretation, Int]
       }
   }
 
@@ -96,10 +96,11 @@ final case class GeneratingToTriplesGenerated[Interpretation[_]: Async: Bracket[
             ON CONFLICT (event_id, project_id, schema_version)
             DO UPDATE SET payload = EXCLUDED.payload;
           """.command
-    session.prepare(query).use(_.execute(eventId.id ~ eventId.projectId ~ payload ~ schemaVersion)).map {
-      case Completion.Insert(n) => n
+    session.prepare(query).use(_.execute(eventId.id ~ eventId.projectId ~ payload ~ schemaVersion)).flatMap {
+      case Completion.Insert(n) => n.pure[Interpretation]
       case completion =>
-        throw new RuntimeException(s"upsert_generated_triples time query failed with completion status $completion")
+        new RuntimeException(s"upsert_generated_triples time query failed with completion status $completion")
+          .raiseError[Interpretation, Int]
     }
   }
 
@@ -143,12 +144,12 @@ final case class TransformingToTriplesGenerated[Interpretation[_]: Bracket[*[_],
     session
       .prepare(query)
       .use(_.execute(status ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ TransformingTriples))
-      .map {
-        case Completion.Update(n) => n
+      .flatMap {
+        case Completion.Update(n) => n.pure[Interpretation]
         case completion =>
-          throw new RuntimeException(
+          new RuntimeException(
             s"generating_triples->triples_generated time query failed with completion status $completion"
-          )
+          ).raiseError[Interpretation, Int]
       }
   }
 

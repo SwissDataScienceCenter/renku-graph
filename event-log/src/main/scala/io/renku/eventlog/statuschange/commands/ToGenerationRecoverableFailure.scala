@@ -69,12 +69,12 @@ final case class ToGenerationRecoverableFailure[Interpretation[_]: Async: Bracke
               ) ~ message ~ eventId.id ~ eventId.projectId ~ GeneratingTriples
             )
           }
-          .map {
-            case Completion.Update(n) => n
+          .flatMap {
+            case Completion.Update(n) => n.pure[Interpretation]
             case completion =>
-              throw new RuntimeException(
+              new RuntimeException(
                 s"generating_triples->generation_recoverable_fail time query failed with completion status $completion"
-              )
+              ).raiseError[Interpretation, Int]
           }
       },
       name = "generating_triples->generation_recoverable_fail"

@@ -19,7 +19,7 @@
 package io.renku.eventlog.events.categories.zombieevents
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, IO}
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.EventStatus.{GeneratingTriples, New, TransformingTriples, TriplesGenerated}
@@ -31,7 +31,6 @@ import io.renku.eventlog.{EventLogDB, ExecutionDate, TypeSerializers}
 import skunk._
 import skunk.data.Completion
 import skunk.implicits._
-import skunk.codec.all._
 
 import java.time.Instant
 
@@ -48,10 +47,10 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: Async: Bracket[*[_], Th
     with TypeSerializers {
 
   override def cleanZombieStatus(event: ZombieEvent): Interpretation[UpdateResult] = sessionResource.useK {
-    cleanEventualDeliveries(event.eventId) >> updateEventStatus(event) >>= toResult
+    cleanEventualDeliveries(event.eventId) >> updateEventStatus(event)
   }
 
-  private lazy val updateEventStatus: ZombieEvent => Kleisli[Interpretation, Session[Interpretation], Completion] = {
+  private lazy val updateEventStatus: ZombieEvent => Kleisli[Interpretation, Session[Interpretation], UpdateResult] = {
     case GeneratingTriplesZombieEvent(eventId, _)   => updateStatusQuery(eventId, GeneratingTriples, New)
     case TransformingTriplesZombieEvent(eventId, _) => updateStatusQuery(eventId, TransformingTriples, TriplesGenerated)
   }
@@ -83,17 +82,17 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: Async: Bracket[*[_], Th
             WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
             """.command
         session.prepare(query).use {
-          _.execute(newStatus ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ oldStatus)
+          _.execute(newStatus ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ oldStatus).flatMap {
+            case Completion.Update(1) => (Updated: UpdateResult).pure[Interpretation]
+            case Completion.Update(0) => (NotUpdated: UpdateResult).pure[Interpretation]
+            case _ =>
+              new Exception(s"${categoryName.value} - zombie_chasing - update status- More than one row updated")
+                .raiseError[Interpretation, UpdateResult]
+          }
         }
       },
       name = "zombie_chasing - update status"
     )
-  }
-
-  private lazy val toResult: Completion => Kleisli[Interpretation, Session[Interpretation], UpdateResult] = {
-    case Completion.Update(1) => Kleisli.pure(Updated: UpdateResult)
-    case Completion.Update(0) => Kleisli.pure((NotUpdated: UpdateResult))
-    case _                    => Kleisli.liftF(new Exception("More than one row updated").raiseError[Interpretation, UpdateResult])
   }
 }
 
@@ -103,7 +102,5 @@ private object ZombieStatusCleaner {
 
   def apply(sessionResource:  SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-  ): IO[ZombieStatusCleaner[IO]] = IO {
-    new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes)
-  }
+  ): IO[ZombieStatusCleaner[IO]] = IO(new ZombieStatusCleanerImpl(sessionResource, queriesExecTimes))
 }

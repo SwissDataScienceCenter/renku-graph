@@ -58,13 +58,13 @@ final case class ToGenerationNonRecoverableFailure[Interpretation[_]: Async: Bra
         session
           .prepare(query)
           .use(_.execute(status ~ ExecutionDate(now()) ~ message ~ eventId.id ~ eventId.projectId ~ GeneratingTriples))
-          .map {
-            case Completion.Update(n) => n
+          .flatMap {
+            case Completion.Update(n) => n.pure[Interpretation]
             case completion =>
-              throw new RuntimeException(
+              new Exception(
                 s"generating_triples->generation_non_recoverable_fail time query failed with completion status $completion"
-              )
-          } // TODO Verify
+              ).raiseError[Interpretation, Int]
+          }
       },
       name = "generating_triples->generation_non_recoverable_fail"
     )

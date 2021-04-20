@@ -20,43 +20,43 @@ package ch.datascience.tokenrepository.repository.deletion
 
 import cats.Monad
 import cats.data.Kleisli
-import cats.syntax.all._
 import cats.effect.Async
+import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.projects.Id
 import ch.datascience.metrics.LabeledHistogram
-import ch.datascience.tokenrepository.repository.ProjectsTokensDB
+import ch.datascience.tokenrepository.repository.{ProjectsTokensDB, TokenRepositoryTypeSerializers}
 import eu.timepit.refined.auto._
 import skunk._
-import skunk.implicits._
-import skunk.codec.all._
 import skunk.data.Completion
+import skunk.implicits._
 
-class TokenRemover[Interpretation[_]: Async: Monad](
+private[repository] class TokenRemover[Interpretation[_]: Async: Monad](
     sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
-) extends DbClient[Interpretation](Some(queriesExecTimes)) {
+) extends DbClient[Interpretation](Some(queriesExecTimes))
+    with TokenRepositoryTypeSerializers {
 
   def delete(projectId: Id): Interpretation[Unit] = sessionResource.useK {
     measureExecutionTimeK {
-      val command: Command[Void] =
-        sql"""
-          delete
-          from projects_tokens
-          where project_id = #${projectId.value.toString}
-          """.command
+      val command: Command[Id] =
+        sql"""delete from projects_tokens
+              where project_id = $projectIdEncoder
+           """.command
       SqlQuery[Interpretation, Unit](
-        Kleisli(_.execute(command).map(failIfMultiUpdate(projectId))),
+        Kleisli(_.prepare(command).use(_.execute(projectId).flatMap(failIfMultiUpdate(projectId)))),
         name = "remove token"
       )
     }
   }
 
-  private def failIfMultiUpdate(projectId: Id): Completion => Unit = {
-    case Completion.Delete(0 | 1) => ()
+  private def failIfMultiUpdate(projectId: Id): Completion => Interpretation[Unit] = {
+    case Completion.Delete(0 | 1) => ().pure[Interpretation]
     case Completion.Delete(n) =>
-      throw new RuntimeException(s"Deleting token for a projectId: $projectId removed $n records")
+      new RuntimeException(s"Deleting token for a projectId: $projectId removed $n records")
+        .raiseError[Interpretation, Unit]
     case completion =>
-      throw new RuntimeException(s"Deleting token for a projectId: $projectId failed with completion code $completion")
+      new RuntimeException(s"Deleting token for a projectId: $projectId failed with completion code $completion")
+        .raiseError[Interpretation, Unit]
   }
 }

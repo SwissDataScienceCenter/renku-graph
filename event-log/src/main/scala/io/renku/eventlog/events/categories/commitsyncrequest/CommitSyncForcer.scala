@@ -50,8 +50,8 @@ private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throw
   override def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): Interpretation[Unit] =
     sessionResource.useK {
       deleteLastSyncedDate(projectId) flatMap {
-        case Completion.Delete(0) => upsertProject(projectId, projectPath).void
-        case _                    => Kleisli.pure(())
+        case true  => upsertProject(projectId, projectPath).void
+        case false => Kleisli.pure(())
       }
     }
 
@@ -64,7 +64,10 @@ private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throw
             DELETE FROM subscription_category_sync_time
             WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
           """.command
-          session.prepare(query).use(_.execute(projectId ~ commitsync.categoryName))
+          session.prepare(query).use(_.execute(projectId ~ commitsync.categoryName)).map {
+            case Completion.Delete(0) => true
+            case _                    => false
+          }
         },
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - delete last_synced")
       )

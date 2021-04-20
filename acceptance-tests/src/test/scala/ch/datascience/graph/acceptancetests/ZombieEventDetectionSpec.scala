@@ -110,9 +110,11 @@ class ZombieEventDetectionSpec
           ON CONFLICT (project_id)
           DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
           """.command
-    session.prepare(query).use(_.execute(project.id ~ project.path ~ eventDate)).map {
-      case Completion.Insert(n) => n
-      case completion           => throw new Exception(s"insertProjectToDB failed with completion code $completion")
+    session.prepare(query).use(_.execute(project.id ~ project.path ~ eventDate)).flatMap {
+      case Completion.Insert(n) => n.pure[IO]
+      case completion =>
+        new RuntimeException(s"insertProjectToDB failed with completion code $completion")
+          .raiseError[IO, Int]
     }
   }
 
