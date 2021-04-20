@@ -19,8 +19,7 @@
 package io.renku.eventlog.statuschange
 
 import cats.data.Kleisli
-import cats.effect.{Async, Bracket, IO}
-import cats.free.Free
+import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.data.ErrorMessage
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
@@ -29,14 +28,13 @@ import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.auto._
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
 import io.renku.eventlog.statuschange.commands.UpdateResult.{NotFound, Updated}
 import io.renku.eventlog.statuschange.commands.{ChangeStatusCommand, UpdateResult}
+import org.typelevel.log4cats.Logger
 import skunk._
-import skunk.implicits._
-import skunk.codec.all._
 import skunk.data.Completion
+import skunk.implicits._
 
 import scala.util.control.NonFatal
 
@@ -57,15 +55,10 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
       Kleisli { case (transaction, session) =>
         {
           for {
-            _ <- deleteDelivery(command) recoverWith errorToUpdateResult(
-                   s"Event ${command.eventId} - cannot remove event delivery",
-                   Completion.Delete(0).pure[Interpretation].widen[Completion]
-                 )
             sp <- Kleisli.liftF(transaction.savepoint)
-            updateResult <-
-              executeCommand(command) recoverWith errorToUpdateResult(s"Event ${command.eventId} got ${command.status}",
-                                                                      transaction.rollback(sp)
-              )
+            updateResult <- (deleteDelivery(command) >> executeCommand(command)).recoverWith(
+                              deliveryCleanUp(command, () => transaction.rollback(sp))
+                            )
             _ <- Kleisli.liftF(logInfo(command, updateResult))
             _ <- command updateGauges updateResult
           } yield updateResult
@@ -73,30 +66,40 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
       }
     }
 
-  private def errorToUpdateResult(message:  String,
-                                  rollback: => Interpretation[Completion]
+  private def deliveryCleanUp(command:  ChangeStatusCommand[Interpretation],
+                              rollback: () => Interpretation[Completion]
   ): PartialFunction[Throwable, Kleisli[Interpretation, Session[Interpretation], UpdateResult]] = {
     case NonFatal(exception) =>
-      Kleisli.liftF {
-        for {
-          _ <- rollback
-          _ <- logger.error(exception)(message)
-        } yield UpdateResult.Failure(ErrorMessage.withExceptionMessage(exception))
+      Kleisli.liftF[Interpretation, Session[Interpretation], Completion](rollback()) >>
+        deleteDelivery(command)
+          .recoverWith(deliveryErrorToResult(command)) >>= {
+        case UpdateResult.Updated => logAndAsResult(s"Event ${command.eventId} got ${command.status}", exception)
+        case deletionResult       => Kleisli.pure(deletionResult)
       }
   }
 
-  private def logInfo(command: ChangeStatusCommand[Interpretation], updateResult: UpdateResult) = updateResult match {
-    case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
-    case _       => ().pure[Interpretation]
+  private def deliveryErrorToResult(
+      command: ChangeStatusCommand[Interpretation]
+  ): PartialFunction[Throwable, Kleisli[Interpretation, Session[Interpretation], UpdateResult]] = {
+    case NonFatal(exception) =>
+      logAndAsResult(s"Event ${command.eventId} - cannot remove event delivery", exception)
   }
+
+  private def logAndAsResult(message: String, cause: Throwable) =
+    Kleisli.liftF(
+      logger.error(cause)(message) >> UpdateResult
+        .Failure(ErrorMessage.withExceptionMessage(cause))
+        .pure[Interpretation]
+        .widen[UpdateResult]
+    )
 
   private def executeCommand(
       command: ChangeStatusCommand[Interpretation]
   ): Kleisli[Interpretation, Session[Interpretation], UpdateResult] =
     checkIfPersisted(command.eventId) >>= {
       case true =>
-        runUpdateQueriesIfSuccessful(
-          command.queries.toList :++ maybeUpdateProcessingTimeQuery(command),
+        executeQueries(
+          queries = command.queries.toList :++ maybeUpdateProcessingTimeQuery(command),
           command
         ) >>= toUpdateResult
       case false => Kleisli.pure(NotFound).widen[commands.UpdateResult]
@@ -138,11 +141,15 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
       )
     }
 
+  private def logInfo(command: ChangeStatusCommand[Interpretation], updateResult: UpdateResult) = updateResult match {
+    case Updated => logger.info(s"Event ${command.eventId} got ${command.status}")
+    case _       => Bracket[Interpretation, Throwable].unit
+  }
   private def maybeUpdateProcessingTimeQuery(command: ChangeStatusCommand[Interpretation]) =
     upsertStatusProcessingTime(command.eventId, command.status, command.maybeProcessingTime)
 
-  private def runUpdateQueriesIfSuccessful(queries: List[SqlQuery[Interpretation, Int]],
-                                           command: ChangeStatusCommand[Interpretation]
+  private def executeQueries(queries: List[SqlQuery[Interpretation, Int]],
+                             command: ChangeStatusCommand[Interpretation]
   ) =
     queries
       .map(query => measureExecutionTimeK(query).map(query -> _))
