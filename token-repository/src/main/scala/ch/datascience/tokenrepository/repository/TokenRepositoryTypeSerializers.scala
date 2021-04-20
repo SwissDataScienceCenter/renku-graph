@@ -25,15 +25,15 @@ import skunk.{Decoder, Encoder}
 import skunk.codec.all.{int4, varchar}
 
 private trait TokenRepositoryTypeSerializers {
-  val projectIdGet: Decoder[projects.Id] = int4.map(projects.Id.apply)
-  val projectIdPut: Encoder[projects.Id] = int4.values.contramap(_.value)
+  val projectIdDecoder: Decoder[projects.Id] = int4.map(projects.Id.apply)
+  val projectIdEncoder: Encoder[projects.Id] = int4.values.contramap(_.value)
 
-  val projectPathGet: Decoder[projects.Path] = varchar.map(projects.Path.apply)
-  val projectPathPut: Encoder[projects.Path] =
+  val projectPathDecoder: Decoder[projects.Path] = varchar.map(projects.Path.apply)
+  val projectPathEncoder: Encoder[projects.Path] =
     varchar.values.contramap((b: projects.Path) => b.value)
 
-  val encryptedAccessTokenGet: Decoder[EncryptedAccessToken] =
+  val encryptedAccessTokenDecoder: Decoder[EncryptedAccessToken] =
     varchar.emap(s => EncryptedAccessToken.from(s).leftMap(_.getMessage))
-  val encryptedAccessTokenPut: Encoder[EncryptedAccessToken] =
+  val encryptedAccessTokenEncoder: Encoder[EncryptedAccessToken] =
     varchar.values.contramap((b: EncryptedAccessToken) => b.value)
 }

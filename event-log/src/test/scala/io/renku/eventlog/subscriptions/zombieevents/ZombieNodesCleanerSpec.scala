@@ -184,7 +184,7 @@ class ZombieNodesCleanerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
           SELECT DISTINCT delivery_id, delivery_url, source_url
           FROM subscriber
           """
-        .query(subscriberIdGet ~ subscriberUrlGet ~ microserviceBaseUrlGet)
+        .query(subscriberIdDecoder ~ subscriberUrlDecoder ~ microserviceBaseUrlDecoder)
         .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
           (subscriberId, subscriberUrl, microserviceBaseUrl)
         }

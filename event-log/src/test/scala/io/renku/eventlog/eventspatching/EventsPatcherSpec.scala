@@ -109,7 +109,7 @@ class EventsPatcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
       gauge: SingleValueGauge[IO],
       protected val sqlQuery: Kleisli[IO, Session[IO], Completion] = Kleisli { session =>
         val query: Command[EventStatus] = sql"""UPDATE event
-                                                SET status = $eventStatusPut
+                                                SET status = $eventStatusEncoder
                                                 """.command
         session.prepare(query).use(_.execute(New))
       }

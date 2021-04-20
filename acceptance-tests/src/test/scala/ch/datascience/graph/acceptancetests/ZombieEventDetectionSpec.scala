@@ -105,7 +105,7 @@ class ZombieEventDetectionSpec
   private def insertProjectToDB(project: Project, eventDate: EventDate) = EventLog.execute { session =>
     val query: Command[Id ~ Path ~ EventDate] =
       sql"""|INSERT INTO project (project_id, project_path, latest_event_date)
-          |VALUES ($projectIdPut, $projectPathPut, $eventDatePut)
+          |VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
           |ON CONFLICT (project_id)
           |DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
           |""".command
@@ -118,11 +118,11 @@ class ZombieEventDetectionSpec
     val query: Command[EventId ~ Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody] =
       sql"""
           INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
-          VALUES ($eventIdPut, $projectIdPut, $eventStatusPut, $createdDatePut,
-          $executionDatePut,
-          $eventDatePut,
-          $batchDatePut,
-          $eventBodyPut)
+          VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder,
+          $executionDateEncoder,
+          $eventDateEncoder,
+          $batchDateEncoder,
+          $eventBodyEncoder)
           """.command
     session
       .prepare(query)
@@ -145,7 +145,7 @@ class ZombieEventDetectionSpec
   private def insertEventDeliveryToDB(commitId: CommitId, project: Project)(implicit session: Session[IO]) = {
     val query: Command[EventId ~ Id ~ MicroserviceIdentifier] = sql"""
           INSERT INTO event_delivery (event_id, project_id, delivery_id)
-          VALUES ($eventIdPut, $projectIdPut, $microserviceIdentifierPut)
+          VALUES ($eventIdEncoder, $projectIdEncoder, $microserviceIdentifierEncoder)
           """.command
     session.prepare(query).use(_.execute(EventId(commitId.value) ~ project.id ~ MicroserviceIdentifier.generate))
   }

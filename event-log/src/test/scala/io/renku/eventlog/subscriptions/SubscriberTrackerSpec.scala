@@ -152,8 +152,8 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
       val query: Query[SubscriberUrl ~ MicroserviceBaseUrl, (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] =
         sql"""SELECT delivery_id, delivery_url, source_url
             FROM subscriber
-            WHERE delivery_url = $subscriberUrlPut AND source_url = $microserviceBaseUrlPut"""
-          .query(subscriberIdGet ~ subscriberUrlGet ~ microserviceBaseUrlGet)
+            WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder"""
+          .query(subscriberIdDecoder ~ subscriberUrlDecoder ~ microserviceBaseUrlDecoder)
           .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
             (subscriberId, subscriberUrl, microserviceBaseUrl)
           }
@@ -168,7 +168,7 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
           sql"""
             INSERT INTO
             subscriber (delivery_id, delivery_url, source_url)
-            VALUES ($subscriberIdPut, $subscriberUrlPut, $microserviceBaseUrlPut)
+            VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
       """.command
         session
           .prepare(query)

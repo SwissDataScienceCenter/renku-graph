@@ -51,8 +51,8 @@ private class EventDetailsFinderImpl[Interpretation[_]: Async](
       Kleisli { session =>
         val query: Query[EventId ~ projects.Id, CompoundEventId] =
           sql"""SELECT evt.event_id, evt.project_id
-                           FROM event evt WHERE evt.event_id = $eventIdPut and evt.project_id = $projectIdPut
-                           """.query(compoundEventIdGet)
+                           FROM event evt WHERE evt.event_id = $eventIdEncoder and evt.project_id = $projectIdEncoder
+                           """.query(compoundEventIdDecoder)
         session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
       },
       name = "find event details"

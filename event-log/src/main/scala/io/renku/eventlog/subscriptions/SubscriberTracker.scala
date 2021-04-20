@@ -51,9 +51,9 @@ private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Thro
         Kleisli { session =>
           val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId] =
             sql"""INSERT INTO subscriber (delivery_id, delivery_url, source_url)
-                  VALUES ($subscriberIdPut, $subscriberUrlPut, $microserviceBaseUrlPut)
+                  VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
                   ON CONFLICT (delivery_url, source_url)
-                  DO UPDATE SET delivery_id = $subscriberIdPut, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
+                  DO UPDATE SET delivery_id = $subscriberIdEncoder, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
                """.command
           session.prepare(query).use {
             _.execute(
@@ -73,7 +73,7 @@ private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Thro
           val query: Command[SubscriberUrl ~ MicroserviceBaseUrl] =
             sql"""
             DELETE FROM subscriber
-            WHERE delivery_url = $subscriberUrlPut AND source_url = $microserviceBaseUrlPut
+            WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
           """.command
           session.prepare(query).use(_.execute(subscriberUrl ~ sourceUrl))
         },

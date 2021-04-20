@@ -111,7 +111,7 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
         Kleisli { session =>
           val query: Command[EventId ~ projects.Id] =
             sql"""DELETE FROM event_delivery
-                            WHERE event_id = $eventIdPut AND project_id = $projectIdPut
+                            WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                          """.command
           session
             .prepare(query)
@@ -133,8 +133,8 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
           val query: Query[EventId ~ projects.Id, EventId] =
             sql"""SELECT event_id
                        FROM event
-                       WHERE event_id = $eventIdPut AND project_id = $projectIdPut"""
-              .query(eventIdGet)
+                       WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
+              .query(eventIdDecoder)
           session.prepare(query).use(_.option(eventId.id ~ eventId.projectId)).map(_.isDefined)
         },
         name = "event update check existence"

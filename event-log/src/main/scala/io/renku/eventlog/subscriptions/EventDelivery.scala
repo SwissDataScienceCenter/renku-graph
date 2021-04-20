@@ -62,9 +62,9 @@ private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwabl
           val query: Command[EventId ~ projects.Id ~ SubscriberUrl ~ MicroserviceBaseUrl] =
             sql"""
            INSERT INTO event_delivery (event_id, project_id, delivery_id)
-             SELECT $eventIdPut, $projectIdPut, delivery_id
+             SELECT $eventIdEncoder, $projectIdEncoder, delivery_id
              FROM subscriber
-             WHERE delivery_url = $subscriberUrlPut AND source_url = $microserviceBaseUrlPut
+             WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
            ON CONFLICT (event_id, project_id)
            DO NOTHING
            """.command
@@ -79,7 +79,7 @@ private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwabl
       Kleisli { session =>
         val query: Command[EventId ~ projects.Id] =
           sql"""DELETE FROM event_delivery
-                                                          WHERE event_id = $eventIdPut AND project_id = $projectIdPut
+                                                          WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                                                        """.command
         session.prepare(query).use(_.execute(eventId ~ projectId)).void
       },

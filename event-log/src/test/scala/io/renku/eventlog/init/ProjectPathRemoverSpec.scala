@@ -84,7 +84,7 @@ class ProjectPathRemoverSpec
     .useK {
       Kleisli { session =>
         val query: Query[Void, projects.Path] = sql"select project_path from event_log limit 1"
-          .query(projectPathGet)
+          .query(projectPathDecoder)
         session
           .option(query)
           .map(_ => true)

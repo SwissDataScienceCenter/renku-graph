@@ -94,8 +94,8 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
           sql"""
            SELECT event_id
            FROM event
-           WHERE event_id = $eventIdPut AND project_id = $projectIdPut"""
-            .query(eventIdGet)
+           WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
+            .query(eventIdDecoder)
         session
           .prepare(query)
           .use(_.option(event.id ~ event.project.id))
@@ -113,9 +113,9 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
           sql"""
         SELECT batch_date
         FROM event
-        WHERE project_id = $projectIdPut AND #${`status IN`(New, GenerationRecoverableFailure, GeneratingTriples)}
+        WHERE project_id = $projectIdEncoder AND #${`status IN`(New, GenerationRecoverableFailure, GeneratingTriples)}
         ORDER BY batch_date DESC
-        LIMIT 1""".query(batchDateGet)
+        LIMIT 1""".query(batchDateDecoder)
         session.prepare(query).use(_.option(event.project.id))
       },
       name = "new - find batch"
@@ -132,7 +132,7 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
               EventId ~ projects.Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
             ] =
               sql"""INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
-                VALUES ($eventIdPut, $projectIdPut, $eventStatusPut, $createdDatePut, $executionDatePut, $eventDatePut, $batchDatePut, $eventBodyPut)
+                VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder)
                 """.command
             session
               .prepare(query)
@@ -154,7 +154,7 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
             ] =
               sql"""INSERT INTO
                   event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
-                  VALUES ($eventIdPut, $projectIdPut, $eventStatusPut, $createdDatePut, $executionDatePut, $eventDatePut, $batchDatePut, $eventBodyPut, $eventMessagePut)
+                  VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder, $eventMessageEncoder)
                   """.command
             session
               .prepare(query)
@@ -175,7 +175,7 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
           sql"""
             INSERT INTO
             project (project_id, project_path, latest_event_date)
-            VALUES ($projectIdPut, $projectPathPut, $eventDatePut)
+            VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
             ON CONFLICT (project_id)
             DO 
               UPDATE SET latest_event_date = EXCLUDED.latest_event_date, project_path = EXCLUDED.project_path 

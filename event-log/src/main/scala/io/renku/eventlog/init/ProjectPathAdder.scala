@@ -119,7 +119,7 @@ private class ProjectPathAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throw
   private lazy val toSqlUpdate: ((Id, Path)) => Kleisli[Interpretation, Session[Interpretation], Unit] = {
     case (projectId, projectPath) =>
       val query: Command[projects.Path ~ projects.Id] =
-        sql"update event_log set project_path = $projectPathPut where project_id = $projectIdPut".command
+        sql"update event_log set project_path = $projectPathEncoder where project_id = $projectIdEncoder".command
       Kleisli(_.prepare(query).use(_.execute(projectPath ~ projectId)).void)
   }
 

@@ -85,10 +85,10 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Async: Bracket[
         FROM event evt
         JOIN project proj on evt.project_id = proj.project_id
         WHERE #${`status IN`(TriplesGenerated, TransformationRecoverableFailure)} 
-          AND execution_date < $executionDatePut
+          AND execution_date < $executionDateEncoder
         ORDER BY proj.latest_event_date DESC
         LIMIT $int4
-      """.query(projectIdGet ~ projectPathGet ~ eventDateGet).map { case projectId ~ projectPath ~ eventDate => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(1)) }
+      """.query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder).map { case projectId ~ projectPath ~ eventDate => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(1)) }
     session.prepare(query).use(_.stream(ExecutionDate(now()) ~ projectsFetchingLimit.value, 32).compile.toList)
   },
     name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
@@ -99,23 +99,23 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Async: Bracket[
   private def findOldestEvent(idAndPath: ProjectIds) = SqlQuery[Interpretation, Option[TriplesGeneratedEvent]](Kleisli { session =>
     val query: Query[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, TriplesGeneratedEvent] =
       sql"""
-         SELECT evt.event_id, evt.project_id, $projectPathPut AS project_path, evt_payload.payload,  evt_payload.schema_version
+         SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt_payload.payload,  evt_payload.schema_version
          FROM (
            SELECT project_id, min(event_date) AS min_event_date
            FROM event
-           WHERE project_id = $projectIdPut
+           WHERE project_id = $projectIdEncoder
              AND #${`status IN`(TriplesGenerated, TransformationRecoverableFailure)}
-             AND execution_date < $executionDatePut
+             AND execution_date < $executionDateEncoder
            GROUP BY project_id
          ) oldest_event_date
          JOIN event evt ON oldest_event_date.project_id = evt.project_id 
            AND oldest_event_date.min_event_date = evt.event_date
            AND #${`status IN`(TriplesGenerated, TransformationRecoverableFailure)}
-           AND execution_date < $executionDatePut
+           AND execution_date < $executionDateEncoder
          JOIN event_payload evt_payload ON evt.event_id = evt_payload.event_id
            AND evt.project_id = evt_payload.project_id
          LIMIT 1
-         """.query(compoundEventIdGet ~ projectPathGet ~ eventPayloadGet ~ schemaVersionGet).map { case eventId ~ projectPath ~ eventPayload ~ schema => TriplesGeneratedEvent(eventId, projectPath, eventPayload, schema) }
+         """.query(compoundEventIdDecoder ~ projectPathDecoder ~ eventPayloadDecoder ~ schemaVersionDecoder).map { case eventId ~ projectPath ~ eventPayload ~ schema => TriplesGeneratedEvent(eventId, projectPath, eventPayload, schema) }
     val executionDate = ExecutionDate(now())
     session.prepare(query).use(_.option(idAndPath.path ~ idAndPath.id ~ executionDate ~ executionDate))
 
@@ -153,10 +153,10 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Async: Bracket[
       val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
         sql"""
             UPDATE event 
-            SET status = $eventStatusPut, execution_date = $executionDatePut
-            WHERE event_id = $eventIdPut
-              AND project_id = $projectIdPut
-              AND status <> $eventStatusPut
+            SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+            WHERE event_id = $eventIdEncoder
+              AND project_id = $projectIdEncoder
+              AND status <> $eventStatusEncoder
             """.command
       session
         .prepare(query)

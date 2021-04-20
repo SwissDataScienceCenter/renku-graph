@@ -26,11 +26,11 @@ import java.time.{OffsetDateTime, ZoneId}
 
 trait SubscriptionTypeSerializers extends TypeSerializers {
 
-  val lastSyncedDateGet: Decoder[LastSyncedDate] =
+  val lastSyncedDateDecoder: Decoder[LastSyncedDate] =
     timestamptz.map(timestamp => LastSyncedDate(timestamp.toInstant))
-  val lastSyncedDatePut: Encoder[LastSyncedDate] =
+  val lastSyncedDateEncoder: Encoder[LastSyncedDate] =
     timestamptz.values.contramap((b: LastSyncedDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
 
-  val categoryNameGet: Decoder[CategoryName] = varchar.map(CategoryName.apply)
-  val categoryNamePut: Encoder[CategoryName] = varchar.contramap(_.value)
+  val categoryNameDecoder: Decoder[CategoryName] = varchar.map(CategoryName.apply)
+  val categoryNameEncoder: Encoder[CategoryName] = varchar.contramap(_.value)
 }

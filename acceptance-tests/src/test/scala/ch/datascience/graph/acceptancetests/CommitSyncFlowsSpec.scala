@@ -113,7 +113,7 @@ class CommitSyncFlowsSpec
       db.EventLog.execute { session =>
         val query: Command[Id] = sql"""
           DELETE FROM subscription_category_sync_time 
-          WHERE project_id = $projectIdPut AND category_name = 'COMMIT_SYNC'
+          WHERE project_id = $projectIdEncoder AND category_name = 'COMMIT_SYNC'
           """.command
         session.prepare(query).use(_.execute(projectId))
       }

@@ -86,7 +86,7 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
         proj.project_id,
         proj.project_path,
         proj.latest_event_date,
-        (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = $eventStatusPut) as current_occupancy
+        (SELECT count(event_id) from event evt_int where evt_int.project_id = proj.project_id and evt_int.status = $eventStatusEncoder) as current_occupancy
       FROM (
         SELECT DISTINCT
           proj.project_id,
@@ -94,11 +94,11 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
           proj.latest_event_date
         FROM event evt
         JOIN project proj on evt.project_id = proj.project_id
-        WHERE #${`status IN`(New, GenerationRecoverableFailure)} AND execution_date < $executionDatePut
+        WHERE #${`status IN`(New, GenerationRecoverableFailure)} AND execution_date < $executionDateEncoder
         ORDER BY proj.latest_event_date DESC
         LIMIT $int4
       ) proj
-      """.query(projectIdGet ~ projectPathGet ~ eventDateGet ~ int8)
+      """.query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder ~ int8)
             .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt)) }
         session.prepare(query).use {
           _.stream(GeneratingTriples ~ ExecutionDate(now()) ~ projectsFetchingLimit.value, 32).compile.toList
@@ -112,19 +112,19 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
   private def findOldestEvent(idAndPath: ProjectIds) = SqlQuery[Interpretation, Option[AwaitingGenerationEvent]](Kleisli { session =>
     val query: Query[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, AwaitingGenerationEvent] =
       sql"""
-       SELECT evt.event_id, evt.project_id, $projectPathPut AS project_path, evt.event_body
+       SELECT evt.event_id, evt.project_id, $projectPathEncoder AS project_path, evt.event_body
        FROM (
          SELECT project_id, min(event_date) AS min_event_date
          FROM event
-         WHERE project_id = $projectIdPut
+         WHERE project_id = $projectIdEncoder
            AND #${`status IN`(New, GenerationRecoverableFailure)}
-           AND execution_date < $executionDatePut
+           AND execution_date < $executionDateEncoder
          GROUP BY project_id
        ) oldest_event_date
        JOIN event evt ON oldest_event_date.project_id = evt.project_id 
          AND oldest_event_date.min_event_date = evt.event_date
          AND #${`status IN`(New, GenerationRecoverableFailure)}
-         AND execution_date < $executionDatePut
+         AND execution_date < $executionDateEncoder
        LIMIT 1
        """
         .query(awaitingGenerationEventGet)
@@ -164,10 +164,10 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
       val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
         sql"""
         UPDATE event 
-        SET status = $eventStatusPut, execution_date = $executionDatePut
-        WHERE event_id = $eventIdPut
-          AND project_id = $projectIdPut
-          AND status <> $eventStatusPut
+        SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+        WHERE event_id = $eventIdEncoder
+          AND project_id = $projectIdEncoder
+          AND status <> $eventStatusEncoder
         """.command
       session
         .prepare(query)
@@ -198,7 +198,7 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
     } getOrElse Kleisli.pure[Interpretation, Session[Interpretation], Unit](())
 
   private val awaitingGenerationEventGet: Decoder[AwaitingGenerationEvent] =
-    (compoundEventIdGet ~ projectPathGet ~ eventBodyGet).gmap[AwaitingGenerationEvent]
+    (compoundEventIdDecoder ~ projectPathDecoder ~ eventBodyDecoder).gmap[AwaitingGenerationEvent]
 }
 
 private object IOAwaitingGenerationEventFinder {

@@ -51,7 +51,9 @@ private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throw
     SqlQuery(
       Kleisli { session =>
         val query: Query[Path, EncryptedAccessToken] =
-          sql"SELECT token FROM projects_tokens WHERE project_path = $projectPathPut".query(encryptedAccessTokenGet)
+          sql"SELECT token FROM projects_tokens WHERE project_path = $projectPathEncoder".query(
+            encryptedAccessTokenDecoder
+          )
         session.prepare(query).use(_.option(projectPath)).map(_.isDefined)
       },
       name = "associate token - check"
@@ -65,8 +67,8 @@ private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throw
         val query: Command[EncryptedAccessToken ~ Id ~ Path] =
           sql"""
           UPDATE projects_tokens
-          SET token = $encryptedAccessTokenPut, project_id = $projectIdPut
-          WHERE project_path = $projectPathPut """.command
+          SET token = $encryptedAccessTokenEncoder, project_id = $projectIdEncoder
+          WHERE project_path = $projectPathEncoder """.command
         session
           .prepare(query)
           .use(_.execute(encryptedToken ~ projectId ~ projectPath))
@@ -83,7 +85,7 @@ private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throw
         val query: Command[Id ~ Path ~ EncryptedAccessToken] =
           sql"""
           INSERT INTO projects_tokens (project_id, project_path, token)
-          VALUES ($projectIdPut, $projectPathPut, $encryptedAccessTokenPut)
+          VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder)
         """.command
         session
           .prepare(query)

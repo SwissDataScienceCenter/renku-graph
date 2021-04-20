@@ -72,41 +72,41 @@ class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
               SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
               JOIN subscription_category_sync_time sync_time
-                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNamePut
+                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
               WHERE
-                   (($eventDatePut - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 minute')
-                OR (($eventDatePut - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 hour')
-                OR (($eventDatePut - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 day')
+                   (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 minute')
+                OR (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
+                OR (($eventDateEncoder - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
               GROUP BY sync_time.category_name
             ) UNION ALL (
-              SELECT $categoryNamePut AS category_name, COUNT(DISTINCT proj.project_id) AS count
+              SELECT $categoryNameEncoder AS category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
               WHERE proj.project_id NOT IN (
                 SELECT project_id
                 FROM subscription_category_sync_time
-                WHERE category_name = $categoryNamePut
+                WHERE category_name = $categoryNameEncoder
               )
             ) UNION ALL (
               SELECT sync_time.category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
               JOIN subscription_category_sync_time sync_time
-                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNamePut
+                ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
               WHERE
-                   (($eventDatePut - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 hour')
-                OR (($eventDatePut - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 day')
+                   (($eventDateEncoder - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
+                OR (($eventDateEncoder - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
               GROUP BY sync_time.category_name
             ) UNION ALL (
-              SELECT $categoryNamePut AS category_name, COUNT(DISTINCT proj.project_id) AS count
+              SELECT $categoryNameEncoder AS category_name, COUNT(DISTINCT proj.project_id) AS count
               FROM project proj
               WHERE proj.project_id NOT IN (
                 SELECT project_id
                 FROM subscription_category_sync_time
-                WHERE category_name = $categoryNamePut
+                WHERE category_name = $categoryNameEncoder
               )
             )
           ) all_counts
           GROUP BY all_counts.category_name
-          """.query(categoryNameGet ~ numeric).map { case categoryName ~ (count: BigDecimal) => (categoryName, count.longValue) }
+          """.query(categoryNameDecoder ~ numeric).map { case categoryName ~ (count: BigDecimal) => (categoryName, count.longValue) }
       val eventDate = EventDate(now())
       val lastSyncedDate = LastSyncedDate(now())
       session.prepare(query).use {
@@ -126,7 +126,7 @@ class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     Kleisli { session =>
       val query: Query[Void, (EventStatus, Long)] =
         sql"""SELECT status, COUNT(event_id) FROM event GROUP BY status;"""
-          .query(eventStatusGet ~ int8)
+          .query(eventStatusDecoder ~ int8)
           .map { case status ~ count => (status, count) }
       session.execute(query)
     },
@@ -167,7 +167,7 @@ class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
                       FROM event evt
                       WHERE evt.project_id = prj.project_id AND status IN (#${statuses.toSql})
                     )
-              """.query(projectPathGet ~ int8).map { case path ~ count => (path, count) }
+              """.query(projectPathDecoder ~ int8).map { case path ~ count => (path, count) }
       session.execute(query)
     },
     name = "projects events count"
@@ -191,7 +191,7 @@ class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
                     )
               LIMIT $int4;
               """
-            .query(projectPathGet ~ int8)
+            .query(projectPathDecoder ~ int8)
             .map { case projectPath ~ count => (projectPath, count) }
         session.prepare(query).use(_.stream(limit, 32).compile.toList)
       },

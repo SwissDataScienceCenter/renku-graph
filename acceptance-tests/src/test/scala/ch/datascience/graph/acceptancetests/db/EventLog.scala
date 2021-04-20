@@ -45,8 +45,8 @@ object EventLog extends TypeSerializers {
       sql"""
      SELECT event_id, status
      FROM event
-     WHERE project_id = $projectIdPut"""
-        .query(eventIdGet ~ eventStatusGet)
+     WHERE project_id = $projectIdEncoder"""
+        .query(eventIdDecoder ~ eventStatusDecoder)
         .map { case id ~ status => (id, status) }
     session.prepare(query).use(_.stream(projectId, 32).compile.toList)
   }
@@ -56,8 +56,8 @@ object EventLog extends TypeSerializers {
       sql"""
      SELECT event_id
      FROM event
-     WHERE project_id = $projectIdPut AND #${`status IN`(status.toList)}"""
-        .query(eventIdGet)
+     WHERE project_id = $projectIdEncoder AND #${`status IN`(status.toList)}"""
+        .query(eventIdDecoder)
         .map(eventId => CommitId(eventId.value))
     session.prepare(query).use(_.stream(projectId, 32).compile.toList)
   }

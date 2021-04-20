@@ -60,10 +60,10 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
           sql"""
           SELECT DISTINCT evt.project_id, evt.status
           FROM event evt
-          WHERE evt.status = $eventStatusPut
-            OR evt.status = $eventStatusPut
+          WHERE evt.status = $eventStatusEncoder
+            OR evt.status = $eventStatusEncoder
           """
-            .query(projectIdGet ~ transformationStatusGet)
+            .query(projectIdDecoder ~ transformationStatusGet)
             .map { case id ~ status => (id, status) }
 
         session.prepare(query).use(_.stream(GeneratingTriples ~ TransformingTriples, 32).compile.toList)
@@ -91,15 +91,15 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
                   FROM event evt
                   JOIN project proj ON proj.project_id = evt.project_id
                   LEFT JOIN event_delivery ed ON ed.project_id = evt.project_id AND ed.event_id = evt.event_id
-                  WHERE evt.project_id = $projectIdPut
-                    AND evt.status = $eventStatusPut
+                  WHERE evt.project_id = $projectIdEncoder
+                    AND evt.status = $eventStatusEncoder
                     AND (evt.message IS NULL OR evt.message <> $text)
                     AND (ed.delivery_id IS NULL
-                      AND ($executionDatePut - evt.execution_date) > $eventProcessingTimePut
+                      AND ($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder
                     )
                   LIMIT 1
                   """
-              .query(compoundEventIdGet ~ projectPathGet ~ eventStatusGet)
+              .query(compoundEventIdDecoder ~ projectPathDecoder ~ eventStatusDecoder)
               .map { case id ~ path ~ status => ZombieEvent(processName, id, path, status) }
 
           session
@@ -127,8 +127,8 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
           val query: Command[String ~ ExecutionDate ~ EventId ~ projects.Id] =
             sql"""
           UPDATE event
-          SET message = $text, execution_date = $executionDatePut
-          WHERE event_id = $eventIdPut AND project_id = $projectIdPut
+          SET message = $text, execution_date = $executionDateEncoder
+          WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
           """.command
           session.prepare(query).use(_.execute(zombieMessage ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId))
         },

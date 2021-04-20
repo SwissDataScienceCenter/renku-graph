@@ -32,67 +32,68 @@ object TypeSerializers extends TypeSerializers
 
 trait TypeSerializers {
 
-  val eventIdGet: Decoder[EventId] = varchar.map(EventId.apply)
-  val eventIdPut: Encoder[EventId] = varchar.values.contramap(_.value)
+  val eventIdDecoder: Decoder[EventId] = varchar.map(EventId.apply)
+  val eventIdEncoder: Encoder[EventId] = varchar.values.contramap(_.value)
 
-  val projectIdGet: Decoder[projects.Id] = int4.map(projects.Id.apply)
-  val projectIdPut: Encoder[projects.Id] = int4.values.contramap(_.value)
+  val projectIdDecoder: Decoder[projects.Id] = int4.map(projects.Id.apply)
+  val projectIdEncoder: Encoder[projects.Id] = int4.values.contramap(_.value)
 
-  val projectPathGet: Decoder[projects.Path] = varchar.map(projects.Path.apply)
-  val projectPathPut: Encoder[projects.Path] =
+  val projectPathDecoder: Decoder[projects.Path] = varchar.map(projects.Path.apply)
+  val projectPathEncoder: Encoder[projects.Path] =
     varchar.values.contramap((b: projects.Path) => b.value)
 
-  val eventBodyGet: Decoder[EventBody] = text.map(EventBody.apply)
-  val eventBodyPut: Encoder[EventBody] = text.values.contramap(_.value)
+  val eventBodyDecoder: Decoder[EventBody] = text.map(EventBody.apply)
+  val eventBodyEncoder: Encoder[EventBody] = text.values.contramap(_.value)
 
-  val createdDateGet: Decoder[CreatedDate] = timestamptz.map(timestamp => CreatedDate(timestamp.toInstant))
-  val createdDatePut: Encoder[CreatedDate] =
+  val createdDateDecoder: Decoder[CreatedDate] = timestamptz.map(timestamp => CreatedDate(timestamp.toInstant))
+  val createdDateEncoder: Encoder[CreatedDate] =
     timestamptz.values.contramap((b: CreatedDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
 
-  val executionDateGet: Decoder[ExecutionDate] =
+  val executionDateDecoder: Decoder[ExecutionDate] =
     timestamptz.map(timestamp => ExecutionDate(timestamp.toInstant))
-  val executionDatePut: Encoder[ExecutionDate] =
+  val executionDateEncoder: Encoder[ExecutionDate] =
     timestamptz.values.contramap((b: ExecutionDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
 
-  val eventDateGet: Decoder[EventDate] = timestamptz.map(timestamp => EventDate(timestamp.toInstant))
-  val eventDatePut: Encoder[EventDate] =
+  val eventDateDecoder: Decoder[EventDate] = timestamptz.map(timestamp => EventDate(timestamp.toInstant))
+  val eventDateEncoder: Encoder[EventDate] =
     timestamptz.values.contramap((b: EventDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
 
-  val batchDateGet: Decoder[BatchDate] = timestamptz.map(timestamp => BatchDate(timestamp.toInstant))
-  val batchDatePut: Encoder[BatchDate] =
+  val batchDateDecoder: Decoder[BatchDate] = timestamptz.map(timestamp => BatchDate(timestamp.toInstant))
+  val batchDateEncoder: Encoder[BatchDate] =
     timestamptz.values.contramap((b: BatchDate) => OffsetDateTime.ofInstant(b.value, ZoneId.systemDefault()))
 
-  val eventMessageGet: Decoder[EventMessage] = varchar.map(EventMessage.apply)
-  val eventMessagePut: Encoder[EventMessage] = varchar.values.contramap(_.value)
+  val eventMessageDecoder: Decoder[EventMessage] = varchar.map(EventMessage.apply)
+  val eventMessageEncoder: Encoder[EventMessage] = varchar.values.contramap(_.value)
 
-  val eventProcessingTimeGet: Decoder[EventProcessingTime] = interval.map(EventProcessingTime.apply)
-  val eventProcessingTimePut: Encoder[EventProcessingTime] = interval.values.contramap(_.value)
+  val eventProcessingTimeDecoder: Decoder[EventProcessingTime] = interval.map(EventProcessingTime.apply)
+  val eventProcessingTimeEncoder: Encoder[EventProcessingTime] = interval.values.contramap(_.value)
 
-  val eventPayloadGet: Decoder[EventPayload] = text.map(EventPayload.apply)
-  val eventPayloadPut: Encoder[EventPayload] = text.values.contramap(_.value)
+  val eventPayloadDecoder: Decoder[EventPayload] = text.map(EventPayload.apply)
+  val eventPayloadEncoder: Encoder[EventPayload] = text.values.contramap(_.value)
 
-  val eventStatusGet: Decoder[EventStatus] = varchar.map(EventStatus.apply)
-  val eventStatusPut: Encoder[EventStatus] = varchar.values.contramap(_.value)
+  val eventStatusDecoder: Decoder[EventStatus] = varchar.map(EventStatus.apply)
+  val eventStatusEncoder: Encoder[EventStatus] = varchar.values.contramap(_.value)
 
-  val schemaVersionGet: Decoder[SchemaVersion] = text.map(SchemaVersion.apply)
-  val schemaVersionPut: Encoder[SchemaVersion] = text.values.contramap(_.value)
+  val schemaVersionDecoder: Decoder[SchemaVersion] = text.map(SchemaVersion.apply)
+  val schemaVersionEncoder: Encoder[SchemaVersion] = text.values.contramap(_.value)
 
-  val compoundEventIdGet: Decoder[CompoundEventId] = (eventIdGet ~ projectIdGet).gmap[CompoundEventId]
-  val projectGet:         Decoder[Project]         = (projectIdGet ~ projectPathGet).gmap[Project]
+  val compoundEventIdDecoder: Decoder[CompoundEventId] = (eventIdDecoder ~ projectIdDecoder).gmap[CompoundEventId]
 
-  val subscriberUrlGet: Decoder[SubscriberUrl] = varchar.map(SubscriberUrl.apply)
-  val subscriberUrlPut: Encoder[SubscriberUrl] = varchar.values.contramap(_.value)
+  val projectDecoder: Decoder[Project] = (projectIdDecoder ~ projectPathDecoder).gmap[Project]
 
-  val microserviceBaseUrlGet: Decoder[MicroserviceBaseUrl] = varchar.map(MicroserviceBaseUrl.apply)
-  val microserviceBaseUrlPut: Encoder[MicroserviceBaseUrl] = varchar.values.contramap(_.value)
+  val subscriberUrlDecoder: Decoder[SubscriberUrl] = varchar.map(SubscriberUrl.apply)
+  val subscriberUrlEncoder: Encoder[SubscriberUrl] = varchar.values.contramap(_.value)
 
-  val subscriberIdGet: Decoder[SubscriberId] = varchar(19).map(SubscriberId.apply)
-  val subscriberIdPut: Encoder[SubscriberId] = varchar(19).values.contramap(_.value)
+  val microserviceBaseUrlDecoder: Decoder[MicroserviceBaseUrl] = varchar.map(MicroserviceBaseUrl.apply)
+  val microserviceBaseUrlEncoder: Encoder[MicroserviceBaseUrl] = varchar.values.contramap(_.value)
 
-  val microserviceIdentifierGet: Decoder[MicroserviceIdentifier] = varchar.map(MicroserviceIdentifier.apply)
-  val microserviceIdentifierPut: Encoder[MicroserviceIdentifier] = varchar.values.contramap(_.value)
+  val subscriberIdDecoder: Decoder[SubscriberId] = varchar(19).map(SubscriberId.apply)
+  val subscriberIdEncoder: Encoder[SubscriberId] = varchar(19).values.contramap(_.value)
 
-  val microserviceUrlGet: Decoder[MicroserviceBaseUrl] = varchar.map(MicroserviceBaseUrl.apply)
-  val microserviceUrlPut: Encoder[MicroserviceBaseUrl] = varchar.values.contramap(_.value)
+  val microserviceIdentifierDecoder: Decoder[MicroserviceIdentifier] = varchar.map(MicroserviceIdentifier.apply)
+  val microserviceIdentifierEncoder: Encoder[MicroserviceIdentifier] = varchar.values.contramap(_.value)
+
+  val microserviceUrlDecoder: Decoder[MicroserviceBaseUrl] = varchar.map(MicroserviceBaseUrl.apply)
+  val microserviceUrlEncoder: Encoder[MicroserviceBaseUrl] = varchar.values.contramap(_.value)
 
 }

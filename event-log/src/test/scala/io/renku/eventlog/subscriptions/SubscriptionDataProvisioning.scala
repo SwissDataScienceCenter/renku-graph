@@ -35,7 +35,7 @@ trait SubscriptionDataProvisioning extends EventLogDataProvisioning with Subscri
         val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] = sql"""
         INSERT INTO
         subscription_category_sync_time (project_id, category_name, last_synced)
-        VALUES ($projectIdPut, $categoryNamePut, $lastSyncedDatePut)
+        VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
         ON CONFLICT (project_id, category_name)
         DO UPDATE SET  last_synced = excluded.last_synced
       """.command
@@ -49,8 +49,8 @@ trait SubscriptionDataProvisioning extends EventLogDataProvisioning with Subscri
         val query: Query[projects.Id ~ CategoryName, LastSyncedDate] = sql"""
         SELECT last_synced
         FROM subscription_category_sync_time
-        WHERE project_id = $projectIdPut AND category_name = $categoryNamePut
-      """.query(lastSyncedDateGet)
+        WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
+      """.query(lastSyncedDateDecoder)
         session.prepare(query).use(_.option(projectId ~ categoryName))
       }
     }

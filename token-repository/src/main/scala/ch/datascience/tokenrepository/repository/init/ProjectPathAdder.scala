@@ -60,7 +60,7 @@ private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], 
 
   private lazy val checkColumnExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
     val query: Query[skunk.Void, projects.Path] = sql"select project_path from projects_tokens limit 1"
-      .query(projectPathGet)
+      .query(projectPathDecoder)
     Kleisli(_.option(query).map(_ => true).recover { case _ => false })
   }
 
@@ -97,7 +97,7 @@ private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], 
       : Kleisli[Interpretation, Session[Interpretation], Option[(Id, EncryptedAccessToken)]] = {
     val query: Query[Void, (Id, EncryptedAccessToken)] =
       sql"select project_id, token from projects_tokens where project_path IS NULL limit 1;"
-        .query(projectIdGet ~ encryptedAccessTokenGet)
+        .query(projectIdDecoder ~ encryptedAccessTokenDecoder)
         .map { case id ~ token => (id, token) }
     Kleisli(_.option(query))
   }
@@ -122,7 +122,7 @@ private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], 
 
   private def addPath(id: Id, path: Path): Kleisli[Interpretation, Session[Interpretation], Unit] = {
     val query: Command[Path ~ Id] =
-      sql"update projects_tokens set project_path = $projectPathPut where project_id = $projectIdPut".command
+      sql"update projects_tokens set project_path = $projectPathEncoder where project_id = $projectIdEncoder".command
     Kleisli(_.prepare(query).use(_.execute(path ~ id)).void)
   }
 

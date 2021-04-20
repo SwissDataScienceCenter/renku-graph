@@ -304,10 +304,10 @@ class EventPersisterSpec
             (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage])
           ] = sql"""SELECT event_id, project_id, status, created_date, execution_date, event_date, event_body, message
                   FROM event  
-                  WHERE event_id = $eventIdPut AND project_id = $projectIdPut
+                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                   """
             .query(
-              eventIdGet ~ projectIdGet ~ eventStatusGet ~ createdDateGet ~ executionDateGet ~ eventDateGet ~ eventBodyGet ~ eventMessageGet.opt
+              eventIdDecoder ~ projectIdDecoder ~ eventStatusDecoder ~ createdDateDecoder ~ executionDateDecoder ~ eventDateDecoder ~ eventBodyDecoder ~ eventMessageDecoder.opt
             )
             .map {
               case eventId ~ projectId ~ eventStatus ~ createdDate ~ executionDate ~ eventDate ~ eventBody ~ maybeEventMessage =>
@@ -333,7 +333,7 @@ class EventPersisterSpec
           SELECT project_id, project_path, latest_event_date
           FROM project
           """
-          .query(projectIdGet ~ projectPathGet ~ eventDateGet)
+          .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder)
           .map { case projectId ~ projectPath ~ eventDate => (projectId, projectPath, eventDate) }
       session.execute(query)
     }

@@ -132,7 +132,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
     Kleisli { session =>
       val query: Query[Void, (Id, Path, EventDate)] =
         sql"""select project_id, project_path, latest_event_date from project"""
-          .query(projectIdGet ~ projectPathGet ~ eventDateTimestampGet)
+          .query(projectIdDecoder ~ projectPathDecoder ~ eventDateTimestampGet)
           .map { case projectId ~ projectPath ~ eventDate =>
             (projectId, projectPath, eventDate)
           }
@@ -154,7 +154,7 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
         ] = sql"""
             insert into
             event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
-            values ($eventIdPut, $projectIdPut, $projectPathPut, $eventStatusPut, $createdDatePut, $executionDatePut, $eventDatePut, $batchDatePut, $eventBodyPut)
+            values ($eventIdEncoder, $projectIdEncoder, $projectPathEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder)
       """.command
         session
           .prepare(query)

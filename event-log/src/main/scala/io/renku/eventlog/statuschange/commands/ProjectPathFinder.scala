@@ -35,8 +35,8 @@ private object ProjectPathFinder {
 
     val query: Query[projects.Id, projects.Path] = sql"""SELECT project_path
                                                         FROM project 
-                                                        WHERE project_id = $projectIdPut
-                                                        """.query(projectPathGet)
+                                                        WHERE project_id = $projectIdEncoder
+                                                        """.query(projectPathDecoder)
 
     Kleisli(_.prepare(query).use(_.unique(eventId.projectId)))
   }

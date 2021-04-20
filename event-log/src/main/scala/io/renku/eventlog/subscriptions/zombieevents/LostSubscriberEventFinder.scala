@@ -59,7 +59,7 @@ private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], 
                 FROM event_delivery delivery
                 JOIN event evt ON evt.event_id = delivery.event_id
                   AND evt.project_id = delivery.project_id
-                  AND (evt.status = $eventStatusPut OR evt.status = $eventStatusPut)
+                  AND (evt.status = $eventStatusEncoder OR evt.status = $eventStatusEncoder)
                   AND (evt.message IS NULL OR evt.message <> $text)
                 JOIN project proj ON evt.project_id = proj.project_id
                 WHERE NOT EXISTS (
@@ -68,7 +68,7 @@ private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], 
                   WHERE sub.delivery_id = delivery.delivery_id
                 )
                 LIMIT 1
-            """.query(eventIdGet ~ projectIdGet ~ projectPathGet ~ eventStatusGet).map {
+            """.query(eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder ~ eventStatusDecoder).map {
             case eventId ~ projectId ~ projectPath ~ status =>
               ZombieEvent(processName, CompoundEventId(eventId, projectId), projectPath, status)
           }
@@ -91,7 +91,7 @@ private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], 
           val query: Command[String ~ OffsetDateTime ~ EventId ~ projects.Id] =
             sql"""UPDATE event
                   SET message = $text, execution_date = $timestamptz
-                  WHERE event_id = $eventIdPut AND project_id = $projectIdPut
+                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
                   """.command
           session
             .prepare(query)

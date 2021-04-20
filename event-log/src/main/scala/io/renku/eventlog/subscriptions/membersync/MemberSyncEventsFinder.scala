@@ -63,17 +63,17 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], 
           sql"""SELECT proj.project_id, sync_time.last_synced, proj.project_path
                   FROM project proj
                   LEFT JOIN subscription_category_sync_time sync_time
-                    ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNamePut
+                    ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
                   WHERE
                     sync_time.last_synced IS NULL
                     OR (
-                         (($eventDatePut - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 minute')
-                      OR (($eventDatePut - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 hour')
-                      OR (($eventDatePut - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 day')
+                         (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 hour' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 minute')
+                      OR (($eventDateEncoder - proj.latest_event_date) < INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
+                      OR (($eventDateEncoder - proj.latest_event_date) > INTERVAL '1 day'  AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
                     )
                   ORDER BY proj.latest_event_date DESC
                   LIMIT 1
-      """.query(projectIdGet ~ lastSyncedDateGet.opt ~ projectPathGet)
+      """.query(projectIdDecoder ~ lastSyncedDateDecoder.opt ~ projectPathDecoder)
             .map { case id ~ maybeDate ~ path => (id, maybeDate, MemberSyncEvent(path)) }
         val eventDate    = EventDate(now())
         val lastSyncDate = LastSyncedDate(now())
@@ -97,8 +97,8 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], 
           val query: Command[LastSyncedDate ~ projects.Id ~ CategoryName] =
             sql"""
             UPDATE subscription_category_sync_time
-            SET last_synced = $lastSyncedDatePut
-            WHERE project_id = $projectIdPut AND category_name = $categoryNamePut
+            SET last_synced = $lastSyncedDateEncoder
+            WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
             """.command
           session.prepare(query).use(_.execute(LastSyncedDate(now()) ~ projectId ~ categoryName)).map {
             case Completion.Update(n) => n
@@ -116,7 +116,7 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], 
           val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] =
             sql"""
             INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
-            VALUES ($projectIdPut, $categoryNamePut, $lastSyncedDatePut)
+            VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
             ON CONFLICT (project_id, category_name)
             DO
               UPDATE SET last_synced = EXCLUDED.last_synced

@@ -41,7 +41,7 @@ trait StatusProcessingTime extends TypeSerializers {
       Kleisli { session =>
         val query: Command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime] =
           sql"""INSERT INTO status_processing_time(event_id, project_id, status, processing_time)
-                VALUES($eventIdPut, $projectIdPut, $eventStatusPut, $eventProcessingTimePut)
+                VALUES($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
                 ON CONFLICT (event_id, project_id, status)
                 DO UPDATE SET processing_time = EXCLUDED.processing_time;
                 """.command

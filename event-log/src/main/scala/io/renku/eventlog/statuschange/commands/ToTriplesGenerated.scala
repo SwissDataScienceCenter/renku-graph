@@ -71,10 +71,10 @@ final case class GeneratingToTriplesGenerated[Interpretation[_]: Async: Bracket[
     val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
       sql"""
       UPDATE event
-      SET status = $eventStatusPut, execution_date = $executionDatePut
-      WHERE event_id = $eventIdPut
-        AND project_id = $projectIdPut
-        AND status = $eventStatusPut;
+      SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+      WHERE event_id = $eventIdEncoder
+        AND project_id = $projectIdEncoder
+        AND status = $eventStatusEncoder;
       """.command
     session
       .prepare(query)
@@ -92,7 +92,7 @@ final case class GeneratingToTriplesGenerated[Interpretation[_]: Async: Bracket[
     val query: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] =
       sql"""
             INSERT INTO event_payload (event_id, project_id, payload, schema_version)
-            VALUES ($eventIdPut,  $projectIdPut, $eventPayloadPut, $schemaVersionPut)
+            VALUES ($eventIdEncoder,  $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
             ON CONFLICT (event_id, project_id, schema_version)
             DO UPDATE SET payload = EXCLUDED.payload;
           """.command
@@ -135,10 +135,10 @@ final case class TransformingToTriplesGenerated[Interpretation[_]: Bracket[*[_],
     val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
       sql"""
       UPDATE event
-      SET status = $eventStatusPut, execution_date = $executionDatePut
-      WHERE event_id = $eventIdPut
-        AND project_id = $projectIdPut
-        AND status = $eventStatusPut;
+      SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+      WHERE event_id = $eventIdEncoder
+        AND project_id = $projectIdEncoder
+        AND status = $eventStatusEncoder;
       """.command
     session
       .prepare(query)
@@ -234,8 +234,8 @@ private[statuschange] object ToTriplesGenerated extends TypeSerializers {
       sql"""
             SELECT status
             FROM event
-            WHERE event_id = $eventIdPut AND project_id = $projectIdPut
-            """.query(eventStatusGet)
+            WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+            """.query(eventStatusDecoder)
     Kleisli[Interpretation, Session[Interpretation], EventStatus](session =>
       session.prepare(query).use(_.unique(eventId.id ~ eventId.projectId))
     )

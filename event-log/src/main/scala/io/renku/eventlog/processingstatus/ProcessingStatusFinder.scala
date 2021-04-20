@@ -64,12 +64,12 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwab
                                                      INNER JOIN (
                                                          SELECT batch_date
                                                          FROM event
-                                                         WHERE project_id = $projectIdPut
+                                                         WHERE project_id = $projectIdEncoder
                                                          ORDER BY batch_date DESC
                                                          LIMIT 1
                                                        ) max_batch_date ON evt.batch_date = max_batch_date.batch_date
-                                                     WHERE evt.project_id = $projectIdPut
-                                                     """.query(eventStatusGet)
+                                                     WHERE evt.project_id = $projectIdEncoder
+                                                     """.query(eventStatusDecoder)
       session.prepare(query).use(pq => pq.stream(projectId ~ projectId, chunkSize = 32).compile.toList)
     },
     name = "processing status"

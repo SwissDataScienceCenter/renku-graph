@@ -71,16 +71,18 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
                     proj.latest_event_date
                   FROM project proj
                   LEFT JOIN subscription_category_sync_time sync_time
-                    ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNamePut
+                    ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNameEncoder
                   WHERE
                     sync_time.last_synced IS NULL
                     OR (
-                         (($eventDatePut - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 hour')
-                      OR (($eventDatePut - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDatePut - sync_time.last_synced) > INTERVAL '1 day')
+                         (($eventDateEncoder - proj.latest_event_date) <= INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 hour')
+                      OR (($eventDateEncoder - proj.latest_event_date) >  INTERVAL '7 days' AND ($lastSyncedDateEncoder - sync_time.last_synced) > INTERVAL '1 day')
                     )
                   ORDER BY proj.latest_event_date DESC
                   LIMIT 1"""
-            .query(eventIdGet.opt ~ projectIdGet ~ projectPathGet ~ lastSyncedDateGet.opt ~ eventDateGet)
+            .query(
+              eventIdDecoder.opt ~ projectIdDecoder ~ projectPathDecoder ~ lastSyncedDateDecoder.opt ~ eventDateDecoder
+            )
             .map {
               case Some(eventId) ~ projectId ~ projectPath ~ maybeLastSyncDate ~ latestEventDate =>
                 FullCommitSyncEvent(CompoundEventId(eventId, projectId),
@@ -107,8 +109,8 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
         Kleisli { session =>
           val query: Command[LastSyncedDate ~ projects.Id ~ CategoryName] =
             sql"""UPDATE subscription_category_sync_time
-                  SET last_synced = $lastSyncedDatePut
-                  WHERE project_id = $projectIdPut AND category_name = $categoryNamePut
+                  SET last_synced = $lastSyncedDateEncoder
+                  WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
               """.command
           session.prepare(query).use(_.execute(LastSyncedDate(now()) ~ event.projectId ~ categoryName))
         },
@@ -123,7 +125,7 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
           val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] =
             sql"""
           INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
-          VALUES ($projectIdPut, $categoryNamePut, $lastSyncedDatePut)
+          VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
           ON CONFLICT (project_id, category_name)
           DO UPDATE
             SET last_synced = EXCLUDED.last_synced

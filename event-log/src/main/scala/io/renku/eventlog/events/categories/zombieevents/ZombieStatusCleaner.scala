@@ -62,7 +62,7 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: Async: Bracket[*[_], Th
         Kleisli { session =>
           val query: Command[EventId ~ projects.Id] =
             sql"""DELETE FROM event_delivery
-            WHERE event_id = $eventIdPut AND project_id = $projectIdPut
+            WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
           session.prepare(query).use(_ execute (eventId.id ~ eventId.projectId))
         },
@@ -79,8 +79,8 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: Async: Bracket[*[_], Th
       Kleisli { session =>
         val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
           sql"""UPDATE event
-            SET status = $eventStatusPut, execution_date = $executionDatePut, message = NULL
-            WHERE event_id = $eventIdPut AND project_id = $projectIdPut AND status = $eventStatusPut
+            SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = NULL
+            WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
             """.command
         session.prepare(query).use {
           _.execute(newStatus ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ oldStatus)

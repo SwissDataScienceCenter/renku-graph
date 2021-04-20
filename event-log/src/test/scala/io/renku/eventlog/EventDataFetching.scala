@@ -36,9 +36,9 @@ trait EventDataFetching {
         val query: Query[(EventStatus, Void), (CompoundEventId, ExecutionDate, BatchDate)] = (sql"""
             SELECT event_id, project_id, execution_date, batch_date
             FROM event
-            WHERE status = $eventStatusPut
+            WHERE status = $eventStatusEncoder
             ORDER BY """ ~ orderBy)
-          .query(eventIdGet ~ projectIdGet ~ executionDateGet ~ batchDateGet)
+          .query(eventIdDecoder ~ projectIdDecoder ~ executionDateDecoder ~ batchDateDecoder)
           .map { case eventId ~ projectId ~ executionDate ~ batchDate =>
             (CompoundEventId(eventId, projectId), executionDate, batchDate)
           }
@@ -52,8 +52,8 @@ trait EventDataFetching {
         val query: Query[EventId ~ projects.Id, (CompoundEventId, EventPayload)] =
           sql"""SELECT event_id, project_id, payload
               FROM event_payload
-              WHERE event_id = $eventIdPut AND project_id = $projectIdPut;"""
-            .query(eventIdGet ~ projectIdGet ~ eventPayloadGet)
+              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder;"""
+            .query(eventIdDecoder ~ projectIdDecoder ~ eventPayloadDecoder)
             .map { case eventId ~ projectId ~ eventPayload =>
               (CompoundEventId(eventId, projectId), eventPayload)
             }
@@ -65,7 +65,7 @@ trait EventDataFetching {
     Kleisli { session =>
       val query: Query[Void, (projects.Id, projects.Path, EventDate)] =
         sql"""SELECT * FROM project"""
-          .query(projectIdGet ~ projectPathGet ~ eventDateGet)
+          .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder)
           .map { case projectId ~ projectPath ~ eventDate => (projectId, projectPath, eventDate) }
       session.execute(query)
     }
@@ -87,8 +87,8 @@ trait EventDataFetching {
         val query: Query[EventId ~ projects.Id, (ExecutionDate, EventStatus, Option[EventMessage])] = sql"""
         SELECT execution_date, status, message
         FROM event
-        WHERE event_id = $eventIdPut AND project_id = $projectIdPut
-      """.query(executionDateGet ~ eventStatusGet ~ eventMessageGet.opt).map {
+        WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+      """.query(executionDateDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt).map {
           case executionDate ~ eventStatus ~ maybeEventMessage => (executionDate, eventStatus, maybeEventMessage)
         }
         session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
@@ -101,9 +101,9 @@ trait EventDataFetching {
         val query: Query[EventId ~ projects.Id, (CompoundEventId, EventProcessingTime)] = sql"""
           SELECT event_id, project_id, processing_time
           FROM status_processing_time
-          WHERE event_id = $eventIdPut AND project_id = $projectIdPut;
+          WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder;
         """
-          .query(eventIdGet ~ projectIdGet ~ eventProcessingTimeGet)
+          .query(eventIdDecoder ~ projectIdDecoder ~ eventProcessingTimeDecoder)
           .map { case eventId ~ projectId ~ eventProcessingTime =>
             (CompoundEventId(eventId, projectId), eventProcessingTime)
           }

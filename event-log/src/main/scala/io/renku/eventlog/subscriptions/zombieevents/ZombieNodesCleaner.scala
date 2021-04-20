@@ -66,7 +66,7 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
             SELECT DISTINCT source_url, delivery_url
             FROM subscriber
             """
-            .query(microserviceBaseUrlGet ~ subscriberUrlGet)
+            .query(microserviceBaseUrlDecoder ~ subscriberUrlDecoder)
             .map { case sourceUrl ~ subscriberUrl => (sourceUrl, subscriberUrl) }
         session.prepare(query).use(_.stream(Void, 32).compile.toList)
       },
@@ -105,8 +105,8 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
           sql"""
             SELECT source_url
             FROM subscriber
-            WHERE source_url = $microserviceBaseUrlPut AND delivery_url = $subscriberUrlPut
-          """.query(microserviceBaseUrlGet)
+            WHERE source_url = $microserviceBaseUrlEncoder AND delivery_url = $subscriberUrlEncoder
+          """.query(microserviceBaseUrlDecoder)
         session.prepare(query).use(_.option(sourceUrl ~ subscriberUrl)).map(_.isDefined)
       },
       name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - check source & delivery exists")
@@ -120,7 +120,7 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
           sql"""
           DELETE
           FROM subscriber
-          WHERE source_url = $microserviceBaseUrlPut AND delivery_url = $subscriberUrlPut
+          WHERE source_url = $microserviceBaseUrlEncoder AND delivery_url = $subscriberUrlEncoder
           """.command
         session.prepare(query).use(_.execute(sourceUrl ~ subscriberUrl))
       },
@@ -134,8 +134,8 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
         val query: Command[MicroserviceBaseUrl ~ MicroserviceBaseUrl ~ SubscriberUrl] =
           sql"""
          UPDATE subscriber
-         SET source_url = $microserviceBaseUrlPut
-         WHERE source_url = $microserviceBaseUrlPut AND delivery_url = $subscriberUrlPut
+         SET source_url = $microserviceBaseUrlEncoder
+         WHERE source_url = $microserviceBaseUrlEncoder AND delivery_url = $subscriberUrlEncoder
         """.command
         session.prepare(query).use(_.execute(microserviceBaseUrl ~ sourceUrl ~ subscriberUrl))
       },

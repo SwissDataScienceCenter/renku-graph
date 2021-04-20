@@ -122,13 +122,13 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
         sql"""insert into
               event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 
               values (
-                $eventIdPut, 
-                $projectIdPut, 
-                $projectPathPut, 
-                $eventStatusPut, 
-                $createdDatePut,
-                $executionDatePut, 
-                $eventDatePut, 
+                $eventIdEncoder, 
+                $projectIdEncoder, 
+                $projectPathEncoder, 
+                $eventStatusEncoder, 
+                $createdDateEncoder,
+                $executionDateEncoder, 
+                $eventDateEncoder, 
                 $text
               )
       """.command

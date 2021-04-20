@@ -58,13 +58,13 @@ private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Thro
           sql"""SELECT evt.event_id, evt.project_id, proj.project_path, evt.status
                 FROM event evt
                 JOIN project proj ON evt.project_id = proj.project_id
-                WHERE (evt.status = $eventStatusPut
-                  OR evt.status = $eventStatusPut)
+                WHERE (evt.status = $eventStatusEncoder
+                  OR evt.status = $eventStatusEncoder)
                   AND evt.message = $text
-                  AND  (($executionDatePut - evt.execution_date) > $eventProcessingTimePut)
+                  AND  (($executionDateEncoder - evt.execution_date) > $eventProcessingTimeEncoder)
                 LIMIT 1
           """
-            .query(eventIdGet ~ projectIdGet ~ projectPathGet ~ eventStatusGet)
+            .query(eventIdDecoder ~ projectIdDecoder ~ projectPathDecoder ~ eventStatusDecoder)
             .map { case eventId ~ projectId ~ path ~ status =>
               ZombieEvent(processName, CompoundEventId(eventId, projectId), path, status)
             }
@@ -103,8 +103,8 @@ private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Thro
           val query: Command[ExecutionDate ~ EventId ~ projects.Id ~ String] =
             sql"""
               UPDATE event
-              SET execution_date = $executionDatePut
-              WHERE event_id = $eventIdPut AND project_id = $projectIdPut AND message = $text
+              SET execution_date = $executionDateEncoder
+              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND message = $text
               """.command
           session.prepare(query).use(_.execute(ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ zombieMessage))
         },

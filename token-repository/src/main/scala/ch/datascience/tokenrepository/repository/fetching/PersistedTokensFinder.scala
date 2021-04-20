@@ -41,7 +41,9 @@ private class PersistedTokensFinder[Interpretation[_]: Async: Bracket[*[_], Thro
     SqlQuery[Interpretation, Option[EncryptedAccessToken]](
       query = Kleisli { session =>
         val query: Query[Id, EncryptedAccessToken] =
-          sql"""select token from projects_tokens where project_id = $projectIdPut""".query(encryptedAccessTokenGet)
+          sql"""select token from projects_tokens where project_id = $projectIdEncoder""".query(
+            encryptedAccessTokenDecoder
+          )
         session.prepare(query).use(_.option(projectId))
       },
       name = "find token - id"
@@ -52,7 +54,9 @@ private class PersistedTokensFinder[Interpretation[_]: Async: Bracket[*[_], Thro
     SqlQuery[Interpretation, Option[EncryptedAccessToken]](
       Kleisli { session =>
         val query: Query[Path, EncryptedAccessToken] =
-          sql"select token from projects_tokens where project_path = $projectPathPut".query(encryptedAccessTokenGet)
+          sql"select token from projects_tokens where project_path = $projectPathEncoder".query(
+            encryptedAccessTokenDecoder
+          )
         session.prepare(query).use(_.option(projectPath))
       },
       name = "find token - path"

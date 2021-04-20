@@ -107,7 +107,7 @@ class ProjectPathAdderSpec
     .useK {
       Kleisli { session =>
         val query: Query[Void, projects.Path] = sql"select project_path from event_log limit 1"
-          .query(projectPathGet)
+          .query(projectPathDecoder)
         session
           .option(query)
           .map(_ => true)
@@ -122,12 +122,12 @@ class ProjectPathAdderSpec
         sql"""insert into
             event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
             values (
-            $eventIdPut, 
-            $projectIdPut, 
-            $eventStatusPut, 
-            $createdDatePut, 
-            $executionDatePut, 
-            $eventDatePut, 
+            $eventIdEncoder, 
+            $projectIdEncoder, 
+            $eventStatusEncoder, 
+            $createdDateEncoder, 
+            $executionDateEncoder, 
+            $eventDateEncoder, 
             $text)
         """.command
 
@@ -155,7 +155,7 @@ class ProjectPathAdderSpec
   private def findProjectPaths: Set[Path] = sessionResource
     .useK {
       Kleisli { session =>
-        val query: Query[Void, projects.Path] = sql"select project_path from event_log".query(projectPathGet)
+        val query: Query[Void, projects.Path] = sql"select project_path from event_log".query(projectPathDecoder)
         session.execute(query)
       }
     }

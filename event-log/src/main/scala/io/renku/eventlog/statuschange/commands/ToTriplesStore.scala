@@ -57,8 +57,8 @@ final case class ToTriplesStore[Interpretation[_]: Async: Bracket[*[_], Throwabl
   private lazy val upsertEventStatus = Kleisli[Interpretation, Session[Interpretation], Int] { session =>
     val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
       sql"""UPDATE event
-            SET status = $eventStatusPut, execution_date = $executionDatePut
-            WHERE event_id = $eventIdPut AND project_id = $projectIdPut AND status = $eventStatusPut
+            SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+            WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
             """.command
     session
       .prepare(query)

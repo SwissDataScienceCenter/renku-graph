@@ -154,8 +154,8 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
         Kleisli { session =>
           val query: Command[EventStatus ~ EventId ~ projects.Id ~ EventStatus] = sql"""
             UPDATE event
-            SET status = $eventStatusPut
-            WHERE event_id = $eventIdPut AND project_id = $projectIdPut AND status = $eventStatusPut
+            SET status = $eventStatusEncoder
+            WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
             """.command
           session.prepare(query).use(_.execute(status ~ eventId.id ~ eventId.projectId ~ New)).map {
             case Completion.Update(n) => n

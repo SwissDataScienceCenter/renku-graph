@@ -125,14 +125,14 @@ class EventStatusRenamerImplSpec
           sql"""INSERT INTO 
               event (event_id, project_id, status, created_date, execution_date, event_date, event_body, batch_date) 
               values (
-              $eventIdPut, 
-              $projectIdPut, 
+              $eventIdEncoder, 
+              $projectIdEncoder, 
               $varchar, 
-              $createdDatePut,
-              $executionDatePut, 
-              $eventDatePut, 
+              $createdDateEncoder,
+              $executionDateEncoder, 
+              $eventDateEncoder, 
               $text,
-              $batchDatePut)
+              $batchDateEncoder)
       """.command
         session
           .prepare(query)
@@ -159,7 +159,7 @@ class EventStatusRenamerImplSpec
   private def findEventsId: Set[EventId] = sessionResource
     .useK {
       Kleisli { session =>
-        val query: Query[Void, EventId] = sql"SELECT event_id FROM event".query(eventIdGet)
+        val query: Query[Void, EventId] = sql"SELECT event_id FROM event".query(eventIdDecoder)
         session.execute(query)
       }
     }
@@ -173,9 +173,9 @@ class EventStatusRenamerImplSpec
           sql"""
             SELECT event_id, project_id
             FROM event
-            WHERE status = $eventStatusPut
+            WHERE status = $eventStatusEncoder
             ORDER BY created_date asc"""
-            .query(eventIdGet ~ projectIdGet)
+            .query(eventIdDecoder ~ projectIdDecoder)
             .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
         session.prepare(query).use(_.stream(status, 32).compile.toList)
       }

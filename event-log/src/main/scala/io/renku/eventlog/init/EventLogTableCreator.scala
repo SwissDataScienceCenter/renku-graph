@@ -97,7 +97,7 @@ private class EventLogTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], T
 
   private lazy val revertStatusToGenerationRecoverableFailure = {
     val query: Command[EventStatus] =
-      sql"UPDATE event_log set status=$eventStatusPut where status='TRIPLES_STORE_FAILURE'".command
+      sql"UPDATE event_log set status=$eventStatusEncoder where status='TRIPLES_STORE_FAILURE'".command
     Kleisli[Interpretation, Session[Interpretation], Unit] {
       _.prepare(query).use(_.execute(GenerationRecoverableFailure).void)
     }

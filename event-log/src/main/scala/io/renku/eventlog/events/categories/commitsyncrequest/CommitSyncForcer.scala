@@ -62,7 +62,7 @@ private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throw
           val query: Command[projects.Id ~ CategoryName] =
             sql"""
             DELETE FROM subscription_category_sync_time
-            WHERE project_id = $projectIdPut AND category_name = $categoryNamePut
+            WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
           """.command
           session.prepare(query).use(_.execute(projectId ~ commitsync.categoryName))
         },
@@ -77,7 +77,7 @@ private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throw
           sql"""
           INSERT INTO
           project (project_id, project_path, latest_event_date)
-          VALUES ($projectIdPut, $projectPathPut, $eventDatePut)
+          VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
           ON CONFLICT (project_id)
           DO NOTHING
       """.command
