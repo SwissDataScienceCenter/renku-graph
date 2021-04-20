@@ -44,7 +44,7 @@ import scala.math.BigDecimal.RoundingMode
 import scala.util.Random
 
 private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
-    transactor:            SessionResource[Interpretation, EventLogDB],
+    sessionResource:       SessionResource[Interpretation, EventLogDB],
     waitingEventsGauge:    LabeledGauge[Interpretation, projects.Path],
     underProcessingGauge:  LabeledGauge[Interpretation, projects.Path],
     queriesExecTimes:      LabeledHistogram[Interpretation, SqlQuery.Name],
@@ -57,43 +57,31 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
     with SubscriptionTypeSerializers
     with TypeSerializers {
 
-  override def popEvent(): Interpretation[Option[AwaitingGenerationEvent]] = transactor.use { implicit session =>
-    session.transaction.use { transaction =>
-      for {
-        sp <- transaction.savepoint
-        maybeProjectAwaitingGenerationEvent <- findEventAndUpdateForProcessing recoverWith { error =>
-                                                 transaction
-                                                   .rollback(sp)
-                                                   .flatMap(_ =>
-                                                     error.raiseError[Interpretation,
-                                                                      (Option[ProjectIds],
-                                                                       Option[AwaitingGenerationEvent]
-                                                                      )
-                                                     ]
-                                                   )
-                                               }
-        (maybeProject, maybeAwaitingGenerationEvent) = maybeProjectAwaitingGenerationEvent
-        _ <- maybeUpdateMetrics(maybeProject, maybeAwaitingGenerationEvent)
-      } yield maybeAwaitingGenerationEvent
-
-    }
+  override def popEvent(): Interpretation[Option[AwaitingGenerationEvent]] = sessionResource.useK {
+    for {
+      maybeProjectAwaitingGenerationEvent <- findEventAndUpdateForProcessing
+      (maybeProject, maybeAwaitingGenerationEvent) = maybeProjectAwaitingGenerationEvent
+      _ <- maybeUpdateMetrics(maybeProject, maybeAwaitingGenerationEvent)
+    } yield maybeAwaitingGenerationEvent
 
   }
 
-  private def findEventAndUpdateForProcessing(implicit session: Session[Interpretation]) = for {
-    maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
+  private lazy val findEventAndUpdateForProcessing = for {
+    maybeProject <- measureExecutionTimeK(findProjectsWithEventsInQueue)
                       .map(projectPrioritisation.prioritise)
                       .map(selectProject)
     maybeIdAndProjectAndBody <- maybeProject
-                                  .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
-                                  .getOrElse(Option.empty[AwaitingGenerationEvent].pure[Interpretation])
-    maybeBody <- markAsProcessing(session)(maybeIdAndProjectAndBody)
+                                  .map(idAndPath => measureExecutionTimeK(findOldestEvent(idAndPath)))
+                                  .getOrElse(Kleisli.pure(Option.empty[AwaitingGenerationEvent]))
+    maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
   } yield maybeProject -> maybeBody
 
   // format: off
-  private def findProjectsWithEventsInQueue = SqlQuery(Kleisli[Interpretation, Session[Interpretation], List[ProjectInfo]] {
-    session => 
-      val query: Query[EventStatus ~ ExecutionDate ~ Int,ProjectInfo] = sql"""
+  private def findProjectsWithEventsInQueue =  
+    SqlQuery(Kleisli[Interpretation, Session[Interpretation], List[ProjectInfo]] {
+      session =>
+        val query: Query[EventStatus ~ ExecutionDate ~ Int, ProjectInfo] =
+          sql"""
       SELECT
         proj.project_id,
         proj.project_path,
@@ -110,17 +98,20 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
         ORDER BY proj.latest_event_date DESC
         LIMIT $int4
       ) proj
-      """ .query(projectIdGet ~ projectPathGet ~ eventDateGet ~ int8)
-      .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt)) }
-      session.prepare(query).use{_.stream(GeneratingTriples ~ ExecutionDate(now()) ~ projectsFetchingLimit.value, 32).compile.toList}
-  },
-    name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
-  )
+      """.query(projectIdGet ~ projectPathGet ~ eventDateGet ~ int8)
+            .map { case projectId ~ projectPath ~ eventDate ~ (currentOccupancy: Long) => ProjectInfo(projectId, projectPath, eventDate, Refined.unsafeApply(currentOccupancy.toInt)) }
+        session.prepare(query).use {
+          _.stream(GeneratingTriples ~ ExecutionDate(now()) ~ projectsFetchingLimit.value, 32).compile.toList
+        }
+    },
+      name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find projects")
+    )
   // format: on
 
   // format: off
   private def findOldestEvent(idAndPath: ProjectIds) = SqlQuery[Interpretation, Option[AwaitingGenerationEvent]](Kleisli { session =>
-    val query: Query[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, AwaitingGenerationEvent] = sql"""
+    val query: Query[projects.Path ~ projects.Id ~ ExecutionDate ~ ExecutionDate, AwaitingGenerationEvent] =
+      sql"""
        SELECT evt.event_id, evt.project_id, $projectPathPut AS project_path, evt.event_body
        FROM (
          SELECT project_id, min(event_date) AS min_event_date
@@ -136,11 +127,11 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
          AND execution_date < $executionDatePut
        LIMIT 1
        """
-      .query(awaitingGenerationEventGet)
-      val executionDate =  ExecutionDate(now())
-      session.prepare(query).use(_.option(idAndPath.path ~ idAndPath.id ~ executionDate ~ executionDate))
-    
-  }, 
+        .query(awaitingGenerationEventGet)
+    val executionDate = ExecutionDate(now())
+    session.prepare(query).use(_.option(idAndPath.path ~ idAndPath.id ~ executionDate ~ executionDate))
+
+  },
     name = Refined.unsafeApply(s"${SubscriptionCategory.name.value.toLowerCase} - find oldest")
   )
   // format: on
@@ -159,18 +150,19 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
       acc :++ List.fill((priority.value * 10).setScale(2, RoundingMode.HALF_UP).toInt)(projectIdAndPath)
     }
 
-  private def markAsProcessing(implicit
-      session: Session[Interpretation]
-  ): Option[AwaitingGenerationEvent] => Interpretation[Option[AwaitingGenerationEvent]] = {
+  private lazy val markAsProcessing: Option[AwaitingGenerationEvent] => Kleisli[Interpretation, Session[
+    Interpretation
+  ], Option[AwaitingGenerationEvent]] = {
     case None =>
-      Option.empty[AwaitingGenerationEvent].pure[Interpretation]
+      Kleisli.pure(Option.empty[AwaitingGenerationEvent])
     case Some(event @ AwaitingGenerationEvent(id, _, _)) =>
-      measureExecutionTime(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
+      measureExecutionTimeK(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
   }
 
   private def updateStatus(commitEventId: CompoundEventId) = SqlQuery[Interpretation, Completion](
     Kleisli { session =>
-      val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] = sql"""
+      val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
+        sql"""
         UPDATE event 
         SET status = $eventStatusPut, execution_date = $executionDatePut
         WHERE event_id = $eventIdPut
@@ -197,11 +189,13 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
 
   private def maybeUpdateMetrics(maybeProject: Option[ProjectIds], maybeBody: Option[AwaitingGenerationEvent]) =
     (maybeBody, maybeProject) mapN { case (_, ProjectIds(_, projectPath)) =>
-      for {
-        _ <- waitingEventsGauge decrement projectPath
-        _ <- underProcessingGauge increment projectPath
-      } yield ()
-    } getOrElse ().pure[Interpretation]
+      Kleisli.liftF {
+        for {
+          _ <- waitingEventsGauge decrement projectPath
+          _ <- underProcessingGauge increment projectPath
+        } yield ()
+      }
+    } getOrElse Kleisli.pure[Interpretation, Session[Interpretation], Unit](())
 
   private val awaitingGenerationEventGet: Decoder[AwaitingGenerationEvent] =
     (compoundEventIdGet ~ projectPathGet ~ eventBodyGet).gmap[AwaitingGenerationEvent]
@@ -212,14 +206,14 @@ private object IOAwaitingGenerationEventFinder {
   private val ProjectsFetchingLimit: Int Refined Positive = 10
 
   def apply(
-      transactor:           SessionResource[IO, EventLogDB],
+      sessionResource:      SessionResource[IO, EventLogDB],
       subscribers:          Subscribers[IO],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift:  ContextShift[IO]): IO[EventFinder[IO, AwaitingGenerationEvent]] = for {
     projectPrioritisation <- ProjectPrioritisation(subscribers)
-  } yield new AwaitingGenerationEventFinderImpl(transactor,
+  } yield new AwaitingGenerationEventFinderImpl(sessionResource,
                                                 waitingEventsGauge,
                                                 underProcessingGauge,
                                                 queriesExecTimes,

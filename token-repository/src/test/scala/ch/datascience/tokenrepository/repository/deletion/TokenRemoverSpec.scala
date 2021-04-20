@@ -53,6 +53,6 @@ class TokenRemoverSpec extends AnyWordSpec with InMemoryProjectsTokensDbSpec wit
     val projectPath = projectPaths.generateOne
 
     private val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val remover                  = new TokenRemover(transactor, queriesExecTimes)
+    val remover                  = new TokenRemover(sessionResource, queriesExecTimes)
   }
 }

@@ -82,15 +82,15 @@ final case class ToGenerationRecoverableFailure[Interpretation[_]: Async: Bracke
   )
 
   override def updateGauges(
-      updateResult:   UpdateResult
-  )(implicit session: Session[Interpretation]): Interpretation[Unit] = updateResult match {
+      updateResult: UpdateResult
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] = updateResult match {
     case UpdateResult.Updated =>
       for {
         path <- findProjectPath(eventId)
-        _    <- awaitingTriplesGenerationGauge increment path
-        _    <- underTriplesGenerationGauge decrement path
+        _    <- Kleisli.liftF(awaitingTriplesGenerationGauge increment path)
+        _    <- Kleisli.liftF(underTriplesGenerationGauge decrement path)
       } yield ()
-    case _ => ().pure[Interpretation]
+    case _ => Kleisli.pure(())
   }
 }
 

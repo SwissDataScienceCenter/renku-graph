@@ -18,12 +18,13 @@
 
 package ch.datascience.tokenrepository.repository.init
 
+import cats.data.Kleisli
 import cats.effect.Bracket
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
 import ch.datascience.tokenrepository.repository.ProjectsTokensDB
 import org.typelevel.log4cats.Logger
-import skunk.Command
+import skunk.{Command, Session}
 import skunk.data.Completion
 import skunk.implicits._
 
@@ -33,25 +34,28 @@ private trait DuplicateProjectsRemover[Interpretation[_]] {
 
 private object DuplicateProjectsRemover {
   def apply[Interpretation[_]: Bracket[*[_], Throwable]](
-      transactor: SessionResource[Interpretation, ProjectsTokensDB],
-      logger:     Logger[Interpretation]
+      sessionResource: SessionResource[Interpretation, ProjectsTokensDB],
+      logger:          Logger[Interpretation]
   ): DuplicateProjectsRemover[Interpretation] =
-    new DuplicateProjectsRemoverImpl(transactor, logger)
+    new DuplicateProjectsRemoverImpl(sessionResource, logger)
 }
 
 private class DuplicateProjectsRemoverImpl[Interpretation[_]: Bracket[*[_], Throwable]](
-    transactor: SessionResource[Interpretation, ProjectsTokensDB],
-    logger:     Logger[Interpretation]
+    sessionResource: SessionResource[Interpretation, ProjectsTokensDB],
+    logger:          Logger[Interpretation]
 ) extends DuplicateProjectsRemover[Interpretation] {
 
-  override def run(): Interpretation[Unit] = for {
-    _ <- deduplicateProjects()
-    _ <- logger info "Projects de-duplicated"
-  } yield ()
+  override def run(): Interpretation[Unit] = sessionResource.useK {
+    for {
+      _ <- deduplicateProjects()
+      _ <- Kleisli.liftF(logger info "Projects de-duplicated")
+    } yield ()
+  }
 
-  private def deduplicateProjects() = {
+  private def deduplicateProjects(): Kleisli[Interpretation, Session[Interpretation], Unit] = {
 
-    val query: Command[skunk.Void] = sql"""DELETE FROM projects_tokens WHERE project_id IN (
+    val query: Command[skunk.Void] =
+      sql"""DELETE FROM projects_tokens WHERE project_id IN (
                                        SELECT project_id
                                        FROM projects_tokens pt
                                        JOIN (
@@ -62,16 +66,6 @@ private class DuplicateProjectsRemoverImpl[Interpretation[_]: Bracket[*[_], Thro
                                        ) pr_to_stay ON pr_to_stay.project_path = pt.project_path AND pr_to_stay.id_to_stay <> pt.project_id
                                      )""".command
 
-    transactor.use { session =>
-      session.transaction.use { xa =>
-        for {
-          sp <- xa.savepoint
-          _ <- session.execute(query).recoverWith { case e =>
-                 xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Completion])
-               }
-
-        } yield ()
-      }
-    }
+    Kleisli(_.execute(query).void)
   }
 }

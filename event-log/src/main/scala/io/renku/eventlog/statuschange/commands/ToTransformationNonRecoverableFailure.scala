@@ -74,10 +74,11 @@ final case class ToTransformationNonRecoverableFailure[Interpretation[_]: Async:
   )
 
   override def updateGauges(
-      updateResult:   UpdateResult
-  )(implicit session: Session[Interpretation]): Interpretation[Unit] = updateResult match {
-    case UpdateResult.Updated => findProjectPath(eventId) flatMap underTriplesTransformationGauge.decrement
-    case _                    => ().pure[Interpretation]
+      updateResult: UpdateResult
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] = updateResult match {
+    case UpdateResult.Updated =>
+      findProjectPath(eventId).flatMap(label => Kleisli.liftF(underTriplesTransformationGauge.decrement(label)))
+    case _ => Kleisli.pure(())
   }
 }
 

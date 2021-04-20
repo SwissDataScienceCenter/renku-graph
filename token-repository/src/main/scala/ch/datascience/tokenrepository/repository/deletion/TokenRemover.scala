@@ -33,13 +33,14 @@ import skunk.codec.all._
 import skunk.data.Completion
 
 class TokenRemover[Interpretation[_]: Async: Monad](
-    transactor:       SessionResource[Interpretation, ProjectsTokensDB],
+    sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes)) {
 
-  def delete(projectId: Id): Interpretation[Unit] = transactor.use { implicit session =>
-    measureExecutionTime {
-      val command: Command[Void] = sql"""
+  def delete(projectId: Id): Interpretation[Unit] = sessionResource.useK {
+    measureExecutionTimeK {
+      val command: Command[Void] =
+        sql"""
           delete
           from projects_tokens
           where project_id = #${projectId.value.toString}

@@ -18,6 +18,7 @@
 
 package ch.datascience.tokenrepository.repository.init
 
+import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlQuery}
@@ -39,7 +40,7 @@ private trait ProjectPathAdder[Interpretation[_]] {
 }
 
 private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], Throwable]: ContextShift](
-    transactor:        SessionResource[Interpretation, ProjectsTokensDB],
+    sessionResource:   SessionResource[Interpretation, ProjectsTokensDB],
     accessTokenCrypto: AccessTokenCrypto[Interpretation],
     pathFinder:        ProjectPathFinder[Interpretation],
     tokenRemover:      TokenRemover[Interpretation],
@@ -50,58 +51,61 @@ private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], 
   import accessTokenCrypto._
   import pathFinder._
 
-  def run(): Interpretation[Unit] =
-    checkColumnExists flatMap {
-      case true  => logger.info("'project_path' column exists")
+  def run(): Interpretation[Unit] = sessionResource.useK {
+    checkColumnExists >>= {
+      case true  => Kleisli.liftF(logger.info("'project_path' column exists"))
       case false => addColumn()
-    }
-
-  private def checkColumnExists: Interpretation[Boolean] = {
-    val query: Query[skunk.Void, projects.Path] = sql"select project_path from projects_tokens limit 1"
-      .query(projectPathGet)
-    transactor.use { session =>
-      session
-        .option(query)
-        .map(_ => true)
-        .recover { case _ => false }
     }
   }
 
-  private def addColumn() = {
-    for {
-      _ <- execute(sql"ALTER TABLE projects_tokens ADD COLUMN IF NOT EXISTS project_path VARCHAR".command, transactor)
-      _ <- Concurrent[Interpretation].start(addMissingPaths())
-    } yield ()
-  } recoverWith logging
+  private lazy val checkColumnExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+    val query: Query[skunk.Void, projects.Path] = sql"select project_path from projects_tokens limit 1"
+      .query(projectPathGet)
+    Kleisli(_.option(query).map(_ => true).recover { case _ => false })
+  }
 
-  private def addMissingPaths(): Interpretation[Unit] =
-    for {
-      _ <- addPathIfMissing()
-      _ <- execute(sql"ALTER TABLE projects_tokens ALTER COLUMN project_path SET NOT NULL".command, transactor)
-      _ <-
-        execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON projects_tokens(project_path)".command, transactor)
-      _ <- logger.info("'project_path' column added")
-    } yield ()
+  private def addColumn(): Kleisli[Interpretation, Session[Interpretation], Unit] = Kleisli { implicit session =>
+    {
+      for {
+        _ <-
+          execute(sql"ALTER TABLE projects_tokens ADD COLUMN IF NOT EXISTS project_path VARCHAR".command)
+        _ <- Concurrent[Interpretation].start(addMissingPaths())
+      } yield ()
+    } recoverWith logging
+  }
 
-  private def addPathIfMissing(): Interpretation[Unit] =
+  private def addMissingPaths(): Interpretation[Unit] = sessionResource.useK {
+    Kleisli { implicit session =>
+      for {
+        _ <- addPathIfMissing().run(session)
+        _ <- execute(sql"ALTER TABLE projects_tokens ALTER COLUMN project_path SET NOT NULL".command)
+        _ <-
+          execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path ON projects_tokens(project_path)".command)
+        _ <- logger.info("'project_path' column added")
+      } yield ()
+    }
+
+  }
+
+  private def addPathIfMissing(): Kleisli[Interpretation, Session[Interpretation], Unit] =
     findEntryWithoutPath flatMap {
-      case None                              => ().pure[Interpretation]
+      case None                              => Kleisli.pure(())
       case Some((projectId, encryptedToken)) => addPathOrRemoveRow(projectId, encryptedToken)
     }
 
-  private def findEntryWithoutPath: Interpretation[Option[(Id, EncryptedAccessToken)]] = {
+  private def findEntryWithoutPath
+      : Kleisli[Interpretation, Session[Interpretation], Option[(Id, EncryptedAccessToken)]] = {
     val query: Query[Void, (Id, EncryptedAccessToken)] =
       sql"select project_id, token from projects_tokens where project_path IS NULL limit 1;"
         .query(projectIdGet ~ encryptedAccessTokenGet)
         .map { case id ~ token => (id, token) }
-    transactor
-      .use(session => session.option(query))
+    Kleisli(_.option(query))
   }
 
   private def addPathOrRemoveRow(id: Id, encryptedToken: EncryptedAccessToken) = {
     for {
-      token            <- decrypt(encryptedToken)
-      maybeProjectPath <- findProjectPath(id, Some(token))
+      token            <- Kleisli.liftF(decrypt(encryptedToken))
+      maybeProjectPath <- Kleisli.liftF(findProjectPath(id, Some(token)))
       _                <- addOrRemove(id, maybeProjectPath)
       _                <- addPathIfMissing()
     } yield ()
@@ -110,23 +114,20 @@ private class ProjectPathAdderImpl[Interpretation[_]: Concurrent: Bracket[*[_], 
     addPathIfMissing()
   }
 
-  private def addOrRemove(id: Id, maybePath: Option[Path]): Interpretation[Unit] =
+  private def addOrRemove(id: Id, maybePath: Option[Path]): Kleisli[Interpretation, Session[Interpretation], Unit] =
     maybePath match {
       case Some(path) => addPath(id, path)
-      case None       => tokenRemover.delete(id)
+      case None       => Kleisli.liftF(tokenRemover.delete(id))
     }
 
-  private def addPath(id: Id, path: Path): Interpretation[Unit] =
-    transactor.use { session =>
-      val query: Command[Path ~ Id] =
-        sql"update projects_tokens set project_path = $projectPathPut where project_id = $projectIdPut".command
-      session.prepare(query).use(_.execute(path ~ id)).void
-    }
+  private def addPath(id: Id, path: Path): Kleisli[Interpretation, Session[Interpretation], Unit] = {
+    val query: Command[Path ~ Id] =
+      sql"update projects_tokens set project_path = $projectPathPut where project_id = $projectIdPut".command
+    Kleisli(_.prepare(query).use(_.execute(path ~ id)).void)
+  }
 
-  private def execute(sql:        Command[Void],
-                      transactor: SessionResource[Interpretation, ProjectsTokensDB]
-  ): Interpretation[Unit] =
-    transactor.use(session => session.execute(sql).void)
+  private def execute(sql: Command[Void])(implicit session: Session[Interpretation]): Interpretation[Unit] =
+    session.execute(sql).void
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     logger.error(exception)("'project_path' column adding failure")
@@ -141,7 +142,7 @@ private object IOProjectPathAdder {
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor:       SessionResource[IO, ProjectsTokensDB],
+      sessionResource:  SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   )(implicit
@@ -152,6 +153,6 @@ private object IOProjectPathAdder {
     for {
       accessTokenCrypto <- AccessTokenCrypto[IO]()
       pathFinder        <- IOProjectPathFinder(logger)
-      tokenRemover = new TokenRemover[IO](transactor, queriesExecTimes)
-    } yield new ProjectPathAdderImpl[IO](transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
+      tokenRemover = new TokenRemover[IO](sessionResource, queriesExecTimes)
+    } yield new ProjectPathAdderImpl[IO](sessionResource, accessTokenCrypto, pathFinder, tokenRemover, logger)
 }

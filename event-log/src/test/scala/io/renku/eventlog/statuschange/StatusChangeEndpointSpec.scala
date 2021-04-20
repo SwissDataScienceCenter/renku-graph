@@ -324,7 +324,7 @@ class StatusChangeEndpointSpec
         nonEmptyStrings()
           .generateNonEmptyList()
           .map(s => SqlQuery[IO, Int](Kleisli(_ => 1.pure[IO]), Refined.unsafeApply(s)))
-      def updateGauges(updateResult: UpdateResult)(implicit session: Session[IO]): IO[Unit] = ().pure[IO]
+      def updateGauges(updateResult: UpdateResult): Kleisli[IO, Session[IO], Unit] = Kleisli.pure(())
 
       def maybeProcessingTime: Option[EventProcessingTime] = eventProcessingTimes.generateOption
     }

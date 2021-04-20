@@ -91,7 +91,7 @@ class EventDeliverySpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
     val compoundIdExtractor: TestCompoundIdEvent => CompoundEventId = _.compoundEventId
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val delivery =
-      new EventDeliveryImpl[IO, TestCompoundIdEvent](transactor, compoundIdExtractor, queriesExecTimes, sourceUrl)
+      new EventDeliveryImpl[IO, TestCompoundIdEvent](sessionResource, compoundIdExtractor, queriesExecTimes, sourceUrl)
   }
 
   private def addEvent(eventId: CompoundEventId): Unit = storeEvent(eventId,

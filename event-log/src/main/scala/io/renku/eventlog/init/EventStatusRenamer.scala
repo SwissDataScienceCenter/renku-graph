@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
@@ -34,8 +35,8 @@ trait EventStatusRenamer[Interpretation[_]] {
 }
 
 private case class EventStatusRenamerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-    transactor: SessionResource[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
 ) extends EventStatusRenamer[Interpretation] {
   override def run(): Interpretation[Unit] = {
     val remaneStatuses = {
@@ -51,9 +52,11 @@ private case class EventStatusRenamerImpl[Interpretation[_]: Async: Bracket[*[_]
     remaneStatuses
   }
 
-  private def renameAllStatuses(from: String, to: String) = transactor.use { session =>
+  private def renameAllStatuses(from: String, to: String) = sessionResource.useK {
     val query: Command[String ~ String] = sql"""UPDATE event SET status = $varchar WHERE status = $varchar""".command
-    session.prepare(query).use(_.execute(to ~ from)).void
+    Kleisli[Interpretation, Session[Interpretation], Unit](session =>
+      session.prepare(query).use(_.execute(to ~ from)).void
+    )
   }
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
@@ -64,8 +67,8 @@ private case class EventStatusRenamerImpl[Interpretation[_]: Async: Bracket[*[_]
 
 private object EventStatusRenamer {
   def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-      transactor: SessionResource[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
   ): EventStatusRenamer[Interpretation] =
-    EventStatusRenamerImpl(transactor, logger)
+    EventStatusRenamerImpl(sessionResource, logger)
 }

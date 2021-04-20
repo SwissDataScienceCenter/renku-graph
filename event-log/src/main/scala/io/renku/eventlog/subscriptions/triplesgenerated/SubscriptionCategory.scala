@@ -33,7 +33,7 @@ private[subscriptions] object SubscriptionCategory {
   val name: CategoryName = CategoryName("TRIPLES_GENERATED")
 
   def apply(
-      transactor:                  SessionResource[IO, EventLogDB],
+      sessionResource:             SessionResource[IO, EventLogDB],
       awaitingTransformationGauge: LabeledGauge[IO, projects.Path],
       underTransformationGauge:    LabeledGauge[IO, projects.Path],
       queriesExecTimes:            LabeledHistogram[IO, SqlQuery.Name],
@@ -46,15 +46,19 @@ private[subscriptions] object SubscriptionCategory {
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers <- Subscribers(name, subscriberTracker, logger)
     eventFetcher <-
-      IOTriplesGeneratedEventFinder(transactor, awaitingTransformationGauge, underTransformationGauge, queriesExecTimes)
+      IOTriplesGeneratedEventFinder(sessionResource,
+                                    awaitingTransformationGauge,
+                                    underTransformationGauge,
+                                    queriesExecTimes
+      )
     dispatchRecovery <-
-      DispatchRecovery(transactor, awaitingTransformationGauge, underTransformationGauge, queriesExecTimes, logger)
-    eventDelivery <- EventDelivery[TriplesGeneratedEvent](transactor,
+      DispatchRecovery(sessionResource, awaitingTransformationGauge, underTransformationGauge, queriesExecTimes, logger)
+    eventDelivery <- EventDelivery[TriplesGeneratedEvent](sessionResource,
                                                           compoundEventIdExtractor = (_: TriplesGeneratedEvent).id,
                                                           queriesExecTimes
                      )
     eventsDistributor <- IOEventsDistributor(name,
-                                             transactor,
+                                             sessionResource,
                                              subscribers,
                                              eventFetcher,
                                              eventDelivery,

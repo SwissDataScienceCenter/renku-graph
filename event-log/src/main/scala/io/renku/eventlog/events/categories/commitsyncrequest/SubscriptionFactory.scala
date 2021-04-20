@@ -30,7 +30,7 @@ import scala.concurrent.ExecutionContext
 
 object SubscriptionFactory {
 
-  def apply(transactor:       SessionResource[IO, EventLogDB],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
             logger:           Logger[IO]
   )(implicit
@@ -38,6 +38,6 @@ object SubscriptionFactory {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[(EventHandler[IO], SubscriptionMechanism[IO])] = for {
-    handler <- EventHandler(transactor, queriesExecTimes, logger)
+    handler <- EventHandler(sessionResource, queriesExecTimes, logger)
   } yield handler -> SubscriptionMechanism.noOpSubscriptionMechanism(categoryName)
 }

@@ -18,16 +18,31 @@
 
 package ch.datascience.db
 
+import cats.data.Kleisli
 import cats.effect._
 import ch.datascience.db.DBConfigProvider.DBConfig
 import natchez.Trace
-import skunk.Session
+import skunk.{Session, Transaction}
 
 import scala.language.postfixOps
 
-class SessionResource[Interpretation[_], TargetDB](resource: Resource[Interpretation, Session[Interpretation]]) {
-  def use[G[x] >: Interpretation[x], B](f: Session[Interpretation] => G[B])(implicit F: BracketThrow[G]): G[B] =
-    resource.use(f)
+class SessionResource[Interpretation[_]: Bracket[*[_], Throwable], TargetDB](
+    resource: Resource[Interpretation, Session[Interpretation]]
+) {
+
+//  def use[G[x] >: Interpretation[x], B](f: Session[Interpretation] => G[B])(implicit F: BracketThrow[G]): G[B] =
+//    resource.use(f)
+
+  def useK[ResultType](
+      query: Kleisli[Interpretation, Session[Interpretation], ResultType]
+  ): Interpretation[ResultType] = resource.use(query.run)
+
+  def useWithTransactionK[ResultType](
+      query: Kleisli[Interpretation, (Transaction[Interpretation], Session[Interpretation]), ResultType]
+  ): Interpretation[ResultType] = resource.use { session =>
+    session.transaction.use(transaction => query.run((transaction, session)))
+  }
+
 }
 
 object SessionPoolResource {

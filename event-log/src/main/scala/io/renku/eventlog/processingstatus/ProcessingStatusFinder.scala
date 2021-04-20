@@ -42,7 +42,7 @@ trait ProcessingStatusFinder[Interpretation[_]] {
 }
 
 class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-    transactor:       SessionResource[Interpretation, EventLogDB],
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
 ) extends DbClient(Some(queriesExecTimes))
     with ProcessingStatusFinder[Interpretation] {
@@ -51,14 +51,15 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwab
   import io.renku.eventlog.TypeSerializers._
 
   override def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus] = OptionT {
-    transactor.use { implicit session =>
-      measureExecutionTime(latestBatchStatues(projectId)) flatMap toProcessingStatus
-    }
+    sessionResource.useK {
+      measureExecutionTimeK(latestBatchStatues(projectId))
+    } flatMap toProcessingStatus
   }
 
   private def latestBatchStatues(projectId: Id) = SqlQuery[Interpretation, List[EventStatus]](
     Kleisli { session =>
-      val query: Query[Id ~ Id, EventStatus] = sql"""SELECT evt.status
+      val query: Query[Id ~ Id, EventStatus] =
+        sql"""SELECT evt.status
                                                      FROM event evt
                                                      INNER JOIN (
                                                          SELECT batch_date
@@ -87,10 +88,10 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwab
 
 object IOProcessingStatusFinder {
   def apply(
-      transactor:          SessionResource[IO, EventLogDB],
+      sessionResource:     SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusFinder[IO]] = IO {
-    new ProcessingStatusFinderImpl(transactor, queriesExecTimes)
+    new ProcessingStatusFinderImpl(sessionResource, queriesExecTimes)
   }
 }
 

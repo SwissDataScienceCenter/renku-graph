@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.data.Kleisli
 import cats.syntax.all._
 import ch.datascience.graph.model.events.{CategoryName, LastSyncedDate}
 import ch.datascience.graph.model.projects
@@ -29,25 +30,28 @@ trait SubscriptionDataProvisioning extends EventLogDataProvisioning with Subscri
   self: InMemoryEventLogDb =>
 
   protected def upsertLastSynced(projectId: projects.Id, categoryName: CategoryName, lastSynced: LastSyncedDate): Unit =
-    execute { session =>
-      val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] = sql"""
+    execute[Unit] {
+      Kleisli { session =>
+        val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] = sql"""
         INSERT INTO
         subscription_category_sync_time (project_id, category_name, last_synced)
         VALUES ($projectIdPut, $categoryNamePut, $lastSyncedDatePut)
         ON CONFLICT (project_id, category_name)
         DO UPDATE SET  last_synced = excluded.last_synced
       """.command
-      session.prepare(query).use(_.execute(projectId ~ categoryName ~ lastSynced)).void
+        session.prepare(query).use(_.execute(projectId ~ categoryName ~ lastSynced)).void
+      }
     }
 
   protected def findSyncTime(projectId: projects.Id, categoryName: CategoryName): Option[LastSyncedDate] =
-    execute { session =>
-      val query: Query[projects.Id ~ CategoryName, LastSyncedDate ] = sql"""
+    execute {
+      Kleisli { session =>
+        val query: Query[projects.Id ~ CategoryName, LastSyncedDate] = sql"""
         SELECT last_synced
         FROM subscription_category_sync_time
         WHERE project_id = $projectIdPut AND category_name = $categoryNamePut
       """.query(lastSyncedDateGet)
-      session.prepare(query).use(_.option(projectId ~ categoryName))
+        session.prepare(query).use(_.option(projectId ~ categoryName))
+      }
     }
 }
-

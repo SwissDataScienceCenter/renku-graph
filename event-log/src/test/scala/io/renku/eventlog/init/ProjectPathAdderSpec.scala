@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
@@ -99,23 +100,26 @@ class ProjectPathAdderSpec
 
   private trait TestCase {
     val logger           = TestLogger[IO]()
-    val projectPathAdder = new ProjectPathAdderImpl[IO](transactor, logger)
+    val projectPathAdder = new ProjectPathAdderImpl[IO](sessionResource, logger)
   }
 
-  private def checkColumnExists: Boolean = transactor
-    .use { session =>
-      val query: Query[Void, projects.Path] = sql"select project_path from event_log limit 1"
-        .query(projectPathGet)
-      session
-        .option(query)
-        .map(_ => true)
-        .recover { case _ => false }
+  private def checkColumnExists: Boolean = sessionResource
+    .useK {
+      Kleisli { session =>
+        val query: Query[Void, projects.Path] = sql"select project_path from event_log limit 1"
+          .query(projectPathGet)
+        session
+          .option(query)
+          .map(_ => true)
+          .recover { case _ => false }
+      }
     }
     .unsafeRunSync()
 
-  private def storeEvent(event: Event): Unit = execute { session =>
-    val query: Command[EventId ~ projects.Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String] =
-      sql"""insert into
+  private def storeEvent(event: Event): Unit = execute[Unit] {
+    Kleisli { session =>
+      val query: Command[EventId ~ projects.Id ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String] =
+        sql"""insert into
             event_log (event_id, project_id, status, created_date, execution_date, event_date, event_body) 
             values (
             $eventIdPut, 
@@ -127,29 +131,33 @@ class ProjectPathAdderSpec
             $text)
         """.command
 
-    session
-      .prepare(query)
-      .use(
-        _.execute(
-          event.id ~ event.project.id ~ eventStatuses.generateOne ~ createdDates.generateOne ~ executionDates.generateOne ~ eventDates.generateOne ~ toJson(
-            event
+      session
+        .prepare(query)
+        .use(
+          _.execute(
+            event.id ~ event.project.id ~ eventStatuses.generateOne ~ createdDates.generateOne ~ executionDates.generateOne ~ eventDates.generateOne ~ toJson(
+              event
+            )
           )
         )
-      )
-      .map(_ => ())
+        .map(_ => ())
+    }
   }
 
-  private def toJson(event: Event): String = json"""{
+  private def toJson(event: Event): String =
+    json"""{
     "project": {
       "id": ${event.project.id.value},
       "path": ${event.project.path.value}
      }
   }""".noSpaces
 
-  private def findProjectPaths: Set[Path] = transactor
-    .use { session =>
-      val query: Query[Void, projects.Path] = sql"select project_path from event_log".query(projectPathGet)
-      session.execute(query)
+  private def findProjectPaths: Set[Path] = sessionResource
+    .useK {
+      Kleisli { session =>
+        val query: Query[Void, projects.Path] = sql"select project_path from event_log".query(projectPathGet)
+        session.execute(query)
+      }
     }
     .unsafeRunSync()
     .toSet

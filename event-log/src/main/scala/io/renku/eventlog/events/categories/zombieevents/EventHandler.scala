@@ -115,7 +115,7 @@ private class EventHandler[Interpretation[_]](
 }
 
 private object EventHandler {
-  def apply(transactor:                         SessionResource[IO, EventLogDB],
+  def apply(sessionResource:                    SessionResource[IO, EventLogDB],
             queriesExecTimes:                   LabeledHistogram[IO, SqlQuery.Name],
             awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
             underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
@@ -127,7 +127,7 @@ private object EventHandler {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    zombieStatusCleaner <- ZombieStatusCleaner(transactor, queriesExecTimes)
+    zombieStatusCleaner <- ZombieStatusCleaner(sessionResource, queriesExecTimes)
   } yield new EventHandler[IO](categoryName,
                                zombieStatusCleaner,
                                awaitingTriplesGenerationGauge,

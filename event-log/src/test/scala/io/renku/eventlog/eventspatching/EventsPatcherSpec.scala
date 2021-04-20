@@ -102,7 +102,7 @@ class EventsPatcherSpec extends AnyWordSpec with InMemoryEventLogDbSpec with Moc
 
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val logger           = TestLogger[IO]()
-    val patcher          = new EventsPatcherImpl(transactor, queriesExecTimes, logger)
+    val patcher          = new EventsPatcherImpl(sessionResource, queriesExecTimes, logger)
   }
 
   private case class TestEventsPatch(

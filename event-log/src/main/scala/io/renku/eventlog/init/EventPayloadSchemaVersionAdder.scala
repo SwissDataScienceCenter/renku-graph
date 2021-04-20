@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.{Async, Bracket}
 import ch.datascience.db.SessionResource
 import org.typelevel.log4cats.Logger
@@ -32,44 +33,47 @@ private trait EventPayloadSchemaVersionAdder[Interpretation[_]] {
 
 private object EventPayloadSchemaVersionAdder {
   def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-      transactor: SessionResource[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
   ): EventPayloadSchemaVersionAdder[Interpretation] =
-    new EventPayloadSchemaVersionAdderImpl(transactor, logger)
+    new EventPayloadSchemaVersionAdderImpl(sessionResource, logger)
 }
 
 private class EventPayloadSchemaVersionAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-    transactor: SessionResource[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
 ) extends EventPayloadSchemaVersionAdder[Interpretation]
     with EventTableCheck {
 
   import cats.syntax.all._
 
-  override def run(): Interpretation[Unit] = transactor.use { implicit session =>
-    checkTableExists flatMap {
-      case true => alterTable
+  override def run(): Interpretation[Unit] = sessionResource.useK {
+    checkTableExists >>= {
+      case true => alterTable()
       case false =>
-        new Exception("Event payload table missing; alteration is not possible").raiseError[Interpretation, Unit]
+        Kleisli.liftF(
+          new Exception("Event payload table missing; alteration is not possible").raiseError[Interpretation, Unit]
+        )
     }
   }
-  private def checkTableExists(implicit session: Session[Interpretation]): Interpretation[Boolean] = {
+
+  private lazy val checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
     val query: Query[Void, Boolean] =
       sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_payload')"
         .query(bool)
 
-    session.unique(query).recover { case _ => false }
+    Kleisli(_.unique(query).recover { case _ => false })
   }
 
-  private def alterTable = transactor.use { implicit session =>
+  private def alterTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
     for {
-      _ <- session.execute(alterTableSql)
+      _ <- execute(alterTableSql)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_schema_version ON event_payload(schema_version)".command)
-      _ <- logger info "'event_payload' table altered"
+      _ <- Kleisli.liftF(logger info "'event_payload' table altered")
     } yield ()
-  }
 
-  private lazy val alterTableSql: Command[Void] = sql"""
+  private lazy val alterTableSql: Command[Void] =
+    sql"""
     ALTER TABLE event_payload
     ALTER COLUMN payload SET NOT NULL,
     ADD COLUMN IF NOT EXISTS schema_version text NOT NULL,

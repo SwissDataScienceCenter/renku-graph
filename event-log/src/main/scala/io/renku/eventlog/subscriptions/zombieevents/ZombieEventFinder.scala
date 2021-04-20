@@ -54,7 +54,7 @@ private class ZombieEventFinder[Interpretation[_]: MonadError[*[_], Throwable]](
 private object ZombieEventFinder {
 
   def apply(
-      transactor:       SessionResource[IO, EventLogDB],
+      sessionResource:  SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   )(implicit
@@ -62,10 +62,10 @@ private object ZombieEventFinder {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventFinder[IO, ZombieEvent]] = for {
-    longProcessingEventFinder <- LongProcessingEventFinder(transactor, queriesExecTimes)
-    lostSubscriberEventFinder <- LostSubscriberEventFinder(transactor, queriesExecTimes)
-    zombieNodesCleaner        <- ZombieNodesCleaner(transactor, queriesExecTimes, logger)
-    lostZombieEventFinder     <- LostZombieEventFinder(transactor, queriesExecTimes)
+    longProcessingEventFinder <- LongProcessingEventFinder(sessionResource, queriesExecTimes)
+    lostSubscriberEventFinder <- LostSubscriberEventFinder(sessionResource, queriesExecTimes)
+    zombieNodesCleaner        <- ZombieNodesCleaner(sessionResource, queriesExecTimes, logger)
+    lostZombieEventFinder     <- LostZombieEventFinder(sessionResource, queriesExecTimes)
   } yield new ZombieEventFinder[IO](longProcessingEventFinder,
                                     lostSubscriberEventFinder,
                                     zombieNodesCleaner,

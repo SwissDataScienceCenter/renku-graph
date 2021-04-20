@@ -47,16 +47,16 @@ object Microservice extends IOMicroservice {
   private def runMicroservice(
       transactorResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]],
       args:               List[String]
-  ) = transactorResource.use { transactor =>
+  ) = transactorResource.use { sessionResource =>
     for {
       certificateLoader      <- CertificateLoader[IO](ApplicationLogger)
       sentryInitializer      <- SentryInitializer[IO]()
       metricsRegistry        <- MetricsRegistry()
       queriesExecTimes       <- QueriesExecutionTimes(metricsRegistry)
-      fetchTokenEndpoint     <- IOFetchTokenEndpoint(transactor, queriesExecTimes, ApplicationLogger)
-      associateTokenEndpoint <- IOAssociateTokenEndpoint(transactor, queriesExecTimes, ApplicationLogger)
-      dbInitializer          <- IODbInitializer(transactor, queriesExecTimes, ApplicationLogger)
-      deleteTokenEndpoint    <- IODeleteTokenEndpoint(transactor, queriesExecTimes, ApplicationLogger)
+      fetchTokenEndpoint     <- IOFetchTokenEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+      associateTokenEndpoint <- IOAssociateTokenEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
+      dbInitializer          <- IODbInitializer(sessionResource, queriesExecTimes, ApplicationLogger)
+      deleteTokenEndpoint    <- IODeleteTokenEndpoint(sessionResource, queriesExecTimes, ApplicationLogger)
       microserviceRoutes = new MicroserviceRoutes[IO](
                              fetchTokenEndpoint,
                              associateTokenEndpoint,

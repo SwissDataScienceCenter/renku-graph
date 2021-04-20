@@ -18,7 +18,8 @@
 
 package io.renku.eventlog.init
 
-import cats.effect.Bracket
+import cats.data.Kleisli
+import cats.effect.{Async, Bracket}
 import ch.datascience.db.SessionResource
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
@@ -31,63 +32,56 @@ private trait SubscriptionCategorySyncTimeTableCreator[Interpretation[_]] {
 }
 
 private object SubscriptionCategorySyncTimeTableCreator {
-  def apply[Interpretation[_]](
-      transactor: SessionResource[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): SubscriptionCategorySyncTimeTableCreator[Interpretation] =
-    new SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation](transactor, logger)
+  def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
+  ): SubscriptionCategorySyncTimeTableCreator[Interpretation] =
+    new SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation](sessionResource, logger)
 }
 
-private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]](
-    transactor: SessionResource[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
-)(implicit ME:  Bracket[Interpretation, Throwable])
-    extends SubscriptionCategorySyncTimeTableCreator[Interpretation] {
+private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
+) extends SubscriptionCategorySyncTimeTableCreator[Interpretation] {
 
   import cats.syntax.all._
 
-  override def run(): Interpretation[Unit] =
-    checkTableExists flatMap {
-      case true => logger info "'subscription_category_sync_time' table exists"
-      case false =>
-        transactor.use { implicit session =>
-          session.transaction.use { xa =>
-            for {
-              sp <- xa.savepoint
-              _ <- createTable recoverWith { e =>
-                     xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
-                   }
-            } yield ()
-          }
-        }
+  override def run(): Interpretation[Unit] = sessionResource.useK {
+    checkTableExists >>= {
+      case true  => Kleisli.liftF(logger info "'subscription_category_sync_time' table exists")
+      case false => createTable()
     }
+  }
 
-  private def checkTableExists: Interpretation[Boolean] =
-    transactor.use { session =>
-      val query: Query[Void, Boolean] =
-        sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'subscription_category_sync_time')".query(bool)
-      session
-        .unique(query)
+  private lazy val checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+    val query: Query[Void, Boolean] =
+      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'subscription_category_sync_time')".query(bool)
+    Kleisli(
+      _.unique(query)
         .recover { case _ => false }
-    }
+    )
+  }
 
-  private def createTable(implicit session: Session[Interpretation]) = for {
-    _ <- execute(createTableSql)
-    _ <- execute(
-           sql"CREATE INDEX IF NOT EXISTS idx_project_id       ON subscription_category_sync_time(project_id)".command
-         )
-    _ <-
-      execute(
-        sql"CREATE INDEX IF NOT EXISTS idx_category_name    ON subscription_category_sync_time(category_name)".command
-      )
-    _ <- execute(
-           sql"CREATE INDEX IF NOT EXISTS idx_last_synced      ON subscription_category_sync_time(last_synced)".command
-         )
-    _ <- logger info "'subscription_category_sync_time' table created"
-    _ <- execute(foreignKeySql)
-  } yield ()
+  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
+    for {
+      _ <- execute(createTableSql)
+      _ <- execute(
+             sql"CREATE INDEX IF NOT EXISTS idx_project_id       ON subscription_category_sync_time(project_id)".command
+           )
+      _ <-
+        execute(
+          sql"CREATE INDEX IF NOT EXISTS idx_category_name    ON subscription_category_sync_time(category_name)".command
+        )
+      _ <-
+        execute(
+          sql"CREATE INDEX IF NOT EXISTS idx_last_synced      ON subscription_category_sync_time(last_synced)".command
+        )
+      _ <- Kleisli.liftF(logger info "'subscription_category_sync_time' table created")
+      _ <- execute(foreignKeySql)
+    } yield ()
 
-  private lazy val createTableSql: Command[Void] = sql"""
+  private lazy val createTableSql: Command[Void] =
+    sql"""
     CREATE TABLE IF NOT EXISTS subscription_category_sync_time(
       project_id        int4      NOT NULL,
       category_name     VARCHAR   NOT NULL,
@@ -96,7 +90,8 @@ private class SubscriptionCategorySyncTimeTableCreatorImpl[Interpretation[_]](
     );
     """.command
 
-  private lazy val foreignKeySql: Command[Void] = sql"""
+  private lazy val foreignKeySql: Command[Void] =
+    sql"""
     ALTER TABLE subscription_category_sync_time
     ADD CONSTRAINT fk_project
     FOREIGN KEY (project_id) 

@@ -182,7 +182,7 @@ class CommitSyncEventFinderSpec
   }
 
   private trait TestCase {
-    val finder = new CommitSyncEventFinderImpl(transactor, TestLabeledHistogram[SqlQuery.Name]("query_id"))
+    val finder = new CommitSyncEventFinderImpl(sessionResource, TestLabeledHistogram[SqlQuery.Name]("query_id"))
   }
 
   private def addEvent(eventId:     CompoundEventId,

@@ -75,7 +75,7 @@ class LostSubscriberEventFinderSpec extends AnyWordSpec with InMemoryEventLogDbS
     val projectPath      = projectPaths.generateOne
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
 
-    val finder = new LostSubscriberEventFinder(transactor, queriesExecTimes)
+    val finder = new LostSubscriberEventFinder(sessionResource, queriesExecTimes)
 
     def addEvent(eventId: CompoundEventId, status: EventStatus): Unit = storeEvent(
       eventId,

@@ -32,7 +32,7 @@ import scala.concurrent.ExecutionContext
 
 object SubscriptionFactory {
 
-  def apply(transactor:                         SessionResource[IO, EventLogDB],
+  def apply(sessionResource:                    SessionResource[IO, EventLogDB],
             awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
             underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
             awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
@@ -50,7 +50,7 @@ object SubscriptionFactory {
                                logger
                              )
     handler <- EventHandler(
-                 transactor,
+                 sessionResource,
                  queriesExecTimes,
                  awaitingTriplesGenerationGauge,
                  underTriplesGenerationGauge,

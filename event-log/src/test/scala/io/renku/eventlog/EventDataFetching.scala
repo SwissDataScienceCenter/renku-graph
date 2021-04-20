@@ -18,6 +18,7 @@
 
 package io.renku.eventlog
 
+import cats.data.Kleisli
 import cats.effect.IO
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventId, EventProcessingTime, EventStatus}
 import ch.datascience.graph.model.projects
@@ -27,40 +28,47 @@ import skunk.implicits._
 trait EventDataFetching {
   self: InMemoryEventLogDb =>
 
-  // format: off
   protected def findEvents(status:  EventStatus,
-                           orderBy: Fragment[Void] = sql"created_date asc"): List[(CompoundEventId, ExecutionDate, BatchDate)] =
-    execute { session: Session[IO] =>
-      val query : Query[(EventStatus, Void), (CompoundEventId, ExecutionDate, BatchDate)] = (sql"""
+                           orderBy: Fragment[Void] = sql"created_date asc"
+  ): List[(CompoundEventId, ExecutionDate, BatchDate)] =
+    execute {
+      Kleisli { session =>
+        val query: Query[(EventStatus, Void), (CompoundEventId, ExecutionDate, BatchDate)] = (sql"""
             SELECT event_id, project_id, execution_date, batch_date
             FROM event
             WHERE status = $eventStatusPut
             ORDER BY """ ~ orderBy)
-        .query(eventIdGet ~ projectIdGet ~ executionDateGet ~ batchDateGet).map{
-        case eventId ~ projectId ~ executionDate ~ batchDate => (CompoundEventId(eventId, projectId), executionDate, batchDate)
+          .query(eventIdGet ~ projectIdGet ~ executionDateGet ~ batchDateGet)
+          .map { case eventId ~ projectId ~ executionDate ~ batchDate =>
+            (CompoundEventId(eventId, projectId), executionDate, batchDate)
+          }
+        session.prepare(query).use(_.stream((status, Void), 32).compile.toList)
       }
-      session.prepare(query).use(_.stream((status, Void), 32).compile.toList)
     }
-  // format: on
 
   protected def findPayload(eventId: CompoundEventId): Option[(CompoundEventId, EventPayload)] =
-    execute { session =>
-      val query: Query[EventId ~ projects.Id, (CompoundEventId, EventPayload)] =
-        sql"""SELECT event_id, project_id, payload
+    execute {
+      Kleisli { session =>
+        val query: Query[EventId ~ projects.Id, (CompoundEventId, EventPayload)] =
+          sql"""SELECT event_id, project_id, payload
               FROM event_payload
               WHERE event_id = $eventIdPut AND project_id = $projectIdPut;"""
-          .query(eventIdGet ~ projectIdGet ~ eventPayloadGet)
-          .map { case eventId ~ projectId ~ eventPayload =>
-            (CompoundEventId(eventId, projectId), eventPayload)
-          }
-      session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
+            .query(eventIdGet ~ projectIdGet ~ eventPayloadGet)
+            .map { case eventId ~ projectId ~ eventPayload =>
+              (CompoundEventId(eventId, projectId), eventPayload)
+            }
+        session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
+      }
     }
 
-  protected def findProjects: List[(projects.Id, projects.Path, EventDate)] = execute { session =>
-    val query: Query[Void, (projects.Id, projects.Path, EventDate)] = sql"""SELECT * FROM project"""
-      .query(projectIdGet ~ projectPathGet ~ eventDateGet)
-      .map { case projectId ~ projectPath ~ eventDate => (projectId, projectPath, eventDate) }
-    session.execute(query)
+  protected def findProjects: List[(projects.Id, projects.Path, EventDate)] = execute {
+    Kleisli { session =>
+      val query: Query[Void, (projects.Id, projects.Path, EventDate)] =
+        sql"""SELECT * FROM project"""
+          .query(projectIdGet ~ projectPathGet ~ eventDateGet)
+          .map { case projectId ~ projectPath ~ eventDate => (projectId, projectPath, eventDate) }
+      session.execute(query)
+    }
   }
 
   protected implicit class FoundEventsOps(events: List[(CompoundEventId, ExecutionDate, BatchDate)]) {
@@ -74,29 +82,33 @@ trait EventDataFetching {
     findEvent(eventId).flatMap(_._3)
 
   protected def findEvent(eventId: CompoundEventId): Option[(ExecutionDate, EventStatus, Option[EventMessage])] =
-    execute { session =>
-      val query: Query[EventId ~ projects.Id, (ExecutionDate, EventStatus, Option[EventMessage])] = sql"""
+    execute {
+      Kleisli { session =>
+        val query: Query[EventId ~ projects.Id, (ExecutionDate, EventStatus, Option[EventMessage])] = sql"""
         SELECT execution_date, status, message
         FROM event
         WHERE event_id = $eventIdPut AND project_id = $projectIdPut
       """.query(executionDateGet ~ eventStatusGet ~ eventMessageGet.opt).map {
-        case executionDate ~ eventStatus ~ maybeEventMessage => (executionDate, eventStatus, maybeEventMessage)
+          case executionDate ~ eventStatus ~ maybeEventMessage => (executionDate, eventStatus, maybeEventMessage)
+        }
+        session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
       }
-      session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
     }
 
   protected def findProcessingTime(eventId: CompoundEventId): List[(CompoundEventId, EventProcessingTime)] =
-    execute { session =>
-      val query: Query[EventId ~ projects.Id, (CompoundEventId, EventProcessingTime)] = sql"""
-        SELECT event_id, project_id, processing_time
-        FROM status_processing_time
-        WHERE event_id = $eventIdPut AND project_id = $projectIdPut;
-      """
-        .query(eventIdGet ~ projectIdGet ~ eventProcessingTimeGet)
-        .map { case eventId ~ projectId ~ eventProcessingTime =>
-          (CompoundEventId(eventId, projectId), eventProcessingTime)
-        }
-      session.prepare(query).use(_.stream(eventId.id ~ eventId.projectId, 32).compile.toList)
+    execute {
+      Kleisli { session =>
+        val query: Query[EventId ~ projects.Id, (CompoundEventId, EventProcessingTime)] = sql"""
+          SELECT event_id, project_id, processing_time
+          FROM status_processing_time
+          WHERE event_id = $eventIdPut AND project_id = $projectIdPut;
+        """
+          .query(eventIdGet ~ projectIdGet ~ eventProcessingTimeGet)
+          .map { case eventId ~ projectId ~ eventProcessingTime =>
+            (CompoundEventId(eventId, projectId), eventProcessingTime)
+          }
+        session.prepare(query).use(_.stream(eventId.id ~ eventId.projectId, 32).compile.toList)
+      }
     }
 
   protected implicit class FoundEventsProcessingTimeOps(events: List[(CompoundEventId, EventProcessingTime)]) {

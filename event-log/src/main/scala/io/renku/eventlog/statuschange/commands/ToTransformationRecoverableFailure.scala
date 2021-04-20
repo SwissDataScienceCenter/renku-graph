@@ -80,15 +80,15 @@ final case class ToTransformationRecoverableFailure[Interpretation[_]: Async: Br
   )
 
   override def updateGauges(
-      updateResult:   UpdateResult
-  )(implicit session: Session[Interpretation]): Interpretation[Unit] = updateResult match {
+      updateResult: UpdateResult
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] = updateResult match {
     case UpdateResult.Updated =>
       for {
         path <- findProjectPath(eventId)
-        _    <- awaitingTriplesTransformationGauge increment path
-        _    <- underTriplesTransformationGauge decrement path
+        _    <- Kleisli.liftF(awaitingTriplesTransformationGauge increment path)
+        _    <- Kleisli.liftF(underTriplesTransformationGauge decrement path)
       } yield ()
-    case _ => ().pure[Interpretation]
+    case _ => Kleisli.pure(())
   }
 }
 

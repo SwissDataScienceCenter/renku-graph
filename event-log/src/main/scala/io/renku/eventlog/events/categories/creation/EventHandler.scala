@@ -36,12 +36,10 @@ import io.renku.eventlog._
 
 import scala.concurrent.ExecutionContext
 
-private class EventHandler[Interpretation[_]](
+private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
     override val categoryName: CategoryName,
     eventPersister:            EventPersister[Interpretation],
     logger:                    Logger[Interpretation]
-)(implicit
-    ME: MonadError[Interpretation, Throwable]
 ) extends consumers.EventHandler[Interpretation] {
 
   import ch.datascience.graph.model.projects
@@ -104,7 +102,7 @@ private class EventHandler[Interpretation[_]](
 }
 
 private object EventHandler {
-  def apply(transactor:         SessionResource[IO, EventLogDB],
+  def apply(sessionResource:    SessionResource[IO, EventLogDB],
             waitingEventsGauge: LabeledGauge[IO, projects.Path],
             queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name],
             logger:             Logger[IO]
@@ -113,6 +111,6 @@ private object EventHandler {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    eventPersister <- IOEventPersister(transactor, waitingEventsGauge, queriesExecTimes)
+    eventPersister <- IOEventPersister(sessionResource, waitingEventsGauge, queriesExecTimes)
   } yield new EventHandler[IO](categoryName, eventPersister, logger)
 }

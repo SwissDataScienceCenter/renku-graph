@@ -76,7 +76,7 @@ class SubscriptionCategorySyncTimeTableCreatorSpec extends AnyWordSpec with DbIn
 
   private trait TestCase {
     val logger       = TestLogger[IO]()
-    val tableCreator = new SubscriptionCategorySyncTimeTableCreatorImpl[IO](transactor, logger)
+    val tableCreator = new SubscriptionCategorySyncTimeTableCreatorImpl[IO](sessionResource, logger)
   }
 
 }

@@ -94,7 +94,7 @@ class LongProcessingEventFinderSpec
 
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
 
-    val finder = new LongProcessingEventFinder(transactor, queriesExecTimes)
+    val finder = new LongProcessingEventFinder(sessionResource, queriesExecTimes)
 
     def addEvent(eventId: CompoundEventId, status: EventStatus, executionDate: ExecutionDate): Unit =
       storeEvent(

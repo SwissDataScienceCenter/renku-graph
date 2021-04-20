@@ -120,7 +120,7 @@ private object IOEventsDistributor {
 
   def apply[CategoryEvent](
       categoryName:         CategoryName,
-      transactor:           SessionResource[IO, EventLogDB],
+      sessionResource:      SessionResource[IO, EventLogDB],
       subscribers:          Subscribers[IO],
       eventsFinder:         EventFinder[IO, CategoryEvent],
       eventDelivery:        EventDelivery[IO, CategoryEvent],

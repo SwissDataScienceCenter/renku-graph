@@ -61,13 +61,11 @@ private class PersistedTokensFinder[Interpretation[_]: Async: Bracket[*[_], Thro
 
   private def run(query: SqlQuery[Interpretation, Option[EncryptedAccessToken]]) =
     OptionT {
-      sessionResource.use { implicit session =>
-        measureExecutionTime(query)
-      }
+      sessionResource.useK(measureExecutionTimeK(query))
     }
 }
 
 private class IOPersistedTokensFinder(
-    transactor:       SessionResource[IO, ProjectsTokensDB],
+    sessionResource:  SessionResource[IO, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
-) extends PersistedTokensFinder[IO](transactor, queriesExecTimes)
+) extends PersistedTokensFinder[IO](sessionResource, queriesExecTimes)

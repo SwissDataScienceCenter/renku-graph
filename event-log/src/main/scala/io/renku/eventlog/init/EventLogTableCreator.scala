@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.{Async, Bracket}
 import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.events.EventStatus
@@ -34,41 +35,39 @@ private trait EventLogTableCreator[Interpretation[_]] {
 
 private object EventLogTableCreator {
   def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-      transactor: SessionResource[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
   ): EventLogTableCreator[Interpretation] =
-    new EventLogTableCreatorImpl(transactor, logger)
+    new EventLogTableCreatorImpl(sessionResource, logger)
 }
 
 private class EventLogTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-    transactor: SessionResource[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
 ) extends EventLogTableCreator[Interpretation]
     with EventTableCheck
     with TypeSerializers {
 
   import cats.syntax.all._
 
-  override def run(): Interpretation[Unit] = transactor.use { implicit session =>
+  override def run(): Interpretation[Unit] = sessionResource.useK {
     whenEventTableExists(
-      logger info "'event_log' table creation skipped",
+      Kleisli.liftF(logger info "'event_log' table creation skipped"),
       otherwise = checkTableExists flatMap {
-        case true  => logger info "'event_log' table exists"
+        case true =>
+          Kleisli.liftF[Interpretation, Session[Interpretation], Unit](logger info "'event_log' table exists")
         case false => createTable
       }
     )
   }
 
-  private def checkTableExists: Interpretation[Boolean] =
-    transactor.use { session =>
-      val query: Query[Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
-        .query(bool)
-      session
-        .unique(query)
-        .recover { case _ => false }
-    }
+  private lazy val checkTableExists = {
+    val query: Query[Void, Boolean] = sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'event_log')"
+      .query(bool)
+    Kleisli[Interpretation, Session[Interpretation], Boolean](_.unique(query).recover { case _ => false })
+  }
 
-  private def createTable(implicit session: Session[Interpretation]) =
+  private lazy val createTable: Kleisli[Interpretation, Session[Interpretation], Unit] =
     for {
       _ <- execute(createTableSql)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id ON event_log(project_id)".command)
@@ -78,10 +77,11 @@ private class EventLogTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], T
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_event_date ON event_log(event_date DESC)".command)
       _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_created_date ON event_log(created_date DESC)".command)
       _ <- revertStatusToGenerationRecoverableFailure
-      _ <- logger info "'event_log' table created"
+      _ <- Kleisli.liftF(logger info "'event_log' table created")
     } yield ()
 
-  private lazy val createTableSql: Command[Void] = sql"""
+  private lazy val createTableSql: Command[Void] =
+    sql"""
     CREATE TABLE IF NOT EXISTS event_log(
       event_id       varchar   NOT NULL,
       project_id     int4      NOT NULL,
@@ -95,10 +95,12 @@ private class EventLogTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], T
     );
     """.command
 
-  private lazy val revertStatusToGenerationRecoverableFailure = transactor.use { session =>
+  private lazy val revertStatusToGenerationRecoverableFailure = {
     val query: Command[EventStatus] =
       sql"UPDATE event_log set status=$eventStatusPut where status='TRIPLES_STORE_FAILURE'".command
-    session.prepare(query).use(_.execute(GenerationRecoverableFailure))
+    Kleisli[Interpretation, Session[Interpretation], Unit] {
+      _.prepare(query).use(_.execute(GenerationRecoverableFailure).void)
+    }
   }
 
 }

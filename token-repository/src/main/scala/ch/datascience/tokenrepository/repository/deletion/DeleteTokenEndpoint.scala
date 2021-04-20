@@ -55,10 +55,10 @@ class DeleteTokenEndpoint[Interpretation[_]: Effect](
 
 object IODeleteTokenEndpoint {
   def apply(
-      transactor:          SessionResource[IO, ProjectsTokensDB],
+      sessionResource:     SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[DeleteTokenEndpoint[IO]] = IO {
-    new DeleteTokenEndpoint[IO](new TokenRemover[IO](transactor, queriesExecTimes), logger)
+    new DeleteTokenEndpoint[IO](new TokenRemover[IO](sessionResource, queriesExecTimes), logger)
   }
 }

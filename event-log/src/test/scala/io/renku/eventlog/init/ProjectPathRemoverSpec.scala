@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.graph.model.projects
@@ -76,17 +77,19 @@ class ProjectPathRemoverSpec
 
   private trait TestCase {
     val logger             = TestLogger[IO]()
-    val projectPathRemover = new ProjectPathRemoverImpl[IO](transactor, logger)
+    val projectPathRemover = new ProjectPathRemoverImpl[IO](sessionResource, logger)
   }
 
-  private def checkColumnExists: Boolean = transactor
-    .use { session =>
-      val query: Query[Void, projects.Path] = sql"select project_path from event_log limit 1"
-        .query(projectPathGet)
-      session
-        .option(query)
-        .map(_ => true)
-        .recover { case _ => false }
+  private def checkColumnExists: Boolean = sessionResource
+    .useK {
+      Kleisli { session =>
+        val query: Query[Void, projects.Path] = sql"select project_path from event_log limit 1"
+          .query(projectPathGet)
+        session
+          .option(query)
+          .map(_ => true)
+          .recover { case _ => false }
+      }
     }
     .unsafeRunSync()
 

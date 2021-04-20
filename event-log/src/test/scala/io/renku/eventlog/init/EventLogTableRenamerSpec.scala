@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.IO
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.interpreters.TestLogger.Level.Info
@@ -99,11 +100,12 @@ class EventLogTableRenamerSpec extends AnyWordSpec with DbInitSpec with should.M
 
   private trait TestCase {
     val logger       = TestLogger[IO]()
-    val tableRenamer = new EventLogTableRenamerImpl[IO](transactor, logger)
+    val tableRenamer = new EventLogTableRenamerImpl[IO](sessionResource, logger)
   }
 
-  private def createEventLogTable(): Unit = execute { session =>
-    val query: Command[Void] = sql"""
+  private def createEventLogTable(): Unit = execute[Unit] {
+    Kleisli { session =>
+      val query: Command[Void] = sql"""
     CREATE TABLE IF NOT EXISTS event_log(
       event_id       varchar   NOT NULL,
       project_id     int4      NOT NULL,
@@ -116,8 +118,9 @@ class EventLogTableRenamerSpec extends AnyWordSpec with DbInitSpec with should.M
       PRIMARY KEY (event_id, project_id)
     );
     """.command
-    session
-      .execute(query)
-      .map(_ => ())
+      session
+        .execute(query)
+        .map(_ => ())
+    }
   }
 }

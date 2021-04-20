@@ -138,7 +138,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     val gauge     = mock[LabeledGauge[IO, projects.Path]]
     val histogram = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val logger    = TestLogger[IO]()
-    val runner    = new StatusUpdatesRunnerImpl(transactor, histogram, logger)
+    val runner    = new StatusUpdatesRunnerImpl(sessionResource, histogram, logger)
   }
 
   private case class TestCommand(eventId:             CompoundEventId,
@@ -171,8 +171,8 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     )
 
     override def updateGauges(
-        updateResult:   UpdateResult
-    )(implicit session: Session[IO]) = gauge increment projectPath
+        updateResult: UpdateResult
+    ): Kleisli[IO, Session[IO], Unit] = Kleisli.liftF(gauge increment projectPath)
   }
 
   private def store(eventId: CompoundEventId, projectPath: projects.Path, status: EventStatus): Unit =
@@ -199,7 +199,7 @@ class StatusUpdatesRunnerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wi
     )
 
     override def updateGauges(
-        updateResult:   UpdateResult
-    )(implicit session: Session[IO]) = gauge increment projectPath
+        updateResult: UpdateResult
+    ): Kleisli[IO, Session[IO], Unit] = Kleisli.liftF(gauge increment projectPath)
   }
 }

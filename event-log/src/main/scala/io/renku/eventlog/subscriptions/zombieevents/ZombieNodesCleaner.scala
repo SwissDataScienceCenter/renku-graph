@@ -40,7 +40,7 @@ private trait ZombieNodesCleaner[Interpretation[_]] {
 }
 
 private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket[*[_], Throwable]: ContextShift](
-    transactor:           SessionResource[Interpretation, EventLogDB],
+    sessionResource:      SessionResource[Interpretation, EventLogDB],
     queriesExecTimes:     LabeledHistogram[Interpretation, SqlQuery.Name],
     microserviceBaseUrl:  MicroserviceBaseUrl,
     serviceHealthChecker: ServiceHealthChecker[Interpretation]
@@ -50,17 +50,15 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
 
   import serviceHealthChecker._
 
-  override def removeZombieNodes(): Interpretation[Unit] = transactor.use { implicit session =>
+  override def removeZombieNodes(): Interpretation[Unit] = sessionResource.useK {
     for {
       maybeZombieRecords <- findPotentialZombieRecords
-      actions            <- (maybeZombieRecords map toAction).parSequence.map(_.filter(_.actionable))
+      actions            <- Kleisli.liftF((maybeZombieRecords map toAction).parSequence.map(_.filter(_.actionable)))
       _                  <- (actions map toQuery map execute).sequence
     } yield ()
   }
 
-  private def findPotentialZombieRecords(implicit
-      session: Session[Interpretation]
-  ): Interpretation[List[(MicroserviceBaseUrl, SubscriberUrl)]] = measureExecutionTime {
+  private lazy val findPotentialZombieRecords = measureExecutionTimeK {
     SqlQuery(
       Kleisli { session =>
         val query: Query[Void, (MicroserviceBaseUrl, SubscriberUrl)] =
@@ -89,9 +87,7 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
       }
   }
 
-  private def toQuery(implicit
-      session: Session[Interpretation]
-  ): Action => Interpretation[Completion] = {
+  private lazy val toQuery: Action => Kleisli[Interpretation, Session[Interpretation], Completion] = {
     case Delete(sourceUrl, subscriberUrl, _) =>
       delete(sourceUrl, subscriberUrl)
     case Upsert(sourceUrl, subscriberUrl, _) =>
@@ -99,15 +95,14 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
         case true  => delete(sourceUrl, subscriberUrl)
         case false => move(sourceUrl, subscriberUrl)
       }
-    case _ => Completion.Delete(1).pure[Interpretation].widen[Completion]
+    case _ => Kleisli.pure(Completion.Delete(1)).widen[Completion]
   }
 
-  private def checkIfExist(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl)(implicit
-      session:                        Session[Interpretation]
-  ) = measureExecutionTime {
+  private def checkIfExist(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTimeK {
     SqlQuery(
       Kleisli { session =>
-        val query: Query[MicroserviceBaseUrl ~ SubscriberUrl, MicroserviceBaseUrl] = sql"""
+        val query: Query[MicroserviceBaseUrl ~ SubscriberUrl, MicroserviceBaseUrl] =
+          sql"""
             SELECT source_url
             FROM subscriber
             WHERE source_url = $microserviceBaseUrlPut AND delivery_url = $subscriberUrlPut
@@ -118,12 +113,11 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
     )
   }
 
-  private def delete(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl)(implicit
-      session:                  Session[Interpretation]
-  ) = measureExecutionTime {
+  private def delete(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTimeK {
     SqlQuery(
       Kleisli { session =>
-        val query: Command[MicroserviceBaseUrl ~ SubscriberUrl] = sql"""
+        val query: Command[MicroserviceBaseUrl ~ SubscriberUrl] =
+          sql"""
           DELETE
           FROM subscriber
           WHERE source_url = $microserviceBaseUrlPut AND delivery_url = $subscriberUrlPut
@@ -134,12 +128,11 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
     )
   }
 
-  private def move(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl)(implicit
-      session:                Session[Interpretation]
-  ) = measureExecutionTime {
+  private def move(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTimeK {
     SqlQuery(
       Kleisli { session =>
-        val query: Command[MicroserviceBaseUrl ~ MicroserviceBaseUrl ~ SubscriberUrl] = sql"""
+        val query: Command[MicroserviceBaseUrl ~ MicroserviceBaseUrl ~ SubscriberUrl] =
+          sql"""
          UPDATE subscriber
          SET source_url = $microserviceBaseUrlPut
          WHERE source_url = $microserviceBaseUrlPut AND delivery_url = $subscriberUrlPut
@@ -150,13 +143,20 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
     )
   }
 
-  private def execute(query: Interpretation[Completion]): Interpretation[Unit] = query.void
+  private def execute(
+      query: Kleisli[Interpretation, Session[Interpretation], Completion]
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] = query.void
 
-  private sealed trait Action { val actionable: Boolean }
+  private sealed trait Action {
+    val actionable: Boolean
+  }
+
   private case class Delete(source: MicroserviceBaseUrl, delivery: SubscriberUrl, actionable: Boolean = true)
       extends Action
+
   private case class Upsert(source: MicroserviceBaseUrl, delivery: SubscriberUrl, actionable: Boolean = true)
       extends Action
+
   private case object NoAction extends Action {
     val actionable: Boolean = false
   }
@@ -164,7 +164,7 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
 
 private object ZombieNodesCleaner {
   def apply(
-      transactor:       SessionResource[IO, EventLogDB],
+      sessionResource:  SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   )(implicit
@@ -175,5 +175,5 @@ private object ZombieNodesCleaner {
     serviceUrlFinder     <- MicroserviceUrlFinder(Microservice.ServicePort)
     serviceBaseUrl       <- serviceUrlFinder.findBaseUrl()
     serviceHealthChecker <- ServiceHealthChecker(logger)
-  } yield new ZombieNodesCleanerImpl(transactor, queriesExecTimes, serviceBaseUrl, serviceHealthChecker)
+  } yield new ZombieNodesCleanerImpl(sessionResource, queriesExecTimes, serviceBaseUrl, serviceHealthChecker)
 }

@@ -93,7 +93,7 @@ class LostZombieEventFinderSpec extends AnyWordSpec with InMemoryEventLogDbSpec 
 
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
 
-    val finder = new LostZombieEventFinder(transactor, queriesExecTimes)
+    val finder = new LostZombieEventFinder(sessionResource, queriesExecTimes)
 
     val zombieEventStatuses = Gen.oneOf(GeneratingTriples, TransformingTriples)
 

@@ -74,7 +74,7 @@ private class EventHandler[Interpretation[_]: MonadError[*[_], Throwable]](
 }
 
 private object EventHandler {
-  def apply(transactor:       SessionResource[IO, EventLogDB],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
             logger:           Logger[IO]
   )(implicit
@@ -82,6 +82,6 @@ private object EventHandler {
       contextShift:     ContextShift[IO],
       timer:            Timer[IO]
   ): IO[EventHandler[IO]] = for {
-    commitSyncForcer <- CommitSyncForcer(transactor, queriesExecTimes)
+    commitSyncForcer <- CommitSyncForcer(sessionResource, queriesExecTimes)
   } yield new EventHandler[IO](categoryName, commitSyncForcer, logger)
 }

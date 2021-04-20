@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.events.categories.creation
 
+import cats.data.Kleisli
 import cats.effect.IO
 import ch.datascience.db.SqlQuery
 import ch.datascience.generators.Generators.Implicits._
@@ -288,7 +289,7 @@ class EventPersisterSpec
     val currentTime        = mockFunction[Instant]
     val waitingEventsGauge = mock[LabeledGauge[IO, projects.Path]]
     val queriesExecTimes   = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val persister          = new EventPersisterImpl(transactor, waitingEventsGauge, queriesExecTimes, currentTime)
+    val persister          = new EventPersisterImpl(sessionResource, waitingEventsGauge, queriesExecTimes, currentTime)
 
     val now = Instant.now()
     currentTime.expects().returning(now)
@@ -296,40 +297,45 @@ class EventPersisterSpec
     def storedEvent(
         compoundEventId: CompoundEventId
     ): (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage]) =
-      execute { session =>
-        val query: Query[
-          EventId ~ projects.Id,
-          (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage])
-        ] = sql"""SELECT event_id, project_id, status, created_date, execution_date, event_date, event_body, message
+      execute {
+        Kleisli { session =>
+          val query: Query[
+            EventId ~ projects.Id,
+            (CompoundEventId, EventStatus, CreatedDate, ExecutionDate, EventDate, EventBody, Option[EventMessage])
+          ] = sql"""SELECT event_id, project_id, status, created_date, execution_date, event_date, event_body, message
                   FROM event  
                   WHERE event_id = $eventIdPut AND project_id = $projectIdPut
                   """
-          .query(
-            eventIdGet ~ projectIdGet ~ eventStatusGet ~ createdDateGet ~ executionDateGet ~ eventDateGet ~ eventBodyGet ~ eventMessageGet.opt
-          )
-          .map {
-            case eventId ~ projectId ~ eventStatus ~ createdDate ~ executionDate ~ eventDate ~ eventBody ~ maybeEventMessage =>
-              (
-                CompoundEventId(eventId, projectId),
-                eventStatus,
-                createdDate,
-                executionDate,
-                eventDate,
-                eventBody,
-                maybeEventMessage
-              )
-          }
-        session.prepare(query).use(_.unique(compoundEventId.id ~ compoundEventId.projectId))
+            .query(
+              eventIdGet ~ projectIdGet ~ eventStatusGet ~ createdDateGet ~ executionDateGet ~ eventDateGet ~ eventBodyGet ~ eventMessageGet.opt
+            )
+            .map {
+              case eventId ~ projectId ~ eventStatus ~ createdDate ~ executionDate ~ eventDate ~ eventBody ~ maybeEventMessage =>
+                (
+                  CompoundEventId(eventId, projectId),
+                  eventStatus,
+                  createdDate,
+                  executionDate,
+                  eventDate,
+                  eventBody,
+                  maybeEventMessage
+                )
+            }
+          session.prepare(query).use(_.unique(compoundEventId.id ~ compoundEventId.projectId))
+        }
       }
   }
 
-  private def storedProjects: List[(projects.Id, projects.Path, EventDate)] = execute { session =>
-    val query: Query[Void, (projects.Id, projects.Path, EventDate)] = sql"""
+  private def storedProjects: List[(projects.Id, projects.Path, EventDate)] = execute {
+    Kleisli { session =>
+      val query: Query[Void, (projects.Id, projects.Path, EventDate)] =
+        sql"""
           SELECT project_id, project_path, latest_event_date
           FROM project
           """
-      .query(projectIdGet ~ projectPathGet ~ eventDateGet)
-      .map { case projectId ~ projectPath ~ eventDate => (projectId, projectPath, eventDate) }
-    session.execute(query)
+          .query(projectIdGet ~ projectPathGet ~ eventDateGet)
+          .map { case projectId ~ projectPath ~ eventDate => (projectId, projectPath, eventDate) }
+      session.execute(query)
+    }
   }
 }

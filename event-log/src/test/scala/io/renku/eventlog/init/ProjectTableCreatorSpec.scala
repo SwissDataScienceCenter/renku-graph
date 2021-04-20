@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.EventsGenerators._
@@ -124,17 +125,19 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
 
   private trait TestCase {
     val logger       = TestLogger[IO]()
-    val tableCreator = new ProjectTableCreatorImpl[IO](transactor, logger)
+    val tableCreator = new ProjectTableCreatorImpl[IO](sessionResource, logger)
   }
 
-  private def fetchProjectData: List[(Id, Path, EventDate)] = execute { session =>
-    val query: Query[Void, (Id, Path, EventDate)] =
-      sql"""select project_id, project_path, latest_event_date from project"""
-        .query(projectIdGet ~ projectPathGet ~ eventDateTimestampGet)
-        .map { case projectId ~ projectPath ~ eventDate =>
-          (projectId, projectPath, eventDate)
-        }
-    session.execute(query)
+  private def fetchProjectData: List[(Id, Path, EventDate)] = execute {
+    Kleisli { session =>
+      val query: Query[Void, (Id, Path, EventDate)] =
+        sql"""select project_id, project_path, latest_event_date from project"""
+          .query(projectIdGet ~ projectPathGet ~ eventDateTimestampGet)
+          .map { case projectId ~ projectPath ~ eventDate =>
+            (projectId, projectPath, eventDate)
+          }
+      session.execute(query)
+    }
   }
 
   private val eventDateTimestampGet: Decoder[EventDate] =
@@ -144,22 +147,24 @@ class ProjectTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.Ma
                           projectPath: Path = projectPaths.generateOne,
                           eventDate:   EventDate = eventDates.generateOne
   ): (Id, Path, EventDate) = {
-    execute { session =>
-      val query: Command[
-        EventId ~ Id ~ Path ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
-      ] = sql"""
+    execute[Unit] {
+      Kleisli { session =>
+        val query: Command[
+          EventId ~ Id ~ Path ~ EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ BatchDate ~ EventBody
+        ] = sql"""
             insert into
             event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, batch_date, event_body)
             values ($eventIdPut, $projectIdPut, $projectPathPut, $eventStatusPut, $createdDatePut, $executionDatePut, $eventDatePut, $batchDatePut, $eventBodyPut)
       """.command
-      session
-        .prepare(query)
-        .use(
-          _.execute(
-            eventIds.generateOne ~ projectId ~ projectPath ~ eventStatuses.generateOne ~ createdDates.generateOne ~ executionDates.generateOne ~ eventDate ~ batchDates.generateOne ~ eventBodies.generateOne
+        session
+          .prepare(query)
+          .use(
+            _.execute(
+              eventIds.generateOne ~ projectId ~ projectPath ~ eventStatuses.generateOne ~ createdDates.generateOne ~ executionDates.generateOne ~ eventDate ~ batchDates.generateOne ~ eventBodies.generateOne
+            )
           )
-        )
-        .map(_ => ())
+          .map(_ => ())
+      }
     }
 
     (projectId, projectPath, eventDate)

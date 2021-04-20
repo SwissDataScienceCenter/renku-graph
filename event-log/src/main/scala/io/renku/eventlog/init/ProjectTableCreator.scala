@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.{Async, Bracket}
 import ch.datascience.db.SessionResource
 import org.typelevel.log4cats.Logger
@@ -32,56 +33,50 @@ private trait ProjectTableCreator[Interpretation[_]] {
 
 private object ProjectTableCreator {
   def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-      transactor: SessionResource[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
   ): ProjectTableCreator[Interpretation] =
-    new ProjectTableCreatorImpl(transactor, logger)
+    new ProjectTableCreatorImpl(sessionResource, logger)
 }
 
 private class ProjectTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-    transactor: SessionResource[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
 ) extends ProjectTableCreator[Interpretation]
     with EventTableCheck {
 
   import cats.syntax.all._
 
-  override def run(): Interpretation[Unit] = transactor.use { implicit session =>
+  override def run(): Interpretation[Unit] = sessionResource.useK {
     whenEventTableExists(
-      logger info "'project' table creation skipped",
-      otherwise = checkTableExists flatMap {
-        case true => logger info "'project' table exists"
-        case false =>
-          session.transaction.use { xa =>
-            for {
-              sp <- xa.savepoint
-              _ <- createTable recoverWith { e =>
-                     xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
-                   }
-            } yield ()
-          }
+      Kleisli.liftF(logger info "'project' table creation skipped"),
+      otherwise = checkTableExists >>= {
+        case true  => Kleisli.liftF(logger info "'project' table exists")
+        case false => createTable()
       }
     )
   }
 
-  private def checkTableExists: Interpretation[Boolean] = transactor
-    .use { session =>
-      val query: Query[Void, Boolean] =
-        sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'project')".query(bool)
-      session.unique(query).recover { case _ => false }
-    }
-  private def createTable(implicit session: Session[Interpretation]) = for {
-    _ <- execute(createTableSql)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id        ON project(project_id)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path      ON project(project_path)".command)
-    _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_latest_event_date ON project(latest_event_date)".command)
-    _ <- logger info "'project' table created"
-    _ <- execute(fillInTableSql)
-    _ <- logger info "'project' table filled in"
-    _ <- execute(foreignKeySql)
-  } yield ()
+  private lazy val checkTableExists: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+    val query: Query[Void, Boolean] =
+      sql"SELECT EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'project')".query(bool)
+    Kleisli(_.unique(query).recover { case _ => false })
+  }
 
-  private lazy val createTableSql: Command[Void] = sql"""
+  private def createTable(): Kleisli[Interpretation, Session[Interpretation], Unit] =
+    for {
+      _ <- execute(createTableSql)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_id        ON project(project_id)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_project_path      ON project(project_path)".command)
+      _ <- execute(sql"CREATE INDEX IF NOT EXISTS idx_latest_event_date ON project(latest_event_date)".command)
+      _ <- Kleisli.liftF(logger info "'project' table created")
+      _ <- execute(fillInTableSql)
+      _ <- Kleisli.liftF(logger info "'project' table filled in")
+      _ <- execute(foreignKeySql)
+    } yield ()
+
+  private lazy val createTableSql: Command[Void] =
+    sql"""
     CREATE TABLE IF NOT EXISTS project(
       project_id        int4      NOT NULL,
       project_path      VARCHAR   NOT NULL,
@@ -90,7 +85,8 @@ private class ProjectTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Th
     );
     """.command
 
-  private lazy val fillInTableSql: Command[Void] = sql"""
+  private lazy val fillInTableSql: Command[Void] =
+    sql"""
     INSERT INTO project
     SELECT DISTINCT
       log.project_id,
@@ -106,7 +102,8 @@ private class ProjectTableCreatorImpl[Interpretation[_]: Async: Bracket[*[_], Th
     JOIN event_log log ON log.project_id = project_event_date.project_id AND log.event_date = project_event_date.latest_event_date
     """.command
 
-  private lazy val foreignKeySql: Command[Void] = sql"""
+  private lazy val foreignKeySql: Command[Void] =
+    sql"""
     ALTER TABLE event_log
     ADD CONSTRAINT fk_project
     FOREIGN KEY (project_id) 

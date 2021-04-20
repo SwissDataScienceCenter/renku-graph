@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.db.SessionResource
@@ -33,69 +34,72 @@ private trait TimestampZoneAdder[Interpretation[_]] {
 
 private object TimestampZoneAdder {
   def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-      transactor: SessionResource[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
   ): TimestampZoneAdder[Interpretation] =
-    TimestampZoneAdderImpl(transactor, logger)
+    TimestampZoneAdderImpl(sessionResource, logger)
 }
+
 private case class TimestampZoneAdderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-    transactor: SessionResource[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
 ) extends TimestampZoneAdder[Interpretation]
     with EventTableCheck {
-  override def run(): Interpretation[Unit] =
-    checkIfAlreadyTimestamptz flatMap {
+  override def run(): Interpretation[Unit] = sessionResource.useK {
+    checkIfAlreadyTimestamptz >>= {
       case true =>
-        logger.info("Fields are already in timestamptz type")
-      case false =>
-        transactor.use { implicit session =>
-          session.transaction.use { xa =>
-            for {
-              sp <- xa.savepoint
-              _ <- migrateTimestampToCEST recoverWith { e =>
-                     xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
-                   }
-            } yield ()
-          }
-        }
+        Kleisli.liftF(logger.info("Fields are already in timestamptz type"))
+      case false => migrateTimestampToCEST()
     }
+  }
 
   private val columnsToMigrate =
     List("batch_date", "created_date", "execution_date", "event_date", "last_synced", "latest_event_date")
 
-  private def checkIfAlreadyTimestamptz = transactor.use { session =>
-    val query: Query[Void, String ~ String] = sql"""
+  private lazy val checkIfAlreadyTimestamptz: Kleisli[Interpretation, Session[Interpretation], Boolean] = {
+    val query: Query[Void, String ~ String] =
+      sql"""
          SELECT column_name, data_type FROM information_schema.columns""".query(varchar ~ varchar)
 
-    session
-      .execute(query)
-      .map {
-        _.filter { case columnName ~ _ =>
-          columnsToMigrate.contains(columnName)
-        }.forall { case _ ~ columnType =>
-          columnType == "timestamp with time zone"
+    Kleisli {
+      _.execute(query)
+        .map {
+          _.filter { case columnName ~ _ =>
+            columnsToMigrate.contains(columnName)
+          }.forall { case _ ~ columnType =>
+            columnType == "timestamp with time zone"
+          }
         }
-      }
-      .recover(_ => false)
+        .recover(_ => false)
+    }
   }
 
-  private def migrateTimestampToCEST(implicit session: Session[Interpretation]) = for {
-    _ <- execute(sql"ALTER table event ALTER batch_date TYPE timestamptz USING batch_date AT TIME ZONE 'CEST' ".command)
-    _ <- execute(
-           sql"ALTER table event ALTER created_date TYPE timestamptz USING created_date AT TIME ZONE 'CEST' ".command
-         )
-    _ <-
-      execute(
-        sql"ALTER table event ALTER execution_date TYPE timestamptz USING execution_date AT TIME ZONE 'CEST' ".command
-      )
-    _ <- execute(sql"ALTER table event ALTER event_date TYPE timestamptz USING event_date AT TIME ZONE 'CEST' ".command)
-    _ <-
-      execute(
-        sql"ALTER table subscription_category_sync_time ALTER last_synced TYPE timestamptz USING last_synced AT TIME ZONE 'CEST' ".command
-      )
-    _ <-
-      execute(
-        sql"ALTER table project ALTER latest_event_date TYPE timestamptz USING latest_event_date AT TIME ZONE 'CEST' ".command
-      )
-  } yield ()
+  private def migrateTimestampToCEST(): Kleisli[Interpretation, Session[Interpretation], Unit] =
+    for {
+      _ <-
+        execute(
+          sql"ALTER table event ALTER batch_date TYPE timestamptz USING batch_date AT TIME ZONE 'CEST' ".command
+        )
+      _ <-
+        execute(
+          sql"ALTER table event ALTER created_date TYPE timestamptz USING created_date AT TIME ZONE 'CEST' ".command
+        )
+      _ <-
+        execute(
+          sql"ALTER table event ALTER execution_date TYPE timestamptz USING execution_date AT TIME ZONE 'CEST' ".command
+        )
+      _ <-
+        execute(
+          sql"ALTER table event ALTER event_date TYPE timestamptz USING event_date AT TIME ZONE 'CEST' ".command
+        )
+      _ <-
+        execute(
+          sql"ALTER table subscription_category_sync_time ALTER last_synced TYPE timestamptz USING last_synced AT TIME ZONE 'CEST' ".command
+        )
+      _ <-
+        execute(
+          sql"ALTER table project ALTER latest_event_date TYPE timestamptz USING latest_event_date AT TIME ZONE 'CEST' ".command
+        )
+    } yield ()
+
 }

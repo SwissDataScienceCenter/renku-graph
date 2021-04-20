@@ -33,33 +33,21 @@ import skunk.data.Completion.{Insert, Update}
 import skunk.implicits._
 
 private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-    transactor:       SessionResource[Interpretation, ProjectsTokensDB],
+    sessionResource:  SessionResource[Interpretation, ProjectsTokensDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes))
     with TokenRepositoryTypeSerializers {
 
   def persistAssociation(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken): Interpretation[Unit] =
-    transactor.use { session =>
-      session.transaction.use { xa =>
-        for {
-          sp <- xa.savepoint
-          _ <- upsert(projectId, projectPath, encryptedToken)(session).recoverWith { case e =>
-                 xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Unit])
-               }
-        } yield ()
+    sessionResource.useK(upsert(projectId, projectPath, encryptedToken))
 
-      }
+  private def upsert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) =
+    checkIfTokenExists(projectPath) flatMap {
+      case true  => update(projectId, projectPath, encryptedToken)
+      case false => insert(projectId, projectPath, encryptedToken)
     }
 
-  private def upsert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken)(
-      session:                  Session[Interpretation]
-  ) =
-    checkIfTokenExists(projectPath)(session) flatMap {
-      case true  => update(projectId, projectPath, encryptedToken)(session)
-      case false => insert(projectId, projectPath, encryptedToken)(session)
-    }
-
-  private def checkIfTokenExists(projectPath: Path)(implicit session: Session[Interpretation]) = measureExecutionTime {
+  private def checkIfTokenExists(projectPath: Path) = measureExecutionTimeK {
     SqlQuery(
       Kleisli { session =>
         val query: Query[Path, EncryptedAccessToken] =
@@ -70,13 +58,12 @@ private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throw
     )
   }
 
-  private def update(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken)(implicit
-      session:                  Session[Interpretation]
-  ) = measureExecutionTime {
+  private def update(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) = measureExecutionTimeK {
 
     SqlQuery(
       Kleisli { session =>
-        val query: Command[EncryptedAccessToken ~ Id ~ Path] = sql"""
+        val query: Command[EncryptedAccessToken ~ Id ~ Path] =
+          sql"""
           UPDATE projects_tokens
           SET token = $encryptedAccessTokenPut, project_id = $projectIdPut
           WHERE project_path = $projectPathPut """.command
@@ -90,13 +77,11 @@ private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throw
     )
   }
 
-  private def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken)(implicit
-      session:                  Session[Interpretation]
-  ) = measureExecutionTime {
-
+  private def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) = measureExecutionTimeK {
     SqlQuery(
       Kleisli { session =>
-        val query: Command[Id ~ Path ~ EncryptedAccessToken] = sql"""
+        val query: Command[Id ~ Path ~ EncryptedAccessToken] =
+          sql"""
           INSERT INTO projects_tokens (project_id, project_path, token)
           VALUES ($projectIdPut, $projectPathPut, $encryptedAccessTokenPut)
         """.command
@@ -116,7 +101,7 @@ private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throw
 }
 
 private class IOAssociationPersister(
-    transactor:          SessionResource[IO, ProjectsTokensDB],
+    sessionResource:     SessionResource[IO, ProjectsTokensDB],
     queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
 )(implicit contextShift: ContextShift[IO])
-    extends AssociationPersister[IO](transactor, queriesExecTimes)
+    extends AssociationPersister[IO](sessionResource, queriesExecTimes)

@@ -45,39 +45,44 @@ trait StatusUpdatesRunner[Interpretation[_]] {
 }
 
 class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-    transactor:       SessionResource[Interpretation, EventLogDB],
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
     logger:           Logger[Interpretation]
 ) extends DbClient(Some(queriesExecTimes))
     with StatusUpdatesRunner[Interpretation]
     with StatusProcessingTime {
 
-  override def run(command: ChangeStatusCommand[Interpretation]): Interpretation[UpdateResult] = transactor.use {
-    implicit session =>
-      session.transaction.use { transaction =>
-        for {
-          _ <- deleteDelivery(command) recoverWith errorToUpdateResult(
-                 s"Event ${command.eventId} - cannot remove event delivery",
-                 Completion.Delete(0).pure[Interpretation].widen[Completion]
-               )
-          sp <- transaction.savepoint
-          updateResult <-
-            executeCommand(command) recoverWith errorToUpdateResult(s"Event ${command.eventId} got ${command.status}",
-                                                                    transaction.rollback(sp)
-            )
-          _ <- logInfo(command, updateResult)
-          _ <- command updateGauges updateResult
-        } yield updateResult
+  override def run(command: ChangeStatusCommand[Interpretation]): Interpretation[UpdateResult] =
+    sessionResource.useWithTransactionK {
+      Kleisli { case (transaction, session) =>
+        {
+          for {
+            _ <- deleteDelivery(command) recoverWith errorToUpdateResult(
+                   s"Event ${command.eventId} - cannot remove event delivery",
+                   Completion.Delete(0).pure[Interpretation].widen[Completion]
+                 )
+            sp <- Kleisli.liftF(transaction.savepoint)
+            updateResult <-
+              executeCommand(command) recoverWith errorToUpdateResult(s"Event ${command.eventId} got ${command.status}",
+                                                                      transaction.rollback(sp)
+              )
+            _ <- Kleisli.liftF(logInfo(command, updateResult))
+            _ <- command updateGauges updateResult
+          } yield updateResult
+        }.run(session)
       }
-  }
+    }
 
   private def errorToUpdateResult(message:  String,
                                   rollback: => Interpretation[Completion]
-  ): PartialFunction[Throwable, Interpretation[UpdateResult]] = { case NonFatal(exception) =>
-    for {
-      _ <- rollback
-      _ <- logger.error(exception)(message)
-    } yield UpdateResult.Failure(ErrorMessage.withExceptionMessage(exception))
+  ): PartialFunction[Throwable, Kleisli[Interpretation, Session[Interpretation], UpdateResult]] = {
+    case NonFatal(exception) =>
+      Kleisli.liftF {
+        for {
+          _ <- rollback
+          _ <- logger.error(exception)(message)
+        } yield UpdateResult.Failure(ErrorMessage.withExceptionMessage(exception))
+      }
   }
 
   private def logInfo(command: ChangeStatusCommand[Interpretation], updateResult: UpdateResult) = updateResult match {
@@ -86,22 +91,23 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
   }
 
   private def executeCommand(
-      command:        ChangeStatusCommand[Interpretation]
-  )(implicit session: Session[Interpretation]): Interpretation[UpdateResult] =
+      command: ChangeStatusCommand[Interpretation]
+  ): Kleisli[Interpretation, Session[Interpretation], UpdateResult] =
     checkIfPersisted(command.eventId) >>= {
       case true =>
         runUpdateQueriesIfSuccessful(
           command.queries.toList :++ maybeUpdateProcessingTimeQuery(command),
           command
         ) >>= toUpdateResult
-      case false => NotFound.pure[Interpretation].widen[commands.UpdateResult]
+      case false => Kleisli.pure(NotFound).widen[commands.UpdateResult]
     }
 
-  private def deleteDelivery(command: ChangeStatusCommand[Interpretation])(implicit session: Session[Interpretation]) =
-    measureExecutionTime {
+  private def deleteDelivery(command: ChangeStatusCommand[Interpretation]) =
+    measureExecutionTimeK {
       SqlQuery(
         Kleisli { session =>
-          val query: Command[EventId ~ projects.Id] = sql"""DELETE FROM event_delivery
+          val query: Command[EventId ~ projects.Id] =
+            sql"""DELETE FROM event_delivery
                             WHERE event_id = $eventIdPut AND project_id = $projectIdPut
                          """.command
           session
@@ -112,13 +118,13 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
       )
     }
 
-  private def toUpdateResult: UpdateResult => Interpretation[UpdateResult] = {
-    case UpdateResult.Failure(message) => new Exception(message).raiseError[Interpretation, UpdateResult]
-    case result                        => result.pure[Interpretation]
+  private def toUpdateResult: UpdateResult => Kleisli[Interpretation, Session[Interpretation], UpdateResult] = {
+    case UpdateResult.Failure(message) => Kleisli.liftF(new Exception(message).raiseError[Interpretation, UpdateResult])
+    case result                        => Kleisli.pure(result)
   }
 
-  private def checkIfPersisted(eventId: CompoundEventId)(implicit session: Session[Interpretation]) =
-    measureExecutionTime {
+  private def checkIfPersisted(eventId: CompoundEventId) =
+    measureExecutionTimeK {
       SqlQuery(
         Kleisli { session =>
           val query: Query[EventId ~ projects.Id, EventId] =
@@ -137,9 +143,9 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
 
   private def runUpdateQueriesIfSuccessful(queries: List[SqlQuery[Interpretation, Int]],
                                            command: ChangeStatusCommand[Interpretation]
-  )(implicit session:                               Session[Interpretation]): Interpretation[UpdateResult] =
+  ) =
     queries
-      .map(query => measureExecutionTime(query).map(query -> _))
+      .map(query => measureExecutionTimeK(query).map(query -> _))
       .sequence
       .map(_.foldLeft(Updated: UpdateResult) {
         case (Updated, (_, 1)) => Updated
@@ -158,10 +164,10 @@ object IOUpdateCommandsRunner {
 
   import cats.effect.IO
 
-  def apply(transactor:       SessionResource[IO, EventLogDB],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
             logger:           Logger[IO]
   ): IO[StatusUpdatesRunner[IO]] = IO {
-    new StatusUpdatesRunnerImpl(transactor, queriesExecTimes, logger)
+    new StatusUpdatesRunnerImpl(sessionResource, queriesExecTimes, logger)
   }
 }

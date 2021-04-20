@@ -18,6 +18,7 @@
 
 package io.renku.eventlog
 
+import cats.data.Kleisli
 import cats.syntax.all._
 import ch.datascience.db.DbSpec
 import io.renku.eventlog.init.EventLogDbMigrations
@@ -39,16 +40,20 @@ trait InMemoryEventLogDbSpec
   protected def initDb(): Unit =
     allMigrations.map(_.run()).sequence.void.unsafeRunSync()
 
-  private def findAllTables(): List[String] = execute { session =>
-    val query: Query[Void, String] = sql"""SELECT DISTINCT tablename FROM pg_tables
+  private def findAllTables(): List[String] = execute {
+    Kleisli { session =>
+      val query: Query[Void, String] = sql"""SELECT DISTINCT tablename FROM pg_tables
                                 WHERE schemaname != 'pg_catalog'
                                 AND schemaname != 'information_schema'"""
-      .query(name)
-    session.execute(query)
+        .query(name)
+      session.execute(query)
+    }
   }
 
-  protected def prepareDbForTest(): Unit = execute { session =>
-    val query: Command[Void] = sql"TRUNCATE TABLE #${findAllTables().mkString(", ")} CASCADE".command
-    session.execute(query).void
+  protected def prepareDbForTest(): Unit = execute[Unit] {
+    Kleisli { session =>
+      val query: Command[Void] = sql"TRUNCATE TABLE #${findAllTables().mkString(", ")} CASCADE".command
+      session.execute(query).void
+    }
   }
 }

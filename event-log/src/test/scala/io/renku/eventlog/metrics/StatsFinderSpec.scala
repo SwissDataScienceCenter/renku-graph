@@ -176,7 +176,7 @@ class StatsFinderSpec
   }
 
   private lazy val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
-  private lazy val stats            = new StatsFinderImpl(transactor, queriesExecTimes)
+  private lazy val stats            = new StatsFinderImpl(sessionResource, queriesExecTimes)
 
   private def store: ((Path, EventId, EventStatus, EventDate)) => Unit = {
     case (projectPath, eventId, status, eventDate) =>

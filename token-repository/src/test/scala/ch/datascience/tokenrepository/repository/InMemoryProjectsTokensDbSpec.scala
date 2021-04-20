@@ -61,19 +61,19 @@ trait InMemoryProjectsTokensDbSpec extends DbSpec with InMemoryProjectsTokensDb 
     case _                    => fail("insertion problem")
   }
 
-  protected def findToken(projectPath: Path): Option[String] = transactor
-    .use { session =>
+  protected def findToken(projectPath: Path): Option[String] = sessionResource
+    .useK {
       val query: Query[String, String] = sql"select token from projects_tokens where project_path = $varchar"
         .query(varchar)
-      session.prepare(query).use(_.option(projectPath.value))
+      Kleisli(_.prepare(query).use(_.option(projectPath.value)))
     }
     .unsafeRunSync()
 
-  protected def findToken(projectId: Id): Option[String] = transactor
-    .use { session =>
+  protected def findToken(projectId: Id): Option[String] = sessionResource
+    .useK {
       val query: Query[Int, String] = sql"select token from projects_tokens where project_id = $int4"
         .query(varchar)
-      session.prepare(query).use(_.option(projectId.value))
+      Kleisli(_.prepare(query).use(_.option(projectId.value)))
     }
     .unsafeRunSync()
 }

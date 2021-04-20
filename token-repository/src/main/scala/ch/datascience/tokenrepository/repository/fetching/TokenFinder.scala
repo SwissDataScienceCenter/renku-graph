@@ -49,13 +49,13 @@ private class TokenFinder[Interpretation[_]](
 
 private object IOTokenFinder {
   def apply(
-      transactor:          SessionResource[IO, ProjectsTokensDB],
+      sessionResource:     SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[TokenFinder[IO]] =
     for {
       accessTokenCrypto <- AccessTokenCrypto[IO]()
     } yield new TokenFinder[IO](
-      new IOPersistedTokensFinder(transactor, queriesExecTimes),
+      new IOPersistedTokensFinder(sessionResource, queriesExecTimes),
       accessTokenCrypto
     )
 }

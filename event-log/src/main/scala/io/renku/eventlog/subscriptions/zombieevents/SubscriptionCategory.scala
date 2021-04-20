@@ -30,7 +30,7 @@ import scala.concurrent.ExecutionContext
 
 private[subscriptions] object SubscriptionCategory {
 
-  def apply(transactor:        SessionResource[IO, EventLogDB],
+  def apply(sessionResource:   SessionResource[IO, EventLogDB],
             queriesExecTimes:  LabeledHistogram[IO, SqlQuery.Name],
             subscriberTracker: SubscriberTracker[IO],
             logger:            Logger[IO]
@@ -40,11 +40,11 @@ private[subscriptions] object SubscriptionCategory {
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers      <- Subscribers(categoryName, subscriberTracker, logger)
-    eventsFinder     <- ZombieEventFinder(transactor, queriesExecTimes, logger)
+    eventsFinder     <- ZombieEventFinder(sessionResource, queriesExecTimes, logger)
     dispatchRecovery <- LoggingDispatchRecovery[IO, ZombieEvent](categoryName, logger)
     eventDelivery    <- EventDelivery.noOp[IO, ZombieEvent]
     eventsDistributor <- IOEventsDistributor(categoryName,
-                                             transactor,
+                                             sessionResource,
                                              subscribers,
                                              eventsFinder,
                                              eventDelivery,

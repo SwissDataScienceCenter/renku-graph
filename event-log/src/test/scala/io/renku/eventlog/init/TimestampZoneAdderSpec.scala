@@ -99,6 +99,6 @@ class TimestampZoneAdderSpec extends AnyWordSpec with DbInitSpec with should.Mat
 
   private trait TestCase {
     val logger        = TestLogger[IO]()
-    val tableRefactor = new TimestampZoneAdderImpl[IO](transactor, logger)
+    val tableRefactor = new TimestampZoneAdderImpl[IO](sessionResource, logger)
   }
 }

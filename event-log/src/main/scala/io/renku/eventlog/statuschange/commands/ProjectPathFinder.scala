@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.statuschange.commands
 
+import cats.data.Kleisli
 import cats.effect.Bracket
 import ch.datascience.graph.model.events.CompoundEventId
 import ch.datascience.graph.model.projects
@@ -29,15 +30,15 @@ private object ProjectPathFinder {
   import io.renku.eventlog.TypeSerializers._
 
   def findProjectPath[Interpretation[_]: Bracket[*[_], Throwable]](
-      eventId:        CompoundEventId
-  )(implicit session: Session[Interpretation]) = {
+      eventId: CompoundEventId
+  ): Kleisli[Interpretation, Session[Interpretation], projects.Path] = {
 
     val query: Query[projects.Id, projects.Path] = sql"""SELECT project_path
                                                         FROM project 
                                                         WHERE project_id = $projectIdPut
                                                         """.query(projectPathGet)
 
-    session.prepare(query).use(_.unique(eventId.projectId))
+    Kleisli(_.prepare(query).use(_.unique(eventId.projectId)))
   }
 
 }

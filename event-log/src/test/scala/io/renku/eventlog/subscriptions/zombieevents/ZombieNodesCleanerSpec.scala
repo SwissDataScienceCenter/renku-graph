@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions.zombieevents
 
+import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.db.SqlQuery
@@ -173,18 +174,21 @@ class ZombieNodesCleanerSpec extends AnyWordSpec with InMemoryEventLogDbSpec wit
     val queriesExecTimes     = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val microserviceBaseUrl  = microserviceBaseUrls.generateOne
     val serviceHealthChecker = mock[ServiceHealthChecker[IO]]
-    val cleaner              = new ZombieNodesCleanerImpl(transactor, queriesExecTimes, microserviceBaseUrl, serviceHealthChecker)
+    val cleaner =
+      new ZombieNodesCleanerImpl(sessionResource, queriesExecTimes, microserviceBaseUrl, serviceHealthChecker)
   }
 
-  private def findAllSubscribers(): List[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute { session =>
-    val query: Query[Void, (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = sql"""
+  private def findAllSubscribers(): List[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute {
+    Kleisli { session =>
+      val query: Query[Void, (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = sql"""
           SELECT DISTINCT delivery_id, delivery_url, source_url
           FROM subscriber
           """
-      .query(subscriberIdGet ~ subscriberUrlGet ~ microserviceBaseUrlGet)
-      .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
-        (subscriberId, subscriberUrl, microserviceBaseUrl)
-      }
-    session.execute(query)
+        .query(subscriberIdGet ~ subscriberUrlGet ~ microserviceBaseUrlGet)
+        .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
+          (subscriberId, subscriberUrl, microserviceBaseUrl)
+        }
+      session.execute(query)
+    }
   }
 }

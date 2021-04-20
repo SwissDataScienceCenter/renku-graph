@@ -89,6 +89,6 @@ class EventLogTableCreatorSpec extends AnyWordSpec with DbInitSpec with should.M
 
   private trait TestCase {
     val logger       = TestLogger[IO]()
-    val tableCreator = new EventLogTableCreatorImpl[IO](transactor, logger)
+    val tableCreator = new EventLogTableCreatorImpl[IO](sessionResource, logger)
   }
 }

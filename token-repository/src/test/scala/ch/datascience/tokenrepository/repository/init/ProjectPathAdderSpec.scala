@@ -144,8 +144,9 @@ class ProjectPathAdderSpec
     val accessTokenCrypto = mock[IOAccessTokenCrypto]
     val pathFinder        = mock[ProjectPathFinder[IO]]
     val queriesExecTimes  = TestLabeledHistogram[SqlQuery.Name]("query_id")
-    val tokenRemover      = new TokenRemover[IO](transactor, queriesExecTimes)
-    val projectPathAdder  = new ProjectPathAdderImpl[IO](transactor, accessTokenCrypto, pathFinder, tokenRemover, logger)
+    val tokenRemover      = new TokenRemover[IO](sessionResource, queriesExecTimes)
+    val projectPathAdder =
+      new ProjectPathAdderImpl[IO](sessionResource, accessTokenCrypto, pathFinder, tokenRemover, logger)
 
     def assumePathExistsInGitLab(projectId:        Id,
                                  maybeProjectPath: Option[Path],
@@ -166,7 +167,8 @@ class ProjectPathAdderSpec
 
   private def addProjectPath(): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
-      val query: Command[Void] = sql"""
+      val query: Command[Void] =
+        sql"""
         ALTER TABLE projects_tokens
         ADD COLUMN project_path VARCHAR;
       """.command
@@ -174,15 +176,16 @@ class ProjectPathAdderSpec
     }
   }
 
-  private def checkColumnExists: Boolean = transactor
-    .use { session =>
+  private def checkColumnExists: Boolean = sessionResource
+    .useK {
       val query: Query[Void, Path] = sql"select project_path from projects_tokens limit 1"
         .query(varchar)
         .gmap[Path]
-      session
-        .option(query)
-        .map(_ => true)
-        .recover { case _ => false }
+      Kleisli {
+        _.option(query)
+          .map(_ => true)
+          .recover { case _ => false }
+      }
     }
     .unsafeRunSync()
 
@@ -204,7 +207,8 @@ class ProjectPathAdderSpec
 
   protected override def createTable(): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
-      val query: Command[Void] = sql"""
+      val query: Command[Void] =
+        sql"""
         CREATE TABLE projects_tokens(
           project_id int4 PRIMARY KEY,
           token VARCHAR NOT NULL

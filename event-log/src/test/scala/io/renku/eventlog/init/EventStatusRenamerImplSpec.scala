@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.IO
 import ch.datascience.generators.Generators.Implicits._
 import ch.datascience.graph.model.events.{BatchDate, CompoundEventId, EventId, EventStatus}
@@ -112,15 +113,16 @@ class EventStatusRenamerImplSpec
 
   private trait TestCase {
     val logger             = TestLogger[IO]()
-    val eventStatusRenamer = new EventStatusRenamerImpl[IO](transactor, logger)
+    val eventStatusRenamer = new EventStatusRenamerImpl[IO](sessionResource, logger)
   }
 
   private def store(event: Event, withStatus: String): Unit = {
     upsertProject(event.compoundEventId, event.project.path, event.date)
-    execute { session =>
-      val query
-          : Command[EventId ~ projects.Id ~ String ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String ~ BatchDate] =
-        sql"""INSERT INTO 
+    execute[Unit] {
+      Kleisli { session =>
+        val query
+            : Command[EventId ~ projects.Id ~ String ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String ~ BatchDate] =
+          sql"""INSERT INTO 
               event (event_id, project_id, status, created_date, execution_date, event_date, event_body, batch_date) 
               values (
               $eventIdPut, 
@@ -132,43 +134,50 @@ class EventStatusRenamerImplSpec
               $text,
               $batchDatePut)
       """.command
-      session
-        .prepare(query)
-        .use(
-          _.execute(
-            event.id ~ event.project.id ~ withStatus ~ createdDates.generateOne ~ executionDates.generateOne ~ event.date ~ toJsonBody(
-              event
-            ) ~ event.batchDate
+        session
+          .prepare(query)
+          .use(
+            _.execute(
+              event.id ~ event.project.id ~ withStatus ~ createdDates.generateOne ~ executionDates.generateOne ~ event.date ~ toJsonBody(
+                event
+              ) ~ event.batchDate
+            )
           )
-        )
-        .map(_ => ())
+          .map(_ => ())
+      }
     }
   }
 
-  private def toJsonBody(event: Event): String = json"""{
+  private def toJsonBody(event: Event): String =
+    json"""{
     "project": {
       "id": ${event.project.id.value},
       "path": ${event.project.path.value}
      }
   }""".noSpaces
 
-  private def findEventsId: Set[EventId] = transactor
-    .use { session =>
-      val query: Query[Void, EventId] = sql"SELECT event_id FROM event".query(eventIdGet)
-      session.execute(query)
+  private def findEventsId: Set[EventId] = sessionResource
+    .useK {
+      Kleisli { session =>
+        val query: Query[Void, EventId] = sql"SELECT event_id FROM event".query(eventIdGet)
+        session.execute(query)
+      }
     }
     .unsafeRunSync()
     .toSet
 
   private def findEventsCompoundId(status: EventStatus): List[CompoundEventId] =
-    execute { session: Session[IO] =>
-      val query: Query[EventStatus, CompoundEventId] = sql"""
+    execute[List[CompoundEventId]] {
+      Kleisli { session =>
+        val query: Query[EventStatus, CompoundEventId] =
+          sql"""
             SELECT event_id, project_id
             FROM event
             WHERE status = $eventStatusPut
             ORDER BY created_date asc"""
-        .query(eventIdGet ~ projectIdGet)
-        .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
-      session.prepare(query).use(_.stream(status, 32).compile.toList)
+            .query(eventIdGet ~ projectIdGet)
+            .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
+        session.prepare(query).use(_.stream(status, 32).compile.toList)
+      }
     }
 }

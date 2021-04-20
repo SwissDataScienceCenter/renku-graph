@@ -54,8 +54,8 @@ libraryDependencies += "org.typelevel" %% "log4cats-core" % "2.0.1"
 
 // Test dependencies
 val testContainersScalaVersion = "0.39.3"
-libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
 libraryDependencies += "com.dimafeng" %% "testcontainers-scala-scalatest"  % testContainersScalaVersion % Test
+libraryDependencies += "com.dimafeng" %% "testcontainers-scala-postgresql" % testContainersScalaVersion % Test
 
 libraryDependencies += "com.github.tomakehurst" % "wiremock" % "2.27.2" % Test
 

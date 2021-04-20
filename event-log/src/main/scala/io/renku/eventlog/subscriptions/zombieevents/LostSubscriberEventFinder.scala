@@ -39,25 +39,19 @@ import java.time.Instant.now
 import java.time.{OffsetDateTime, ZoneId}
 
 private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
-    transactor:       SessionResource[Interpretation, EventLogDB],
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[Interpretation, ZombieEvent]
     with ZombieEventSubProcess
     with TypeSerializers {
 
-  override def popEvent(): Interpretation[Option[ZombieEvent]] = transactor.use { implicit session =>
-    session.transaction.use { transation =>
-      for {
-        sp <- transation.savepoint
-        result <- (findEvents >>= markEventTaken) recoverWith { error =>
-                    transation.rollback(sp).flatMap(_ => error.raiseError[Interpretation, Option[ZombieEvent]])
-                  }
-      } yield result
-    }
+  override def popEvent(): Interpretation[Option[ZombieEvent]] = sessionResource.useK {
+    findEvents >>= markEventTaken()
+
   }
 
-  private def findEvents(implicit session: Session[Interpretation]) = measureExecutionTime {
+  private lazy val findEvents = measureExecutionTimeK {
     SqlQuery(
       Kleisli { session =>
         val query: Query[EventStatus ~ EventStatus ~ String, ZombieEvent] =
@@ -84,15 +78,14 @@ private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], 
     )
   }
 
-  private def markEventTaken(implicit
-      session: Session[Interpretation]
-  ): Option[ZombieEvent] => Interpretation[Option[ZombieEvent]] = {
-    case None        => Option.empty[ZombieEvent].pure[Interpretation]
+  private def markEventTaken()
+      : Option[ZombieEvent] => Kleisli[Interpretation, Session[Interpretation], Option[ZombieEvent]] = {
+    case None        => Kleisli.pure(Option.empty[ZombieEvent])
     case Some(event) => updateMessage(event.eventId) map toNoneIfEventAlreadyTaken(event)
   }
 
-  private def updateMessage(eventId: CompoundEventId)(implicit session: Session[Interpretation]) =
-    measureExecutionTime {
+  private def updateMessage(eventId: CompoundEventId) =
+    measureExecutionTimeK {
       SqlQuery(
         Kleisli { session =>
           val query: Command[String ~ OffsetDateTime ~ EventId ~ projects.Id] =
@@ -126,9 +119,9 @@ private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], 
 
 private object LostSubscriberEventFinder {
   def apply(
-      transactor:          SessionResource[IO, EventLogDB],
+      sessionResource:     SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
-    new LostSubscriberEventFinder[IO](transactor, queriesExecTimes)
+    new LostSubscriberEventFinder[IO](sessionResource, queriesExecTimes)
   }
 }

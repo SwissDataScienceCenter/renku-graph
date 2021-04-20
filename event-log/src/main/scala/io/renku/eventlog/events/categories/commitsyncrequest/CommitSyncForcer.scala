@@ -39,7 +39,7 @@ private trait CommitSyncForcer[Interpretation[_]] {
 }
 
 private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-    transactor:       SessionResource[Interpretation, EventLogDB],
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
@@ -48,18 +48,19 @@ private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throw
     with SubscriptionTypeSerializers {
 
   override def forceCommitSync(projectId: projects.Id, projectPath: projects.Path): Interpretation[Unit] =
-    transactor.use { implicit session =>
+    sessionResource.useK {
       deleteLastSyncedDate(projectId) flatMap {
         case Completion.Delete(0) => upsertProject(projectId, projectPath).void
-        case _                    => ().pure[Interpretation]
+        case _                    => Kleisli.pure(())
       }
     }
 
-  private def deleteLastSyncedDate(projectId: projects.Id)(implicit session: Session[Interpretation]) =
-    measureExecutionTime {
+  private def deleteLastSyncedDate(projectId: projects.Id) =
+    measureExecutionTimeK {
       SqlQuery(
         Kleisli { session =>
-          val query: Command[projects.Id ~ CategoryName] = sql"""
+          val query: Command[projects.Id ~ CategoryName] =
+            sql"""
             DELETE FROM subscription_category_sync_time
             WHERE project_id = $projectIdPut AND category_name = $categoryNamePut
           """.command
@@ -69,12 +70,11 @@ private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throw
       )
     }
 
-  private def upsertProject(projectId: projects.Id, projectPath: projects.Path)(implicit
-      session:                         Session[Interpretation]
-  ) = measureExecutionTime {
+  private def upsertProject(projectId: projects.Id, projectPath: projects.Path) = measureExecutionTimeK {
     SqlQuery(
       Kleisli { session =>
-        val query: Command[projects.Id ~ projects.Path ~ EventDate] = sql"""
+        val query: Command[projects.Id ~ projects.Path ~ EventDate] =
+          sql"""
           INSERT INTO
           project (project_id, project_path, latest_event_date)
           VALUES ($projectIdPut, $projectPathPut, $eventDatePut)
@@ -89,11 +89,12 @@ private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throw
 }
 
 private object CommitSyncForcer {
+
   import cats.effect.IO
 
-  def apply(transactor:       SessionResource[IO, EventLogDB],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
   ): IO[CommitSyncForcer[IO]] = IO {
-    new CommitSyncForcerImpl(transactor, queriesExecTimes)
+    new CommitSyncForcerImpl(sessionResource, queriesExecTimes)
   }
 }

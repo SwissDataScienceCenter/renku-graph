@@ -39,7 +39,7 @@ private[subscriptions] trait EventDelivery[Interpretation[_], CategoryEvent] {
 }
 
 private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwable], CategoryEvent](
-    transactor:               SessionResource[Interpretation, EventLogDB],
+    sessionResource:          SessionResource[Interpretation, EventLogDB],
     compoundEventIdExtractor: CategoryEvent => CompoundEventId,
     queriesExecTimes:         LabeledHistogram[Interpretation, SqlQuery.Name],
     sourceUrl:                MicroserviceBaseUrl
@@ -47,22 +47,20 @@ private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwabl
     with EventDelivery[Interpretation, CategoryEvent]
     with TypeSerializers {
 
-  def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit] = transactor.use {
-    implicit session =>
-      val CompoundEventId(id, projectId) = compoundEventIdExtractor(event)
-      for {
-        _      <- deleteDelivery(id, projectId)
-        result <- insert(id, projectId, subscriberUrl)
-      } yield result
+  def registerSending(event: CategoryEvent, subscriberUrl: SubscriberUrl): Interpretation[Unit] = sessionResource.useK {
+    val CompoundEventId(id, projectId) = compoundEventIdExtractor(event)
+    for {
+      _      <- deleteDelivery(id, projectId)
+      result <- insert(id, projectId, subscriberUrl)
+    } yield result
   } flatMap toResult
 
-  private def insert(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl)(implicit
-      session:                Session[Interpretation]
-  ) =
-    measureExecutionTime {
+  private def insert(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl) =
+    measureExecutionTimeK {
       SqlQuery(
         Kleisli { session =>
-          val query: Command[EventId ~ projects.Id ~ SubscriberUrl ~ MicroserviceBaseUrl] = sql"""
+          val query: Command[EventId ~ projects.Id ~ SubscriberUrl ~ MicroserviceBaseUrl] =
+            sql"""
            INSERT INTO event_delivery (event_id, project_id, delivery_id)
              SELECT $eventIdPut, $projectIdPut, delivery_id
              FROM subscriber
@@ -76,12 +74,11 @@ private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwabl
       )
     }
 
-  private def deleteDelivery(eventId: events.EventId, projectId: projects.Id)(implicit
-      session:                        Session[Interpretation]
-  ) = measureExecutionTime {
+  private def deleteDelivery(eventId: events.EventId, projectId: projects.Id) = measureExecutionTimeK {
     SqlQuery(
       Kleisli { session =>
-        val query: Command[EventId ~ projects.Id] = sql"""DELETE FROM event_delivery
+        val query: Command[EventId ~ projects.Id] =
+          sql"""DELETE FROM event_delivery
                                                           WHERE event_id = $eventIdPut AND project_id = $projectIdPut
                                                        """.command
         session.prepare(query).use(_.execute(eventId ~ projectId)).void
@@ -99,13 +96,13 @@ private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwabl
 private[subscriptions] object EventDelivery {
 
   def apply[CategoryEvent](
-      transactor:               SessionResource[IO, EventLogDB],
+      sessionResource:          SessionResource[IO, EventLogDB],
       compoundEventIdExtractor: CategoryEvent => CompoundEventId,
       queriesExecTimes:         LabeledHistogram[IO, SqlQuery.Name]
   ): IO[EventDelivery[IO, CategoryEvent]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     microserviceUrl       <- microserviceUrlFinder.findBaseUrl()
-  } yield new EventDeliveryImpl[IO, CategoryEvent](transactor,
+  } yield new EventDeliveryImpl[IO, CategoryEvent](sessionResource,
                                                    compoundEventIdExtractor,
                                                    queriesExecTimes,
                                                    microserviceUrl

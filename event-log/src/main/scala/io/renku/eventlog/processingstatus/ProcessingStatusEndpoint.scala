@@ -83,11 +83,11 @@ object IOProcessingStatusEndpoint {
   import io.renku.eventlog.EventLogDB
 
   def apply(
-      transactor:          SessionResource[IO, EventLogDB],
+      sessionResource:     SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[ProcessingStatusEndpoint[IO]] =
     for {
-      statusFinder <- IOProcessingStatusFinder(transactor, queriesExecTimes)
+      statusFinder <- IOProcessingStatusFinder(sessionResource, queriesExecTimes)
     } yield new ProcessingStatusEndpoint[IO](statusFinder, logger)
 }

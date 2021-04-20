@@ -77,7 +77,7 @@ object IOAssociateTokenEndpoint {
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor:       SessionResource[IO, ProjectsTokensDB],
+      sessionResource:  SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   )(implicit
@@ -86,6 +86,6 @@ object IOAssociateTokenEndpoint {
       timer:            Timer[IO]
   ): IO[AssociateTokenEndpoint[IO]] =
     for {
-      tokenAssociator <- IOTokenAssociator(transactor, queriesExecTimes, logger)
+      tokenAssociator <- IOTokenAssociator(sessionResource, queriesExecTimes, logger)
     } yield new AssociateTokenEndpoint[IO](tokenAssociator, logger)
 }

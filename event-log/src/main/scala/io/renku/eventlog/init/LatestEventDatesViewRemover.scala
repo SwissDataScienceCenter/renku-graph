@@ -18,12 +18,13 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.{Async, Bracket}
 import cats.syntax.all._
 import ch.datascience.db.{DbClient, SessionResource}
 import org.typelevel.log4cats.Logger
 import io.renku.eventlog.EventLogDB
-import skunk.Command
+import skunk.{Command, Session}
 import skunk.implicits.toStringOps
 
 private[eventlog] trait LatestEventDatesViewRemover[Interpretation[_]] {
@@ -32,23 +33,25 @@ private[eventlog] trait LatestEventDatesViewRemover[Interpretation[_]] {
 
 private[eventlog] object LatestEventDatesViewRemover {
   def apply[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-      transactor: SessionResource[Interpretation, EventLogDB],
-      logger:     Logger[Interpretation]
-  )(implicit ME:  Bracket[Interpretation, Throwable]): LatestEventDatesViewRemover[Interpretation] =
-    new LatestEventDatesViewRemoverImpl(transactor, logger)
+      sessionResource: SessionResource[Interpretation, EventLogDB],
+      logger:          Logger[Interpretation]
+  )(implicit ME:       Bracket[Interpretation, Throwable]): LatestEventDatesViewRemover[Interpretation] =
+    new LatestEventDatesViewRemoverImpl(sessionResource, logger)
 }
 
 private[eventlog] class LatestEventDatesViewRemoverImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-    transactor: SessionResource[Interpretation, EventLogDB],
-    logger:     Logger[Interpretation]
+    sessionResource: SessionResource[Interpretation, EventLogDB],
+    logger:          Logger[Interpretation]
 ) extends DbClient[Interpretation](maybeHistogram = None)
     with LatestEventDatesViewRemover[Interpretation] {
 
-  override def run(): Interpretation[Unit] = transactor.use { session =>
-    for {
-      _ <- session.execute(dropView)
-      _ <- logger.info("'project_latest_event_date' view dropped")
-    } yield ()
+  override def run(): Interpretation[Unit] = sessionResource.useK {
+    Kleisli[Interpretation, Session[Interpretation], Unit] { session =>
+      for {
+        _ <- session.execute(dropView)
+        _ <- logger.info("'project_latest_event_date' view dropped")
+      } yield ()
+    }
   }
 
   private lazy val dropView: Command[skunk.Void] =

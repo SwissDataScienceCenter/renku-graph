@@ -76,7 +76,7 @@ private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO, Name]]) e
 
   def executeQuery(expected: Int)(transactorResource: Resource[IO, Resource[IO, Session[IO]]]) =
     transactorResource.use {
-      _.use(implicit session => measureExecutionTime[Int](query(expected)))
+      _.use(session => measureExecutionTimeK[Int](query(expected))(session))
     }
 }
 

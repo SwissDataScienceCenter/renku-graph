@@ -37,7 +37,7 @@ import skunk.implicits._
 import java.time.{Duration, Instant}
 
 private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
-    transactor:       SessionResource[Interpretation, EventLogDB],
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
@@ -45,33 +45,26 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
     with ZombieEventSubProcess
     with TypeSerializers {
 
-  override def popEvent(): Interpretation[Option[ZombieEvent]] = transactor.use { implicit session =>
-    session.transaction.use { transaction =>
-      for {
-        sp <- transaction.savepoint
-        result <- (findPotentialZombies >>= lookForZombie >>= markEventTaken) recoverWith { error =>
-                    transaction.rollback(sp).flatMap(_ => error.raiseError[Interpretation, Option[ZombieEvent]])
-                  }
-      } yield result
-    }
+  override def popEvent(): Interpretation[Option[ZombieEvent]] = sessionResource.useK {
+    findPotentialZombies >>= lookForZombie >>= markEventTaken
   }
 
-  private def findPotentialZombies(implicit
-      session: Session[Interpretation]
-  ): Interpretation[List[(projects.Id, EventStatus)]] =
+  private lazy val findPotentialZombies
+      : Kleisli[Interpretation, Session[Interpretation], List[(projects.Id, EventStatus)]] =
     Nested(queryProjectsToCheck).map { case (id, currentStatus) => id -> currentStatus.toEventStatus }.value
 
-  private def queryProjectsToCheck(implicit session: Session[Interpretation]) = measureExecutionTime {
+  private def queryProjectsToCheck = measureExecutionTimeK {
     SqlQuery[Interpretation, List[(projects.Id, TransformationStatus)]](
       Kleisli { session =>
-        val query: Query[EventStatus ~ EventStatus, (projects.Id, TransformationStatus)] = sql"""
+        val query: Query[EventStatus ~ EventStatus, (projects.Id, TransformationStatus)] =
+          sql"""
           SELECT DISTINCT evt.project_id, evt.status
           FROM event evt
           WHERE evt.status = $eventStatusPut
             OR evt.status = $eventStatusPut
           """
-          .query(projectIdGet ~ transformationStatusGet)
-          .map { case id ~ status => (id, status) }
+            .query(projectIdGet ~ transformationStatusGet)
+            .map { case id ~ status => (id, status) }
 
         session.prepare(query).use(_.stream(GeneratingTriples ~ TransformingTriples, 32).compile.toList)
       },
@@ -79,19 +72,18 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
     )
   }
 
-  private def lookForZombie(implicit
-      session: Session[Interpretation]
-  ): List[(projects.Id, EventStatus)] => Interpretation[Option[ZombieEvent]] = {
-    case Nil => Option.empty[ZombieEvent].pure[Interpretation]
+  private lazy val lookForZombie
+      : List[(projects.Id, EventStatus)] => Kleisli[Interpretation, Session[Interpretation], Option[ZombieEvent]] = {
+    case Nil => Kleisli.pure(Option.empty[ZombieEvent])
     case (projectId, status) :: rest =>
       queryZombieEvent(projectId, status) flatMap {
-        case None              => lookForZombie(session)(rest)
-        case Some(zombieEvent) => Option[ZombieEvent](zombieEvent).pure[Interpretation]
+        case None              => lookForZombie(rest)
+        case Some(zombieEvent) => Kleisli.pure(Option[ZombieEvent](zombieEvent))
       }
   }
 
-  private def queryZombieEvent(projectId: projects.Id, status: EventStatus)(implicit session: Session[Interpretation]) =
-    measureExecutionTime {
+  private def queryZombieEvent(projectId: projects.Id, status: EventStatus) =
+    measureExecutionTimeK {
       SqlQuery[Interpretation, Option[ZombieEvent]](
         Kleisli { session =>
           val query: Query[projects.Id ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent] =
@@ -122,18 +114,18 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
       )
     }
 
-  private def markEventTaken(implicit
-      session: Session[Interpretation]
-  ): Option[ZombieEvent] => Interpretation[Option[ZombieEvent]] = {
-    case None        => Option.empty[ZombieEvent].pure[Interpretation]
+  private lazy val markEventTaken
+      : Option[ZombieEvent] => Kleisli[Interpretation, Session[Interpretation], Option[ZombieEvent]] = {
+    case None        => Kleisli.pure(Option.empty[ZombieEvent])
     case Some(event) => updateMessage(event.eventId) map toNoneIfEventAlreadyTaken(event)
   }
 
-  private def updateMessage(eventId: CompoundEventId)(implicit session: Session[Interpretation]) =
-    measureExecutionTime {
+  private def updateMessage(eventId: CompoundEventId) =
+    measureExecutionTimeK {
       SqlQuery(
         Kleisli { session =>
-          val query: Command[String ~ ExecutionDate ~ EventId ~ projects.Id] = sql"""
+          val query: Command[String ~ ExecutionDate ~ EventId ~ projects.Id] =
+            sql"""
           UPDATE event
           SET message = $text, execution_date = $executionDatePut
           WHERE event_id = $eventIdPut AND project_id = $projectIdPut
@@ -156,11 +148,15 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
     case TransformingTriples.value => TransformationStatus.Transforming
     case other                     => throw new Exception(s"${getClass.getName} cannot work with $other")
   }
+
   private sealed trait TransformationStatus {
     val toEventStatus: EventStatus
+
     def processingTimeFindingStatus: EventStatus
-    def followingFindingStatuses:    Set[EventStatus]
+
+    def followingFindingStatuses: Set[EventStatus]
   }
+
   private object TransformationStatus {
     final case object Generating extends TransformationStatus {
       override val toEventStatus:               EventStatus = GeneratingTriples
@@ -172,6 +168,7 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
                                                                     TriplesStore
       )
     }
+
     final case object Transforming extends TransformationStatus {
       override val toEventStatus:               EventStatus      = TransformingTriples
       override val processingTimeFindingStatus: EventStatus      = TriplesStore
@@ -183,9 +180,9 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
 private object LongProcessingEventFinder {
 
   def apply(
-      transactor:          SessionResource[IO, EventLogDB],
+      sessionResource:     SessionResource[IO, EventLogDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name]
   )(implicit contextShift: ContextShift[IO]): IO[EventFinder[IO, ZombieEvent]] = IO {
-    new LongProcessingEventFinder(transactor, queriesExecTimes)
+    new LongProcessingEventFinder(sessionResource, queriesExecTimes)
   }
 }

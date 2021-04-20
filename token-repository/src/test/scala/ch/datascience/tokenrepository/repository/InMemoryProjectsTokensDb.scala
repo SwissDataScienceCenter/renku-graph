@@ -46,7 +46,7 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
     password = dbConfig.pass.value
   )
 
-  lazy val transactor: SessionResource[IO, ProjectsTokensDB] = new SessionResource[IO, ProjectsTokensDB](
+  lazy val sessionResource: SessionResource[IO, ProjectsTokensDB] = new SessionResource[IO, ProjectsTokensDB](
     Session.single(
       host = container.host,
       database = dbConfig.name.value,
@@ -57,17 +57,13 @@ trait InMemoryProjectsTokensDb extends ForAllTestContainer {
   )
 
   def execute[O](query: Kleisli[IO, Session[IO], O]): O =
-    transactor
-      .use { session =>
-        query.run(session)
-      }
-      .unsafeRunSync()
+    sessionResource.useK(query).unsafeRunSync()
 
   protected def tableExists(): Boolean =
-    transactor
-      .use { session =>
+    sessionResource
+      .useK {
         val query: Query[Void, Boolean] = sql"""select exists (select * from projects_tokens);""".query(bool)
-        session.option(query).recover { case _ => None }
+        Kleisli[IO, Session[IO], Option[Boolean]](_.option(query).recover { case _ => None })
       }
       .unsafeRunSync()
       .isDefined

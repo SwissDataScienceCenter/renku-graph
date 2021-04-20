@@ -18,6 +18,7 @@
 
 package ch.datascience.tokenrepository.repository.init
 
+import cats.data.Kleisli
 import cats.effect._
 import cats.syntax.all._
 import ch.datascience.db.{SessionResource, SqlQuery}
@@ -28,12 +29,12 @@ import skunk.data.Completion
 
 import scala.util.control.NonFatal
 
-class DbInitializer[Interpretation[_]](
+class DbInitializer[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     projectPathAdder:         ProjectPathAdder[Interpretation],
     duplicateProjectsRemover: DuplicateProjectsRemover[Interpretation],
-    transactor:               SessionResource[Interpretation, ProjectsTokensDB],
+    sessionResource:          SessionResource[Interpretation, ProjectsTokensDB],
     logger:                   Logger[Interpretation]
-)(implicit ME:                Bracket[Interpretation, Throwable]) {
+) {
 
   import skunk._
   import skunk.implicits._
@@ -48,33 +49,27 @@ class DbInitializer[Interpretation[_]](
   } recoverWith logging
 
   private def createTable: Interpretation[Unit] =
-    transactor
-      .use { session =>
-        session.transaction.use { xa =>
-          val query: Command[Void] = sql"""CREATE TABLE IF NOT EXISTS projects_tokens(
+    sessionResource.useK {
+      val query: Command[Void] =
+        sql"""CREATE TABLE IF NOT EXISTS projects_tokens(
                             project_id int4 PRIMARY KEY,
                             token VARCHAR NOT NULL
                             );""".command
-          for {
-            sp <- xa.savepoint
-            _ <- session.execute(query).recoverWith { case e =>
-                   xa.rollback(sp).flatMap(_ => e.raiseError[Interpretation, Completion])
-                 }
-          } yield ()
-        }
-      }
+      Kleisli[Interpretation, Session[Interpretation], Unit](session => session.execute(query).void)
+    }
 
   private lazy val logging: PartialFunction[Throwable, Interpretation[Unit]] = { case NonFatal(exception) =>
     logger.error(exception)("Projects Tokens database initialization failure")
-    ME.raiseError(exception)
+    Bracket[Interpretation, Throwable].raiseError(exception)
   }
 }
 
 object IODbInitializer {
+
   import scala.concurrent.ExecutionContext
 
   def apply(
-      transactor:       SessionResource[IO, ProjectsTokensDB],
+      sessionResource:  SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   )(implicit
@@ -83,7 +78,7 @@ object IODbInitializer {
       timer:            Timer[IO]
   ): IO[DbInitializer[IO]] =
     for {
-      pathAdder <- IOProjectPathAdder(transactor, queriesExecTimes, logger)
-      duplicateProjectsRemover = DuplicateProjectsRemover[IO](transactor, logger)
-    } yield new DbInitializer[IO](pathAdder, duplicateProjectsRemover, transactor, logger)
+      pathAdder <- IOProjectPathAdder(sessionResource, queriesExecTimes, logger)
+      duplicateProjectsRemover = DuplicateProjectsRemover[IO](sessionResource, logger)
+    } yield new DbInitializer[IO](pathAdder, duplicateProjectsRemover, sessionResource, logger)
 }

@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.syntax.all._
 import io.renku.eventlog.InMemoryEventLogDb
 import org.scalatest.{BeforeAndAfter, Suite}
@@ -37,12 +38,14 @@ trait DbInitSpec extends InMemoryEventLogDb with EventLogDbMigrations with Befor
     migrationsToRun.map(_.run()).sequence.unsafeRunSync()
   }
 
-  private def findAllTables(): List[String] = execute { session =>
-    val query: Query[Void, String] = sql"""
+  private def findAllTables(): List[String] = execute {
+    Kleisli { session =>
+      val query: Query[Void, String] = sql"""
           SELECT DISTINCT tablename FROM pg_tables
           WHERE schemaname != 'pg_catalog'
             AND schemaname != 'information_schema'""".query(name)
-    session.execute(query)
+      session.execute(query)
+    }
   }
 
   protected def createEventTable(): Unit =

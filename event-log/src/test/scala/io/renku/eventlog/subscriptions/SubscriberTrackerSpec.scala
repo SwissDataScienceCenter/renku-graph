@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.subscriptions
 
+import cats.data.Kleisli
 import ch.datascience.db.SqlQuery
 import ch.datascience.events.consumers.subscriptions._
 import ch.datascience.generators.CommonGraphGenerators.microserviceBaseUrls
@@ -69,7 +70,7 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
     "insert a new row in the subscriber table " +
       "if the subscriber exists but the source_url is different" in new TestCase {
         val otherSource  = microserviceBaseUrls.generateOne
-        val otherTracker = new SubscriberTrackerImpl(transactor, queriesExecTimes, otherSource)
+        val otherTracker = new SubscriberTrackerImpl(sessionResource, queriesExecTimes, otherSource)
         (otherTracker add subscriptionInfo).unsafeRunSync() shouldBe true
 
         findSubscriber(subscriptionInfo.subscriberUrl, otherSource) shouldBe Some(
@@ -141,33 +142,38 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
     val subscriptionInfo = subscriptionInfos.generateOne
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
     val sourceUrl        = microserviceBaseUrls.generateOne
-    val tracker          = new SubscriberTrackerImpl(transactor, queriesExecTimes, sourceUrl)
+    val tracker          = new SubscriberTrackerImpl(sessionResource, queriesExecTimes, sourceUrl)
   }
 
   private def findSubscriber(subscriberUrl: SubscriberUrl,
                              sourceUrl:     MicroserviceBaseUrl
-  ): Option[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute { session =>
-    val query: Query[SubscriberUrl ~ MicroserviceBaseUrl, (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] =
-      sql"""SELECT delivery_id, delivery_url, source_url
+  ): Option[(SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] = execute {
+    Kleisli { session =>
+      val query: Query[SubscriberUrl ~ MicroserviceBaseUrl, (SubscriberId, SubscriberUrl, MicroserviceBaseUrl)] =
+        sql"""SELECT delivery_id, delivery_url, source_url
             FROM subscriber
             WHERE delivery_url = $subscriberUrlPut AND source_url = $microserviceBaseUrlPut"""
-        .query(subscriberIdGet ~ subscriberUrlGet ~ microserviceBaseUrlGet)
-        .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
-          (subscriberId, subscriberUrl, microserviceBaseUrl)
-        }
-    session.prepare(query).use(_.option(subscriberUrl ~ sourceUrl))
+          .query(subscriberIdGet ~ subscriberUrlGet ~ microserviceBaseUrlGet)
+          .map { case subscriberId ~ subscriberUrl ~ microserviceBaseUrl =>
+            (subscriberId, subscriberUrl, microserviceBaseUrl)
+          }
+      session.prepare(query).use(_.option(subscriberUrl ~ sourceUrl))
+    }
   }
 
   private def storeSubscriptionInfo(subscriptionInfo: SubscriptionInfo, sourceUrl: MicroserviceBaseUrl): Unit =
-    execute { session =>
-      val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl] = sql"""
+    execute[Unit] {
+      Kleisli { session =>
+        val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl] =
+          sql"""
             INSERT INTO
             subscriber (delivery_id, delivery_url, source_url)
             VALUES ($subscriberIdPut, $subscriberUrlPut, $microserviceBaseUrlPut)
       """.command
-      session
-        .prepare(query)
-        .use(_.execute(subscriptionInfo.subscriberId ~ subscriptionInfo.subscriberUrl ~ sourceUrl))
-        .void
+        session
+          .prepare(query)
+          .use(_.execute(subscriptionInfo.subscriberId ~ subscriptionInfo.subscriberUrl ~ sourceUrl))
+          .void
+      }
     }
 }

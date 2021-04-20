@@ -34,7 +34,7 @@ private[subscriptions] object SubscriptionCategory {
   val name: CategoryName = CategoryName("AWAITING_GENERATION")
 
   def apply(
-      transactor:                     SessionResource[IO, EventLogDB],
+      sessionResource:                SessionResource[IO, EventLogDB],
       awaitingTriplesGenerationGauge: LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge:    LabeledGauge[IO, projects.Path],
       queriesExecTimes:               LabeledHistogram[IO, SqlQuery.Name],
@@ -46,24 +46,24 @@ private[subscriptions] object SubscriptionCategory {
       timer:            Timer[IO]
   ): IO[subscriptions.SubscriptionCategory[IO]] = for {
     subscribers <- Subscribers(name, subscriberTracker, logger)
-    eventFetcher <- IOAwaitingGenerationEventFinder(transactor,
+    eventFetcher <- IOAwaitingGenerationEventFinder(sessionResource,
                                                     subscribers,
                                                     awaitingTriplesGenerationGauge,
                                                     underTriplesGenerationGauge,
                                                     queriesExecTimes
                     )
-    dispatchRecovery <- DispatchRecovery(transactor,
+    dispatchRecovery <- DispatchRecovery(sessionResource,
                                          awaitingTriplesGenerationGauge,
                                          underTriplesGenerationGauge,
                                          queriesExecTimes,
                                          logger
                         )
-    eventDelivery <- EventDelivery[AwaitingGenerationEvent](transactor,
+    eventDelivery <- EventDelivery[AwaitingGenerationEvent](sessionResource,
                                                             compoundEventIdExtractor = (_: AwaitingGenerationEvent).id,
                                                             queriesExecTimes
                      )
     eventsDistributor <- IOEventsDistributor(name,
-                                             transactor,
+                                             sessionResource,
                                              subscribers,
                                              eventFetcher,
                                              eventDelivery,

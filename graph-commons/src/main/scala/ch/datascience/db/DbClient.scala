@@ -17,6 +17,7 @@
  */
 
 package ch.datascience.db
+import cats.data.Kleisli
 import cats.effect.Async
 import cats.syntax.all._
 import ch.datascience.db.SqlQuery.Name
@@ -27,9 +28,9 @@ abstract class DbClient[Interpretation[_]: Async](
     maybeHistogram: Option[LabeledHistogram[Interpretation, Name]]
 ) {
 
-  protected def measureExecutionTime[ResultType](
-      query:          SqlQuery[Interpretation, ResultType]
-  )(implicit session: Session[Interpretation]): Interpretation[ResultType] =
+  protected def measureExecutionTimeK[ResultType](
+      query: SqlQuery[Interpretation, ResultType]
+  ): Kleisli[Interpretation, Session[Interpretation], ResultType] = Kleisli { session =>
     maybeHistogram match {
       case None => query.query.run(session)
       case Some(histogram) =>
@@ -39,5 +40,5 @@ abstract class DbClient[Interpretation[_]: Async](
           _      <- timer.observeDuration
         } yield result
     }
-
+  }
 }

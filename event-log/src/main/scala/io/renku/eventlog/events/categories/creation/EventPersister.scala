@@ -45,7 +45,7 @@ trait EventPersister[Interpretation[_]] {
 }
 
 class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-    transactor:         SessionResource[Interpretation, EventLogDB],
+    sessionResource:    SessionResource[Interpretation, EventLogDB],
     waitingEventsGauge: LabeledGauge[Interpretation, projects.Path],
     queriesExecTimes:   LabeledHistogram[Interpretation, SqlQuery.Name],
     now:                () => Instant = () => Instant.now
@@ -54,39 +54,40 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
 
   import io.renku.eventlog.TypeSerializers._
 
-  override def storeNewEvent(event: Event): Interpretation[Result] = transactor.use { implicit session =>
-    session.transaction.use { transaction =>
+  override def storeNewEvent(event: Event): Interpretation[Result] = sessionResource.useWithTransactionK[Result] {
+    Kleisli { case (transaction, session) =>
       for {
         sp <- transaction.savepoint
-        result <- insertIfNotDuplicate(event) recoverWith { case error =>
+        result <- insertIfNotDuplicate(event)(session) recoverWith { case error =>
                     transaction.rollback(sp).flatMap(_ => error.raiseError[Interpretation, Result])
                   }
-        _ <- Applicative[Interpretation].whenA(result == Created && event.status == New)(
-               waitingEventsGauge.increment(event.project.path)
-             )
+        _ <-
+          Applicative[Interpretation].whenA(result == Created && event.status == New)(
+            waitingEventsGauge.increment(event.project.path)
+          )
+
       } yield result
     }
-
   }
 
-  private def insertIfNotDuplicate(event: Event)(implicit session: Session[Interpretation]) =
+  private def insertIfNotDuplicate(event: Event) =
     checkIfPersisted(event) flatMap {
-      case true  => (Existed: Result).pure[Interpretation]
+      case true  => Kleisli.pure(Existed: Result)
       case false => persist(event)
     }
 
-  private def persist(event: Event)(implicit session: Session[Interpretation]): Interpretation[Result] =
+  private def persist(event: Event): Kleisli[Interpretation, Session[Interpretation], Result] =
     for {
       updatedCommitEvent <- eventuallyAddToExistingBatch(event)
       _                  <- upsertProject(updatedCommitEvent)
-      _                  <- insert(session)(updatedCommitEvent)
+      _                  <- insert(updatedCommitEvent)
     } yield Created
 
-  private def eventuallyAddToExistingBatch(event: Event)(implicit session: Session[Interpretation]) =
+  private def eventuallyAddToExistingBatch(event: Event) =
     findBatchInQueue(event)
       .map(_.map(event.withBatchDate).getOrElse(event))
 
-  private def checkIfPersisted(event: Event)(implicit session: Session[Interpretation]) = measureExecutionTime(
+  private def checkIfPersisted(event: Event) = measureExecutionTimeK(
     SqlQuery(
       Kleisli { session =>
         val query: Query[EventId ~ projects.Id, EventId] =
@@ -105,7 +106,7 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
   )
 
   // format: off
-  private def findBatchInQueue(event: Event)(implicit session: Session[Interpretation]) = measureExecutionTime(
+  private def findBatchInQueue(event: Event) = measureExecutionTimeK(
     SqlQuery(
       Kleisli { session =>
         val query: Query[projects.Id, BatchDate] =
@@ -121,10 +122,10 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     ))
   // format: on
 
-  private def insert(implicit session: Session[Interpretation]): Event => Interpretation[Unit] = {
+  private lazy val insert: Event => Kleisli[Interpretation, Session[Interpretation], Unit] = {
     case NewEvent(id, project, date, batchDate, body) =>
       val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply _)(now())
-      measureExecutionTime(
+      measureExecutionTimeK(
         SqlQuery(
           Kleisli { session =>
             val query: Command[
@@ -138,17 +139,14 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
               .use {
                 _.execute(id ~ project.id ~ New ~ createdDate ~ executionDate ~ date ~ batchDate ~ body)
               }
-              .map { completion =>
-                println(completion)
-                ()
-              }
+              .void
           },
           name = "new - create (NEW)"
         )
       )
     case SkippedEvent(id, project, date, batchDate, body, message) =>
       val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply _)(now())
-      measureExecutionTime(
+      measureExecutionTimeK(
         SqlQuery(
           Kleisli { session =>
             val query: Command[
@@ -163,17 +161,14 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
               .use(
                 _.execute(id ~ project.id ~ Skipped ~ createdDate ~ executionDate ~ date ~ batchDate ~ body ~ message)
               )
-              .map { completion =>
-                println(completion)
-                ()
-              }
+              .void
           },
           name = "new - create (SKIPPED)"
         )
       )
   }
 
-  private def upsertProject(event: Event)(implicit session: Session[Interpretation]) = measureExecutionTime(
+  private def upsertProject(event: Event) = measureExecutionTimeK(
     SqlQuery(
       Kleisli { session =>
         val query: Command[projects.Id ~ projects.Path ~ EventDate] =
@@ -209,10 +204,10 @@ object EventPersister {
 
 object IOEventPersister {
   def apply(
-      transactor:         SessionResource[IO, EventLogDB],
+      sessionResource:    SessionResource[IO, EventLogDB],
       waitingEventsGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:   LabeledHistogram[IO, SqlQuery.Name]
   ): IO[EventPersisterImpl[IO]] = IO {
-    new EventPersisterImpl[IO](transactor, waitingEventsGauge, queriesExecTimes)
+    new EventPersisterImpl[IO](sessionResource, waitingEventsGauge, queriesExecTimes)
   }
 }

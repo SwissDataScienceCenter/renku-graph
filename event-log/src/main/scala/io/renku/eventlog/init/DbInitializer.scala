@@ -50,26 +50,26 @@ class DbInitializerImpl[Interpretation[_]](
 
 object DbInitializer {
   def apply(
-      transactor:          SessionResource[IO, EventLogDB],
+      sessionResource:     SessionResource[IO, EventLogDB],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[DbInitializer[IO]] = IO {
     new DbInitializerImpl[IO](
       migrators = List[Runnable[IO, Unit]](
-        EventLogTableCreator(transactor, logger),
-        ProjectPathAdder(transactor, logger),
-        BatchDateAdder(transactor, logger),
-        LatestEventDatesViewRemover[IO](transactor, logger),
-        ProjectTableCreator(transactor, logger),
-        ProjectPathRemover(transactor, logger),
-        EventLogTableRenamer(transactor, logger),
-        EventStatusRenamer(transactor, logger),
-        EventPayloadTableCreator(transactor, logger),
-        EventPayloadSchemaVersionAdder(transactor, logger),
-        SubscriptionCategorySyncTimeTableCreator(transactor, logger),
-        StatusesProcessingTimeTableCreator(transactor, logger),
-        SubscriberTableCreator(transactor, logger),
-        EventDeliveryTableCreator(transactor, logger),
-        TimestampZoneAdder(transactor, logger)
+        EventLogTableCreator(sessionResource, logger),
+        ProjectPathAdder(sessionResource, logger),
+        BatchDateAdder(sessionResource, logger),
+        LatestEventDatesViewRemover[IO](sessionResource, logger),
+        ProjectTableCreator(sessionResource, logger),
+        ProjectPathRemover(sessionResource, logger),
+        EventLogTableRenamer(sessionResource, logger),
+        EventStatusRenamer(sessionResource, logger),
+        EventPayloadTableCreator(sessionResource, logger),
+        EventPayloadSchemaVersionAdder(sessionResource, logger),
+        SubscriptionCategorySyncTimeTableCreator(sessionResource, logger),
+        StatusesProcessingTimeTableCreator(sessionResource, logger),
+        SubscriberTableCreator(sessionResource, logger),
+        EventDeliveryTableCreator(sessionResource, logger),
+        TimestampZoneAdder(sessionResource, logger)
       ),
       logger
     )

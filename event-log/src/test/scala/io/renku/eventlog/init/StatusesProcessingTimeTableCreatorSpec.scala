@@ -77,7 +77,7 @@ class StatusesProcessingTimeTableCreatorSpec extends AnyWordSpec with DbInitSpec
 
   private trait TestCase {
     val logger       = TestLogger[IO]()
-    val tableCreator = new StatusesProcessingTimeTableCreatorImpl[IO](transactor, logger)
+    val tableCreator = new StatusesProcessingTimeTableCreatorImpl[IO](sessionResource, logger)
   }
 
 }

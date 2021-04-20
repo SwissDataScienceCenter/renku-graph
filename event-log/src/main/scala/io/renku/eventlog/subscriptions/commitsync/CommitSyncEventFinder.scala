@@ -35,37 +35,29 @@ import skunk.implicits._
 import java.time.Instant
 
 private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: Bracket[*[_], Throwable]](
-    transactor:       SessionResource[Interpretation, EventLogDB],
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[Interpretation, CommitSyncEvent]
     with SubscriptionTypeSerializers {
 
-  override def popEvent(): Interpretation[Option[CommitSyncEvent]] = transactor.use { implicit session =>
-    session.transaction.use { transaction =>
-      for {
-        sp <- transaction.savepoint
-        result <- findEventAndMarkTaken recoverWith { error =>
-                    transaction.rollback(sp).flatMap(_ => error.raiseError[Interpretation, Option[CommitSyncEvent]])
-                  }
-      } yield result
-    }
-  }
+  override def popEvent(): Interpretation[Option[CommitSyncEvent]] = sessionResource.useK(findEventAndMarkTaken)
 
-  private def findEventAndMarkTaken(implicit session: Session[Interpretation]) =
+  private lazy val findEventAndMarkTaken =
     findEvent >>= {
       case Some((event, maybeSyncDate)) =>
         setSyncDate(event, maybeSyncDate) map toNoneIfEventAlreadyTaken(event)
-      case None => Option.empty[CommitSyncEvent].pure[Interpretation]
+      case None => Kleisli.pure(Option.empty[CommitSyncEvent])
     }
 
-  private def findEvent(implicit session: Session[Interpretation]) = measureExecutionTime {
+  private lazy val findEvent = measureExecutionTimeK {
     SqlQuery[Interpretation, Option[(CommitSyncEvent, Option[LastSyncedDate])]](
       Kleisli { session =>
         val query: Query[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
                          (CommitSyncEvent, Option[LastSyncedDate])
-        ] = sql"""SELECT
+        ] =
+          sql"""SELECT
                     (SELECT evt.event_id
                       FROM event evt
                       WHERE evt.project_id = proj.project_id
@@ -88,16 +80,16 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
                     )
                   ORDER BY proj.latest_event_date DESC
                   LIMIT 1"""
-          .query(eventIdGet.opt ~ projectIdGet ~ projectPathGet ~ lastSyncedDateGet.opt ~ eventDateGet)
-          .map {
-            case Some(eventId) ~ projectId ~ projectPath ~ maybeLastSyncDate ~ latestEventDate =>
-              FullCommitSyncEvent(CompoundEventId(eventId, projectId),
-                                  projectPath,
-                                  maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
-              ) -> maybeLastSyncDate
-            case None ~ projectId ~ projectPath ~ maybeLastSyncDate ~ _ =>
-              MinimalCommitSyncEvent(projectId, projectPath) -> maybeLastSyncDate
-          }
+            .query(eventIdGet.opt ~ projectIdGet ~ projectPathGet ~ lastSyncedDateGet.opt ~ eventDateGet)
+            .map {
+              case Some(eventId) ~ projectId ~ projectPath ~ maybeLastSyncDate ~ latestEventDate =>
+                FullCommitSyncEvent(CompoundEventId(eventId, projectId),
+                                    projectPath,
+                                    maybeLastSyncDate getOrElse LastSyncedDate(latestEventDate.value)
+                ) -> maybeLastSyncDate
+              case None ~ projectId ~ projectPath ~ maybeLastSyncDate ~ _ =>
+                MinimalCommitSyncEvent(projectId, projectPath) -> maybeLastSyncDate
+            }
         val (eventDate, lastSyncDate) = (EventDate.apply _ &&& LastSyncedDate.apply _)(now())
         session.prepare(query).use(_.option(categoryName ~ eventDate ~ lastSyncDate ~ eventDate ~ lastSyncDate))
       },
@@ -105,14 +97,12 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
     )
   }
 
-  private def setSyncDate(event: CommitSyncEvent, maybeSyncedDate: Option[LastSyncedDate])(implicit
-      session:                   Session[Interpretation]
-  ) =
+  private def setSyncDate(event: CommitSyncEvent, maybeSyncedDate: Option[LastSyncedDate]) =
     if (maybeSyncedDate.isDefined) updateLastSyncedDate(event)
     else insertLastSyncedDate(event)
 
-  private def updateLastSyncedDate(event: CommitSyncEvent)(implicit session: Session[Interpretation]) =
-    measureExecutionTime {
+  private def updateLastSyncedDate(event: CommitSyncEvent) =
+    measureExecutionTimeK {
       SqlQuery(
         Kleisli { session =>
           val query: Command[LastSyncedDate ~ projects.Id ~ CategoryName] =
@@ -126,11 +116,12 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
       )
     }
 
-  private def insertLastSyncedDate(event: CommitSyncEvent)(implicit session: Session[Interpretation]) =
-    measureExecutionTime {
+  private def insertLastSyncedDate(event: CommitSyncEvent) =
+    measureExecutionTimeK {
       SqlQuery(
         Kleisli { session =>
-          val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] = sql"""
+          val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] =
+            sql"""
           INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
           VALUES ($projectIdPut, $categoryNamePut, $lastSyncedDatePut)
           ON CONFLICT (project_id, category_name)
@@ -159,9 +150,9 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
 
 private object CommitSyncEventFinder {
   def apply(
-      transactor:       SessionResource[IO, EventLogDB],
+      sessionResource:  SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
   )(implicit ME:        Bracket[IO, Throwable], contextShift: ContextShift[IO]): IO[EventFinder[IO, CommitSyncEvent]] = IO {
-    new CommitSyncEventFinderImpl(transactor, queriesExecTimes)
+    new CommitSyncEventFinderImpl(sessionResource, queriesExecTimes)
   }
 }

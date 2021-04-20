@@ -18,13 +18,14 @@
 
 package io.renku.eventlog
 
+import cats.data.Kleisli
 import cats.effect.Bracket
 import cats.syntax.all._
 import skunk._
 
 package object init {
 
-  def execute[Interpretation[_]: Bracket[*[_], Throwable]](sql: Command[Void])(implicit
-      session: Session[Interpretation]
-  ): Interpretation[Unit] = session.execute(sql).void
+  def execute[Interpretation[_]: Bracket[*[_], Throwable]](
+      sql: Command[Void]
+  ): Kleisli[Interpretation, Session[Interpretation], Unit] = Kleisli(session => session.execute(sql).void)
 }

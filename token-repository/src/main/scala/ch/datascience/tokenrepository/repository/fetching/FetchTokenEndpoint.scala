@@ -72,11 +72,11 @@ class FetchTokenEndpoint[Interpretation[_]: Effect](
 
 object IOFetchTokenEndpoint {
   def apply(
-      transactor:          SessionResource[IO, ProjectsTokensDB],
+      sessionResource:     SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes:    LabeledHistogram[IO, SqlQuery.Name],
       logger:              Logger[IO]
   )(implicit contextShift: ContextShift[IO]): IO[FetchTokenEndpoint[IO]] =
     for {
-      tokenFinder <- IOTokenFinder(transactor, queriesExecTimes)
+      tokenFinder <- IOTokenFinder(sessionResource, queriesExecTimes)
     } yield new FetchTokenEndpoint[IO](tokenFinder, logger)
 }

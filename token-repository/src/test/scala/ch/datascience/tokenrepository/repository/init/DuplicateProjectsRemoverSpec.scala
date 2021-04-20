@@ -62,6 +62,6 @@ class DuplicateProjectsRemoverSpec extends AnyWordSpec with InMemoryProjectsToke
 
   private trait TestCase {
     val logger       = TestLogger[IO]()
-    val deduplicator = new DuplicateProjectsRemoverImpl[IO](transactor, logger)
+    val deduplicator = new DuplicateProjectsRemoverImpl[IO](sessionResource, logger)
   }
 }

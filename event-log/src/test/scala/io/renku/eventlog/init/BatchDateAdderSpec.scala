@@ -18,6 +18,7 @@
 
 package io.renku.eventlog.init
 
+import cats.data.Kleisli
 import cats.effect.IO
 import cats.syntax.all._
 import ch.datascience.generators.Generators.Implicits._
@@ -95,26 +96,30 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
 
   private trait TestCase {
     val logger         = TestLogger[IO]()
-    val batchDateAdder = new BatchDateAdderImpl[IO](transactor, logger)
+    val batchDateAdder = new BatchDateAdderImpl[IO](sessionResource, logger)
   }
 
   private def checkColumnExists: Boolean =
-    transactor
-      .use { session =>
-        val query: Query[Void, BatchDate] = sql"select batch_date from event_log limit 1"
-          .query(timestamp)
-          .map { case time: LocalDateTime => BatchDate(time.toInstant(ZoneOffset.UTC)) }
-        session
-          .option(query)
-          .map(_ => true)
-          .recover { case _ => false }
+    sessionResource
+      .useK {
+        Kleisli { session =>
+          val query: Query[Void, BatchDate] = sql"select batch_date from event_log limit 1"
+            .query(timestamp)
+            .map { case time: LocalDateTime => BatchDate(time.toInstant(ZoneOffset.UTC)) }
+          session
+            .option(query)
+            .map(_ => true)
+            .recover { case _ => false }
+        }
       }
       .unsafeRunSync()
 
-  private def storeEvent(event: Event, createdDate: CreatedDate): Unit = execute { session =>
-    val query: Command[
-      EventId ~ projects.Id ~ projects.Path ~ events.EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String
-    ] = sql"""insert into
+  private def storeEvent(event: Event, createdDate: CreatedDate): Unit = execute[Unit] {
+    Kleisli { session =>
+      val query: Command[
+        EventId ~ projects.Id ~ projects.Path ~ events.EventStatus ~ CreatedDate ~ ExecutionDate ~ EventDate ~ String
+      ] =
+        sql"""insert into
               event_log (event_id, project_id, project_path, status, created_date, execution_date, event_date, event_body) 
               values (
                 $eventIdPut, 
@@ -127,19 +132,21 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
                 $text
               )
       """.command
-    session
-      .prepare(query)
-      .use(
-        _.execute(
-          event.id ~ event.project.id ~ event.project.path ~ eventStatuses.generateOne ~ createdDate ~ executionDates.generateOne ~ event.date ~ toJsonBody(
-            event
+      session
+        .prepare(query)
+        .use(
+          _.execute(
+            event.id ~ event.project.id ~ event.project.path ~ eventStatuses.generateOne ~ createdDate ~ executionDates.generateOne ~ event.date ~ toJsonBody(
+              event
+            )
           )
         )
-      )
-      .map(_ => ())
+        .map(_ => ())
+    }
   }
 
-  private def toJsonBody(event: Event): String = json"""{
+  private def toJsonBody(event: Event): String =
+    json"""{
     "project": {
       "id": ${event.project.id.value},
       "path": ${event.project.path.value}
@@ -147,13 +154,15 @@ class BatchDateAdderSpec extends AnyWordSpec with DbInitSpec with should.Matcher
   }""".noSpaces
 
   private def findBatchDates: Set[BatchDate] =
-    transactor
-      .use { session =>
-        val query: Query[Void, BatchDate] = sql"select batch_date from event_log"
-          .query(timestamp)
-          .map { case time: LocalDateTime => BatchDate(time.toInstant(ZoneOffset.UTC)) }
+    sessionResource
+      .useK {
+        Kleisli { session =>
+          val query: Query[Void, BatchDate] = sql"select batch_date from event_log"
+            .query(timestamp)
+            .map { case time: LocalDateTime => BatchDate(time.toInstant(ZoneOffset.UTC)) }
 
-        session.execute(query)
+          session.execute(query)
+        }
       }
       .unsafeRunSync()
       .toSet

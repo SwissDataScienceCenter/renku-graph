@@ -147,6 +147,6 @@ class MemberSyncEventFinderSpec
 
     val queriesExecTimes = TestLabeledHistogram[SqlQuery.Name]("query_id")
 
-    val finder = new MemberSyncEventFinderImpl(transactor, queriesExecTimes)
+    val finder = new MemberSyncEventFinderImpl(sessionResource, queriesExecTimes)
   }
 }

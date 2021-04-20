@@ -57,7 +57,7 @@ private class TokenAssociator[Interpretiation[_]](
 
 private object IOTokenAssociator {
   def apply(
-      transactor:       SessionResource[IO, ProjectsTokensDB],
+      sessionResource:  SessionResource[IO, ProjectsTokensDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
       logger:           Logger[IO]
   )(implicit
@@ -68,7 +68,7 @@ private object IOTokenAssociator {
     for {
       pathFinder        <- IOProjectPathFinder(logger)
       accessTokenCrypto <- AccessTokenCrypto[IO]()
-      persister    = new IOAssociationPersister(transactor, queriesExecTimes)
-      tokenRemover = new TokenRemover[IO](transactor, queriesExecTimes)
+      persister    = new IOAssociationPersister(sessionResource, queriesExecTimes)
+      tokenRemover = new TokenRemover[IO](sessionResource, queriesExecTimes)
     } yield new TokenAssociator[IO](pathFinder, accessTokenCrypto, persister, tokenRemover)
 }

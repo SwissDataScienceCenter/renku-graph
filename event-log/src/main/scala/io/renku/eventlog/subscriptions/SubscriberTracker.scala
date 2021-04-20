@@ -33,19 +33,20 @@ import skunk.implicits._
 
 private trait SubscriberTracker[Interpretation[_]] {
   def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean]
-  def remove(subscriberUrl: SubscriberUrl):    Interpretation[Boolean]
+
+  def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean]
 }
 
 private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
-    transactor:       SessionResource[Interpretation, EventLogDB],
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
     sourceUrl:        MicroserviceBaseUrl
 ) extends DbClient(Some(queriesExecTimes))
     with SubscriberTracker[Interpretation]
     with TypeSerializers {
 
-  override def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean] = transactor.use { implicit session =>
-    measureExecutionTime(
+  override def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean] = sessionResource.useK {
+    measureExecutionTimeK(
       SqlQuery(
         Kleisli { session =>
           val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId] =
@@ -64,11 +65,13 @@ private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Thro
       )
     ) map insertToTableResult
   }
-  override def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean] = transactor.use { implicit session =>
-    measureExecutionTime(
+
+  override def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean] = sessionResource.useK {
+    measureExecutionTimeK(
       SqlQuery(
         Kleisli { session =>
-          val query: Command[SubscriberUrl ~ MicroserviceBaseUrl] = sql"""
+          val query: Command[SubscriberUrl ~ MicroserviceBaseUrl] =
+            sql"""
             DELETE FROM subscriber
             WHERE delivery_url = $subscriberUrlPut AND source_url = $microserviceBaseUrlPut
           """.command
@@ -91,10 +94,10 @@ private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Thro
 }
 
 private object SubscriberTracker {
-  def apply(transactor:       SessionResource[IO, EventLogDB],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
   ): IO[SubscriberTracker[IO]] = for {
     microserviceUrlFinder <- MicroserviceUrlFinder(Microservice.ServicePort)
     sourceUrl             <- microserviceUrlFinder.findBaseUrl()
-  } yield new SubscriberTrackerImpl(transactor, queriesExecTimes, sourceUrl)
+  } yield new SubscriberTrackerImpl(sessionResource, queriesExecTimes, sourceUrl)
 }

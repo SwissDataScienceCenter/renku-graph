@@ -18,11 +18,11 @@
 
 package ch.datascience.graph.acceptancetests.db
 
-import cats.data.NonEmptyList
+import cats.data.{Kleisli, NonEmptyList}
 import cats.effect.{ContextShift, IO}
 import ch.datascience.db.{DBConfigProvider, SessionResource}
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
-import ch.datascience.graph.model.events.{CommitId, EventStatus}
+import ch.datascience.graph.model.events.{CommitId, EventId, EventStatus}
 import ch.datascience.graph.model.projects
 import ch.datascience.graph.model.projects.Id
 import com.dimafeng.testcontainers.PostgreSQLContainer
@@ -40,22 +40,25 @@ object EventLog extends TypeSerializers {
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
   private val logger = TestLogger()
 
-  def findEvents(projectId: Id): List[(EventId, EventStatus)] = execute {
-    fr"""
+  def findEvents(projectId: Id): List[(EventId, EventStatus)] = execute { session =>
+    val query: Query[projects.Id, (EventId, EventStatus)] =
+      sql"""
      SELECT event_id, status
      FROM event
-     WHERE project_id = $projectId"""
-      .query[(EventId, EventStatus)]
-      .to[List]
+     WHERE project_id = $projectIdPut"""
+        .query(eventIdGet ~ eventStatusGet)
+        .map { case id ~ status => (id, status) }
+    session.prepare(query).use(_.stream(projectId, 32).compile.toList)
   }
 
   def findEvents(projectId: Id, status: EventStatus*): List[CommitId] = execute { session =>
-    val query: Query[projects.Id, CommitId] = sql"""
+    val query: Query[projects.Id, CommitId] =
+      sql"""
      SELECT event_id
      FROM event
      WHERE project_id = $projectIdPut AND #${`status IN`(status.toList)}"""
-      .query(eventIdGet)
-      .map(eventId => CommitId(eventId.value))
+        .query(eventIdGet)
+        .map(eventId => CommitId(eventId.value))
     session.prepare(query).use(_.stream(projectId, 32).compile.toList)
   }
 
@@ -63,14 +66,16 @@ object EventLog extends TypeSerializers {
     s"status IN (${NonEmptyList.fromListUnsafe(status).map(el => s"'$el'").toList.mkString(",")})"
 
   def execute[O](query: Session[IO] => IO[O]): O =
-    transactor.use(session => query(session)).unsafeRunSync()
+    sessionResource
+      .useK(Kleisli[IO, Session[IO], O](session => query(session)))
+      .unsafeRunSync()
 
   private val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
     new EventLogDbConfigProvider[IO].get().unsafeRunSync()
 
   private val postgresContainer: PostgreSQLContainer = PostgreSQLContainer(
     dockerImageNameOverride = DockerImageName.parse("postgres:9.6.19-alpine"),
-    databaseName = "event_log",
+    databaseName = dbConfig.name.value,
     username = dbConfig.user.value,
     password = dbConfig.pass.value
   )
@@ -80,7 +85,7 @@ object EventLog extends TypeSerializers {
     _ <- logger.info("event_log DB started")
   } yield ()
 
-  private lazy val transactor: SessionResource[IO, EventLogDB] = new SessionResource[IO, EventLogDB](
+  private lazy val sessionResource: SessionResource[IO, EventLogDB] = new SessionResource[IO, EventLogDB](
     Session.single(
       host = postgresContainer.host,
       port = postgresContainer.container.getMappedPort(dbConfig.port.value),

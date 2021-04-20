@@ -35,38 +35,32 @@ import skunk.implicits._
 import java.time.Instant
 
 private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]: ContextShift](
-    transactor:       SessionResource[Interpretation, EventLogDB],
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name],
     now:              () => Instant = () => Instant.now
 ) extends DbClient(Some(queriesExecTimes))
     with EventFinder[Interpretation, MemberSyncEvent]
     with SubscriptionTypeSerializers {
 
-  override def popEvent(): Interpretation[Option[MemberSyncEvent]] = transactor.use { implicit session =>
-    session.transaction.use { transaction =>
-      for {
-        sp <- transaction.savepoint
-        result <- findEventAndMarkTaken recoverWith { error =>
-                    transaction.rollback(sp).flatMap(_ => error.raiseError[Interpretation, Option[MemberSyncEvent]])
-                  }
-      } yield result
-    }
+  override def popEvent(): Interpretation[Option[MemberSyncEvent]] = sessionResource.useK {
+    findEventAndMarkTaken()
   }
 
-  private def findEventAndMarkTaken(implicit session: Session[Interpretation]) =
-    findEvent flatMap {
+  private def findEventAndMarkTaken() =
+    findEvent >>= {
       case Some((projectId, maybeSyncedDate, event)) =>
         setSyncDate(projectId, maybeSyncedDate) map toNoneIfEventAlreadyTaken(event)
-      case None => Option.empty[MemberSyncEvent].pure[Interpretation]
+      case None => Kleisli.pure(Option.empty[MemberSyncEvent])
     }
 
-  private def findEvent(implicit session: Session[Interpretation]) = measureExecutionTime {
+  private lazy val findEvent = measureExecutionTimeK {
     SqlQuery[Interpretation, Option[(projects.Id, Option[LastSyncedDate], MemberSyncEvent)]](
       Kleisli { session =>
         val query
             : Query[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
                     (projects.Id, Option[LastSyncedDate], MemberSyncEvent)
-            ] = sql"""SELECT proj.project_id, sync_time.last_synced, proj.project_path
+            ] =
+          sql"""SELECT proj.project_id, sync_time.last_synced, proj.project_path
                   FROM project proj
                   LEFT JOIN subscription_category_sync_time sync_time
                     ON sync_time.project_id = proj.project_id AND sync_time.category_name = $categoryNamePut
@@ -80,7 +74,7 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], 
                   ORDER BY proj.latest_event_date DESC
                   LIMIT 1
       """.query(projectIdGet ~ lastSyncedDateGet.opt ~ projectPathGet)
-          .map { case id ~ maybeDate ~ path => (id, maybeDate, MemberSyncEvent(path)) }
+            .map { case id ~ maybeDate ~ path => (id, maybeDate, MemberSyncEvent(path)) }
         val eventDate    = EventDate(now())
         val lastSyncDate = LastSyncedDate(now())
         session
@@ -92,14 +86,12 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], 
     )
   }
 
-  private def setSyncDate(projectId: projects.Id, maybeSyncedDate: Option[LastSyncedDate])(implicit
-      session:                       Session[Interpretation]
-  ) =
+  private def setSyncDate(projectId: projects.Id, maybeSyncedDate: Option[LastSyncedDate]) =
     if (maybeSyncedDate.isDefined) updateLastSyncedDate(projectId)
     else insertLastSyncedDate(projectId)
 
-  private def updateLastSyncedDate(projectId: projects.Id)(implicit session: Session[Interpretation]) =
-    measureExecutionTime {
+  private def updateLastSyncedDate(projectId: projects.Id) =
+    measureExecutionTimeK {
       SqlQuery(
         Kleisli { session =>
           val query: Command[LastSyncedDate ~ projects.Id ~ CategoryName] =
@@ -117,11 +109,12 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], 
       )
     }
 
-  private def insertLastSyncedDate(projectId: projects.Id)(implicit session: Session[Interpretation]) =
-    measureExecutionTime {
+  private def insertLastSyncedDate(projectId: projects.Id) =
+    measureExecutionTimeK {
       SqlQuery(
         Kleisli { session =>
-          val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] = sql"""
+          val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] =
+            sql"""
             INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
             VALUES ($projectIdPut, $categoryNamePut, $lastSyncedDatePut)
             ON CONFLICT (project_id, category_name)
@@ -145,9 +138,9 @@ private class MemberSyncEventFinderImpl[Interpretation[_]: Async: Bracket[*[_], 
 
 private object MemberSyncEventFinder {
   def apply(
-      transactor:       SessionResource[IO, EventLogDB],
+      sessionResource:  SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
   )(implicit ME:        Bracket[IO, Throwable], contextShift: ContextShift[IO]): IO[EventFinder[IO, MemberSyncEvent]] = IO {
-    new MemberSyncEventFinderImpl(transactor, queriesExecTimes)
+    new MemberSyncEventFinderImpl(sessionResource, queriesExecTimes)
   }
 }

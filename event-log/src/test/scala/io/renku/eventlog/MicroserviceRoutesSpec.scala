@@ -197,7 +197,7 @@ class MicroserviceRoutesSpec extends AnyWordSpec with MockFactory with should.Ma
   ) extends SubscriptionsEndpoint[IO](subscriptionCategoryRegistry, logger)
 
   class TestStatusChangeEndpoint(
-      transactor:                      SessionResource[IO, EventLogDB],
+      sessionResource:                 SessionResource[IO, EventLogDB],
       updateCommandsRunner:            StatusUpdatesRunner[IO],
       awaitingTriplesGenerationGauge:  LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],

@@ -35,7 +35,7 @@ private trait EventDetailsFinder[Interpretation[_]] {
 }
 
 private class EventDetailsFinderImpl[Interpretation[_]: Async](
-    transactor:       SessionResource[Interpretation, EventLogDB],
+    sessionResource:  SessionResource[Interpretation, EventLogDB],
     queriesExecTimes: LabeledHistogram[Interpretation, SqlQuery.Name]
 ) extends DbClient[Interpretation](Some(queriesExecTimes))
     with EventDetailsFinder[Interpretation]
@@ -44,12 +44,13 @@ private class EventDetailsFinderImpl[Interpretation[_]: Async](
   import eu.timepit.refined.auto._
 
   override def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]] =
-    transactor.use(implicit session => measureExecutionTime(find(eventId)))
+    sessionResource.useK(measureExecutionTimeK(find(eventId)))
 
   private def find(eventId: CompoundEventId) =
     SqlQuery[Interpretation, Option[CompoundEventId]](
       Kleisli { session =>
-        val query: Query[EventId ~ projects.Id, CompoundEventId] = sql"""SELECT evt.event_id, evt.project_id
+        val query: Query[EventId ~ projects.Id, CompoundEventId] =
+          sql"""SELECT evt.event_id, evt.project_id
                            FROM event evt WHERE evt.event_id = $eventIdPut and evt.project_id = $projectIdPut
                            """.query(compoundEventIdGet)
         session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
@@ -60,9 +61,9 @@ private class EventDetailsFinderImpl[Interpretation[_]: Async](
 
 private object EventDetailsFinder {
   def apply(
-      transactor:       SessionResource[IO, EventLogDB],
+      sessionResource:  SessionResource[IO, EventLogDB],
       queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name]
   ): IO[EventDetailsFinder[IO]] = IO {
-    new EventDetailsFinderImpl(transactor, queriesExecTimes)
+    new EventDetailsFinderImpl(sessionResource, queriesExecTimes)
   }
 }

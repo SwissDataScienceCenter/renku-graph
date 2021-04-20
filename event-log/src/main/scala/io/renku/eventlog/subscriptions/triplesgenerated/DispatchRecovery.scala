@@ -84,13 +84,13 @@ private object DispatchRecovery {
 
   private val OnErrorSleep: FiniteDuration = 1 seconds
 
-  def apply(transactor:                      SessionResource[IO, EventLogDB],
+  def apply(sessionResource:                 SessionResource[IO, EventLogDB],
             awaitingTransformationGauge:     LabeledGauge[IO, projects.Path],
             underTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
             queriesExecTimes:                LabeledHistogram[IO, SqlQuery.Name],
             logger:                          Logger[IO]
   )(implicit timer:                          Timer[IO]): IO[DispatchRecovery[IO, TriplesGeneratedEvent]] = for {
-    updateCommandRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
+    updateCommandRunner <- IOUpdateCommandsRunner(sessionResource, queriesExecTimes, logger)
   } yield new DispatchRecoveryImpl[IO](awaitingTransformationGauge,
                                        underTriplesTransformationGauge,
                                        updateCommandRunner,

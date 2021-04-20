@@ -143,7 +143,7 @@ object IOStatusChangeEndpoint {
   import cats.effect.IO
 
   def apply(
-      transactor:                         SessionResource[IO, EventLogDB],
+      sessionResource:                    SessionResource[IO, EventLogDB],
       awaitingTriplesGenerationGauge:     LabeledGauge[IO, projects.Path],
       underTriplesGenerationGauge:        LabeledGauge[IO, projects.Path],
       awaitingTriplesTransformationGauge: LabeledGauge[IO, projects.Path],
@@ -152,12 +152,12 @@ object IOStatusChangeEndpoint {
       logger:                             Logger[IO]
   )(implicit contextShift:                ContextShift[IO]): IO[StatusChangeEndpoint[IO]] =
     for {
-      statusUpdatesRunner <- IOUpdateCommandsRunner(transactor, queriesExecTimes, logger)
+      statusUpdatesRunner <- IOUpdateCommandsRunner(sessionResource, queriesExecTimes, logger)
     } yield new StatusChangeEndpoint(statusUpdatesRunner,
                                      Set(
                                        ToTriplesStore.factory(underTriplesTransformationGauge),
                                        ToNew.factory(awaitingTriplesGenerationGauge, underTriplesGenerationGauge),
-                                       ToTriplesGenerated.factory(transactor,
+                                       ToTriplesGenerated.factory(sessionResource,
                                                                   underTriplesTransformationGauge,
                                                                   underTriplesGenerationGauge,
                                                                   awaitingTriplesTransformationGauge

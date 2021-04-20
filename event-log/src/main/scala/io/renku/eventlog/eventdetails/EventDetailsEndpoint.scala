@@ -69,10 +69,10 @@ class EventDetailsEndpointImpl[Interpretation[_]: Effect](eventDetailsFinder: Ev
 }
 
 object EventDetailsEndpoint {
-  def apply(transactor:       SessionResource[IO, EventLogDB],
+  def apply(sessionResource:  SessionResource[IO, EventLogDB],
             queriesExecTimes: LabeledHistogram[IO, SqlQuery.Name],
             logger:           Logger[IO]
   ): IO[EventDetailsEndpoint[IO]] = for {
-    eventDetailFinder <- EventDetailsFinder(transactor, queriesExecTimes)
+    eventDetailFinder <- EventDetailsFinder(sessionResource, queriesExecTimes)
   } yield new EventDetailsEndpointImpl[IO](eventDetailFinder, logger)
 }

@@ -22,5 +22,5 @@ import cats.effect.{IO, Resource}
 import ch.datascience.db.SessionResource
 import skunk.Session
 
-class TestSessionResource[TargetDB](transactor: Resource[IO, Session[IO]])
-    extends SessionResource[IO, TargetDB](transactor)
+class TestSessionResource[TargetDB](sessionResource: Resource[IO, Session[IO]])
+    extends SessionResource[IO, TargetDB](sessionResource)

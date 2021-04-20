@@ -93,14 +93,14 @@ object IOEventsPatchingEndpoint {
   import io.renku.eventlog.EventLogDB
 
   def apply(
-      transactor:           SessionResource[IO, EventLogDB],
+      sessionResource:      SessionResource[IO, EventLogDB],
       waitingEventsGauge:   LabeledGauge[IO, projects.Path],
       underProcessingGauge: LabeledGauge[IO, projects.Path],
       queriesExecTimes:     LabeledHistogram[IO, SqlQuery.Name],
       logger:               Logger[IO]
   )(implicit contextShift:  ContextShift[IO]): IO[EventsPatchingEndpoint[IO]] =
     for {
-      eventsPatcher <- IOEventsPatcher(transactor, queriesExecTimes, logger)
+      eventsPatcher <- IOEventsPatcher(sessionResource, queriesExecTimes, logger)
     } yield new EventsPatchingEndpointImpl(
       eventsPatcher,
       waitingEventsGauge,
