@@ -26,7 +26,7 @@ import ch.datascience.generators.Generators._
 import ch.datascience.interpreters.TestLogger
 import ch.datascience.stubbing.ExternalServiceStubbing
 import com.github.tomakehurst.wiremock.client.WireMock._
-import io.renku.eventlog.subscriptions.EventsSender.SendingResult.{Delivered, Misdelivered, ServiceBusy}
+import io.renku.eventlog.subscriptions.EventsSender.SendingResult._
 import io.renku.eventlog.subscriptions.TestCategoryEvent._
 import org.http4s.Status._
 import org.scalamock.scalatest.MockFactory
@@ -60,30 +60,8 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
       sender.sendEvent(subscriberUrl, event).unsafeRunSync() shouldBe Delivered
     }
 
-    TooManyRequests +: ServiceUnavailable +: Nil foreach { status =>
-      s"return ServiceBusy if remote responds with $status" in new TestCase {
-
-        val (eventJson, eventPayload) = expectEventEncoding(event)
-
-        stubFor {
-          post("/")
-            .withMultipartRequestBody(
-              aMultipart("event")
-                .withBody(equalToJson(eventJson.spaces2))
-            )
-            .withMultipartRequestBody(
-              aMultipart("payload")
-                .withBody(equalTo(eventPayload))
-            )
-            .willReturn(aResponse().withStatus(TooManyRequests.code))
-        }
-
-        sender.sendEvent(subscriberUrl, event).unsafeRunSync() shouldBe ServiceBusy
-      }
-    }
-
-    NotFound +: BadGateway +: Nil foreach { status =>
-      s"return Misdelivered if remote responds with $status" in new TestCase {
+    TooManyRequests +: ServiceUnavailable +: NotFound +: BadGateway +: Nil foreach { status =>
+      s"return TemporarilyUnavailable if remote responds with $status" in new TestCase {
 
         val (eventJson, eventPayload) = expectEventEncoding(event)
 
@@ -100,7 +78,7 @@ class EventsSenderSpec extends AnyWordSpec with ExternalServiceStubbing with Moc
             .willReturn(aResponse().withStatus(status.code))
         }
 
-        sender.sendEvent(subscriberUrl, event).unsafeRunSync() shouldBe Misdelivered
+        sender.sendEvent(subscriberUrl, event).unsafeRunSync() shouldBe TemporarilyUnavailable
       }
     }
 

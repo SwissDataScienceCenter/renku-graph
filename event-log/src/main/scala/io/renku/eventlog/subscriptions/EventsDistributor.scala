@@ -85,7 +85,7 @@ private class EventsDistributorImpl[Interpretation[_]: Effect: MonadError[*[_], 
     case result @ Delivered =>
       logger.info(s"$categoryName: $event, url = $subscriber -> $result")
       eventDelivery.registerSending(event, subscriber) recoverWith logError(event, subscriber)
-    case ServiceBusy =>
+    case TemporarilyUnavailable =>
       (markBusy(subscriber) recover withNothing) >> (returnToQueue(event) recoverWith logError(event))
     case result @ Misdelivered =>
       logger.error(s"$categoryName: $event, url = $subscriber -> $result")

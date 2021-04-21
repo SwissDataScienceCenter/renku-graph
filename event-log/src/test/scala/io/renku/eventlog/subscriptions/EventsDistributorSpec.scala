@@ -84,7 +84,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
     }
 
     "mark subscriber busy and return the event back to the queue " +
-      s"if delivery resulted in $ServiceBusy" in new TestCase {
+      s"if delivery resulted in $TemporarilyUnavailable" in new TestCase {
 
         val event           = testCategoryEvents.generateOne
         val subscriber      = subscriberUrls.generateOne
@@ -93,7 +93,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
         inSequence {
           givenThereIs(freeSubscriber = subscriber)
           givenEventFinder(returns = Some(event))
-          givenSending(event, to = subscriber, got = ServiceBusy)
+          givenSending(event, to = subscriber, got = TemporarilyUnavailable)
           givenDispatchRecoveryExists(subscriber, event)
           expectMarkedBusy(subscriber)
           expectEventReturnedToTheQueue(event, got = ().pure[IO])
@@ -307,7 +307,7 @@ class EventsDistributorSpec extends AnyWordSpec with MockFactory with Eventually
       inSequence {
         givenThereIs(freeSubscriber = subscriber)
         givenEventFinder(returns = Some(event))
-        givenSending(event, to = subscriber, got = ServiceBusy)
+        givenSending(event, to = subscriber, got = TemporarilyUnavailable)
         givenDispatchRecoveryExists(subscriber, event)
         (subscribers.markBusy _)
           .expects(subscriber)
