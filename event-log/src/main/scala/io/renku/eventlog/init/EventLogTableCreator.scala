@@ -23,8 +23,8 @@ import cats.effect.{Async, Bracket}
 import ch.datascience.db.SessionResource
 import ch.datascience.graph.model.events.EventStatus
 import ch.datascience.graph.model.events.EventStatus.GenerationRecoverableFailure
-import org.typelevel.log4cats.Logger
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
+import org.typelevel.log4cats.Logger
 import skunk._
 import skunk.codec.all._
 import skunk.implicits._

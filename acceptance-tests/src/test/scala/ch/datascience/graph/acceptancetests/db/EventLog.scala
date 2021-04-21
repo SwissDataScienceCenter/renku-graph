@@ -19,7 +19,7 @@
 package ch.datascience.graph.acceptancetests.db
 
 import cats.data.{Kleisli, NonEmptyList}
-import cats.effect.{ContextShift, IO}
+import cats.effect.{Concurrent, ContextShift, IO, Resource}
 import ch.datascience.db.{DBConfigProvider, SessionResource}
 import ch.datascience.graph.acceptancetests.tooling.TestLogger
 import ch.datascience.graph.model.events.{CommitId, EventId, EventStatus}
@@ -37,6 +37,7 @@ import scala.language.postfixOps
 object EventLog extends TypeSerializers {
 
   private implicit val contextShift: ContextShift[IO] = IO.contextShift(global)
+  private implicit val concurrent:   Concurrent[IO]   = IO.ioConcurrentEffect
   private val logger = TestLogger()
 
   def findEvents(projectId: Id): List[(EventId, EventStatus)] = execute { session =>
@@ -65,7 +66,7 @@ object EventLog extends TypeSerializers {
 
   def execute[O](query: Session[IO] => IO[O]): O =
     sessionResource
-      .useK(Kleisli[IO, Session[IO], O](session => query(session)))
+      .use(_.useK(Kleisli[IO, Session[IO], O](session => query(session))))
       .unsafeRunSync()
 
   private val dbConfig: DBConfigProvider.DBConfig[EventLogDB] =
@@ -88,13 +89,15 @@ object EventLog extends TypeSerializers {
     _ <- logger.info("event_log DB started")
   } yield ()
 
-  private lazy val sessionResource: SessionResource[IO, EventLogDB] = new SessionResource[IO, EventLogDB](
-    Session.single(
-      host = postgresContainer.host,
-      port = postgresContainer.container.getMappedPort(dbConfig.port.value),
-      database = dbConfig.name.value,
-      user = dbConfig.user.value,
-      password = Some(dbConfig.pass.value)
-    )
-  )
+  private lazy val sessionResource: Resource[IO, SessionResource[IO, EventLogDB]] =
+    Session
+      .pooled(
+        host = postgresContainer.host,
+        port = postgresContainer.container.getMappedPort(dbConfig.port.value),
+        database = dbConfig.name.value,
+        user = dbConfig.user.value,
+        password = Some(dbConfig.pass.value),
+        max = dbConfig.connectionPool.value
+      )
+      .map(new SessionResource(_))
 }
