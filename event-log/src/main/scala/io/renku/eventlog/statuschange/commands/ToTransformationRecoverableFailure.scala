@@ -57,7 +57,7 @@ final case class ToTransformationRecoverableFailure[Interpretation[_]: Async: Br
           sql"""UPDATE event
                 SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = $eventMessageEncoder
                 WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
-             """.command
+          """.command
         session
           .prepare(query)
           .use {

@@ -56,10 +56,9 @@ final case class ToGenerationRecoverableFailure[Interpretation[_]: Async: Bracke
       Kleisli { session =>
         val query: Command[EventStatus ~ ExecutionDate ~ EventMessage ~ EventId ~ projects.Id ~ EventStatus] =
           sql"""UPDATE event
-                         SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = $eventMessageEncoder
-                         WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
-                         """.command
-
+                SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = $eventMessageEncoder
+                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
+          """.command
         session
           .prepare(query)
           .use {

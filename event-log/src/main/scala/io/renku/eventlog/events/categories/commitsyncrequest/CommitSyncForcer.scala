@@ -56,7 +56,7 @@ private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throw
     }
 
   private def deleteLastSyncedDate(projectId: projects.Id) =
-    measureExecutionTimeK {
+    measureExecutionTime {
       SqlQuery(
         Kleisli { session =>
           val query: Command[projects.Id ~ CategoryName] =
@@ -73,7 +73,7 @@ private class CommitSyncForcerImpl[Interpretation[_]: Async: Bracket[*[_], Throw
       )
     }
 
-  private def upsertProject(projectId: projects.Id, projectPath: projects.Path) = measureExecutionTimeK {
+  private def upsertProject(projectId: projects.Id, projectPath: projects.Path) = measureExecutionTime {
     SqlQuery(
       Kleisli { session =>
         val query: Command[projects.Id ~ projects.Path ~ EventDate] =

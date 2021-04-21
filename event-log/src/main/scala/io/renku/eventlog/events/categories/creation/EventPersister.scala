@@ -87,15 +87,14 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     findBatchInQueue(event)
       .map(_.map(event.withBatchDate).getOrElse(event))
 
-  private def checkIfPersisted(event: Event) = measureExecutionTimeK(
+  private def checkIfPersisted(event: Event) = measureExecutionTime(
     SqlQuery(
       Kleisli { session =>
         val query: Query[EventId ~ projects.Id, EventId] =
-          sql"""
-           SELECT event_id
-           FROM event
-           WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
-            .query(eventIdDecoder)
+          sql"""SELECT event_id
+                FROM event
+                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+          """.query(eventIdDecoder)
         session
           .prepare(query)
           .use(_.option(event.id ~ event.project.id))
@@ -106,16 +105,16 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
   )
 
   // format: off
-  private def findBatchInQueue(event: Event) = measureExecutionTimeK(
+  private def findBatchInQueue(event: Event) = measureExecutionTime(
     SqlQuery(
       Kleisli { session =>
         val query: Query[projects.Id, BatchDate] =
-          sql"""
-        SELECT batch_date
-        FROM event
-        WHERE project_id = $projectIdEncoder AND #${`status IN`(New, GenerationRecoverableFailure, GeneratingTriples)}
-        ORDER BY batch_date DESC
-        LIMIT 1""".query(batchDateDecoder)
+          sql"""SELECT batch_date
+                FROM event
+                WHERE project_id = $projectIdEncoder AND #${`status IN`(New, GenerationRecoverableFailure, GeneratingTriples)}
+                ORDER BY batch_date DESC
+                LIMIT 1
+          """.query(batchDateDecoder)
         session.prepare(query).use(_.option(event.project.id))
       },
       name = "new - find batch"
@@ -125,7 +124,7 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
   private lazy val insert: Event => Kleisli[Interpretation, Session[Interpretation], Unit] = {
     case NewEvent(id, project, date, batchDate, body) =>
       val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply _)(now())
-      measureExecutionTimeK(
+      measureExecutionTime(
         SqlQuery(
           Kleisli { session =>
             val query: Command[
@@ -133,7 +132,7 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
             ] =
               sql"""INSERT INTO event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body)
                 VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder)
-                """.command
+              """.command
             session
               .prepare(query)
               .use {
@@ -146,7 +145,7 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       )
     case SkippedEvent(id, project, date, batchDate, body, message) =>
       val (createdDate, executionDate) = (CreatedDate.apply _ &&& ExecutionDate.apply _)(now())
-      measureExecutionTimeK(
+      measureExecutionTime(
         SqlQuery(
           Kleisli { session =>
             val query: Command[
@@ -155,7 +154,7 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
               sql"""INSERT INTO
                   event (event_id, project_id, status, created_date, execution_date, event_date, batch_date, event_body, message)
                   VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $createdDateEncoder, $executionDateEncoder, $eventDateEncoder, $batchDateEncoder, $eventBodyEncoder, $eventMessageEncoder)
-                  """.command
+              """.command
             session
               .prepare(query)
               .use(
@@ -168,7 +167,7 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       )
   }
 
-  private def upsertProject(event: Event) = measureExecutionTimeK(
+  private def upsertProject(event: Event) = measureExecutionTime(
     SqlQuery(
       Kleisli { session =>
         val query: Command[projects.Id ~ projects.Path ~ EventDate] =
@@ -180,7 +179,7 @@ class EventPersisterImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
             DO 
               UPDATE SET latest_event_date = EXCLUDED.latest_event_date, project_path = EXCLUDED.project_path 
               WHERE EXCLUDED.latest_event_date > project.latest_event_date
-      """.command
+          """.command
         session.prepare(query).use(_.execute(event.project.id ~ event.project.path ~ event.date)).void
       },
       name = "new - upsert project"

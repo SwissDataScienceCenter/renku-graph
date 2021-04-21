@@ -51,8 +51,8 @@ trait EventDataFetching {
       Kleisli { session =>
         val query: Query[EventId ~ projects.Id, (CompoundEventId, EventPayload)] =
           sql"""SELECT event_id, project_id, payload
-              FROM event_payload
-              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder;"""
+                FROM event_payload
+                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder;"""
             .query(eventIdDecoder ~ projectIdDecoder ~ eventPayloadDecoder)
             .map { case eventId ~ projectId ~ eventPayload =>
               (CompoundEventId(eventId, projectId), eventPayload)
@@ -85,10 +85,10 @@ trait EventDataFetching {
     execute {
       Kleisli { session =>
         val query: Query[EventId ~ projects.Id, (ExecutionDate, EventStatus, Option[EventMessage])] = sql"""
-        SELECT execution_date, status, message
-        FROM event
-        WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
-      """.query(executionDateDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt).map {
+          SELECT execution_date, status, message
+          FROM event
+          WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+        """.query(executionDateDecoder ~ eventStatusDecoder ~ eventMessageDecoder.opt).map {
           case executionDate ~ eventStatus ~ maybeEventMessage => (executionDate, eventStatus, maybeEventMessage)
         }
         session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))

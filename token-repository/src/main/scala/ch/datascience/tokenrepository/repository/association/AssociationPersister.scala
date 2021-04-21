@@ -47,7 +47,7 @@ private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throw
       case false => insert(projectId, projectPath, encryptedToken)
     }
 
-  private def checkIfTokenExists(projectPath: Path) = measureExecutionTimeK {
+  private def checkIfTokenExists(projectPath: Path) = measureExecutionTime {
     SqlQuery(
       Kleisli { session =>
         val query: Query[Path, EncryptedAccessToken] =
@@ -60,15 +60,15 @@ private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throw
     )
   }
 
-  private def update(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) = measureExecutionTimeK {
+  private def update(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) = measureExecutionTime {
 
     SqlQuery(
       Kleisli { session =>
         val query: Command[EncryptedAccessToken ~ Id ~ Path] =
-          sql"""
-          UPDATE projects_tokens
-          SET token = $encryptedAccessTokenEncoder, project_id = $projectIdEncoder
-          WHERE project_path = $projectPathEncoder """.command
+          sql"""UPDATE projects_tokens
+                SET token = $encryptedAccessTokenEncoder, project_id = $projectIdEncoder
+                WHERE project_path = $projectPathEncoder 
+          """.command
         session
           .prepare(query)
           .use(_.execute(encryptedToken ~ projectId ~ projectPath))
@@ -79,14 +79,13 @@ private class AssociationPersister[Interpretation[_]: Async: Bracket[*[_], Throw
     )
   }
 
-  private def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) = measureExecutionTimeK {
+  private def insert(projectId: Id, projectPath: Path, encryptedToken: EncryptedAccessToken) = measureExecutionTime {
     SqlQuery(
       Kleisli { session =>
         val query: Command[Id ~ Path ~ EncryptedAccessToken] =
-          sql"""
-          INSERT INTO projects_tokens (project_id, project_path, token)
-          VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder)
-        """.command
+          sql"""INSERT INTO projects_tokens (project_id, project_path, token)
+                VALUES ($projectIdEncoder, $projectPathEncoder, $encryptedAccessTokenEncoder)
+          """.command
         session
           .prepare(query)
           .use(_.execute(projectId ~ projectPath ~ encryptedToken))

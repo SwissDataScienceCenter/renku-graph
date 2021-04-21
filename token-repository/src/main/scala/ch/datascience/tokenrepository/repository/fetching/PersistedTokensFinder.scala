@@ -65,7 +65,7 @@ private class PersistedTokensFinder[Interpretation[_]: Async: Bracket[*[_], Thro
 
   private def run(query: SqlQuery[Interpretation, Option[EncryptedAccessToken]]) =
     OptionT {
-      sessionResource.useK(measureExecutionTimeK(query))
+      sessionResource.useK(measureExecutionTime(query))
     }
 }
 

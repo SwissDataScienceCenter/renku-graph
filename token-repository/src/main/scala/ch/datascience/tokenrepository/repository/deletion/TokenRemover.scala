@@ -38,11 +38,11 @@ private[repository] class TokenRemover[Interpretation[_]: Async: Monad](
     with TokenRepositoryTypeSerializers {
 
   def delete(projectId: Id): Interpretation[Unit] = sessionResource.useK {
-    measureExecutionTimeK {
+    measureExecutionTime {
       val command: Command[Id] =
         sql"""delete from projects_tokens
               where project_id = $projectIdEncoder
-           """.command
+        """.command
       SqlQuery[Interpretation, Unit](
         Kleisli(_.prepare(command).use(_.execute(projectId).flatMap(failIfMultiUpdate(projectId)))),
         name = "remove token"

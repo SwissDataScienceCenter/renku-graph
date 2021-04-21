@@ -65,11 +65,11 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Async: Bracket[
   }
 
   private def findEventAndUpdateForProcessing() = for {
-    maybeProject <- measureExecutionTimeK(findProjectsWithEventsInQueue)
+    maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
                       .map(projectPrioritisation.prioritise)
                       .map(selectProject)
     maybeIdAndProjectAndBody <- maybeProject
-                                  .map(idAndPath => measureExecutionTimeK(findOldestEvent(idAndPath)))
+                                  .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
                                   .getOrElse(Kleisli.pure(Option.empty[TriplesGeneratedEvent]))
     maybeBody <- markAsTransformingTriples(maybeIdAndProjectAndBody)
   } yield maybeProject -> maybeBody
@@ -145,19 +145,18 @@ private class TriplesGeneratedEventFinderImpl[Interpretation[_]: Async: Bracket[
     case None =>
       Kleisli.pure(Option.empty[TriplesGeneratedEvent])
     case Some(event @ TriplesGeneratedEvent(id, _, _, _)) =>
-      measureExecutionTimeK(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
+      measureExecutionTime(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
   }
 
   private def updateStatus(commitEventId: CompoundEventId) = SqlQuery[Interpretation, Completion](
     Kleisli { implicit session =>
       val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
-        sql"""
-            UPDATE event 
-            SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
-            WHERE event_id = $eventIdEncoder
-              AND project_id = $projectIdEncoder
-              AND status <> $eventStatusEncoder
-            """.command
+        sql"""UPDATE event 
+              SET status = $eventStatusEncoder, execution_date = $executionDateEncoder
+              WHERE event_id = $eventIdEncoder
+                AND project_id = $projectIdEncoder
+                AND status <> $eventStatusEncoder
+        """.command
       session
         .prepare(query)
         .use(

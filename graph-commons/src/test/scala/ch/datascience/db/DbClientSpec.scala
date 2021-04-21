@@ -43,7 +43,7 @@ class DbClientSpec extends AnyWordSpec with should.Matchers with ContainerTestDb
     "execute the query and do nothing if no histogram given" in {
       val result = 1
       new TestDbClient(maybeHistogram = None)
-        .executeQuery(expected = result)(transactorResource)
+        .executeQuery(expected = result)(sessionPoolResource)
         .unsafeRunSync() shouldBe result
     }
 
@@ -54,7 +54,7 @@ class DbClientSpec extends AnyWordSpec with should.Matchers with ContainerTestDb
       val dbClient = new TestDbClient(maybeHistogram = Some(histogram))
 
       val result = 1
-      dbClient.executeQuery(expected = result)(transactorResource).unsafeRunSync() shouldBe result
+      dbClient.executeQuery(expected = result)(sessionPoolResource).unsafeRunSync() shouldBe result
 
       histogram.verifyExecutionTimeMeasured(forLabelValue = dbClient.queryName)
     }
@@ -74,9 +74,9 @@ private class TestDbClient(maybeHistogram: Option[LabeledHistogram[IO, Name]]) e
                                                        queryName
   )
 
-  def executeQuery(expected: Int)(transactorResource: Resource[IO, Resource[IO, Session[IO]]]) =
-    transactorResource.use {
-      _.use(session => measureExecutionTimeK[Int](query(expected))(session))
+  def executeQuery(expected: Int)(sessionPoolResource: Resource[IO, Resource[IO, Session[IO]]]): IO[Int] =
+    sessionPoolResource.use {
+      _.use(session => measureExecutionTime[Int](query(expected))(session))
     }
 }
 
@@ -95,7 +95,7 @@ trait ContainerTestDb extends ForAllTestContainer {
     password = dbConfig.pass
   )
 
-  lazy val transactorResource: Resource[IO, Resource[IO, Session[IO]]] =
+  lazy val sessionPoolResource: Resource[IO, Resource[IO, Session[IO]]] =
     Session.pooled(
       host = container.host,
       port = container.container.getMappedPort(dbConfig.port),

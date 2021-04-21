@@ -52,7 +52,7 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwab
 
   override def fetchStatus(projectId: Id): OptionT[Interpretation, ProcessingStatus] = OptionT {
     sessionResource.useK {
-      measureExecutionTimeK(latestBatchStatues(projectId))
+      measureExecutionTime(latestBatchStatues(projectId))
     } flatMap toProcessingStatus
   }
 
@@ -60,16 +60,16 @@ class ProcessingStatusFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwab
     Kleisli { session =>
       val query: Query[Id ~ Id, EventStatus] =
         sql"""SELECT evt.status
-                                                     FROM event evt
-                                                     INNER JOIN (
-                                                         SELECT batch_date
-                                                         FROM event
-                                                         WHERE project_id = $projectIdEncoder
-                                                         ORDER BY batch_date DESC
-                                                         LIMIT 1
-                                                       ) max_batch_date ON evt.batch_date = max_batch_date.batch_date
-                                                     WHERE evt.project_id = $projectIdEncoder
-                                                     """.query(eventStatusDecoder)
+              FROM event evt
+              INNER JOIN (
+                SELECT batch_date
+                FROM event
+                WHERE project_id = $projectIdEncoder
+                ORDER BY batch_date DESC
+                LIMIT 1
+              ) max_batch_date ON evt.batch_date = max_batch_date.batch_date
+              WHERE evt.project_id = $projectIdEncoder
+           """.query(eventStatusDecoder)
       session.prepare(query).use(pq => pq.stream(projectId ~ projectId, chunkSize = 32).compile.toList)
     },
     name = "processing status"

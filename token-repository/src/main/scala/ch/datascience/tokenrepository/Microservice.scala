@@ -40,14 +40,14 @@ object Microservice extends IOMicroservice {
 
   override def run(args: List[String]): IO[ExitCode] =
     for {
-      transactorResource <- new ProjectsTokensDbConfigProvider[IO]() map SessionPoolResource[IO, ProjectsTokensDB]
-      exitCode           <- runMicroservice(transactorResource, args)
+      sessionPoolResource <- new ProjectsTokensDbConfigProvider[IO]() map SessionPoolResource[IO, ProjectsTokensDB]
+      exitCode            <- runMicroservice(sessionPoolResource, args)
     } yield exitCode
 
   private def runMicroservice(
-      transactorResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]],
-      args:               List[String]
-  ) = transactorResource.use { sessionResource =>
+      sessionPoolResource: Resource[IO, SessionResource[IO, ProjectsTokensDB]],
+      args:                List[String]
+  ) = sessionPoolResource.use { sessionResource =>
     for {
       certificateLoader      <- CertificateLoader[IO](ApplicationLogger)
       sentryInitializer      <- SentryInitializer[IO]()

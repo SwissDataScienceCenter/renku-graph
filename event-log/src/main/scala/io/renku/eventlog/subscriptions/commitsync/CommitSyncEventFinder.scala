@@ -51,7 +51,7 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
       case None => Kleisli.pure(Option.empty[CommitSyncEvent])
     }
 
-  private lazy val findEvent = measureExecutionTimeK {
+  private lazy val findEvent = measureExecutionTime {
     SqlQuery[Interpretation, Option[(CommitSyncEvent, Option[LastSyncedDate])]](
       Kleisli { session =>
         val query: Query[CategoryName ~ EventDate ~ LastSyncedDate ~ EventDate ~ LastSyncedDate,
@@ -104,14 +104,14 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
     else insertLastSyncedDate(event)
 
   private def updateLastSyncedDate(event: CommitSyncEvent) =
-    measureExecutionTimeK {
+    measureExecutionTime {
       SqlQuery(
         Kleisli { session =>
           val query: Command[LastSyncedDate ~ projects.Id ~ CategoryName] =
             sql"""UPDATE subscription_category_sync_time
                   SET last_synced = $lastSyncedDateEncoder
                   WHERE project_id = $projectIdEncoder AND category_name = $categoryNameEncoder
-              """.command
+            """.command
           session.prepare(query).use(_.execute(LastSyncedDate(now()) ~ event.projectId ~ categoryName))
         },
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - update last_synced")
@@ -119,17 +119,16 @@ private class CommitSyncEventFinderImpl[Interpretation[_]: Async: ContextShift: 
     }
 
   private def insertLastSyncedDate(event: CommitSyncEvent) =
-    measureExecutionTimeK {
+    measureExecutionTime {
       SqlQuery(
         Kleisli { session =>
           val query: Command[projects.Id ~ CategoryName ~ LastSyncedDate] =
-            sql"""
-          INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
-          VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
-          ON CONFLICT (project_id, category_name)
-          DO UPDATE
-            SET last_synced = EXCLUDED.last_synced
-          """.command
+            sql"""INSERT INTO subscription_category_sync_time(project_id, category_name, last_synced)
+                  VALUES ($projectIdEncoder, $categoryNameEncoder, $lastSyncedDateEncoder)
+                  ON CONFLICT (project_id, category_name)
+                  DO UPDATE
+                    SET last_synced = EXCLUDED.last_synced
+            """.command
           session.prepare(query).use(_.execute(event.projectId ~ categoryName ~ LastSyncedDate(now())))
         },
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - insert last_synced")

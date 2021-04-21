@@ -43,8 +43,8 @@ object EventLog extends TypeSerializers {
   def findEvents(projectId: Id): List[(EventId, EventStatus)] = execute { session =>
     val query: Query[projects.Id, (EventId, EventStatus)] =
       sql"""SELECT event_id, status
-         FROM event
-         WHERE project_id = $projectIdEncoder"""
+            FROM event
+            WHERE project_id = $projectIdEncoder"""
         .query(eventIdDecoder ~ eventStatusDecoder)
         .map { case id ~ status => (id, status) }
     session.prepare(query).use(_.stream(projectId, 32).compile.toList)
@@ -97,7 +97,9 @@ object EventLog extends TypeSerializers {
         database = dbConfig.name.value,
         user = dbConfig.user.value,
         password = Some(dbConfig.pass.value),
-        max = dbConfig.connectionPool.value
+        max = dbConfig.connectionPool.value,
+        readTimeout = dbConfig.maxLifetime,
+        writeTimeout = dbConfig.maxLifetime
       )
       .map(new SessionResource(_))
 }

@@ -165,11 +165,10 @@ class SubscriberTrackerSpec extends AnyWordSpec with InMemoryEventLogDbSpec with
     execute[Unit] {
       Kleisli { session =>
         val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl] =
-          sql"""
-            INSERT INTO
-            subscriber (delivery_id, delivery_url, source_url)
-            VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
-      """.command
+          sql"""INSERT INTO
+                subscriber (delivery_id, delivery_url, source_url)
+                VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
+          """.command
         session
           .prepare(query)
           .use(_.execute(subscriptionInfo.subscriberId ~ subscriptionInfo.subscriberUrl ~ sourceUrl))

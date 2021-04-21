@@ -168,10 +168,9 @@ class ProjectPathAdderSpec
   private def addProjectPath(): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
       val query: Command[Void] =
-        sql"""
-        ALTER TABLE projects_tokens
-        ADD COLUMN project_path VARCHAR;
-      """.command
+        sql"""ALTER TABLE projects_tokens
+              ADD COLUMN project_path VARCHAR;
+        """.command
       session.execute(query).void
     }
   }
@@ -208,12 +207,11 @@ class ProjectPathAdderSpec
   protected override def createTable(): Unit = execute {
     Kleisli[IO, Session[IO], Unit] { session =>
       val query: Command[Void] =
-        sql"""
-        CREATE TABLE projects_tokens(
-          project_id int4 PRIMARY KEY,
-          token VARCHAR NOT NULL
-        );
-      """.command
+        sql"""CREATE TABLE projects_tokens(
+                project_id int4 PRIMARY KEY,
+                token VARCHAR NOT NULL
+              );
+        """.command
       session.execute(query).void
     }
   }

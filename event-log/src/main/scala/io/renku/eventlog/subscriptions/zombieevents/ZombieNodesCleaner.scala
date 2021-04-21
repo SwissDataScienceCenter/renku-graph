@@ -58,14 +58,13 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
     } yield ()
   }
 
-  private lazy val findPotentialZombieRecords = measureExecutionTimeK {
+  private lazy val findPotentialZombieRecords = measureExecutionTime {
     SqlQuery(
       Kleisli { session =>
         val query: Query[Void, (MicroserviceBaseUrl, SubscriberUrl)] =
-          sql"""
-            SELECT DISTINCT source_url, delivery_url
-            FROM subscriber
-            """
+          sql"""SELECT DISTINCT source_url, delivery_url
+                FROM subscriber
+          """
             .query(microserviceBaseUrlDecoder ~ subscriberUrlDecoder)
             .map { case sourceUrl ~ subscriberUrl => (sourceUrl, subscriberUrl) }
         session.prepare(query).use(_.stream(Void, 32).compile.toList)
@@ -98,7 +97,7 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
     case _ => Kleisli.pure(Completion.Delete(1)).widen[Completion]
   }
 
-  private def checkIfExist(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTimeK {
+  private def checkIfExist(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTime {
     SqlQuery(
       Kleisli { session =>
         val query: Query[MicroserviceBaseUrl ~ SubscriberUrl, MicroserviceBaseUrl] =
@@ -113,7 +112,7 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
     )
   }
 
-  private def delete(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTimeK {
+  private def delete(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTime {
     SqlQuery(
       Kleisli { session =>
         val query: Command[MicroserviceBaseUrl ~ SubscriberUrl] =
@@ -128,7 +127,7 @@ private class ZombieNodesCleanerImpl[Interpretation[_]: Async: Parallel: Bracket
     )
   }
 
-  private def move(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTimeK {
+  private def move(sourceUrl: MicroserviceBaseUrl, subscriberUrl: SubscriberUrl) = measureExecutionTime {
     SqlQuery(
       Kleisli { session =>
         val query: Command[MicroserviceBaseUrl ~ MicroserviceBaseUrl ~ SubscriberUrl] =

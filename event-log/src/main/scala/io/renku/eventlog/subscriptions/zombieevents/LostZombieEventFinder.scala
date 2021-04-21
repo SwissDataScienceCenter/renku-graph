@@ -51,7 +51,7 @@ private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Thro
   }
   private val maxDurationForEvent = EventProcessingTime(Duration.ofMinutes(5))
 
-  private lazy val findEvent = measureExecutionTimeK {
+  private lazy val findEvent = measureExecutionTime {
     SqlQuery(
       Kleisli { session =>
         val query: Query[EventStatus ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent] =
@@ -93,15 +93,14 @@ private class LostZombieEventFinder[Interpretation[_]: Async: Bracket[*[_], Thro
   }
 
   private def updateExecutionDate(eventId: CompoundEventId) =
-    measureExecutionTimeK {
+    measureExecutionTime {
       SqlQuery(
         Kleisli { session =>
           val query: Command[ExecutionDate ~ EventId ~ projects.Id ~ String] =
-            sql"""
-              UPDATE event
-              SET execution_date = $executionDateEncoder
-              WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND message = $text
-              """.command
+            sql"""UPDATE event
+                  SET execution_date = $executionDateEncoder
+                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND message = $text
+            """.command
           session
             .prepare(query)
             .use(_.execute(ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ zombieMessage))

@@ -28,7 +28,7 @@ abstract class DbClient[Interpretation[_]: Async](
     maybeHistogram: Option[LabeledHistogram[Interpretation, Name]]
 ) {
 
-  protected def measureExecutionTimeK[ResultType](
+  protected def measureExecutionTime[ResultType](
       query: SqlQuery[Interpretation, ResultType]
   ): Kleisli[Interpretation, Session[Interpretation], ResultType] = Kleisli { session =>
     maybeHistogram match {

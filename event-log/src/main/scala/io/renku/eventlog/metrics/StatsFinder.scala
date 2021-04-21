@@ -55,7 +55,7 @@ class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
     with SubscriptionTypeSerializers {
 
   override def countEventsByCategoryName(): Interpretation[Map[CategoryName, Long]] = sessionResource.useK {
-    measureExecutionTimeK(countEventsPerCategoryName).map(_.toMap)
+    measureExecutionTime(countEventsPerCategoryName).map(_.toMap)
   }
 
   // format: off
@@ -118,7 +118,7 @@ class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
   )
 
   override def statuses(): Interpretation[Map[EventStatus, Long]] = sessionResource.useK { 
-    measureExecutionTimeK(findStatuses)
+    measureExecutionTime(findStatuses)
       .map(_.toMap)
       .map(addMissingStatues)
   }
@@ -144,7 +144,7 @@ class StatsFinderImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]](
       case None => Map.empty[Path, Long].pure[Interpretation]
       case Some(statusesList) =>
         sessionResource.useK {
-          measureExecutionTimeK(countProjectsEvents(statusesList, maybeLimit))
+          measureExecutionTime(countProjectsEvents(statusesList, maybeLimit))
             .map(_.toMap)
         }
     }

@@ -56,12 +56,12 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: Async: Bracket[*[_], Th
   }
 
   private def cleanEventualDeliveries(eventId: CompoundEventId) =
-    measureExecutionTimeK {
+    measureExecutionTime {
       SqlQuery(
         Kleisli { session =>
           val query: Command[EventId ~ projects.Id] =
             sql"""DELETE FROM event_delivery
-            WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
             """.command
           session.prepare(query).use(_ execute (eventId.id ~ eventId.projectId))
         },
@@ -73,14 +73,14 @@ private class ZombieStatusCleanerImpl[Interpretation[_]: Async: Bracket[*[_], Th
       eventId:   CompoundEventId,
       oldStatus: EventStatus,
       newStatus: EventStatus
-  ) = measureExecutionTimeK {
+  ) = measureExecutionTime {
     SqlQuery(
       Kleisli { session =>
         val query: Command[EventStatus ~ ExecutionDate ~ EventId ~ projects.Id ~ EventStatus] =
           sql"""UPDATE event
-            SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = NULL
-            WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
-            """.command
+                SET status = $eventStatusEncoder, execution_date = $executionDateEncoder, message = NULL
+                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder AND status = $eventStatusEncoder
+          """.command
         session.prepare(query).use {
           _.execute(newStatus ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId ~ oldStatus).flatMap {
             case Completion.Update(1) => (Updated: UpdateResult).pure[Interpretation]

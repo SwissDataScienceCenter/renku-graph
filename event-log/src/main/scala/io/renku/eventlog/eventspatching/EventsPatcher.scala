@@ -41,7 +41,7 @@ private class EventsPatcherImpl[Interpretation[_]: Async: Bracket[*[_], Throwabl
 
   def applyToAllEvents(eventsPatch: EventsPatch[Interpretation]): Interpretation[Unit] = sessionResource.useK {
     for {
-      _ <- measureExecutionTimeK(eventsPatch.query)
+      _ <- measureExecutionTime(eventsPatch.query)
       _ <- Kleisli.liftF(eventsPatch.updateGauges())
       _ <- Kleisli.liftF(logger.info(s"All events patched with ${eventsPatch.name}"))
     } yield ()

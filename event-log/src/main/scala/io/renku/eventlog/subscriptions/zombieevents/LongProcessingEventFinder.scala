@@ -53,15 +53,14 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
       : Kleisli[Interpretation, Session[Interpretation], List[(projects.Id, EventStatus)]] =
     Nested(queryProjectsToCheck).map { case (id, currentStatus) => id -> currentStatus.toEventStatus }.value
 
-  private def queryProjectsToCheck = measureExecutionTimeK {
+  private def queryProjectsToCheck = measureExecutionTime {
     SqlQuery[Interpretation, List[(projects.Id, TransformationStatus)]](
       Kleisli { session =>
         val query: Query[EventStatus ~ EventStatus, (projects.Id, TransformationStatus)] =
-          sql"""
-          SELECT DISTINCT evt.project_id, evt.status
-          FROM event evt
-          WHERE evt.status = $eventStatusEncoder
-            OR evt.status = $eventStatusEncoder
+          sql"""SELECT DISTINCT evt.project_id, evt.status
+                FROM event evt
+                WHERE evt.status = $eventStatusEncoder
+                  OR evt.status = $eventStatusEncoder
           """
             .query(projectIdDecoder ~ transformationStatusGet)
             .map { case id ~ status => (id, status) }
@@ -83,7 +82,7 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
   }
 
   private def queryZombieEvent(projectId: projects.Id, status: EventStatus) =
-    measureExecutionTimeK {
+    measureExecutionTime {
       SqlQuery[Interpretation, Option[ZombieEvent]](
         Kleisli { session =>
           val query: Query[projects.Id ~ EventStatus ~ String ~ ExecutionDate ~ EventProcessingTime, ZombieEvent] =
@@ -121,15 +120,14 @@ private class LongProcessingEventFinder[Interpretation[_]: Async: Bracket[*[_], 
   }
 
   private def updateMessage(eventId: CompoundEventId) =
-    measureExecutionTimeK {
+    measureExecutionTime {
       SqlQuery(
         Kleisli { session =>
           val query: Command[String ~ ExecutionDate ~ EventId ~ projects.Id] =
-            sql"""
-          UPDATE event
-          SET message = $text, execution_date = $executionDateEncoder
-          WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
-          """.command
+            sql"""UPDATE event
+                  SET message = $text, execution_date = $executionDateEncoder
+                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+            """.command
           session.prepare(query).use(_.execute(zombieMessage ~ ExecutionDate(now()) ~ eventId.id ~ eventId.projectId))
         },
         name = Refined.unsafeApply(s"${categoryName.value.toLowerCase} - lpe - update message")

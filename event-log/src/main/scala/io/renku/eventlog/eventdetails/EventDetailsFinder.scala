@@ -44,7 +44,7 @@ private class EventDetailsFinderImpl[Interpretation[_]: Async](
   import eu.timepit.refined.auto._
 
   override def findDetails(eventId: CompoundEventId): Interpretation[Option[CompoundEventId]] =
-    sessionResource.useK(measureExecutionTimeK(find(eventId)))
+    sessionResource.useK(measureExecutionTime(find(eventId)))
 
   private def find(eventId: CompoundEventId) =
     SqlQuery[Interpretation, Option[CompoundEventId]](

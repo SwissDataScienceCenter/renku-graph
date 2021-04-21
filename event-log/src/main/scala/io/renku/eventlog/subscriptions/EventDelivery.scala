@@ -56,31 +56,30 @@ private class EventDeliveryImpl[Interpretation[_]: Async: Bracket[*[_], Throwabl
   } flatMap toResult
 
   private def insert(eventId: events.EventId, projectId: projects.Id, subscriberUrl: SubscriberUrl) =
-    measureExecutionTimeK {
+    measureExecutionTime {
       SqlQuery(
         Kleisli { session =>
           val query: Command[EventId ~ projects.Id ~ SubscriberUrl ~ MicroserviceBaseUrl] =
-            sql"""
-           INSERT INTO event_delivery (event_id, project_id, delivery_id)
-             SELECT $eventIdEncoder, $projectIdEncoder, delivery_id
-             FROM subscriber
-             WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
-           ON CONFLICT (event_id, project_id)
-           DO NOTHING
-           """.command
+            sql"""INSERT INTO event_delivery (event_id, project_id, delivery_id)
+                    SELECT $eventIdEncoder, $projectIdEncoder, delivery_id
+                    FROM subscriber
+                    WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
+                  ON CONFLICT (event_id, project_id)
+                  DO NOTHING
+            """.command
           session.prepare(query).use(_.execute(eventId ~ projectId ~ subscriberUrl ~ sourceUrl))
         },
         name = "event delivery info - insert"
       )
     }
 
-  private def deleteDelivery(eventId: events.EventId, projectId: projects.Id) = measureExecutionTimeK {
+  private def deleteDelivery(eventId: events.EventId, projectId: projects.Id) = measureExecutionTime {
     SqlQuery(
       Kleisli { session =>
         val query: Command[EventId ~ projects.Id] =
           sql"""DELETE FROM event_delivery
-                                                          WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
-                                                       """.command
+                WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+          """.command
         session.prepare(query).use(_.execute(eventId ~ projectId)).void
       },
       name = "event delivery info - remove"

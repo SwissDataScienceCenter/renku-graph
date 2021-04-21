@@ -329,10 +329,8 @@ class EventPersisterSpec
   private def storedProjects: List[(projects.Id, projects.Path, EventDate)] = execute {
     Kleisli { session =>
       val query: Query[Void, (projects.Id, projects.Path, EventDate)] =
-        sql"""
-          SELECT project_id, project_path, latest_event_date
-          FROM project
-          """
+        sql"""SELECT project_id, project_path, latest_event_date
+              FROM project"""
           .query(projectIdDecoder ~ projectPathDecoder ~ eventDateDecoder)
           .map { case projectId ~ projectPath ~ eventDate => (projectId, projectPath, eventDate) }
       session.execute(query)

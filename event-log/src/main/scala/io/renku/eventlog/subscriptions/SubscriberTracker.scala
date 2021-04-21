@@ -46,7 +46,7 @@ private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Thro
     with TypeSerializers {
 
   override def add(subscriptionInfo: SubscriptionInfo): Interpretation[Boolean] = sessionResource.useK {
-    measureExecutionTimeK(
+    measureExecutionTime(
       SqlQuery(
         Kleisli { session =>
           val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId] =
@@ -67,14 +67,13 @@ private class SubscriberTrackerImpl[Interpretation[_]: Async: Bracket[*[_], Thro
   }
 
   override def remove(subscriberUrl: SubscriberUrl): Interpretation[Boolean] = sessionResource.useK {
-    measureExecutionTimeK(
+    measureExecutionTime(
       SqlQuery(
         Kleisli { session =>
           val query: Command[SubscriberUrl ~ MicroserviceBaseUrl] =
-            sql"""
-            DELETE FROM subscriber
-            WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
-          """.command
+            sql"""DELETE FROM subscriber
+                  WHERE delivery_url = $subscriberUrlEncoder AND source_url = $microserviceBaseUrlEncoder
+            """.command
           session.prepare(query).use(_.execute(subscriberUrl ~ sourceUrl))
         },
         name = "subscriber - delete"

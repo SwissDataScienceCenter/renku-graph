@@ -106,13 +106,13 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
     }
 
   private def deleteDelivery(command: ChangeStatusCommand[Interpretation]) =
-    measureExecutionTimeK {
+    measureExecutionTime {
       SqlQuery(
         Kleisli { session =>
           val query: Command[EventId ~ projects.Id] =
             sql"""DELETE FROM event_delivery
-                            WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
-                         """.command
+                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
+               """.command
           session
             .prepare(query)
             .use(_.execute(command.eventId.id ~ command.eventId.projectId).map(_ => UpdateResult.Updated: UpdateResult))
@@ -127,13 +127,13 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
   }
 
   private def checkIfPersisted(eventId: CompoundEventId) =
-    measureExecutionTimeK {
+    measureExecutionTime {
       SqlQuery(
         Kleisli { session =>
           val query: Query[EventId ~ projects.Id, EventId] =
             sql"""SELECT event_id
-                       FROM event
-                       WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
+                  FROM event
+                  WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder"""
               .query(eventIdDecoder)
           session.prepare(query).use(_.option(eventId.id ~ eventId.projectId)).map(_.isDefined)
         },
@@ -152,7 +152,7 @@ class StatusUpdatesRunnerImpl[Interpretation[_]: Async: Bracket[*[_], Throwable]
                              command: ChangeStatusCommand[Interpretation]
   ) =
     queries
-      .map(query => measureExecutionTimeK(query).map(query -> _))
+      .map(query => measureExecutionTime(query).map(query -> _))
       .sequence
       .map(_.foldLeft(Updated: UpdateResult) {
         case (Updated, (_, 1)) => Updated

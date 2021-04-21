@@ -58,12 +58,12 @@ object Microservice extends IOMicroservice {
   protected implicit override def timer: Timer[IO] = IO.timer(executionContext)
 
   override def run(args: List[String]): IO[ExitCode] = for {
-    transactorResource <- new EventLogDbConfigProvider[IO]() map SessionPoolResource[IO, EventLogDB]
-    exitCode           <- runMicroservice(transactorResource)
+    sessionPoolResource <- new EventLogDbConfigProvider[IO]() map SessionPoolResource[IO, EventLogDB]
+    exitCode            <- runMicroservice(sessionPoolResource)
   } yield exitCode
 
-  private def runMicroservice(transactorResource: Resource[IO, SessionResource[IO, EventLogDB]]) =
-    transactorResource.use { sessionResource =>
+  private def runMicroservice(sessionPoolResource: Resource[IO, SessionResource[IO, EventLogDB]]) =
+    sessionPoolResource.use { sessionResource =>
       for {
         certificateLoader           <- CertificateLoader[IO](ApplicationLogger)
         sentryInitializer           <- SentryInitializer[IO]()

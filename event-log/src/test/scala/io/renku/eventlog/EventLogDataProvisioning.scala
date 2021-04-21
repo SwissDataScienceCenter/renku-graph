@@ -108,13 +108,12 @@ trait EventLogDataProvisioning {
     execute {
       Kleisli { session =>
         val query: Command[projects.Id ~ projects.Path ~ EventDate] =
-          sql"""
-            INSERT INTO
-            project (project_id, project_path, latest_event_date)
-            VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
-            ON CONFLICT (project_id)
-            DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
-      """.command
+          sql"""INSERT INTO
+                project (project_id, project_path, latest_event_date)
+                VALUES ($projectIdEncoder, $projectPathEncoder, $eventDateEncoder)
+                ON CONFLICT (project_id)
+                DO UPDATE SET latest_event_date = excluded.latest_event_date WHERE excluded.latest_event_date > project.latest_event_date
+          """.command
         session.prepare(query).use(_.execute(projectId ~ projectPath ~ eventDate)).void
       }
     }
@@ -128,13 +127,12 @@ trait EventLogDataProvisioning {
       execute[Unit] {
         Kleisli { session =>
           val query: Command[EventId ~ projects.Id ~ EventPayload ~ SchemaVersion] =
-            sql"""
-              INSERT INTO
-              event_payload (event_id, project_id, payload, schema_version)
-              VALUES ($eventIdEncoder, $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
-              ON CONFLICT (event_id, project_id, schema_version)
-              DO UPDATE SET payload = excluded.payload
-      """.command
+            sql"""INSERT INTO
+                  event_payload (event_id, project_id, payload, schema_version)
+                  VALUES ($eventIdEncoder, $projectIdEncoder, $eventPayloadEncoder, $schemaVersionEncoder)
+                  ON CONFLICT (event_id, project_id, schema_version)
+                  DO UPDATE SET payload = excluded.payload
+            """.command
           session
             .prepare(query)
             .use(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ payload ~ schemaVersion))
@@ -150,13 +148,12 @@ trait EventLogDataProvisioning {
   ): Unit = execute[Unit] {
     Kleisli { session =>
       val query: Command[EventId ~ projects.Id ~ EventStatus ~ EventProcessingTime] =
-        sql"""
-          INSERT INTO
-          status_processing_time (event_id, project_id, status, processing_time)
-          VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
-          ON CONFLICT (event_id, project_id, status)
-          DO UPDATE SET processing_time = excluded.processing_time
-      """.command
+        sql"""INSERT INTO
+              status_processing_time (event_id, project_id, status, processing_time)
+              VALUES ($eventIdEncoder, $projectIdEncoder, $eventStatusEncoder, $eventProcessingTimeEncoder)
+              ON CONFLICT (event_id, project_id, status)
+              DO UPDATE SET processing_time = excluded.processing_time
+        """.command
       session
         .prepare(query)
         .use(_.execute(compoundEventId.id ~ compoundEventId.projectId ~ eventStatus ~ processingTime))
@@ -180,13 +177,12 @@ trait EventLogDataProvisioning {
   ): Unit = execute[Unit] {
     Kleisli { session =>
       val query: Command[SubscriberId ~ SubscriberUrl ~ MicroserviceBaseUrl ~ SubscriberId] =
-        sql"""
-        INSERT INTO
-        subscriber (delivery_id, delivery_url, source_url)
-        VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
-        ON CONFLICT (delivery_url, source_url)
-        DO UPDATE SET delivery_id = $subscriberIdEncoder, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
-      """.command
+        sql"""INSERT INTO
+              subscriber (delivery_id, delivery_url, source_url)
+              VALUES ($subscriberIdEncoder, $subscriberUrlEncoder, $microserviceBaseUrlEncoder)
+              ON CONFLICT (delivery_url, source_url)
+              DO UPDATE SET delivery_id = $subscriberIdEncoder, delivery_url = EXCLUDED.delivery_url, source_url = EXCLUDED.source_url
+        """.command
 
       session.prepare(query).use(_.execute(deliveryId ~ deliveryUrl ~ sourceUrl ~ deliveryId)).void
     }
@@ -197,13 +193,12 @@ trait EventLogDataProvisioning {
   ): Unit = execute[Unit] {
     Kleisli { session =>
       val query: Command[EventId ~ projects.Id ~ SubscriberId] =
-        sql"""
-        INSERT INTO
-        event_delivery (event_id, project_id, delivery_id)
-        VALUES ($eventIdEncoder, $projectIdEncoder, $subscriberIdEncoder)
-        ON CONFLICT (event_id, project_id)
-        DO NOTHING
-    """.command
+        sql"""INSERT INTO
+              event_delivery (event_id, project_id, delivery_id)
+              VALUES ($eventIdEncoder, $projectIdEncoder, $subscriberIdEncoder)
+              ON CONFLICT (event_id, project_id)
+              DO NOTHING
+        """.command
       session.prepare(query).use(_.execute(eventId.id ~ eventId.projectId ~ deliveryId)).void
     }
   }
@@ -211,9 +206,8 @@ trait EventLogDataProvisioning {
   protected def findAllDeliveries: List[(CompoundEventId, SubscriberId)] = execute {
     Kleisli { session =>
       val query: Query[Void, (CompoundEventId, SubscriberId)] =
-        sql"""
-          SELECT event_id, project_id, delivery_id
-          FROM event_delivery"""
+        sql"""SELECT event_id, project_id, delivery_id
+              FROM event_delivery"""
           .query(eventIdDecoder ~ projectIdDecoder ~ subscriberIdDecoder)
           .map { case eventId ~ projectId ~ subscriberId => (CompoundEventId(eventId, projectId), subscriberId) }
       session.execute(query)

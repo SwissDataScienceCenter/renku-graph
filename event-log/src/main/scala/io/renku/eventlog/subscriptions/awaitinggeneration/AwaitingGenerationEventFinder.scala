@@ -67,11 +67,11 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
   }
 
   private lazy val findEventAndUpdateForProcessing = for {
-    maybeProject <- measureExecutionTimeK(findProjectsWithEventsInQueue)
+    maybeProject <- measureExecutionTime(findProjectsWithEventsInQueue)
                       .map(projectPrioritisation.prioritise)
                       .map(selectProject)
     maybeIdAndProjectAndBody <- maybeProject
-                                  .map(idAndPath => measureExecutionTimeK(findOldestEvent(idAndPath)))
+                                  .map(idAndPath => measureExecutionTime(findOldestEvent(idAndPath)))
                                   .getOrElse(Kleisli.pure(Option.empty[AwaitingGenerationEvent]))
     maybeBody <- markAsProcessing(maybeIdAndProjectAndBody)
   } yield maybeProject -> maybeBody
@@ -156,7 +156,7 @@ private class AwaitingGenerationEventFinderImpl[Interpretation[_]: Async: Bracke
     case None =>
       Kleisli.pure(Option.empty[AwaitingGenerationEvent])
     case Some(event @ AwaitingGenerationEvent(id, _, _)) =>
-      measureExecutionTimeK(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
+      measureExecutionTime(updateStatus(id)) map toNoneIfEventAlreadyTaken(event)
   }
 
   private def updateStatus(commitEventId: CompoundEventId) = SqlQuery[Interpretation, Completion](

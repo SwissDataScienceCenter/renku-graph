@@ -51,7 +51,7 @@ private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], 
 
   }
 
-  private lazy val findEvents = measureExecutionTimeK {
+  private lazy val findEvents = measureExecutionTime {
     SqlQuery(
       Kleisli { session =>
         val query: Query[EventStatus ~ EventStatus ~ String, ZombieEvent] =
@@ -85,14 +85,14 @@ private class LostSubscriberEventFinder[Interpretation[_]: Async: Bracket[*[_], 
   }
 
   private def updateMessage(eventId: CompoundEventId) =
-    measureExecutionTimeK {
+    measureExecutionTime {
       SqlQuery(
         Kleisli { session =>
           val query: Command[String ~ OffsetDateTime ~ EventId ~ projects.Id] =
             sql"""UPDATE event
                   SET message = $text, execution_date = $timestamptz
                   WHERE event_id = $eventIdEncoder AND project_id = $projectIdEncoder
-                  """.command
+            """.command
           session
             .prepare(query)
             .use(

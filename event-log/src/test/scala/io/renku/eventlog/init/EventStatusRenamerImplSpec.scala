@@ -170,11 +170,10 @@ class EventStatusRenamerImplSpec
     execute[List[CompoundEventId]] {
       Kleisli { session =>
         val query: Query[EventStatus, CompoundEventId] =
-          sql"""
-            SELECT event_id, project_id
-            FROM event
-            WHERE status = $eventStatusEncoder
-            ORDER BY created_date asc"""
+          sql"""SELECT event_id, project_id
+                FROM event
+                WHERE status = $eventStatusEncoder
+                ORDER BY created_date asc"""
             .query(eventIdDecoder ~ projectIdDecoder)
             .map { case eventId ~ projectId => CompoundEventId(eventId, projectId) }
         session.prepare(query).use(_.stream(status, 32).compile.toList)

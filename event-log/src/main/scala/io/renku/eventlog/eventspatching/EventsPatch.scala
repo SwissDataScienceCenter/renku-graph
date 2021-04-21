@@ -53,9 +53,10 @@ private case class StatusNewPatch[Interpretation[_]: Async: MonadError[*[_], Thr
   val name:   String Refined NonEmpty = Refined.unsafeApply(s"status $status patch")
 
   protected override def sqlQuery: Kleisli[Interpretation, Session[Interpretation], Completion] = Kleisli { session =>
-    val query: Command[EventStatus ~ BatchDate] = sql"""UPDATE event
-                                     SET status = $eventStatusEncoder, execution_date = event_date, batch_date = $batchDateEncoder, message = NULL
-                                     """.command
+    val query: Command[EventStatus ~ BatchDate] = sql"""
+      UPDATE event
+      SET status = $eventStatusEncoder, execution_date = event_date, batch_date = $batchDateEncoder, message = NULL
+    """.command
     session.prepare(query).use(_.execute(status ~ BatchDate(now())))
   }
 
