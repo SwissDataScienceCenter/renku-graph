@@ -18,7 +18,6 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.config.GitLabApiUrl
 import ch.datascience.rdfstore.entities.CommandParameter.Argument.ArgumentFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory
 import ch.datascience.rdfstore.entities.CommandParameter.Input.InputFactory._
@@ -30,13 +29,12 @@ import ch.datascience.rdfstore.entities.RunPlan._
 import ch.datascience.tinytypes.constraints.{NonBlank, NonNegativeInt, UUID}
 import ch.datascience.tinytypes.{IntTinyType, StringTinyType, TinyTypeFactory}
 
-final class RunPlan private (val id:            Id,
-                             val command:       Command,
-                             argumentFactories: List[ArgumentFactory],
-                             inputFactories:    List[PositionInputFactory],
-                             outputFactories:   List[OutputFactory],
-                             val subprocesses:  List[RunPlan],
-                             val successCodes:  List[SuccessCode]
+final case class RunPlan(id:                Id,
+                         command:           Command,
+                         argumentFactories: List[ArgumentFactory],
+                         inputFactories:    List[PositionInputFactory],
+                         outputFactories:   List[OutputFactory],
+                         successCodes:      List[SuccessCode]
 ) {
   lazy val arguments: List[CommandParameter with Argument] = toArguments(argumentFactories)
   lazy val inputs:    List[CommandParameter with Input]    = toInputParameters(inputFactories)
@@ -93,65 +91,31 @@ object RunPlan {
   implicit object SuccessCode extends TinyTypeFactory[SuccessCode](new SuccessCode(_)) with NonNegativeInt
 
   import ch.datascience.graph.config.RenkuBaseUrl
-  import ch.datascience.rdfstore.FusekiBaseUrl
   import io.renku.jsonld._
   import JsonLDEncoder._
   import io.renku.jsonld.syntax._
 
-  def workflow(
-      argumentFactories: List[ArgumentFactory] = Nil,
-      inputFactories:    List[PositionInputFactory] = Nil,
-      outputFactories:   List[OutputFactory] = Nil,
-      subprocesses:      List[RunPlan],
-      successCodes:      List[SuccessCode] = Nil
-  ): RunPlan = new RunPlan(Id.generate,
-                           Command("update"),
-                           argumentFactories,
-                           inputFactories,
-                           outputFactories,
-                           subprocesses,
-                           successCodes
-  )
-
-  def process(
+  def apply(
       command:           Command,
       argumentFactories: List[ArgumentFactory] = Nil,
       inputFactories:    List[PositionInputFactory] = Nil,
       outputFactories:   List[OutputFactory] = Nil,
       successCodes:      List[SuccessCode] = Nil
-  ): RunPlan = new RunPlan(Id.generate,
-                           command,
-                           argumentFactories,
-                           inputFactories,
-                           outputFactories,
-                           subprocesses = Nil,
-                           successCodes
-  )
+  ): RunPlan = RunPlan(Id.generate, command, argumentFactories, inputFactories, outputFactories, successCodes)
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[RunPlan] =
-    JsonLDEncoder.instance { entity =>
-      implicit lazy val subprocessEncoder: JsonLDEncoder[(RunPlan, Int)] =
-        JsonLDEncoder.instance[(RunPlan, Int)] { case (entity, idx) =>
-          JsonLD.entity(
-            id = entity.asEntityId / "subprocess" / (idx + 1),
-            types = EntityTypes of renku / "OrderedSubprocess",
-            renku / "index"   -> idx.asJsonLD,
-            renku / "process" -> entity.asJsonLD(encoder)
-          )
-        }
-
-      JsonLD.entity(
-        entity.asEntityId,
-        EntityTypes.of(prov / "Plan", renku / "Run"),
-        renku / "command"       -> entity.command.asJsonLD,
-        renku / "hasArguments"  -> entity.arguments.asJsonLD,
-        renku / "hasInputs"     -> entity.inputs.asJsonLD,
-        renku / "hasOutputs"    -> entity.outputs.asJsonLD,
-        renku / "hasSubprocess" -> entity.subprocesses.zipWithIndex.asJsonLD,
-        renku / "successCodes"  -> entity.successCodes.asJsonLD
-      )
-    }
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[RunPlan] = JsonLDEncoder.instance { plan =>
+    JsonLD.entity(
+      plan.asEntityId,
+      EntityTypes.of(prov / "Plan", renku / "Run"),
+      schema / "name"        -> s"${plan.command}-${plan.id}".asJsonLD,
+      renku / "command"      -> plan.command.asJsonLD,
+      renku / "hasArguments" -> plan.arguments.asJsonLD,
+      renku / "hasInputs"    -> plan.inputs.asJsonLD,
+      renku / "hasOutputs"   -> plan.outputs.asJsonLD,
+      renku / "successCodes" -> plan.successCodes.asJsonLD
+    )
+  }
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[RunPlan] =
-    EntityIdEncoder.instance(entity => EntityId of (renkuBaseUrl / "plans" / entity.id))
+    EntityIdEncoder.instance(plan => EntityId of renkuBaseUrl / "plans" / plan.id)
 }

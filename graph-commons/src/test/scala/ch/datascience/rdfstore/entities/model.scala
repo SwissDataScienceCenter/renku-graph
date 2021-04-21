@@ -18,8 +18,12 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
-import ch.datascience.tinytypes.constraints.NonBlank
+import ch.datascience.tinytypes.constraints.{NonBlank, RelativePath, RelativePathOps}
+import ch.datascience.tinytypes.{RelativePathTinyType, StringTinyType, TinyTypeFactory}
 
 final class Role private (val value: String) extends AnyVal with StringTinyType
 object Role extends TinyTypeFactory[Role](new Role(_)) with NonBlank
+
+sealed trait Location extends Any with RelativePathTinyType
+object Location       extends TinyTypeFactory[Location](new LocationImpl(_)) with RelativePath with RelativePathOps[Location]
+final class LocationImpl(override val value: String) extends AnyVal with Location

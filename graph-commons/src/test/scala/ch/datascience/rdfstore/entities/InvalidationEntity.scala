@@ -24,7 +24,7 @@ import ch.datascience.graph.model.events.CommitId
 import ch.datascience.rdfstore.FusekiBaseUrl
 import ch.datascience.rdfstore.entities.Activity.Id
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityId, JsonLDEncoder}
+import io.renku.jsonld.{EntityId, EntityTypes, JsonLD, JsonLDEncoder}
 
 final case class InvalidationEntity(
     override val id:      Id,
@@ -37,7 +37,6 @@ final case class InvalidationEntity(
                  Some(invalidationActivity),
                  None
     )
-    with Artifact
 
 object InvalidationEntity {
 

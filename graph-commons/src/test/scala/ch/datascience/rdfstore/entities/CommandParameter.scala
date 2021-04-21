@@ -35,12 +35,12 @@ import eu.timepit.refined.auto._
 import eu.timepit.refined.collection.NonEmpty
 import io.renku.jsonld.JsonLDEncoder._
 import io.renku.jsonld.syntax._
-import io.renku.jsonld.{EntityId, EntityTypes, JsonLDEncoder}
+import io.renku.jsonld.{EntityId, EntityIdEncoder, EntityTypes, JsonLD, JsonLDEncoder}
 
 import java.util.UUID.randomUUID
 import scala.language.postfixOps
 
-sealed abstract class CommandParameter(val maybePrefix: Option[Prefix], val runPlan: RunPlan) {
+sealed abstract class CommandParameter(val runPlan: RunPlan, val maybePrefix: Option[Prefix]) {
   val value: Value
 }
 
@@ -128,10 +128,10 @@ object CommandParameter {
     }
   }
 
-  sealed abstract class EntityCommandParameter(override val maybePrefix: Option[Prefix],
-                                               override val runPlan:     RunPlan,
+  sealed abstract class EntityCommandParameter(override val runPlan:     RunPlan,
+                                               override val maybePrefix: Option[Prefix],
                                                val entity:               Entity
-  ) extends CommandParameter(maybePrefix, runPlan) {
+  ) extends CommandParameter(runPlan, maybePrefix) {
     override lazy val value: Value = Value(entity.location)
   }
 
@@ -155,8 +155,8 @@ object CommandParameter {
 
   final class Argument(override val position:    Position,
                        override val maybePrefix: Option[Prefix],
-                       override val runPlan:     Entity with RunPlan
-  ) extends CommandParameter(maybePrefix, runPlan)
+                       override val runPlan:     RunPlan
+  ) extends CommandParameter(runPlan, maybePrefix)
       with PositionInfo {
     override val value:         Value  = Value("input_path")
     override lazy val toString: String = s"argument_$position"
@@ -169,44 +169,27 @@ object CommandParameter {
     def factory(maybePrefix: Option[Prefix] = None): ArgumentFactory =
       position => runPlan => new Argument(position, maybePrefix, runPlan)
 
-    private implicit def converter(implicit
-        renkuBaseUrl:  RenkuBaseUrl,
-        gitLabApiUrl:  GitLabApiUrl,
-        fusekiBaseUrl: FusekiBaseUrl
-    ): PartialEntityConverter[CommandParameter with Argument] =
-      new PartialEntityConverter[CommandParameter with Argument] {
-
-        override def convert[T <: CommandParameter with Argument]: T => Either[Exception, PartialEntity] =
-          argument =>
-            PartialEntity(
-              EntityTypes of renku / "CommandArgument",
-              rdfs / "label" -> s"""Command Argument "${argument.value}"""".asJsonLD
-            ).asRight
-
-        override lazy val toEntityId: CommandParameter with Argument => Option[EntityId] = argument =>
-          argument.runPlan.getEntityId map (_ / "arguments" / argument)
+    implicit def argumentEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandParameter with Argument] =
+      JsonLDEncoder.instance { argument =>
+        JsonLD.entity(
+          argument.asEntityId,
+          EntityTypes of (renku / "CommandArgument", renku / "CommandParameter"),
+          rdfs / "label"     -> s"""Command Argument "${argument.value}"""".asJsonLD,
+          renku / "position" -> argument.position.asJsonLD,
+          renku / "prefix"   -> argument.maybePrefix.asJsonLD,
+          renku / "value"    -> argument.value.asJsonLD
+        )
       }
 
-    implicit def argumentEncoder(implicit
-        renkuBaseUrl:  RenkuBaseUrl,
-        gitLabApiUrl:  GitLabApiUrl,
-        fusekiBaseUrl: FusekiBaseUrl
-    ): JsonLDEncoder[CommandParameter with Argument] =
-      JsonLDEncoder.instance[CommandParameter with Argument] { entity =>
-        entity
-          .asPartialJsonLD[CommandParameter]
-          .combine(entity.asPartialJsonLD[PositionInfo])
-          .combine(entity.asPartialJsonLD[CommandParameter with Argument])
-          .getOrFail
-      }
+    implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[CommandParameter with Argument] =
+      EntityIdEncoder.instance(argument =>
+        EntityId of renkuBaseUrl / "runs" / argument.runPlan.id / "arguments" / argument.position
+      )
   }
 
   sealed trait Input {
     self: CommandParameter =>
-
-    val maybeStep:            Option[Step]
-    val role:                 Role
-    protected val identifier: String
+    val role: Role
   }
 
   object Input {
@@ -221,49 +204,56 @@ object CommandParameter {
       trait NoPositionInputFactory extends InputFactory with (RunPlan => EntityCommandParameter with Input)
     }
 
-    def from(entity: Entity): PositionInputFactory =
-      from(entity, maybePrefix = None, maybeUsedIn = None)
+    def from(entity: Entity): PositionInputFactory = from(entity, maybePrefix = None)
 
-    def from(entity: Entity, usedIn: Step): PositionInputFactory =
-      from(entity, maybePrefix = None, maybeUsedIn = usedIn.some)
-
-    def from(entity: Entity, maybePrefix: Option[Prefix], maybeUsedIn: Option[Step]): PositionInputFactory =
-      positionArg =>
+    def from(entity: Entity, maybePrefix: Option[Prefix]): PositionInputFactory =
+      inputPosition =>
         runPlan =>
-          new EntityCommandParameter(maybePrefix, runPlan, entity) with Input with PositionInfo {
-            protected override val identifier: String       = positionArg.toString
-            override val maybeStep:            Option[Step] = maybeUsedIn
-            override val position:             Position     = positionArg
+          new EntityCommandParameter(runPlan, maybePrefix, entity) with Input with PositionInfo {
+            override val position: Position = inputPosition
+            override val role:     Role     = Role(s"inputs/$position")
           }
 
     def streamFrom(entity: Entity): MappedInputFactory =
-      streamFrom(entity, maybePrefix = None, maybeUsedIn = None)
+      streamFrom(entity, maybePrefix = None)
 
-    def streamFrom(entity: Entity, maybePrefix: Option[Prefix], maybeUsedIn: Option[Step]): MappedInputFactory =
+    def streamFrom(entity: Entity, maybePrefix: Option[Prefix]): MappedInputFactory =
       runPlan =>
-        new EntityCommandParameter(maybePrefix, runPlan, entity) with Input with InputMapping {
-          protected override val identifier: String       = StdIn.name.value
-          override val maybeStep:            Option[Step] = maybeUsedIn
-          override val mappedTo:             IOStream.In  = StdIn
+        new EntityCommandParameter(runPlan, maybePrefix, entity) with Input with InputMapping {
+          override val mappedTo: IOStream.In = StdIn
+          override val role:     Role        = Role(mappedTo.name.value)
         }
 
     def withoutPositionFrom(entity: Entity): NoPositionInputFactory =
-      withoutPositionFrom(entity, maybePrefix = None, maybeUsedIn = None)
+      withoutPositionFrom(entity, maybePrefix = None)
 
-    def withoutPositionFrom(entity:      Entity,
-                            maybePrefix: Option[Prefix],
-                            maybeUsedIn: Option[Step]
-    ): NoPositionInputFactory =
+    def withoutPositionFrom(entity: Entity, maybePrefix: Option[Prefix]): NoPositionInputFactory =
       runPlan =>
-        new EntityCommandParameter(maybePrefix, runPlan, entity) with Input {
-          protected override val identifier: String       = randomUUID().toString
-          override val maybeStep:            Option[Step] = maybeUsedIn
+        new EntityCommandParameter(runPlan, maybePrefix, entity) with Input {
+          override val role: Role = Role("input")
         }
 
+    implicit def argumentEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandParameter with Input] =
+      JsonLDEncoder.instance { input =>
+        JsonLD.entity(
+          input.asEntityId,
+          EntityTypes of (renku / "CommandInputTemplate", renku / "CommandParameter"),
+          rdfs / "label"     -> s"""Command Input Template "${input.value}"""".asJsonLD,
+          renku / "position" -> input.position.asJsonLD,
+          renku / "prefix"   -> input.maybePrefix.asJsonLD,
+          renku / "value"    -> input.value.asJsonLD,
+          renku / "consumes" -> input.entity.asJsonLD
+        )
+      }
+
+    implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[CommandParameter with Input] =
+      EntityIdEncoder.instance(input =>
+        EntityId of renkuBaseUrl / "runs" / input.runPlan.id / "inputs" / input.position
+      )
+
     private implicit def converter(implicit
-        renkuBaseUrl:  RenkuBaseUrl,
-        gitLabApiUrl:  GitLabApiUrl,
-        fusekiBaseUrl: FusekiBaseUrl
+        renkuBaseUrl: RenkuBaseUrl,
+        gitLabApiUrl: GitLabApiUrl
     ): PartialEntityConverter[CommandParameter with Input] =
       new PartialEntityConverter[CommandParameter with Input] {
         override def convert[T <: CommandParameter with Input]: T => Either[Exception, PartialEntity] = {
@@ -276,19 +266,12 @@ object CommandParameter {
           case other => throw new IllegalStateException(s"$other not supported")
         }
 
-        override lazy val toEntityId: CommandParameter with Input => Option[EntityId] = input =>
-          input.runPlan.getEntityId map { runPlanId =>
-            input.maybeStep match {
-              case None       => runPlanId / "inputs" / input
-              case Some(step) => runPlanId / "steps" / step / "inputs" / input
-            }
-          }
+        override lazy val toEntityId: CommandParameter with Input => Option[EntityId] = ???
       }
 
     implicit def inputEncoder(implicit
-        renkuBaseUrl:  RenkuBaseUrl,
-        gitLabApiUrl:  GitLabApiUrl,
-        fusekiBaseUrl: FusekiBaseUrl
+        renkuBaseUrl: RenkuBaseUrl,
+        gitLabApiUrl: GitLabApiUrl
     ): JsonLDEncoder[CommandParameter with Input] =
       JsonLDEncoder.instance[CommandParameter with Input] {
         case entity: CommandParameter with Input with PositionInfo =>
@@ -319,9 +302,6 @@ object CommandParameter {
 
     val role:                 Role
     val outputFolderCreation: FolderCreation
-    val maybeProducedByStep:  Option[Step]
-    protected val identifier: String
-    override lazy val toString: String = s"output_$identifier"
   }
 
   object Output {
@@ -336,65 +316,72 @@ object CommandParameter {
     }
 
     def factory(entityFactory: Activity => Entity): PositionOutputFactory =
-      factory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = None)
-
-    def factory(entityFactory: Activity => Entity, producedBy: Step): PositionOutputFactory =
-      factory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = producedBy.some)
+      factory(entityFactory, maybePrefix = None, folderCreation = no)
 
     def factory(
-        entityFactory:   Activity => Entity,
-        maybePrefix:     Option[Prefix],
-        folderCreation:  FolderCreation,
-        maybeProducedBy: Option[Step]
+        entityFactory:  Activity => Entity,
+        maybePrefix:    Option[Prefix],
+        folderCreation: FolderCreation
     ): PositionOutputFactory =
       activity =>
-        positionArg =>
+        outputPosition =>
           runPlan =>
-            new EntityCommandParameter(maybePrefix, runPlan, entityFactory(activity)) with Output with PositionInfo {
+            new EntityCommandParameter(runPlan, maybePrefix, entityFactory(activity)) with Output with PositionInfo {
               override val outputFolderCreation: FolderCreation = folderCreation
-              override val maybeProducedByStep:  Option[Step]   = maybeProducedBy
-              protected override val identifier: String         = positionArg.toString
-              override val position:             Position       = positionArg
+              override val position:             Position       = outputPosition
             }
 
     def streamFactory(
         entityFactory: Activity => Entity,
         to:            IOStream.Out
     ): MappedOutputFactory =
-      streamFactory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = None, to)
+      streamFactory(entityFactory, maybePrefix = None, folderCreation = no, to)
 
     def streamFactory(
-        entityFactory:   Activity => Entity,
-        maybePrefix:     Option[Prefix],
-        folderCreation:  FolderCreation,
-        maybeProducedBy: Option[Step],
-        to:              IOStream.Out
+        entityFactory:  Activity => Entity,
+        maybePrefix:    Option[Prefix],
+        folderCreation: FolderCreation,
+        to:             IOStream.Out
     ): MappedOutputFactory =
       activity =>
         runPlan =>
-          new EntityCommandParameter(maybePrefix, runPlan, entityFactory(activity)) with Output with OutputMapping {
+          new EntityCommandParameter(runPlan, maybePrefix, entityFactory(activity)) with Output with OutputMapping {
             override val outputFolderCreation: FolderCreation = folderCreation
-            override val maybeProducedByStep:  Option[Step]   = maybeProducedBy
-            protected override val identifier: String         = to.name.value
             override val mappedTo:             IOStream.Out   = to
           }
 
     def withoutPositionFactory(entityFactory: Activity => Entity): NoPositionOutputFactory =
-      withoutPositionFactory(entityFactory, maybePrefix = None, folderCreation = no, maybeProducedBy = None)
+      withoutPositionFactory(entityFactory, maybePrefix = None, folderCreation = no)
 
     def withoutPositionFactory(
-        entityFactory:   Activity => Entity,
-        maybePrefix:     Option[Prefix],
-        folderCreation:  FolderCreation,
-        maybeProducedBy: Option[Step]
+        entityFactory:  Activity => Entity,
+        maybePrefix:    Option[Prefix],
+        folderCreation: FolderCreation
     ): NoPositionOutputFactory =
       activity =>
         runPlan =>
           new EntityCommandParameter(maybePrefix, runPlan, entityFactory(activity)) with Output {
             override val outputFolderCreation: FolderCreation = folderCreation
-            override val maybeProducedByStep:  Option[Step]   = maybeProducedBy
-            protected override val identifier: String         = randomUUID().toString
           }
+
+    implicit def argumentEncoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[CommandParameter with Output] =
+      JsonLDEncoder.instance { output =>
+        JsonLD.entity(
+          output.asEntityId,
+          EntityTypes of (renku / "CommandOutputTemplate", renku / "CommandParameter"),
+          rdfs / "label"         -> s"""Command Output Template "${output.value}"""".asJsonLD,
+          renku / "createFolder" -> output.outputFolderCreation.asJsonLD,
+          renku / "produces"     -> output.entity.asJsonLD,
+          renku / "position"     -> output.position.asJsonLD,
+          renku / "prefix"       -> output.maybePrefix.asJsonLD,
+          renku / "value"        -> output.value.asJsonLD
+        )
+      }
+
+    implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[CommandParameter with Output] =
+      EntityIdEncoder.instance(output =>
+        EntityId of renkuBaseUrl / "runs" / output.runPlan.id / "outputs" / output.position
+      )
 
     private implicit def converter(implicit
         renkuBaseUrl: RenkuBaseUrl,
@@ -412,14 +399,7 @@ object CommandParameter {
           case other => throw new IllegalStateException(s"$other not supported")
         }
 
-        override lazy val toEntityId: CommandParameter with Output => Option[EntityId] =
-          output =>
-            output.runPlan.getEntityId map { runPlanId =>
-              output.maybeProducedByStep match {
-                case None       => runPlanId / "outputs" / output
-                case Some(step) => runPlanId / "steps" / step / "outputs" / output
-              }
-            }
+        override lazy val toEntityId: CommandParameter with Output => Option[EntityId] = ???
       }
 
     implicit def outputEncoder(implicit

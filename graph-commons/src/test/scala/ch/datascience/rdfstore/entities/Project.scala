@@ -18,10 +18,9 @@
 
 package ch.datascience.rdfstore.entities
 
-import cats.syntax.all._
 import ch.datascience.graph.config.GitLabApiUrl
-import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 import ch.datascience.graph.model.projects.{DateCreated, Name, Path, ResourceId, Visibility}
+import ch.datascience.graph.model.{CliVersion, SchemaVersion}
 
 final case class Project(path:               Path,
                          name:               Name,
@@ -41,45 +40,25 @@ object Project {
   import JsonLDEncoder._
   import io.renku.jsonld.syntax._
 
-  private[entities] implicit def converter(implicit
-      renkuBaseUrl: RenkuBaseUrl,
-      gitLabApiUrl: GitLabApiUrl
-  ): PartialEntityConverter[Project] =
-    new PartialEntityConverter[Project] {
-      override def convert[T <: Project]: T => Either[Exception, PartialEntity] =
-        entity =>
-          Right(
-            PartialEntity(
-              EntityTypes.of(prov / "Location", schema / "Project"),
-              schema / "name"             -> entity.name.asJsonLD,
-              schema / "agent"            -> entity.agent.asJsonLD,
-              schema / "dateCreated"      -> entity.dateCreated.asJsonLD,
-              schema / "creator"          -> entity.maybeCreator.asJsonLD,
-              renku / "projectVisibility" -> entity.maybeVisibility.asJsonLD,
-              schema / "member"           -> entity.members.toList.asJsonLD,
-              schema / "schemaVersion"    -> entity.version.asJsonLD,
-              prov / "wasDerivedFrom"     -> entity.maybeParentProject.asJsonLD
-            )
-          )
-
-      override def toEntityId: Project => Option[EntityId] =
-        entity => (EntityId of ResourceId(renkuBaseUrl, entity.path)).some
-    }
-
   implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Project] =
-    JsonLDEncoder.instance { entity =>
-      entity.asPartialJsonLD[Project].getOrFail
+    JsonLDEncoder.instance { project =>
+      JsonLD.entity(
+        project.asEntityId,
+        EntityTypes.of(prov / "Location", schema / "Project"),
+        schema / "name"             -> project.name.asJsonLD,
+        schema / "agent"            -> project.agent.asJsonLD,
+        schema / "dateCreated"      -> project.dateCreated.asJsonLD,
+        schema / "creator"          -> project.maybeCreator.asJsonLD,
+        renku / "projectVisibility" -> project.maybeVisibility.asJsonLD,
+        schema / "member"           -> project.members.toList.asJsonLD,
+        schema / "schemaVersion"    -> project.version.asJsonLD,
+        prov / "wasDerivedFrom"     -> project.maybeParentProject.asJsonLD
+      )
     }
 
-  implicit def entityIdEncoder(implicit
-      renkuBaseUrl: RenkuBaseUrl,
-      gitLabApiUrl: GitLabApiUrl
-  ): EntityIdEncoder[Project] =
-    EntityIdEncoder.instance { entity =>
-      converter.toEntityId(entity).getOrElse(throw new IllegalStateException(s"No EntityId found for $entity"))
-    }
+  implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Project] =
+    EntityIdEncoder.instance(project => renkuBaseUrl / "projects" / project.path)
 
   private implicit val projectResourceToEntityId: ResourceId => EntityId =
     resource => EntityId of resource.value
-
 }

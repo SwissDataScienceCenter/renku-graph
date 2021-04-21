@@ -31,14 +31,9 @@ import scala.util.Random
 final case class Entity(checksum:                  Checksum,
                         location:                  Location,
                         project:                   Project,
-                        maybeInvalidationActivity: Option[Activity],
-                        maybeGeneration:           Option[Generation]
-) extends EntityOps
-
-trait EntityOps {
-  self: Entity =>
-  lazy val pathIdentifier: List[TinyType] = List(checksum, location)
-}
+                        generation:                Generation,
+                        maybeInvalidationActivity: Option[Activity]
+)
 
 object Entity {
 
@@ -47,30 +42,20 @@ object Entity {
     def generate: Checksum = Checksum(Random.nextString(40))
   }
 
-  def apply(location: Location): Entity =
-    Entity(Checksum.generate,
-           location,
-           generation.activity.project,
-           maybeInvalidationActivity = None,
-           maybeGeneration = Some(generation)
-    )
-
   def factory(location: Location)(activity: Activity): Entity =
     new Entity(Checksum.generate, location, activity.project, maybeInvalidationActivity = None, maybeGeneration = None)
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Entity] =
-    JsonLDEncoder.instance { entity =>
-      JsonLD.entity(
-        entity.asEntityId,
-        EntityTypes of (prov / "Entity", wfprov / "Artifact"),
-        rdfs / "label"               -> s"${entity.location}@UNCOMMITTED".asJsonLD,
-        prov / "atLocation"          -> entity.location.asJsonLD,
-        schema / "isPartOf"          -> entity.project.asJsonLD,
-        prov / "qualifiedGeneration" -> entity.maybeGeneration.asJsonLD,
-        renku / "checksum"           -> entity.checksum.asJsonLD,
-        prov / "wasInvalidatedBy"    -> entity.maybeInvalidationActivity.asJsonLD
-      )
-    }
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Entity] = JsonLDEncoder.instance { entity =>
+    JsonLD.entity(
+      entity.asEntityId,
+      EntityTypes of (prov / "Entity", wfprov / "Artifact"),
+      prov / "atLocation"          -> entity.location.asJsonLD,
+      schema / "isPartOf"          -> entity.project.asJsonLD,
+      prov / "qualifiedGeneration" -> entity.generation.asJsonLD,
+      renku / "checksum"           -> entity.checksum.asJsonLD,
+      prov / "wasInvalidatedBy"    -> entity.maybeInvalidationActivity.asJsonLD
+    )
+  }
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Entity] =
     EntityIdEncoder.instance(entity => EntityId of renkuBaseUrl / "blob" / entity.checksum / entity.location)

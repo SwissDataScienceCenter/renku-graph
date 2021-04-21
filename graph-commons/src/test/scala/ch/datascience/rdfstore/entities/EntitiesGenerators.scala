@@ -21,9 +21,8 @@ package ch.datascience.rdfstore.entities
 import ch.datascience.generators.CommonGraphGenerators.cliVersions
 import ch.datascience.generators.Generators.Implicits.GenOps
 import ch.datascience.generators.Generators._
-import ch.datascience.graph.model.GraphModelGenerators.{projectCreatedDates, projectNames, projectPaths, projectSchemaVersions, userAffiliations, userEmails, userGitLabIds, userNames}
+import ch.datascience.graph.model.GraphModelGenerators._
 import ch.datascience.graph.model.users.{Email, GitLabId}
-import eu.timepit.refined.api.Refined.unsafeApply
 import eu.timepit.refined.auto._
 import org.scalacheck.Gen
 
@@ -31,12 +30,9 @@ object EntitiesGenerators extends EntitiesGenerators
 
 trait EntitiesGenerators {
 
-  val activityIds:            Gen[Activity.Id]        = Gen.uuid.map(uuid => Activity.Id(uuid.toString))
-  val activityStartTimes:     Gen[Activity.StartTime] = timestampsNotInTheFuture.map(Activity.StartTime.apply)
-  val locations:              Gen[Location]           = relativePaths() map Location.apply
-  val cwlFiles:               Gen[WorkflowFile]       = nonBlankStrings() map (n => WorkflowFile.cwl(unsafeApply(s"$n.cwl")))
-  val yamlFiles:              Gen[WorkflowFile]       = nonBlankStrings() map (n => WorkflowFile.yaml(unsafeApply(s"$n.yaml")))
-  implicit val workflowFiles: Gen[WorkflowFile]       = Gen.oneOf(cwlFiles, yamlFiles)
+  val activityIds:        Gen[Activity.Id]        = Gen.uuid.map(uuid => Activity.Id(uuid.toString))
+  val activityStartTimes: Gen[Activity.StartTime] = timestampsNotInTheFuture.map(Activity.StartTime.apply)
+  val locations:          Gen[Location]           = relativePaths() map Location.apply
 
   implicit val runPlanCommands: Gen[RunPlan.Command] = nonBlankStrings() map (c => RunPlan.Command(c.value))
 

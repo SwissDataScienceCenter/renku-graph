@@ -18,14 +18,13 @@
 
 package ch.datascience.rdfstore.entities
 
-import ch.datascience.graph.config.GitLabApiUrl
+import ch.datascience.rdfstore.entities.CommandParameter.{EntityCommandParameter, Output}
 import ch.datascience.rdfstore.entities.Generation.Id
 import ch.datascience.rdfstore.entities.RunPlan.Id
 import ch.datascience.tinytypes.constraints.UUID
 import ch.datascience.tinytypes.{StringTinyType, TinyTypeFactory}
 
-// TODO: role to be taken from the RunPlan's output parameter
-final case class Generation(id: Id, activity: Activity, role: Role, entity: Entity)
+final case class Generation(id: Id, activity: Activity, commandOutput: EntityCommandParameter with Output)
 
 object Generation {
 
@@ -43,19 +42,19 @@ object Generation {
   def factory(role: Role, entityFactory: Activity => Entity): Activity => Generation =
     activity => Generation(Id.generate, activity, role, entityFactory(activity))
 
-  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl, gitLabApiUrl: GitLabApiUrl): JsonLDEncoder[Generation] =
-    JsonLDEncoder.instance { generation =>
+  implicit def encoder(implicit renkuBaseUrl: RenkuBaseUrl): JsonLDEncoder[Generation] = JsonLDEncoder.instance {
+    generation =>
       JsonLD.entity(
         generation.asEntityId,
         EntityTypes of prov / "Generation",
-        Reverse.ofJsonLDsUnsafe(prov / "qualifiedGeneration" -> generation.entity.asJsonLD),
+        Reverse.ofJsonLDsUnsafe(prov / "qualifiedGeneration" -> generation.commandOutput.entity.asJsonLD),
         prov / "activity" -> generation.activity.asEntityId.asJsonLD,
-        prov / "hadRole"  -> generation.role.asJsonLD
+        prov / "hadRole"  -> generation.commandOutput.role.asJsonLD
       )
-    }
+  }
 
   implicit def entityIdEncoder(implicit renkuBaseUrl: RenkuBaseUrl): EntityIdEncoder[Generation] =
     EntityIdEncoder.instance(generation =>
-      generation.activity.asEntityId.asUrlEntityId / "generation" / generation.id / generation.entity.checksum / generation.entity.location
+      generation.activity.asEntityId.asUrlEntityId / "generation" / generation.id / generation.commandOutput.entity.checksum / generation.commandOutput.entity.location
     )
 }
