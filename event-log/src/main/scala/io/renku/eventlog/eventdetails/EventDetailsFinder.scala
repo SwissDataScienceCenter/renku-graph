@@ -19,15 +19,13 @@
 package io.renku.eventlog.eventdetails
 
 import cats.data.Kleisli
-import cats.syntax.all._
 import cats.effect.{Async, IO}
 import ch.datascience.db.{DbClient, SessionResource, SqlQuery}
 import ch.datascience.graph.model.events.{CompoundEventId, EventId}
 import ch.datascience.graph.model.projects
 import ch.datascience.metrics.LabeledHistogram
 import io.renku.eventlog.{EventLogDB, TypeSerializers}
-import skunk.{Decoder, _}
-import skunk.codec.all._
+import skunk._
 import skunk.implicits._
 
 private trait EventDetailsFinder[Interpretation[_]] {
@@ -52,7 +50,7 @@ private class EventDetailsFinderImpl[Interpretation[_]: Async](
         val query: Query[EventId ~ projects.Id, CompoundEventId] =
           sql"""SELECT evt.event_id, evt.project_id
                 FROM event evt WHERE evt.event_id = $eventIdEncoder and evt.project_id = $projectIdEncoder
-             """.query(compoundEventIdDecoder)
+          """.query(compoundEventIdDecoder)
         session.prepare(query).use(_.option(eventId.id ~ eventId.projectId))
       },
       name = "find event details"

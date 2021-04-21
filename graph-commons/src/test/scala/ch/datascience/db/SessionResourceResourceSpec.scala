@@ -19,7 +19,6 @@
 package ch.datascience.db
 
 import cats.effect.{ContextShift, IO}
-import ch.datascience.db.DbConfigGenerator._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.matchers.should
 import org.scalatest.wordspec.AnyWordSpec
@@ -42,6 +41,7 @@ class SessionResourceResourceSpec extends AnyWordSpec with MockFactory with shou
 
   private trait TestCase {
     import natchez.Trace.Implicits.noop
+    trait TestDB
     val transactedBlock  = mockFunction[SessionResource[IO, TestDB], IO[Unit]]
     val dbConfig         = TestDbConfig.newDbConfig[TestDB]
     val ssessionResource = SessionPoolResource[IO, TestDB](dbConfig)
