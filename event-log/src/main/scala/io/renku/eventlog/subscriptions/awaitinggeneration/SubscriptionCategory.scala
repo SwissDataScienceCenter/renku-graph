@@ -63,7 +63,6 @@ private[subscriptions] object SubscriptionCategory {
                                                             queriesExecTimes
                      )
     eventsDistributor <- IOEventsDistributor(name,
-                                             sessionResource,
                                              subscribers,
                                              eventFetcher,
                                              eventDelivery,

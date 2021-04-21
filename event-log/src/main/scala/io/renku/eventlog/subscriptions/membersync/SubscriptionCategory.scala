@@ -43,7 +43,6 @@ private[subscriptions] object SubscriptionCategory {
     dispatchRecovery <- LoggingDispatchRecovery[IO, MemberSyncEvent](categoryName, logger)
     eventDelivery    <- EventDelivery.noOp[IO, MemberSyncEvent]
     eventsDistributor <- IOEventsDistributor(categoryName,
-                                             sessionResource,
                                              subscribers,
                                              eventsFinder,
                                              eventDelivery,
